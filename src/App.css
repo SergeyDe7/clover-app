@@ -1,0 +1,49 @@
+*{box-sizing:border-box}
+html,body,#root{min-width:320px;min-height:100%}
+body{margin:0;min-height:100vh;font-family:Arial,Helvetica,sans-serif;color:#263326;background:radial-gradient(circle at top left,#eef8eb 0,transparent 40%),linear-gradient(135deg,#f9fcf7,#e5f2df)}
+button,input{font:inherit}
+button{cursor:pointer}
+.page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:30px 16px}
+.login-card{width:100%;max-width:440px;padding:42px 38px;background:rgba(255,255,255,.96);border:1px solid rgba(86,156,80,.15);border-radius:28px;box-shadow:0 24px 60px rgba(62,110,57,.16);text-align:center}
+.logo{width:230px;max-width:85%;height:auto;margin-bottom:22px}
+.login-card h1{margin:0 0 10px;font-size:30px;color:#386f37}
+.subtitle{margin:0 0 30px;color:#6d786d;line-height:1.5}
+.login-form{display:flex;flex-direction:column;text-align:left}
+.login-form label{margin:0 0 8px;font-size:14px;font-weight:600;color:#3f4c3f}
+.login-form input{width:100%;height:52px;margin-bottom:18px;padding:0 16px;border:1px solid #d5dfd2;border-radius:14px;background:#fbfdfb;outline:none;transition:.2s}
+.login-form input:focus{border-color:#5b9d57;box-shadow:0 0 0 4px rgba(91,157,87,.12)}
+.login-form button{height:54px;margin-top:6px;border:0;border-radius:14px;background:#5b9d57;color:#fff;font-weight:700;transition:.2s}
+.login-form button:hover{background:#4d8b49;transform:translateY(-1px)}
+.forgot-button{margin-top:18px;padding:5px;border:0;background:transparent;color:#568e52}
+.registration{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:28px;padding-top:24px;border-top:1px solid #e6ece4;font-size:14px;color:#727c72}
+.registration button{padding:0;border:0;background:transparent;color:#4f8d4b;font-weight:700}
+.dashboard-page{min-height:100vh;background:#f4f8f2;color:#293329}
+.dashboard-header{min-height:86px;padding:14px 6%;display:flex;align-items:center;justify-content:space-between;gap:24px;background:#fff;border-bottom:1px solid #e1e9de}
+.dashboard-logo{width:145px;height:auto}
+.header-actions{display:flex;align-items:center;gap:18px;color:#596359}
+.logout-button{padding:10px 18px;border:1px solid #5b9d57;border-radius:12px;background:#fff;color:#4f8d4b;font-weight:600}
+.logout-button:hover{background:#f1f8ef}
+.dashboard-content{width:min(1180px,90%);margin:0 auto;padding:45px 0 70px}
+.welcome-block{display:flex;justify-content:space-between;align-items:center;gap:30px;margin-bottom:30px}
+.welcome-block h1{margin:5px 0 10px;font-size:36px;color:#386f37}
+.welcome-block p{max-width:650px;margin:0;color:#697469;line-height:1.6}
+.small-title{color:#5b9d57!important;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+.create-order-button{flex-shrink:0;padding:15px 24px;border:0;border-radius:14px;background:#5b9d57;color:#fff;font-weight:700}
+.dashboard-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-bottom:30px}
+.dashboard-card{padding:26px;background:#fff;border:1px solid #e2eae0;border-radius:22px;box-shadow:0 12px 30px rgba(56,97,52,.07)}
+.dashboard-card p{margin:16px 0 8px;color:#747e74}
+.dashboard-card h2{margin:0 0 8px;color:#386f37;font-size:25px}
+.dashboard-card span{color:#8a938a;font-size:14px}
+.card-icon{display:block;font-size:30px!important}
+.next-order{background:linear-gradient(135deg,#fff,#edf7e9)}
+.orders-section{padding:30px;background:#fff;border:1px solid #e2eae0;border-radius:24px;box-shadow:0 12px 30px rgba(56,97,52,.07)}
+.orders-heading h2{margin:0 0 8px;color:#386f37}
+.orders-heading p{margin:0;color:#818a81}
+.empty-orders{padding:55px 20px 30px;text-align:center}
+.empty-icon{margin-bottom:16px;font-size:45px}
+.empty-orders h3{margin:0 0 10px;color:#394639}
+.empty-orders p{margin:0 auto 24px;color:#7a847a}
+.empty-orders button{padding:14px 22px;border:0;border-radius:13px;background:#5b9d57;color:#fff;font-weight:700}
+.create-order-button:hover,.empty-orders button:hover{background:#4d8b49}
+@media(max-width:800px){.dashboard-header{padding:14px 20px}.header-actions span{display:none}.welcome-block{align-items:flex-start;flex-direction:column}.dashboard-grid{grid-template-columns:1fr}.create-order-button{width:100%}}
+@media(max-width:500px){.login-card{padding:34px 22px;border-radius:22px}.login-card h1{font-size:26px}.dashboard-logo{width:120px}.dashboard-content{width:92%;padding-top:30px}.welcome-block h1{font-size:29px}.orders-section{padding:22px 16px}}
