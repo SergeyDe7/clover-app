@@ -373,7 +373,7 @@ function resolveClientCatalog(products, rawLink) {
 app.get("/api/health", (req, res) => {
   res.json({
     ok: true,
-    service: "clover-server", version: "1.6.0",
+    service: "clover-server", version: "1.9.0",
     time: new Date().toISOString(),
   });
 });
@@ -916,9 +916,46 @@ app.get(
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const clientLinks = getGlobalState("clientLinks", {});
     const overview = summarizeExchange(orders, products, clientLinks);
+    const usedClientIds = new Set(
+      orders.map((order) => String(order.clientId || "")).filter(Boolean)
+    );
+    const usedProductIds = new Set(
+      orders.flatMap((order) =>
+        (order.items || []).map((item) =>
+          String(item.productId ?? item.id ?? "")
+        )
+      ).filter(Boolean)
+    );
+    const matchingClients = listClients()
+      .filter((client) => {
+        if (!usedClientIds.has(String(client.id))) return false;
+        const link = clientLinks?.[client.id] || {};
+        return !link.matched1C || !String(link.oneCId || "").trim();
+      })
+      .map((client) => ({
+        id: client.id,
+        companyName: client.companyName,
+        contactName: client.contactName,
+        phone: client.phone,
+        email: client.email,
+      }));
+    const matchingProducts = (products || [])
+      .filter((product) =>
+        usedProductIds.has(String(product.id)) &&
+        !String(product.oneCId || "").trim()
+      )
+      .map((product) => ({
+        id: product.id,
+        code: product.code || "",
+        name: product.name || "",
+      }));
 
     res.json({
       ...overview,
+      matching: {
+        clients: matchingClients,
+        products: matchingProducts,
+      },
       log: listExchangeAudit(req.query.limit || 300),
       testMode: true,
       realConnectionEnabled: false,
@@ -1212,7 +1249,7 @@ try {
 
 app.listen(port, host, () => {
   console.log("");
-  console.log("Clover Server 1.6 запущен");
+  console.log("Clover Server 1.9 запущен");
   console.log(`API: http://localhost:${port}/api/health`);
   console.log(
     `Менеджер: ${

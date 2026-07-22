@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import cloverLogo from "./assets/clover-logo.png";
 import {
@@ -7,6 +7,30 @@ import {
   getApiToken,
   setApiToken,
 } from "./serverApi";
+
+const MANAGER_NOTICE_SEEN_KEY = "clover-manager-notice-seen-orders-v1";
+
+function readSeenManagerOrderIds() {
+  try {
+    const value = JSON.parse(localStorage.getItem(MANAGER_NOTICE_SEEN_KEY) || "[]");
+    return new Set(Array.isArray(value) ? value.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function markManagerOrderNoticeSeen(orderIds) {
+  const ids = Array.isArray(orderIds) ? orderIds : [orderIds];
+  const validIds = ids.filter(Boolean);
+  if (!validIds.length) return;
+
+  const seen = readSeenManagerOrderIds();
+  validIds.forEach((orderId) => seen.add(String(orderId)));
+  localStorage.setItem(
+    MANAGER_NOTICE_SEEN_KEY,
+    JSON.stringify([...seen].slice(-500))
+  );
+}
 
 const DEFAULT_PRODUCTS = [
   { id: 1, category: "Перчатки", name: "Перчатки нитриловые черные XL (100 шт.)", packSize: 100, pieceSize: 1, bundleSize: 1, saleUnits: ["piece", "pack"] },
@@ -359,6 +383,49 @@ textarea { resize: vertical; }
   line-height: 1.5;
 }
 
+.login-card .logo {
+  display: block;
+  width: 230px;
+  max-width: 85%;
+  height: auto;
+  margin: 0 auto 22px;
+  object-fit: contain;
+}
+
+.loading-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, #eef8eb 0, transparent 40%),
+    linear-gradient(135deg, #f9fcf7, #e5f2df);
+}
+.loading-card {
+  width: min(420px, 100%);
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 30px;
+  border: 1px solid rgba(86, 156, 80, .16);
+  border-radius: 26px;
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 24px 60px rgba(62, 110, 57, .14);
+  text-align: center;
+}
+.loading-logo {
+  display: block;
+  width: 190px;
+  max-width: 65vw;
+  height: auto;
+  margin: 0 auto 18px;
+  object-fit: contain;
+}
+.loading-card h2 { margin: 0 0 8px; color: #386f37; }
+.loading-card p { margin: 0; color: #6d786d; line-height: 1.5; }
+
 .app-header {
   min-height: 86px;
   padding: 14px 5%;
@@ -372,7 +439,7 @@ textarea { resize: vertical; }
   top: 0;
   z-index: 40;
 }
-.app-header-logo { width: 145px; height: auto; }
+.app-header-logo { display: block; width: 145px; max-width: 145px; height: auto; object-fit: contain; flex: 0 0 auto; }
 .app-header-actions { display: flex; align-items: center; gap: 12px; color: #596359; }
 .manager-contact { position: relative; }
 .manager-contact-trigger {
@@ -1089,6 +1156,60 @@ function statusClass(status) {
   return "status-cancel";
 }
 
+
+function makeOrderHistoryEvent(type, label, actor = "Система") {
+  return {
+    id: makeId("history"),
+    type,
+    label,
+    actor,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function appendOrderHistory(order, event) {
+  const history = Array.isArray(order?.history) ? order.history : [];
+  return [...history, event].slice(-100);
+}
+
+function OrderTimeline({ order }) {
+  const history = Array.isArray(order?.history) ? order.history : [];
+  const items = history.length
+    ? [...history].sort((a, b) =>
+        String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
+      )
+    : [
+        {
+          id: `created-${order.id}`,
+          label: "Заказ создан",
+          actor: order.customerContact || "Клиент",
+          createdAt: order.createdAt,
+        },
+      ];
+
+  return (
+    <div className="comment-box" style={{ marginTop: 14 }}>
+      <strong>История заказа</strong>
+      <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+        {items.map((item) => (
+          <div
+            key={item.id}
+            style={{
+              borderLeft: "3px solid rgba(47, 125, 50, 0.35)",
+              paddingLeft: 12,
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>{item.label}</div>
+            <small>
+              {formatDateTime(item.createdAt)} · {item.actor || "Система"}
+            </small>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ManagerContact({ settings }) {
   const [open, setOpen] = useState(false);
   const fullName = String(settings.managerFullName || "").trim();
@@ -1167,7 +1288,7 @@ function ManagerContact({ settings }) {
 function Header({ title, subtitle, onLogout, children }) {
   return (
     <header className="app-header">
-      <img className="app-header-logo" src={cloverLogo} alt="Логотип Clover" />
+      <img className="app-header-logo" src={cloverLogo} alt="Логотип Clover" width="145" height="98" />
       <div className="app-header-actions">
         <div style={{ textAlign: "right" }}>
           <strong>{title}</strong>
@@ -1220,7 +1341,7 @@ function LoginView({
   return (
     <main className="page">
       <section className="login-card">
-        <img className="logo" src={cloverLogo} alt="Логотип Clover" />
+        <img className="logo" src={cloverLogo} alt="Логотип Clover" width="230" height="155" />
         <h1>{isRegistration ? "Создание аккаунта" : "Личный кабинет"}</h1>
         <p className="subtitle">
           {isRegistration
@@ -1964,7 +2085,7 @@ function ClientDashboard({
                       {(order.items || []).map((item) => <div className="order-product" key={`${order.id}-${item.productId ?? item.id}`}><span>{item.name}<small>{item.code || item.category}</small></span><strong>{item.quantity} {UNIT_CONFIG[item.unit]?.shortLabel || item.unit}<small>{item.multiplier > 1 ? `${item.quantity * item.multiplier} шт. всего` : ""}</small></strong></div>)}
                       {(order.customItems || []).map((item) => <div className="order-product custom-line" key={`${order.id}-${item.id}`}><span><span className="badge yellow">{item.requestStatus || "Новый запрос"}</span>{item.name}<small>{item.details}</small>{item.managerComment && <small>Менеджер: {item.managerComment}</small>}</span><strong>{item.quantity} {item.unit}<small>{Number(item.unitPrice) > 0 ? formatMoney(Number(item.unitPrice) * item.quantity) : "Цена уточняется"}</small></strong></div>)}
                     </div>
-                    {(order.clientComment || order.managerComment) && <div className="order-comments">{order.clientComment && <div className="comment-box"><strong>Ваш комментарий</strong><p>{order.clientComment}</p></div>}{order.managerComment && <div className="comment-box"><strong>Комментарий менеджера</strong><p>{order.managerComment}</p></div>}</div>}
+                    {(order.clientComment || order.managerComment) && <div className="order-comments">{order.clientComment && <div className="comment-box"><strong>Ваш комментарий</strong><p>{order.clientComment}</p></div>}{order.managerComment && <div className="comment-box"><strong>Комментарий менеджера</strong><p>{order.managerComment}</p></div>}</div>}<OrderTimeline order={order} />
                   </details>
                   <div className="client-order-actions">
                     {canEdit && <button className="secondary-button" type="button" onClick={() => onEdit(order)}>Редактировать</button>}
@@ -1982,12 +2103,15 @@ function ClientDashboard({
   );
 }
 
-function ManagerOrders({ orders, settings, onUpdateOrder, onDeleteOrder, onCreateProductFromCustom, onReload }) {
+function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onCreateProductFromCustom, onReload }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Все");
   const [exchangeFilter, setExchangeFilter] = useState("all");
   const [sort, setSort] = useState("newest");
   const [busyOrderId, setBusyOrderId] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkStatus, setBulkStatus] = useState("Принят");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -2039,6 +2163,53 @@ function ManagerOrders({ orders, settings, onUpdateOrder, onDeleteOrder, onCreat
     }
   };
 
+  const toggleSelected = (orderId) => {
+    setSelectedIds((current) =>
+      current.includes(orderId)
+        ? current.filter((id) => id !== orderId)
+        : [...current, orderId]
+    );
+  };
+
+  const selectVisible = () => {
+    const visibleIds = visible.map((order) => order.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+    setSelectedIds((current) =>
+      allSelected
+        ? current.filter((id) => !visibleIds.includes(id))
+        : [...new Set([...current, ...visibleIds])]
+    );
+  };
+
+  const applyBulkStatus = () => {
+    if (!selectedIds.length) return;
+    onBulkUpdateOrders(selectedIds, { status: bulkStatus });
+    setSelectedIds([]);
+  };
+
+  const runBulkExchange = async (action) => {
+    if (!selectedIds.length) return;
+    setBulkBusy(true);
+    const errors = [];
+    try {
+      for (const orderId of selectedIds) {
+        try {
+          if (action === "check") await api.checkExchangeOrder(orderId);
+          if (action === "send") await api.sendExchangeOrder(orderId);
+        } catch (error) {
+          errors.push(error.message);
+        }
+      }
+      await onReload();
+      if (errors.length) {
+        alert(`Не все заказы обработаны:\n${errors.join("\n")}`);
+      }
+      setSelectedIds([]);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   return (
     <section>
       <div className="toolbar four">
@@ -2047,6 +2218,31 @@ function ManagerOrders({ orders, settings, onUpdateOrder, onDeleteOrder, onCreat
         <select value={exchangeFilter} onChange={(e) => setExchangeFilter(e.target.value)}><option value="all">Все статусы 1С</option>{Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select>
         <select value={sort} onChange={(e) => setSort(e.target.value)}><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="delivery">По дате доставки</option></select>
       </div>
+      <div className="panel" style={{ marginTop: 14, marginBottom: 18, padding: 16 }}>
+        <div className="toolbar four">
+          <button className="secondary-button" type="button" onClick={selectVisible}>
+            {visible.length > 0 && visible.every((order) => selectedIds.includes(order.id))
+              ? "Снять выбор с видимых"
+              : "Выбрать все видимые"}
+          </button>
+          <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
+            {ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}
+          </select>
+          <button className="primary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={applyBulkStatus}>
+            Изменить статус ({selectedIds.length})
+          </button>
+          <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => runBulkExchange("check")}>
+            Проверить выбранные в 1С
+          </button>
+        </div>
+        <div className="exchange-actions" style={{ marginTop: 10 }}>
+          <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => runBulkExchange("send")}>
+            Тестово передать выбранные
+          </button>
+          {selectedIds.length > 0 && <button className="secondary-button" type="button" onClick={() => setSelectedIds([])}>Очистить выбор</button>}
+          <span className="muted small">Выбрано заказов: {selectedIds.length}</span>
+        </div>
+      </div>
 
       {visible.length ? <div className="manager-grid">{visible.map((order) => {
         const exchange = normalizeOrderExchange(order.exchange);
@@ -2054,6 +2250,14 @@ function ManagerOrders({ orders, settings, onUpdateOrder, onDeleteOrder, onCreat
         return (
         <article className="order-card" key={order.id}>
           <div className="order-card-header">
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(order.id)}
+                onChange={() => toggleSelected(order.id)}
+                aria-label={`Выбрать заказ ${order.number}`}
+              />
+            </label>
             <div>
               <div className="exchange-status-line"><span className={`badge ${statusClass(order.status)}`}>{order.status}</span><span className={`badge ${exchangeBadgeClass(exchange.status)}`}>1С: {EXCHANGE_STATUS_LABELS[exchange.status]}</span></div>
               <h3>Заказ № {order.number} · {order.customerName || "Клиент"}</h3>
@@ -2113,6 +2317,7 @@ function ManagerOrders({ orders, settings, onUpdateOrder, onDeleteOrder, onCreat
                 <textarea value={order.internalNote || ""} onChange={(e) => onUpdateOrder(order.id, { internalNote: e.target.value })} />
               </label>
             </div>
+            <OrderTimeline order={order} />
           </details>
         </article>
       );})}</div> : <div className="empty-box">Заказы не найдены.</div>}
@@ -3167,7 +3372,7 @@ function formatAuditDetails(item) {
   }
 }
 
-function ManagerExchange({ onReload }) {
+function ManagerExchange({ onReload, onNavigate }) {
   const [data, setData] = useState(null);
   const [loadingExchange, setLoadingExchange] = useState(true);
   const [error, setError] = useState("");
@@ -3246,6 +3451,48 @@ function ManagerExchange({ onReload }) {
       <div className="warning-box" style={{ padding: 10 }}>Не сопоставлено клиентов: {summary.missingClientLinks || 0} · товаров: {summary.missingProductLinks || 0}</div>
     </div>
 
+    {(data?.matching?.clients?.length || data?.matching?.products?.length) > 0 && (
+      <section className="panel" style={{ marginTop: 16 }}>
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Подготовка данных</p>
+            <h2>Мастер сопоставления с 1С</h2>
+            <p>Показаны только клиенты и товары, которые используются в заказах и ещё не имеют ID из 1С.</p>
+          </div>
+        </div>
+        <div className="form-grid">
+          <div className="comment-box">
+            <strong>Клиенты без связи с 1С: {data?.matching?.clients?.length || 0}</strong>
+            <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+              {(data?.matching?.clients || []).slice(0, 8).map((client) => (
+                <div key={client.id}>
+                  <strong>{client.companyName || client.email}</strong>
+                  <small style={{ display: "block" }}>{client.contactName || "Контакт не указан"} · {client.email}</small>
+                </div>
+              ))}
+            </div>
+            <button className="secondary-button" style={{ marginTop: 12 }} type="button" onClick={() => onNavigate("clients")}>
+              Открыть клиентов
+            </button>
+          </div>
+          <div className="comment-box">
+            <strong>Товары без ID номенклатуры: {data?.matching?.products?.length || 0}</strong>
+            <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+              {(data?.matching?.products || []).slice(0, 8).map((product) => (
+                <div key={product.id}>
+                  <strong>{product.name}</strong>
+                  <small style={{ display: "block" }}>{product.code || "Без внутреннего кода"}</small>
+                </div>
+              ))}
+            </div>
+            <button className="secondary-button" style={{ marginTop: 12 }} type="button" onClick={() => onNavigate("products")}>
+              Открыть товары
+            </button>
+          </div>
+        </div>
+      </section>
+    )}
+
     <div className="exchange-order-list">
       {(data?.rows || []).map((row) => {
         const exchange = normalizeOrderExchange(row.exchange);
@@ -3312,7 +3559,7 @@ function ManagerAudit() {
   </section>;
 }
 
-function ManagerDashboard({ orders, products, setProducts, profile, addresses, serverClients, settings, setSettings, clientLinks, setClientLinks, onUpdateOrder, onDeleteOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onLogout }) {
+function ManagerDashboard({ orders, products, setProducts, profile, addresses, serverClients, settings, setSettings, clientLinks, setClientLinks, managerNotice, onDismissNotice, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onLogout }) {
   const [tab, setTab] = useState("orders");
   const clients = useMemo(() => {
     const map = new Map(
@@ -3365,9 +3612,28 @@ function ManagerDashboard({ orders, products, setProducts, profile, addresses, s
   ];
 
   return <main className="clover-app">
-    <Header title="Кабинет менеджера" subtitle="Большой пакет 1.4–1.6" onLogout={onLogout} />
+    <Header title="Кабинет менеджера" subtitle="Большой пакет 1.7–1.9 · исправление 1.9.1" onLogout={onLogout} />
     <section className="page-content">
       <div className="page-title-row"><div><p className="eyebrow">Управление</p><h1>Рабочее пространство</h1><p>Заказы, клиенты, товары, документы и тестовый контур обмена с 1С.</p></div></div>
+      {managerNotice && (
+        <div className="exchange-notice" style={{ marginBottom: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+            <div>
+              <strong>Новый заказ № {managerNotice.number}</strong>
+              <div>{managerNotice.customerName || "Клиент"} · {formatDateTime(managerNotice.createdAt)}</div>
+              {managerNotice.pendingCount > 1 && (
+                <div>Непросмотренных новых заказов: {managerNotice.pendingCount}</div>
+              )}
+            </div>
+            <div className="exchange-actions">
+              <button className="primary-button" type="button" onClick={() => { setTab("orders"); onDismissNotice(); }}>
+                Открыть заказ
+              </button>
+              <button className="secondary-button" type="button" onClick={onDismissNotice}>Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="stats-grid">
         <article className="stat-card"><span>Новые заказы</span><strong>{newCount}</strong></article>
         <article className="stat-card"><span>В работе</span><strong>{workCount}</strong></article>
@@ -3375,8 +3641,8 @@ function ManagerDashboard({ orders, products, setProducts, profile, addresses, s
         <article className="stat-card"><span>Активных товаров</span><strong>{products.filter((item) => item.active).length}</strong></article>
       </div>
       <nav className="manager-nav">{tabs.map(([id,label]) => <button className={tab === id ? "active" : ""} type="button" key={id} onClick={() => setTab(id)}>{label}</button>)}</nav>
-      {tab === "orders" && <ManagerOrders orders={orders} settings={settings} onUpdateOrder={onUpdateOrder} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} onReload={onReload} />}
-      {tab === "exchange" && <ManagerExchange onReload={onReload} />}
+      {tab === "orders" && <ManagerOrders orders={orders} settings={settings} onUpdateOrder={onUpdateOrder} onBulkUpdateOrders={onBulkUpdateOrders} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} onReload={onReload} />}
+      {tab === "exchange" && <ManagerExchange onReload={onReload} onNavigate={setTab} />}
       {tab === "clients" && <ManagerClients clients={clients} products={products} clientLinks={clientLinks} setClientLinks={setClientLinks} />}
       {tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}
       {tab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} />}
@@ -3417,6 +3683,9 @@ function App() {
   const [clientLinks, setClientLinks] = useState({});
   const [serverClients, setServerClients] = useState([]);
   const [catalogSession, setCatalogSession] = useState(null);
+  const [managerNotice, setManagerNotice] = useState(null);
+  const knownManagerOrderIds = useRef(new Set());
+  const managerOrdersInitialized = useRef(false);
 
   const applyBootstrap = (data) => {
     setAuthUser(data.user);
@@ -3441,7 +3710,47 @@ function App() {
     if (!data.catalogPolicy?.allowFullCatalog) {
       setShowFullCatalog(false);
     }
-    setOrders(Array.isArray(data.orders) ? data.orders : []);
+
+    const incomingOrders = Array.isArray(data.orders) ? data.orders : [];
+
+    if (data.user.role === "manager") {
+      const seenOrderIds = readSeenManagerOrderIds();
+      const unseenNewOrders = incomingOrders
+        .filter(
+          (order) =>
+            order.status === "Новый" &&
+            !seenOrderIds.has(String(order.id))
+        )
+        .sort((a, b) =>
+          String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
+        );
+
+      setManagerNotice((current) => {
+        if (!unseenNewOrders.length) return null;
+
+        const currentOrder = current
+          ? unseenNewOrders.find((order) => order.id === current.id)
+          : null;
+        const noticeOrder = currentOrder || unseenNewOrders[0];
+
+        return {
+          ...noticeOrder,
+          pendingCount: unseenNewOrders.length,
+          pendingOrderIds: unseenNewOrders.map((order) => order.id),
+        };
+      });
+
+      knownManagerOrderIds.current = new Set(
+        incomingOrders.map((order) => order.id)
+      );
+      managerOrdersInitialized.current = true;
+    } else {
+      knownManagerOrderIds.current = new Set();
+      managerOrdersInitialized.current = false;
+      setManagerNotice(null);
+    }
+
+    setOrders(incomingOrders);
     setProfile({
       ...EMPTY_PROFILE,
       ...(data.profile || EMPTY_PROFILE),
@@ -3503,11 +3812,21 @@ function App() {
       return undefined;
     }
 
-    const intervalId = window.setInterval(() => {
-      loadBootstrap({ silent: true });
-    }, 15000);
+    const refresh = () => loadBootstrap({ silent: true });
+    const intervalId = window.setInterval(refresh, 15000);
+    const handleFocus = () => refresh();
+    const handleVisibility = () => {
+      if (!document.hidden) refresh();
+    };
 
-    return () => window.clearInterval(intervalId);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [isLoggedIn, hydrated]);
 
   const scheduleSync = (callback, delay = 650) => {
@@ -3608,6 +3927,10 @@ function App() {
         );
       }
 
+      managerOrdersInitialized.current = false;
+      knownManagerOrderIds.current = new Set();
+      setManagerNotice(null);
+
       setApiToken(result.token);
       setAuthUser(result.user);
       setRole(result.user.role);
@@ -3707,8 +4030,20 @@ function App() {
     (order) => order.clientId === clientId
   );
 
+  const dismissManagerNotice = () => {
+    if (managerNotice?.id) {
+      markManagerOrderNoticeSeen(
+        managerNotice.pendingOrderIds || managerNotice.id
+      );
+    }
+    setManagerNotice(null);
+  };
+
   const logout = () => {
     clearApiToken();
+    managerOrdersInitialized.current = false;
+    knownManagerOrderIds.current = new Set();
+    setManagerNotice(null);
     setCatalogSession(null);
     setAuthUser(null);
     setIsLoggedIn(false);
@@ -3770,28 +4105,41 @@ function App() {
   const saveOrder = (payload) => {
     if (catalogSession.mode === "edit") {
       setOrders((current) =>
-        current.map((order) =>
-          order.id === catalogSession.order.id
-            ? {
-                ...order,
-                ...payload,
-                updatedAt: new Date().toISOString(),
-              }
-            : order
-        )
+        current.map((order) => {
+          if (order.id !== catalogSession.order.id) return order;
+
+          const updatedAt = new Date().toISOString();
+          const history = appendOrderHistory(
+            order,
+            makeOrderHistoryEvent(
+              "client.edit",
+              "Клиент изменил состав или условия заказа",
+              profile.contactName || "Клиент"
+            )
+          );
+
+          return {
+            ...order,
+            ...payload,
+            history,
+            updatedAt,
+          };
+        })
       );
     } else {
       const timestamp = Date.now();
       const identifiers = makeOrderIdentifiers(timestamp);
+      const createdAt = new Date().toISOString();
+      const orderId = makeId("order");
 
       setOrders((current) => [
         {
-          id: makeId("order"),
+          id: orderId,
           externalId: identifiers.externalId,
           number: identifiers.number,
           exchange: normalizeOrderExchange(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          createdAt,
+          updatedAt: createdAt,
           status: "Новый",
           clientId,
           customerName:
@@ -3803,6 +4151,16 @@ function App() {
           customerEmail: profile.email,
           managerComment: "",
           internalNote: "",
+          history: [
+            {
+              ...makeOrderHistoryEvent(
+                "order.created",
+                "Заказ создан",
+                profile.contactName || "Клиент"
+              ),
+              createdAt,
+            },
+          ],
           ...payload,
         },
         ...current,
@@ -3826,15 +4184,59 @@ function App() {
 
   const updateOrder = (id, patch) => {
     setOrders((current) =>
-      current.map((order) =>
-        order.id === id
-          ? {
-              ...order,
-              ...patch,
-              updatedAt: new Date().toISOString(),
-            }
-          : order
-      )
+      current.map((order) => {
+        if (order.id !== id) return order;
+
+        let history = Array.isArray(order.history) ? order.history : [];
+
+        if (patch.status && patch.status !== order.status) {
+          history = appendOrderHistory(
+            order,
+            makeOrderHistoryEvent(
+              "status.changed",
+              `Статус изменён: ${order.status || "—"} → ${patch.status}`,
+              role === "manager" ? "Менеджер" : profile.contactName || "Клиент"
+            )
+          );
+        }
+
+        return {
+          ...order,
+          ...patch,
+          history,
+          updatedAt: new Date().toISOString(),
+        };
+      })
+    );
+  };
+
+  const bulkUpdateOrders = (ids, patch) => {
+    const selected = new Set(ids || []);
+
+    setOrders((current) =>
+      current.map((order) => {
+        if (!selected.has(order.id)) return order;
+
+        let history = Array.isArray(order.history) ? order.history : [];
+
+        if (patch.status && patch.status !== order.status) {
+          history = appendOrderHistory(
+            order,
+            makeOrderHistoryEvent(
+              "status.bulk",
+              `Статус массово изменён: ${order.status || "—"} → ${patch.status}`,
+              "Менеджер"
+            )
+          );
+        }
+
+        return {
+          ...order,
+          ...patch,
+          history,
+          updatedAt: new Date().toISOString(),
+        };
+      })
     );
   };
 
@@ -3967,15 +4369,24 @@ function App() {
 
   if (loading) {
     return (
-      <main className="loading-page">
-        <section className="loading-card">
-          <img src={cloverLogo} alt="Логотип Clover" />
-          <h2>Подключаемся к серверу</h2>
-          <p>
-            Загружаем аккаунт, товары, адреса и заказы.
-          </p>
-        </section>
-      </main>
+      <>
+        <style>{APP_STYLES}</style>
+        <main className="loading-page">
+          <section className="loading-card">
+            <img
+              className="loading-logo"
+              src={cloverLogo}
+              alt="Логотип Clover"
+              width="190"
+              height="128"
+            />
+            <h2>Подключаемся к серверу</h2>
+            <p>
+              Загружаем аккаунт, товары, адреса и заказы.
+            </p>
+          </section>
+        </main>
+      </>
     );
   }
 
@@ -4004,7 +4415,10 @@ function App() {
         setSettings={setSettings}
         clientLinks={clientLinks}
         setClientLinks={setClientLinks}
+        managerNotice={managerNotice}
+        onDismissNotice={dismissManagerNotice}
         onUpdateOrder={updateOrder}
+        onBulkUpdateOrders={bulkUpdateOrders}
         onDeleteOrder={deleteManagerOrder}
         onCreateProductFromCustom={createProductFromCustom}
         onImport={importBackup}
