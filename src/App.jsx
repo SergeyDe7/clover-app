@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import cloverLogo from "./assets/clover-logo.png";
+import {
+  api,
+  clearApiToken,
+  getApiToken,
+  setApiToken,
+} from "./serverApi";
 
 const DEFAULT_PRODUCTS = [
   { id: 1, category: "Перчатки", name: "Перчатки нитриловые черные XL (100 шт.)", packSize: 100, pieceSize: 1, bundleSize: 1, saleUnits: ["piece", "pack"] },
@@ -85,7 +91,7 @@ const STORAGE = {
 };
 
 const DEFAULT_SETTINGS = {
-  showPrices: false,
+  showPrices: true,
   allowCustomItems: true,
   allowClientEdit: true,
   allowClientDelete: true,
@@ -109,8 +115,18 @@ const EMPTY_LINK = {
   oneCId: "",
   oneCName: "",
   managerNote: "",
-  matrixMode: "all",
+  matrixMode: "pending",
   matrixProductIds: [],
+  allowFullCatalog: false,
+  personalPrices: {},
+};
+
+const PRICE_SOURCE_LABELS = {
+  manual: "Персональная цена",
+  contract: "Цена по договору",
+  oneC: "Цена из 1С",
+  base: "Базовая цена",
+  unspecified: "Цена уточняется",
 };
 
 const APP_STYLES = `
@@ -398,6 +414,105 @@ textarea { resize: vertical; }
 .client-metrics strong { display: block; margin-top: 5px; color: #386f37; font-size: 15px; }
 .matrix-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; max-height: 330px; overflow: auto; margin-top: 12px; padding: 10px; border: 1px solid #e1e9de; border-radius: 12px; }
 .matrix-item { display: flex; align-items: flex-start; gap: 7px; padding: 8px; border-radius: 9px; background: #f8fbf6; color: #596359; font-size: 11px; line-height: 1.35; }
+.matrix-catalog-note {
+  margin: 18px 0;
+  padding: 16px 18px;
+  border: 1px solid #dbe8d7;
+  border-radius: 15px;
+  background: #f7fbf5;
+  color: #596359;
+  line-height: 1.55;
+}
+.matrix-catalog-note.pending {
+  border-color: #ead9b5;
+  background: #fffaf0;
+  color: #7f693b;
+}
+.catalog-scope-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.catalog-scope-switch button {
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid #d5dfd2;
+  border-radius: 10px;
+  background: #fff;
+  color: #607060;
+  font-weight: 700;
+}
+.catalog-scope-switch button.active {
+  border-color: #5b9d57;
+  background: #5b9d57;
+  color: #fff;
+}
+.price-source {
+  display: block;
+  margin-top: -7px;
+  margin-bottom: 11px;
+  color: #7a847a;
+  font-size: 10px;
+  font-weight: 700;
+}
+.price-source.personal { color: #4f8d4b; }
+.matrix-editor-list {
+  display: grid;
+  gap: 10px;
+  max-height: 620px;
+  overflow: auto;
+  margin-top: 12px;
+  padding-right: 4px;
+}
+.matrix-editor-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(110px, .55fr)) minmax(140px, .65fr);
+  gap: 9px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid #e1e9de;
+  border-radius: 13px;
+  background: #f8fbf6;
+}
+.matrix-editor-product {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #465146;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.matrix-price-field {
+  display: grid;
+  gap: 5px;
+  color: #707a70;
+  font-size: 10px;
+  font-weight: 700;
+}
+.matrix-price-field input,
+.matrix-price-field select {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 8px;
+  border: 1px solid #d7e0d4;
+  border-radius: 9px;
+  background: #fff;
+}
+.matrix-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.matrix-summary span {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #eef5eb;
+  color: #587058;
+  font-size: 11px;
+  font-weight: 700;
+}
 
 .product-manager-list { display: grid; gap: 10px; }
 .product-manager-row { display: grid; grid-template-columns: minmax(0,1fr) 130px 100px 150px; align-items: center; gap: 12px; padding: 14px; border: 1px solid #e1e9de; border-radius: 14px; background: #fff; }
@@ -435,6 +550,8 @@ textarea { resize: vertical; }
   .catalog-layout { grid-template-columns: minmax(0,1fr) 340px; }
   .profile-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .matrix-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .matrix-editor-row { grid-template-columns: 1fr 1fr; }
+  .matrix-editor-product { grid-column: 1 / -1; }
 }
 @media (max-width: 900px) {
   .stats-grid { grid-template-columns: repeat(2,1fr); }
@@ -458,6 +575,8 @@ textarea { resize: vertical; }
   .custom-row { grid-template-columns: 1fr; }
   .unit-settings { grid-template-columns: 1fr; }
   .matrix-grid { grid-template-columns: 1fr; }
+  .matrix-editor-row { grid-template-columns: 1fr; }
+  .matrix-editor-product { grid-column: auto; }
   .product-manager-row { grid-template-columns: 1fr; }
   .form-actions, .inline-actions, .backup-actions { align-items: stretch; flex-direction: column; }
   .form-actions button, .inline-actions button, .backup-actions button, .import-label { width: 100%; justify-content: center; }
@@ -559,6 +678,24 @@ function normalizeProduct(product) {
     pricePiece: Math.max(0, Number(product.pricePiece) || 0),
     pricePack: Math.max(0, Number(product.pricePack) || 0),
     priceBundle: Math.max(0, Number(product.priceBundle) || 0),
+    basePricePiece: Math.max(
+      0,
+      Number(product.basePricePiece ?? product.pricePiece) || 0
+    ),
+    basePricePack: Math.max(
+      0,
+      Number(product.basePricePack ?? product.pricePack) || 0
+    ),
+    basePriceBundle: Math.max(
+      0,
+      Number(product.basePriceBundle ?? product.priceBundle) || 0
+    ),
+    priceSources:
+      product.priceSources &&
+      typeof product.priceSources === "object"
+        ? product.priceSources
+        : {},
+    isMatrixProduct: product.isMatrixProduct !== false,
     saleUnits,
   };
 }
@@ -602,6 +739,21 @@ function getUnitPrice(product, unit) {
   if (unit === "pack") return Number(product.pricePack) || 0;
   if (unit === "bundle") return Number(product.priceBundle) || 0;
   return Number(product.pricePiece) || 0;
+}
+
+function getPriceSource(product, unit) {
+  return product.priceSources?.[unit] || "unspecified";
+}
+
+function hasPersonalPrices(link) {
+  return Object.values(link.personalPrices || {}).some((price) =>
+    ["piece", "pack", "bundle"].some(
+      (unit) =>
+        price?.[unit] !== null &&
+        price?.[unit] !== undefined &&
+        price?.[unit] !== ""
+    )
+  );
 }
 
 function getOrderTotal(order) {
@@ -648,17 +800,37 @@ function Header({ title, subtitle, onLogout, children }) {
   );
 }
 
-function LoginView({ role, setRole, onLogin }) {
+function LoginView({
+  role,
+  setRole,
+  onAuth,
+  authBusy,
+  authError,
+}) {
   const [isRegistration, setIsRegistration] = useState(false);
+  const [form, setForm] = useState({
+    companyName: "",
+    contactName: "",
+    phone: "",
+    email: "",
+    password: "",
+  });
 
-  const submit = (event) => {
+  const updateField = (field, value) => {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const submit = async (event) => {
     event.preventDefault();
-    if (isRegistration) {
-      alert("Регистрация пока работает в демонстрационном режиме. Профиль можно заполнить после входа.");
-      setIsRegistration(false);
-      return;
-    }
-    onLogin();
+
+    await onAuth({
+      mode: isRegistration ? "register" : "login",
+      role,
+      ...form,
+    });
   };
 
   return (
@@ -667,9 +839,11 @@ function LoginView({ role, setRole, onLogin }) {
         <img className="logo" src={cloverLogo} alt="Логотип Clover" />
         <h1>{isRegistration ? "Создание аккаунта" : "Личный кабинет"}</h1>
         <p className="subtitle">
-          {role === "manager"
-            ? "Принимайте заказы, управляйте клиентами и товарами"
-            : "Создавайте и отслеживайте заказы в одном месте"}
+          {isRegistration
+            ? "Создайте настоящий аккаунт клиента"
+            : role === "manager"
+              ? "Принимайте заказы, управляйте клиентами и товарами"
+              : "Создавайте и отслеживайте заказы в одном месте"}
         </p>
 
         {!isRegistration && (
@@ -678,6 +852,7 @@ function LoginView({ role, setRole, onLogin }) {
               className={role === "client" ? "active" : ""}
               type="button"
               onClick={() => setRole("client")}
+              disabled={authBusy}
             >
               Клиент
             </button>
@@ -685,6 +860,7 @@ function LoginView({ role, setRole, onLogin }) {
               className={role === "manager" ? "active" : ""}
               type="button"
               onClick={() => setRole("manager")}
+              disabled={authBusy}
             >
               Менеджер
             </button>
@@ -694,30 +870,108 @@ function LoginView({ role, setRole, onLogin }) {
         <form className="login-form" onSubmit={submit}>
           {isRegistration && (
             <>
-              <label htmlFor="company">Название организации</label>
-              <input id="company" type="text" placeholder="ООО Ромашка" required />
+              <label htmlFor="companyName">Название организации</label>
+              <input
+                id="companyName"
+                type="text"
+                placeholder="ООО Ромашка"
+                value={form.companyName}
+                onChange={(event) =>
+                  updateField("companyName", event.target.value)
+                }
+                required
+                disabled={authBusy}
+              />
+
+              <label htmlFor="contactName">Контактное лицо</label>
+              <input
+                id="contactName"
+                type="text"
+                placeholder="Имя сотрудника"
+                value={form.contactName}
+                onChange={(event) =>
+                  updateField("contactName", event.target.value)
+                }
+                required
+                disabled={authBusy}
+              />
+
+              <label htmlFor="phone">Телефон</label>
+              <input
+                id="phone"
+                type="tel"
+                placeholder="+7 999 000-00-00"
+                value={form.phone}
+                onChange={(event) =>
+                  updateField("phone", event.target.value)
+                }
+                required
+                disabled={authBusy}
+              />
             </>
           )}
+
           <label htmlFor="email">Электронная почта</label>
-          <input id="email" type="email" placeholder="name@company.ru" required />
+          <input
+            id="email"
+            type="email"
+            placeholder="name@company.ru"
+            value={form.email}
+            onChange={(event) =>
+              updateField("email", event.target.value)
+            }
+            required
+            disabled={authBusy}
+          />
+
           <label htmlFor="password">Пароль</label>
-          <input id="password" type="password" placeholder="Введите пароль" required />
-          <button type="submit">
-            {isRegistration ? "Зарегистрироваться" : role === "manager" ? "Войти как менеджер" : "Войти"}
+          <input
+            id="password"
+            type="password"
+            placeholder="Минимум 8 символов"
+            minLength="8"
+            value={form.password}
+            onChange={(event) =>
+              updateField("password", event.target.value)
+            }
+            required
+            disabled={authBusy}
+          />
+
+          <button type="submit" disabled={authBusy}>
+            {authBusy
+              ? "Подождите..."
+              : isRegistration
+                ? "Зарегистрироваться"
+                : role === "manager"
+                  ? "Войти как менеджер"
+                  : "Войти"}
           </button>
         </form>
 
+        {authError && <div className="auth-error">{authError}</div>}
+
         {role === "client" && (
           <div className="registration">
-            <span>{isRegistration ? "Уже есть аккаунт?" : "Нет аккаунта?"}</span>
-            <button type="button" onClick={() => setIsRegistration((value) => !value)}>
+            <span>
+              {isRegistration ? "Уже есть аккаунт?" : "Нет аккаунта?"}
+            </span>
+            <button
+              type="button"
+              disabled={authBusy}
+              onClick={() => {
+                setIsRegistration((value) => !value);
+              }}
+            >
               {isRegistration ? "Войти" : "Зарегистрироваться"}
             </button>
           </div>
         )}
 
         <div className="test-note">
-          Сейчас вход демонстрационный: можно вводить любые данные. Настоящие пользователи и пароли появятся после подключения сервера.
+          Серверная версия. Тестовый менеджер: manager@clover.local,
+          пароль Clover123!. Перед публикацией пароль обязательно
+          заменим.
         </div>
       </section>
     </main>
@@ -933,7 +1187,19 @@ function CustomItemForm({ onAdd }) {
   );
 }
 
-function OrderEditor({ session, products, addresses, favorites, setFavorites, settings, onClose, onSave }) {
+function OrderEditor({
+  session,
+  products,
+  addresses,
+  favorites,
+  setFavorites,
+  settings,
+  catalogPolicy,
+  showFullCatalog,
+  setShowFullCatalog,
+  onClose,
+  onSave,
+}) {
   const initialOrder = session.order || null;
   const defaultAddress = addresses.find((item) => item.isDefault) || addresses[0];
   const savedDraft = session.mode === "new" && settings.enableDrafts ? safeRead(STORAGE.draft, null) : null;
@@ -1053,6 +1319,33 @@ function OrderEditor({ session, products, addresses, favorites, setFavorites, se
           <div className="mini-card"><span className="mini-label">Позиций</span><strong>{selectedItems.length + customItems.length}</strong></div>
         </div>
 
+        {catalogPolicy.matrixMode === "pending" && (
+          <div className="matrix-catalog-note pending">
+            Менеджер ещё подготавливает ваш постоянный список
+            товаров и персональные цены. Пока можно добавить товар
+            через форму «Не нашли нужный товар?».
+          </div>
+        )}
+
+        {catalogPolicy.allowFullCatalog && (
+          <div className="catalog-scope-switch">
+            <button
+              className={!showFullCatalog ? "active" : ""}
+              type="button"
+              onClick={() => setShowFullCatalog(false)}
+            >
+              Мои постоянные позиции
+            </button>
+            <button
+              className={showFullCatalog ? "active" : ""}
+              type="button"
+              onClick={() => setShowFullCatalog(true)}
+            >
+              Весь каталог
+            </button>
+          </div>
+        )}
+
         <div className="catalog-layout">
           <div>
             <div className="catalog-toolbar">
@@ -1080,6 +1373,21 @@ function OrderEditor({ session, products, addresses, favorites, setFavorites, se
                     <h2>{product.name}</h2>
                     <p className="product-code">Код: {product.code}</p>
                     <p className="product-price">{settings.showPrices && price > 0 ? formatMoney(price) : "Цена уточняется"}</p>
+                    {settings.showPrices && price > 0 && (
+                      <small
+                        className={
+                          ["manual", "contract", "oneC"].includes(
+                            getPriceSource(product, unit)
+                          )
+                            ? "price-source personal"
+                            : "price-source"
+                        }
+                      >
+                        {PRICE_SOURCE_LABELS[
+                          getPriceSource(product, unit)
+                        ] || "Цена"}
+                      </small>
+                    )}
                     <div className="unit-choice">
                       {UNIT_ORDER.filter((item) => product.saleUnits.includes(item)).map((item) => (
                         <button className={unit === item ? "active" : ""} type="button" key={item} onClick={() => setUnits((current) => ({ ...current, [product.id]: item }))}>{UNIT_CONFIG[item].label}</button>
@@ -1140,7 +1448,22 @@ function OrderEditor({ session, products, addresses, favorites, setFavorites, se
   );
 }
 
-function ClientDashboard({ profile, setProfile, addresses, setAddresses, orders, settings, onNew, onEdit, onRepeat, onDelete, onLogout }) {
+function ClientDashboard({
+  profile,
+  setProfile,
+  addresses,
+  setAddresses,
+  orders,
+  settings,
+  catalogPolicy,
+  matrixProductCount,
+  fullCatalogCount,
+  onNew,
+  onEdit,
+  onRepeat,
+  onDelete,
+  onLogout,
+}) {
   const [filter, setFilter] = useState("Все");
   const visibleOrders = orders.filter((order) => filter === "Все" || order.status === filter);
   const active = orders.filter((order) => !["Выполнен", "Отменён"].includes(order.status));
@@ -1159,6 +1482,32 @@ function ClientDashboard({ profile, setProfile, addresses, setAddresses, orders,
           <article className="stat-card"><span>Активные заказы</span><strong>{active.length}</strong></article>
           <article className="stat-card"><span>Выполнено</span><strong>{orders.filter((item) => item.status === "Выполнен").length}</strong></article>
           <article className="stat-card"><span>Всего заказов</span><strong>{orders.length}</strong></article>
+        </div>
+
+        <div
+          className={
+            catalogPolicy.matrixMode === "pending"
+              ? "matrix-catalog-note pending"
+              : "matrix-catalog-note"
+          }
+        >
+          {catalogPolicy.matrixMode === "pending" ? (
+            <>
+              <strong>Персональная матрица подготавливается</strong>
+              <br />
+              Менеджер закрепит ваши постоянные товары и цены.
+              Заказ отсутствующей позиции уже можно отправить через
+              каталог.
+            </>
+          ) : (
+            <>
+              <strong>Ваш персональный каталог готов</strong>
+              <br />
+              Постоянных позиций: {matrixProductCount}.
+              {catalogPolicy.allowFullCatalog &&
+                ` Доступен также весь каталог: ${fullCatalogCount} позиций.`}
+            </>
+          )}
         </div>
 
         <ProfilePanel profile={profile} onChange={setProfile} />
@@ -1295,66 +1644,521 @@ function ManagerOrders({ orders, settings, onUpdateOrder, onDeleteOrder, onCreat
   );
 }
 
-function ManagerClients({ clients, products, clientLinks, setClientLinks }) {
+function ManagerClients({
+  clients,
+  products,
+  clientLinks,
+  setClientLinks,
+}) {
   const [search, setSearch] = useState("");
   const [matrixSearch, setMatrixSearch] = useState("");
-  const visible = clients.filter((client) => `${client.companyName} ${client.contactName} ${client.phone} ${client.email}`.toLowerCase().includes(search.trim().toLowerCase()));
+
+  const visible = clients.filter((client) =>
+    `${client.companyName} ${client.contactName} ${client.phone} ${client.email}`
+      .toLowerCase()
+      .includes(search.trim().toLowerCase())
+  );
 
   const updateLink = (clientId, patch) => {
-    setClientLinks((current) => ({ ...current, [clientId]: { ...EMPTY_LINK, ...(current[clientId] || {}), ...patch } }));
+    setClientLinks((current) => ({
+      ...current,
+      [clientId]: {
+        ...EMPTY_LINK,
+        ...(current[clientId] || {}),
+        ...patch,
+      },
+    }));
   };
+
+  const updatePersonalPrice = (
+    clientId,
+    link,
+    productId,
+    patch
+  ) => {
+    const key = String(productId);
+    const currentPrice = {
+      source: "manual",
+      ...(link.personalPrices?.[key] || {}),
+    };
+
+    const nextPrice = {
+      ...currentPrice,
+      ...patch,
+    };
+
+    const hasAnyPrice = ["piece", "pack", "bundle"].some(
+      (unit) =>
+        nextPrice[unit] !== null &&
+        nextPrice[unit] !== undefined &&
+        nextPrice[unit] !== ""
+    );
+
+    const nextPrices = {
+      ...(link.personalPrices || {}),
+    };
+
+    if (hasAnyPrice) {
+      nextPrices[key] = nextPrice;
+    } else {
+      delete nextPrices[key];
+    }
+
+    updateLink(clientId, {
+      personalPrices: nextPrices,
+    });
+  };
+
+  const parsePriceInput = (value) =>
+    value === "" ? null : Math.max(0, Number(value) || 0);
 
   return (
     <section>
-      <div className="toolbar two"><input type="search" placeholder="Поиск клиента" value={search} onChange={(e) => setSearch(e.target.value)} /><div className="mini-card"><span className="mini-label">Клиентов</span><strong>{clients.length}</strong></div></div>
-      {visible.length ? <div className="client-list">{visible.map((client) => {
-        const link = { ...EMPTY_LINK, ...(clientLinks[client.id] || {}) };
-        const orderedIds = [...new Set(client.orders.flatMap((order) => (order.items || []).map((item) => item.productId ?? item.id)))];
-        const matrixProducts = products.filter((product) => product.active && (!matrixSearch || product.name.toLowerCase().includes(matrixSearch.toLowerCase())));
-        return (
-          <article className="client-card" key={client.id}>
-            <div className="client-card-header">
-              <div><span className={link.matched1C ? "badge green" : "badge yellow"}>{link.matched1C ? "Связан с 1С" : "Не сопоставлен"}</span><h3>{client.companyName || "Клиент без названия"}</h3><p className="muted small">{client.contactName} · {client.phone} · {client.email}</p></div>
-              <strong>{client.orders.length} заказов</strong>
-            </div>
-            <div className="client-metrics">
-              <article><span>Заказов</span><strong>{client.orders.length}</strong></article>
-              <article><span>Активных</span><strong>{client.orders.filter((order) => !["Выполнен", "Отменён"].includes(order.status)).length}</strong></article>
-              <article><span>Адресов</span><strong>{client.addresses.length}</strong></article>
-              <article><span>Последний заказ</span><strong>{client.lastOrder ? formatDate(client.lastOrder.firstDeliveryDate) : "—"}</strong></article>
-            </div>
-            <details className="order-details" style={{ marginTop: 15 }}>
-              <summary>Настройки клиента и связь с 1С</summary>
-              <div className="form-grid" style={{ marginTop: 14 }}>
-                <label className="field">Статус связи с 1С
-                  <select value={link.matched1C ? "yes" : "no"} onChange={(e) => updateLink(client.id, { matched1C: e.target.value === "yes" })}><option value="no">Не сопоставлен</option><option value="yes">Сопоставлен</option></select>
-                </label>
-                <label className="field">ID контрагента в 1С
-                  <input value={link.oneCId} onChange={(e) => updateLink(client.id, { oneCId: e.target.value })} />
-                </label>
-                <label className="field">Название контрагента в 1С
-                  <input value={link.oneCName} onChange={(e) => updateLink(client.id, { oneCName: e.target.value })} />
-                </label>
-                <label className="field">Режим товарной матрицы
-                  <select value={link.matrixMode} onChange={(e) => updateLink(client.id, { matrixMode: e.target.value })}><option value="all">Все активные товары</option><option value="selected">Только выбранные товары</option></select>
-                </label>
-              </div>
-              <label className="field" style={{ marginTop: 12 }}>Заметка менеджера
-                <textarea rows="3" value={link.managerNote} onChange={(e) => updateLink(client.id, { managerNote: e.target.value })} />
-              </label>
-              {link.matrixMode === "selected" && (
-                <div style={{ marginTop: 14 }}>
-                  <div className="toolbar two"><input type="search" placeholder="Поиск товара в матрице" value={matrixSearch} onChange={(e) => setMatrixSearch(e.target.value)} /><button className="secondary-button" type="button" onClick={() => updateLink(client.id, { matrixProductIds: orderedIds })}>Заполнить по истории заказов</button></div>
-                  <div className="matrix-grid">
-                    {matrixProducts.map((product) => <label className="matrix-item" key={product.id}><input type="checkbox" checked={link.matrixProductIds.includes(product.id)} onChange={(e) => updateLink(client.id, { matrixProductIds: e.target.checked ? [...link.matrixProductIds, product.id] : link.matrixProductIds.filter((id) => id !== product.id) })} /><span>{product.name}</span></label>)}
+      <div className="toolbar two">
+        <input
+          type="search"
+          placeholder="Поиск клиента"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <div className="mini-card">
+          <span className="mini-label">Клиентов</span>
+          <strong>{clients.length}</strong>
+        </div>
+      </div>
+
+      {visible.length ? (
+        <div className="client-list">
+          {visible.map((client) => {
+            const link = {
+              ...EMPTY_LINK,
+              ...(clientLinks[client.id] || {}),
+              personalPrices: {
+                ...((clientLinks[client.id] || {}).personalPrices || {}),
+              },
+            };
+            const orderedIds = [
+              ...new Set(
+                client.orders.flatMap((order) =>
+                  (order.items || []).map(
+                    (item) => item.productId ?? item.id
+                  )
+                )
+              ),
+            ];
+            const matrixProducts = products.filter(
+              (product) =>
+                product.active &&
+                (!matrixSearch ||
+                  product.name
+                    .toLowerCase()
+                    .includes(matrixSearch.toLowerCase()) ||
+                  String(product.code || "")
+                    .toLowerCase()
+                    .includes(matrixSearch.toLowerCase()))
+            );
+            const personalPriceCount = Object.keys(
+              link.personalPrices || {}
+            ).length;
+
+            return (
+              <article className="client-card" key={client.id}>
+                <div className="client-card-header">
+                  <div>
+                    <span
+                      className={
+                        link.matched1C
+                          ? "badge green"
+                          : "badge yellow"
+                      }
+                    >
+                      {link.matched1C
+                        ? "Связан с 1С"
+                        : "Не сопоставлен"}
+                    </span>
+                    <h3>
+                      {client.companyName || "Клиент без названия"}
+                    </h3>
+                    <p className="muted small">
+                      {client.contactName} · {client.phone} ·{" "}
+                      {client.email}
+                    </p>
                   </div>
+                  <strong>{client.orders.length} заказов</strong>
                 </div>
-              )}
-              <div className="comment-box" style={{ marginTop: 14 }}><strong>Адреса из заказов</strong><p>{client.addresses.length ? client.addresses.join("; ") : "Нет адресов"}</p></div>
-            </details>
-          </article>
-        );
-      })}</div> : <div className="empty-box">Клиенты не найдены.</div>}
+
+                <div className="client-metrics">
+                  <article>
+                    <span>Заказов</span>
+                    <strong>{client.orders.length}</strong>
+                  </article>
+                  <article>
+                    <span>Активных</span>
+                    <strong>
+                      {
+                        client.orders.filter(
+                          (order) =>
+                            !["Выполнен", "Отменён"].includes(
+                              order.status
+                            )
+                        ).length
+                      }
+                    </strong>
+                  </article>
+                  <article>
+                    <span>Товаров в матрице</span>
+                    <strong>
+                      {link.matrixMode === "all"
+                        ? products.filter((item) => item.active)
+                            .length
+                        : link.matrixProductIds.length}
+                    </strong>
+                  </article>
+                  <article>
+                    <span>Персональных цен</span>
+                    <strong>{personalPriceCount}</strong>
+                  </article>
+                </div>
+
+                <details
+                  className="order-details"
+                  style={{ marginTop: 15 }}
+                >
+                  <summary>
+                    Товарная матрица, цены и связь с 1С
+                  </summary>
+
+                  <div
+                    className="form-grid"
+                    style={{ marginTop: 14 }}
+                  >
+                    <label className="field">
+                      Статус связи с 1С
+                      <select
+                        value={link.matched1C ? "yes" : "no"}
+                        onChange={(event) =>
+                          updateLink(client.id, {
+                            matched1C:
+                              event.target.value === "yes",
+                          })
+                        }
+                      >
+                        <option value="no">Не сопоставлен</option>
+                        <option value="yes">Сопоставлен</option>
+                      </select>
+                    </label>
+
+                    <label className="field">
+                      ID контрагента в 1С
+                      <input
+                        value={link.oneCId}
+                        onChange={(event) =>
+                          updateLink(client.id, {
+                            oneCId: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+
+                    <label className="field">
+                      Название контрагента в 1С
+                      <input
+                        value={link.oneCName}
+                        onChange={(event) =>
+                          updateLink(client.id, {
+                            oneCName: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+
+                    <label className="field">
+                      Режим товарной матрицы
+                      <select
+                        value={link.matrixMode}
+                        onChange={(event) =>
+                          updateLink(client.id, {
+                            matrixMode: event.target.value,
+                          })
+                        }
+                      >
+                        <option value="pending">
+                          Матрица подготавливается
+                        </option>
+                        <option value="selected">
+                          Только выбранные товары
+                        </option>
+                        <option value="all">
+                          Все активные товары
+                        </option>
+                      </select>
+                    </label>
+
+                    <label className="field">
+                      Полный каталог для клиента
+                      <select
+                        value={
+                          link.allowFullCatalog ? "yes" : "no"
+                        }
+                        onChange={(event) =>
+                          updateLink(client.id, {
+                            allowFullCatalog:
+                              event.target.value === "yes",
+                          })
+                        }
+                      >
+                        <option value="no">
+                          Скрыт — только матрица
+                        </option>
+                        <option value="yes">
+                          Разрешить просмотр
+                        </option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <label
+                    className="field"
+                    style={{ marginTop: 12 }}
+                  >
+                    Заметка менеджера
+                    <textarea
+                      rows="3"
+                      value={link.managerNote}
+                      onChange={(event) =>
+                        updateLink(client.id, {
+                          managerNote: event.target.value,
+                        })
+                      }
+                    />
+                  </label>
+
+                  {link.matrixMode !== "all" && (
+                    <div style={{ marginTop: 14 }}>
+                      <div className="toolbar two">
+                        <input
+                          type="search"
+                          placeholder="Поиск товара в матрице"
+                          value={matrixSearch}
+                          onChange={(event) =>
+                            setMatrixSearch(event.target.value)
+                          }
+                        />
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() =>
+                            updateLink(client.id, {
+                              matrixMode: "selected",
+                              matrixProductIds: orderedIds,
+                            })
+                          }
+                        >
+                          Заполнить по истории заказов
+                        </button>
+                      </div>
+
+                      <div className="matrix-summary">
+                        <span>
+                          Выбрано: {link.matrixProductIds.length}
+                        </span>
+                        <span>
+                          Персональных цен: {personalPriceCount}
+                        </span>
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() =>
+                            updateLink(client.id, {
+                              matrixMode: "selected",
+                              matrixProductIds: products
+                                .filter((item) => item.active)
+                                .map((item) => item.id),
+                            })
+                          }
+                        >
+                          Выбрать все
+                        </button>
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() =>
+                            updateLink(client.id, {
+                              matrixProductIds: [],
+                            })
+                          }
+                        >
+                          Снять все
+                        </button>
+                      </div>
+
+                      <div className="matrix-editor-list">
+                        {matrixProducts.map((product) => {
+                          const price =
+                            link.personalPrices?.[
+                              String(product.id)
+                            ] || {};
+                          const selected =
+                            link.matrixProductIds.includes(
+                              product.id
+                            );
+
+                          return (
+                            <div
+                              className="matrix-editor-row"
+                              key={product.id}
+                            >
+                              <label className="matrix-editor-product">
+                                <input
+                                  type="checkbox"
+                                  checked={selected}
+                                  onChange={(event) =>
+                                    updateLink(client.id, {
+                                      matrixMode: "selected",
+                                      matrixProductIds:
+                                        event.target.checked
+                                          ? [
+                                              ...new Set([
+                                                ...link.matrixProductIds,
+                                                product.id,
+                                              ]),
+                                            ]
+                                          : link.matrixProductIds.filter(
+                                              (id) =>
+                                                id !== product.id
+                                            ),
+                                    })
+                                  }
+                                />
+                                <span>
+                                  <strong>{product.name}</strong>
+                                  <small
+                                    style={{
+                                      display: "block",
+                                      marginTop: 3,
+                                    }}
+                                  >
+                                    {product.code} · {product.category}
+                                  </small>
+                                </span>
+                              </label>
+
+                              {["piece", "pack", "bundle"].map(
+                                (unit) => {
+                                  const priceField =
+                                    unit === "piece"
+                                      ? "pricePiece"
+                                      : unit === "pack"
+                                        ? "pricePack"
+                                        : "priceBundle";
+                                  const unitAllowed =
+                                    product.saleUnits.includes(unit);
+
+                                  return (
+                                    <label
+                                      className="matrix-price-field"
+                                      key={unit}
+                                    >
+                                      {UNIT_CONFIG[unit].label}
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        disabled={!unitAllowed}
+                                        placeholder={
+                                          unitAllowed
+                                            ? `База: ${
+                                                Number(
+                                                  product[priceField]
+                                                ) || 0
+                                              }`
+                                            : "Не продаётся"
+                                        }
+                                        value={
+                                          price[unit] ?? ""
+                                        }
+                                        onChange={(event) =>
+                                          updatePersonalPrice(
+                                            client.id,
+                                            link,
+                                            product.id,
+                                            {
+                                              [unit]:
+                                                parsePriceInput(
+                                                  event.target.value
+                                                ),
+                                            }
+                                          )
+                                        }
+                                      />
+                                    </label>
+                                  );
+                                }
+                              )}
+
+                              <label className="matrix-price-field">
+                                Источник цены
+                                <select
+                                  value={price.source || "manual"}
+                                  onChange={(event) =>
+                                    updatePersonalPrice(
+                                      client.id,
+                                      link,
+                                      product.id,
+                                      {
+                                        source: event.target.value,
+                                      }
+                                    )
+                                  }
+                                >
+                                  <option value="manual">
+                                    Вручную
+                                  </option>
+                                  <option value="contract">
+                                    По договору
+                                  </option>
+                                  <option value="oneC">
+                                    Из 1С
+                                  </option>
+                                </select>
+                              </label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {link.matrixMode === "all" && (
+                    <div
+                      className="matrix-catalog-note"
+                      style={{ marginTop: 14 }}
+                    >
+                      Клиент видит все активные товары. Персональные
+                      цены можно назначить, переключив режим на
+                      «Только выбранные товары».
+                    </div>
+                  )}
+
+                  <div
+                    className="comment-box"
+                    style={{ marginTop: 14 }}
+                  >
+                    <strong>Адреса клиента</strong>
+                    <p>
+                      {client.addresses.length
+                        ? client.addresses.join("; ")
+                        : "Нет адресов"}
+                    </p>
+                  </div>
+                </details>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="empty-box">Клиенты не найдены.</div>
+      )}
     </section>
   );
 }
@@ -1503,152 +2307,738 @@ function ManagerBackup({ data, onImport, onClearOrders, onResetAll }) {
   </div><div className="backup-actions"><button className="primary-button" type="button" onClick={exportData}>Скачать резервную копию</button><label className="import-label">Загрузить копию<input type="file" accept="application/json" onChange={importFile} /></label><button className="danger-button" type="button" onClick={onClearOrders}>Удалить все заказы</button><button className="danger-button" type="button" onClick={onResetAll}>Полный сброс</button></div></section>;
 }
 
-function ManagerDashboard({ orders, products, setProducts, profile, addresses, settings, setSettings, clientLinks, setClientLinks, onUpdateOrder, onDeleteOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onLogout }) {
+function ManagerDashboard({ orders, products, setProducts, profile, addresses, serverClients, settings, setSettings, clientLinks, setClientLinks, onUpdateOrder, onDeleteOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onLogout }) {
   const [tab, setTab] = useState("orders");
   const clients = useMemo(() => {
-    const map = new Map();
+    const map = new Map(
+      (serverClients || []).map((client) => [
+        client.id,
+        {
+          ...client,
+          orders: [],
+          addresses: Array.isArray(client.addresses)
+            ? client.addresses.map((item) =>
+                typeof item === "string" ? item : item.address
+              )
+            : [],
+        },
+      ])
+    );
+
     orders.forEach((order) => {
-      const id = order.clientId || `legacy-${order.customerEmail || order.customerName}`;
-      const current = map.get(id) || { id, companyName: order.customerName || "", contactName: order.customerContact || "", phone: order.customerPhone || "", email: order.customerEmail || "", orders: [], addresses: [] };
+      const id =
+        order.clientId ||
+        `legacy-${order.customerEmail || order.customerName}`;
+
+      const current =
+        map.get(id) || {
+          id,
+          companyName: order.customerName || "",
+          contactName: order.customerContact || "",
+          phone: order.customerPhone || "",
+          email: order.customerEmail || "",
+          orders: [],
+          addresses: [],
+        };
+
       current.orders.push(order);
-      if (order.address && !current.addresses.includes(order.address)) current.addresses.push(order.address);
+
+      if (
+        order.address &&
+        !current.addresses.includes(order.address)
+      ) {
+        current.addresses.push(order.address);
+      }
+
       map.set(id, current);
     });
-    const currentClientId = getOrCreateClientId();
-    if (!map.has(currentClientId)) map.set(currentClientId, { id: currentClientId, companyName: profile.companyName, contactName: profile.contactName, phone: profile.phone, email: profile.email, orders: [], addresses: addresses.map((item) => item.address) });
-    return [...map.values()].map((client) => ({ ...client, lastOrder: [...client.orders].sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] }));
-  }, [orders, profile, addresses]);
+
+    return [...map.values()].map((client) => ({
+      ...client,
+      lastOrder: [...client.orders].sort((firstOrder, secondOrder) =>
+        String(secondOrder.createdAt).localeCompare(
+          String(firstOrder.createdAt)
+        )
+      )[0],
+    }));
+  }, [orders, serverClients]);
 
   const newCount = orders.filter((order) => order.status === "Новый").length;
   const workCount = orders.filter((order) => ["Принят", "Собирается", "Готов к доставке"].includes(order.status)).length;
 
-  return <main className="clover-app"><Header title="Кабинет менеджера" subtitle="Локальная демонстрационная версия" onLogout={onLogout} /><section className="page-content"><div className="page-title-row"><div><p className="eyebrow">Управление</p><h1>Рабочее пространство</h1><p>Заказы, клиенты, товары, правила и резервные копии.</p></div></div><div className="stats-grid"><article className="stat-card"><span>Новые заказы</span><strong>{newCount}</strong></article><article className="stat-card"><span>В работе</span><strong>{workCount}</strong></article><article className="stat-card"><span>Клиентов</span><strong>{clients.length}</strong></article><article className="stat-card"><span>Активных товаров</span><strong>{products.filter((item) => item.active).length}</strong></article></div><nav className="manager-nav">{[["orders","Заказы"],["clients","Клиенты"],["products","Товары"],["settings","Настройки"],["backup","Резервная копия"]].map(([id,label]) => <button className={tab === id ? "active" : ""} type="button" key={id} onClick={() => setTab(id)}>{label}</button>)}</nav>{tab === "orders" && <ManagerOrders orders={orders} settings={settings} onUpdateOrder={onUpdateOrder} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} />}{tab === "clients" && <ManagerClients clients={clients} products={products} clientLinks={clientLinks} setClientLinks={setClientLinks} />}{tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}{tab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} />}{tab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} />}</section></main>;
+  return <main className="clover-app"><Header title="Кабинет менеджера" subtitle="Серверная версия" onLogout={onLogout} /><section className="page-content"><div className="page-title-row"><div><p className="eyebrow">Управление</p><h1>Рабочее пространство</h1><p>Заказы, клиенты, товары, правила и резервные копии.</p></div></div><div className="stats-grid"><article className="stat-card"><span>Новые заказы</span><strong>{newCount}</strong></article><article className="stat-card"><span>В работе</span><strong>{workCount}</strong></article><article className="stat-card"><span>Клиентов</span><strong>{clients.length}</strong></article><article className="stat-card"><span>Активных товаров</span><strong>{products.filter((item) => item.active).length}</strong></article></div><nav className="manager-nav">{[["orders","Заказы"],["clients","Клиенты"],["products","Товары"],["settings","Настройки"],["backup","Резервная копия"]].map(([id,label]) => <button className={tab === id ? "active" : ""} type="button" key={id} onClick={() => setTab(id)}>{label}</button>)}</nav>{tab === "orders" && <ManagerOrders orders={orders} settings={settings} onUpdateOrder={onUpdateOrder} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} />}{tab === "clients" && <ManagerClients clients={clients} products={products} clientLinks={clientLinks} setClientLinks={setClientLinks} />}{tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}{tab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} />}{tab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} />}</section></main>;
 }
 
 function App() {
-  const [initialSession] = useState(() => readDemoSession());
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    initialSession.isLoggedIn
+  const [role, setRole] = useState("client");
+  const [authUser, setAuthUser] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getApiToken()));
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [loading, setLoading] = useState(Boolean(getApiToken()));
+  const [hydrated, setHydrated] = useState(false);
+  const [syncError, setSyncError] = useState("");
+
+  const [products, setProducts] = useState(
+    DEFAULT_PRODUCTS.map(normalizeProduct)
   );
-  const [role, setRole] = useState(initialSession.role);
-  const [clientId] = useState(() => getOrCreateClientId());
-  const [products, setProducts] = useState(() => safeRead(STORAGE.products, DEFAULT_PRODUCTS).map(normalizeProduct));
-  const [orders, setOrders] = useState(() => safeRead(STORAGE.orders, []));
-  const [profile, setProfile] = useState(() => ({ ...EMPTY_PROFILE, ...safeRead(STORAGE.profile, EMPTY_PROFILE) }));
-  const [addresses, setAddresses] = useState(() => safeRead(STORAGE.addresses, []));
-  const [favorites, setFavorites] = useState(() => safeRead(STORAGE.favorites, []));
-  const [settings, setSettings] = useState(() => ({ ...DEFAULT_SETTINGS, ...safeRead(STORAGE.settings, DEFAULT_SETTINGS) }));
-  const [clientLinks, setClientLinks] = useState(() => safeRead(STORAGE.clientLinks, {}));
+  const [fullCatalogProducts, setFullCatalogProducts] = useState(
+    DEFAULT_PRODUCTS.map(normalizeProduct)
+  );
+  const [catalogPolicy, setCatalogPolicy] = useState({
+    matrixMode: "pending",
+    allowFullCatalog: false,
+    matrixReady: false,
+    matrixProductIds: [],
+  });
+  const [showFullCatalog, setShowFullCatalog] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [profile, setProfile] = useState(EMPTY_PROFILE);
+  const [addresses, setAddresses] = useState([]);
+  const [favorites, setFavorites] = useState([]);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [clientLinks, setClientLinks] = useState({});
+  const [serverClients, setServerClients] = useState([]);
   const [catalogSession, setCatalogSession] = useState(null);
 
+  const applyBootstrap = (data) => {
+    setAuthUser(data.user);
+    setRole(data.user.role);
+    setProducts(
+      (data.products || DEFAULT_PRODUCTS).map(normalizeProduct)
+    );
+    setFullCatalogProducts(
+      (
+        data.fullCatalogProducts ||
+        data.products ||
+        DEFAULT_PRODUCTS
+      ).map(normalizeProduct)
+    );
+    setCatalogPolicy({
+      matrixMode: "pending",
+      allowFullCatalog: false,
+      matrixReady: false,
+      matrixProductIds: [],
+      ...(data.catalogPolicy || {}),
+    });
+    if (!data.catalogPolicy?.allowFullCatalog) {
+      setShowFullCatalog(false);
+    }
+    setOrders(Array.isArray(data.orders) ? data.orders : []);
+    setProfile({
+      ...EMPTY_PROFILE,
+      ...(data.profile || EMPTY_PROFILE),
+    });
+    setAddresses(
+      Array.isArray(data.addresses) ? data.addresses : []
+    );
+    setFavorites(
+      Array.isArray(data.favorites) ? data.favorites : []
+    );
+    setSettings({
+      ...DEFAULT_SETTINGS,
+      ...(data.settings || DEFAULT_SETTINGS),
+    });
+    setClientLinks(data.clientLinks || {});
+    setServerClients(
+      Array.isArray(data.clients) ? data.clients : []
+    );
+    setHydrated(true);
+  };
+
+  const loadBootstrap = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+    }
+
+    try {
+      const data = await api.bootstrap();
+      applyBootstrap(data);
+      setIsLoggedIn(true);
+      setSyncError("");
+    } catch (error) {
+      if (error.status === 401) {
+        clearApiToken();
+        setAuthUser(null);
+        setIsLoggedIn(false);
+        setHydrated(false);
+      } else {
+        setSyncError(error.message);
+      }
+    } finally {
+      if (!silent) {
+        setLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
-    writeDemoSession(isLoggedIn, role);
-  }, [isLoggedIn, role]);
+    if (!getApiToken()) {
+      setLoading(false);
+      return;
+    }
 
-  useEffect(() => safeWrite(STORAGE.products, products), [products]);
-  useEffect(() => safeWrite(STORAGE.orders, orders), [orders]);
-  useEffect(() => safeWrite(STORAGE.profile, profile), [profile]);
-  useEffect(() => safeWrite(STORAGE.addresses, addresses), [addresses]);
-  useEffect(() => safeWrite(STORAGE.favorites, favorites), [favorites]);
-  useEffect(() => safeWrite(STORAGE.settings, settings), [settings]);
-  useEffect(() => safeWrite(STORAGE.clientLinks, clientLinks), [clientLinks]);
-
-  const profileComplete = Object.values(profile).every((value) => String(value || "").trim());
+    loadBootstrap();
+  }, []);
 
   useEffect(() => {
-    if (!profileComplete) return;
-    setOrders((current) => current.map((order) => {
-      if (order.clientId && order.customerName !== "Тестовый клиент" && order.customerEmail !== "example@mail.ru") return order;
-      return { ...order, clientId, customerName: profile.companyName || profile.contactName || "Клиент", customerContact: profile.contactName, customerPhone: profile.phone, customerEmail: profile.email };
-    }));
-  }, [clientId, profile, profileComplete]);
+    if (!isLoggedIn || !hydrated) {
+      return undefined;
+    }
 
-  const link = { ...EMPTY_LINK, ...(clientLinks[clientId] || {}) };
+    const intervalId = window.setInterval(() => {
+      loadBootstrap({ silent: true });
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [isLoggedIn, hydrated]);
+
+  const scheduleSync = (callback, delay = 650) => {
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        await callback();
+        setSyncError("");
+      } catch (error) {
+        setSyncError(
+          `${error.message}. Данные останутся на экране, но сервер пока их не сохранил.`
+        );
+      }
+    }, delay);
+
+    return () => window.clearTimeout(timeoutId);
+  };
+
+  useEffect(() => {
+    if (!hydrated || !authUser) return undefined;
+    return scheduleSync(() => api.saveOrders(orders));
+  }, [orders, hydrated, authUser?.id]);
+
+  useEffect(() => {
+    if (!hydrated || authUser?.role !== "client") {
+      return undefined;
+    }
+
+    return scheduleSync(() => api.saveProfile(profile));
+  }, [profile, hydrated, authUser?.role]);
+
+  useEffect(() => {
+    if (!hydrated || authUser?.role !== "client") {
+      return undefined;
+    }
+
+    return scheduleSync(() => api.saveAddresses(addresses));
+  }, [addresses, hydrated, authUser?.role]);
+
+  useEffect(() => {
+    if (!hydrated || authUser?.role !== "client") {
+      return undefined;
+    }
+
+    return scheduleSync(() => api.saveFavorites(favorites));
+  }, [favorites, hydrated, authUser?.role]);
+
+  useEffect(() => {
+    if (!hydrated || authUser?.role !== "manager") {
+      return undefined;
+    }
+
+    return scheduleSync(() => api.saveProducts(products));
+  }, [products, hydrated, authUser?.role]);
+
+  useEffect(() => {
+    if (!hydrated || authUser?.role !== "manager") {
+      return undefined;
+    }
+
+    return scheduleSync(() => api.saveSettings(settings));
+  }, [settings, hydrated, authUser?.role]);
+
+  useEffect(() => {
+    if (!hydrated || authUser?.role !== "manager") {
+      return undefined;
+    }
+
+    return scheduleSync(() => api.saveClientLinks(clientLinks));
+  }, [clientLinks, hydrated, authUser?.role]);
+
+  const handleAuth = async (form) => {
+    setAuthBusy(true);
+    setAuthError("");
+
+    try {
+      const result =
+        form.mode === "register"
+          ? await api.register({
+              companyName: form.companyName,
+              contactName: form.contactName,
+              phone: form.phone,
+              email: form.email,
+              password: form.password,
+            })
+          : await api.login({
+              email: form.email,
+              password: form.password,
+            });
+
+      if (
+        form.mode === "login" &&
+        result.user.role !== form.role
+      ) {
+        throw new Error(
+          result.user.role === "manager"
+            ? "Этот аккаунт относится к менеджеру. Выберите вкладку «Менеджер»."
+            : "Этот аккаунт относится к клиенту. Выберите вкладку «Клиент»."
+        );
+      }
+
+      setApiToken(result.token);
+      setAuthUser(result.user);
+      setRole(result.user.role);
+      setIsLoggedIn(true);
+      setLoading(true);
+
+      const oldProfile = safeRead(STORAGE.profile, EMPTY_PROFILE);
+      const oldAddresses = safeRead(STORAGE.addresses, []);
+      const oldFavorites = safeRead(STORAGE.favorites, []);
+      const oldOrders = safeRead(STORAGE.orders, []);
+      const oldProducts = safeRead(STORAGE.products, []);
+      const oldSettings = safeRead(STORAGE.settings, null);
+      const oldClientLinks = safeRead(STORAGE.clientLinks, null);
+
+      if (
+        result.user.role === "client" &&
+        !localStorage.getItem(
+          `clover-server-migrated-client-${result.user.id}`
+        ) &&
+        (
+          Object.values(oldProfile).some(Boolean) ||
+          oldAddresses.length ||
+          oldOrders.length
+        )
+      ) {
+        await api.migrateClient({
+          profile: oldProfile,
+          addresses: oldAddresses,
+          favorites: oldFavorites,
+          orders: oldOrders,
+        });
+
+        localStorage.setItem(
+          `clover-server-migrated-client-${result.user.id}`,
+          "1"
+        );
+      }
+
+      if (
+        result.user.role === "manager" &&
+        !localStorage.getItem("clover-server-migrated-manager") &&
+        (
+          oldProducts.length ||
+          oldSettings ||
+          oldClientLinks
+        )
+      ) {
+        await api.migrateManager({
+          products: oldProducts,
+          settings: oldSettings,
+          clientLinks: oldClientLinks,
+        });
+
+        localStorage.setItem(
+          "clover-server-migrated-manager",
+          "1"
+        );
+      }
+
+      await loadBootstrap();
+    } catch (error) {
+      clearApiToken();
+      setIsLoggedIn(false);
+      setHydrated(false);
+      setAuthError(error.message);
+      setLoading(false);
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const clientId = authUser?.id || "";
+  const profileComplete = Object.values(profile).every((value) =>
+    String(value || "").trim()
+  );
+
+  const link = {
+    ...EMPTY_LINK,
+    ...(clientLinks[clientId] || {}),
+  };
+
   const catalogProducts = useMemo(() => {
-    const active = products.filter((product) => product.active);
-    return link.matrixMode === "selected" ? active.filter((product) => link.matrixProductIds.includes(product.id)) : active;
-  }, [products, link.matrixMode, link.matrixProductIds]);
-  const clientOrders = orders.filter((order) => !order.clientId || order.clientId === clientId);
+    const source =
+      showFullCatalog && catalogPolicy.allowFullCatalog
+        ? fullCatalogProducts
+        : products;
+
+    return source.filter((product) => product.active);
+  }, [
+    products,
+    fullCatalogProducts,
+    showFullCatalog,
+    catalogPolicy.allowFullCatalog,
+  ]);
+
+  const clientOrders = orders.filter(
+    (order) => order.clientId === clientId
+  );
 
   const logout = () => {
+    clearApiToken();
     setCatalogSession(null);
+    setAuthUser(null);
     setIsLoggedIn(false);
+    setHydrated(false);
+    setProducts(DEFAULT_PRODUCTS.map(normalizeProduct));
+    setFullCatalogProducts(
+      DEFAULT_PRODUCTS.map(normalizeProduct)
+    );
+    setCatalogPolicy({
+      matrixMode: "pending",
+      allowFullCatalog: false,
+      matrixReady: false,
+      matrixProductIds: [],
+    });
+    setShowFullCatalog(false);
+    setOrders([]);
+    setProfile(EMPTY_PROFILE);
+    setAddresses([]);
+    setFavorites([]);
+    setSettings(DEFAULT_SETTINGS);
+    setClientLinks({});
+    setServerClients([]);
   };
 
   const validateNewOrder = () => {
-    if (settings.requireProfile && !profileComplete) { alert("Сначала заполните профиль организации."); return false; }
-    if (settings.requireAddress && !addresses.length) { alert("Сначала добавьте адрес доставки."); return false; }
+    if (settings.requireProfile && !profileComplete) {
+      alert("Сначала заполните профиль организации.");
+      return false;
+    }
+
+    if (settings.requireAddress && !addresses.length) {
+      alert("Сначала добавьте адрес доставки.");
+      return false;
+    }
+
     return true;
   };
 
-  const openNew = () => { if (validateNewOrder()) setCatalogSession({ mode: "new" }); };
-  const openEdit = (order) => { if (order.status !== "Новый") return alert("Редактировать можно только новый заказ."); setCatalogSession({ mode: "edit", order }); };
-  const openRepeat = (order) => { if (validateNewOrder()) setCatalogSession({ mode: "repeat", order }); };
+  const openNew = () => {
+    if (validateNewOrder()) {
+      setCatalogSession({ mode: "new" });
+    }
+  };
+
+  const openEdit = (order) => {
+    if (order.status !== "Новый") {
+      return alert("Редактировать можно только новый заказ.");
+    }
+
+    setCatalogSession({ mode: "edit", order });
+  };
+
+  const openRepeat = (order) => {
+    if (validateNewOrder()) {
+      setCatalogSession({ mode: "repeat", order });
+    }
+  };
 
   const saveOrder = (payload) => {
     if (catalogSession.mode === "edit") {
-      setOrders((current) => current.map((order) => order.id === catalogSession.order.id ? { ...order, ...payload, updatedAt: new Date().toISOString() } : order));
+      setOrders((current) =>
+        current.map((order) =>
+          order.id === catalogSession.order.id
+            ? {
+                ...order,
+                ...payload,
+                updatedAt: new Date().toISOString(),
+              }
+            : order
+        )
+      );
     } else {
       const timestamp = Date.now();
-      setOrders((current) => [{
-        id: makeId("order"), number: String(timestamp).slice(-6), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), status: "Новый",
-        clientId, customerName: profile.companyName || profile.contactName || "Клиент", customerContact: profile.contactName, customerPhone: profile.phone, customerEmail: profile.email,
-        managerComment: "", internalNote: "", ...payload,
-      }, ...current]);
+
+      setOrders((current) => [
+        {
+          id: makeId("order"),
+          number: String(timestamp).slice(-6),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          status: "Новый",
+          clientId,
+          customerName:
+            profile.companyName ||
+            profile.contactName ||
+            "Клиент",
+          customerContact: profile.contactName,
+          customerPhone: profile.phone,
+          customerEmail: profile.email,
+          managerComment: "",
+          internalNote: "",
+          ...payload,
+        },
+        ...current,
+      ]);
     }
+
     setCatalogSession(null);
   };
 
   const deleteClientOrder = (order) => {
-    if (order.status !== "Новый") return alert("Удалить можно только новый заказ.");
-    if (window.confirm(`Удалить заказ № ${order.number}?`)) setOrders((current) => current.filter((item) => item.id !== order.id));
+    if (order.status !== "Новый") {
+      return alert("Удалить можно только новый заказ.");
+    }
+
+    if (window.confirm(`Удалить заказ № ${order.number}?`)) {
+      setOrders((current) =>
+        current.filter((item) => item.id !== order.id)
+      );
+    }
   };
-  const updateOrder = (id, patch) => setOrders((current) => current.map((order) => order.id === id ? { ...order, ...patch } : order));
-  const deleteManagerOrder = (order) => { if (window.confirm(`Удалить заказ № ${order.number}?`)) setOrders((current) => current.filter((item) => item.id !== order.id)); };
+
+  const updateOrder = (id, patch) => {
+    setOrders((current) =>
+      current.map((order) =>
+        order.id === id
+          ? {
+              ...order,
+              ...patch,
+              updatedAt: new Date().toISOString(),
+            }
+          : order
+      )
+    );
+  };
+
+  const deleteManagerOrder = (order) => {
+    if (window.confirm(`Удалить заказ № ${order.number}?`)) {
+      setOrders((current) =>
+        current.filter((item) => item.id !== order.id)
+      );
+    }
+  };
 
   const createProductFromCustom = (order, customItem) => {
-    if (!window.confirm(`Создать в каталоге товар «${customItem.name}»?`)) return;
-    const id = Math.max(0, ...products.map((item) => Number(item.id) || 0)) + 1;
-    const unitMap = { "шт.": "piece", "уп.": "pack", "пач.": "bundle" };
+    if (
+      !window.confirm(
+        `Создать в каталоге товар «${customItem.name}»?`
+      )
+    ) {
+      return;
+    }
+
+    const id =
+      Math.max(
+        0,
+        ...products.map((item) => Number(item.id) || 0)
+      ) + 1;
+
+    const unitMap = {
+      "шт.": "piece",
+      "уп.": "pack",
+      "пач.": "bundle",
+    };
+
     const saleUnit = unitMap[customItem.unit] || "piece";
+
     const newProduct = normalizeProduct({
-      id, category: "Новые товары", name: customItem.name, code: `CL-${String(id).padStart(4, "0")}`, oneCId: "", active: true,
-      pieceSize: 1, packSize: 1, bundleSize: 1,
-      pricePiece: saleUnit === "piece" ? Number(customItem.unitPrice) || 0 : 0,
-      pricePack: saleUnit === "pack" ? Number(customItem.unitPrice) || 0 : 0,
-      priceBundle: saleUnit === "bundle" ? Number(customItem.unitPrice) || 0 : 0,
+      id,
+      category: "Новые товары",
+      name: customItem.name,
+      code: `CL-${String(id).padStart(4, "0")}`,
+      oneCId: "",
+      active: true,
+      pieceSize: 1,
+      packSize: 1,
+      bundleSize: 1,
+      pricePiece:
+        saleUnit === "piece"
+          ? Number(customItem.unitPrice) || 0
+          : 0,
+      pricePack:
+        saleUnit === "pack"
+          ? Number(customItem.unitPrice) || 0
+          : 0,
+      priceBundle:
+        saleUnit === "bundle"
+          ? Number(customItem.unitPrice) || 0
+          : 0,
       saleUnits: [saleUnit],
     });
+
     setProducts((current) => [...current, newProduct]);
-    updateOrder(order.id, { customItems: (order.customItems || []).map((item) => item.id === customItem.id ? { ...item, requestStatus: "Добавлен в каталог", matchedProductId: id } : item) });
+
+    updateOrder(order.id, {
+      customItems: (order.customItems || []).map((item) =>
+        item.id === customItem.id
+          ? {
+              ...item,
+              requestStatus: "Добавлен в каталог",
+              matchedProductId: id,
+            }
+          : item
+      ),
+    });
   };
 
   const importBackup = (backup) => {
-    if (Array.isArray(backup.products)) setProducts(backup.products.map(normalizeProduct));
-    if (Array.isArray(backup.orders)) setOrders(backup.orders);
-    if (backup.profile) setProfile({ ...EMPTY_PROFILE, ...backup.profile });
-    if (Array.isArray(backup.addresses)) setAddresses(backup.addresses);
-    if (backup.settings) setSettings({ ...DEFAULT_SETTINGS, ...backup.settings });
-    if (backup.clientLinks) setClientLinks(backup.clientLinks);
+    if (Array.isArray(backup.products)) {
+      setProducts(backup.products.map(normalizeProduct));
+    }
+
+    if (Array.isArray(backup.orders)) {
+      setOrders(backup.orders);
+    }
+
+    if (backup.profile) {
+      setProfile({
+        ...EMPTY_PROFILE,
+        ...backup.profile,
+      });
+    }
+
+    if (Array.isArray(backup.addresses)) {
+      setAddresses(backup.addresses);
+    }
+
+    if (backup.settings) {
+      setSettings({
+        ...DEFAULT_SETTINGS,
+        ...backup.settings,
+      });
+    }
+
+    if (backup.clientLinks) {
+      setClientLinks(backup.clientLinks);
+    }
   };
 
-  const clearOrders = () => { if (window.confirm("Удалить все заказы?")) setOrders([]); };
-  const resetAll = () => {
-    if (!window.confirm("Полностью удалить локальные данные Clover?")) return;
-    Object.values(STORAGE).forEach((key) => localStorage.removeItem(key));
-    sessionStorage.removeItem(DEMO_SESSION_KEY);
-    setProducts(DEFAULT_PRODUCTS.map(normalizeProduct)); setOrders([]); setProfile(EMPTY_PROFILE); setAddresses([]); setFavorites([]); setSettings(DEFAULT_SETTINGS); setClientLinks({});
-    setCatalogSession(null);
-    setIsLoggedIn(false);
+  const clearOrders = () => {
+    if (window.confirm("Удалить все заказы?")) {
+      setOrders([]);
+    }
   };
+
+  const resetAll = async () => {
+    if (
+      !window.confirm(
+        "Сбросить серверные данные Clover? Аккаунт менеджера сохранится."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await api.resetAll();
+      await loadBootstrap();
+      alert("Серверные данные сброшены.");
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  if (loading) {
+    return (
+      <main className="loading-page">
+        <section className="loading-card">
+          <img src={cloverLogo} alt="Логотип Clover" />
+          <h2>Подключаемся к серверу</h2>
+          <p>
+            Загружаем аккаунт, товары, адреса и заказы.
+          </p>
+        </section>
+      </main>
+    );
+  }
 
   let content;
-  if (!isLoggedIn) content = <LoginView role={role} setRole={setRole} onLogin={() => setIsLoggedIn(true)} />;
-  else if (role === "manager") content = <ManagerDashboard orders={orders} products={products} setProducts={setProducts} profile={profile} addresses={addresses} settings={settings} setSettings={setSettings} clientLinks={clientLinks} setClientLinks={setClientLinks} onUpdateOrder={updateOrder} onDeleteOrder={deleteManagerOrder} onCreateProductFromCustom={createProductFromCustom} onImport={importBackup} onClearOrders={clearOrders} onResetAll={resetAll} onLogout={logout} />;
-  else if (catalogSession) content = <OrderEditor session={catalogSession} products={catalogProducts} addresses={addresses} favorites={favorites} setFavorites={setFavorites} settings={settings} onClose={() => setCatalogSession(null)} onSave={saveOrder} />;
-  else content = <ClientDashboard profile={profile} setProfile={setProfile} addresses={addresses} setAddresses={setAddresses} orders={clientOrders} settings={settings} onNew={openNew} onEdit={openEdit} onRepeat={openRepeat} onDelete={deleteClientOrder} onLogout={logout} />;
 
-  return <><style>{APP_STYLES}</style>{content}</>;
+  if (!isLoggedIn) {
+    content = (
+      <LoginView
+        role={role}
+        setRole={setRole}
+        onAuth={handleAuth}
+        authBusy={authBusy}
+        authError={authError}
+      />
+    );
+  } else if (role === "manager") {
+    content = (
+      <ManagerDashboard
+        orders={orders}
+        products={products}
+        setProducts={setProducts}
+        profile={profile}
+        addresses={addresses}
+        serverClients={serverClients}
+        settings={settings}
+        setSettings={setSettings}
+        clientLinks={clientLinks}
+        setClientLinks={setClientLinks}
+        onUpdateOrder={updateOrder}
+        onDeleteOrder={deleteManagerOrder}
+        onCreateProductFromCustom={createProductFromCustom}
+        onImport={importBackup}
+        onClearOrders={clearOrders}
+        onResetAll={resetAll}
+        onLogout={logout}
+      />
+    );
+  } else if (catalogSession) {
+    content = (
+      <OrderEditor
+        session={catalogSession}
+        products={catalogProducts}
+        addresses={addresses}
+        favorites={favorites}
+        setFavorites={setFavorites}
+        settings={settings}
+        catalogPolicy={catalogPolicy}
+        showFullCatalog={showFullCatalog}
+        setShowFullCatalog={setShowFullCatalog}
+        onClose={() => setCatalogSession(null)}
+        onSave={saveOrder}
+      />
+    );
+  } else {
+    content = (
+      <ClientDashboard
+        profile={profile}
+        setProfile={setProfile}
+        addresses={addresses}
+        setAddresses={setAddresses}
+        orders={clientOrders}
+        settings={settings}
+        catalogPolicy={catalogPolicy}
+        matrixProductCount={products.length}
+        fullCatalogCount={fullCatalogProducts.length}
+        onNew={openNew}
+        onEdit={openEdit}
+        onRepeat={openRepeat}
+        onDelete={deleteClientOrder}
+        onLogout={logout}
+      />
+    );
+  }
+
+  return (
+    <>
+      <style>{APP_STYLES}</style>
+      {content}
+      {syncError && (
+        <div className="server-banner">{syncError}</div>
+      )}
+    </>
+  );
 }
 
 export default App;
