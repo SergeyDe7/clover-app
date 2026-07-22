@@ -7,7 +7,8 @@ const UNIT_LABELS = {
 export const EXCHANGE_STATUSES = {
   not_sent: "Не отправлен",
   ready: "Готов к передаче",
-  sent: "Передан в 1С",
+  sent: "Передан тестово",
+  draft: "Черновик создан в 1С",
   error: "Ошибка",
 };
 
@@ -22,6 +23,8 @@ export function normalizeExchangeState(value = {}) {
     checkedAt: value?.checkedAt || "",
     lastAttemptAt: value?.lastAttemptAt || "",
     sentAt: value?.sentAt || "",
+    remoteDocument: value?.remoteDocument || null,
+    channel: value?.channel || "",
     message: value?.message || "",
     receipt: value?.receipt || "",
     payloadVersion: value?.payloadVersion || "1.0",
@@ -226,6 +229,7 @@ export function summarizeExchange(orders, products, clientLinks) {
     notSent: 0,
     ready: 0,
     sent: 0,
+    draft: 0,
     error: 0,
     missingClientLinks: 0,
     missingProductLinks: 0,

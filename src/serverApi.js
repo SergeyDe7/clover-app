@@ -227,6 +227,36 @@ export const api = {
     return request(`/admin/exchange?limit=${encodeURIComponent(limit)}`);
   },
 
+  getOneCConfig() {
+    return request("/admin/one-c/config");
+  },
+
+  saveOneCConfig(config) {
+    return request("/admin/one-c/config", {
+      method: "PUT",
+      body: { config },
+    });
+  },
+
+  testOneCConnection() {
+    return request("/admin/one-c/test", {
+      method: "POST",
+    });
+  },
+
+  previewOneCCatalog(type, limit = 20) {
+    return request(
+      `/admin/one-c/preview/${encodeURIComponent(type)}?limit=${encodeURIComponent(limit)}`
+    );
+  },
+
+  createOneCDraft(orderId) {
+    return request(
+      `/admin/one-c/orders/${encodeURIComponent(orderId)}/draft`,
+      { method: "POST" }
+    );
+  },
+
   checkExchangeOrder(orderId) {
     return request(`/admin/exchange/orders/${encodeURIComponent(orderId)}/check`, {
       method: "POST",

@@ -48,8 +48,17 @@ import {
   summarizeExchange,
   validateOrderFor1C,
 } from "./exchange.js";
+import {
+  DEFAULT_ONE_C_CONFIG,
+  createOneCDraft,
+  previewOneCCatalog,
+  publicOneCStatus,
+  sanitizeOneCConfig,
+  testOneCConnection,
+} from "./oneC.js";
 
 const app = express();
+const ONE_C_STATE_KEY = "oneCIntegration";
 
 const currentFile = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFile);
@@ -908,6 +917,210 @@ app.post(
 );
 
 app.get(
+  "/api/admin/one-c/config",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const stored = getGlobalState(ONE_C_STATE_KEY, DEFAULT_ONE_C_CONFIG);
+    res.json({ ok: true, ...publicOneCStatus(stored) });
+  }
+);
+
+app.put(
+  "/api/admin/one-c/config",
+  authRequired,
+  roleRequired("manager"),
+  (req, res, next) => {
+    try {
+      const config = sanitizeOneCConfig(req.body?.config || req.body || {});
+      setGlobalState(ONE_C_STATE_KEY, config);
+      auditFromRequest(req, "exchange.config.save", {
+        mode: config.mode,
+        baseUrlConfigured: Boolean(config.baseUrl),
+        allowDraftCreation: config.allowDraftCreation,
+      });
+      res.json({ ok: true, ...publicOneCStatus(config) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  "/api/admin/one-c/test",
+  authRequired,
+  roleRequired("manager"),
+  async (req, res) => {
+    const config = getGlobalState(ONE_C_STATE_KEY, DEFAULT_ONE_C_CONFIG);
+    try {
+      const result = await testOneCConnection(config);
+      auditFromRequest(req, "exchange.connection.test", {
+        ok: true,
+        mode: result.mode,
+        configuration: result.configuration,
+        database: result.database,
+      });
+      res.json({ ok: true, result, ...publicOneCStatus(config) });
+    } catch (error) {
+      auditFromRequest(req, "exchange.connection.error", {
+        ok: false,
+        message: error.message,
+      });
+      res.status(error?.status >= 400 && error?.status < 600 ? 502 : 400).json({
+        error: error.message,
+      });
+    }
+  }
+);
+
+app.get(
+  "/api/admin/one-c/preview/:type",
+  authRequired,
+  roleRequired("manager"),
+  async (req, res) => {
+    const type = req.params.type === "clients" ? "clients" : req.params.type === "products" ? "products" : "";
+    if (!type) {
+      return res.status(400).json({ error: "Неизвестный справочник 1С." });
+    }
+
+    const config = getGlobalState(ONE_C_STATE_KEY, DEFAULT_ONE_C_CONFIG);
+    try {
+      const result = await previewOneCCatalog(config, type, req.query.limit || 20);
+      auditFromRequest(req, "exchange.catalog.preview", {
+        type,
+        mode: result.mode,
+        count: result.count,
+      });
+      res.json(result);
+    } catch (error) {
+      auditFromRequest(req, "exchange.catalog.error", {
+        type,
+        message: error.message,
+      });
+      res.status(error?.status >= 400 && error?.status < 600 ? 502 : 400).json({
+        error: error.message,
+      });
+    }
+  }
+);
+
+app.post(
+  "/api/admin/one-c/orders/:orderId/draft",
+  authRequired,
+  roleRequired("manager"),
+  async (req, res) => {
+    const stored = getOrderById(req.params.orderId);
+    if (!stored) return res.status(404).json({ error: "Заказ не найден." });
+
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const clientLinks = getGlobalState("clientLinks", {});
+    const validation = validateOrderFor1C({
+      order: stored.payload,
+      products,
+      clientLinks,
+    });
+
+    if (!validation.ready) {
+      return res.status(422).json({
+        error: validation.issues.join(" "),
+        validation,
+      });
+    }
+
+    const config = getGlobalState(ONE_C_STATE_KEY, DEFAULT_ONE_C_CONFIG);
+    const payload = build1CPayload({
+      order: stored.payload,
+      products,
+      clientLinks,
+    });
+
+    try {
+      const result = await createOneCDraft(config, {
+        ...payload,
+        testMode: publicOneCStatus(config).config.mode !== "real",
+        target: {
+          configuration: "Управление нашей фирмой 1.6",
+          document: "ЗаказПокупателя",
+          tabularSection: "Запасы",
+          conduct: false,
+        },
+      });
+      const previous = normalizeExchangeState(stored.payload.exchange);
+      const attemptedAt = new Date().toISOString();
+      const remoteDocument = {
+        id: result.documentId || "",
+        number: result.documentNumber || "",
+        date: result.documentDate || "",
+        posted: Boolean(result.posted),
+        duplicate: Boolean(result.duplicate),
+        mode: result.mode,
+      };
+      const exchange = {
+        ...previous,
+        status: "draft",
+        attempts: previous.attempts + 1,
+        checkedAt: attemptedAt,
+        lastAttemptAt: attemptedAt,
+        sentAt: attemptedAt,
+        receipt: result.documentNumber || result.documentId || "",
+        remoteDocument,
+        channel: result.mode === "real" ? "onec" : "simulation",
+        message: result.message,
+      };
+      const order = updateOrderPayload(stored.id, {
+        ...stored.payload,
+        exchange,
+        updatedAt: attemptedAt,
+      });
+
+      auditFromRequest(req, "exchange.send.draft", {
+        orderId: order.id,
+        orderNumber: order.number,
+        mode: result.mode,
+        documentId: result.documentId,
+        documentNumber: result.documentNumber,
+        duplicate: result.duplicate,
+      });
+
+      res.json({
+        ok: true,
+        result,
+        order,
+        exchange,
+        validation,
+      });
+    } catch (error) {
+      const previous = normalizeExchangeState(stored.payload.exchange);
+      const attemptedAt = new Date().toISOString();
+      const exchange = {
+        ...previous,
+        status: "error",
+        attempts: previous.attempts + 1,
+        checkedAt: attemptedAt,
+        lastAttemptAt: attemptedAt,
+        channel: "onec",
+        message: error.message,
+      };
+      const order = updateOrderPayload(stored.id, {
+        ...stored.payload,
+        exchange,
+        updatedAt: attemptedAt,
+      });
+      auditFromRequest(req, "exchange.send.draft.error", {
+        orderId: order.id,
+        orderNumber: order.number,
+        message: error.message,
+      });
+      res.status(error?.status >= 400 && error?.status < 600 ? 502 : 400).json({
+        error: error.message,
+        order,
+        exchange,
+      });
+    }
+  }
+);
+
+app.get(
   "/api/admin/exchange",
   authRequired,
   roleRequired("manager"),
@@ -958,7 +1171,9 @@ app.get(
       },
       log: listExchangeAudit(req.query.limit || 300),
       testMode: true,
-      realConnectionEnabled: false,
+      oneC: publicOneCStatus(
+        getGlobalState(ONE_C_STATE_KEY, DEFAULT_ONE_C_CONFIG)
+      ),
     });
   }
 );
@@ -1077,6 +1292,8 @@ app.post(
       lastAttemptAt: "",
       sentAt: "",
       receipt: "",
+      remoteDocument: null,
+      channel: "",
       message: "Статус передачи сброшен менеджером.",
     };
     const order = updateOrderPayload(stored.id, {
@@ -1217,7 +1434,10 @@ app.use((error, req, res, next) => {
   if (
     String(error?.message || "").includes("JPG") ||
     String(error?.message || "").includes("резервной копии") ||
-    String(error?.message || "").includes("раздел")
+    String(error?.message || "").includes("раздел") ||
+    String(error?.message || "").includes("адрес 1С") ||
+    String(error?.message || "").includes("HTTP") ||
+    String(error?.message || "").includes("HTTPS")
   ) {
     return res.status(400).json({ error: error.message });
   }
@@ -1249,7 +1469,7 @@ try {
 
 app.listen(port, host, () => {
   console.log("");
-  console.log("Clover Server 1.9 запущен");
+  console.log("Clover Server 2.2 запущен");
   console.log(`API: http://localhost:${port}/api/health`);
   console.log(
     `Менеджер: ${

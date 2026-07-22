@@ -239,7 +239,8 @@ const PRICE_SOURCE_LABELS = {
 const EXCHANGE_STATUS_LABELS = {
   not_sent: "Не отправлен",
   ready: "Готов к передаче",
-  sent: "Передан в 1С",
+  sent: "Передан тестово",
+  draft: "Черновик создан в 1С",
   error: "Ошибка",
 };
 
@@ -254,6 +255,8 @@ function normalizeOrderExchange(value = {}) {
     checkedAt: value?.checkedAt || "",
     lastAttemptAt: value?.lastAttemptAt || "",
     sentAt: value?.sentAt || "",
+    remoteDocument: value?.remoteDocument || null,
+    channel: value?.channel || "",
     message: value?.message || "",
     receipt: value?.receipt || "",
     payloadVersion: value?.payloadVersion || "1.0",
@@ -261,7 +264,7 @@ function normalizeOrderExchange(value = {}) {
 }
 
 function exchangeBadgeClass(status) {
-  if (status === "sent") return "exchange-sent";
+  if (status === "sent" || status === "draft") return "exchange-sent";
   if (status === "ready") return "exchange-ready";
   if (status === "error") return "exchange-error";
   return "exchange-pending";
@@ -874,6 +877,8 @@ textarea { resize: vertical; }
 .audit-details { margin-top: 4px; color: #667266; font-size: 10px; word-break: break-word; }
 .server-safe-note { margin-top: 14px; padding: 13px; border-radius: 12px; background: #eef6eb; color: #4e714d; font-size: 11px; line-height: 1.5; }
 .exchange-notice { margin-bottom: 16px; padding: 15px; border: 1px solid #ead9b5; border-radius: 13px; background: #fff9ec; color: #78632e; line-height: 1.5; }
+.success-box { padding: 13px; border: 1px solid #cfe3ca; border-radius: 12px; background: #eef8eb; color: #3f713d; line-height: 1.5; }
+.section-toggle { cursor: pointer; color: #4f684f; font-weight: 800; }
 .exchange-status-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .exchange-pending { background: #edf0ed; color: #687168; }
 .exchange-ready { background: #e7f2ff; color: #2f6592; }
@@ -882,7 +887,7 @@ textarea { resize: vertical; }
 .exchange-message { margin-top: 8px; color: #727d72; font-size: 11px; line-height: 1.45; }
 .exchange-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
 .exchange-actions button { min-height: 34px; padding: 7px 10px; }
-.exchange-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
+.exchange-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: 12px; margin-bottom: 16px; }
 .exchange-grid article { padding: 16px; border: 1px solid #e1e9de; border-radius: 14px; background: #fff; }
 .exchange-grid span { display: block; color: #778177; font-size: 11px; }
 .exchange-grid strong { display: block; margin-top: 7px; color: #3f533f; font-size: 25px; }
@@ -2195,7 +2200,10 @@ function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrders, on
       for (const orderId of selectedIds) {
         try {
           if (action === "check") await api.checkExchangeOrder(orderId);
-          if (action === "send") await api.sendExchangeOrder(orderId);
+          if (action === "send") {
+            await api.checkExchangeOrder(orderId);
+            await api.sendExchangeOrder(orderId);
+          }
         } catch (error) {
           errors.push(error.message);
         }
@@ -3315,6 +3323,13 @@ const AUDIT_ACTION_LABELS = {
   "exchange.reset": "Сброшен статус обмена с 1С",
   "exchange.download.order": "Скачан файл заказа для 1С",
   "exchange.download.batch": "Скачан пакет заказов для 1С",
+  "exchange.config.save": "Сохранены настройки подключения к 1С",
+  "exchange.connection.test": "Проверено подключение к 1С",
+  "exchange.connection.error": "Ошибка подключения к 1С",
+  "exchange.catalog.preview": "Просмотрен справочник 1С",
+  "exchange.catalog.error": "Ошибка чтения справочника 1С",
+  "exchange.send.draft": "Создан черновик заказа в 1С",
+  "exchange.send.draft.error": "Ошибка создания черновика в 1С",
 };
 
 function formatAuditDetails(item) {
@@ -3367,6 +3382,20 @@ function formatAuditDetails(item) {
       return `Заказ № ${details.orderNumber || "—"} · формат: ${String(details.format || "json").toUpperCase()}`;
     case "exchange.download.batch":
       return `Формат: ${String(details.format || "json").toUpperCase()} · заказов: ${Number(details.count) || 0}`;
+    case "exchange.config.save":
+      return `Режим: ${details.mode === "real" ? "реальная 1С" : "симулятор"} · адрес: ${details.baseUrlConfigured ? "заполнен" : "не заполнен"}`;
+    case "exchange.connection.test":
+      return `${details.mode === "real" ? "Реальная 1С" : "Симулятор"} · ${details.configuration || "подключение проверено"}`;
+    case "exchange.connection.error":
+      return details.message || "Ошибка подключения";
+    case "exchange.catalog.preview":
+      return `${details.type === "clients" ? "Контрагенты" : "Номенклатура"} · записей: ${Number(details.count) || 0}`;
+    case "exchange.catalog.error":
+      return `${details.type || "Справочник"} · ${details.message || "ошибка"}`;
+    case "exchange.send.draft":
+      return `Заказ № ${details.orderNumber || "—"} · документ ${details.documentNumber || details.documentId || "создан"} · ${details.mode === "real" ? "1С" : "симулятор"}`;
+    case "exchange.send.draft.error":
+      return `Заказ № ${details.orderNumber || "—"} · ${details.message || "ошибка"}`;
     default:
       return "";
   }
@@ -3374,16 +3403,45 @@ function formatAuditDetails(item) {
 
 function ManagerExchange({ onReload, onNavigate }) {
   const [data, setData] = useState(null);
+  const [oneC, setOneC] = useState(null);
+  const [configForm, setConfigForm] = useState({
+    mode: "simulation",
+    baseUrl: "",
+    healthPath: "/hs/clover/v1/health",
+    clientsPath: "/hs/clover/v1/clients",
+    productsPath: "/hs/clover/v1/products",
+    draftOrderPath: "/hs/clover/v1/orders/draft",
+    username: "",
+    timeoutMs: 10000,
+    allowDraftCreation: false,
+  });
+  const [connectionResult, setConnectionResult] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [loadingExchange, setLoadingExchange] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
+  const [busyConnection, setBusyConnection] = useState("");
   const [batchStatus, setBatchStatus] = useState("all");
+
+  const applyOneCState = (result) => {
+    setOneC(result);
+    if (result?.config) {
+      setConfigForm((current) => ({
+        ...current,
+        ...result.config,
+      }));
+    }
+  };
 
   const load = async () => {
     setLoadingExchange(true);
     try {
-      const result = await api.getExchange(300);
-      setData(result);
+      const [exchangeResult, oneCResult] = await Promise.all([
+        api.getExchange(300),
+        api.getOneCConfig(),
+      ]);
+      setData(exchangeResult);
+      applyOneCState(oneCResult);
       setError("");
     } catch (loadError) {
       setError(loadError.message);
@@ -3394,12 +3452,66 @@ function ManagerExchange({ onReload, onNavigate }) {
 
   useEffect(() => { load(); }, []);
 
+  const saveConnection = async () => {
+    setBusyConnection("save");
+    try {
+      const result = await api.saveOneCConfig(configForm);
+      applyOneCState(result);
+      setConnectionResult(null);
+      setPreview(null);
+      alert("Настройки подключения к 1С сохранены.");
+    } catch (saveError) {
+      alert(saveError.message);
+    } finally {
+      setBusyConnection("");
+    }
+  };
+
+  const testConnection = async () => {
+    setBusyConnection("test");
+    try {
+      const saved = await api.saveOneCConfig(configForm);
+      applyOneCState(saved);
+      const result = await api.testOneCConnection();
+      applyOneCState(result);
+      setConnectionResult(result.result || null);
+      setPreview(null);
+    } catch (testError) {
+      setConnectionResult({ ok: false, message: testError.message });
+    } finally {
+      setBusyConnection("");
+    }
+  };
+
+  const loadPreview = async (type) => {
+    setBusyConnection(type);
+    try {
+      const saved = await api.saveOneCConfig(configForm);
+      applyOneCState(saved);
+      const result = await api.previewOneCCatalog(type, 20);
+      setPreview(result);
+    } catch (previewError) {
+      alert(previewError.message);
+    } finally {
+      setBusyConnection("");
+    }
+  };
+
   const action = async (row, type) => {
     setBusyId(row.id);
     try {
-      if (type === "check") await api.checkExchangeOrder(row.id);
-      if (type === "send") await api.sendExchangeOrder(row.id);
-      if (type === "reset") await api.resetExchangeOrder(row.id);
+      let result;
+      if (type === "check") result = await api.checkExchangeOrder(row.id);
+      if (type === "send") {
+        await api.checkExchangeOrder(row.id);
+        result = await api.sendExchangeOrder(row.id);
+      }
+      if (type === "draft") {
+        await api.checkExchangeOrder(row.id);
+        result = await api.createOneCDraft(row.id);
+      }
+      if (type === "reset") result = await api.resetExchangeOrder(row.id);
+      if (result?.result?.message) alert(result.result.message);
       await onReload();
       await load();
     } catch (actionError) {
@@ -3433,15 +3545,146 @@ function ManagerExchange({ onReload, onNavigate }) {
   };
 
   const summary = data?.summary || {};
+  const runtime = oneC?.runtime || {};
+  const modeIsReal = configForm.mode === "real";
+  const connectionLabel = modeIsReal
+    ? runtime.readyForRead
+      ? "Режим реальной 1С"
+      : "Требуется адрес публикации"
+    : "Безопасный симулятор";
 
   return <section>
-    <div className="exchange-notice"><strong>Тестовый контур обмена с 1С.</strong> Здесь проверяются ID контрагентов и номенклатуры, формируются JSON/CSV-файлы и имитируется передача. Реальное соединение с рабочей 1С будет включено после получения параметров вашей базы и согласования формата обмена.</div>
-    <div className="panel-heading"><div><p className="eyebrow">Интеграция</p><h2>Центр обмена с 1С</h2><p>Проверка заказов, тестовая передача, повторные попытки и журнал обмена.</p></div><button className="secondary-button" type="button" onClick={load}>Обновить</button></div>
+    <div className="exchange-notice">
+      <strong>{connectionLabel}.</strong>{" "}
+      В версии 2.0–2.2 добавлены настройки соединения, проверка HTTP-сервиса,
+      чтение контрагентов и номенклатуры, а также создание непроведённого
+      черновика. Реальная запись дополнительно блокируется на сервере и не
+      включится случайно.
+    </div>
+
+    <section className="panel" style={{ marginTop: 0 }}>
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">1С:УНФ 1.6</p>
+          <h2>Подключение к рабочей базе</h2>
+          <p>Сначала используйте симулятор. Реальный режим включаем после установки расширения и публикации HTTP-сервиса.</p>
+        </div>
+        <span className={`badge ${modeIsReal ? "exchange-ready" : "exchange-pending"}`}>{connectionLabel}</span>
+      </div>
+
+      <div className="form-grid">
+        <label className="field">
+          Режим подключения
+          <select value={configForm.mode} onChange={(event) => setConfigForm({ ...configForm, mode: event.target.value })}>
+            <option value="simulation">Безопасный симулятор</option>
+            <option value="real">Реальная 1С по локальной сети</option>
+          </select>
+        </label>
+        <label className="field">
+          Адрес опубликованной базы 1С
+          <input
+            value={configForm.baseUrl || ""}
+            disabled={Boolean(runtime.baseUrlFromEnv)}
+            placeholder="http://192.168.1.10/clover"
+            onChange={(event) => setConfigForm({ ...configForm, baseUrl: event.target.value })}
+          />
+        </label>
+        <label className="field">
+          Пользователь обмена 1С
+          <input
+            value={configForm.username || ""}
+            disabled={Boolean(runtime.usernameFromEnv)}
+            placeholder="CloverExchange"
+            onChange={(event) => setConfigForm({ ...configForm, username: event.target.value })}
+          />
+        </label>
+        <label className="field">
+          Тайм-аут, мс
+          <input
+            type="number"
+            min="3000"
+            max="30000"
+            value={configForm.timeoutMs || 10000}
+            onChange={(event) => setConfigForm({ ...configForm, timeoutMs: Number(event.target.value) || 10000 })}
+          />
+        </label>
+      </div>
+
+      <details style={{ marginTop: 12 }}>
+        <summary className="section-toggle">Технические пути HTTP-сервиса</summary>
+        <div className="form-grid" style={{ marginTop: 12 }}>
+          <label className="field">Проверка связи<input value={configForm.healthPath || ""} onChange={(event) => setConfigForm({ ...configForm, healthPath: event.target.value })} /></label>
+          <label className="field">Контрагенты<input value={configForm.clientsPath || ""} onChange={(event) => setConfigForm({ ...configForm, clientsPath: event.target.value })} /></label>
+          <label className="field">Номенклатура<input value={configForm.productsPath || ""} onChange={(event) => setConfigForm({ ...configForm, productsPath: event.target.value })} /></label>
+          <label className="field">Черновик заказа<input value={configForm.draftOrderPath || ""} onChange={(event) => setConfigForm({ ...configForm, draftOrderPath: event.target.value })} /></label>
+        </div>
+      </details>
+
+      <div className="setting-card" style={{ marginTop: 12 }}>
+        <div>
+          <h3>Разрешить создание черновика</h3>
+          <p>Даже после включения здесь рабочая запись останется заблокированной, пока в server/.env не установлено ONEC_WRITE_ENABLED=true.</p>
+        </div>
+        <button
+          className={configForm.allowDraftCreation ? "toggle active" : "toggle"}
+          type="button"
+          onClick={() => setConfigForm({ ...configForm, allowDraftCreation: !configForm.allowDraftCreation })}
+          aria-label="Разрешить создание черновика"
+        ><span /></button>
+      </div>
+
+      <div className="exchange-actions">
+        <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={saveConnection}>Сохранить настройки</button>
+        <button className="primary-button" disabled={Boolean(busyConnection)} type="button" onClick={testConnection}>{busyConnection === "test" ? "Проверяем…" : "Проверить связь"}</button>
+        <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={() => loadPreview("clients")}>Контрагенты</button>
+        <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={() => loadPreview("products")}>Номенклатура</button>
+      </div>
+
+      <div className="toolbar four" style={{ marginTop: 12 }}>
+        <div className="warning-box" style={{ padding: 10 }}>Секрет в server/.env: {runtime.secretConfigured ? "настроен" : "не настроен"}</div>
+        <div className="warning-box" style={{ padding: 10 }}>Чтение: {runtime.readyForRead ? "доступно" : "не готово"}</div>
+        <div className="warning-box" style={{ padding: 10 }}>Запись: {runtime.readyForWrite ? "разрешена" : "заблокирована"}</div>
+        <div className="warning-box" style={{ padding: 10 }}>База: УНФ 1.6 · документ ЗаказПокупателя</div>
+      </div>
+
+      {connectionResult && (
+        <div className={connectionResult.ok === false ? "auth-error" : "success-box"} style={{ marginTop: 12 }}>
+          {connectionResult.ok === false
+            ? connectionResult.message
+            : <><strong>Связь работает.</strong> {connectionResult.configuration || "1С:УНФ"}{connectionResult.database ? ` · база ${connectionResult.database}` : ""}{connectionResult.extensionVersion ? ` · расширение ${connectionResult.extensionVersion}` : ""}</>}
+        </div>
+      )}
+
+      {preview && (
+        <div className="comment-box" style={{ marginTop: 12 }}>
+          <strong>{preview.type === "clients" ? "Контрагенты" : "Номенклатура"}: {preview.count || 0}</strong>
+          <p className="muted small">Только просмотр. Данные Clover пока не изменяются.</p>
+          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+            {(preview.items || []).map((item, index) => (
+              <div key={item.id || index} style={{ paddingBottom: 8, borderBottom: "1px solid #e5ebe3" }}>
+                <strong>{item.name || item.presentation || item.code || "Без названия"}</strong>
+                <small style={{ display: "block" }}>ID: {item.id || "—"}{item.article ? ` · артикул ${item.article}` : ""}{item.inn ? ` · ИНН ${item.inn}` : ""}</small>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+
+    <div className="panel-heading">
+      <div>
+        <p className="eyebrow">Интеграция</p>
+        <h2>Центр обмена с 1С</h2>
+        <p>Проверка заказов, тестовая передача, черновики и журнал обмена.</p>
+      </div>
+      <button className="secondary-button" type="button" onClick={load}>Обновить</button>
+    </div>
     {error && <div className="auth-error">{error}</div>}
     <div className="exchange-grid">
       <article><span>Не отправлено</span><strong>{summary.notSent || 0}</strong></article>
       <article><span>Готово</span><strong>{summary.ready || 0}</strong></article>
       <article><span>Передано тестово</span><strong>{summary.sent || 0}</strong></article>
+      <article><span>Черновики 1С</span><strong>{summary.draft || 0}</strong></article>
       <article><span>Ошибки</span><strong>{summary.error || 0}</strong></article>
     </div>
     <div className="toolbar four">
@@ -3471,9 +3714,7 @@ function ManagerExchange({ onReload, onNavigate }) {
                 </div>
               ))}
             </div>
-            <button className="secondary-button" style={{ marginTop: 12 }} type="button" onClick={() => onNavigate("clients")}>
-              Открыть клиентов
-            </button>
+            <button className="secondary-button" style={{ marginTop: 12 }} type="button" onClick={() => onNavigate("clients")}>Открыть клиентов</button>
           </div>
           <div className="comment-box">
             <strong>Товары без ID номенклатуры: {data?.matching?.products?.length || 0}</strong>
@@ -3485,9 +3726,7 @@ function ManagerExchange({ onReload, onNavigate }) {
                 </div>
               ))}
             </div>
-            <button className="secondary-button" style={{ marginTop: 12 }} type="button" onClick={() => onNavigate("products")}>
-              Открыть товары
-            </button>
+            <button className="secondary-button" style={{ marginTop: 12 }} type="button" onClick={() => onNavigate("products")}>Открыть товары</button>
           </div>
         </div>
       </section>
@@ -3501,9 +3740,11 @@ function ManagerExchange({ onReload, onNavigate }) {
           <div className="exchange-order-head"><div><span className={`badge ${exchangeBadgeClass(exchange.status)}`}>{EXCHANGE_STATUS_LABELS[exchange.status]}</span><h3>Заказ № {row.number} · {row.customerName}</h3><p className="muted small">Создан {formatDateTime(row.createdAt)} · доставка {formatDate(row.deliveryDate)} · статус заказа: {row.orderStatus}</p></div><strong>{row.validation?.ready ? "Готов" : `${row.validation?.issues?.length || 0} ошибок`}</strong></div>
           {row.validation?.issues?.length > 0 && <ul className="exchange-issues">{row.validation.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>}
           {exchange.message && <div className="exchange-message">{exchange.message}{exchange.receipt ? ` · ${exchange.receipt}` : ""}</div>}
+          {exchange.remoteDocument && <div className="exchange-message">Документ: {exchange.remoteDocument.number || exchange.remoteDocument.id || "—"} · {exchange.remoteDocument.posted ? "проведён" : "не проведён"} · {exchange.remoteDocument.mode === "real" ? "рабочая 1С" : "симулятор"}</div>}
           <div className="exchange-actions">
             <button className="secondary-button" disabled={busy} type="button" onClick={() => action(row, "check")}>Проверить</button>
-            <button className="primary-button" disabled={busy} type="button" onClick={() => action(row, "send")}>Тестовая передача</button>
+            <button className="secondary-button" disabled={busy} type="button" onClick={() => action(row, "send")}>Проверить и передать тестово</button>
+            <button className="primary-button" disabled={busy || !runtime.readyForWrite} title={!runtime.readyForWrite ? "Запись пока заблокирована настройками" : ""} type="button" onClick={() => action(row, "draft")}>{modeIsReal ? "Черновик в 1С" : "Черновик в симуляторе"}</button>
             <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "json")}>JSON</button>
             <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "csv")}>CSV</button>
             {exchange.status !== "not_sent" && <button className="secondary-button" disabled={busy} type="button" onClick={() => action(row, "reset")}>Сбросить</button>}
@@ -3517,7 +3758,7 @@ function ManagerExchange({ onReload, onNavigate }) {
     <section className="panel">
       <div className="panel-heading"><div><p className="eyebrow">История</p><h2>Журнал обмена</h2></div></div>
       <div className="exchange-log">
-        {(data?.log || []).map((item) => <article className="exchange-log-row" key={item.id}><h4>{item.action === "exchange.check" ? "Проверка заказа" : item.action === "exchange.send.test" ? "Тестовая передача" : item.action === "exchange.send.error" ? "Ошибка передачи" : item.action === "exchange.reset" ? "Сброс статуса" : item.action === "exchange.download.order" ? "Скачан файл заказа" : item.action === "exchange.download.batch" ? "Скачан пакет заказов" : item.action}</h4><p>{formatDateTime(item.createdAt)} · заказ № {item.details?.orderNumber || "—"} · {item.userEmail || "Система"}</p></article>)}
+        {(data?.log || []).map((item) => <article className="exchange-log-row" key={item.id}><h4>{AUDIT_ACTION_LABELS[item.action] || item.action}</h4><p>{formatDateTime(item.createdAt)} · заказ № {item.details?.orderNumber || "—"} · {item.userEmail || "Система"}</p></article>)}
         {!(data?.log || []).length && <div className="empty-box">Операций обмена пока нет.</div>}
       </div>
     </section>
@@ -3612,7 +3853,7 @@ function ManagerDashboard({ orders, products, setProducts, profile, addresses, s
   ];
 
   return <main className="clover-app">
-    <Header title="Кабинет менеджера" subtitle="Большой пакет 1.7–1.9 · исправление 1.9.1" onLogout={onLogout} />
+    <Header title="Кабинет менеджера" subtitle="Большой пакет 2.0–2.2 · подготовка к 1С:УНФ" onLogout={onLogout} />
     <section className="page-content">
       <div className="page-title-row"><div><p className="eyebrow">Управление</p><h1>Рабочее пространство</h1><p>Заказы, клиенты, товары, документы и тестовый контур обмена с 1С.</p></div></div>
       {managerNotice && (

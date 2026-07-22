@@ -1,6 +1,6 @@
 {
   "name": "clover-server",
-  "version": "1.9.0",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "check": "node --check src/server.js && node --check src/db.js && node --check src/backups.js && node --check src/exchange.js"
+    "check": "node --check src/server.js && node --check src/db.js && node --check src/backups.js && node --check src/exchange.js && node --check src/oneC.js"
   },
   "dependencies": {
     "bcryptjs": "latest",
