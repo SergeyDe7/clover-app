@@ -1,0 +1,161 @@
+.client-profile {
+  margin-top: 28px;
+  padding: 25px;
+  border: 1px solid #e1e9de;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 10px 26px rgba(56, 97, 52, 0.05);
+}
+
+.client-profile-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 22px;
+}
+
+.client-profile-heading h2 {
+  margin: 4px 0 7px;
+  color: #394639;
+}
+
+.client-profile-heading p {
+  margin: 0;
+  color: #737d73;
+}
+
+.profile-edit-button,
+.profile-save-button {
+  min-height: 43px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 12px;
+  background: #5b9d57;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.profile-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.profile-summary article {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #e4ebe1;
+  border-radius: 14px;
+  background: #f8fbf6;
+}
+
+.profile-summary span {
+  display: block;
+  margin-bottom: 6px;
+  color: #7b857b;
+  font-size: 11px;
+}
+
+.profile-summary strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #3f4b3f;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.profile-empty {
+  margin-top: 18px;
+  padding: 20px;
+  border-radius: 14px;
+  background: #fff8e9;
+  color: #846b38;
+  text-align: center;
+}
+
+.profile-empty p {
+  margin: 0;
+}
+
+.client-profile-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: 16px;
+  background: #f4f8f2;
+}
+
+.profile-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.client-profile-form label {
+  display: grid;
+  gap: 7px;
+  color: #515d51;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.client-profile-form input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1px solid #d6e0d3;
+  border-radius: 11px;
+  background: #ffffff;
+  color: #394639;
+  font: inherit;
+  outline: none;
+}
+
+.client-profile-form input:focus {
+  border-color: #5b9d57;
+  box-shadow: 0 0 0 3px rgba(91, 157, 87, 0.1);
+}
+
+.profile-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.profile-cancel-button {
+  min-height: 43px;
+  padding: 10px 16px;
+  border: 1px solid #d5dfd2;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #687268;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .client-profile-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .profile-edit-button {
+    width: 100%;
+  }
+
+  .profile-form-grid,
+  .profile-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .profile-form-actions {
+    flex-direction: column;
+  }
+
+  .profile-form-actions button {
+    width: 100%;
+  }
+}
