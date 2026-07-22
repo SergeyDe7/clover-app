@@ -212,6 +212,102 @@ const PRICE_SOURCE_LABELS = {
   unspecified: "Цена уточняется",
 };
 
+const EXCHANGE_STATUS_LABELS = {
+  not_sent: "Не отправлен",
+  ready: "Готов к передаче",
+  sent: "Передан в 1С",
+  error: "Ошибка",
+};
+
+function normalizeOrderExchange(value = {}) {
+  const status = Object.hasOwn(EXCHANGE_STATUS_LABELS, value?.status)
+    ? value.status
+    : "not_sent";
+
+  return {
+    status,
+    attempts: Math.max(0, Number(value?.attempts) || 0),
+    checkedAt: value?.checkedAt || "",
+    lastAttemptAt: value?.lastAttemptAt || "",
+    sentAt: value?.sentAt || "",
+    message: value?.message || "",
+    receipt: value?.receipt || "",
+    payloadVersion: value?.payloadVersion || "1.0",
+  };
+}
+
+function exchangeBadgeClass(status) {
+  if (status === "sent") return "exchange-sent";
+  if (status === "ready") return "exchange-ready";
+  if (status === "error") return "exchange-error";
+  return "exchange-pending";
+}
+
+function downloadBlobFile(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function printOrderDocument(order, settings) {
+  const printWindow = window.open("", "_blank", "width=960,height=760");
+  if (!printWindow) {
+    alert("Браузер заблокировал окно печати. Разрешите всплывающие окна для localhost.");
+    return;
+  }
+
+  const itemRows = (order.items || []).map((item, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td><strong>${escapeHtml(item.name)}</strong><br><small>${escapeHtml(item.code || item.category || "")}</small></td>
+      <td>${escapeHtml(UNIT_CONFIG[item.unit]?.label || item.unit)}</td>
+      <td>${Number(item.quantity) || 0}</td>
+      <td>${settings.showPrices ? escapeHtml(formatMoney(Number(item.unitPrice) || 0)) : "—"}</td>
+      <td>${settings.showPrices ? escapeHtml(formatMoney(Number(item.lineTotal) || 0)) : "—"}</td>
+    </tr>`).join("");
+  const customRows = (order.customItems || []).map((item, index) => `
+    <tr>
+      <td>${(order.items || []).length + index + 1}</td>
+      <td><strong>${escapeHtml(item.name)}</strong><br><small>Товар вне матрицы · ${escapeHtml(item.details || "")}</small></td>
+      <td>${escapeHtml(item.unit || "шт.")}</td>
+      <td>${Number(item.quantity) || 0}</td>
+      <td>${settings.showPrices ? escapeHtml(formatMoney(Number(item.unitPrice) || 0)) : "—"}</td>
+      <td>${settings.showPrices ? escapeHtml(formatMoney((Number(item.unitPrice) || 0) * (Number(item.quantity) || 0))) : "—"}</td>
+    </tr>`).join("");
+
+  printWindow.document.write(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Заказ ${escapeHtml(order.number)}</title><style>
+    body{font-family:Arial,sans-serif;color:#263226;margin:32px} h1{margin:0 0 4px;color:#3f7c3d} .meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:22px 0;padding:16px;background:#f3f7f1;border-radius:12px}.meta div{line-height:1.5} table{width:100%;border-collapse:collapse;margin-top:18px}th,td{border:1px solid #dce6d9;padding:9px;text-align:left;vertical-align:top}th{background:#eef5eb}.total{margin-top:18px;text-align:right;font-size:20px;font-weight:700}.note{margin-top:18px;padding:12px;background:#fff8e8;border-radius:10px}.footer{margin-top:36px;color:#718071;font-size:12px}@media print{button{display:none}body{margin:12mm}}
+  </style></head><body>
+    <h1>Заказ № ${escapeHtml(order.number)}</h1>
+    <div>Система Clover · ${escapeHtml(formatDateTime(order.createdAt))}</div>
+    <div class="meta">
+      <div><strong>Клиент:</strong><br>${escapeHtml(order.customerName || "")}<br>${escapeHtml(order.customerContact || "")}<br>${escapeHtml(order.customerPhone || "")}</div>
+      <div><strong>Доставка:</strong><br>${escapeHtml(formatDate(order.firstDeliveryDate))}<br>${escapeHtml(order.address || "")}</div>
+    </div>
+    <table><thead><tr><th>№</th><th>Товар</th><th>Единица</th><th>Количество</th><th>Цена</th><th>Сумма</th></tr></thead><tbody>${itemRows}${customRows}</tbody></table>
+    ${settings.showPrices ? `<div class="total">Итого: ${escapeHtml(formatMoney(getOrderTotal(order)))}</div>` : ""}
+    ${order.clientComment ? `<div class="note"><strong>Комментарий клиента:</strong><br>${escapeHtml(order.clientComment)}</div>` : ""}
+    ${order.managerComment ? `<div class="note"><strong>Комментарий менеджера:</strong><br>${escapeHtml(order.managerComment)}</div>` : ""}
+    <div class="footer">Внешний ID: ${escapeHtml(order.externalId || order.id || "")}</div>
+    <script>window.onload=()=>window.print();<\/script>
+  </body></html>`);
+  printWindow.document.close();
+}
+
 const APP_STYLES = `
 :root {
   font-family: Arial, Helvetica, sans-serif;
@@ -710,6 +806,28 @@ textarea { resize: vertical; }
 .backup-row .inline-actions { justify-content: flex-end; }
 .audit-details { margin-top: 4px; color: #667266; font-size: 10px; word-break: break-word; }
 .server-safe-note { margin-top: 14px; padding: 13px; border-radius: 12px; background: #eef6eb; color: #4e714d; font-size: 11px; line-height: 1.5; }
+.exchange-notice { margin-bottom: 16px; padding: 15px; border: 1px solid #ead9b5; border-radius: 13px; background: #fff9ec; color: #78632e; line-height: 1.5; }
+.exchange-status-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.exchange-pending { background: #edf0ed; color: #687168; }
+.exchange-ready { background: #e7f2ff; color: #2f6592; }
+.exchange-sent { background: #e5f4e2; color: #3e7b3b; }
+.exchange-error { background: #fbe8e8; color: #a34e4e; }
+.exchange-message { margin-top: 8px; color: #727d72; font-size: 11px; line-height: 1.45; }
+.exchange-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.exchange-actions button { min-height: 34px; padding: 7px 10px; }
+.exchange-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
+.exchange-grid article { padding: 16px; border: 1px solid #e1e9de; border-radius: 14px; background: #fff; }
+.exchange-grid span { display: block; color: #778177; font-size: 11px; }
+.exchange-grid strong { display: block; margin-top: 7px; color: #3f533f; font-size: 25px; }
+.exchange-order-list { display: grid; gap: 12px; margin-top: 14px; }
+.exchange-order-row { padding: 16px; border: 1px solid #e1e9de; border-radius: 14px; background: #fff; }
+.exchange-order-head { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; }
+.exchange-order-head h3 { margin: 5px 0; color: #3f4c3f; }
+.exchange-issues { margin: 10px 0 0; padding: 11px 13px 11px 29px; border-radius: 10px; background: #fff1f1; color: #934e4e; font-size: 11px; line-height: 1.5; }
+.exchange-log { display: grid; gap: 8px; margin-top: 14px; }
+.exchange-log-row { padding: 12px; border: 1px solid #e5ebe3; border-radius: 11px; background: #f8fbf6; }
+.exchange-log-row h4 { margin: 0 0 4px; color: #465346; }
+.exchange-log-row p { margin: 0; color: #788278; font-size: 11px; }
 .import-label { display: inline-flex; align-items: center; min-height: 42px; padding: 9px 14px; border: 1px solid #d5dfd2; border-radius: 11px; background: #fff; color: #587058; font-weight: 700; cursor: pointer; }
 .import-label input { display: none; }
 
@@ -825,6 +943,19 @@ function makeId(prefix = "id") {
     return crypto.randomUUID();
   }
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function makeOrderIdentifiers(timestamp = Date.now()) {
+  const date = new Date(timestamp);
+  const pad = (value, size = 2) => String(value).padStart(size, "0");
+  const datePart = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
+  const timePart = `${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+  const milliseconds = pad(date.getMilliseconds(), 3);
+
+  return {
+    number: `CL-${datePart.slice(2)}-${timePart}-${milliseconds}`,
+    externalId: `CLOVER-${datePart}-${timePart}-${milliseconds}`,
+  };
 }
 
 function getOrCreateClientId() {
@@ -1535,6 +1666,7 @@ function OrderEditor({
         id: product.id,
         productId: product.id,
         code: product.code,
+        oneCId: product.oneCId || "",
         name: product.name,
         category: product.category,
         quantity,
@@ -1850,57 +1982,111 @@ function ClientDashboard({
   );
 }
 
-function ManagerOrders({ orders, settings, onUpdateOrder, onDeleteOrder, onCreateProductFromCustom }) {
+function ManagerOrders({ orders, settings, onUpdateOrder, onDeleteOrder, onCreateProductFromCustom, onReload }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Все");
+  const [exchangeFilter, setExchangeFilter] = useState("all");
   const [sort, setSort] = useState("newest");
+  const [busyOrderId, setBusyOrderId] = useState("");
 
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return [...orders].filter((order) => {
-      const haystack = `${order.number} ${order.customerName} ${order.customerContact} ${order.customerPhone} ${order.customerEmail} ${order.address}`.toLowerCase();
-      return (!needle || haystack.includes(needle)) && (status === "Все" || order.status === status);
+      const exchange = normalizeOrderExchange(order.exchange);
+      const haystack = `${order.number} ${order.externalId || ""} ${order.customerName} ${order.customerContact} ${order.customerPhone} ${order.customerEmail} ${order.address}`.toLowerCase();
+      return (!needle || haystack.includes(needle))
+        && (status === "Все" || order.status === status)
+        && (exchangeFilter === "all" || exchange.status === exchangeFilter);
     }).sort((a, b) => {
       if (sort === "delivery") return String(a.firstDeliveryDate).localeCompare(String(b.firstDeliveryDate));
       if (sort === "oldest") return String(a.createdAt).localeCompare(String(b.createdAt));
       return String(b.createdAt).localeCompare(String(a.createdAt));
     });
-  }, [orders, search, status, sort]);
+  }, [orders, search, status, exchangeFilter, sort]);
+
+  const runExchangeAction = async (order, action) => {
+    setBusyOrderId(order.id);
+    try {
+      if (action === "check") {
+        const result = await api.checkExchangeOrder(order.id);
+        alert(result.validation?.ready
+          ? "Заказ готов к тестовой передаче в 1С."
+          : (result.validation?.issues || []).join("\n"));
+      } else if (action === "send") {
+        const result = await api.sendExchangeOrder(order.id);
+        alert(result.exchange?.message || "Тестовая передача выполнена.");
+      } else if (action === "reset") {
+        await api.resetExchangeOrder(order.id);
+      }
+      await onReload();
+    } catch (error) {
+      alert(error.message);
+      await onReload();
+    } finally {
+      setBusyOrderId("");
+    }
+  };
+
+  const downloadOrder = async (order, format) => {
+    setBusyOrderId(order.id);
+    try {
+      const blob = await api.downloadExchangeOrder(order.id, format);
+      downloadBlobFile(blob, `clover-order-${order.number || order.id}-1c.${format}`);
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setBusyOrderId("");
+    }
+  };
 
   return (
     <section>
       <div className="toolbar four">
-        <input type="search" placeholder="Поиск по заказу, клиенту, телефону" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input type="search" placeholder="Поиск по заказу, клиенту, телефону или ID" value={search} onChange={(e) => setSearch(e.target.value)} />
         <select value={status} onChange={(e) => setStatus(e.target.value)}><option>Все</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
+        <select value={exchangeFilter} onChange={(e) => setExchangeFilter(e.target.value)}><option value="all">Все статусы 1С</option>{Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select>
         <select value={sort} onChange={(e) => setSort(e.target.value)}><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="delivery">По дате доставки</option></select>
-        <button className="secondary-button" type="button" onClick={() => window.print()}>Печать списка</button>
       </div>
 
-      {visible.length ? <div className="manager-grid">{visible.map((order) => (
+      {visible.length ? <div className="manager-grid">{visible.map((order) => {
+        const exchange = normalizeOrderExchange(order.exchange);
+        const busy = busyOrderId === order.id;
+        return (
         <article className="order-card" key={order.id}>
           <div className="order-card-header">
-            <div><span className={`badge ${statusClass(order.status)}`}>{order.status}</span><h3>Заказ № {order.number} · {order.customerName || "Клиент"}</h3><p>{order.customerContact} · {order.customerPhone} · {order.customerEmail}</p></div>
+            <div>
+              <div className="exchange-status-line"><span className={`badge ${statusClass(order.status)}`}>{order.status}</span><span className={`badge ${exchangeBadgeClass(exchange.status)}`}>1С: {EXCHANGE_STATUS_LABELS[exchange.status]}</span></div>
+              <h3>Заказ № {order.number} · {order.customerName || "Клиент"}</h3>
+              <p>{order.customerContact} · {order.customerPhone} · {order.customerEmail}</p>
+              <p className="small">Внешний ID: {order.externalId || order.id}</p>
+              {exchange.message && <div className="exchange-message">{exchange.message}{exchange.receipt ? ` · квитанция ${exchange.receipt}` : ""}</div>}
+            </div>
             <strong className="success-text">{settings.showPrices && getOrderTotal(order) > 0 ? formatMoney(getOrderTotal(order)) : `${getPositionCount(order)} поз.`}</strong>
           </div>
           <div className="order-meta">
             <div><span>Доставка</span><strong>{formatDate(order.firstDeliveryDate)}</strong></div>
             <div><span>Адрес</span><strong>{order.address}</strong></div>
-            <div><span>Позиций</span><strong>{getPositionCount(order)}</strong></div>
+            <div><span>Попыток 1С</span><strong>{exchange.attempts}</strong></div>
             <div><span>Создан</span><strong>{formatDateTime(order.createdAt)}</strong></div>
           </div>
           <div className="manager-order-controls">
-            <label className="field">Статус
+            <label className="field">Статус заказа
               <select value={order.status} onChange={(e) => onUpdateOrder(order.id, { status: e.target.value, updatedAt: new Date().toISOString() })}>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
             </label>
-            <div className="inline-actions" style={{ alignSelf: "end" }}>
-              <button className="secondary-button" type="button" onClick={() => window.print()}>Печать</button>
-              {settings.managerCanDeleteOrders && <button className="danger-button" type="button" onClick={() => onDeleteOrder(order)}>Удалить заказ</button>}
+            <div className="exchange-actions" style={{ alignSelf: "end" }}>
+              <button className="secondary-button" disabled={busy} type="button" onClick={() => runExchangeAction(order, "check")}>Проверить 1С</button>
+              <button className="primary-button" disabled={busy} type="button" onClick={() => runExchangeAction(order, "send")}>{exchange.status === "sent" || exchange.status === "error" ? "Повторить тест" : "Тестовая отправка"}</button>
+              <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOrder(order, "json")}>JSON</button>
+              <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOrder(order, "csv")}>CSV</button>
+              <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
+              {exchange.status !== "not_sent" && <button className="secondary-button" disabled={busy} type="button" onClick={() => runExchangeAction(order, "reset")}>Сбросить 1С</button>}
+              {settings.managerCanDeleteOrders && <button className="danger-button" type="button" onClick={() => onDeleteOrder(order)}>Удалить</button>}
             </div>
           </div>
           <details className="order-details" open={false}>
             <summary>Состав и обработка заказа</summary>
             <div className="order-products">
-              {(order.items || []).map((item) => <div className="order-product" key={`${order.id}-${item.productId ?? item.id}`}><span>{item.name}<small>{item.code || item.category}</small></span><strong>{item.quantity} {UNIT_CONFIG[item.unit]?.shortLabel || item.unit}<small>{settings.showPrices && item.lineTotal > 0 ? formatMoney(item.lineTotal) : item.multiplier > 1 ? `${item.quantity * item.multiplier} шт. всего` : ""}</small></strong></div>)}
+              {(order.items || []).map((item) => <div className="order-product" key={`${order.id}-${item.productId ?? item.id}`}><span>{item.name}<small>{item.code || item.category} · ID 1С: {item.oneCId || "проверяется по каталогу"}</small></span><strong>{item.quantity} {UNIT_CONFIG[item.unit]?.shortLabel || item.unit}<small>{settings.showPrices && item.lineTotal > 0 ? formatMoney(item.lineTotal) : item.multiplier > 1 ? `${item.quantity * item.multiplier} шт. всего` : ""}</small></strong></div>)}
               {(order.customItems || []).map((item) => (
                 <div className="custom-line" key={`${order.id}-${item.id}`}>
                   <div className="order-product" style={{ border: 0, paddingTop: 0 }}><span><span className="badge yellow">Товар вне матрицы</span>{item.name}<small>{item.details}</small></span><strong>{item.quantity} {item.unit}<small>{Number(item.unitPrice) > 0 ? formatMoney(item.unitPrice * item.quantity) : "Цена уточняется"}</small></strong></div>
@@ -1909,7 +2095,7 @@ function ManagerOrders({ orders, settings, onUpdateOrder, onDeleteOrder, onCreat
                       <select value={item.requestStatus || "Новый запрос"} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, requestStatus: e.target.value } : value) })}>{CUSTOM_STATUSES.map((value) => <option key={value}>{value}</option>)}</select>
                     </label>
                     <label className="field">Цена за указанную единицу
-                      <input type="number" min="0" step="0.01" value={item.unitPrice || ""} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, unitPrice: Number(e.target.value) || 0 } : value) })} />
+                      <input type="number" min="0" step="0.01" value={item.unitPrice || ""} onFocus={selectDefaultNumber} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, unitPrice: Number(e.target.value) || 0 } : value) })} />
                     </label>
                     <label className="field">Комментарий клиенту
                       <input value={item.managerComment || ""} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, managerComment: e.target.value } : value) })} />
@@ -1929,7 +2115,7 @@ function ManagerOrders({ orders, settings, onUpdateOrder, onDeleteOrder, onCreat
             </div>
           </details>
         </article>
-      ))}</div> : <div className="empty-box">Заказы не найдены.</div>}
+      );})}</div> : <div className="empty-box">Заказы не найдены.</div>}
     </section>
   );
 }
@@ -2918,6 +3104,12 @@ const AUDIT_ACTION_LABELS = {
   "backup.restore": "Восстановлена резервная копия",
   "backup.cleanup": "Удалены старые резервные копии",
   "server.reset": "Выполнен полный сброс",
+  "exchange.check": "Проверен заказ для 1С",
+  "exchange.send.test": "Выполнена тестовая передача в 1С",
+  "exchange.send.error": "Ошибка тестовой передачи в 1С",
+  "exchange.reset": "Сброшен статус обмена с 1С",
+  "exchange.download.order": "Скачан файл заказа для 1С",
+  "exchange.download.batch": "Скачан пакет заказов для 1С",
 };
 
 function formatAuditDetails(item) {
@@ -2958,9 +3150,131 @@ function formatAuditDetails(item) {
       return "Создан новый аккаунт клиента";
     case "server.reset":
       return "Данные сброшены после создания страховочной копии";
+    case "exchange.check":
+      return `Заказ № ${details.orderNumber || "—"} · ${details.ready ? "готов к передаче" : `ошибок: ${(details.issues || []).length}`}`;
+    case "exchange.send.test":
+      return `Заказ № ${details.orderNumber || "—"} · квитанция: ${details.receipt || "—"}`;
+    case "exchange.send.error":
+      return `Заказ № ${details.orderNumber || "—"} · ошибок: ${(details.issues || []).length}`;
+    case "exchange.reset":
+      return `Заказ № ${details.orderNumber || "—"}`;
+    case "exchange.download.order":
+      return `Заказ № ${details.orderNumber || "—"} · формат: ${String(details.format || "json").toUpperCase()}`;
+    case "exchange.download.batch":
+      return `Формат: ${String(details.format || "json").toUpperCase()} · заказов: ${Number(details.count) || 0}`;
     default:
       return "";
   }
+}
+
+function ManagerExchange({ onReload }) {
+  const [data, setData] = useState(null);
+  const [loadingExchange, setLoadingExchange] = useState(true);
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState("");
+  const [batchStatus, setBatchStatus] = useState("all");
+
+  const load = async () => {
+    setLoadingExchange(true);
+    try {
+      const result = await api.getExchange(300);
+      setData(result);
+      setError("");
+    } catch (loadError) {
+      setError(loadError.message);
+    } finally {
+      setLoadingExchange(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const action = async (row, type) => {
+    setBusyId(row.id);
+    try {
+      if (type === "check") await api.checkExchangeOrder(row.id);
+      if (type === "send") await api.sendExchangeOrder(row.id);
+      if (type === "reset") await api.resetExchangeOrder(row.id);
+      await onReload();
+      await load();
+    } catch (actionError) {
+      alert(actionError.message);
+      await onReload();
+      await load();
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  const downloadOne = async (row, format) => {
+    setBusyId(row.id);
+    try {
+      const blob = await api.downloadExchangeOrder(row.id, format);
+      downloadBlobFile(blob, `clover-order-${row.number || row.id}-1c.${format}`);
+    } catch (downloadError) {
+      alert(downloadError.message);
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  const downloadBatch = async (format) => {
+    try {
+      const blob = await api.downloadExchangeBatch(format, batchStatus);
+      downloadBlobFile(blob, `clover-orders-1c.${format}`);
+    } catch (downloadError) {
+      alert(downloadError.message);
+    }
+  };
+
+  const summary = data?.summary || {};
+
+  return <section>
+    <div className="exchange-notice"><strong>Тестовый контур обмена с 1С.</strong> Здесь проверяются ID контрагентов и номенклатуры, формируются JSON/CSV-файлы и имитируется передача. Реальное соединение с рабочей 1С будет включено после получения параметров вашей базы и согласования формата обмена.</div>
+    <div className="panel-heading"><div><p className="eyebrow">Интеграция</p><h2>Центр обмена с 1С</h2><p>Проверка заказов, тестовая передача, повторные попытки и журнал обмена.</p></div><button className="secondary-button" type="button" onClick={load}>Обновить</button></div>
+    {error && <div className="auth-error">{error}</div>}
+    <div className="exchange-grid">
+      <article><span>Не отправлено</span><strong>{summary.notSent || 0}</strong></article>
+      <article><span>Готово</span><strong>{summary.ready || 0}</strong></article>
+      <article><span>Передано тестово</span><strong>{summary.sent || 0}</strong></article>
+      <article><span>Ошибки</span><strong>{summary.error || 0}</strong></article>
+    </div>
+    <div className="toolbar four">
+      <select value={batchStatus} onChange={(e) => setBatchStatus(e.target.value)}><option value="all">Все заказы</option>{Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select>
+      <button className="secondary-button" type="button" onClick={() => downloadBatch("json")}>Скачать пакет JSON</button>
+      <button className="secondary-button" type="button" onClick={() => downloadBatch("csv")}>Скачать пакет CSV</button>
+      <div className="warning-box" style={{ padding: 10 }}>Не сопоставлено клиентов: {summary.missingClientLinks || 0} · товаров: {summary.missingProductLinks || 0}</div>
+    </div>
+
+    <div className="exchange-order-list">
+      {(data?.rows || []).map((row) => {
+        const exchange = normalizeOrderExchange(row.exchange);
+        const busy = busyId === row.id;
+        return <article className="exchange-order-row" key={row.id}>
+          <div className="exchange-order-head"><div><span className={`badge ${exchangeBadgeClass(exchange.status)}`}>{EXCHANGE_STATUS_LABELS[exchange.status]}</span><h3>Заказ № {row.number} · {row.customerName}</h3><p className="muted small">Создан {formatDateTime(row.createdAt)} · доставка {formatDate(row.deliveryDate)} · статус заказа: {row.orderStatus}</p></div><strong>{row.validation?.ready ? "Готов" : `${row.validation?.issues?.length || 0} ошибок`}</strong></div>
+          {row.validation?.issues?.length > 0 && <ul className="exchange-issues">{row.validation.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>}
+          {exchange.message && <div className="exchange-message">{exchange.message}{exchange.receipt ? ` · ${exchange.receipt}` : ""}</div>}
+          <div className="exchange-actions">
+            <button className="secondary-button" disabled={busy} type="button" onClick={() => action(row, "check")}>Проверить</button>
+            <button className="primary-button" disabled={busy} type="button" onClick={() => action(row, "send")}>Тестовая передача</button>
+            <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "json")}>JSON</button>
+            <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "csv")}>CSV</button>
+            {exchange.status !== "not_sent" && <button className="secondary-button" disabled={busy} type="button" onClick={() => action(row, "reset")}>Сбросить</button>}
+          </div>
+        </article>;
+      })}
+      {!loadingExchange && !(data?.rows || []).length && !error && <div className="empty-box">Заказов для обмена пока нет.</div>}
+      {loadingExchange && <div className="empty-box">Загружаем центр обмена...</div>}
+    </div>
+
+    <section className="panel">
+      <div className="panel-heading"><div><p className="eyebrow">История</p><h2>Журнал обмена</h2></div></div>
+      <div className="exchange-log">
+        {(data?.log || []).map((item) => <article className="exchange-log-row" key={item.id}><h4>{item.action === "exchange.check" ? "Проверка заказа" : item.action === "exchange.send.test" ? "Тестовая передача" : item.action === "exchange.send.error" ? "Ошибка передачи" : item.action === "exchange.reset" ? "Сброс статуса" : item.action === "exchange.download.order" ? "Скачан файл заказа" : item.action === "exchange.download.batch" ? "Скачан пакет заказов" : item.action}</h4><p>{formatDateTime(item.createdAt)} · заказ № {item.details?.orderNumber || "—"} · {item.userEmail || "Система"}</p></article>)}
+        {!(data?.log || []).length && <div className="empty-box">Операций обмена пока нет.</div>}
+      </div>
+    </section>
+  </section>;
 }
 
 function ManagerAudit() {
@@ -3008,56 +3322,68 @@ function ManagerDashboard({ orders, products, setProducts, profile, addresses, s
           ...client,
           orders: [],
           addresses: Array.isArray(client.addresses)
-            ? client.addresses.map((item) =>
-                typeof item === "string" ? item : item.address
-              )
+            ? client.addresses.map((item) => typeof item === "string" ? item : item.address)
             : [],
         },
       ])
     );
 
     orders.forEach((order) => {
-      const id =
-        order.clientId ||
-        `legacy-${order.customerEmail || order.customerName}`;
-
-      const current =
-        map.get(id) || {
-          id,
-          companyName: order.customerName || "",
-          contactName: order.customerContact || "",
-          phone: order.customerPhone || "",
-          email: order.customerEmail || "",
-          orders: [],
-          addresses: [],
-        };
-
+      const id = order.clientId || `legacy-${order.customerEmail || order.customerName}`;
+      const current = map.get(id) || {
+        id,
+        companyName: order.customerName || "",
+        contactName: order.customerContact || "",
+        phone: order.customerPhone || "",
+        email: order.customerEmail || "",
+        orders: [],
+        addresses: [],
+      };
       current.orders.push(order);
-
-      if (
-        order.address &&
-        !current.addresses.includes(order.address)
-      ) {
-        current.addresses.push(order.address);
-      }
-
+      if (order.address && !current.addresses.includes(order.address)) current.addresses.push(order.address);
       map.set(id, current);
     });
 
     return [...map.values()].map((client) => ({
       ...client,
-      lastOrder: [...client.orders].sort((firstOrder, secondOrder) =>
-        String(secondOrder.createdAt).localeCompare(
-          String(firstOrder.createdAt)
-        )
-      )[0],
+      lastOrder: [...client.orders].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0],
     }));
   }, [orders, serverClients]);
 
   const newCount = orders.filter((order) => order.status === "Новый").length;
   const workCount = orders.filter((order) => ["Принят", "Собирается", "Готов к доставке"].includes(order.status)).length;
+  const exchangeErrors = orders.filter((order) => normalizeOrderExchange(order.exchange).status === "error").length;
 
-  return <main className="clover-app"><Header title="Кабинет менеджера" subtitle="Интерфейс 1.3.3" onLogout={onLogout} /><section className="page-content"><div className="page-title-row"><div><p className="eyebrow">Управление</p><h1>Рабочее пространство</h1><p>Заказы, клиенты, товары, правила, резервные копии и журнал действий.</p></div></div><div className="stats-grid"><article className="stat-card"><span>Новые заказы</span><strong>{newCount}</strong></article><article className="stat-card"><span>В работе</span><strong>{workCount}</strong></article><article className="stat-card"><span>Клиентов</span><strong>{clients.length}</strong></article><article className="stat-card"><span>Активных товаров</span><strong>{products.filter((item) => item.active).length}</strong></article></div><nav className="manager-nav">{[["orders","Заказы"],["clients","Клиенты"],["products","Товары"],["settings","Настройки"],["backup","Резервные копии"],["audit","Журнал действий"]].map(([id,label]) => <button className={tab === id ? "active" : ""} type="button" key={id} onClick={() => setTab(id)}>{label}</button>)}</nav>{tab === "orders" && <ManagerOrders orders={orders} settings={settings} onUpdateOrder={onUpdateOrder} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} />}{tab === "clients" && <ManagerClients clients={clients} products={products} clientLinks={clientLinks} setClientLinks={setClientLinks} />}{tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}{tab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} />}{tab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} onReload={onReload} />}{tab === "audit" && <ManagerAudit />}</section></main>;
+  const tabs = [
+    ["orders", "Заказы"],
+    ["exchange", "Обмен с 1С"],
+    ["clients", "Клиенты"],
+    ["products", "Товары"],
+    ["settings", "Настройки"],
+    ["backup", "Резервные копии"],
+    ["audit", "Журнал действий"],
+  ];
+
+  return <main className="clover-app">
+    <Header title="Кабинет менеджера" subtitle="Большой пакет 1.4–1.6" onLogout={onLogout} />
+    <section className="page-content">
+      <div className="page-title-row"><div><p className="eyebrow">Управление</p><h1>Рабочее пространство</h1><p>Заказы, клиенты, товары, документы и тестовый контур обмена с 1С.</p></div></div>
+      <div className="stats-grid">
+        <article className="stat-card"><span>Новые заказы</span><strong>{newCount}</strong></article>
+        <article className="stat-card"><span>В работе</span><strong>{workCount}</strong></article>
+        <article className="stat-card"><span>Ошибки обмена</span><strong>{exchangeErrors}</strong></article>
+        <article className="stat-card"><span>Активных товаров</span><strong>{products.filter((item) => item.active).length}</strong></article>
+      </div>
+      <nav className="manager-nav">{tabs.map(([id,label]) => <button className={tab === id ? "active" : ""} type="button" key={id} onClick={() => setTab(id)}>{label}</button>)}</nav>
+      {tab === "orders" && <ManagerOrders orders={orders} settings={settings} onUpdateOrder={onUpdateOrder} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} onReload={onReload} />}
+      {tab === "exchange" && <ManagerExchange onReload={onReload} />}
+      {tab === "clients" && <ManagerClients clients={clients} products={products} clientLinks={clientLinks} setClientLinks={setClientLinks} />}
+      {tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}
+      {tab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} />}
+      {tab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} onReload={onReload} />}
+      {tab === "audit" && <ManagerAudit />}
+    </section>
+  </main>;
 }
 
 function App() {
@@ -3456,11 +3782,14 @@ function App() {
       );
     } else {
       const timestamp = Date.now();
+      const identifiers = makeOrderIdentifiers(timestamp);
 
       setOrders((current) => [
         {
           id: makeId("order"),
-          number: String(timestamp).slice(-6),
+          externalId: identifiers.externalId,
+          number: identifiers.number,
+          exchange: normalizeOrderExchange(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           status: "Новый",

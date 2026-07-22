@@ -23,6 +23,9 @@ import {
   setClientStateField,
   setGlobalState,
   listAudit,
+  listExchangeAudit,
+  getOrderById,
+  updateOrderPayload,
   writeAudit,
 } from "./db.js";
 import {
@@ -38,6 +41,13 @@ import {
   resolveBackupPath,
   restoreServerBackup,
 } from "./backups.js";
+import {
+  build1CPayload,
+  normalizeExchangeState,
+  payloadToCsv,
+  summarizeExchange,
+  validateOrderFor1C,
+} from "./exchange.js";
 
 const app = express();
 
@@ -363,7 +373,7 @@ function resolveClientCatalog(products, rawLink) {
 app.get("/api/health", (req, res) => {
   res.json({
     ok: true,
-    service: "clover-server", version: "1.3.1",
+    service: "clover-server", version: "1.6.0",
     time: new Date().toISOString(),
   });
 });
@@ -898,6 +908,235 @@ app.post(
 );
 
 app.get(
+  "/api/admin/exchange",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const orders = listOrders();
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const clientLinks = getGlobalState("clientLinks", {});
+    const overview = summarizeExchange(orders, products, clientLinks);
+
+    res.json({
+      ...overview,
+      log: listExchangeAudit(req.query.limit || 300),
+      testMode: true,
+      realConnectionEnabled: false,
+    });
+  }
+);
+
+app.post(
+  "/api/admin/exchange/orders/:orderId/check",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const stored = getOrderById(req.params.orderId);
+    if (!stored) return res.status(404).json({ error: "Заказ не найден." });
+
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const clientLinks = getGlobalState("clientLinks", {});
+    const validation = validateOrderFor1C({
+      order: stored.payload,
+      products,
+      clientLinks,
+    });
+    const previous = normalizeExchangeState(stored.payload.exchange);
+    const exchange = {
+      ...previous,
+      status: validation.ready ? "ready" : "error",
+      checkedAt: new Date().toISOString(),
+      message: validation.ready
+        ? "Заказ готов к тестовой передаче в 1С."
+        : validation.issues.join(" "),
+    };
+    const order = updateOrderPayload(stored.id, {
+      ...stored.payload,
+      exchange,
+      updatedAt: new Date().toISOString(),
+    });
+
+    auditFromRequest(req, "exchange.check", {
+      orderId: order.id,
+      orderNumber: order.number,
+      ready: validation.ready,
+      issues: validation.issues,
+    });
+
+    res.json({ ok: true, order, validation, exchange });
+  }
+);
+
+app.post(
+  "/api/admin/exchange/orders/:orderId/send",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const stored = getOrderById(req.params.orderId);
+    if (!stored) return res.status(404).json({ error: "Заказ не найден." });
+
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const clientLinks = getGlobalState("clientLinks", {});
+    const validation = validateOrderFor1C({
+      order: stored.payload,
+      products,
+      clientLinks,
+    });
+    const previous = normalizeExchangeState(stored.payload.exchange);
+    const attemptedAt = new Date().toISOString();
+    const receipt = validation.ready
+      ? `TEST-1C-${Date.now()}-${String(stored.payload.number || stored.id).replace(/[^a-zA-Z0-9_-]/g, "")}`
+      : "";
+    const exchange = {
+      ...previous,
+      status: validation.ready ? "sent" : "error",
+      attempts: previous.attempts + 1,
+      checkedAt: attemptedAt,
+      lastAttemptAt: attemptedAt,
+      sentAt: validation.ready ? attemptedAt : previous.sentAt,
+      receipt,
+      message: validation.ready
+        ? "Тестовая передача выполнена. Реальное подключение к 1С пока не включено."
+        : validation.issues.join(" "),
+    };
+    const order = updateOrderPayload(stored.id, {
+      ...stored.payload,
+      exchange,
+      updatedAt: attemptedAt,
+    });
+
+    auditFromRequest(req, validation.ready ? "exchange.send.test" : "exchange.send.error", {
+      orderId: order.id,
+      orderNumber: order.number,
+      receipt,
+      issues: validation.issues,
+      attempts: exchange.attempts,
+    });
+
+    res.status(validation.ready ? 200 : 422).json({
+      ok: validation.ready,
+      error: validation.ready ? undefined : validation.issues.join(" "),
+      order,
+      validation,
+      exchange,
+      testMode: true,
+    });
+  }
+);
+
+app.post(
+  "/api/admin/exchange/orders/:orderId/reset",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const stored = getOrderById(req.params.orderId);
+    if (!stored) return res.status(404).json({ error: "Заказ не найден." });
+
+    const previous = normalizeExchangeState(stored.payload.exchange);
+    const exchange = {
+      ...previous,
+      status: "not_sent",
+      checkedAt: "",
+      lastAttemptAt: "",
+      sentAt: "",
+      receipt: "",
+      message: "Статус передачи сброшен менеджером.",
+    };
+    const order = updateOrderPayload(stored.id, {
+      ...stored.payload,
+      exchange,
+      updatedAt: new Date().toISOString(),
+    });
+
+    auditFromRequest(req, "exchange.reset", {
+      orderId: order.id,
+      orderNumber: order.number,
+    });
+
+    res.json({ ok: true, order, exchange });
+  }
+);
+
+app.get(
+  "/api/admin/exchange/orders/:orderId/download",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const stored = getOrderById(req.params.orderId);
+    if (!stored) return res.status(404).json({ error: "Заказ не найден." });
+
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const clientLinks = getGlobalState("clientLinks", {});
+    const payload = build1CPayload({
+      order: stored.payload,
+      products,
+      clientLinks,
+    });
+    const safeNumber = String(stored.payload.number || stored.id).replace(/[^a-zA-Z0-9а-яА-Я_-]/g, "-");
+    const format = String(req.query.format || "json").toLowerCase();
+
+    auditFromRequest(req, "exchange.download.order", {
+      orderId: stored.id,
+      orderNumber: stored.payload.number,
+      format,
+      ready: payload.validation.ready,
+    });
+
+    if (format === "csv") {
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename=clover-order-${safeNumber}-1c.csv`);
+      return res.send(payloadToCsv(payload));
+    }
+
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename=clover-order-${safeNumber}-1c.json`);
+    return res.send(JSON.stringify(payload, null, 2));
+  }
+);
+
+app.get(
+  "/api/admin/exchange/batch/download",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const clientLinks = getGlobalState("clientLinks", {});
+    const requestedStatus = String(req.query.status || "all");
+    const format = String(req.query.format || "json").toLowerCase();
+    const orders = listOrders().filter((order) => {
+      if (requestedStatus === "all") return true;
+      return normalizeExchangeState(order.exchange).status === requestedStatus;
+    });
+    const payloads = orders.map((order) => build1CPayload({ order, products, clientLinks }));
+    const stamp = new Date().toISOString().slice(0, 10);
+
+    auditFromRequest(req, "exchange.download.batch", {
+      format,
+      status: requestedStatus,
+      count: payloads.length,
+    });
+
+    if (format === "csv") {
+      const chunks = payloads.map((payload) => payloadToCsv(payload).replace(/^\uFEFF/, ""));
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename=clover-orders-1c-${stamp}.csv`);
+      return res.send("\uFEFF" + chunks.join("\r\n\r\n"));
+    }
+
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename=clover-orders-1c-${stamp}.json`);
+    return res.send(JSON.stringify({
+      schema: "clover.orders.batch.1c",
+      schemaVersion: "1.0",
+      generatedAt: new Date().toISOString(),
+      testMode: true,
+      count: payloads.length,
+      orders: payloads,
+    }, null, 2));
+  }
+);
+
+app.get(
   "/api/admin/audit",
   authRequired,
   roleRequired("manager"),
@@ -973,7 +1212,7 @@ try {
 
 app.listen(port, host, () => {
   console.log("");
-  console.log("Clover Server 1.3 запущен");
+  console.log("Clover Server 1.6 запущен");
   console.log(`API: http://localhost:${port}/api/health`);
   console.log(
     `Менеджер: ${

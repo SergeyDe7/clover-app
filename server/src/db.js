@@ -268,6 +268,49 @@ export function listOrders(userId = null) {
   return rows.map((row) => parseJson(row.payload_json, {}));
 }
 
+export function getOrderById(orderId) {
+  const row = db.prepare(`
+    SELECT id, user_id, payload_json, created_at, updated_at
+    FROM orders
+    WHERE id = ?
+  `).get(String(orderId));
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    userId: row.user_id,
+    payload: parseJson(row.payload_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function updateOrderPayload(orderId, payload) {
+  const stored = getOrderById(orderId);
+
+  if (!stored) {
+    throw new Error("Заказ не найден.");
+  }
+
+  const updatedAt = payload?.updatedAt || now();
+  const normalized = {
+    ...stored.payload,
+    ...(payload || {}),
+    id: stored.id,
+    clientId: stored.userId,
+    updatedAt,
+  };
+
+  db.prepare(`
+    UPDATE orders
+    SET payload_json = ?, updated_at = ?
+    WHERE id = ?
+  `).run(JSON.stringify(normalized), updatedAt, stored.id);
+
+  return normalized;
+}
+
 function resolveOrderUserId(order, fallbackUserId) {
   if (fallbackUserId) {
     return fallbackUserId;
@@ -461,6 +504,27 @@ export function listAudit(limit = 200) {
   const rows = db.prepare(`
     SELECT id, user_id, user_email, user_role, action, details_json, created_at
     FROM audit_log
+    ORDER BY created_at DESC
+    LIMIT ?
+  `).all(safeLimit);
+
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    userEmail: row.user_email || "",
+    userRole: row.user_role || "",
+    action: row.action,
+    details: parseJson(row.details_json, {}),
+    createdAt: row.created_at,
+  }));
+}
+
+export function listExchangeAudit(limit = 300) {
+  const safeLimit = Math.min(500, Math.max(1, Number(limit) || 300));
+  const rows = db.prepare(`
+    SELECT id, user_id, user_email, user_role, action, details_json, created_at
+    FROM audit_log
+    WHERE action LIKE 'exchange.%'
     ORDER BY created_at DESC
     LIMIT ?
   `).all(safeLimit);

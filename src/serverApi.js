@@ -223,6 +223,40 @@ export const api = {
     return request(`/admin/audit?limit=${encodeURIComponent(limit)}`);
   },
 
+  getExchange(limit = 300) {
+    return request(`/admin/exchange?limit=${encodeURIComponent(limit)}`);
+  },
+
+  checkExchangeOrder(orderId) {
+    return request(`/admin/exchange/orders/${encodeURIComponent(orderId)}/check`, {
+      method: "POST",
+    });
+  },
+
+  sendExchangeOrder(orderId) {
+    return request(`/admin/exchange/orders/${encodeURIComponent(orderId)}/send`, {
+      method: "POST",
+    });
+  },
+
+  resetExchangeOrder(orderId) {
+    return request(`/admin/exchange/orders/${encodeURIComponent(orderId)}/reset`, {
+      method: "POST",
+    });
+  },
+
+  downloadExchangeOrder(orderId, format = "json") {
+    return requestBlob(
+      `/admin/exchange/orders/${encodeURIComponent(orderId)}/download?format=${encodeURIComponent(format)}`
+    );
+  },
+
+  downloadExchangeBatch(format = "json", status = "all") {
+    return requestBlob(
+      `/admin/exchange/batch/download?format=${encodeURIComponent(format)}&status=${encodeURIComponent(status)}`
+    );
+  },
+
   resetAll() {
     return request("/admin/reset", {
       method: "POST",
