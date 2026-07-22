@@ -200,6 +200,13 @@ export const api = {
     });
   },
 
+  cleanupBackups(data = {}) {
+    return request("/admin/backups/cleanup", {
+      method: "POST",
+      body: data,
+    });
+  },
+
   restoreBackup(fileName) {
     return request(`/admin/backups/${encodeURIComponent(fileName)}/restore`, {
       method: "POST",

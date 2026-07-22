@@ -31,6 +31,7 @@ import {
   EMPTY_LINK,
 } from "./defaults.js";
 import {
+  cleanupOldBackups,
   createServerBackup,
   ensureDailyBackup,
   listServerBackups,
@@ -362,7 +363,7 @@ function resolveClientCatalog(products, rawLink) {
 app.get("/api/health", (req, res) => {
   res.json({
     ok: true,
-    service: "clover-server",
+    service: "clover-server", version: "1.3.1",
     time: new Date().toISOString(),
   });
 });
@@ -832,6 +833,21 @@ app.post(
   }
 );
 
+app.post(
+  "/api/admin/backups/cleanup",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const result = cleanupOldBackups({
+      maxFiles: Number(req.body?.maxFiles) || 50,
+      automaticMaxAgeDays:
+        Number(req.body?.automaticMaxAgeDays) || 30,
+    });
+    auditFromRequest(req, "backup.cleanup", result);
+    res.json({ ok: true, ...result });
+  }
+);
+
 app.get(
   "/api/admin/backups/:fileName/download",
   authRequired,
@@ -865,11 +881,15 @@ app.post(
         details: {
           fileName: req.params.fileName,
           restoredAt: new Date().toISOString(),
+          restoredPhotos: snapshot.restoredPhotos || 0,
+          legacy: Boolean(snapshot.legacy),
         },
       });
       res.json({
         ok: true,
         restoredAt: snapshot.exportedAt,
+        restoredPhotos: snapshot.restoredPhotos || 0,
+        legacy: Boolean(snapshot.legacy),
       });
     } catch (error) {
       next(error);
@@ -953,7 +973,7 @@ try {
 
 app.listen(port, host, () => {
   console.log("");
-  console.log("Clover Server запущен");
+  console.log("Clover Server 1.3 запущен");
   console.log(`API: http://localhost:${port}/api/health`);
   console.log(
     `Менеджер: ${

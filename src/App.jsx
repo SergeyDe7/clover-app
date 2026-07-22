@@ -59,6 +59,85 @@ const UNIT_CONFIG = {
   bundle: { label: "Пачка", shortLabel: "пач." },
 };
 
+const RUSSIAN_PHONE_PREFIX = "+7 ";
+
+function getRussianPhoneLocalDigits(value) {
+  let digits = String(value || "").replace(/\D/g, "");
+
+  if (digits.startsWith("7") || digits.startsWith("8")) {
+    digits = digits.slice(1);
+  }
+
+  return digits.slice(0, 10);
+}
+
+function formatRussianPhone(value) {
+  const digits = getRussianPhoneLocalDigits(value);
+
+  if (!digits) return RUSSIAN_PHONE_PREFIX;
+
+  let result = `+7 (${digits.slice(0, 3)}`;
+  if (digits.length >= 3) result += ")";
+  if (digits.length > 3) result += ` ${digits.slice(3, 6)}`;
+  if (digits.length > 6) result += `-${digits.slice(6, 8)}`;
+  if (digits.length > 8) result += `-${digits.slice(8, 10)}`;
+
+  return result;
+}
+
+function getManagerPhoneLinks(value) {
+  const localDigits = getRussianPhoneLocalDigits(value);
+
+  if (localDigits.length !== 10) {
+    return {
+      phone: "",
+    };
+  }
+
+  const fullNumber = `7${localDigits}`;
+
+  return {
+    phone: `tel:+${fullNumber}`,
+  };
+}
+
+function getMaxLink(value) {
+  const rawValue = String(value || "").trim();
+
+  if (!rawValue) return "";
+  if (/^https?:\/\/(?:www\.)?max\.ru\//i.test(rawValue)) return rawValue;
+  if (/^(?:www\.)?max\.ru\//i.test(rawValue)) return `https://${rawValue}`;
+
+  const profilePath = rawValue
+    .replace(/^@/, "")
+    .replace(/^\/+|\/+$/g, "");
+
+  return /^(?:u\/)?[a-zA-Z0-9_-]+$/.test(profilePath)
+    ? `https://max.ru/${profilePath}`
+    : "";
+}
+
+function getTelegramLink(value) {
+  const rawValue = String(value || "").trim();
+
+  if (!rawValue) return "";
+  if (/^https?:\/\//i.test(rawValue)) return rawValue;
+
+  const username = rawValue
+    .replace(/^@/, "")
+    .replace(/^t\.me\//i, "")
+    .replace(/[^a-zA-Z0-9_]/g, "");
+
+  return username ? `https://t.me/${username}` : "";
+}
+
+function selectDefaultNumber(event) {
+  const value = String(event.currentTarget.value ?? "");
+  if (value === "0" || value === "1") {
+    event.currentTarget.select();
+  }
+}
+
 const UNIT_ORDER = ["piece", "pack", "bundle"];
 const ORDER_STATUSES = [
   "Новый",
@@ -101,6 +180,10 @@ const DEFAULT_SETTINGS = {
   managerCanDeleteOrders: true,
   showFavorites: true,
   enableDrafts: true,
+  managerFullName: "",
+  managerPhone: "+7 ",
+  managerMax: "",
+  managerTelegram: "",
 };
 
 const EMPTY_PROFILE = {
@@ -195,6 +278,72 @@ textarea { resize: vertical; }
 }
 .app-header-logo { width: 145px; height: auto; }
 .app-header-actions { display: flex; align-items: center; gap: 12px; color: #596359; }
+.manager-contact { position: relative; }
+.manager-contact-trigger {
+  min-height: 42px;
+  padding: 9px 14px;
+  border: 1px solid #d7e3d4;
+  border-radius: 12px;
+  background: #f7fbf5;
+  color: #4f8d4b;
+  font-weight: 800;
+}
+.manager-contact-trigger:hover,
+.manager-contact.open .manager-contact-trigger,
+.manager-contact:focus-within .manager-contact-trigger {
+  border-color: #5b9d57;
+  background: #eef7eb;
+}
+.manager-contact-popover {
+  position: absolute;
+  top: calc(100% + 11px);
+  right: 0;
+  z-index: 80;
+  display: none;
+  width: 310px;
+  padding: 18px;
+  border: 1px solid #dbe6d8;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 18px 44px rgba(43, 72, 40, .18);
+  text-align: left;
+}
+.manager-contact:hover .manager-contact-popover,
+.manager-contact.open .manager-contact-popover,
+.manager-contact:focus-within .manager-contact-popover { display: block; }
+.manager-contact-popover::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  right: 28px;
+  width: 13px;
+  height: 13px;
+  border-top: 1px solid #dbe6d8;
+  border-left: 1px solid #dbe6d8;
+  background: #fff;
+  transform: rotate(45deg);
+}
+.manager-contact-popover .eyebrow { margin: 0 0 7px; }
+.manager-contact-popover h3 { margin: 0 0 8px; color: #394639; font-size: 18px; }
+.manager-contact-phone { display: block; margin-bottom: 13px; color: #596359; font-size: 14px; font-weight: 700; text-decoration: none; }
+.manager-contact-note { margin: 0 0 13px; color: #7a847a; font-size: 12px; line-height: 1.45; }
+.manager-contact-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.manager-contact-actions a {
+  display: grid;
+  min-height: 40px;
+  padding: 9px 10px;
+  border: 1px solid #d7e3d4;
+  border-radius: 11px;
+  background: #fff;
+  color: #4f8d4b;
+  font-size: 12px;
+  font-weight: 800;
+  place-items: center;
+  text-decoration: none;
+}
+.manager-contact-actions a.primary { border-color: #5b9d57; background: #5b9d57; color: #fff; }
+.manager-contact-actions a.wide { grid-column: 1 / -1; }
+.manager-contact-empty { padding: 11px; border-radius: 10px; background: #fff8e9; color: #806936; font-size: 12px; line-height: 1.45; }
 .header-button {
   padding: 10px 16px;
   border: 1px solid #5b9d57;
@@ -534,6 +683,16 @@ textarea { resize: vertical; }
 .unit-setting label { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; color: #465146; font-weight: 800; }
 .unit-setting .field { margin-top: 8px; }
 
+.manager-contact-settings {
+  margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid #dce7d9;
+  border-radius: 16px;
+  background: #f8fbf6;
+}
+.manager-contact-settings h3 { margin: 0 0 6px; color: #394639; }
+.manager-contact-settings > p { margin: 0 0 15px; color: #747e74; font-size: 12px; line-height: 1.5; }
+.manager-contact-help { margin: 12px 0 0 !important; color: #7a847a !important; font-size: 11px !important; }
 .settings-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
 .setting-card { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 16px; border: 1px solid #e1e9de; border-radius: 14px; background: #f8fbf6; }
 .setting-card h3 { margin: 0 0 5px; color: #394639; font-size: 14px; }
@@ -581,6 +740,8 @@ textarea { resize: vertical; }
 @media (max-width: 700px) {
   .app-header { align-items: flex-start; padding: 12px 4%; }
   .app-header-actions { align-items: flex-end; flex-direction: column; gap: 7px; }
+  .manager-contact-popover { position: fixed; top: 94px; right: 4%; width: min(340px, 92vw); }
+  .manager-contact-popover::before { display: none; }
   .page-content, .catalog-content { width: 92%; padding-top: 26px; }
   .page-title-row, .panel-heading, .address-card, .order-card-header, .client-card-header { align-items: stretch; flex-direction: column; }
   .page-title-row h1 { font-size: 29px; }
@@ -797,6 +958,81 @@ function statusClass(status) {
   return "status-cancel";
 }
 
+function ManagerContact({ settings }) {
+  const [open, setOpen] = useState(false);
+  const fullName = String(settings.managerFullName || "").trim();
+  const phoneValue = formatRussianPhone(settings.managerPhone || "");
+  const phoneLinks = getManagerPhoneLinks(settings.managerPhone);
+  const maxLink = getMaxLink(settings.managerMax);
+  const telegramLink = getTelegramLink(settings.managerTelegram);
+  const hasAnyContact = Boolean(fullName || phoneLinks.phone || maxLink || telegramLink);
+
+  return (
+    <div
+      className={open ? "manager-contact open" : "manager-contact"}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") setOpen(false);
+      }}
+    >
+      <button
+        className="manager-contact-trigger"
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        Ваш менеджер
+      </button>
+      <div className="manager-contact-popover">
+        <p className="eyebrow">Ваш менеджер</p>
+        <h3>{fullName || "Менеджер Clover"}</h3>
+        {phoneLinks.phone ? (
+          <a className="manager-contact-phone" href={phoneLinks.phone}>
+            {phoneValue}
+          </a>
+        ) : (
+          <p className="manager-contact-note">Телефон пока не указан.</p>
+        )}
+
+        {hasAnyContact && (phoneLinks.phone || maxLink || telegramLink) ? (
+          <div className="manager-contact-actions">
+            {phoneLinks.phone && (
+              <a className="primary" href={phoneLinks.phone}>
+                Позвонить
+              </a>
+            )}
+            {maxLink && (
+              <a
+                className={phoneLinks.phone ? "" : "primary"}
+                href={maxLink}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Написать в MAX
+              </a>
+            )}
+            {telegramLink && (
+              <a
+                className={phoneLinks.phone || maxLink ? "wide" : "primary wide"}
+                href={telegramLink}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Написать в Telegram
+              </a>
+            )}
+          </div>
+        ) : (
+          <div className="manager-contact-empty">
+            Контакты менеджера ещё не заполнены.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Header({ title, subtitle, onLogout, children }) {
   return (
     <header className="app-header">
@@ -828,7 +1064,7 @@ function LoginView({
   const [form, setForm] = useState({
     companyName: "",
     contactName: "",
-    phone: "",
+    phone: RUSSIAN_PHONE_PREFIX,
     email: "",
     password: "",
   });
@@ -917,10 +1153,18 @@ function LoginView({
               <input
                 id="phone"
                 type="tel"
-                placeholder="+7 999 000-00-00"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="+7 (999) 000-00-00"
+                maxLength="18"
                 value={form.phone}
+                onFocus={(event) => {
+                  if (!getRussianPhoneLocalDigits(event.currentTarget.value)) {
+                    updateField("phone", RUSSIAN_PHONE_PREFIX);
+                  }
+                }}
                 onChange={(event) =>
-                  updateField("phone", event.target.value)
+                  updateField("phone", formatRussianPhone(event.target.value))
                 }
                 required
                 disabled={authBusy}
@@ -1051,7 +1295,26 @@ function ProfilePanel({ profile, onChange }) {
               <input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} required />
             </label>
             <label className="field">Телефон
-              <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
+              <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="+7 (999) 000-00-00"
+                maxLength="18"
+                value={form.phone || RUSSIAN_PHONE_PREFIX}
+                onFocus={(event) => {
+                  if (!getRussianPhoneLocalDigits(event.currentTarget.value)) {
+                    setForm((current) => ({ ...current, phone: RUSSIAN_PHONE_PREFIX }));
+                  }
+                }}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    phone: formatRussianPhone(event.target.value),
+                  }))
+                }
+                required
+              />
             </label>
             <label className="field">Электронная почта
               <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
@@ -1328,6 +1591,7 @@ function OrderEditor({
   return (
     <main className="clover-app">
       <Header title={session.mode === "edit" ? "Редактирование заказа" : session.mode === "repeat" ? "Повтор заказа" : "Новый заказ"}>
+        <ManagerContact settings={settings} />
         <button className="header-button" type="button" onClick={onClose}>← В кабинет</button>
       </Header>
       <section className="catalog-content">
@@ -1495,7 +1759,9 @@ function ClientDashboard({
 
   return (
     <main className="clover-app">
-      <Header title={profile.contactName ? `Здравствуйте, ${profile.contactName}!` : "Личный кабинет клиента"} subtitle={profile.companyName} onLogout={onLogout} />
+      <Header title={profile.contactName ? `Здравствуйте, ${profile.contactName}!` : "Личный кабинет клиента"} subtitle={profile.companyName} onLogout={onLogout}>
+        <ManagerContact settings={settings} />
+      </Header>
       <section className="page-content">
         <div className="page-title-row">
           <div><p className="eyebrow">Clover</p><h1>Заказы и доставка</h1><p>Создавайте, повторяйте и отслеживайте заказы.</p></div>
@@ -2224,8 +2490,59 @@ function ProductEditor({ product, onClose, onSave }) {
             const priceField = unit === "piece" ? "pricePiece" : unit === "pack" ? "pricePack" : "priceBundle";
             return <div className="unit-setting" key={unit}>
               <label><input type="checkbox" checked={form.saleUnits.includes(unit)} onChange={(e) => toggleUnit(unit, e.target.checked)} />{UNIT_CONFIG[unit].label}</label>
-              <label className="field">Внутри, шт.<input type="number" min="1" value={form[sizeField]} onChange={(e) => setForm({ ...form, [sizeField]: Math.max(1, Number(e.target.value) || 1) })} /></label>
-              <label className="field">Цена за единицу продажи<input type="number" min="0" step="0.01" value={form[priceField]} onChange={(e) => setForm({ ...form, [priceField]: Math.max(0, Number(e.target.value) || 0) })} /></label>
+              <label className="field">Внутри, шт.
+                <input
+                  type="number"
+                  min="1"
+                  value={form[sizeField]}
+                  onFocus={selectDefaultNumber}
+                  onMouseUp={(event) => {
+                    if (["0", "1"].includes(String(event.currentTarget.value))) {
+                      event.preventDefault();
+                      event.currentTarget.select();
+                    }
+                  }}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      [sizeField]: event.target.value,
+                    }))
+                  }
+                  onBlur={() =>
+                    setForm((current) => ({
+                      ...current,
+                      [sizeField]: Math.max(1, Number(current[sizeField]) || 1),
+                    }))
+                  }
+                />
+              </label>
+              <label className="field">Цена за единицу продажи
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form[priceField]}
+                  onFocus={selectDefaultNumber}
+                  onMouseUp={(event) => {
+                    if (String(event.currentTarget.value) === "0") {
+                      event.preventDefault();
+                      event.currentTarget.select();
+                    }
+                  }}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      [priceField]: event.target.value,
+                    }))
+                  }
+                  onBlur={() =>
+                    setForm((current) => ({
+                      ...current,
+                      [priceField]: Math.max(0, Number(current[priceField]) || 0),
+                    }))
+                  }
+                />
+              </label>
             </div>;
           })}
         </div>
@@ -2357,18 +2674,86 @@ function ToggleSetting({ title, description, value, onChange }) {
 
 function ManagerSettings({ settings, setSettings }) {
   const set = (key, value) => setSettings((current) => ({ ...current, [key]: value }));
-  return <section className="panel" style={{ marginTop: 0 }}><div className="panel-heading"><div><p className="eyebrow">Правила</p><h2>Настройки кабинета</h2><p>Изменения сохраняются автоматически и применяются сразу.</p></div></div><div className="settings-grid">
-    <ToggleSetting title="Показывать цены" description="Клиент увидит цены, заполненные в карточках товаров." value={settings.showPrices} onChange={(value) => set("showPrices", value)} />
-    <ToggleSetting title="Товары вне матрицы" description="Разрешить клиенту запрашивать отсутствующие позиции." value={settings.allowCustomItems} onChange={(value) => set("allowCustomItems", value)} />
-    <ToggleSetting title="Редактирование новых заказов" description="Клиент может менять заказ до принятия менеджером." value={settings.allowClientEdit} onChange={(value) => set("allowClientEdit", value)} />
-    <ToggleSetting title="Удаление новых заказов" description="Клиент может удалить заказ со статусом «Новый»." value={settings.allowClientDelete} onChange={(value) => set("allowClientDelete", value)} />
-    <ToggleSetting title="Повтор заказа" description="Показывать кнопку для быстрого повторения заказа." value={settings.allowRepeatOrder} onChange={(value) => set("allowRepeatOrder", value)} />
-    <ToggleSetting title="Обязательный профиль" description="Запретить заказ без данных организации." value={settings.requireProfile} onChange={(value) => set("requireProfile", value)} />
-    <ToggleSetting title="Обязательный адрес" description="Запретить заказ без сохранённого адреса." value={settings.requireAddress} onChange={(value) => set("requireAddress", value)} />
-    <ToggleSetting title="Удаление менеджером" description="Разрешить менеджеру удалять тестовые заказы." value={settings.managerCanDeleteOrders} onChange={(value) => set("managerCanDeleteOrders", value)} />
-    <ToggleSetting title="Избранные товары" description="Клиент может отмечать часто используемые товары." value={settings.showFavorites} onChange={(value) => set("showFavorites", value)} />
-    <ToggleSetting title="Автосохранение черновика" description="Незавершённый новый заказ сохраняется в браузере." value={settings.enableDrafts} onChange={(value) => set("enableDrafts", value)} />
-  </div></section>;
+
+  return (
+    <section className="panel" style={{ marginTop: 0 }}>
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Правила</p>
+          <h2>Настройки кабинета</h2>
+          <p>Изменения сохраняются автоматически и применяются сразу.</p>
+        </div>
+      </div>
+
+      <div className="manager-contact-settings">
+        <h3>Контакты менеджера для клиентов</h3>
+        <p>
+          В личном кабинете появится кнопка «Ваш менеджер». При наведении
+          или нажатии клиент увидит ФИО, телефон и кнопки связи.
+        </p>
+        <div className="form-grid">
+          <label className="field">
+            ФИО менеджера
+            <input
+              value={settings.managerFullName || ""}
+              placeholder="Например: Иванов Иван Иванович"
+              onChange={(event) => set("managerFullName", event.target.value)}
+            />
+          </label>
+          <label className="field">
+            Телефон менеджера
+            <input
+              inputMode="tel"
+              value={formatRussianPhone(settings.managerPhone || "")}
+              onFocus={(event) => {
+                if (!getRussianPhoneLocalDigits(event.currentTarget.value)) {
+                  requestAnimationFrame(() => {
+                    const end = event.currentTarget.value.length;
+                    event.currentTarget.setSelectionRange(end, end);
+                  });
+                }
+              }}
+              onChange={(event) => set("managerPhone", formatRussianPhone(event.target.value))}
+              placeholder="+7 (___) ___-__-__"
+            />
+          </label>
+          <label className="field">
+            Ссылка на профиль MAX
+            <input
+              value={settings.managerMax || ""}
+              placeholder="https://max.ru/u/... или max.ru/username"
+              onChange={(event) => set("managerMax", event.target.value)}
+            />
+          </label>
+          <label className="field">
+            Telegram менеджера — необязательно
+            <input
+              value={settings.managerTelegram || ""}
+              placeholder="@username или ссылка t.me"
+              onChange={(event) => set("managerTelegram", event.target.value)}
+            />
+          </label>
+        </div>
+        <p className="manager-contact-help">
+          Для MAX вставьте ссылку на профиль, скопированную в приложении MAX.
+          Telegram показывается только после заполнения имени пользователя или ссылки.
+        </p>
+      </div>
+
+      <div className="settings-grid">
+        <ToggleSetting title="Показывать цены" description="Клиент увидит цены, заполненные в карточках товаров." value={settings.showPrices} onChange={(value) => set("showPrices", value)} />
+        <ToggleSetting title="Товары вне матрицы" description="Разрешить клиенту запрашивать отсутствующие позиции." value={settings.allowCustomItems} onChange={(value) => set("allowCustomItems", value)} />
+        <ToggleSetting title="Редактирование новых заказов" description="Клиент может менять заказ до принятия менеджером." value={settings.allowClientEdit} onChange={(value) => set("allowClientEdit", value)} />
+        <ToggleSetting title="Удаление новых заказов" description="Клиент может удалить заказ со статусом «Новый»." value={settings.allowClientDelete} onChange={(value) => set("allowClientDelete", value)} />
+        <ToggleSetting title="Повтор заказа" description="Показывать кнопку для быстрого повторения заказа." value={settings.allowRepeatOrder} onChange={(value) => set("allowRepeatOrder", value)} />
+        <ToggleSetting title="Обязательный профиль" description="Запретить заказ без данных организации." value={settings.requireProfile} onChange={(value) => set("requireProfile", value)} />
+        <ToggleSetting title="Обязательный адрес" description="Запретить заказ без сохранённого адреса." value={settings.requireAddress} onChange={(value) => set("requireAddress", value)} />
+        <ToggleSetting title="Удаление менеджером" description="Разрешить менеджеру удалять тестовые заказы." value={settings.managerCanDeleteOrders} onChange={(value) => set("managerCanDeleteOrders", value)} />
+        <ToggleSetting title="Избранные товары" description="Клиент может отмечать часто используемые товары." value={settings.showFavorites} onChange={(value) => set("showFavorites", value)} />
+        <ToggleSetting title="Автосохранение черновика" description="Незавершённый новый заказ сохраняется в браузере." value={settings.enableDrafts} onChange={(value) => set("enableDrafts", value)} />
+      </div>
+    </section>
+  );
 }
 
 function formatFileSize(value) {
@@ -2408,6 +2793,32 @@ function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onReload }) 
       alert("Резервная копия создана на сервере.");
     } catch (createError) {
       alert(createError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cleanupBackups = async () => {
+    if (!window.confirm(
+      "Удалить автоматические копии старше 30 дней и оставить не больше 50 копий? Ручные свежие копии сохранятся."
+    )) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const result = await api.cleanupBackups({
+        maxFiles: 50,
+        automaticMaxAgeDays: 30,
+      });
+      await loadBackups();
+      alert(
+        result.removed?.length
+          ? `Удалено старых копий: ${result.removed.length}.`
+          : "Старых копий для удаления нет."
+      );
+    } catch (cleanupError) {
+      alert(cleanupError.message);
     } finally {
       setBusy(false);
     }
@@ -2473,15 +2884,15 @@ function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onReload }) 
   };
 
   return <section className="panel" style={{ marginTop: 0 }}>
-    <div className="panel-heading"><div><p className="eyebrow">Защита данных</p><h2>Серверные резервные копии</h2><p>Копии включают клиентов, заказы, матрицы, настройки и пароли в зашифрованном виде. Они хранятся только на вашем компьютере.</p></div><button className="primary-button" type="button" disabled={busy} onClick={createBackup}>{busy ? "Подождите..." : "Создать копию сейчас"}</button></div>
+    <div className="panel-heading"><div><p className="eyebrow">Защита данных</p><h2>Полные резервные копии</h2><p>Копии включают клиентов, заказы, матрицы, настройки, пароли и фотографии товаров. Они хранятся только на вашем компьютере.</p></div><div className="inline-actions"><button className="secondary-button" type="button" disabled={busy} onClick={cleanupBackups}>Очистить старые</button><button className="primary-button" type="button" disabled={busy} onClick={createBackup}>{busy ? "Подождите..." : "Создать полную копию"}</button></div></div>
     <div className="profile-summary">
       <article><span>Серверных копий</span><strong>{backups.length}</strong></article><article><span>Товаров</span><strong>{data.products.length}</strong></article><article><span>Заказов</span><strong>{data.orders.length}</strong></article><article><span>Связей с клиентами</span><strong>{Object.keys(data.clientLinks).length}</strong></article>
     </div>
-    <div className="server-safe-note">Clover автоматически создаёт копию при первом запуске каждого дня, перед полным сбросом и перед восстановлением старой копии.</div>
+    <div className="server-safe-note">Clover автоматически создаёт полную копию при первом запуске каждого дня, перед полным сбросом и перед восстановлением. Перед восстановлением всегда создаётся страховочная копия.</div>
     {error && <div className="auth-error" style={{ marginTop: 14 }}>{error}</div>}
     <div className="backup-list">
       {backups.map((item) => <article className="backup-row" key={item.fileName}>
-        <div><h3>{item.reason}</h3><p>{formatDateTime(item.createdAt)} · {formatFileSize(item.size)}<br />{item.fileName}</p></div>
+        <div><h3>{item.reason}</h3><p>{formatDateTime(item.createdAt)} · {formatFileSize(item.size)} · {item.includesPhotos ? `полная копия, фото: ${item.photoCount || 0}` : "старая JSON-копия без фото"}<br />{item.fileName}</p></div>
         <div className="inline-actions"><button className="secondary-button" type="button" disabled={busy} onClick={() => downloadBackup(item)}>Скачать</button><button className="secondary-button" type="button" disabled={busy} onClick={() => restoreBackup(item)}>Восстановить</button></div>
       </article>)}
       {!backups.length && !error && <div className="empty-box">Копии пока не созданы.</div>}
@@ -2505,8 +2916,52 @@ const AUDIT_ACTION_LABELS = {
   "product.image.delete": "Удалено фото товара",
   "backup.create": "Создана резервная копия",
   "backup.restore": "Восстановлена резервная копия",
+  "backup.cleanup": "Удалены старые резервные копии",
   "server.reset": "Выполнен полный сброс",
 };
+
+function formatAuditDetails(item) {
+  const details = item?.details || {};
+
+  switch (item?.action) {
+    case "orders.save":
+      return `Заказов сохранено: ${Number(details.count) || 0}`;
+    case "products.save":
+      return `Товаров в каталоге: ${Number(details.count) || 0}`;
+    case "client.matrix.save":
+      return `Изменено клиентов: ${Number(details.clients) || 0}`;
+    case "product.image.upload":
+      return details.productName
+        ? `Товар: ${details.productName}`
+        : "Фотография загружена";
+    case "product.image.delete":
+      return details.productName
+        ? `Товар: ${details.productName}`
+        : "Фотография удалена";
+    case "backup.create":
+      return `${details.reason || "Резервная копия"}${
+        details.photoCount !== undefined
+          ? ` · фотографий: ${details.photoCount}`
+          : ""
+      }`;
+    case "backup.restore":
+      return `Файл: ${details.fileName || "копия"} · фотографий восстановлено: ${
+        Number(details.restoredPhotos) || 0
+      }`;
+    case "backup.cleanup":
+      return `Удалено копий: ${Array.isArray(details.removed) ? details.removed.length : 0} · осталось: ${Number(details.remaining) || 0}`;
+    case "settings.save":
+      return "Настройки кабинета обновлены";
+    case "auth.login":
+      return "Успешный вход";
+    case "auth.register":
+      return "Создан новый аккаунт клиента";
+    case "server.reset":
+      return "Данные сброшены после создания страховочной копии";
+    default:
+      return "";
+  }
+}
 
 function ManagerAudit() {
   const [items, setItems] = useState([]);
@@ -2535,7 +2990,7 @@ function ManagerAudit() {
     {error && <div className="auth-error">{error}</div>}
     <div className="audit-list">
       {items.map((item) => <article className="audit-row" key={item.id}>
-        <div><h3>{AUDIT_ACTION_LABELS[item.action] || item.action}</h3><p>{formatDateTime(item.createdAt)} · {item.userEmail || "Система"} · {item.userRole === "manager" ? "менеджер" : item.userRole === "client" ? "клиент" : "система"}</p>{Object.keys(item.details || {}).length > 0 && <div className="audit-details">{JSON.stringify(item.details)}</div>}</div>
+        <div><h3>{AUDIT_ACTION_LABELS[item.action] || item.action}</h3><p>{formatDateTime(item.createdAt)} · {item.userEmail || "Система"} · {item.userRole === "manager" ? "менеджер" : item.userRole === "client" ? "клиент" : "система"}</p>{formatAuditDetails(item) && <div className="audit-details">{formatAuditDetails(item)}</div>}</div>
       </article>)}
       {!loadingAudit && !items.length && !error && <div className="empty-box">Записей пока нет.</div>}
       {loadingAudit && <div className="empty-box">Загружаем журнал...</div>}
@@ -2602,7 +3057,7 @@ function ManagerDashboard({ orders, products, setProducts, profile, addresses, s
   const newCount = orders.filter((order) => order.status === "Новый").length;
   const workCount = orders.filter((order) => ["Принят", "Собирается", "Готов к доставке"].includes(order.status)).length;
 
-  return <main className="clover-app"><Header title="Кабинет менеджера" subtitle="Серверная версия 1.2" onLogout={onLogout} /><section className="page-content"><div className="page-title-row"><div><p className="eyebrow">Управление</p><h1>Рабочее пространство</h1><p>Заказы, клиенты, товары, правила, резервные копии и журнал действий.</p></div></div><div className="stats-grid"><article className="stat-card"><span>Новые заказы</span><strong>{newCount}</strong></article><article className="stat-card"><span>В работе</span><strong>{workCount}</strong></article><article className="stat-card"><span>Клиентов</span><strong>{clients.length}</strong></article><article className="stat-card"><span>Активных товаров</span><strong>{products.filter((item) => item.active).length}</strong></article></div><nav className="manager-nav">{[["orders","Заказы"],["clients","Клиенты"],["products","Товары"],["settings","Настройки"],["backup","Резервные копии"],["audit","Журнал действий"]].map(([id,label]) => <button className={tab === id ? "active" : ""} type="button" key={id} onClick={() => setTab(id)}>{label}</button>)}</nav>{tab === "orders" && <ManagerOrders orders={orders} settings={settings} onUpdateOrder={onUpdateOrder} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} />}{tab === "clients" && <ManagerClients clients={clients} products={products} clientLinks={clientLinks} setClientLinks={setClientLinks} />}{tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}{tab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} />}{tab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} onReload={onReload} />}{tab === "audit" && <ManagerAudit />}</section></main>;
+  return <main className="clover-app"><Header title="Кабинет менеджера" subtitle="Интерфейс 1.3.3" onLogout={onLogout} /><section className="page-content"><div className="page-title-row"><div><p className="eyebrow">Управление</p><h1>Рабочее пространство</h1><p>Заказы, клиенты, товары, правила, резервные копии и журнал действий.</p></div></div><div className="stats-grid"><article className="stat-card"><span>Новые заказы</span><strong>{newCount}</strong></article><article className="stat-card"><span>В работе</span><strong>{workCount}</strong></article><article className="stat-card"><span>Клиентов</span><strong>{clients.length}</strong></article><article className="stat-card"><span>Активных товаров</span><strong>{products.filter((item) => item.active).length}</strong></article></div><nav className="manager-nav">{[["orders","Заказы"],["clients","Клиенты"],["products","Товары"],["settings","Настройки"],["backup","Резервные копии"],["audit","Журнал действий"]].map(([id,label]) => <button className={tab === id ? "active" : ""} type="button" key={id} onClick={() => setTab(id)}>{label}</button>)}</nav>{tab === "orders" && <ManagerOrders orders={orders} settings={settings} onUpdateOrder={onUpdateOrder} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} />}{tab === "clients" && <ManagerClients clients={clients} products={products} clientLinks={clientLinks} setClientLinks={setClientLinks} />}{tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}{tab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} />}{tab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} onReload={onReload} />}{tab === "audit" && <ManagerAudit />}</section></main>;
 }
 
 function App() {
