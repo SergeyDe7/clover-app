@@ -65,6 +65,19 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_users_role
   ON users(role);
+
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    user_email TEXT,
+    user_role TEXT,
+    action TEXT NOT NULL,
+    details_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+  ) STRICT;
+
+  CREATE INDEX IF NOT EXISTS idx_audit_created_at
+  ON audit_log(created_at DESC);
 `);
 
 function parseJson(value, fallback) {
@@ -411,6 +424,200 @@ export function resetServerData() {
   }
 
   ensureGlobalState();
+}
+
+
+export function writeAudit({
+  userId = null,
+  userEmail = "",
+  userRole = "",
+  action,
+  details = {},
+}) {
+  db.prepare(`
+    INSERT INTO audit_log(
+      id,
+      user_id,
+      user_email,
+      user_role,
+      action,
+      details_json,
+      created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    randomUUID(),
+    userId,
+    userEmail,
+    userRole,
+    String(action || "unknown"),
+    JSON.stringify(details || {}),
+    now()
+  );
+}
+
+export function listAudit(limit = 200) {
+  const safeLimit = Math.min(500, Math.max(1, Number(limit) || 200));
+  const rows = db.prepare(`
+    SELECT id, user_id, user_email, user_role, action, details_json, created_at
+    FROM audit_log
+    ORDER BY created_at DESC
+    LIMIT ?
+  `).all(safeLimit);
+
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    userEmail: row.user_email || "",
+    userRole: row.user_role || "",
+    action: row.action,
+    details: parseJson(row.details_json, {}),
+    createdAt: row.created_at,
+  }));
+}
+
+export function exportDatabaseSnapshot() {
+  return {
+    version: 2,
+    exportedAt: now(),
+    users: db.prepare(`
+      SELECT id, email, password_hash, role, created_at
+      FROM users
+      ORDER BY created_at
+    `).all(),
+    clientState: db.prepare(`
+      SELECT user_id, profile_json, addresses_json, favorites_json, updated_at
+      FROM client_state
+      ORDER BY user_id
+    `).all(),
+    appState: db.prepare(`
+      SELECT key, value_json, updated_at
+      FROM app_state
+      ORDER BY key
+    `).all(),
+    orders: db.prepare(`
+      SELECT id, user_id, payload_json, created_at, updated_at
+      FROM orders
+      ORDER BY created_at
+    `).all(),
+    auditLog: db.prepare(`
+      SELECT id, user_id, user_email, user_role, action, details_json, created_at
+      FROM audit_log
+      ORDER BY created_at
+    `).all(),
+  };
+}
+
+function assertSnapshotArray(snapshot, key) {
+  if (!Array.isArray(snapshot?.[key])) {
+    throw new Error(`В резервной копии отсутствует раздел ${key}.`);
+  }
+}
+
+export function importDatabaseSnapshot(snapshot) {
+  for (const key of ["users", "clientState", "appState", "orders"]) {
+    assertSnapshotArray(snapshot, key);
+  }
+
+  db.exec("BEGIN IMMEDIATE");
+
+  try {
+    db.exec("DELETE FROM orders");
+    db.exec("DELETE FROM client_state");
+    db.exec("DELETE FROM users");
+    db.exec("DELETE FROM app_state");
+    db.exec("DELETE FROM audit_log");
+
+    const insertUser = db.prepare(`
+      INSERT INTO users(id, email, password_hash, role, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    for (const row of snapshot.users) {
+      insertUser.run(
+        String(row.id),
+        String(row.email).toLowerCase(),
+        String(row.password_hash),
+        String(row.role),
+        String(row.created_at)
+      );
+    }
+
+    const insertClientState = db.prepare(`
+      INSERT INTO client_state(
+        user_id,
+        profile_json,
+        addresses_json,
+        favorites_json,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?)
+    `);
+    for (const row of snapshot.clientState) {
+      insertClientState.run(
+        String(row.user_id),
+        String(row.profile_json || "{}"),
+        String(row.addresses_json || "[]"),
+        String(row.favorites_json || "[]"),
+        String(row.updated_at || now())
+      );
+    }
+
+    const insertAppState = db.prepare(`
+      INSERT INTO app_state(key, value_json, updated_at)
+      VALUES (?, ?, ?)
+    `);
+    for (const row of snapshot.appState) {
+      insertAppState.run(
+        String(row.key),
+        String(row.value_json || "{}"),
+        String(row.updated_at || now())
+      );
+    }
+
+    const insertOrder = db.prepare(`
+      INSERT INTO orders(id, user_id, payload_json, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    for (const row of snapshot.orders) {
+      insertOrder.run(
+        String(row.id),
+        String(row.user_id),
+        String(row.payload_json || "{}"),
+        String(row.created_at || now()),
+        String(row.updated_at || row.created_at || now())
+      );
+    }
+
+    const insertAudit = db.prepare(`
+      INSERT INTO audit_log(
+        id,
+        user_id,
+        user_email,
+        user_role,
+        action,
+        details_json,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const row of Array.isArray(snapshot.auditLog) ? snapshot.auditLog : []) {
+      insertAudit.run(
+        String(row.id || randomUUID()),
+        row.user_id ? String(row.user_id) : null,
+        String(row.user_email || ""),
+        String(row.user_role || ""),
+        String(row.action || "restored"),
+        String(row.details_json || "{}"),
+        String(row.created_at || now())
+      );
+    }
+
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  ensureGlobalState();
+  seedManager();
 }
 
 ensureGlobalState();

@@ -29,19 +29,18 @@ server/data/*.sqlite
 server/data/*.sqlite-shm
 server/data/*.sqlite-wal
 server/node_modules/
+server/uploads/*
+!server/uploads/.gitkeep
+server/backups/*
+!server/backups/.gitkeep
 
-# Clover server private files
-server/node_modules/
+# Clover local data and temporary update files
 server/data/
 server/uploads/
+server/backups/
 server/.env
-server/**/*.db
-server/**/*.db-*
-server/**/*.sqlite
-server/**/*.sqlite3
-.env
-.env.*
-*.db
-*.db-*
-*.sqlite
-*.sqlite3
+_stage2/
+INSTALL_STAGE2_FIXED.bat
+INSTALL_UPDATE_STAGE2.bat
+README_FIXED.txt
+README_STAGE2.txt

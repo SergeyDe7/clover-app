@@ -1,8 +1,12 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, unlinkSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import multer from "multer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
@@ -18,14 +22,56 @@ import {
   resetServerData,
   setClientStateField,
   setGlobalState,
+  listAudit,
+  writeAudit,
 } from "./db.js";
 import {
   DEFAULT_PRODUCTS,
   DEFAULT_SETTINGS,
   EMPTY_LINK,
 } from "./defaults.js";
+import {
+  createServerBackup,
+  ensureDailyBackup,
+  listServerBackups,
+  resolveBackupPath,
+  restoreServerBackup,
+} from "./backups.js";
 
 const app = express();
+
+const currentFile = fileURLToPath(import.meta.url);
+const currentDirectory = path.dirname(currentFile);
+const serverDirectory = path.resolve(currentDirectory, "..");
+const uploadsDirectory = path.resolve(serverDirectory, "uploads");
+mkdirSync(uploadsDirectory, { recursive: true });
+
+const imageUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadsDirectory,
+    filename(req, file, callback) {
+      const extensionMap = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+      };
+      callback(
+        null,
+        `product-${String(req.params.productId || "item")}-${Date.now()}-${randomUUID()}${extensionMap[file.mimetype] || ".img"}`
+      );
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter(req, file, callback) {
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.mimetype)) {
+      return callback(
+        new Error("Разрешены только изображения JPG, PNG или WEBP.")
+      );
+    }
+    callback(null, true);
+  },
+});
 const port = Number(process.env.PORT || 4000);
 const host = process.env.HOST || "0.0.0.0";
 const jwtSecret =
@@ -40,6 +86,7 @@ app.use(
   })
 );
 app.use(express.json({ limit: "8mb" }));
+app.use("/uploads", express.static(uploadsDirectory, { maxAge: "1h" }));
 
 const loginAttempts = new Map();
 
@@ -53,6 +100,33 @@ function publicUser(user) {
     email: user.email,
     role: user.role,
   };
+}
+
+function auditFromRequest(req, action, details = {}) {
+  try {
+    writeAudit({
+      userId: req.user?.id || null,
+      userEmail: req.user?.email || "",
+      userRole: req.user?.role || "",
+      action,
+      details,
+    });
+  } catch (error) {
+    console.error("Не удалось записать действие в журнал", error);
+  }
+}
+
+function removeUploadedImage(imageUrl) {
+  if (!String(imageUrl || "").startsWith("/uploads/")) {
+    return;
+  }
+
+  const fileName = path.basename(imageUrl);
+  const filePath = path.resolve(uploadsDirectory, fileName);
+
+  if (existsSync(filePath)) {
+    unlinkSync(filePath);
+  }
 }
 
 function signToken(user) {
@@ -318,6 +392,14 @@ app.post("/api/auth/register", async (req, res, next) => {
       },
     });
 
+    writeAudit({
+      userId: user.id,
+      userEmail: user.email,
+      userRole: user.role,
+      action: "auth.register",
+      details: { companyName: input.companyName },
+    });
+
     res.status(201).json({
       token: signToken(user),
       user: publicUser(user),
@@ -354,6 +436,13 @@ app.post("/api/auth/login", async (req, res, next) => {
     }
 
     clearLoginLimit(email);
+    writeAudit({
+      userId: user.id,
+      userEmail: user.email,
+      userRole: user.role,
+      action: "auth.login",
+      details: {},
+    });
 
     res.json({
       token: signToken(user),
@@ -439,6 +528,7 @@ app.put("/api/state/orders", authRequired, (req, res) => {
     userId: req.user.id,
     managerMode: req.user.role === "manager",
   });
+  auditFromRequest(req, "orders.save", { count: orders.length });
 
   res.json({ ok: true });
 });
@@ -497,12 +587,11 @@ app.put(
   authRequired,
   roleRequired("manager"),
   (req, res) => {
-    setGlobalState(
-      "products",
-      Array.isArray(req.body?.products)
-        ? req.body.products
-        : DEFAULT_PRODUCTS
-    );
+    const products = Array.isArray(req.body?.products)
+      ? req.body.products
+      : DEFAULT_PRODUCTS;
+    setGlobalState("products", products);
+    auditFromRequest(req, "products.save", { count: products.length });
 
     res.json({ ok: true });
   }
@@ -517,6 +606,7 @@ app.put(
       "settings",
       req.body?.settings || DEFAULT_SETTINGS
     );
+    auditFromRequest(req, "settings.save", {});
 
     res.json({ ok: true });
   }
@@ -527,10 +617,11 @@ app.put(
   authRequired,
   roleRequired("manager"),
   (req, res) => {
-    setGlobalState(
-      "clientLinks",
-      req.body?.clientLinks || {}
-    );
+    const clientLinks = req.body?.clientLinks || {};
+    setGlobalState("clientLinks", clientLinks);
+    auditFromRequest(req, "client.matrix.save", {
+      clients: Object.keys(clientLinks).length,
+    });
 
     res.json({ ok: true });
   }
@@ -633,11 +724,178 @@ app.post(
   }
 );
 
+
+app.post(
+  "/api/admin/products/:productId/image",
+  authRequired,
+  roleRequired("manager"),
+  imageUpload.single("image"),
+  (req, res) => {
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const productIndex = products.findIndex(
+      (product) => String(product.id) === String(req.params.productId)
+    );
+
+    if (productIndex < 0) {
+      if (req.file?.path && existsSync(req.file.path)) {
+        unlinkSync(req.file.path);
+      }
+      return res.status(404).json({ error: "Товар не найден." });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "Выберите изображение товара." });
+    }
+
+    removeUploadedImage(products[productIndex].imageUrl);
+
+    const imageUrl = `/uploads/${req.file.filename}`;
+    const updatedProduct = {
+      ...products[productIndex],
+      imageUrl,
+      imageUpdatedAt: new Date().toISOString(),
+    };
+    const updatedProducts = products.map((product, index) =>
+      index === productIndex ? updatedProduct : product
+    );
+
+    setGlobalState("products", updatedProducts);
+    auditFromRequest(req, "product.image.upload", {
+      productId: updatedProduct.id,
+      productName: updatedProduct.name,
+      imageUrl,
+    });
+
+    res.status(201).json({
+      ok: true,
+      imageUrl,
+      product: updatedProduct,
+    });
+  }
+);
+
+app.delete(
+  "/api/admin/products/:productId/image",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const productIndex = products.findIndex(
+      (product) => String(product.id) === String(req.params.productId)
+    );
+
+    if (productIndex < 0) {
+      return res.status(404).json({ error: "Товар не найден." });
+    }
+
+    removeUploadedImage(products[productIndex].imageUrl);
+
+    const updatedProduct = {
+      ...products[productIndex],
+      imageUrl: "",
+      imageUpdatedAt: new Date().toISOString(),
+    };
+    const updatedProducts = products.map((product, index) =>
+      index === productIndex ? updatedProduct : product
+    );
+
+    setGlobalState("products", updatedProducts);
+    auditFromRequest(req, "product.image.delete", {
+      productId: updatedProduct.id,
+      productName: updatedProduct.name,
+    });
+
+    res.json({ ok: true, product: updatedProduct });
+  }
+);
+
+app.get(
+  "/api/admin/backups",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    res.json({ backups: listServerBackups() });
+  }
+);
+
+app.post(
+  "/api/admin/backups",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const backup = createServerBackup({
+      label: req.body?.label || "manual",
+      reason: req.body?.reason || "Ручная резервная копия",
+    });
+    auditFromRequest(req, "backup.create", backup);
+    res.status(201).json({ ok: true, backup });
+  }
+);
+
+app.get(
+  "/api/admin/backups/:fileName/download",
+  authRequired,
+  roleRequired("manager"),
+  (req, res, next) => {
+    try {
+      const filePath = resolveBackupPath(req.params.fileName);
+      res.download(filePath, path.basename(filePath));
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  "/api/admin/backups/:fileName/restore",
+  authRequired,
+  roleRequired("manager"),
+  (req, res, next) => {
+    try {
+      createServerBackup({
+        label: "before-restore",
+        reason: "Автоматическая копия перед восстановлением",
+      });
+      const snapshot = restoreServerBackup(req.params.fileName);
+      writeAudit({
+        userId: req.user.id,
+        userEmail: req.user.email,
+        userRole: req.user.role,
+        action: "backup.restore",
+        details: {
+          fileName: req.params.fileName,
+          restoredAt: new Date().toISOString(),
+        },
+      });
+      res.json({
+        ok: true,
+        restoredAt: snapshot.exportedAt,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  "/api/admin/audit",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    res.json({ audit: listAudit(req.query.limit || 200) });
+  }
+);
+
 app.post(
   "/api/admin/reset",
   authRequired,
   roleRequired("manager"),
   (req, res) => {
+    createServerBackup({
+      label: "before-reset",
+      reason: "Автоматическая копия перед полным сбросом",
+    });
+    auditFromRequest(req, "server.reset", {});
     resetServerData();
     res.json({ ok: true });
   }
@@ -654,6 +912,20 @@ app.use((error, req, res, next) => {
     });
   }
 
+  if (error?.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).json({
+      error: "Фотография слишком большая. Максимальный размер — 5 МБ.",
+    });
+  }
+
+  if (
+    String(error?.message || "").includes("JPG") ||
+    String(error?.message || "").includes("резервной копии") ||
+    String(error?.message || "").includes("раздел")
+  ) {
+    return res.status(400).json({ error: error.message });
+  }
+
   if (
     error?.code === "SQLITE_CONSTRAINT_UNIQUE" ||
     String(error?.message || "").includes("UNIQUE")
@@ -667,6 +939,17 @@ app.use((error, req, res, next) => {
     error: "Внутренняя ошибка сервера Clover.",
   });
 });
+
+try {
+  const automaticBackup = ensureDailyBackup();
+  if (automaticBackup) {
+    console.log(
+      `Создана автоматическая резервная копия: ${automaticBackup.fileName}`
+    );
+  }
+} catch (error) {
+  console.error("Не удалось создать автоматическую резервную копию", error);
+}
 
 app.listen(port, host, () => {
   console.log("");

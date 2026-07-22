@@ -361,7 +361,10 @@ textarea { resize: vertical; }
 .category-button { padding: 8px 12px; border: 1px solid #d8e2d5; border-radius: 999px; background: #fff; color: #657065; font-size: 12px; font-weight: 700; }
 .category-button.active { border-color: #5b9d57; background: #5b9d57; color: #fff; }
 .product-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
-.product-card { display: flex; min-height: 315px; padding: 18px; border: 1px solid #e1e9de; border-radius: 18px; background: #fff; flex-direction: column; box-shadow: 0 8px 20px rgba(56,97,52,.04); }
+.product-card { display: flex; min-height: 390px; padding: 18px; border: 1px solid #e1e9de; border-radius: 18px; background: #fff; flex-direction: column; box-shadow: 0 8px 20px rgba(56,97,52,.04); }
+.product-image-wrap { display: grid; place-items: center; width: 100%; height: 145px; margin: 10px 0 2px; overflow: hidden; border-radius: 14px; background: #f2f6ef; }
+.product-image { width: 100%; height: 100%; object-fit: contain; }
+.product-image-placeholder { color: #9aaa98; font-size: 12px; font-weight: 700; text-align: center; }
 .product-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .product-category { color: #5b9d57; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; }
 .favorite-button { border: none; background: transparent; color: #b1b8b1; font-size: 21px; line-height: 1; }
@@ -515,7 +518,12 @@ textarea { resize: vertical; }
 }
 
 .product-manager-list { display: grid; gap: 10px; }
-.product-manager-row { display: grid; grid-template-columns: minmax(0,1fr) 130px 100px 150px; align-items: center; gap: 12px; padding: 14px; border: 1px solid #e1e9de; border-radius: 14px; background: #fff; }
+.product-manager-row { display: grid; grid-template-columns: 74px minmax(0,1fr) 110px 100px 180px; align-items: center; gap: 12px; padding: 14px; border: 1px solid #e1e9de; border-radius: 14px; background: #fff; }
+.product-manager-thumb { display: grid; place-items: center; width: 70px; height: 70px; overflow: hidden; border-radius: 12px; background: #f2f6ef; color: #9aaa98; font-size: 10px; text-align: center; }
+.product-manager-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.image-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.image-upload-label { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 7px 10px; border: 1px solid #d5dfd2; border-radius: 9px; background: #fff; color: #587058; font-size: 11px; font-weight: 800; cursor: pointer; }
+.image-upload-label input { display: none; }
 .product-manager-row h3 { margin: 0 0 4px; color: #394639; font-size: 14px; }
 .product-manager-row p { margin: 0; color: #7a847a; font-size: 10px; }
 .product-manager-row.inactive { opacity: .58; }
@@ -536,6 +544,13 @@ textarea { resize: vertical; }
 .toggle.active span { transform: translateX(20px); }
 
 .backup-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
+.backup-list, .audit-list { display: grid; gap: 9px; margin-top: 16px; }
+.backup-row, .audit-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 14px; align-items: center; padding: 13px; border: 1px solid #e1e9de; border-radius: 12px; background: #f8fbf6; }
+.backup-row h3, .audit-row h3 { margin: 0 0 4px; color: #394639; font-size: 13px; }
+.backup-row p, .audit-row p { margin: 0; color: #7a847a; font-size: 10px; line-height: 1.45; }
+.backup-row .inline-actions { justify-content: flex-end; }
+.audit-details { margin-top: 4px; color: #667266; font-size: 10px; word-break: break-word; }
+.server-safe-note { margin-top: 14px; padding: 13px; border-radius: 12px; background: #eef6eb; color: #4e714d; font-size: 11px; line-height: 1.5; }
 .import-label { display: inline-flex; align-items: center; min-height: 42px; padding: 9px 14px; border: 1px solid #d5dfd2; border-radius: 11px; background: #fff; color: #587058; font-weight: 700; cursor: pointer; }
 .import-label input { display: none; }
 
@@ -559,7 +574,7 @@ textarea { resize: vertical; }
   .order-summary { position: static; }
   .order-meta { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .toolbar.four { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  .product-manager-row { grid-template-columns: minmax(0,1fr) 110px 90px; }
+  .product-manager-row { grid-template-columns: 70px minmax(0,1fr) 110px 90px; }
   .product-manager-row .row-actions { grid-column: 1 / -1; }
   .client-metrics { grid-template-columns: repeat(2,1fr); }
 }
@@ -671,6 +686,8 @@ function normalizeProduct(product) {
     id: hasNumericId ? numericId : product.id,
     code: product.code || (hasNumericId ? `CL-${String(numericId).padStart(4, "0")}` : ""),
     oneCId: product.oneCId || "",
+    imageUrl: product.imageUrl || "",
+    imageUpdatedAt: product.imageUpdatedAt || "",
     active: product.active !== false,
     pieceSize: Math.max(1, Number(product.pieceSize) || 1),
     packSize: Math.max(1, Number(product.packSize) || 1),
@@ -1369,6 +1386,13 @@ function OrderEditor({
                     <div className="product-card-top">
                       <span className="product-category">{product.category}</span>
                       {settings.showFavorites && <button className={favorites.includes(product.id) ? "favorite-button active" : "favorite-button"} type="button" onClick={() => setFavorites((current) => current.includes(product.id) ? current.filter((id) => id !== product.id) : [...current, product.id])}>★</button>}
+                    </div>
+                    <div className="product-image-wrap">
+                      {product.imageUrl ? (
+                        <img className="product-image" src={product.imageUrl} alt={product.name} />
+                      ) : (
+                        <span className="product-image-placeholder">Фото товара пока не загружено</span>
+                      )}
                     </div>
                     <h2>{product.name}</h2>
                     <p className="product-code">Код: {product.code}</p>
@@ -2216,6 +2240,7 @@ function ManagerProducts({ products, setProducts }) {
   const [category, setCategory] = useState("Все");
   const [visibility, setVisibility] = useState("Все");
   const [editorProduct, setEditorProduct] = useState(undefined);
+  const [imageBusyId, setImageBusyId] = useState(null);
   const categories = ["Все", ...new Set(products.map((item) => item.category))];
   const visible = products.filter((product) => {
     const bySearch = !search || `${product.name} ${product.code} ${product.oneCId}`.toLowerCase().includes(search.toLowerCase());
@@ -2233,6 +2258,50 @@ function ManagerProducts({ products, setProducts }) {
     setEditorProduct(undefined);
   };
 
+  const uploadImage = async (product, file) => {
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Выберите фотографию товара.");
+      return;
+    }
+
+    setImageBusyId(product.id);
+    try {
+      const result = await api.uploadProductImage(product.id, file);
+      setProducts((current) => current.map((item) =>
+        item.id === product.id
+          ? normalizeProduct({ ...item, ...result.product })
+          : item
+      ));
+      alert("Фотография товара сохранена на сервере.");
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setImageBusyId(null);
+    }
+  };
+
+  const deleteImage = async (product) => {
+    if (!window.confirm(`Удалить фотографию товара «${product.name}»?`)) {
+      return;
+    }
+
+    setImageBusyId(product.id);
+    try {
+      const result = await api.deleteProductImage(product.id);
+      setProducts((current) => current.map((item) =>
+        item.id === product.id
+          ? normalizeProduct({ ...item, ...result.product })
+          : item
+      ));
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setImageBusyId(null);
+    }
+  };
+
   return (
     <section>
       <div className="toolbar four">
@@ -2241,12 +2310,35 @@ function ManagerProducts({ products, setProducts }) {
         <select value={visibility} onChange={(e) => setVisibility(e.target.value)}><option>Все</option><option>Активные</option><option>Скрытые</option></select>
         <button className="primary-button" type="button" onClick={() => setEditorProduct(null)}>+ Добавить товар</button>
       </div>
-      <div className="product-manager-list">
+      <div className="server-safe-note">
+        Фото загружается на сервер и автоматически появляется в личном кабинете клиента. Поддерживаются JPG, PNG и WEBP до 5 МБ.
+      </div>
+      <div className="product-manager-list" style={{ marginTop: 14 }}>
         {visible.map((product) => <article className={product.active ? "product-manager-row" : "product-manager-row inactive"} key={product.id}>
+          <div className="product-manager-thumb">
+            {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <span>Нет фото</span>}
+          </div>
           <div><h3>{product.name}</h3><p>{product.category} · {product.code} · 1С: {product.oneCId || "не связан"}</p></div>
           <span className={product.active ? "badge green" : "badge gray"}>{product.active ? "Активен" : "Скрыт"}</span>
           <strong>{settingsPriceLabel(product)}</strong>
-          <div className="inline-actions row-actions"><button className="secondary-button" type="button" onClick={() => setEditorProduct(product)}>Изменить</button><button className="secondary-button" type="button" onClick={() => setProducts((current) => current.map((item) => item.id === product.id ? { ...item, active: !item.active } : item))}>{product.active ? "Скрыть" : "Показать"}</button></div>
+          <div className="image-actions">
+            <label className="image-upload-label">
+              {imageBusyId === product.id ? "Загрузка..." : product.imageUrl ? "Заменить фото" : "Добавить фото"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={imageBusyId === product.id}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  uploadImage(product, file);
+                  event.target.value = "";
+                }}
+              />
+            </label>
+            {product.imageUrl && <button className="secondary-button" type="button" disabled={imageBusyId === product.id} onClick={() => deleteImage(product)}>Удалить фото</button>}
+            <button className="secondary-button" type="button" onClick={() => setEditorProduct(product)}>Изменить</button>
+            <button className="secondary-button" type="button" onClick={() => setProducts((current) => current.map((item) => item.id === product.id ? { ...item, active: !item.active } : item))}>{product.active ? "Скрыть" : "Показать"}</button>
+          </div>
         </article>)}
       </div>
       {editorProduct !== undefined && <ProductEditor product={editorProduct} onClose={() => setEditorProduct(undefined)} onSave={save} />}
@@ -2279,13 +2371,91 @@ function ManagerSettings({ settings, setSettings }) {
   </div></section>;
 }
 
-function ManagerBackup({ data, onImport, onClearOrders, onResetAll }) {
+function formatFileSize(value) {
+  const bytes = Number(value) || 0;
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
+}
+
+function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onReload }) {
+  const [backups, setBackups] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadBackups = async () => {
+    try {
+      const result = await api.listBackups();
+      setBackups(result.backups || []);
+      setError("");
+    } catch (loadError) {
+      setError(loadError.message);
+    }
+  };
+
+  useEffect(() => {
+    loadBackups();
+  }, []);
+
+  const createBackup = async () => {
+    setBusy(true);
+    try {
+      await api.createBackup({
+        label: "manual",
+        reason: "Ручная копия из кабинета менеджера",
+      });
+      await loadBackups();
+      alert("Резервная копия создана на сервере.");
+    } catch (createError) {
+      alert(createError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadBackup = async (item) => {
+    setBusy(true);
+    try {
+      const blob = await api.downloadBackup(item.fileName);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = item.fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (downloadError) {
+      alert(downloadError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const restoreBackup = async (item) => {
+    if (!window.confirm(
+      `Восстановить данные из копии «${item.fileName}»? Перед восстановлением сервер автоматически создаст страховочную копию.`
+    )) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await api.restoreBackup(item.fileName);
+      await onReload();
+      await loadBackups();
+      alert("Данные восстановлены. Кабинет обновлён.");
+    } catch (restoreError) {
+      alert(restoreError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const exportData = () => {
     const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), ...data }, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `clover-backup-${new Date().toISOString().slice(0,10)}.json`;
+    link.download = `clover-public-backup-${new Date().toISOString().slice(0,10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -2295,19 +2465,85 @@ function ManagerBackup({ data, onImport, onClearOrders, onResetAll }) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      try { onImport(JSON.parse(String(reader.result))); alert("Резервная копия загружена."); }
+      try { onImport(JSON.parse(String(reader.result))); alert("JSON-копия загружена."); }
       catch { alert("Не удалось прочитать файл резервной копии."); }
       event.target.value = "";
     };
     reader.readAsText(file);
   };
 
-  return <section className="panel" style={{ marginTop: 0 }}><div className="panel-heading"><div><p className="eyebrow">Данные</p><h2>Резервная копия</h2><p>Экспорт и импорт нужны только для локальной версии до подключения базы.</p></div></div><div className="profile-summary">
-    <article><span>Товаров</span><strong>{data.products.length}</strong></article><article><span>Заказов</span><strong>{data.orders.length}</strong></article><article><span>Адресов</span><strong>{data.addresses.length}</strong></article><article><span>Связей с 1С</span><strong>{Object.keys(data.clientLinks).length}</strong></article>
-  </div><div className="backup-actions"><button className="primary-button" type="button" onClick={exportData}>Скачать резервную копию</button><label className="import-label">Загрузить копию<input type="file" accept="application/json" onChange={importFile} /></label><button className="danger-button" type="button" onClick={onClearOrders}>Удалить все заказы</button><button className="danger-button" type="button" onClick={onResetAll}>Полный сброс</button></div></section>;
+  return <section className="panel" style={{ marginTop: 0 }}>
+    <div className="panel-heading"><div><p className="eyebrow">Защита данных</p><h2>Серверные резервные копии</h2><p>Копии включают клиентов, заказы, матрицы, настройки и пароли в зашифрованном виде. Они хранятся только на вашем компьютере.</p></div><button className="primary-button" type="button" disabled={busy} onClick={createBackup}>{busy ? "Подождите..." : "Создать копию сейчас"}</button></div>
+    <div className="profile-summary">
+      <article><span>Серверных копий</span><strong>{backups.length}</strong></article><article><span>Товаров</span><strong>{data.products.length}</strong></article><article><span>Заказов</span><strong>{data.orders.length}</strong></article><article><span>Связей с клиентами</span><strong>{Object.keys(data.clientLinks).length}</strong></article>
+    </div>
+    <div className="server-safe-note">Clover автоматически создаёт копию при первом запуске каждого дня, перед полным сбросом и перед восстановлением старой копии.</div>
+    {error && <div className="auth-error" style={{ marginTop: 14 }}>{error}</div>}
+    <div className="backup-list">
+      {backups.map((item) => <article className="backup-row" key={item.fileName}>
+        <div><h3>{item.reason}</h3><p>{formatDateTime(item.createdAt)} · {formatFileSize(item.size)}<br />{item.fileName}</p></div>
+        <div className="inline-actions"><button className="secondary-button" type="button" disabled={busy} onClick={() => downloadBackup(item)}>Скачать</button><button className="secondary-button" type="button" disabled={busy} onClick={() => restoreBackup(item)}>Восстановить</button></div>
+      </article>)}
+      {!backups.length && !error && <div className="empty-box">Копии пока не созданы.</div>}
+    </div>
+    <details style={{ marginTop: 22 }}>
+      <summary style={{ cursor: "pointer", color: "#4f8d4b", fontWeight: 800 }}>Дополнительная переносимая JSON-копия</summary>
+      <p className="muted small">Эта копия не содержит аккаунты и пароли. Она нужна только для переноса каталога, заказов и настроек.</p>
+      <div className="backup-actions"><button className="secondary-button" type="button" onClick={exportData}>Скачать JSON-копию</button><label className="import-label">Загрузить JSON-копию<input type="file" accept="application/json" onChange={importFile} /></label><button className="danger-button" type="button" onClick={onClearOrders}>Удалить все заказы</button><button className="danger-button" type="button" onClick={onResetAll}>Полный сброс</button></div>
+    </details>
+  </section>;
 }
 
-function ManagerDashboard({ orders, products, setProducts, profile, addresses, serverClients, settings, setSettings, clientLinks, setClientLinks, onUpdateOrder, onDeleteOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onLogout }) {
+const AUDIT_ACTION_LABELS = {
+  "auth.register": "Зарегистрирован клиент",
+  "auth.login": "Вход в кабинет",
+  "orders.save": "Сохранены заказы",
+  "products.save": "Изменён каталог",
+  "settings.save": "Изменены настройки",
+  "client.matrix.save": "Изменена матрица клиента",
+  "product.image.upload": "Загружено фото товара",
+  "product.image.delete": "Удалено фото товара",
+  "backup.create": "Создана резервная копия",
+  "backup.restore": "Восстановлена резервная копия",
+  "server.reset": "Выполнен полный сброс",
+};
+
+function ManagerAudit() {
+  const [items, setItems] = useState([]);
+  const [loadingAudit, setLoadingAudit] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    setLoadingAudit(true);
+    try {
+      const result = await api.listAudit(250);
+      setItems(result.audit || []);
+      setError("");
+    } catch (loadError) {
+      setError(loadError.message);
+    } finally {
+      setLoadingAudit(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return <section className="panel" style={{ marginTop: 0 }}>
+    <div className="panel-heading"><div><p className="eyebrow">Контроль</p><h2>Журнал действий</h2><p>Последние входы, изменения каталога, матриц, фотографий и резервных копий.</p></div><button className="secondary-button" type="button" onClick={load}>Обновить</button></div>
+    {error && <div className="auth-error">{error}</div>}
+    <div className="audit-list">
+      {items.map((item) => <article className="audit-row" key={item.id}>
+        <div><h3>{AUDIT_ACTION_LABELS[item.action] || item.action}</h3><p>{formatDateTime(item.createdAt)} · {item.userEmail || "Система"} · {item.userRole === "manager" ? "менеджер" : item.userRole === "client" ? "клиент" : "система"}</p>{Object.keys(item.details || {}).length > 0 && <div className="audit-details">{JSON.stringify(item.details)}</div>}</div>
+      </article>)}
+      {!loadingAudit && !items.length && !error && <div className="empty-box">Записей пока нет.</div>}
+      {loadingAudit && <div className="empty-box">Загружаем журнал...</div>}
+    </div>
+  </section>;
+}
+
+function ManagerDashboard({ orders, products, setProducts, profile, addresses, serverClients, settings, setSettings, clientLinks, setClientLinks, onUpdateOrder, onDeleteOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onLogout }) {
   const [tab, setTab] = useState("orders");
   const clients = useMemo(() => {
     const map = new Map(
@@ -2366,7 +2602,7 @@ function ManagerDashboard({ orders, products, setProducts, profile, addresses, s
   const newCount = orders.filter((order) => order.status === "Новый").length;
   const workCount = orders.filter((order) => ["Принят", "Собирается", "Готов к доставке"].includes(order.status)).length;
 
-  return <main className="clover-app"><Header title="Кабинет менеджера" subtitle="Серверная версия" onLogout={onLogout} /><section className="page-content"><div className="page-title-row"><div><p className="eyebrow">Управление</p><h1>Рабочее пространство</h1><p>Заказы, клиенты, товары, правила и резервные копии.</p></div></div><div className="stats-grid"><article className="stat-card"><span>Новые заказы</span><strong>{newCount}</strong></article><article className="stat-card"><span>В работе</span><strong>{workCount}</strong></article><article className="stat-card"><span>Клиентов</span><strong>{clients.length}</strong></article><article className="stat-card"><span>Активных товаров</span><strong>{products.filter((item) => item.active).length}</strong></article></div><nav className="manager-nav">{[["orders","Заказы"],["clients","Клиенты"],["products","Товары"],["settings","Настройки"],["backup","Резервная копия"]].map(([id,label]) => <button className={tab === id ? "active" : ""} type="button" key={id} onClick={() => setTab(id)}>{label}</button>)}</nav>{tab === "orders" && <ManagerOrders orders={orders} settings={settings} onUpdateOrder={onUpdateOrder} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} />}{tab === "clients" && <ManagerClients clients={clients} products={products} clientLinks={clientLinks} setClientLinks={setClientLinks} />}{tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}{tab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} />}{tab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} />}</section></main>;
+  return <main className="clover-app"><Header title="Кабинет менеджера" subtitle="Серверная версия 1.2" onLogout={onLogout} /><section className="page-content"><div className="page-title-row"><div><p className="eyebrow">Управление</p><h1>Рабочее пространство</h1><p>Заказы, клиенты, товары, правила, резервные копии и журнал действий.</p></div></div><div className="stats-grid"><article className="stat-card"><span>Новые заказы</span><strong>{newCount}</strong></article><article className="stat-card"><span>В работе</span><strong>{workCount}</strong></article><article className="stat-card"><span>Клиентов</span><strong>{clients.length}</strong></article><article className="stat-card"><span>Активных товаров</span><strong>{products.filter((item) => item.active).length}</strong></article></div><nav className="manager-nav">{[["orders","Заказы"],["clients","Клиенты"],["products","Товары"],["settings","Настройки"],["backup","Резервные копии"],["audit","Журнал действий"]].map(([id,label]) => <button className={tab === id ? "active" : ""} type="button" key={id} onClick={() => setTab(id)}>{label}</button>)}</nav>{tab === "orders" && <ManagerOrders orders={orders} settings={settings} onUpdateOrder={onUpdateOrder} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} />}{tab === "clients" && <ManagerClients clients={clients} products={products} clientLinks={clientLinks} setClientLinks={setClientLinks} />}{tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}{tab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} />}{tab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} onReload={onReload} />}{tab === "audit" && <ManagerAudit />}</section></main>;
 }
 
 function App() {
@@ -2990,6 +3226,7 @@ function App() {
         onImport={importBackup}
         onClearOrders={clearOrders}
         onResetAll={resetAll}
+        onReload={() => loadBootstrap()}
         onLogout={logout}
       />
     );

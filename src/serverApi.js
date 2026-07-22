@@ -62,6 +62,36 @@ async function request(path, options = {}) {
   return payload;
 }
 
+
+async function requestBlob(path, options = {}) {
+  const token = getApiToken();
+  const headers = new Headers(options.headers || {});
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  let response;
+
+  try {
+    response = await fetch(`/api${path}`, {
+      ...options,
+      headers,
+    });
+  } catch {
+    throw new Error(
+      "Сервер Clover недоступен. Проверьте, что сервер запущен на порту 4000."
+    );
+  }
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || `Ошибка сервера: ${response.status}`);
+  }
+
+  return response.blob();
+}
+
 export const api = {
   register(data) {
     return request("/auth/register", {
@@ -142,6 +172,48 @@ export const api = {
       method: "POST",
       body: data,
     });
+  },
+
+  uploadProductImage(productId, file) {
+    const formData = new FormData();
+    formData.append("image", file);
+    return request(`/admin/products/${productId}/image`, {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  deleteProductImage(productId) {
+    return request(`/admin/products/${productId}/image`, {
+      method: "DELETE",
+    });
+  },
+
+  listBackups() {
+    return request("/admin/backups");
+  },
+
+  createBackup(data = {}) {
+    return request("/admin/backups", {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  restoreBackup(fileName) {
+    return request(`/admin/backups/${encodeURIComponent(fileName)}/restore`, {
+      method: "POST",
+    });
+  },
+
+  downloadBackup(fileName) {
+    return requestBlob(
+      `/admin/backups/${encodeURIComponent(fileName)}/download`
+    );
+  },
+
+  listAudit(limit = 200) {
+    return request(`/admin/audit?limit=${encodeURIComponent(limit)}`);
   },
 
   resetAll() {
