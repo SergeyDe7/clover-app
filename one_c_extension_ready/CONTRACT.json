@@ -1,0 +1,96 @@
+{
+  "name": "Clover ↔ 1C UNF 1.6",
+  "version": "2.3",
+  "basePath": "/hs/clover/v1",
+  "endpoints": {
+    "health": {
+      "method": "GET",
+      "path": "/health",
+      "write": false
+    },
+    "clients": {
+      "method": "GET",
+      "path": "/clients",
+      "write": false
+    },
+    "products": {
+      "method": "GET",
+      "path": "/products",
+      "write": false
+    },
+    "draftOrder": {
+      "method": "POST",
+      "path": "/orders/draft",
+      "write": true,
+      "enabled": false
+    }
+  },
+  "target": {
+    "configuration": "Управление нашей фирмой 1.6",
+    "document": "ЗаказПокупателя",
+    "tabularSection": "Запасы",
+    "headerFields": [
+      "Контрагент",
+      "Организация",
+      "Договор",
+      "ВидЦен",
+      "ВалютаДокумента",
+      "СтруктурнаяЕдиницаПродажи",
+      "Ответственный",
+      "АдресДоставки",
+      "ДатаОтгрузки",
+      "КонтактноеЛицо",
+      "КонтактныйТелефон",
+      "СпособДоставки",
+      "СпособОтгрузки",
+      "СостояниеЗаказа",
+      "Комментарий"
+    ],
+    "itemFields": [
+      "Номенклатура",
+      "Характеристика",
+      "ЕдиницаИзмерения",
+      "Количество",
+      "Цена",
+      "Сумма",
+      "СтавкаНДС",
+      "СуммаНДС",
+      "Всего",
+      "ДатаОтгрузки",
+      "Содержание"
+    ]
+  },
+  "cloverInbound": {
+    "authentication": {
+      "header": "X-Clover-Key",
+      "requiredForRemoteRequests": true,
+      "localFallbackWithoutKey": true,
+      "disableLocalFallbackSetting": "ONEC_ALLOW_LOCAL_WITHOUT_KEY=false"
+    },
+    "purchasePriceRequest": {
+      "method": "GET",
+      "path": "/api/one-c/purchase-price-request"
+    },
+    "purchasePrices": {
+      "method": "POST",
+      "path": "/api/one-c/purchase-prices"
+    },
+    "nextOrder": {
+      "method": "GET",
+      "path": "/api/one-c/test-order"
+    },
+    "orderAck": {
+      "method": "POST",
+      "path": "/api/one-c/orders/{orderId}/ack"
+    },
+    "reconciliationRequests": {
+      "method": "GET",
+      "path": "/api/one-c/reconciliation/requests"
+    },
+    "reconciliationResult": {
+      "method": "POST",
+      "path": "/api/one-c/reconciliation/{requestId}/result",
+      "content": "application/json with PDF base64"
+    }
+  }
+}

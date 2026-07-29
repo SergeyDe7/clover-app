@@ -1,0 +1,15 @@
+---
+description: "Правила Node.js/API/очереди при изменении backend Clover."
+globs: "server/**/*.{js,cjs,mjs,ts,json}"
+alwaysApply: false
+---
+
+
+- Идемпотентность обязательна для очереди и ACK.
+- GET не удаляет заказ.
+- ACK связан с точным Clover ID и документом 1С.
+- TEST/production проверяются backend.
+- Ошибки имеют стабильные коды.
+- Добавляй негативные integration tests.
+- Не ослабляй защиту ради совместимости без отдельного TEST-флага.
+

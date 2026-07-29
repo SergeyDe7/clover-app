@@ -1,0 +1,29 @@
+CLOVER V18.1 — НАСТРОЙКИ ПОСЛЕ ЛОКАЛЬНОЙ ПРОВЕРКИ
+
+Установщик сохраняет существующие адреса 1С, учётные данные, SMTP, VAPID и доменные значения. Он выставляет рабочие локальные порты 5273/4100 и создаёт безопасный JWT_SECRET только если прежний отсутствует или небезопасен. Существующий ключ 1С не меняется. Если ONEC_API_KEY пока не настроен, callback-запросы принимаются только с этого же компьютера. Значения секретов не показываются в журнале и не должны отправляться в чат.
+
+Локальные адреса:
+APP_PUBLIC_URL=http://localhost:5273
+PORT=4100
+
+После покупки домена и включения HTTPS:
+APP_PUBLIC_URL=https://clover.example.ru
+ALLOW_DEV_AUTH_LINKS=false
+PASSKEY_RP_NAME=Clover
+PASSKEY_RP_ID=clover.example.ru
+PASSKEY_ORIGIN=https://clover.example.ru
+
+Почта:
+SMTP_HOST=
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=
+SMTP_PASSWORD=
+MAIL_FROM=Clover <no-reply@example.ru>
+
+Push:
+VAPID_SUBJECT=mailto:admin@example.ru
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+
+После отдельной настройки ключа 1С должна передавать ONEC_API_KEY в заголовке X-Clover-Key. На постоянном сервере затем установите ONEC_ALLOW_LOCAL_WITHOUT_KEY=false. Не копируйте ключ в сообщения или скриншоты.

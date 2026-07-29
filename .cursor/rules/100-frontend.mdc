@@ -1,0 +1,14 @@
+---
+description: "Правила React/Vite/PWA при изменении frontend Clover."
+globs: "src/**/*.{js,jsx,ts,tsx,css,scss}"
+alwaysApply: false
+---
+
+
+- Используй существующие компоненты и дизайн-токены.
+- Добавляй состояния loading/error/empty/success.
+- Защищай кнопки заказа от повторной отправки.
+- Проверяй mobile, desktop, keyboard и PWA.
+- Не помещай секреты в код клиента.
+- Добавляй тест для изменённого критического сценария.
+
