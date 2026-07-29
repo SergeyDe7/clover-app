@@ -1844,7 +1844,7 @@ async function handleOneCTestOrder(req, res, next) {
           (sum, item) => sum + item.quantity * item.price,
           0
         ),
-        comment: `Заказ Clover № ${realOrder.number}`,
+        comment: `Заказ Clover № ${realOrder.number || realOrder.displayId || ""}`.trim(),
       },
     });
   } catch (error) {
