@@ -70,3 +70,17 @@ README_FIX_1_9_2.txt
 _clover_big_2_0_2_2/
 INSTALL_BIG_2_0_2_2.bat
 README_BIG_2_0_2_2.txt
+
+# Local backups, secrets and install debris
+backups/
+payload/
+_clover_onec_queue_update/
+clover-source.zip
+*.xlsx
+.clover-primary
+server/.env.*
+!server/.env.example
+INSTALL_*_RESULT.txt
+ONEC_QUEUE_DIAGNOSTIC*.txt
+PROJECT_REPORT.txt
+CHECKSUMS_SHA256.txt

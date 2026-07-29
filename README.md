@@ -1,16 +1,11 @@
-# React + Vite
+# Clover V18.1
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Рабочая версия приложения: 4.0.4.
 
-Currently, two official plugins are available:
+Обновление выполняется только через `INSTALL_CLOVER_V18.bat` из корня установочного пакета. Не заменяйте файлы вручную и не запускайте отдельные установщики внутри папки `payload`.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+После установки:
+- Clover: http://localhost:5273/
+- сервер: http://localhost:4100/api/health
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Настройки 1С, SMTP, Push и Passkey хранятся только в `server/.env`.

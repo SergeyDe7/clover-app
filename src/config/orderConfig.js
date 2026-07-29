@@ -13,7 +13,7 @@ export const UNIT_CONFIG = {
   },
 };
 
-export const UNIT_ORDER = ["piece", "pack", "bundle"];
+export const UNIT_ORDER = ["piece", "bundle", "pack"];
 
 export const ORDER_STATUSES = [
   "Новый",

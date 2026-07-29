@@ -131,14 +131,18 @@ function buildUrl(baseUrl, endpointPath, query = {}) {
   return url;
 }
 
-function authHeaders(config) {
+export function buildOneCAuthHeaders(config) {
   const headers = {
     Accept: "application/json",
   };
 
+  // Send both credentials when available. Existing 1C publications can keep
+  // using HTTP Basic auth, while the Clover extension can additionally check
+  // the private X-Clover-Key header.
   if (config.apiKey) {
     headers["X-Clover-Key"] = config.apiKey;
-  } else if (config.username || config.password) {
+  }
+  if (config.username || config.password) {
     headers.Authorization = `Basic ${Buffer.from(
       `${config.username || ""}:${config.password || ""}`,
       "utf8"
@@ -162,7 +166,7 @@ async function requestJson(config, endpointPath, options = {}) {
       {
         method: options.method || "GET",
         headers: {
-          ...authHeaders(config),
+          ...buildOneCAuthHeaders(config),
           ...(options.body ? { "Content-Type": "application/json" } : {}),
         },
         body: options.body ? JSON.stringify(options.body) : undefined,

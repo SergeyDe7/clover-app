@@ -147,3 +147,43 @@
     width: 100%;
   }
 }
+
+.custom-photo-error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fdecec;
+  color: #a45151;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.custom-photo-preview {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #d6e0d3;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.custom-photo-preview img {
+  width: 110px;
+  height: 82px;
+  border-radius: 9px;
+  object-fit: cover;
+}
+
+.custom-photo-preview > div {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.custom-photo-preview button {
+  border: none;
+  background: transparent;
+  color: #ae5e4b;
+  font-weight: 700;
+}

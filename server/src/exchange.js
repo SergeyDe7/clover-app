@@ -6,8 +6,8 @@ const UNIT_LABELS = {
 
 export const EXCHANGE_STATUSES = {
   not_sent: "Не отправлен",
-  ready: "Готов к передаче",
-  sent: "Передан тестово",
+  ready: "В очереди 1С TEST",
+  sent: "Создан в 1С TEST",
   draft: "Черновик создан в 1С",
   error: "Ошибка",
 };
@@ -49,7 +49,9 @@ export function validateOrderFor1C({ order, products, clientLinks }) {
   if (!order?.firstDeliveryDate) warnings.push("Не указана дата доставки.");
 
   if (!link?.matched1C || !String(link?.oneCId || "").trim()) {
-    issues.push("Клиент не сопоставлен с контрагентом в 1С.");
+    warnings.push(
+      "Клиент ещё не связан с контрагентом 1С. При получении заказа 1С должна определить его по названию, телефону или email и вернуть найденный ID в подтверждении."
+    );
   }
 
   const items = Array.isArray(order?.items) ? order.items : [];
@@ -86,6 +88,7 @@ export function validateOrderFor1C({ order, products, clientLinks }) {
     warnings: [...new Set(warnings)],
     client1CId: String(link?.oneCId || "").trim(),
     client1CName: String(link?.oneCName || "").trim(),
+    clientLookupRequired: !String(link?.oneCId || "").trim(),
   };
 }
 
@@ -116,11 +119,14 @@ export function build1CPayload({ order, products, clientLinks }) {
     client: {
       cloverId: String(order?.clientId || ""),
       oneCId: String(link?.oneCId || ""),
-      oneCName: String(link?.oneCName || ""),
+      oneCCode: String(link?.oneCCode || link?.oneCMatchCode || ""),
+      oneCName: String(link?.oneCName || link?.oneCMatchName || ""),
+      oneCInn: String(link?.oneCInn || link?.oneCMatchInn || ""),
+      lookupRequired: !String(link?.oneCId || "").trim(),
       companyName: order?.customerName || "",
       contactName: order?.customerContact || "",
-      phone: order?.customerPhone || "",
-      email: order?.customerEmail || "",
+      phone: link?.oneCMatchPhone || order?.customerPhone || "",
+      email: link?.oneCMatchEmail || order?.customerEmail || "",
       address: order?.address || "",
     },
     items: (order?.items || []).map((item, index) => {
@@ -129,8 +135,9 @@ export function build1CPayload({ order, products, clientLinks }) {
         line: index + 1,
         cloverProductId: String(item.productId ?? item.id ?? ""),
         oneCId: String(item.oneCId || product?.oneCId || ""),
-        code: item.code || product?.code || "",
-        name: item.name || product?.name || "",
+        code: item.oneCCode || product?.oneCCode || item.code || product?.code || "",
+        name: item.oneCName || product?.oneCName || item.name || product?.name || "",
+        displayName: item.name || product?.name || "",
         unit: item.unit || "piece",
         unitName: UNIT_LABELS[item.unit] || item.unit || "",
         quantity: Number(item.quantity) || 0,
@@ -239,7 +246,7 @@ export function summarizeExchange(orders, products, clientLinks) {
     const exchange = normalizeExchangeState(order.exchange);
     const validation = validateOrderFor1C({ order, products, clientLinks });
     summary[exchange.status === "not_sent" ? "notSent" : exchange.status] += 1;
-    if (validation.issues.some((issue) => issue.includes("Клиент не сопоставлен"))) {
+    if (validation.clientLookupRequired) {
       summary.missingClientLinks += 1;
     }
     summary.missingProductLinks += validation.issues.filter((issue) => issue.includes("ID номенклатуры 1С")).length;

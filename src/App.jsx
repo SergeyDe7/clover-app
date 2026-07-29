@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import cloverLogo from "./assets/clover-logo.png";
+import { startPasskeyAuthentication, startPasskeyRegistration } from "./utils/webauthn";
 import {
   api,
   clearApiToken,
@@ -8,28 +9,55 @@ import {
   setApiToken,
 } from "./serverApi";
 
-const MANAGER_NOTICE_SEEN_KEY = "clover-manager-notice-seen-orders-v1";
+const MANAGER_ACTIVE_TAB_KEY = "clover-manager-active-tab-v1";
+const MANAGER_OPEN_CLIENT_KEY = "clover-manager-open-client-v1";
 
-function readSeenManagerOrderIds() {
+const MANAGER_TABS = [
+  ["orders", "Заказы"],
+  ["exchange", "Обмен с 1С"],
+  ["clients", "Клиенты"],
+  ["acts", "Акты сверки"],
+  ["products", "Товары"],
+  ["settings", "Настройки"],
+  ["backup", "Резервные копии"],
+  ["audit", "Журнал действий"],
+];
+
+function readManagerActiveTab() {
   try {
-    const value = JSON.parse(localStorage.getItem(MANAGER_NOTICE_SEEN_KEY) || "[]");
-    return new Set(Array.isArray(value) ? value.map(String) : []);
+    const value = localStorage.getItem(MANAGER_ACTIVE_TAB_KEY) || "orders";
+    return MANAGER_TABS.some(([id]) => id === value) ? value : "orders";
   } catch {
-    return new Set();
+    return "orders";
   }
 }
 
-function markManagerOrderNoticeSeen(orderIds) {
-  const ids = Array.isArray(orderIds) ? orderIds : [orderIds];
-  const validIds = ids.filter(Boolean);
-  if (!validIds.length) return;
+function writeManagerActiveTab(value) {
+  try {
+    localStorage.setItem(MANAGER_ACTIVE_TAB_KEY, value);
+  } catch (error) {
+    console.error("Не удалось сохранить раздел менеджера", error);
+  }
+}
 
-  const seen = readSeenManagerOrderIds();
-  validIds.forEach((orderId) => seen.add(String(orderId)));
-  localStorage.setItem(
-    MANAGER_NOTICE_SEEN_KEY,
-    JSON.stringify([...seen].slice(-500))
-  );
+function readOpenManagerClientId() {
+  try {
+    return localStorage.getItem(MANAGER_OPEN_CLIENT_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function writeOpenManagerClientId(value) {
+  try {
+    if (value) {
+      localStorage.setItem(MANAGER_OPEN_CLIENT_KEY, String(value));
+    } else {
+      localStorage.removeItem(MANAGER_OPEN_CLIENT_KEY);
+    }
+  } catch (error) {
+    console.error("Не удалось сохранить открытую карточку клиента", error);
+  }
 }
 
 const DEFAULT_PRODUCTS = [
@@ -162,7 +190,7 @@ function selectDefaultNumber(event) {
   }
 }
 
-const UNIT_ORDER = ["piece", "pack", "bundle"];
+const UNIT_ORDER = ["piece", "bundle", "pack"];
 const ORDER_STATUSES = [
   "Новый",
   "Принят",
@@ -208,6 +236,18 @@ const DEFAULT_SETTINGS = {
   managerPhone: "+7 ",
   managerMax: "",
   managerTelegram: "",
+  managerNotificationsEnabled: true,
+  managerNotifyNewOrders: true,
+  managerNotifyOrderChanges: true,
+  managerNotifyCustomItems: true,
+  managerNotifyReconciliation: true,
+  managerNotifyRegistrations: true,
+  managerNotifyOneCErrors: true,
+  managerNotifyEmail: false,
+  managerNotificationEmail: "",
+  managerNotifyTelegram: false,
+  managerTelegramChatId: "",
+  managerNotifyPush: true,
 };
 
 const EMPTY_PROFILE = {
@@ -220,26 +260,31 @@ const EMPTY_PROFILE = {
 const EMPTY_LINK = {
   matched1C: false,
   oneCId: "",
+  oneCCode: "",
   oneCName: "",
+  oneCInn: "",
+  oneCMatchCode: "",
+  oneCMatchName: "",
+  oneCMatchInn: "",
+  oneCMatchPhone: "",
+  oneCMatchEmail: "",
+  oneCSearchQuery: "",
+  oneCLinkMode: "",
+  oneCLinkedAt: "",
   managerNote: "",
   matrixMode: "pending",
   matrixProductIds: [],
   allowFullCatalog: false,
+  defaultPricingMode: "base",
+  defaultMarkupPercent: 0,
   personalPrices: {},
 };
 
-const PRICE_SOURCE_LABELS = {
-  manual: "Персональная цена",
-  contract: "Цена по договору",
-  oneC: "Цена из 1С",
-  base: "Базовая цена",
-  unspecified: "Цена уточняется",
-};
 
 const EXCHANGE_STATUS_LABELS = {
   not_sent: "Не отправлен",
-  ready: "Готов к передаче",
-  sent: "Передан тестово",
+  ready: "В очереди 1С TEST",
+  sent: "Создан в 1С TEST",
   draft: "Черновик создан в 1С",
   error: "Ошибка",
 };
@@ -687,6 +732,7 @@ textarea { resize: vertical; }
 .product-card h2 { margin: 12px 0 8px; color: #3f4b3f; font-size: 16px; line-height: 1.35; }
 .product-code { margin: 0 0 10px; color: #929a92; font-size: 10px; }
 .product-price { margin: auto 0 12px; color: #386f37; font-weight: 800; }
+.product-price small { color: #6f7b6f; font-size: 11px; font-weight: 700; }
 .unit-choice { display: flex; gap: 7px; margin-bottom: 8px; }
 .unit-choice button { flex: 1 1 0; min-height: 37px; padding: 7px; border: 1px solid #d8e3d4; border-radius: 10px; background: #fff; color: #5f695f; font-size: 11px; font-weight: 800; }
 .unit-choice button.active { border-color: #5b9d57; background: #5b9d57; color: #fff; }
@@ -713,6 +759,27 @@ textarea { resize: vertical; }
 .custom-product-box h3 { margin: 7px 0; color: #394639; }
 .custom-product-form { display: grid; gap: 12px; margin-top: 15px; }
 .custom-row { display: grid; grid-template-columns: 1fr 140px; gap: 12px; }
+.request-photo-picker input[type="file"] { padding: 9px; border: 1px dashed #a8c5a3; background: #fff; }
+.request-photo-picker small { color: #7a847a; font-size: 10px; font-weight: 500; }
+.request-photo-status { padding: 10px 12px; border-radius: 10px; background: #eef6eb; color: #4f7d4b; font-size: 11px; font-weight: 700; }
+.request-photo-error { padding: 10px 12px; border-radius: 10px; background: #fdecec; color: #a45151; font-size: 11px; font-weight: 700; }
+.request-photo-preview { display: grid; grid-template-columns: 120px minmax(0,1fr); gap: 12px; align-items: center; padding: 12px; border: 1px solid #dce7d9; border-radius: 13px; background: #fff; }
+.request-photo-preview > div { display: grid; justify-items: start; gap: 6px; }
+.request-photo-preview strong { color: #455245; font-size: 12px; overflow-wrap: anywhere; }
+.request-photo-preview small { color: #7a847a; font-size: 10px; }
+.custom-request-photo { display: block; overflow: hidden; padding: 0; border: 1px solid #dbe5d8; border-radius: 11px; background: #f2f6ef; cursor: zoom-in; appearance: none; }
+.custom-request-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.custom-photo-viewer { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 24px; background: rgba(18, 25, 18, 0.9); cursor: zoom-out; }
+.custom-photo-viewer > img { display: block; width: auto; height: auto; max-width: min(1200px, 94vw); max-height: 90vh; object-fit: contain; border-radius: 12px; background: #fff; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45); cursor: default; }
+.custom-photo-viewer-close { position: fixed; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); z-index: 10001; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid rgba(255, 255, 255, 0.55); border-radius: 50%; background: rgba(255, 255, 255, 0.95); color: #345934; font-size: 30px; line-height: 1; font-weight: 500; cursor: pointer; }
+.request-photo-preview .custom-request-photo { width: 120px; height: 90px; }
+.custom-request-photo-small { width: 58px; height: 44px; margin-top: 5px; }
+.custom-request-order-row { grid-template-columns: 74px minmax(0,1fr) auto; align-items: center; }
+.custom-request-photo-order { width: 68px; height: 54px; }
+.manager-request-photo-block { display: grid; justify-items: start; gap: 8px; margin: 0 0 12px; padding: 12px; border-radius: 12px; background: #fff; }
+.manager-request-photo-block > strong { color: #596359; font-size: 11px; }
+.custom-request-photo-manager { width: min(320px, 100%); aspect-ratio: 4 / 3; }
+
 
 .manager-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
 .manager-nav button { padding: 10px 15px; border: 1px solid #d7e1d4; border-radius: 12px; background: #fff; color: #5d695d; font-weight: 800; }
@@ -766,15 +833,6 @@ textarea { resize: vertical; }
   background: #5b9d57;
   color: #fff;
 }
-.price-source {
-  display: block;
-  margin-top: -7px;
-  margin-bottom: 11px;
-  color: #7a847a;
-  font-size: 10px;
-  font-weight: 700;
-}
-.price-source.personal { color: #4f8d4b; }
 .matrix-editor-list {
   display: grid;
   gap: 10px;
@@ -785,7 +843,7 @@ textarea { resize: vertical; }
 }
 .matrix-editor-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(110px, .55fr)) minmax(140px, .65fr);
+  grid-template-columns: minmax(220px, 1.35fr) repeat(3, minmax(120px, .55fr)) minmax(175px, .75fr);
   gap: 9px;
   align-items: end;
   padding: 12px;
@@ -817,6 +875,21 @@ textarea { resize: vertical; }
   border-radius: 9px;
   background: #fff;
 }
+.matrix-price-calculated {
+  align-self: stretch;
+  padding: 8px 9px;
+  border: 1px solid #d7e4d3;
+  border-radius: 10px;
+  background: #fff;
+}
+.matrix-price-calculated small,
+.matrix-price-calculated strong {
+  display: block;
+  line-height: 1.35;
+}
+.matrix-price-calculated strong { color: #386f37; font-size: 12px; }
+.matrix-price-mode { display: grid; gap: 7px; }
+.price-update-time { color: #7a847a; font-size: 9px; line-height: 1.35; }
 .matrix-summary {
   display: flex;
   flex-wrap: wrap;
@@ -842,6 +915,18 @@ textarea { resize: vertical; }
 .product-manager-row h3 { margin: 0 0 4px; color: #394639; font-size: 14px; }
 .product-manager-row p { margin: 0; color: #7a847a; font-size: 10px; }
 .product-manager-row.inactive { opacity: .58; }
+.product-purchase-summary { display: flex; flex-wrap: wrap; gap: 5px 10px; margin-top: 7px; color: #526852; font-size: 10px; line-height: 1.4; }
+.product-purchase-summary span { white-space: nowrap; }
+.product-purchase-summary strong { color: #315f31; font-size: 10px; }
+.product-purchase-updated { width: 100%; color: #7a847a; }
+.purchase-price-card { margin-top: 14px; padding: 15px; border: 1px solid #dce7d9; border-radius: 14px; background: #f8fbf6; }
+.purchase-price-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.purchase-price-card-head h3 { margin: 0; color: #394639; font-size: 14px; }
+.purchase-price-card-head small { color: #7a847a; text-align: right; }
+.purchase-price-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.purchase-price-grid article { padding: 11px; border: 1px solid #dce7d9; border-radius: 11px; background: #fff; }
+.purchase-price-grid span, .purchase-price-grid small { display: block; color: #7a847a; font-size: 10px; }
+.purchase-price-grid strong { display: block; margin: 5px 0 3px; color: #315f31; font-size: 15px; }
 .product-editor { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgba(28,40,28,.48); }
 .product-editor-card { width: min(800px,100%); max-height: 92vh; overflow: auto; padding: 24px; border-radius: 20px; background: #fff; box-shadow: 0 25px 80px rgba(0,0,0,.2); }
 .unit-settings { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 12px; }
@@ -939,7 +1024,7 @@ textarea { resize: vertical; }
   .product-grid { grid-template-columns: 1fr; }
   .order-meta { grid-template-columns: 1fr; }
   .custom-row { grid-template-columns: 1fr; }
-  .unit-settings { grid-template-columns: 1fr; }
+  .unit-settings, .purchase-price-grid { grid-template-columns: 1fr; }
   .matrix-grid { grid-template-columns: 1fr; }
   .matrix-editor-row { grid-template-columns: 1fr; }
   .matrix-editor-product { grid-column: auto; }
@@ -1050,6 +1135,14 @@ function normalizeProduct(product) {
     id: hasNumericId ? numericId : product.id,
     code: product.code || (hasNumericId ? `CL-${String(numericId).padStart(4, "0")}` : ""),
     oneCId: product.oneCId || "",
+    oneCCode: product.oneCCode || "",
+    oneCName: product.oneCName || "",
+    oneCLinkMode: product.oneCLinkMode || "",
+    oneCLinkedAt: product.oneCLinkedAt || "",
+    oneCMatchCode: product.oneCMatchCode || "",
+    oneCMatchName: product.oneCMatchName || "",
+    oneCSearchQuery: product.oneCSearchQuery || "",
+    oneCSearchRequestedAt: product.oneCSearchRequestedAt || "",
     imageUrl: product.imageUrl || "",
     imageUpdatedAt: product.imageUpdatedAt || "",
     active: product.active !== false,
@@ -1076,6 +1169,18 @@ function normalizeProduct(product) {
       typeof product.priceSources === "object"
         ? product.priceSources
         : {},
+    purchasePrices:
+      product.purchasePrices && typeof product.purchasePrices === "object"
+        ? product.purchasePrices
+        : { piece: null, pack: null, bundle: null },
+    purchasePriceUpdatedAt: product.purchasePriceUpdatedAt || "",
+    purchasePriceUnit: product.purchasePriceUnit || "piece",
+    purchasePriceAvailable: Boolean(product.purchasePriceAvailable),
+    clientPriceMode: product.clientPriceMode || "base",
+    clientPriceOverrideMode: product.clientPriceOverrideMode || "inherit",
+    markupPercent: Math.max(0, Number(product.markupPercent) || 0),
+    defaultPricingMode: product.defaultPricingMode || "base",
+    defaultMarkupPercent: Math.max(0, Number(product.defaultMarkupPercent) || 0),
     isMatrixProduct: product.isMatrixProduct !== false,
     saleUnits,
   };
@@ -1128,6 +1233,7 @@ function getPriceSource(product, unit) {
 
 function hasPersonalPrices(link) {
   return Object.values(link.personalPrices || {}).some((price) =>
+    price?.source === "purchase_markup" ||
     ["piece", "pack", "bundle"].some(
       (unit) =>
         price?.[unit] !== null &&
@@ -1135,6 +1241,29 @@ function hasPersonalPrices(link) {
         price?.[unit] !== ""
     )
   );
+}
+
+function roundPriceUp(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 0
+    ? Math.ceil(numeric - 1e-9)
+    : 0;
+}
+
+function hasPurchasePrice(value) {
+  return (
+    value !== null &&
+    value !== undefined &&
+    value !== "" &&
+    Number.isFinite(Number(value))
+  );
+}
+
+function calculateMarkupPreview(purchasePrice, markupPercent) {
+  const purchase = Number(purchasePrice);
+  if (!Number.isFinite(purchase) || purchase < 0) return 0;
+  const markup = Math.max(0, Number(markupPercent) || 0);
+  return roundPriceUp(purchase * (1 + markup / 100));
 }
 
 function getOrderTotal(order) {
@@ -1215,76 +1344,57 @@ function OrderTimeline({ order }) {
   );
 }
 
-function ManagerContact({ settings }) {
+function ManagerContact({ settings, profile = {}, orders = [] }) {
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const fullName = String(settings.managerFullName || "").trim();
   const phoneValue = formatRussianPhone(settings.managerPhone || "");
   const phoneLinks = getManagerPhoneLinks(settings.managerPhone);
   const maxLink = getMaxLink(settings.managerMax);
-  const telegramLink = getTelegramLink(settings.managerTelegram);
+  const baseTelegramLink = getTelegramLink(settings.managerTelegram);
+  const latestOrder = [...orders].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0];
+  const message = `Здравствуйте! Компания «${profile.companyName || "клиент Clover"}». ${latestOrder?.number ? `Вопрос по заказу №${latestOrder.number}.` : "У меня вопрос по работе с Clover."}`;
+  const telegramLink = baseTelegramLink
+    ? `${baseTelegramLink}${baseTelegramLink.includes("?") ? "&" : "?"}text=${encodeURIComponent(message)}`
+    : "";
   const hasAnyContact = Boolean(fullName || phoneLinks.phone || maxLink || telegramLink);
+
+  const copyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      window.prompt("Скопируйте текст обращения:", message);
+    }
+  };
 
   return (
     <div
       className={open ? "manager-contact open" : "manager-contact"}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") setOpen(false);
-      }}
+      onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}
     >
-      <button
-        className="manager-contact-trigger"
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-      >
-        Ваш менеджер
+      <button className="manager-contact-trigger" type="button" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
+        Связаться с менеджером
       </button>
       <div className="manager-contact-popover">
         <p className="eyebrow">Ваш менеджер</p>
         <h3>{fullName || "Менеджер Clover"}</h3>
-        {phoneLinks.phone ? (
-          <a className="manager-contact-phone" href={phoneLinks.phone}>
-            {phoneValue}
-          </a>
-        ) : (
-          <p className="manager-contact-note">Телефон пока не указан.</p>
-        )}
-
+        {phoneLinks.phone ? <a className="manager-contact-phone" href={phoneLinks.phone}>{phoneValue}</a> : <p className="manager-contact-note">Телефон пока не указан.</p>}
+        <div className="manager-message-template">
+          <strong>Шаблон обращения</strong>
+          <p>{message}</p>
+          <button className="secondary-button" type="button" onClick={copyMessage}>{copied ? "Скопировано" : "Скопировать текст"}</button>
+        </div>
         {hasAnyContact && (phoneLinks.phone || maxLink || telegramLink) ? (
           <div className="manager-contact-actions">
-            {phoneLinks.phone && (
-              <a className="primary" href={phoneLinks.phone}>
-                Позвонить
-              </a>
-            )}
-            {maxLink && (
-              <a
-                className={phoneLinks.phone ? "" : "primary"}
-                href={maxLink}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Написать в MAX
-              </a>
-            )}
-            {telegramLink && (
-              <a
-                className={phoneLinks.phone || maxLink ? "wide" : "primary wide"}
-                href={telegramLink}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Написать в Telegram
-              </a>
-            )}
+            {phoneLinks.phone && <a className="primary" href={phoneLinks.phone}>Позвонить</a>}
+            {maxLink && <a className={phoneLinks.phone ? "" : "primary"} href={maxLink} target="_blank" rel="noreferrer" onClick={copyMessage}>Открыть MAX</a>}
+            {telegramLink && <a className={phoneLinks.phone || maxLink ? "wide" : "primary wide"} href={telegramLink} target="_blank" rel="noreferrer">Открыть Telegram</a>}
           </div>
-        ) : (
-          <div className="manager-contact-empty">
-            Контакты менеджера ещё не заполнены.
-          </div>
-        )}
+        ) : <div className="manager-contact-empty">Контакты менеджера ещё не заполнены.</div>}
       </div>
     </div>
   );
@@ -1310,186 +1420,229 @@ function Header({ title, subtitle, onLogout, children }) {
   );
 }
 
-function LoginView({
-  role,
-  setRole,
-  onAuth,
-  authBusy,
-  authError,
-}) {
-  const [isRegistration, setIsRegistration] = useState(false);
+function LoginView({ onAuth, authBusy, authError }) {
+  const params = new URLSearchParams(window.location.search);
+  const verifyToken = params.get("verify") || "";
+  const resetToken = params.get("reset") || "";
+  const [mode, setMode] = useState(resetToken ? "reset" : "login");
   const [form, setForm] = useState({
     companyName: "",
     contactName: "",
     phone: RUSSIAN_PHONE_PREFIX,
     email: "",
     password: "",
+    confirmPassword: "",
   });
+  const [message, setMessage] = useState("");
+  const [localError, setLocalError] = useState("");
+  const [developmentLink, setDevelopmentLink] = useState("");
+  const [verificationBusy, setVerificationBusy] = useState(Boolean(verifyToken));
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+
+  useEffect(() => {
+    if (!verifyToken) return;
+    let cancelled = false;
+    api.verifyEmail(verifyToken)
+      .then((result) => {
+        if (cancelled) return;
+        setMessage(result.message || "Электронная почта подтверждена.");
+        window.history.replaceState({}, "", window.location.pathname);
+        setMode("login");
+      })
+      .catch((error) => {
+        if (!cancelled) setLocalError(error.message);
+      })
+      .finally(() => {
+        if (!cancelled) setVerificationBusy(false);
+      });
+    return () => { cancelled = true; };
+  }, [verifyToken]);
 
   const updateField = (field, value) => {
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const switchMode = (nextMode) => {
+    setMode(nextMode);
+    setMessage("");
+    setLocalError("");
+    setDevelopmentLink("");
   };
 
   const submit = async (event) => {
     event.preventDefault();
-
-    await onAuth({
-      mode: isRegistration ? "register" : "login",
-      role,
-      ...form,
-    });
+    setLocalError("");
+    setMessage("");
+    setDevelopmentLink("");
+    try {
+      if (mode === "forgot") {
+        const result = await api.forgotPassword(form.email);
+        setMessage(result.message);
+        setDevelopmentLink(result.developmentLink || "");
+        return;
+      }
+      if (mode === "reset") {
+        if (form.password !== form.confirmPassword) {
+          throw new Error("Пароли не совпадают.");
+        }
+        const result = await api.resetPassword(resetToken, form.password);
+        setMessage(result.message);
+        window.history.replaceState({}, "", window.location.pathname);
+        setMode("login");
+        setForm((current) => ({ ...current, password: "", confirmPassword: "" }));
+        return;
+      }
+      const result = await onAuth({
+        mode,
+        companyName: form.companyName,
+        contactName: form.contactName,
+        phone: form.phone,
+        email: form.email,
+        password: form.password,
+      });
+      if (mode === "register" && result) {
+        setMessage(result.message || "Регистрация создана.");
+        setDevelopmentLink(result.developmentLink || "");
+        setMode("login");
+      }
+    } catch (error) {
+      setLocalError(error.message);
+    }
   };
+
+  const resend = async () => {
+    setLocalError("");
+    try {
+      const result = await api.resendVerification(form.email);
+      setMessage(result.message);
+      setDevelopmentLink(result.developmentLink || "");
+    } catch (error) {
+      setLocalError(error.message);
+    }
+  };
+
+  const loginWithPasskey = async () => {
+    setLocalError("");
+    setMessage("");
+    if (!form.email.trim()) {
+      setLocalError("Сначала укажите электронную почту.");
+      return;
+    }
+    if (!("PublicKeyCredential" in window)) {
+      setLocalError("Это устройство или браузер не поддерживает вход по Face ID или ключу доступа.");
+      return;
+    }
+    setPasskeyBusy(true);
+    try {
+      const ceremony = await api.getPasskeyAuthenticationOptions(form.email);
+      const response = await startPasskeyAuthentication(ceremony.options);
+      const result = await api.verifyPasskeyAuthentication(form.email, ceremony.ceremonyId, response);
+      await onAuth({ mode: "passkey", result });
+    } catch (error) {
+      setLocalError(error.message || "Не удалось выполнить вход по ключу доступа.");
+    } finally {
+      setPasskeyBusy(false);
+    }
+  };
+
+  if (verificationBusy) {
+    return (
+      <main className="page">
+        <section className="login-card">
+          <img className="logo" src={cloverLogo} alt="Логотип Clover" width="230" height="155" />
+          <h1>Подтверждаем почту</h1>
+          <p className="subtitle">Проверяем ссылку регистрации…</p>
+        </section>
+      </main>
+    );
+  }
+
+  const title = mode === "register"
+    ? "Создание аккаунта"
+    : mode === "forgot"
+      ? "Восстановление пароля"
+      : mode === "reset"
+        ? "Новый пароль"
+        : "Личный кабинет";
 
   return (
     <main className="page">
       <section className="login-card">
         <img className="logo" src={cloverLogo} alt="Логотип Clover" width="230" height="155" />
-        <h1>{isRegistration ? "Создание аккаунта" : "Личный кабинет"}</h1>
-        <p className="subtitle">
-          {isRegistration
-            ? "Создайте настоящий аккаунт клиента"
-            : role === "manager"
-              ? "Принимайте заказы, управляйте клиентами и товарами"
-              : "Создавайте и отслеживайте заказы в одном месте"}
-        </p>
-
-        {!isRegistration && (
-          <div className="role-switch">
-            <button
-              className={role === "client" ? "active" : ""}
-              type="button"
-              onClick={() => setRole("client")}
-              disabled={authBusy}
-            >
-              Клиент
-            </button>
-            <button
-              className={role === "manager" ? "active" : ""}
-              type="button"
-              onClick={() => setRole("manager")}
-              disabled={authBusy}
-            >
-              Менеджер
-            </button>
-          </div>
+        <h1>{title}</h1>
+        {mode !== "login" && (
+          <p className="subtitle">
+            {mode === "register"
+              ? "Регистрация доступна только клиентам. Роль определится автоматически при входе."
+              : mode === "forgot"
+                ? "Укажите почту — мы отправим ссылку для установки нового пароля."
+                : "Придумайте новый пароль длиной не менее 8 символов."}
+          </p>
         )}
 
         <form className="login-form" onSubmit={submit}>
-          {isRegistration && (
+          {mode === "register" && (
             <>
               <label htmlFor="companyName">Название организации</label>
-              <input
-                id="companyName"
-                type="text"
-                placeholder="ООО Ромашка"
-                value={form.companyName}
-                onChange={(event) =>
-                  updateField("companyName", event.target.value)
-                }
-                required
-                disabled={authBusy}
-              />
-
+              <input id="companyName" value={form.companyName} onChange={(event) => updateField("companyName", event.target.value)} required disabled={authBusy} />
               <label htmlFor="contactName">Контактное лицо</label>
-              <input
-                id="contactName"
-                type="text"
-                placeholder="Имя сотрудника"
-                value={form.contactName}
-                onChange={(event) =>
-                  updateField("contactName", event.target.value)
-                }
-                required
-                disabled={authBusy}
-              />
-
+              <input id="contactName" value={form.contactName} onChange={(event) => updateField("contactName", event.target.value)} required disabled={authBusy} />
               <label htmlFor="phone">Телефон</label>
-              <input
-                id="phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="+7 (999) 000-00-00"
-                maxLength="18"
-                value={form.phone}
-                onFocus={(event) => {
-                  if (!getRussianPhoneLocalDigits(event.currentTarget.value)) {
-                    updateField("phone", RUSSIAN_PHONE_PREFIX);
-                  }
-                }}
-                onChange={(event) =>
-                  updateField("phone", formatRussianPhone(event.target.value))
-                }
-                required
-                disabled={authBusy}
-              />
+              <input id="phone" type="tel" inputMode="tel" autoComplete="tel" maxLength="18" value={form.phone} onChange={(event) => updateField("phone", formatRussianPhone(event.target.value))} required disabled={authBusy} />
             </>
           )}
 
-          <label htmlFor="email">Электронная почта</label>
-          <input
-            id="email"
-            type="email"
-            placeholder="name@company.ru"
-            value={form.email}
-            onChange={(event) =>
-              updateField("email", event.target.value)
-            }
-            required
-            disabled={authBusy}
-          />
+          {mode !== "reset" && (
+            <>
+              <label htmlFor="email">Электронная почта</label>
+              <input id="email" type="email" autoComplete={mode === "login" ? "username webauthn" : "email"} value={form.email} onChange={(event) => updateField("email", event.target.value)} required disabled={authBusy} />
+            </>
+          )}
 
-          <label htmlFor="password">Пароль</label>
-          <input
-            id="password"
-            type="password"
-            placeholder="Минимум 8 символов"
-            minLength="8"
-            value={form.password}
-            onChange={(event) =>
-              updateField("password", event.target.value)
-            }
-            required
-            disabled={authBusy}
-          />
+          {!["forgot"].includes(mode) && (
+            <>
+              <label htmlFor="password">{mode === "reset" ? "Новый пароль" : "Пароль"}</label>
+              <input id="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? 1 : 8} value={form.password} onChange={(event) => updateField("password", event.target.value)} required disabled={authBusy} />
+            </>
+          )}
+
+          {mode === "reset" && (
+            <>
+              <label htmlFor="confirmPassword">Повторите новый пароль</label>
+              <input id="confirmPassword" type="password" autoComplete="new-password" minLength="8" value={form.confirmPassword} onChange={(event) => updateField("confirmPassword", event.target.value)} required disabled={authBusy} />
+            </>
+          )}
 
           <button type="submit" disabled={authBusy}>
-            {authBusy
-              ? "Подождите..."
-              : isRegistration
-                ? "Зарегистрироваться"
-                : role === "manager"
-                  ? "Войти как менеджер"
-                  : "Войти"}
+            {authBusy ? "Подождите…" : mode === "register" ? "Зарегистрироваться" : mode === "forgot" ? "Отправить ссылку" : mode === "reset" ? "Сохранить пароль" : "Войти"}
           </button>
         </form>
 
-        {authError && <div className="auth-error">{authError}</div>}
+        {mode === "login" && (
+          <button className="passkey-login-button" type="button" disabled={authBusy || passkeyBusy} onClick={loginWithPasskey}>
+            {passkeyBusy ? "Подтверждаем…" : "Войти по Face ID / отпечатку"}
+          </button>
+        )}
 
-        {role === "client" && (
-          <div className="registration">
-            <span>
-              {isRegistration ? "Уже есть аккаунт?" : "Нет аккаунта?"}
-            </span>
-            <button
-              type="button"
-              disabled={authBusy}
-              onClick={() => {
-                setIsRegistration((value) => !value);
-              }}
-            >
-              {isRegistration ? "Войти" : "Зарегистрироваться"}
-            </button>
+        {(localError || authError) && <div className="auth-error">{localError || authError}</div>}
+        {message && <div className="auth-success">{message}</div>}
+        {developmentLink && (
+          <div className="test-note">
+            Тестовая ссылка для локальной настройки: <a href={developmentLink}>открыть</a>
           </div>
         )}
 
-        <div className="test-note">
-          Серверная версия. Тестовый менеджер: manager@clover.local,
-          пароль Clover123!. Перед публикацией пароль обязательно
-          заменим.
+        <div className="registration auth-links">
+          {mode === "login" && (
+            <>
+              <button type="button" onClick={() => switchMode("register")}>Зарегистрироваться</button>
+              <button type="button" onClick={() => switchMode("forgot")}>Забыли пароль?</button>
+              <button type="button" disabled={!form.email} onClick={resend}>Повторить письмо</button>
+            </>
+          )}
+          {mode !== "login" && mode !== "reset" && (
+            <button type="button" onClick={() => switchMode("login")}>Вернуться ко входу</button>
+          )}
         </div>
       </section>
     </main>
@@ -1665,27 +1818,181 @@ function AddressesPanel({ addresses, onChange }) {
   );
 }
 
+
+const CUSTOM_REQUEST_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const CUSTOM_REQUEST_PHOTO_MAX_SOURCE_BYTES = 12 * 1024 * 1024;
+const CUSTOM_REQUEST_PHOTO_MAX_DIMENSION = 1600;
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Не удалось прочитать фотографию."));
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadBrowserImage(source) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onerror = () => reject(new Error("Файл не удалось распознать как фотографию."));
+    image.onload = () => resolve(image);
+    image.src = source;
+  });
+}
+
+async function prepareCustomRequestPhoto(file) {
+  if (!CUSTOM_REQUEST_PHOTO_TYPES.includes(file?.type)) {
+    throw new Error("Можно прикрепить JPG, PNG или WEBP.");
+  }
+  if (file.size > CUSTOM_REQUEST_PHOTO_MAX_SOURCE_BYTES) {
+    throw new Error("Фотография слишком большая. Максимальный исходный размер — 12 МБ.");
+  }
+
+  const source = await readFileAsDataUrl(file);
+  const image = await loadBrowserImage(source);
+  const scale = Math.min(
+    1,
+    CUSTOM_REQUEST_PHOTO_MAX_DIMENSION / image.naturalWidth,
+    CUSTOM_REQUEST_PHOTO_MAX_DIMENSION / image.naturalHeight
+  );
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Браузер не смог подготовить фотографию.");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(image, 0, 0, width, height);
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+  if (dataUrl.length > 6 * 1024 * 1024) {
+    throw new Error("После обработки фотография всё ещё слишком большая. Выберите снимок меньшего размера.");
+  }
+
+  return {
+    name: file.name || "Фото товара.jpg",
+    type: "image/jpeg",
+    size: Math.round((dataUrl.length * 3) / 4),
+    width,
+    height,
+    dataUrl,
+  };
+}
+
+function CustomRequestPhoto({ photo, className = "" }) {
+  const [viewerOpen, setViewerOpen] = useState(false);
+
+  useEffect(() => {
+    if (!viewerOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setViewerOpen(false);
+    };
+
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [viewerOpen]);
+
+  if (!photo?.dataUrl) return null;
+
+  const altText = photo.name || "Фото товара из запроса";
+
+  return (
+    <>
+      <button
+        className={`custom-request-photo ${className}`.trim()}
+        type="button"
+        onClick={() => setViewerOpen(true)}
+        title="Открыть фотографию"
+        aria-label={`Открыть фотографию: ${altText}`}
+      >
+        <img src={photo.dataUrl} alt={altText} />
+      </button>
+      {viewerOpen && (
+        <div
+          className="custom-photo-viewer"
+          role="dialog"
+          aria-modal="true"
+          aria-label={altText}
+          onClick={() => setViewerOpen(false)}
+        >
+          <button
+            className="custom-photo-viewer-close"
+            type="button"
+            onClick={() => setViewerOpen(false)}
+            aria-label="Закрыть фотографию"
+            title="Закрыть"
+          >
+            ×
+          </button>
+          <img
+            src={photo.dataUrl}
+            alt={altText}
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
 function CustomItemForm({ onAdd }) {
-  const initial = { name: "", quantity: "1", unit: "шт.", details: "" };
+  const initial = { name: "", quantity: "1", unit: "шт.", details: "", photo: null };
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(initial);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState("");
+
+  const resetForm = () => {
+    setForm(initial);
+    setPhotoBusy(false);
+    setPhotoError("");
+  };
+
+  const selectPhoto = async (event) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+
+    setPhotoBusy(true);
+    setPhotoError("");
+    try {
+      const photo = await prepareCustomRequestPhoto(file);
+      setForm((current) => ({ ...current, photo }));
+    } catch (error) {
+      setPhotoError(error.message || "Не удалось прикрепить фотографию.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
   const submit = (event) => {
     event.preventDefault();
     const quantity = Math.max(1, Number.parseInt(form.quantity, 10) || 1);
-    if (!form.name.trim()) return;
+    if (!form.name.trim() || photoBusy) return;
     onAdd({
       id: makeId("custom"),
       name: form.name.trim(),
       quantity,
       unit: form.unit,
       details: form.details.trim(),
+      photo: form.photo || null,
       requestStatus: "Новый запрос",
       unitPrice: 0,
       managerComment: "",
       matchedProductId: null,
       isCustom: true,
     });
-    setForm(initial);
+    resetForm();
     setOpen(false);
   };
 
@@ -1693,7 +2000,7 @@ function CustomItemForm({ onAdd }) {
     <section className="custom-product-box">
       <span className="badge green">Не нашли нужный товар?</span>
       <h3>Добавьте запрос менеджеру</h3>
-      <p className="muted small">Укажите название, количество и важные характеристики.</p>
+      <p className="muted small">Укажите название, количество и важные характеристики. При необходимости приложите фотографию.</p>
       {!open ? (
         <button className="primary-button" type="button" onClick={() => setOpen(true)}>+ Добавить отсутствующий товар</button>
       ) : (
@@ -1714,9 +2021,36 @@ function CustomItemForm({ onAdd }) {
           <label className="field">Марка или характеристики
             <textarea rows="3" value={form.details} onChange={(e) => setForm({ ...form, details: e.target.value })} />
           </label>
+          <label className="field request-photo-picker">Фото товара — необязательно
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={photoBusy}
+              onChange={selectPhoto}
+            />
+            <small>JPG, PNG или WEBP. Clover уменьшит фотографию перед сохранением.</small>
+          </label>
+          {photoBusy && <div className="request-photo-status">Подготавливаем фотографию…</div>}
+          {photoError && <div className="request-photo-error">{photoError}</div>}
+          {form.photo?.dataUrl && (
+            <div className="request-photo-preview">
+              <CustomRequestPhoto photo={form.photo} />
+              <div>
+                <strong>{form.photo.name}</strong>
+                <small>{form.photo.width} × {form.photo.height} пикс.</small>
+                <button
+                  className="danger-button"
+                  type="button"
+                  onClick={() => setForm((current) => ({ ...current, photo: null }))}
+                >
+                  Удалить фото
+                </button>
+              </div>
+            </div>
+          )}
           <div className="form-actions">
-            <button className="secondary-button" type="button" onClick={() => { setOpen(false); setForm(initial); }}>Отмена</button>
-            <button className="primary-button" type="submit">Добавить в заказ</button>
+            <button className="secondary-button" type="button" onClick={() => { setOpen(false); resetForm(); }}>Отмена</button>
+            <button className="primary-button" type="submit" disabled={photoBusy}>Добавить в заказ</button>
           </div>
         </form>
       )}
@@ -1731,6 +2065,8 @@ function OrderEditor({
   favorites,
   setFavorites,
   settings,
+  profile,
+  orders,
   catalogPolicy,
   showFullCatalog,
   setShowFullCatalog,
@@ -1849,7 +2185,7 @@ function OrderEditor({
   return (
     <main className="clover-app">
       <Header title={session.mode === "edit" ? "Редактирование заказа" : session.mode === "repeat" ? "Повтор заказа" : "Новый заказ"}>
-        <ManagerContact settings={settings} />
+        <ManagerContact settings={settings} profile={profile} orders={orders} />
         <button className="header-button" type="button" onClick={onClose}>← В кабинет</button>
       </Header>
       <section className="catalog-content">
@@ -1918,22 +2254,11 @@ function OrderEditor({
                     </div>
                     <h2>{product.name}</h2>
                     <p className="product-code">Код: {product.code}</p>
-                    <p className="product-price">{settings.showPrices && price > 0 ? formatMoney(price) : "Цена уточняется"}</p>
-                    {settings.showPrices && price > 0 && (
-                      <small
-                        className={
-                          ["manual", "contract", "oneC"].includes(
-                            getPriceSource(product, unit)
-                          )
-                            ? "price-source personal"
-                            : "price-source"
-                        }
-                      >
-                        {PRICE_SOURCE_LABELS[
-                          getPriceSource(product, unit)
-                        ] || "Цена"}
-                      </small>
-                    )}
+                    <p className="product-price">
+                      {settings.showPrices && price > 0
+                        ? <>{formatMoney(price)} <small>/ {UNIT_CONFIG[unit].shortLabel}</small></>
+                        : "Цена уточняется"}
+                    </p>
                     <div className="unit-choice">
                       {UNIT_ORDER.filter((item) => product.saleUnits.includes(item)).map((item) => (
                         <button className={unit === item ? "active" : ""} type="button" key={item} onClick={() => setUnits((current) => ({ ...current, [product.id]: item }))}>{UNIT_CONFIG[item].label}</button>
@@ -1965,7 +2290,11 @@ function OrderEditor({
                 ))}
                 {customItems.map((item) => (
                   <div className="summary-item custom-line" key={item.id}>
-                    <span>{item.name}<small>Товар вне матрицы · {item.details || "без уточнений"}</small></span>
+                    <span>
+                      {item.name}
+                      <small>Товар вне матрицы · {item.details || "без уточнений"}</small>
+                      <CustomRequestPhoto photo={item.photo} className="custom-request-photo-small" />
+                    </span>
                     <strong>{item.quantity} {item.unit}<button className="danger-text" style={{ border: 0, background: "transparent", fontSize: 9 }} type="button" onClick={() => setCustomItems((current) => current.filter((value) => value.id !== item.id))}>Убрать</button></strong>
                   </div>
                 ))}
@@ -1994,6 +2323,405 @@ function OrderEditor({
   );
 }
 
+
+function PasswordSecurityPanel() {
+  const [form, setForm] = useState({ currentPassword: "", newPassword: "", repeatPassword: "" });
+  const [busy, setBusy] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [passkeys, setPasskeys] = useState([]);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const loadPasskeys = async () => {
+    try {
+      const result = await api.listPasskeys();
+      setPasskeys(result.passkeys || []);
+    } catch (loadError) {
+      setError(loadError.message);
+    }
+  };
+
+  useEffect(() => { loadPasskeys(); }, []);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+    if (form.newPassword !== form.repeatPassword) {
+      setError("Новые пароли не совпадают.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await api.changePassword(form.currentPassword, form.newPassword);
+      if (result.token) setApiToken(result.token);
+      setMessage(result.message || "Пароль изменён.");
+      setForm({ currentPassword: "", newPassword: "", repeatPassword: "" });
+    } catch (changeError) {
+      setError(changeError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const endOtherSessions = async () => {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await api.logoutOtherSessions();
+      if (result.token) setApiToken(result.token);
+      setMessage(result.message || "Другие сессии завершены.");
+    } catch (sessionError) {
+      setError(sessionError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addPasskey = async () => {
+    setError("");
+    setMessage("");
+    if (!("PublicKeyCredential" in window)) {
+      setError("Это устройство или браузер не поддерживает Face ID, отпечаток или ключи доступа.");
+      return;
+    }
+    setPasskeyBusy(true);
+    try {
+      const ceremony = await api.getPasskeyRegistrationOptions();
+      const response = await startPasskeyRegistration(ceremony.options);
+      const result = await api.verifyPasskeyRegistration(ceremony.ceremonyId, response);
+      setMessage(result.message || "Ключ доступа добавлен.");
+      await loadPasskeys();
+    } catch (registrationError) {
+      setError(registrationError.message || "Не удалось добавить ключ доступа.");
+    } finally {
+      setPasskeyBusy(false);
+    }
+  };
+
+  const removePasskey = async (credentialId) => {
+    if (!window.confirm("Удалить этот ключ доступа? Вход по паролю останется доступен.")) return;
+    setPasskeyBusy(true);
+    setError("");
+    try {
+      await api.deletePasskey(credentialId);
+      setMessage("Ключ доступа удалён.");
+      await loadPasskeys();
+    } catch (deleteError) {
+      setError(deleteError.message);
+    } finally {
+      setPasskeyBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel compact-panel">
+      <div className="panel-heading">
+        <div><p className="eyebrow">Безопасность</p><h2>Пароль и вход по устройству</h2><p>Можно входить по паролю либо через Face ID, отпечаток или код блокировки телефона.</p></div>
+      </div>
+      <form className="form-grid security-form" onSubmit={submit}>
+        <label className="field">Текущий пароль<input type="password" autoComplete="current-password" value={form.currentPassword} onChange={(event) => setForm({ ...form, currentPassword: event.target.value })} required /></label>
+        <label className="field">Новый пароль<input type="password" autoComplete="new-password" minLength="8" value={form.newPassword} onChange={(event) => setForm({ ...form, newPassword: event.target.value })} required /></label>
+        <label className="field">Повторите новый пароль<input type="password" autoComplete="new-password" minLength="8" value={form.repeatPassword} onChange={(event) => setForm({ ...form, repeatPassword: event.target.value })} required /></label>
+        <div className="form-actions"><button className="primary-button" disabled={busy} type="submit">{busy ? "Сохраняем…" : "Изменить пароль"}</button></div>
+      </form>
+      <div className="form-actions session-actions">
+        <button className="secondary-button" type="button" disabled={busy} onClick={endOtherSessions}>
+          Завершить другие сессии
+        </button>
+      </div>
+
+      <div className="passkey-settings">
+        <div>
+          <h3>Face ID / отпечаток</h3>
+          <p className="muted">Данные лица и отпечатка остаются только на устройстве. Clover получает лишь подтверждение входа.</p>
+        </div>
+        <button className="secondary-button" type="button" disabled={passkeyBusy} onClick={addPasskey}>
+          {passkeyBusy ? "Подождите…" : passkeys.length ? "Добавить ещё устройство" : "Включить вход по устройству"}
+        </button>
+        <div className="passkey-list">
+          {passkeys.map((item, index) => (
+            <div className="passkey-row" key={item.id}>
+              <div><strong>Ключ доступа {index + 1}</strong><span>{item.backedUp ? "Синхронизируется с аккаунтом устройства" : "Сохранён на этом устройстве"}</span></div>
+              <button className="danger-button" type="button" disabled={passkeyBusy} onClick={() => removePasskey(item.id)}>Удалить</button>
+            </div>
+          ))}
+          {!passkeys.length && <div className="empty-box">Ключи доступа пока не добавлены.</div>}
+        </div>
+      </div>
+
+      {message && <div className="auth-success">{message}</div>}
+      {error && <div className="auth-error">{error}</div>}
+    </section>
+  );
+}
+
+function reconciliationPeriodLabel(item) {
+  const labels = { q1: "1 квартал", q2: "2 квартал", q3: "3 квартал", q4: "4 квартал", all: "За весь период", custom: "Определённый период" };
+  if (item.periodType === "all") return labels.all;
+  if (["q1", "q2", "q3", "q4"].includes(item.periodType)) return `${labels[item.periodType]} ${item.year || ""}`.trim();
+  return `${item.dateFrom || "—"} — ${item.dateTo || "—"}`;
+}
+
+const RECONCILIATION_STATUS_LABELS = {
+  new: "Новый запрос",
+  processing: "Готовится",
+  ready: "Готов",
+  rejected: "Отклонён",
+};
+
+function ReconciliationPanel({ requests = [], onReload }) {
+  const nowDate = new Date();
+  const [periodType, setPeriodType] = useState(`q${Math.floor(nowDate.getMonth() / 3) + 1}`);
+  const [year, setYear] = useState(nowDate.getFullYear());
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const submit = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      await api.createReconciliation({ periodType, year: Number(year), dateFrom, dateTo, comment });
+      setComment("");
+      setMessage("Запрос отправлен менеджеру.");
+      await onReload();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const download = async (item) => {
+    try {
+      const blob = await api.downloadReconciliationFile(item.id);
+      downloadBlobFile(blob, item.fileName || `Акт-сверки-${item.id}.pdf`);
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  return (
+    <section className="panel" id="reconciliation">
+      <div className="panel-heading"><div><p className="eyebrow">Документы</p><h2>Запросить акт сверки</h2><p>Выберите готовый период или укажите собственный диапазон дат.</p></div></div>
+      <div className="period-buttons">
+        {[['q1','1 квартал'],['q2','2 квартал'],['q3','3 квартал'],['q4','4 квартал'],['all','За весь период'],['custom','Определённый период']].map(([value,label]) => (
+          <button className={periodType === value ? "category-button active" : "category-button"} type="button" key={value} onClick={() => setPeriodType(value)}>{label}</button>
+        ))}
+      </div>
+      <div className="form-grid" style={{ marginTop: 14 }}>
+        {periodType !== "all" && periodType !== "custom" && <label className="field">Год<input type="number" min="2000" max="2100" value={year} onChange={(event) => setYear(event.target.value)} /></label>}
+        {periodType === "custom" && <><label className="field">Дата с<input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label><label className="field">Дата по<input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label></>}
+        <label className="field field-wide">Комментарий — необязательно<textarea rows="2" value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Например: прошу отдельно проверить возвраты" /></label>
+      </div>
+      <div className="form-actions"><button className="primary-button" type="button" disabled={busy} onClick={submit}>{busy ? "Отправляем…" : "Отправить запрос"}</button></div>
+      {message && <div className="request-photo-status">{message}</div>}
+      <div className="reconciliation-list">
+        {requests.length ? requests.map((item) => (
+          <article className="reconciliation-row" key={item.id}>
+            <div><span className={`badge ${item.status === "ready" ? "green" : item.status === "rejected" ? "red" : "yellow"}`}>{RECONCILIATION_STATUS_LABELS[item.status] || item.status}</span><h3>{reconciliationPeriodLabel(item)}</h3><p>{formatDateTime(item.createdAt)}{item.managerComment ? ` · ${item.managerComment}` : ""}</p></div>
+            {item.hasFile && <button className="primary-button" type="button" onClick={() => download(item)}>Скачать PDF</button>}
+          </article>
+        )) : <div className="empty-box">Запросов актов сверки пока нет.</div>}
+      </div>
+    </section>
+  );
+}
+
+function ManagerReconciliation({ requests = [], onReload }) {
+  const [busyId, setBusyId] = useState("");
+  const [comments, setComments] = useState({});
+
+  const update = async (item, status) => {
+    setBusyId(item.id);
+    try {
+      await api.updateReconciliation(item.id, { status, managerComment: comments[item.id] ?? item.managerComment ?? "" });
+      await onReload();
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  const upload = async (item, file) => {
+    if (!file) return;
+    setBusyId(item.id);
+    try {
+      await api.uploadReconciliationFile(item.id, file, comments[item.id] ?? item.managerComment ?? "");
+      await onReload();
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  return (
+    <section className="panel" style={{ marginTop: 0 }}>
+      <div className="panel-heading"><div><p className="eyebrow">Документы</p><h2>Запросы актов сверки</h2><p>Подготовьте акт в 1С, прикрепите PDF и клиент получит уведомление.</p></div></div>
+      <div className="reconciliation-list">
+        {requests.length ? requests.map((item) => (
+          <article className="manager-reconciliation-row" key={item.id}>
+            <div><span className={`badge ${item.status === "ready" ? "green" : item.status === "rejected" ? "red" : "yellow"}`}>{RECONCILIATION_STATUS_LABELS[item.status] || item.status}</span><h3>{item.client?.companyName || item.client?.email || "Клиент"}</h3><p>{reconciliationPeriodLabel(item)} · {formatDateTime(item.createdAt)}</p>{item.clientComment && <p>Комментарий клиента: {item.clientComment}</p>}</div>
+            <label className="field">Комментарий менеджера<input value={comments[item.id] ?? item.managerComment ?? ""} onChange={(event) => setComments((current) => ({ ...current, [item.id]: event.target.value }))} /></label>
+            <div className="inline-actions">
+              <button className="secondary-button" type="button" disabled={busyId === item.id} onClick={() => update(item, "processing")}>В работу</button>
+              <label className="import-label">Прикрепить PDF<input type="file" accept="application/pdf" disabled={busyId === item.id} onChange={(event) => upload(item, event.target.files?.[0])} /></label>
+              <button className="danger-button" type="button" disabled={busyId === item.id} onClick={() => update(item, "rejected")}>Отклонить</button>
+            </div>
+          </article>
+        )) : <div className="empty-box">Новых запросов актов сверки нет.</div>}
+      </div>
+    </section>
+  );
+}
+
+function urlBase64ToUint8Array(value) {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
+}
+
+function PushSettings() {
+  const [status, setStatus] = useState(null);
+  const [currentEndpoint, setCurrentEndpoint] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [promotions, setPromotions] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const load = async () => {
+    try {
+      const result = await api.getPushStatus();
+      setStatus(result);
+      let endpoint = "";
+      if ("serviceWorker" in navigator && "PushManager" in window) {
+        const registration = await navigator.serviceWorker.ready;
+        const browserSubscription = await registration.pushManager.getSubscription();
+        endpoint = browserSubscription?.endpoint || "";
+      }
+      setCurrentEndpoint(endpoint);
+      const saved = (result.subscriptions || []).find((item) => item.endpoint === endpoint);
+      setPromotions(Boolean(saved?.promotions));
+    } catch (error) {
+      setMessage(error.message);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const enable = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      if (!status?.enabled) throw new Error("Push будет доступен после настройки домена, HTTPS и VAPID-ключей.");
+      if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+        throw new Error("Этот браузер не поддерживает push-уведомления.");
+      }
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") throw new Error("Разрешение на уведомления не предоставлено.");
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(status.publicKey) });
+      }
+      await api.subscribePush(subscription.toJSON(), { orderEvents: true, promotions });
+      setMessage(currentEndpoint ? "Настройки уведомлений сохранены." : "Уведомления включены на этом устройстве.");
+      await load();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disable = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (subscription) {
+        await api.unsubscribePush(subscription.endpoint);
+        await subscription.unsubscribe();
+      }
+      setCurrentEndpoint("");
+      setMessage("Уведомления отключены на этом устройстве.");
+      await load();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const subscribed = Boolean(currentEndpoint && status?.subscriptions?.some((item) => item.endpoint === currentEndpoint));
+  return (
+    <section className="panel compact-panel">
+      <div className="panel-heading"><div><p className="eyebrow">Уведомления</p><h2>Уведомления на телефоне</h2><p>Статусы заказов и документы — основные; акции можно отключить отдельно.</p></div></div>
+      <label className="checkbox-line"><input type="checkbox" checked={promotions} onChange={(event) => setPromotions(event.target.checked)} /> Получать акции и новинки</label>
+      <div className="inline-actions">
+        <button className="primary-button" type="button" disabled={busy} onClick={enable}>{busy ? "Сохраняем…" : subscribed ? "Сохранить настройки" : "Включить уведомления"}</button>
+        {subscribed && <button className="secondary-button" type="button" disabled={busy} onClick={disable}>Отключить на этом устройстве</button>}
+      </div>
+      {!status?.enabled && <p className="muted small">Техническая часть подготовлена. Фактическая отправка включится после домена, HTTPS и добавления VAPID-ключей.</p>}
+      {status?.subscriptions?.length > 0 && !subscribed && <p className="muted small">Уведомления уже включены на другом устройстве. На этом телефоне или компьютере их можно включить отдельно.</p>}
+      {message && <div className="request-photo-status">{message}</div>}
+    </section>
+  );
+}
+
+function ManagerPromotionPanel() {
+  const [title, setTitle] = useState("Новость Clover");
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const send = async () => {
+    setBusy(true);
+    try {
+      const result = await api.sendPromotion(title, body);
+      alert(result.result?.enabled ? `Отправлено: ${result.result.sent}` : "Push пока не настроен на сервере.");
+      setBody("");
+    } catch (error) { alert(error.message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="manager-contact-settings">
+      <h3>Push-уведомление об акции или новинке</h3>
+      <div className="form-grid"><label className="field">Заголовок<input value={title} onChange={(event) => setTitle(event.target.value)} /></label><label className="field field-wide">Текст<textarea rows="3" value={body} onChange={(event) => setBody(event.target.value)} /></label></div>
+      <div className="form-actions"><button className="primary-button" type="button" disabled={busy || !body.trim()} onClick={send}>Отправить подписанным клиентам</button></div>
+    </div>
+  );
+}
+
+function InstallPrompt() {
+  const [promptEvent, setPromptEvent] = useState(null);
+  const [dismissed, setDismissed] = useState(false);
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const standalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone;
+
+  useEffect(() => {
+    const handler = (event) => { event.preventDefault(); setPromptEvent(event); };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  if (standalone || dismissed || (!promptEvent && !isIos)) return null;
+  const install = async () => {
+    if (promptEvent) {
+      await promptEvent.prompt();
+      await promptEvent.userChoice;
+      setPromptEvent(null);
+    } else {
+      alert("На iPhone откройте меню «Поделиться» в Safari и выберите «На экран Домой». Затем включите «Открыть как веб-приложение».");
+    }
+  };
+  return <div className="install-prompt"><div><strong>Установить Clover</strong><span>{isIos && !promptEvent ? "Добавьте ярлык на экран iPhone" : "Открывайте как обычное приложение"}</span></div><button type="button" onClick={install}>Установить</button><button className="install-close" type="button" onClick={() => setDismissed(true)}>×</button></div>;
+}
+
 function ClientDashboard({
   profile,
   setProfile,
@@ -2004,6 +2732,8 @@ function ClientDashboard({
   catalogPolicy,
   matrixProductCount,
   fullCatalogCount,
+  reconciliationRequests,
+  onReload,
   onNew,
   onEdit,
   onRepeat,
@@ -2014,6 +2744,18 @@ function ClientDashboard({
   const visibleOrders = orders.filter((order) => filter === "Все" || order.status === filter);
   const active = orders.filter((order) => !["Выполнен", "Отменён"].includes(order.status));
   const nextOrder = [...active].sort((a, b) => String(a.firstDeliveryDate).localeCompare(String(b.firstDeliveryDate)))[0];
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const section = params.get("section");
+    const orderId = params.get("order");
+    const targetId = orderId ? `order-${orderId}` : section;
+    if (!targetId) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [orders.length]);
 
   return (
     <main className="clover-app">
@@ -2060,6 +2802,9 @@ function ClientDashboard({
 
         <ProfilePanel profile={profile} onChange={setProfile} />
         <AddressesPanel addresses={addresses} onChange={setAddresses} />
+        <ReconciliationPanel requests={reconciliationRequests} onReload={onReload} />
+        <PushSettings />
+        <PasswordSecurityPanel />
 
         <section className="panel">
           <div className="panel-heading"><div><p className="eyebrow">История</p><h2>Мои заказы</h2><p>Статусы и комментарии менеджера обновляются в карточке заказа.</p></div></div>
@@ -2073,7 +2818,7 @@ function ClientDashboard({
               const canEdit = settings.allowClientEdit && order.status === "Новый";
               const canDelete = settings.allowClientDelete && order.status === "Новый";
               return (
-                <article className="order-card" key={order.id}>
+                <article className="order-card" id={`order-${order.id}`} key={order.id}>
                   <div className="order-card-header">
                     <div><span className={`badge ${statusClass(order.status)}`}>{order.status}</span><h3>Заказ № {order.number}</h3><p>Создан: {formatDateTime(order.createdAt)}</p></div>
                     <div className="nowrap"><strong className="success-text">{settings.showPrices && total > 0 ? formatMoney(total) : `${getPositionCount(order)} поз.`}</strong></div>
@@ -2088,7 +2833,13 @@ function ClientDashboard({
                     <summary>Посмотреть состав заказа</summary>
                     <div className="order-products">
                       {(order.items || []).map((item) => <div className="order-product" key={`${order.id}-${item.productId ?? item.id}`}><span>{item.name}<small>{item.code || item.category}</small></span><strong>{item.quantity} {UNIT_CONFIG[item.unit]?.shortLabel || item.unit}<small>{item.multiplier > 1 ? `${item.quantity * item.multiplier} шт. всего` : ""}</small></strong></div>)}
-                      {(order.customItems || []).map((item) => <div className="order-product custom-line" key={`${order.id}-${item.id}`}><span><span className="badge yellow">{item.requestStatus || "Новый запрос"}</span>{item.name}<small>{item.details}</small>{item.managerComment && <small>Менеджер: {item.managerComment}</small>}</span><strong>{item.quantity} {item.unit}<small>{Number(item.unitPrice) > 0 ? formatMoney(Number(item.unitPrice) * item.quantity) : "Цена уточняется"}</small></strong></div>)}
+                      {(order.customItems || []).map((item) => (
+                        <div className="order-product custom-line custom-request-order-row" key={`${order.id}-${item.id}`}>
+                          <CustomRequestPhoto photo={item.photo} className="custom-request-photo-order" />
+                          <span><span className="badge yellow">{item.requestStatus || "Новый запрос"}</span>{item.name}<small>{item.details}</small>{item.managerComment && <small>Менеджер: {item.managerComment}</small>}</span>
+                          <strong>{item.quantity} {item.unit}<small>{Number(item.unitPrice) > 0 ? formatMoney(Number(item.unitPrice) * item.quantity) : "Цена уточняется"}</small></strong>
+                        </div>
+                      ))}
                     </div>
                     {(order.clientComment || order.managerComment) && <div className="order-comments">{order.clientComment && <div className="comment-box"><strong>Ваш комментарий</strong><p>{order.clientComment}</p></div>}{order.managerComment && <div className="comment-box"><strong>Комментарий менеджера</strong><p>{order.managerComment}</p></div>}</div>}<OrderTimeline order={order} />
                   </details>
@@ -2139,7 +2890,7 @@ function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrders, on
       if (action === "check") {
         const result = await api.checkExchangeOrder(order.id);
         alert(result.validation?.ready
-          ? "Заказ готов к тестовой передаче в 1С."
+          ? "Проверка пройдена. Для отправки нажмите «Передать в 1С TEST»."
           : (result.validation?.issues || []).join("\n"));
       } else if (action === "send") {
         const result = await api.sendExchangeOrder(order.id);
@@ -2287,7 +3038,7 @@ function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrders, on
             </label>
             <div className="exchange-actions" style={{ alignSelf: "end" }}>
               <button className="secondary-button" disabled={busy} type="button" onClick={() => runExchangeAction(order, "check")}>Проверить 1С</button>
-              <button className="primary-button" disabled={busy} type="button" onClick={() => runExchangeAction(order, "send")}>{exchange.status === "sent" || exchange.status === "error" ? "Повторить тест" : "Тестовая отправка"}</button>
+              <button className="primary-button" disabled={busy} type="button" onClick={() => runExchangeAction(order, "send")}>{exchange.status === "ready" ? "Обновить очередь" : exchange.status === "sent" || exchange.status === "error" ? "Передать повторно" : "Передать в 1С TEST"}</button>
               <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOrder(order, "json")}>JSON</button>
               <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOrder(order, "csv")}>CSV</button>
               <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
@@ -2302,6 +3053,12 @@ function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrders, on
               {(order.customItems || []).map((item) => (
                 <div className="custom-line" key={`${order.id}-${item.id}`}>
                   <div className="order-product" style={{ border: 0, paddingTop: 0 }}><span><span className="badge yellow">Товар вне матрицы</span>{item.name}<small>{item.details}</small></span><strong>{item.quantity} {item.unit}<small>{Number(item.unitPrice) > 0 ? formatMoney(item.unitPrice * item.quantity) : "Цена уточняется"}</small></strong></div>
+                  {item.photo?.dataUrl && (
+                    <div className="manager-request-photo-block">
+                      <strong>Фотография клиента</strong>
+                      <CustomRequestPhoto photo={item.photo} className="custom-request-photo-manager" />
+                    </div>
+                  )}
                   <div className="form-grid">
                     <label className="field">Статус запроса
                       <select value={item.requestStatus || "Новый запрос"} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, requestStatus: e.target.value } : value) })}>{CUSTOM_STATUSES.map((value) => <option key={value}>{value}</option>)}</select>
@@ -2333,14 +3090,474 @@ function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrders, on
   );
 }
 
+function OneCClientPicker({ client, link, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState(client.companyName || "");
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadCandidates = async () => {
+    setOpen(true);
+    setLoading(true);
+    setError("");
+    try {
+      const candidates = await api.getOneCClientCandidates(client.id);
+      if ((candidates.items || []).length) {
+        setItems(candidates.items || []);
+        return;
+      }
+      const result = await api.getOneCClients({ search: client.companyName || "", limit: 30 });
+      setItems(result.items || []);
+    } catch (loadError) {
+      setError(loadError.message);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runSearch = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await api.getOneCClients({ search, limit: 50 });
+      setItems(result.items || []);
+    } catch (searchError) {
+      setError(searchError.message);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectClient = async (item) => {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await api.linkOneCClient(client.id, item.id, item);
+      onChange(result.clientLink || {});
+      setOpen(false);
+    } catch (selectError) {
+      setError(selectError.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearLink = () => {
+    onChange({
+      matched1C: false,
+      oneCId: "",
+      oneCCode: "",
+      oneCName: "",
+      oneCInn: "",
+      oneCLinkMode: "manual-cleared",
+      oneCLinkedAt: "",
+    });
+  };
+
+  return (
+    <div className="one-c-client-picker">
+      <div className="one-c-link-editor-head">
+        <div>
+          <span className={link.oneCId ? "badge green" : "badge yellow"}>
+            {link.oneCId ? "Связан с 1С" : "Будет определён при заказе"}
+          </span>
+          <p className="muted small" style={{ marginTop: 8 }}>
+            {link.oneCId
+              ? `${link.oneCName || "Контрагент 1С"} · ${link.oneCCode || "без кода"}`
+              : "Clover передаст название, телефон и email. Если 1С вернёт ID контрагента, связь сохранится автоматически."}
+          </p>
+        </div>
+        <div className="inline-actions">
+          <button className="secondary-button" type="button" onClick={loadCandidates}>
+            {link.oneCId ? "Изменить контрагента" : "Выбрать контрагента 1С"}
+          </button>
+          {link.oneCId && (
+            <button className="secondary-button" type="button" onClick={clearLink}>Убрать связь</button>
+          )}
+        </div>
+      </div>
+
+      {open && (
+        <div className="one-c-picker">
+          <div className="one-c-products-search">
+            <input
+              type="search"
+              value={search}
+              placeholder="Название, ИНН, телефон, email или код"
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  runSearch();
+                }
+              }}
+            />
+            <button className="secondary-button" type="button" disabled={loading} onClick={runSearch}>
+              {loading ? "Поиск..." : "Найти"}
+            </button>
+            <button className="secondary-button" type="button" onClick={() => setOpen(false)}>Закрыть</button>
+          </div>
+          {error && <div className="sync-error">{error}</div>}
+          <div className="one-c-products-list one-c-picker-list">
+            {items.map((item) => {
+              const linkedToCurrent = item.cloverLink && String(item.cloverLink.clientId) === String(client.id);
+              const linkedElsewhere = item.cloverLink && !linkedToCurrent;
+              return (
+                <article key={item.id}>
+                  <div>
+                    <strong>{item.name}</strong>
+                    <span>Код: {item.code || "—"} · ИНН: {item.inn || "—"}</span>
+                    {(item.phone || item.email) && <span>{item.phone || ""} {item.email || ""}</span>}
+                    {Number(item.score) > 0 && <span className="muted small">Совпадение: {Math.round(Number(item.score) * 100)}%</span>}
+                    {linkedElsewhere && <span className="warning-text">Уже связан с клиентом Clover: {item.cloverLink.clientName}</span>}
+                  </div>
+                  <button
+                    className={linkedToCurrent ? "secondary-button" : "primary-button"}
+                    type="button"
+                    disabled={loading || Boolean(linkedElsewhere)}
+                    onClick={() => selectClient(item)}
+                  >
+                    {linkedToCurrent ? "Выбрано" : linkedElsewhere ? "Уже связан" : "Выбрать"}
+                  </button>
+                </article>
+              );
+            })}
+            {!loading && !items.length && (
+              <div className="empty-box">
+                Контрагент ещё не загружен. Заказ всё равно передаст данные клиента в 1С, а точная связь сохранится автоматически после подтверждения 1С.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function normalizeManagerClientAddresses(addresses = []) {
+  const normalized = (Array.isArray(addresses) ? addresses : [])
+    .map((item, index) => {
+      if (typeof item === "string") {
+        const address = item.trim();
+        if (!address) return null;
+        return {
+          id: `legacy-address-${index}`,
+          label: index === 0 ? "Основной адрес" : `Адрес ${index + 1}`,
+          address,
+          isDefault: index === 0,
+        };
+      }
+
+      const address = String(item?.address || "").trim();
+      if (!address) return null;
+
+      return {
+        id: String(item?.id || `address-${index}`),
+        label: String(item?.label || `Адрес ${index + 1}`).trim(),
+        address,
+        isDefault: Boolean(item?.isDefault),
+      };
+    })
+    .filter(Boolean);
+
+  if (normalized.length && !normalized.some((item) => item.isDefault)) {
+    normalized[0] = { ...normalized[0], isDefault: true };
+  }
+
+  let defaultFound = false;
+  return normalized.map((item) => {
+    if (!item.isDefault) return item;
+    if (defaultFound) return { ...item, isDefault: false };
+    defaultFound = true;
+    return item;
+  });
+}
+
+function createManagerClientForm(client) {
+  return {
+    companyName: client.companyName || "",
+    contactName: client.contactName || "",
+    phone: client.phone || "",
+    email: client.email || "",
+    managerNote: client.managerNote || "",
+    addresses: normalizeManagerClientAddresses(client.addresses),
+  };
+}
+
+function ManagerClientEditor({ client, onReload }) {
+  const [form, setForm] = useState(() => createManagerClientForm(client));
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const clientVersion = JSON.stringify({
+    id: client.id,
+    companyName: client.companyName || "",
+    contactName: client.contactName || "",
+    phone: client.phone || "",
+    email: client.email || "",
+    managerNote: client.managerNote || "",
+    addresses: normalizeManagerClientAddresses(client.addresses),
+  });
+
+  useEffect(() => {
+    setForm(createManagerClientForm(client));
+  }, [clientVersion]);
+
+  const setProfileField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setMessage("");
+    setError("");
+  };
+
+  const updateAddress = (addressId, patch) => {
+    setForm((current) => ({
+      ...current,
+      addresses: current.addresses.map((item) => {
+        if (patch.isDefault === true) {
+          return item.id === addressId
+            ? { ...item, ...patch, isDefault: true }
+            : { ...item, isDefault: false };
+        }
+        return item.id === addressId ? { ...item, ...patch } : item;
+      }),
+    }));
+    setMessage("");
+    setError("");
+  };
+
+  const addAddress = () => {
+    const id =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `address-${Date.now()}`;
+    setForm((current) => ({
+      ...current,
+      addresses: [
+        ...current.addresses,
+        {
+          id,
+          label: "",
+          address: "",
+          isDefault: current.addresses.length === 0,
+        },
+      ],
+    }));
+    setMessage("");
+    setError("");
+  };
+
+  const removeAddress = (addressId) => {
+    setForm((current) => {
+      const removed = current.addresses.find((item) => item.id === addressId);
+      const addresses = current.addresses.filter((item) => item.id !== addressId);
+      if (removed?.isDefault && addresses.length) {
+        addresses[0] = { ...addresses[0], isDefault: true };
+      }
+      return { ...current, addresses };
+    });
+    setMessage("");
+    setError("");
+  };
+
+  const save = async () => {
+    const companyName = form.companyName.trim();
+    const contactName = form.contactName.trim();
+    const phone = form.phone.trim();
+    const email = form.email.trim().toLowerCase();
+    const managerNote = form.managerNote.trim();
+    const addresses = form.addresses.map((item) => ({
+      ...item,
+      label: item.label.trim(),
+      address: item.address.trim(),
+    }));
+
+    if (!companyName && !contactName) {
+      setError("Укажите название компании или имя клиента.");
+      return;
+    }
+    if (!email) {
+      setError("Укажите email клиента.");
+      return;
+    }
+    if (addresses.some((item) => !item.label || !item.address)) {
+      setError("Заполните название и полный адрес во всех строках.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await api.updateClient(client.id, {
+        profile: {
+          companyName,
+          contactName,
+          phone,
+          email,
+        },
+        addresses,
+        managerNote,
+      });
+      setMessage("Данные клиента сохранены в Clover.");
+      await onReload?.();
+    } catch (saveError) {
+      setError(saveError.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <details className="order-details" style={{ marginTop: 15 }}>
+      <summary>Данные клиента: телефон, email и адреса</summary>
+      <div className="form-grid" style={{ marginTop: 14 }}>
+        <label className="field">
+          Компания или торговая точка
+          <input
+            value={form.companyName}
+            onChange={(event) => setProfileField("companyName", event.target.value)}
+          />
+        </label>
+        <label className="field">
+          Контактное лицо
+          <input
+            value={form.contactName}
+            onChange={(event) => setProfileField("contactName", event.target.value)}
+          />
+        </label>
+        <label className="field">
+          Телефон
+          <input
+            value={form.phone}
+            onChange={(event) => setProfileField("phone", event.target.value)}
+          />
+        </label>
+        <label className="field">
+          Email для входа клиента
+          <input
+            type="email"
+            value={form.email}
+            onChange={(event) => setProfileField("email", event.target.value)}
+          />
+        </label>
+      </div>
+
+      <div className="manager-client-addresses">
+        <div className="manager-client-addresses-heading">
+          <strong>Адреса доставки</strong>
+          <button className="secondary-button" type="button" onClick={addAddress}>
+            + Добавить адрес
+          </button>
+        </div>
+        {form.addresses.map((item) => (
+          <div className="manager-client-address-row" key={item.id}>
+            <label className="field">
+              Название
+              <input
+                value={item.label}
+                placeholder="Например: Основной магазин"
+                onChange={(event) => updateAddress(item.id, { label: event.target.value })}
+              />
+            </label>
+            <label className="field manager-client-address-field">
+              Полный адрес
+              <input
+                value={item.address}
+                placeholder="Город, улица, дом, помещение"
+                onChange={(event) => updateAddress(item.id, { address: event.target.value })}
+              />
+            </label>
+            <label className="manager-client-default-address">
+              <input
+                type="radio"
+                name={`default-address-${client.id}`}
+                checked={Boolean(item.isDefault)}
+                onChange={() => updateAddress(item.id, { isDefault: true })}
+              />
+              Основной
+            </label>
+            <button
+              className="danger-button"
+              type="button"
+              onClick={() => removeAddress(item.id)}
+            >
+              Удалить
+            </button>
+          </div>
+        ))}
+        {!form.addresses.length && (
+          <div className="empty-box">Адресов пока нет.</div>
+        )}
+      </div>
+
+      <label className="field" style={{ marginTop: 14 }}>
+        Комментарий менеджера
+        <textarea
+          rows="4"
+          maxLength="2000"
+          placeholder="Например: звонить перед доставкой, принимает товар до 16:00"
+          value={form.managerNote}
+          onChange={(event) => setProfileField("managerNote", event.target.value)}
+        />
+        <small>Виден только менеджерам Clover. Клиенту и в 1С не передаётся.</small>
+      </label>
+
+      <div className="matrix-catalog-note" style={{ marginTop: 14 }}>
+        Изменения используются в новых заказах Clover. Данные контрагента в 1С автоматически не перезаписываются. При изменении email клиент будет входить по новому адресу.
+      </div>
+      {error && <div className="auth-error" style={{ marginTop: 12 }}>{error}</div>}
+      {message && <div className="sync-success" style={{ marginTop: 12 }}>{message}</div>}
+      <div className="form-actions" style={{ marginTop: 14 }}>
+        <button className="primary-button" type="button" disabled={saving} onClick={save}>
+          {saving ? "Сохраняем..." : "Сохранить данные клиента"}
+        </button>
+      </div>
+    </details>
+  );
+}
+
 function ManagerClients({
   clients,
   products,
   clientLinks,
   setClientLinks,
+  onReload,
 }) {
   const [search, setSearch] = useState("");
   const [matrixSearch, setMatrixSearch] = useState("");
+  const [defaultMarkupDrafts, setDefaultMarkupDrafts] = useState({});
+  const [individualMarkupDrafts, setIndividualMarkupDrafts] = useState({});
+  const [matrixSaveState, setMatrixSaveState] = useState({});
+  const [openClientId, setOpenClientId] = useState(readOpenManagerClientId);
+  const [approvalBusyId, setApprovalBusyId] = useState("");
+  const restoredOpenClient = useRef(false);
+
+  useEffect(() => {
+    if (restoredOpenClient.current || !openClientId) return;
+    const target = document.getElementById(`client-matrix-${openClientId}`);
+    if (!target) return;
+
+    restoredOpenClient.current = true;
+    window.requestAnimationFrame(() => {
+      target.scrollIntoView({ block: "start" });
+    });
+  }, [openClientId, clients]);
+
+  const setApproval = async (client, status) => {
+    setApprovalBusyId(client.id);
+    try {
+      await api.setClientApproval(client.id, status);
+      await onReload();
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setApprovalBusyId("");
+    }
+  };
 
   const visible = clients.filter((client) =>
     `${client.companyName} ${client.contactName} ${client.phone} ${client.email}`
@@ -2367,7 +3584,7 @@ function ManagerClients({
   ) => {
     const key = String(productId);
     const currentPrice = {
-      source: "manual",
+      source: "inherit",
       ...(link.personalPrices?.[key] || {}),
     };
 
@@ -2376,21 +3593,14 @@ function ManagerClients({
       ...patch,
     };
 
-    const hasAnyPrice = ["piece", "pack", "bundle"].some(
-      (unit) =>
-        nextPrice[unit] !== null &&
-        nextPrice[unit] !== undefined &&
-        nextPrice[unit] !== ""
-    );
-
     const nextPrices = {
       ...(link.personalPrices || {}),
     };
 
-    if (hasAnyPrice) {
-      nextPrices[key] = nextPrice;
-    } else {
+    if (nextPrice.source === "inherit") {
       delete nextPrices[key];
+    } else {
+      nextPrices[key] = nextPrice;
     }
 
     updateLink(clientId, {
@@ -2400,6 +3610,82 @@ function ManagerClients({
 
   const parsePriceInput = (value) =>
     value === "" ? null : Math.max(0, Number(value) || 0);
+
+  const normalizePercentInput = (value) => {
+    if (value === "" || value === null || value === undefined) return 0;
+    return Math.max(0, Number(value) || 0);
+  };
+
+  const getDefaultMarkupDraft = (clientId, link) =>
+    Object.prototype.hasOwnProperty.call(defaultMarkupDrafts, clientId)
+      ? defaultMarkupDrafts[clientId]
+      : String(link.defaultMarkupPercent ?? "");
+
+  const getIndividualMarkupDraft = (clientId, productId, price) => {
+    const clientDrafts = individualMarkupDrafts[clientId] || {};
+    const key = String(productId);
+    return Object.prototype.hasOwnProperty.call(clientDrafts, key)
+      ? clientDrafts[key]
+      : String(price.markupPercent ?? "");
+  };
+
+  const saveClientMatrix = async (clientId, link) => {
+    setMatrixSaveState((current) => ({
+      ...current,
+      [clientId]: { status: "saving", message: "Сохраняем матрицу..." },
+    }));
+
+    const nextLink = {
+      ...link,
+      defaultMarkupPercent: normalizePercentInput(
+        getDefaultMarkupDraft(clientId, link)
+      ),
+      personalPrices: { ...(link.personalPrices || {}) },
+    };
+
+    const productDrafts = individualMarkupDrafts[clientId] || {};
+    for (const [productId, rawValue] of Object.entries(productDrafts)) {
+      const currentPrice = nextLink.personalPrices[productId];
+      if (currentPrice?.source === "purchase_markup") {
+        nextLink.personalPrices[productId] = {
+          ...currentPrice,
+          markupPercent: normalizePercentInput(rawValue),
+        };
+      }
+    }
+
+    const nextLinks = {
+      ...clientLinks,
+      [clientId]: nextLink,
+    };
+
+    try {
+      setClientLinks(nextLinks);
+      await api.saveClientLinks(nextLinks);
+      setDefaultMarkupDrafts((current) => {
+        const next = { ...current };
+        delete next[clientId];
+        return next;
+      });
+      setIndividualMarkupDrafts((current) => {
+        const next = { ...current };
+        delete next[clientId];
+        return next;
+      });
+      setMatrixSaveState((current) => ({
+        ...current,
+        [clientId]: { status: "saved", message: "Матрица сохранена." },
+      }));
+    } catch (error) {
+      setMatrixSaveState((current) => ({
+        ...current,
+        [clientId]: {
+          status: "error",
+          message: error.message || "Не удалось сохранить матрицу.",
+        },
+      }));
+    }
+  };
 
   return (
     <section>
@@ -2509,55 +3795,82 @@ function ManagerClients({
                   </article>
                 </div>
 
+                {client.isRegistered !== false && (
+                  <div className="approval-box">
+                    <div>
+                      <strong>Регистрация клиента</strong>
+                      <p>{client.emailVerified ? "Электронная почта подтверждена" : "Электронная почта ещё не подтверждена"} · {client.approvalStatus === "approved" ? "доступ разрешён" : client.approvalStatus === "rejected" ? "регистрация отклонена" : "ожидает решения менеджера"}</p>
+                    </div>
+                    <div className="inline-actions">
+                      {client.approvalStatus !== "approved" && <button className="primary-button" type="button" disabled={approvalBusyId === client.id || !client.emailVerified} onClick={() => setApproval(client, "approved")}>Одобрить</button>}
+                      {client.approvalStatus !== "rejected" && <button className="danger-button" type="button" disabled={approvalBusyId === client.id} onClick={() => setApproval(client, "rejected")}>Отклонить</button>}
+                    </div>
+                  </div>
+                )}
+
+                {client.isRegistered !== false ? (
+                  <ManagerClientEditor client={client} onReload={onReload} />
+                ) : (
+                  <div className="matrix-catalog-note" style={{ marginTop: 15 }}>
+                    Это клиент из старого заказа без отдельного аккаунта Clover. Его данные в заказе сохранены, но карточка станет редактируемой после регистрации клиента.
+                  </div>
+                )}
+
                 <details
+                  id={`client-matrix-${client.id}`}
                   className="order-details"
                   style={{ marginTop: 15 }}
+                  open={String(openClientId) === String(client.id)}
+                  onToggle={(event) => {
+                    const nextId = event.currentTarget.open ? String(client.id) : "";
+                    setOpenClientId((current) => {
+                      const value = event.currentTarget.open
+                        ? nextId
+                        : String(current) === String(client.id)
+                          ? ""
+                          : current;
+                      writeOpenManagerClientId(value);
+                      return value;
+                    });
+                  }}
                 >
                   <summary>
                     Товарная матрица, цены и связь с 1С
                   </summary>
+
+                  <OneCClientPicker
+                    client={client}
+                    link={link}
+                    onChange={(patch) => updateLink(client.id, patch)}
+                  />
 
                   <div
                     className="form-grid"
                     style={{ marginTop: 14 }}
                   >
                     <label className="field">
-                      Статус связи с 1С
-                      <select
-                        value={link.matched1C ? "yes" : "no"}
-                        onChange={(event) =>
-                          updateLink(client.id, {
-                            matched1C:
-                              event.target.value === "yes",
-                          })
-                        }
-                      >
-                        <option value="no">Не сопоставлен</option>
-                        <option value="yes">Сопоставлен</option>
-                      </select>
-                    </label>
-
-                    <label className="field">
-                      ID контрагента в 1С
+                      Точное название в 1С — необязательно
                       <input
-                        value={link.oneCId}
-                        onChange={(event) =>
-                          updateLink(client.id, {
-                            oneCId: event.target.value,
-                          })
-                        }
+                        value={link.oneCMatchName || ""}
+                        placeholder={client.companyName || "Название контрагента"}
+                        onChange={(event) => updateLink(client.id, { oneCMatchName: event.target.value })}
                       />
                     </label>
 
                     <label className="field">
-                      Название контрагента в 1С
+                      ИНН для точного сопоставления
                       <input
-                        value={link.oneCName}
-                        onChange={(event) =>
-                          updateLink(client.id, {
-                            oneCName: event.target.value,
-                          })
-                        }
+                        value={link.oneCMatchInn || ""}
+                        inputMode="numeric"
+                        onChange={(event) => updateLink(client.id, { oneCMatchInn: event.target.value })}
+                      />
+                    </label>
+
+                    <label className="field">
+                      Код контрагента в 1С — необязательно
+                      <input
+                        value={link.oneCMatchCode || ""}
+                        onChange={(event) => updateLink(client.id, { oneCMatchCode: event.target.value })}
                       />
                     </label>
 
@@ -2604,13 +3917,62 @@ function ManagerClients({
                         </option>
                       </select>
                     </label>
+
+
+                    <label className="field">
+                      Цена по умолчанию для матрицы
+                      <select
+                        value={link.defaultPricingMode || "base"}
+                        onChange={(event) =>
+                          updateLink(client.id, {
+                            defaultPricingMode: event.target.value,
+                          })
+                        }
+                      >
+                        <option value="base">
+                          Базовая цена Clover
+                        </option>
+                        <option value="purchase_markup">
+                          Закупка 1С + общий процент
+                        </option>
+                      </select>
+                    </label>
+
+                    {link.defaultPricingMode === "purchase_markup" && (
+                      <label className="field">
+                        Общая наценка для клиента, %
+                        <input
+                          type="number"
+                          min="0"
+                          max="10000"
+                          step="0.1"
+                          value={getDefaultMarkupDraft(client.id, link)}
+                          onChange={(event) =>
+                            setDefaultMarkupDrafts((current) => ({
+                              ...current,
+                              [client.id]: event.target.value,
+                            }))
+                          }
+                          onBlur={() =>
+                            updateLink(client.id, {
+                              defaultMarkupPercent: normalizePercentInput(
+                                getDefaultMarkupDraft(client.id, link)
+                              ),
+                            })
+                          }
+                        />
+                        <small>
+                          Применяется ко всем товарам без индивидуального исключения.
+                        </small>
+                      </label>
+                    )}
                   </div>
 
                   <label
                     className="field"
                     style={{ marginTop: 12 }}
                   >
-                    Заметка менеджера
+                    Заметка по матрице и связи с 1С
                     <textarea
                       rows="3"
                       value={link.managerNote}
@@ -2620,9 +3982,16 @@ function ManagerClients({
                         })
                       }
                     />
+                    <small>Видна только менеджерам и относится к настройкам матрицы/1С.</small>
                   </label>
 
-                  {link.matrixMode !== "all" && (
+                  {link.matrixMode === "pending" && (
+                    <div className="matrix-catalog-note pending" style={{ marginTop: 14 }}>
+                      Сначала выберите режим товарной матрицы. Настройки цен сохранятся вместе с матрицей.
+                    </div>
+                  )}
+
+                  {link.matrixMode !== "pending" && (
                     <div style={{ marginTop: 14 }}>
                       <div className="toolbar two">
                         <input
@@ -2633,51 +4002,91 @@ function ManagerClients({
                             setMatrixSearch(event.target.value)
                           }
                         />
-                        <button
-                          className="secondary-button"
-                          type="button"
-                          onClick={() =>
-                            updateLink(client.id, {
-                              matrixMode: "selected",
-                              matrixProductIds: orderedIds,
-                            })
-                          }
-                        >
-                          Заполнить по истории заказов
-                        </button>
+                        {link.matrixMode === "selected" ? (
+                          <button
+                            className="secondary-button"
+                            type="button"
+                            onClick={() =>
+                              updateLink(client.id, {
+                                matrixMode: "selected",
+                                matrixProductIds: orderedIds,
+                              })
+                            }
+                          >
+                            Заполнить по истории заказов
+                          </button>
+                        ) : (
+                          <div className="matrix-catalog-note">
+                            Все активные товары используют общую схему цены, кроме индивидуальных исключений.
+                          </div>
+                        )}
                       </div>
 
                       <div className="matrix-summary">
                         <span>
-                          Выбрано: {link.matrixProductIds.length}
+                          {link.matrixMode === "all"
+                            ? `Товаров в матрице: ${products.filter((item) => item.active).length}`
+                            : `Выбрано: ${link.matrixProductIds.length}`}
                         </span>
                         <span>
-                          Персональных цен: {personalPriceCount}
+                          Индивидуальных исключений: {personalPriceCount}
                         </span>
+                        {link.matrixMode === "selected" && (
+                          <>
+                            <button
+                              className="secondary-button"
+                              type="button"
+                              onClick={() =>
+                                updateLink(client.id, {
+                                  matrixMode: "selected",
+                                  matrixProductIds: products
+                                    .filter((item) => item.active)
+                                    .map((item) => item.id),
+                                })
+                              }
+                            >
+                              Выбрать все
+                            </button>
+                            <button
+                              className="secondary-button"
+                              type="button"
+                              onClick={() =>
+                                updateLink(client.id, {
+                                  matrixProductIds: [],
+                                })
+                              }
+                            >
+                              Снять все
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="matrix-save-bar">
+                        <div>
+                          <strong>Сохранение товарной матрицы</strong>
+                          <small>
+                            После изменения цен, процентов или состава нажмите кнопку справа.
+                          </small>
+                          {matrixSaveState[client.id]?.message && (
+                            <span
+                              className={`matrix-save-message ${
+                                matrixSaveState[client.id]?.status || ""
+                              }`}
+                            >
+                              {matrixSaveState[client.id].message}
+                            </span>
+                          )}
+                        </div>
                         <button
-                          className="secondary-button"
+                          className="primary-button"
                           type="button"
-                          onClick={() =>
-                            updateLink(client.id, {
-                              matrixMode: "selected",
-                              matrixProductIds: products
-                                .filter((item) => item.active)
-                                .map((item) => item.id),
-                            })
-                          }
+                          disabled={matrixSaveState[client.id]?.status === "saving"}
+                          onClick={() => saveClientMatrix(client.id, link)}
                         >
-                          Выбрать все
-                        </button>
-                        <button
-                          className="secondary-button"
-                          type="button"
-                          onClick={() =>
-                            updateLink(client.id, {
-                              matrixProductIds: [],
-                            })
-                          }
-                        >
-                          Снять все
+                          {matrixSaveState[client.id]?.status === "saving"
+                            ? "Сохраняем..."
+                            : "Сохранить матрицу"}
                         </button>
                       </div>
 
@@ -2688,9 +4097,29 @@ function ManagerClients({
                               String(product.id)
                             ] || {};
                           const selected =
-                            link.matrixProductIds.includes(
-                              product.id
-                            );
+                            link.matrixMode === "all" ||
+                            link.matrixProductIds.includes(product.id);
+                          const priceMode = ["manual", "purchase_markup"].includes(
+                            price.source
+                          )
+                            ? price.source
+                            : "inherit";
+                          const effectiveMode =
+                            priceMode === "inherit"
+                              ? link.defaultPricingMode || "base"
+                              : priceMode;
+                          const markupPercent =
+                            priceMode === "purchase_markup"
+                              ? normalizePercentInput(
+                                  getIndividualMarkupDraft(
+                                    client.id,
+                                    product.id,
+                                    price
+                                  )
+                                )
+                              : normalizePercentInput(
+                                  getDefaultMarkupDraft(client.id, link)
+                                );
 
                           return (
                             <div
@@ -2701,6 +4130,7 @@ function ManagerClients({
                                 <input
                                   type="checkbox"
                                   checked={selected}
+                                  disabled={link.matrixMode === "all"}
                                   onChange={(event) =>
                                     updateLink(client.id, {
                                       matrixMode: "selected",
@@ -2713,8 +4143,7 @@ function ManagerClients({
                                               ]),
                                             ]
                                           : link.matrixProductIds.filter(
-                                              (id) =>
-                                                id !== product.id
+                                              (id) => id !== product.id
                                             ),
                                     })
                                   }
@@ -2732,7 +4161,7 @@ function ManagerClients({
                                 </span>
                               </label>
 
-                              {["piece", "pack", "bundle"].map(
+                              {UNIT_ORDER.map(
                                 (unit) => {
                                   const priceField =
                                     unit === "piece"
@@ -2742,90 +4171,183 @@ function ManagerClients({
                                         : "priceBundle";
                                   const unitAllowed =
                                     product.saleUnits.includes(unit);
+                                  const purchasePrice =
+                                    product.purchasePrices?.[unit];
+                                  const calculatedPrice =
+                                    calculateMarkupPreview(
+                                      purchasePrice,
+                                      markupPercent
+                                    );
 
-                                  return (
-                                    <label
-                                      className="matrix-price-field"
-                                      key={unit}
-                                    >
-                                      {UNIT_CONFIG[unit].label}
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        disabled={!unitAllowed}
-                                        placeholder={
-                                          unitAllowed
-                                            ? `База: ${
-                                                Number(
-                                                  product[priceField]
-                                                ) || 0
-                                              }`
-                                            : "Не продаётся"
-                                        }
-                                        value={
-                                          price[unit] ?? ""
-                                        }
-                                        onChange={(event) =>
-                                          updatePersonalPrice(
-                                            client.id,
-                                            link,
-                                            product.id,
-                                            {
-                                              [unit]:
-                                                parsePriceInput(
+                                  if (effectiveMode === "purchase_markup") {
+                                    return (
+                                      <div
+                                        className="matrix-price-field matrix-price-calculated"
+                                        key={unit}
+                                      >
+                                        <span>{UNIT_CONFIG[unit].label}</span>
+                                        {!unitAllowed ? (
+                                          <strong>Не продаётся</strong>
+                                        ) : hasPurchasePrice(purchasePrice) ? (
+                                          <>
+                                            <small>
+                                              Закупка: {formatMoney(purchasePrice)}
+                                            </small>
+                                            <strong>
+                                              Клиенту: {formatMoney(calculatedPrice)}
+                                            </strong>
+                                          </>
+                                        ) : (
+                                          <strong className="danger-text">
+                                            Нет цены из 1С
+                                          </strong>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+
+                                  if (priceMode === "manual") {
+                                    return (
+                                      <label
+                                        className="matrix-price-field"
+                                        key={unit}
+                                      >
+                                        {UNIT_CONFIG[unit].label}
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          disabled={!unitAllowed}
+                                          placeholder={
+                                            unitAllowed
+                                              ? `База: ${
+                                                  Number(product[priceField]) || 0
+                                                }`
+                                              : "Не продаётся"
+                                          }
+                                          value={price[unit] ?? ""}
+                                          onChange={(event) =>
+                                            updatePersonalPrice(
+                                              client.id,
+                                              link,
+                                              product.id,
+                                              {
+                                                [unit]: parsePriceInput(
                                                   event.target.value
                                                 ),
-                                            }
-                                          )
-                                        }
-                                      />
-                                    </label>
+                                              }
+                                            )
+                                          }
+                                        />
+                                      </label>
+                                    );
+                                  }
+
+                                  return (
+                                    <div
+                                      className="matrix-price-field matrix-price-calculated"
+                                      key={unit}
+                                    >
+                                      <span>{UNIT_CONFIG[unit].label}</span>
+                                      {!unitAllowed ? (
+                                        <strong>Не продаётся</strong>
+                                      ) : (
+                                        <>
+                                          <small>Базовая цена Clover</small>
+                                          <strong>
+                                            {formatMoney(product[priceField])}
+                                          </strong>
+                                        </>
+                                      )}
+                                    </div>
                                   );
                                 }
                               )}
 
-                              <label className="matrix-price-field">
-                                Источник цены
-                                <select
-                                  value={price.source || "manual"}
-                                  onChange={(event) =>
-                                    updatePersonalPrice(
-                                      client.id,
-                                      link,
-                                      product.id,
-                                      {
-                                        source: event.target.value,
+                              <div className="matrix-price-mode">
+                                <label className="matrix-price-field">
+                                  Способ расчёта
+                                  <select
+                                    value={priceMode}
+                                    onChange={(event) =>
+                                      updatePersonalPrice(
+                                        client.id,
+                                        link,
+                                        product.id,
+                                        {
+                                          source: event.target.value,
+                                        }
+                                      )
+                                    }
+                                  >
+                                    <option value="inherit">
+                                      По умолчанию клиента
+                                    </option>
+                                    <option value="manual">
+                                      Фиксированная цена вручную
+                                    </option>
+                                    <option value="purchase_markup">
+                                      Индивидуальный процент
+                                    </option>
+                                  </select>
+                                </label>
+                                {priceMode === "purchase_markup" && (
+                                  <label className="matrix-price-field">
+                                    Индивидуальная наценка, %
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="10000"
+                                      step="0.1"
+                                      value={getIndividualMarkupDraft(
+                                        client.id,
+                                        product.id,
+                                        price
+                                      )}
+                                      onChange={(event) =>
+                                        setIndividualMarkupDrafts((current) => ({
+                                          ...current,
+                                          [client.id]: {
+                                            ...(current[client.id] || {}),
+                                            [String(product.id)]: event.target.value,
+                                          },
+                                        }))
                                       }
-                                    )
-                                  }
-                                >
-                                  <option value="manual">
-                                    Вручную
-                                  </option>
-                                  <option value="contract">
-                                    По договору
-                                  </option>
-                                  <option value="oneC">
-                                    Из 1С
-                                  </option>
-                                </select>
-                              </label>
+                                      onBlur={() =>
+                                        updatePersonalPrice(
+                                          client.id,
+                                          link,
+                                          product.id,
+                                          {
+                                            markupPercent: normalizePercentInput(
+                                              getIndividualMarkupDraft(
+                                                client.id,
+                                                product.id,
+                                                price
+                                              )
+                                            ),
+                                          }
+                                        )
+                                      }
+                                    />
+                                  </label>
+                                )}
+                                {priceMode === "inherit" &&
+                                  effectiveMode === "purchase_markup" && (
+                                    <small className="price-update-time">
+                                      Общая наценка клиента: {markupPercent}%
+                                    </small>
+                                  )}
+                                {effectiveMode === "purchase_markup" && (
+                                  <small className="price-update-time">
+                                    Цена 1С обновлена: {formatDateTime(product.purchasePriceUpdatedAt)}
+                                  </small>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
                       </div>
-                    </div>
-                  )}
-
-                  {link.matrixMode === "all" && (
-                    <div
-                      className="matrix-catalog-note"
-                      style={{ marginTop: 14 }}
-                    >
-                      Клиент видит все активные товары. Персональные
-                      цены можно назначить, переключив режим на
-                      «Только выбранные товары».
                     </div>
                   )}
 
@@ -2836,7 +4358,12 @@ function ManagerClients({
                     <strong>Адреса клиента</strong>
                     <p>
                       {client.addresses.length
-                        ? client.addresses.join("; ")
+                        ? client.addresses
+                            .map((item) =>
+                              typeof item === "string" ? item : item.address
+                            )
+                            .filter(Boolean)
+                            .join("; ")
                         : "Нет адресов"}
                     </p>
                   </div>
@@ -2855,21 +4382,156 @@ function ManagerClients({
 function ProductEditor({ product, onClose, onSave }) {
   const isNew = !product;
   const [form, setForm] = useState(product || {
-    name: "", category: "Новые товары", code: "", oneCId: "", active: true,
+    name: "", category: "Новые товары", code: "", oneCId: "",
+    oneCCode: "", oneCName: "", oneCMatchCode: "", oneCMatchName: "", oneCSearchQuery: "", oneCSearchRequestedAt: "", oneCLinkMode: "", oneCLinkedAt: "", active: true,
     pieceSize: 1, packSize: 1, bundleSize: 1,
     pricePiece: 0, pricePack: 0, priceBundle: 0,
     saleUnits: ["piece"],
   });
+  const [oneCOpen, setOneCOpen] = useState(false);
+  const [oneCSearch, setOneCSearch] = useState(product?.oneCName || product?.name || "");
+  const [oneCResults, setOneCResults] = useState([]);
+  const [oneCTotal, setOneCTotal] = useState(0);
+  const [oneCLoading, setOneCLoading] = useState(false);
+  const [oneCError, setOneCError] = useState("");
+  const [oneCNotice, setOneCNotice] = useState("");
 
   const toggleUnit = (unit, checked) => {
     const next = checked ? [...new Set([...form.saleUnits, unit])] : form.saleUnits.filter((item) => item !== unit);
     setForm({ ...form, saleUnits: next.length ? next : ["piece"] });
   };
 
+  const searchOneCProducts = async (query = oneCSearch) => {
+    setOneCLoading(true);
+    setOneCError("");
+    try {
+      const result = await api.getOneCProducts({
+        search: String(query || "").trim(),
+        limit: 50,
+        offset: 0,
+      });
+      setOneCResults(result.items || []);
+      setOneCTotal(Number(result.total) || 0);
+    } catch (error) {
+      setOneCError(error.message);
+      setOneCResults([]);
+      setOneCTotal(0);
+    } finally {
+      setOneCLoading(false);
+    }
+  };
+
+  const openOneCSearch = async () => {
+    const query = form.oneCSearchQuery || form.oneCCode || form.oneCMatchCode || form.oneCName || form.oneCMatchName || form.name || "";
+    setOneCSearch(query);
+    setOneCOpen(true);
+    setOneCLoading(true);
+    setOneCError("");
+    setOneCNotice("");
+    try {
+      if (product?.id) {
+        const candidateResult = await api.getOneCProductCandidates(product.id);
+        if ((candidateResult.items || []).length) {
+          setOneCResults(candidateResult.items || []);
+          setOneCTotal(Number(candidateResult.total) || 0);
+          setOneCNotice("Показаны наиболее подходящие варианты, найденные при последней выгрузке из 1С.");
+          return;
+        }
+      }
+      const result = await api.getOneCProducts({ search: String(query || "").trim(), limit: 50, offset: 0 });
+      setOneCResults(result.items || []);
+      setOneCTotal(Number(result.total) || 0);
+    } catch (error) {
+      setOneCError(error.message);
+      setOneCResults([]);
+      setOneCTotal(0);
+    } finally {
+      setOneCLoading(false);
+    }
+  };
+
+  const selectOneCProduct = (item) => {
+    const nextProduct = normalizeProduct({
+      ...form,
+      oneCId: item.id,
+      oneCCode: item.code || "",
+      oneCName: item.name || "",
+      oneCMatchCode: item.code || "",
+      oneCMatchName: item.name || "",
+      oneCSearchQuery: "",
+      oneCSearchRequestedAt: "",
+      oneCLinkMode: "manual",
+      oneCLinkedAt: new Date().toISOString(),
+    });
+
+    setForm(nextProduct);
+    setOneCOpen(false);
+    setOneCError("");
+    setOneCNotice(
+      "Позиция 1С выбрана, но ещё не сохранена. Проверьте название, категорию, единицы, коэффициенты и цены, затем нажмите «Сохранить товар»."
+    );
+  };
+
+  const requestOneCSearch = async () => {
+    if (!product?.id) {
+      setForm((current) => ({ ...current, oneCSearchQuery: oneCSearch || current.name }));
+      setOneCNotice("Запрос будет сохранён вместе с новым товаром.");
+      return;
+    }
+    setOneCLoading(true);
+    setOneCError("");
+    try {
+      const result = await api.requestOneCProduct(product.id, {
+        query: oneCSearch || form.name,
+        code: form.oneCMatchCode || "",
+        name: form.oneCMatchName || "",
+      });
+      const updatedProduct = normalizeProduct({
+        ...form,
+        ...(result.product || {}),
+        oneCSearchQuery: oneCSearch || form.name,
+      });
+      setForm(updatedProduct);
+      setOneCNotice(result.message || "Запрос сохранён.");
+      await onSave(updatedProduct);
+    } catch (error) {
+      setOneCError(error.message);
+    } finally {
+      setOneCLoading(false);
+    }
+  };
+
+  const clearOneCProduct = () => {
+    setForm((current) => ({
+      ...current,
+      oneCId: "",
+      oneCCode: "",
+      oneCName: "",
+      oneCMatchCode: "",
+      oneCMatchName: "",
+      oneCSearchQuery: "",
+      oneCSearchRequestedAt: "",
+      oneCLinkMode: "manual-cleared",
+      oneCLinkedAt: "",
+    }));
+  };
+
   const submit = (event) => {
     event.preventDefault();
     if (!form.name.trim() || !form.category.trim()) return;
-    onSave(normalizeProduct({ ...form, name: form.name.trim(), category: form.category.trim() }));
+
+    onSave(normalizeProduct({
+      ...form,
+      name: form.name.trim(),
+      category: form.category.trim(),
+      oneCId: String(form.oneCId || "").trim(),
+      oneCCode: String(form.oneCCode || "").trim(),
+      oneCName: String(form.oneCName || "").trim(),
+      oneCMatchCode: String(form.oneCMatchCode || "").trim(),
+      oneCMatchName: String(form.oneCMatchName || "").trim(),
+      oneCSearchQuery: String(form.oneCSearchQuery || "").trim(),
+      oneCSearchRequestedAt: String(form.oneCSearchRequestedAt || "").trim(),
+    }));
   };
 
   return (
@@ -2880,9 +4542,153 @@ function ProductEditor({ product, onClose, onSave }) {
           <label className="field">Название товара<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></label>
           <label className="field">Категория<input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required /></label>
           <label className="field">Внутренний код<input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></label>
-          <label className="field">ID номенклатуры 1С<input value={form.oneCId} onChange={(e) => setForm({ ...form, oneCId: e.target.value })} /></label>
           <label className="field">Показывать клиентам<select value={form.active ? "yes" : "no"} onChange={(e) => setForm({ ...form, active: e.target.value === "yes" })}><option value="yes">Да</option><option value="no">Нет</option></select></label>
         </div>
+
+        <section className="one-c-link-editor">
+          <div className="one-c-link-editor-head">
+            <div>
+              <p className="eyebrow">Связь с 1С</p>
+              <h3>Точная номенклатура 1С TEST</h3>
+            </div>
+            <button className="secondary-button" type="button" onClick={openOneCSearch}>
+              {form.oneCId ? "Изменить товар 1С" : "Выбрать из загруженных 1С"}
+            </button>
+          </div>
+
+          {form.oneCId ? (
+            <div className="one-c-link-selected">
+              <div>
+                <strong>{form.oneCName || "Выбранный товар 1С"}</strong>
+                <span>Код: {form.oneCCode || "—"} · ID: {form.oneCId}</span>
+              </div>
+              <button className="secondary-button" type="button" onClick={clearOneCProduct}>Убрать связь</button>
+            </div>
+          ) : (
+            <div className="one-c-link-empty one-c-match-hints">
+              <p>
+                Название для сайта может отличаться от названия в 1С. Укажите код
+                или точное внутреннее название из 1С TEST. После следующей выгрузки
+                Clover сохранит только подходящую позицию и свяжет её автоматически.
+              </p>
+              <div className="form-grid one-c-match-fields">
+                <label className="field">Код товара в 1С
+                  <input
+                    value={form.oneCMatchCode || ""}
+                    placeholder="Например, НФ-00000742"
+                    onChange={(event) => setForm({ ...form, oneCMatchCode: event.target.value })}
+                  />
+                </label>
+                <label className="field">Точное название в 1С
+                  <input
+                    value={form.oneCMatchName || ""}
+                    placeholder="Как позиция называется внутри 1С"
+                    onChange={(event) => setForm({ ...form, oneCMatchName: event.target.value })}
+                  />
+                </label>
+              </div>
+            </div>
+          )}
+
+          {!oneCOpen && oneCNotice && <div className="sync-success">{oneCNotice}</div>}
+
+          {oneCOpen && (
+            <div className="one-c-picker">
+              <div className="one-c-products-search">
+                <input
+                  type="search"
+                  placeholder="Поиск среди сохранённых позиций: название, код или ID"
+                  value={oneCSearch}
+                  onChange={(event) => setOneCSearch(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      searchOneCProducts(oneCSearch);
+                    }
+                  }}
+                  autoFocus
+                />
+                <button className="secondary-button" type="button" disabled={oneCLoading} onClick={() => searchOneCProducts(oneCSearch)}>
+                  {oneCLoading ? "Поиск..." : "Найти"}
+                </button>
+                <button className="secondary-button" type="button" onClick={() => setOneCOpen(false)}>Закрыть</button>
+              </div>
+
+              {oneCError && <div className="sync-error">{oneCError}</div>}
+              {oneCNotice && <div className="sync-success">{oneCNotice}</div>}
+              <p className="muted small">Найдено: {oneCTotal}. Показаны первые {oneCResults.length} позиций.</p>
+
+              <div className="one-c-products-list one-c-picker-list">
+                {oneCResults.map((item) => {
+                  const linkedToCurrent = item.cloverLink && String(item.cloverLink.productId) === String(product?.id);
+                  const linkedElsewhere = item.cloverLink && !linkedToCurrent;
+                  const selected = String(form.oneCId) === String(item.id);
+
+                  return (
+                    <article key={item.id}>
+                      <div>
+                        <strong>{item.name}</strong>
+                        <span>Код: {item.code || "—"} · ID: {item.id}</span>
+                        {Number(item.score) > 0 && <span className="muted small">Совпадение: {Math.round(Number(item.score) * 100)}%</span>}
+                        {linkedElsewhere && <span className="warning-text">Уже связан с товаром Clover: {item.cloverLink.productName}</span>}
+                      </div>
+                      <button
+                        className={selected || linkedToCurrent ? "secondary-button" : "primary-button"}
+                        type="button"
+                        disabled={Boolean(linkedElsewhere)}
+                        onClick={() => selectOneCProduct(item)}
+                      >
+                        {selected || linkedToCurrent ? "Выбрано" : linkedElsewhere ? "Уже связан" : "Выбрать"}
+                      </button>
+                    </article>
+                  );
+                })}
+                {!oneCLoading && !oneCResults.length && (
+                  <div className="empty-box">
+                    <p>Подходящих сохранённых позиций пока нет.</p>
+                    <button className="primary-button" type="button" onClick={requestOneCSearch}>
+                      Сохранить запрос для следующей выгрузки из 1С
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="purchase-price-card">
+          <div className="purchase-price-card-head">
+            <div>
+              <p className="eyebrow">Цена из 1С TEST</p>
+              <h3>Закупочная цена товара</h3>
+            </div>
+            <small>
+              {form.purchasePriceUpdatedAt
+                ? `Обновлено: ${formatDateTime(form.purchasePriceUpdatedAt)}`
+                : "Закупочная цена ещё не получена"}
+            </small>
+          </div>
+          <div className="purchase-price-grid">
+            {UNIT_ORDER.map((unit) => {
+              const value = form.purchasePrices?.[unit];
+              const available = hasPurchasePrice(value);
+              return (
+                <article key={unit}>
+                  <span>{UNIT_CONFIG[unit].label}</span>
+                  <strong>{available ? formatMoney(value) : "—"}</strong>
+                  <small>
+                    {form.saleUnits.includes(unit)
+                      ? available
+                        ? "Получено из 1С"
+                        : "Нет цены из 1С"
+                      : "Единица не продаётся"}
+                  </small>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
         <div className="unit-settings">
           {UNIT_ORDER.map((unit) => {
             const sizeField = unit === "piece" ? "pieceSize" : unit === "pack" ? "packSize" : "bundleSize";
@@ -2951,6 +4757,206 @@ function ProductEditor({ product, onClose, onSave }) {
   );
 }
 
+function OneCProductsPanel({ products, setProducts }) {
+  const [catalog, setCatalog] = useState(null);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [linking, setLinking] = useState(false);
+  const [error, setError] = useState("");
+  const [open, setOpen] = useState(false);
+  const initialLinkDone = useRef(false);
+
+  const loadCatalog = async (query = search) => {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await api.getOneCProducts({
+        search: query,
+        limit: 50,
+        offset: 0,
+      });
+      setCatalog(result);
+      return result;
+    } catch (loadError) {
+      setError(loadError.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runAutoLink = async ({ silent = false } = {}) => {
+    setLinking(true);
+    if (!silent) setError("");
+    try {
+      const result = await api.autoLinkOneCProducts();
+      setProducts((result.products || []).map(normalizeProduct));
+      const refreshed = await api.getOneCProducts({
+        search,
+        limit: 50,
+        offset: 0,
+      });
+      setCatalog(refreshed);
+      if (!silent) {
+        const linked = result.report?.newlyLinked || 0;
+        alert(
+          linked
+            ? `Автоматически связаны товары: ${linked}.`
+            : "Новых точных совпадений не найдено. Уже созданные связи сохранены."
+        );
+      }
+    } catch (linkError) {
+      setError(linkError.message);
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const initialize = async () => {
+      const result = await loadCatalog("");
+      if (cancelled || initialLinkDone.current) return;
+      initialLinkDone.current = true;
+
+      if (result?.summary?.oneCTotal > 0) {
+        await runAutoLink({ silent: true });
+      }
+    };
+
+    initialize();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const summary = catalog?.summary || {};
+
+  return (
+    <section className="one-c-products-panel">
+      <div className="one-c-products-head">
+        <div>
+          <p className="eyebrow">Каталог 1С</p>
+          <h2>Автоматическое сопоставление номенклатуры</h2>
+          <p>
+            Clover сохраняет только точные совпадения и несколько наиболее похожих
+            вариантов для несвязанных товаров. Красивое название на сайте может быть
+            другим: в заказ передаётся ID 1С. Полная номенклатура и база клиентов в
+            Clover не сохраняются. Неоднозначные варианты выбирает менеджер.
+          </p>
+        </div>
+        <div className="one-c-products-actions">
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={() => loadCatalog()}
+            disabled={loading || linking}
+          >
+            {loading ? "Обновление..." : "Обновить"}
+          </button>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={() => runAutoLink()}
+            disabled={linking || !summary.oneCTotal}
+          >
+            {linking ? "Сопоставление..." : "Сопоставить автоматически"}
+          </button>
+        </div>
+      </div>
+
+      {error && <div className="sync-error">{error}</div>}
+
+      <div className="one-c-products-stats">
+        <article><span>Подходящих из 1С</span><strong>{summary.oneCTotal || 0}</strong></article>
+        <article><span>Товаров Clover</span><strong>{summary.cloverTotal ?? products.length}</strong></article>
+        <article><span>Связано</span><strong>{summary.linked || 0}</strong></article>
+        <article><span>С закупочной ценой</span><strong>{summary.pricedProducts || 0}</strong></article>
+        <article><span>Без связи</span><strong>{summary.unmatched ?? products.filter((item) => !item.oneCId).length}</strong></article>
+        {Number(summary.candidateProducts) > 0 && <article><span>Есть варианты</span><strong>{summary.candidateProducts}</strong></article>}
+      </div>
+
+      <div className="one-c-products-meta">
+        <span>
+          Последняя выгрузка: {summary.receivedAt ? formatDateTime(summary.receivedAt) : "ещё не выполнялась"}
+        </span>
+        <span>
+          Автоматически: {summary.autoLinked || 0} · вручную: {summary.manualLinked || 0}
+        </span>
+        {summary.stale > 0 && <span className="warning-text">Не найдено в свежем каталоге: {summary.stale}</span>}
+      </div>
+
+      <button
+        className="one-c-products-toggle"
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+      >
+        {open ? "Скрыть сохранённые позиции 1С" : "Показать сохранённые позиции 1С"}
+      </button>
+
+      {open && (
+        <div className="one-c-products-browser">
+          <form
+            className="one-c-products-search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              loadCatalog(search);
+            }}
+          >
+            <input
+              type="search"
+              placeholder="Поиск среди сохранённых позиций: название, код или ID"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <button className="secondary-button" type="submit" disabled={loading}>
+              Найти
+            </button>
+            {search && (
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  loadCatalog("");
+                }}
+              >
+                Сбросить
+              </button>
+            )}
+          </form>
+
+          <p className="muted small">
+            Найдено: {catalog?.total || 0}. Показаны первые {catalog?.items?.length || 0} позиций.
+          </p>
+
+          <div className="one-c-products-list">
+            {(catalog?.items || []).map((item) => (
+              <article key={item.id}>
+                <div>
+                  <strong>{item.name}</strong>
+                  <span>Код: {item.code || "—"} · ID: {item.id}</span>
+                </div>
+                {item.cloverLink ? (
+                  <span className="badge green">
+                    Связан: {item.cloverLink.productName}
+                  </span>
+                ) : (
+                  <span className="badge gray">Не используется в Clover</span>
+                )}
+              </article>
+            ))}
+            {!loading && !(catalog?.items || []).length && (
+              <div className="empty-box">Позиции не найдены.</div>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ManagerProducts({ products, setProducts }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Все");
@@ -2959,19 +4965,42 @@ function ManagerProducts({ products, setProducts }) {
   const [imageBusyId, setImageBusyId] = useState(null);
   const categories = ["Все", ...new Set(products.map((item) => item.category))];
   const visible = products.filter((product) => {
-    const bySearch = !search || `${product.name} ${product.code} ${product.oneCId}`.toLowerCase().includes(search.toLowerCase());
+    const bySearch = !search || `${product.name} ${product.code} ${product.oneCId} ${product.oneCCode} ${product.oneCName} ${product.oneCMatchCode} ${product.oneCMatchName} ${product.oneCSearchQuery}`.toLowerCase().includes(search.toLowerCase());
     const byCategory = category === "Все" || product.category === category;
-    const byVisibility = visibility === "Все" || (visibility === "Активные" ? product.active : !product.active);
+    const hasOneCLink = Boolean(String(product.oneCId || "").trim());
+    const byVisibility =
+      visibility === "Все" ||
+      (visibility === "Активные" && product.active) ||
+      (visibility === "Скрытые" && !product.active) ||
+      (visibility === "Связанные с 1С" && hasOneCLink) ||
+      (visibility === "Без связи с 1С" && !hasOneCLink);
     return bySearch && byCategory && byVisibility;
   });
 
-  const save = (value) => {
-    if (value.id) setProducts((current) => current.map((item) => item.id === value.id ? value : item));
-    else {
+  const save = async (value) => {
+    let nextProducts;
+
+    if (value.id) {
+      nextProducts = products.map((item) => item.id === value.id ? normalizeProduct(value) : item);
+    } else {
       const id = Math.max(0, ...products.map((item) => Number(item.id) || 0)) + 1;
-      setProducts((current) => [...current, normalizeProduct({ ...value, id, code: value.code || `CL-${String(id).padStart(4, "0")}` })]);
+      nextProducts = [
+        ...products,
+        normalizeProduct({
+          ...value,
+          id,
+          code: value.code || `CL-${String(id).padStart(4, "0")}`,
+        }),
+      ];
     }
-    setEditorProduct(undefined);
+
+    try {
+      const result = await api.saveProducts(nextProducts);
+      setProducts((result.products || nextProducts).map(normalizeProduct));
+      setEditorProduct(undefined);
+    } catch (error) {
+      alert(`Не удалось сохранить товар: ${error.message}`);
+    }
   };
 
   const uploadImage = async (product, file) => {
@@ -3020,10 +5049,18 @@ function ManagerProducts({ products, setProducts }) {
 
   return (
     <section>
+      <OneCProductsPanel products={products} setProducts={setProducts} />
+
       <div className="toolbar four">
         <input type="search" placeholder="Поиск товара, кода или ID 1С" value={search} onChange={(e) => setSearch(e.target.value)} />
         <select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select>
-        <select value={visibility} onChange={(e) => setVisibility(e.target.value)}><option>Все</option><option>Активные</option><option>Скрытые</option></select>
+        <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>
+          <option>Все</option>
+          <option>Активные</option>
+          <option>Скрытые</option>
+          <option>Связанные с 1С</option>
+          <option>Без связи с 1С</option>
+        </select>
         <button className="primary-button" type="button" onClick={() => setEditorProduct(null)}>+ Добавить товар</button>
       </div>
       <div className="server-safe-note">
@@ -3034,7 +5071,30 @@ function ManagerProducts({ products, setProducts }) {
           <div className="product-manager-thumb">
             {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <span>Нет фото</span>}
           </div>
-          <div><h3>{product.name}</h3><p>{product.category} · {product.code} · 1С: {product.oneCId || "не связан"}</p></div>
+          <div>
+            <h3>{product.name}</h3>
+            <p>{product.category} · {product.code}</p>
+            <p className="product-one-c-line">
+              {product.oneCId
+                ? `1С: ${product.oneCCode || "без кода"} · ${product.oneCId}`
+                : "1С: не связан"}
+              {product.oneCLinkMode === "auto" ? " · автоматически" : product.oneCId ? " · вручную" : ""}
+            </p>
+            <div className="product-purchase-summary">
+              {UNIT_ORDER.map((unit) => {
+                const value = product.purchasePrices?.[unit];
+                return (
+                  <span key={unit}>
+                    <strong>{UNIT_CONFIG[unit].label}:</strong>{" "}
+                    {hasPurchasePrice(value) ? formatMoney(value) : "—"}
+                  </span>
+                );
+              })}
+              <span className="product-purchase-updated">
+                Закупка 1С обновлена: {formatDateTime(product.purchasePriceUpdatedAt)}
+              </span>
+            </div>
+          </div>
           <span className={product.active ? "badge green" : "badge gray"}>{product.active ? "Активен" : "Скрыт"}</span>
           <strong>{settingsPriceLabel(product)}</strong>
           <div className="image-actions">
@@ -3069,6 +5129,82 @@ function settingsPriceLabel(product) {
 
 function ToggleSetting({ title, description, value, onChange }) {
   return <article className="setting-card"><div><h3>{title}</h3><p>{description}</p></div><button className={value ? "toggle active" : "toggle"} type="button" onClick={() => onChange(!value)} aria-label={title}><span /></button></article>;
+}
+
+function ManagerNotificationSettings({ settings, set }) {
+  const [status, setStatus] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const loadStatus = async () => {
+    try {
+      const result = await api.getManagerNotifications({ limit: 1 });
+      setStatus(result.status || null);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  };
+
+  useEffect(() => { loadStatus(); }, []);
+
+  const test = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      await api.saveSettings(settings);
+      const result = await api.testManagerNotifications();
+      const delivery = result.result?.delivery || [];
+      const parts = delivery.map((item) => {
+        const channel = item.channel === "email" ? "email" : item.channel === "telegram" ? "Telegram" : item.channel === "push" ? "push" : "канал";
+        if (item.sent === true || Number(item.sent) > 0) return `${channel}: отправлено`;
+        return `${channel}: ${item.reason || item.error || "не отправлено"}`;
+      });
+      setMessage(parts.length ? parts.join("; ") : "Внутреннее уведомление создано. Внешние каналы пока выключены.");
+      setStatus(result.status || null);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="manager-contact-settings manager-notification-settings">
+      <h3>Уведомления менеджеру</h3>
+      <p>Новый заказ, изменение заказа, товар вне матрицы, запрос акта сверки, регистрация клиента и ошибки 1С.</p>
+      <div className="settings-grid">
+        <ToggleSetting title="Уведомления в Clover" description="Показывать новые события сразу в кабинете менеджера." value={settings.managerNotificationsEnabled !== false} onChange={(value) => set("managerNotificationsEnabled", value)} />
+        <ToggleSetting title="Новые заказы" description="Сообщать о каждом новом заказе клиента." value={settings.managerNotifyNewOrders !== false} onChange={(value) => set("managerNotifyNewOrders", value)} />
+        <ToggleSetting title="Изменения заказов" description="Сообщать, когда клиент меняет или удаляет новый заказ." value={settings.managerNotifyOrderChanges !== false} onChange={(value) => set("managerNotifyOrderChanges", value)} />
+        <ToggleSetting title="Товары вне матрицы" description="Отдельно сообщать о новой позиции, комментарии и фотографии." value={settings.managerNotifyCustomItems !== false} onChange={(value) => set("managerNotifyCustomItems", value)} />
+        <ToggleSetting title="Запросы актов сверки" description="Сообщать о новом запросе с выбранным периодом." value={settings.managerNotifyReconciliation !== false} onChange={(value) => set("managerNotifyReconciliation", value)} />
+        <ToggleSetting title="Новые регистрации" description="Сообщать о клиентах, ожидающих подтверждения менеджера." value={settings.managerNotifyRegistrations !== false} onChange={(value) => set("managerNotifyRegistrations", value)} />
+        <ToggleSetting title="Ошибки обмена с 1С" description="Сообщать о сбоях передачи и обработки заказов." value={settings.managerNotifyOneCErrors !== false} onChange={(value) => set("managerNotifyOneCErrors", value)} />
+        <ToggleSetting title="Push на устройства менеджера" description="Отправлять уведомления в установленную PWA Clover." value={settings.managerNotifyPush !== false} onChange={(value) => set("managerNotifyPush", value)} />
+        <ToggleSetting title="Отправлять на email" description="Использовать SMTP и адрес, указанный ниже." value={Boolean(settings.managerNotifyEmail)} onChange={(value) => set("managerNotifyEmail", value)} />
+        <ToggleSetting title="Отправлять в Telegram-бот" description="Токен хранится только в server/.env, Chat ID указывается ниже." value={Boolean(settings.managerNotifyTelegram)} onChange={(value) => set("managerNotifyTelegram", value)} />
+      </div>
+      <div className="form-grid" style={{ marginTop: 14 }}>
+        <label className="field">Email для уведомлений
+          <input type="email" value={settings.managerNotificationEmail || ""} placeholder="manager@company.ru" onChange={(event) => set("managerNotificationEmail", event.target.value)} />
+        </label>
+        <label className="field">Telegram Chat ID менеджера
+          <input value={settings.managerTelegramChatId || ""} placeholder="Например: 123456789" onChange={(event) => set("managerTelegramChatId", event.target.value.trim())} />
+        </label>
+      </div>
+      <div className="notification-channel-status">
+        <span className={status?.email?.configured ? "badge green" : "badge yellow"}>Email: {status?.email?.configured ? "готов" : status?.email?.smtpConfigured ? "укажите адрес" : "SMTP не настроен"}</span>
+        <span className={status?.telegram?.configured ? "badge green" : "badge yellow"}>Telegram: {status?.telegram?.configured ? "готов" : status?.telegram?.tokenConfigured ? "укажите Chat ID" : "токен не настроен"}</span>
+        <span className={status?.push?.configured ? "badge green" : "badge yellow"}>Push: {status?.push?.configured ? "готов" : "после HTTPS и VAPID"}</span>
+      </div>
+      <p className="manager-contact-help">Токен Telegram-бота и SMTP-пароль не вводятся в браузере и не отправляются в чат. Для них в обновлении будет отдельный локальный настройщик.</p>
+      <div className="inline-actions">
+        <button className="primary-button" type="button" disabled={busy} onClick={test}>{busy ? "Проверяем…" : "Отправить тестовое уведомление"}</button>
+        <button className="secondary-button" type="button" disabled={busy} onClick={loadStatus}>Обновить статус</button>
+      </div>
+      {message && <div className="request-photo-status">{message}</div>}
+    </div>
+  );
 }
 
 function ManagerSettings({ settings, setSettings }) {
@@ -3139,6 +5275,9 @@ function ManagerSettings({ settings, setSettings }) {
         </p>
       </div>
 
+      <ManagerNotificationSettings settings={settings} set={set} />
+      <PushSettings />
+
       <div className="settings-grid">
         <ToggleSetting title="Показывать цены" description="Клиент увидит цены, заполненные в карточках товаров." value={settings.showPrices} onChange={(value) => set("showPrices", value)} />
         <ToggleSetting title="Товары вне матрицы" description="Разрешить клиенту запрашивать отсутствующие позиции." value={settings.allowCustomItems} onChange={(value) => set("allowCustomItems", value)} />
@@ -3151,6 +5290,8 @@ function ManagerSettings({ settings, setSettings }) {
         <ToggleSetting title="Избранные товары" description="Клиент может отмечать часто используемые товары." value={settings.showFavorites} onChange={(value) => set("showFavorites", value)} />
         <ToggleSetting title="Автосохранение черновика" description="Незавершённый новый заказ сохраняется в браузере." value={settings.enableDrafts} onChange={(value) => set("enableDrafts", value)} />
       </div>
+      <ManagerPromotionPanel />
+      <PasswordSecurityPanel />
     </section>
   );
 }
@@ -3310,7 +5451,12 @@ const AUDIT_ACTION_LABELS = {
   "orders.save": "Сохранены заказы",
   "products.save": "Изменён каталог",
   "settings.save": "Изменены настройки",
+  "manager.notification": "Отправлено уведомление менеджеру",
+  "manager.notification.read": "Уведомление отмечено прочитанным",
+  "manager.notification.read_all": "Все уведомления отмечены прочитанными",
+  "manager.notification.test": "Проверены каналы уведомлений",
   "client.matrix.save": "Изменена матрица клиента",
+  "client.profile.manager_update": "Менеджер изменил данные клиента",
   "product.image.upload": "Загружено фото товара",
   "product.image.delete": "Удалено фото товара",
   "backup.create": "Создана резервная копия",
@@ -3318,7 +5464,7 @@ const AUDIT_ACTION_LABELS = {
   "backup.cleanup": "Удалены старые резервные копии",
   "server.reset": "Выполнен полный сброс",
   "exchange.check": "Проверен заказ для 1С",
-  "exchange.send.test": "Выполнена тестовая передача в 1С",
+  "exchange.send.test": "Заказ поставлен в очередь 1С",
   "exchange.send.error": "Ошибка тестовой передачи в 1С",
   "exchange.reset": "Сброшен статус обмена с 1С",
   "exchange.download.order": "Скачан файл заказа для 1С",
@@ -3328,6 +5474,8 @@ const AUDIT_ACTION_LABELS = {
   "exchange.connection.error": "Ошибка подключения к 1С",
   "exchange.catalog.preview": "Просмотрен справочник 1С",
   "exchange.catalog.error": "Ошибка чтения справочника 1С",
+  "one-c.products.receive": "Получена номенклатура из 1С",
+  "one-c.products.auto-link": "Автоматически сопоставлены товары с 1С",
   "exchange.send.draft": "Создан черновик заказа в 1С",
   "exchange.send.draft.error": "Ошибка создания черновика в 1С",
 };
@@ -3342,6 +5490,8 @@ function formatAuditDetails(item) {
       return `Товаров в каталоге: ${Number(details.count) || 0}`;
     case "client.matrix.save":
       return `Изменено клиентов: ${Number(details.clients) || 0}`;
+    case "client.profile.manager_update":
+      return `Клиент: ${details.clientId || "—"} · адресов: ${Number(details.addresses) || 0}${details.changedEmail ? " · изменён email для входа" : ""}`;
     case "product.image.upload":
       return details.productName
         ? `Товар: ${details.productName}`
@@ -3392,6 +5542,10 @@ function formatAuditDetails(item) {
       return `${details.type === "clients" ? "Контрагенты" : "Номенклатура"} · записей: ${Number(details.count) || 0}`;
     case "exchange.catalog.error":
       return `${details.type || "Справочник"} · ${details.message || "ошибка"}`;
+    case "one-c.products.receive":
+      return `Получено: ${Number(details.received) || 0} · новых связей: ${Number(details.newlyLinked) || 0} · без совпадения: ${Number(details.unmatched) || 0}`;
+    case "one-c.products.auto-link":
+      return `Товаров Clover: ${Number(details.cloverTotal) || 0} · связанных: ${Number(details.linked) || 0} · новых связей: ${Number(details.newlyLinked) || 0}`;
     case "exchange.send.draft":
       return `Заказ № ${details.orderNumber || "—"} · документ ${details.documentNumber || details.documentId || "создан"} · ${details.mode === "real" ? "1С" : "симулятор"}`;
     case "exchange.send.draft.error":
@@ -3556,7 +5710,7 @@ function ManagerExchange({ onReload, onNavigate }) {
   return <section>
     <div className="exchange-notice">
       <strong>{connectionLabel}.</strong>{" "}
-      В версии 2.0–2.2 добавлены настройки соединения, проверка HTTP-сервиса,
+      В версии 2.0–3.0 добавлены настройки соединения, проверка HTTP-сервиса,
       чтение контрагентов и номенклатуры, а также создание непроведённого
       черновика. Реальная запись дополнительно блокируется на сервере и не
       включится случайно.
@@ -3800,18 +5954,69 @@ function ManagerAudit() {
   </section>;
 }
 
-function ManagerDashboard({ orders, products, setProducts, profile, addresses, serverClients, settings, setSettings, clientLinks, setClientLinks, managerNotice, onDismissNotice, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onLogout }) {
-  const [tab, setTab] = useState("orders");
+const MANAGER_NOTIFICATION_META = {
+  new_order: { label: "Новый заказ", tab: "orders" },
+  order_changed: { label: "Заказ изменён", tab: "orders" },
+  order_deleted: { label: "Заказ удалён", tab: "orders" },
+  custom_item: { label: "Товар вне матрицы", tab: "orders" },
+  reconciliation_request: { label: "Акт сверки", tab: "acts" },
+  client_registration: { label: "Новый клиент", tab: "clients" },
+  onec_error: { label: "Ошибка 1С", tab: "exchange" },
+  test: { label: "Тест", tab: "settings" },
+};
+
+function managerNotificationTab(notification) {
+  return MANAGER_NOTIFICATION_META[notification?.type]?.tab || "orders";
+}
+
+function ManagerNotificationCenter({ notifications = [], onOpen, onRead, onReadAll }) {
+  const unread = notifications.filter((item) => !item.readAt);
+  if (!unread.length) return null;
+  return (
+    <section className="manager-notification-center">
+      <div className="manager-notification-header">
+        <div>
+          <p className="eyebrow">Уведомления менеджера</p>
+          <h2>Новых событий: {unread.length}</h2>
+        </div>
+        <button className="secondary-button" type="button" onClick={onReadAll}>Отметить всё прочитанным</button>
+      </div>
+      <div className="manager-notification-list">
+        {unread.slice(0, 5).map((item) => (
+          <article className="manager-notification-item" key={item.id}>
+            <div>
+              <span className="badge yellow">{MANAGER_NOTIFICATION_META[item.type]?.label || "Событие"}</span>
+              <h3>{item.title}</h3>
+              {item.body && <p>{item.body}</p>}
+              <small>{formatDateTime(item.createdAt)}</small>
+            </div>
+            <div className="inline-actions">
+              <button className="primary-button" type="button" onClick={() => onOpen(item)}>Открыть</button>
+              <button className="secondary-button" type="button" onClick={() => onRead(item)}>Прочитано</button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ManagerDashboard({ orders, products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onLogout }) {
+  const [tab, setTab] = useState(readManagerActiveTab);
+
+  const selectTab = (nextTab) => {
+    setTab(nextTab);
+    writeManagerActiveTab(nextTab);
+  };
   const clients = useMemo(() => {
     const map = new Map(
       (serverClients || []).map((client) => [
         client.id,
         {
           ...client,
+          isRegistered: true,
           orders: [],
-          addresses: Array.isArray(client.addresses)
-            ? client.addresses.map((item) => typeof item === "string" ? item : item.address)
-            : [],
+          addresses: normalizeManagerClientAddresses(client.addresses),
         },
       ])
     );
@@ -3824,11 +6029,25 @@ function ManagerDashboard({ orders, products, setProducts, profile, addresses, s
         contactName: order.customerContact || "",
         phone: order.customerPhone || "",
         email: order.customerEmail || "",
+        isRegistered: false,
         orders: [],
         addresses: [],
       };
       current.orders.push(order);
-      if (order.address && !current.addresses.includes(order.address)) current.addresses.push(order.address);
+      if (
+        order.address &&
+        !current.addresses.some((item) =>
+          String(typeof item === "string" ? item : item.address) ===
+          String(order.address)
+        )
+      ) {
+        current.addresses.push({
+          id: `order-address-${order.id || current.addresses.length}`,
+          label: "Адрес из заказа",
+          address: order.address,
+          isDefault: current.addresses.length === 0,
+        });
+      }
       map.set(id, current);
     });
 
@@ -3842,49 +6061,48 @@ function ManagerDashboard({ orders, products, setProducts, profile, addresses, s
   const workCount = orders.filter((order) => ["Принят", "Собирается", "Готов к доставке"].includes(order.status)).length;
   const exchangeErrors = orders.filter((order) => normalizeOrderExchange(order.exchange).status === "error").length;
 
-  const tabs = [
-    ["orders", "Заказы"],
-    ["exchange", "Обмен с 1С"],
-    ["clients", "Клиенты"],
-    ["products", "Товары"],
-    ["settings", "Настройки"],
-    ["backup", "Резервные копии"],
-    ["audit", "Журнал действий"],
-  ];
 
   return <main className="clover-app">
-    <Header title="Кабинет менеджера" subtitle="Большой пакет 2.0–2.2 · подготовка к 1С:УНФ" onLogout={onLogout} />
+    <Header title="Кабинет менеджера" subtitle="V18 · заказы, документы, безопасность и 1С" onLogout={onLogout} />
     <section className="page-content">
       <div className="page-title-row"><div><p className="eyebrow">Управление</p><h1>Рабочее пространство</h1><p>Заказы, клиенты, товары, документы и тестовый контур обмена с 1С.</p></div></div>
       {managerNotice && (
         <div className="exchange-notice" style={{ marginBottom: 18 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
             <div>
-              <strong>Новый заказ № {managerNotice.number}</strong>
-              <div>{managerNotice.customerName || "Клиент"} · {formatDateTime(managerNotice.createdAt)}</div>
+              <strong>{managerNotice.title}</strong>
+              {managerNotice.body && <div>{managerNotice.body}</div>}
+              <div>{formatDateTime(managerNotice.createdAt)}</div>
               {managerNotice.pendingCount > 1 && (
-                <div>Непросмотренных новых заказов: {managerNotice.pendingCount}</div>
+                <div>Непросмотренных событий: {managerNotice.pendingCount}</div>
               )}
             </div>
             <div className="exchange-actions">
-              <button className="primary-button" type="button" onClick={() => { setTab("orders"); onDismissNotice(); }}>
-                Открыть заказ
+              <button className="primary-button" type="button" onClick={() => { selectTab(managerNotificationTab(managerNotice)); onDismissNotice(); }}>
+                Открыть
               </button>
-              <button className="secondary-button" type="button" onClick={onDismissNotice}>Закрыть</button>
+              <button className="secondary-button" type="button" onClick={onDismissNotice}>Прочитано</button>
             </div>
           </div>
         </div>
       )}
+      <ManagerNotificationCenter
+        notifications={managerNotifications}
+        onOpen={(item) => { selectTab(managerNotificationTab(item)); onReadNotification(item); }}
+        onRead={onReadNotification}
+        onReadAll={onReadAllNotifications}
+      />
       <div className="stats-grid">
         <article className="stat-card"><span>Новые заказы</span><strong>{newCount}</strong></article>
         <article className="stat-card"><span>В работе</span><strong>{workCount}</strong></article>
         <article className="stat-card"><span>Ошибки обмена</span><strong>{exchangeErrors}</strong></article>
         <article className="stat-card"><span>Активных товаров</span><strong>{products.filter((item) => item.active).length}</strong></article>
       </div>
-      <nav className="manager-nav">{tabs.map(([id,label]) => <button className={tab === id ? "active" : ""} type="button" key={id} onClick={() => setTab(id)}>{label}</button>)}</nav>
+      <nav className="manager-nav">{MANAGER_TABS.map(([id,label]) => <button className={tab === id ? "active" : ""} type="button" key={id} onClick={() => selectTab(id)}>{label}</button>)}</nav>
       {tab === "orders" && <ManagerOrders orders={orders} settings={settings} onUpdateOrder={onUpdateOrder} onBulkUpdateOrders={onBulkUpdateOrders} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} onReload={onReload} />}
-      {tab === "exchange" && <ManagerExchange onReload={onReload} onNavigate={setTab} />}
-      {tab === "clients" && <ManagerClients clients={clients} products={products} clientLinks={clientLinks} setClientLinks={setClientLinks} />}
+      {tab === "exchange" && <ManagerExchange onReload={onReload} onNavigate={selectTab} />}
+      {tab === "clients" && <ManagerClients clients={clients} products={products} clientLinks={clientLinks} setClientLinks={setClientLinks} onReload={onReload} />}
+      {tab === "acts" && <ManagerReconciliation requests={reconciliationRequests} onReload={onReload} />}
       {tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}
       {tab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} />}
       {tab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} onReload={onReload} />}
@@ -3923,10 +6141,21 @@ function App() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [clientLinks, setClientLinks] = useState({});
   const [serverClients, setServerClients] = useState([]);
+  const [reconciliationRequests, setReconciliationRequests] = useState([]);
+  const [managerNotifications, setManagerNotifications] = useState([]);
   const [catalogSession, setCatalogSession] = useState(null);
   const [managerNotice, setManagerNotice] = useState(null);
-  const knownManagerOrderIds = useRef(new Set());
-  const managerOrdersInitialized = useRef(false);
+
+  const applyManagerNotificationList = (items) => {
+    const incomingNotifications = Array.isArray(items) ? items : [];
+    const unreadNotifications = incomingNotifications.filter((item) => !item.readAt);
+    setManagerNotifications(incomingNotifications);
+    setManagerNotice(
+      unreadNotifications[0]
+        ? { ...unreadNotifications[0], pendingCount: unreadNotifications.length }
+        : null
+    );
+  };
 
   const applyBootstrap = (data) => {
     setAuthUser(data.user);
@@ -3955,39 +6184,9 @@ function App() {
     const incomingOrders = Array.isArray(data.orders) ? data.orders : [];
 
     if (data.user.role === "manager") {
-      const seenOrderIds = readSeenManagerOrderIds();
-      const unseenNewOrders = incomingOrders
-        .filter(
-          (order) =>
-            order.status === "Новый" &&
-            !seenOrderIds.has(String(order.id))
-        )
-        .sort((a, b) =>
-          String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
-        );
-
-      setManagerNotice((current) => {
-        if (!unseenNewOrders.length) return null;
-
-        const currentOrder = current
-          ? unseenNewOrders.find((order) => order.id === current.id)
-          : null;
-        const noticeOrder = currentOrder || unseenNewOrders[0];
-
-        return {
-          ...noticeOrder,
-          pendingCount: unseenNewOrders.length,
-          pendingOrderIds: unseenNewOrders.map((order) => order.id),
-        };
-      });
-
-      knownManagerOrderIds.current = new Set(
-        incomingOrders.map((order) => order.id)
-      );
-      managerOrdersInitialized.current = true;
+      applyManagerNotificationList(data.managerNotifications);
     } else {
-      knownManagerOrderIds.current = new Set();
-      managerOrdersInitialized.current = false;
+      setManagerNotifications([]);
       setManagerNotice(null);
     }
 
@@ -4010,11 +6209,17 @@ function App() {
     setServerClients(
       Array.isArray(data.clients) ? data.clients : []
     );
+    setReconciliationRequests(
+      Array.isArray(data.reconciliationRequests) ? data.reconciliationRequests : []
+    );
     setHydrated(true);
   };
 
   const loadBootstrap = async ({ silent = false } = {}) => {
-    if (!silent) {
+    // Показываем полноэкранную загрузку только при первом запуске/входе.
+    // После загрузки кабинета фоновые обновления не должны заменять экран.
+    const shouldBlockScreen = !silent && !hydrated;
+    if (shouldBlockScreen) {
       setLoading(true);
     }
 
@@ -4033,7 +6238,7 @@ function App() {
         setSyncError(error.message);
       }
     } finally {
-      if (!silent) {
+      if (shouldBlockScreen) {
         setLoading(false);
       }
     }
@@ -4049,26 +6254,55 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!isLoggedIn || !hydrated) {
+    if (!isLoggedIn || !hydrated || authUser?.role !== "manager") {
       return undefined;
     }
 
-    const refresh = () => loadBootstrap({ silent: true });
-    const intervalId = window.setInterval(refresh, 15000);
-    const handleFocus = () => refresh();
+    let active = true;
+    let requestInProgress = false;
+
+    const refreshNotifications = async () => {
+      if (requestInProgress) return;
+      requestInProgress = true;
+
+      try {
+        const data = await api.getManagerNotifications({ limit: 100 });
+        if (!active) return;
+        applyManagerNotificationList(data.notifications);
+        setSyncError("");
+      } catch (error) {
+        if (!active) return;
+        if (error.status === 401) {
+          clearApiToken();
+          setAuthUser(null);
+          setIsLoggedIn(false);
+          setHydrated(false);
+        } else {
+          setSyncError(error.message);
+        }
+      } finally {
+        requestInProgress = false;
+      }
+    };
+
+    // В фоне обновляем только список уведомлений менеджера.
+    // Полная загрузка кабинета больше не запускается по таймеру и не меняет экран в режиме ожидания.
+    const intervalId = window.setInterval(refreshNotifications, 30000);
+    const handleFocus = () => refreshNotifications();
     const handleVisibility = () => {
-      if (!document.hidden) refresh();
+      if (!document.hidden) refreshNotifications();
     };
 
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
+      active = false;
       window.clearInterval(intervalId);
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [isLoggedIn, hydrated]);
+  }, [isLoggedIn, hydrated, authUser?.role]);
 
   const scheduleSync = (callback, delay = 650) => {
     const timeoutId = window.setTimeout(async () => {
@@ -4144,33 +6378,27 @@ function App() {
 
     try {
       const result =
-        form.mode === "register"
-          ? await api.register({
-              companyName: form.companyName,
-              contactName: form.contactName,
-              phone: form.phone,
-              email: form.email,
-              password: form.password,
-            })
-          : await api.login({
-              email: form.email,
-              password: form.password,
-            });
+        form.mode === "passkey"
+          ? form.result
+          : form.mode === "register"
+            ? await api.register({
+                companyName: form.companyName,
+                contactName: form.contactName,
+                phone: form.phone,
+                email: form.email,
+                password: form.password,
+              })
+            : await api.login({
+                email: form.email,
+                password: form.password,
+              });
 
-      if (
-        form.mode === "login" &&
-        result.user.role !== form.role
-      ) {
-        throw new Error(
-          result.user.role === "manager"
-            ? "Этот аккаунт относится к менеджеру. Выберите вкладку «Менеджер»."
-            : "Этот аккаунт относится к клиенту. Выберите вкладку «Клиент»."
-        );
+      if (form.mode === "register" || !result.token) {
+        return result;
       }
 
-      managerOrdersInitialized.current = false;
-      knownManagerOrderIds.current = new Set();
       setManagerNotice(null);
+      setManagerNotifications([]);
 
       setApiToken(result.token);
       setAuthUser(result.user);
@@ -4232,12 +6460,14 @@ function App() {
       }
 
       await loadBootstrap();
+      return result;
     } catch (error) {
       clearApiToken();
       setIsLoggedIn(false);
       setHydrated(false);
       setAuthError(error.message);
       setLoading(false);
+      throw error;
     } finally {
       setAuthBusy(false);
     }
@@ -4271,20 +6501,42 @@ function App() {
     (order) => order.clientId === clientId
   );
 
-  const dismissManagerNotice = () => {
-    if (managerNotice?.id) {
-      markManagerOrderNoticeSeen(
-        managerNotice.pendingOrderIds || managerNotice.id
-      );
+  const readManagerNotification = async (notificationOrId) => {
+    const notificationId = typeof notificationOrId === "string"
+      ? notificationOrId
+      : notificationOrId?.id;
+    if (!notificationId) return;
+    try {
+      await api.readManagerNotification(notificationId);
+      await loadBootstrap({ silent: true });
+    } catch (error) {
+      setSyncError(error.message);
     }
-    setManagerNotice(null);
+  };
+
+  const dismissManagerNotice = async () => {
+    if (!managerNotice?.id) {
+      setManagerNotice(null);
+      return;
+    }
+    await readManagerNotification(managerNotice.id);
+  };
+
+  const readAllManagerNotifications = async () => {
+    try {
+      await api.readAllManagerNotifications();
+      await loadBootstrap({ silent: true });
+    } catch (error) {
+      setSyncError(error.message);
+    }
   };
 
   const logout = () => {
     clearApiToken();
-    managerOrdersInitialized.current = false;
-    knownManagerOrderIds.current = new Set();
+    writeManagerActiveTab("orders");
+    writeOpenManagerClientId("");
     setManagerNotice(null);
+    setManagerNotifications([]);
     setCatalogSession(null);
     setAuthUser(null);
     setIsLoggedIn(false);
@@ -4307,6 +6559,8 @@ function App() {
     setSettings(DEFAULT_SETTINGS);
     setClientLinks({});
     setServerClients([]);
+    setReconciliationRequests([]);
+    setManagerNotifications([]);
   };
 
   const validateNewOrder = () => {
@@ -4636,8 +6890,6 @@ function App() {
   if (!isLoggedIn) {
     content = (
       <LoginView
-        role={role}
-        setRole={setRole}
         onAuth={handleAuth}
         authBusy={authBusy}
         authError={authError}
@@ -4652,12 +6904,16 @@ function App() {
         profile={profile}
         addresses={addresses}
         serverClients={serverClients}
+        reconciliationRequests={reconciliationRequests}
+        managerNotifications={managerNotifications}
         settings={settings}
         setSettings={setSettings}
         clientLinks={clientLinks}
         setClientLinks={setClientLinks}
         managerNotice={managerNotice}
         onDismissNotice={dismissManagerNotice}
+        onReadNotification={readManagerNotification}
+        onReadAllNotifications={readAllManagerNotifications}
         onUpdateOrder={updateOrder}
         onBulkUpdateOrders={bulkUpdateOrders}
         onDeleteOrder={deleteManagerOrder}
@@ -4665,7 +6921,7 @@ function App() {
         onImport={importBackup}
         onClearOrders={clearOrders}
         onResetAll={resetAll}
-        onReload={() => loadBootstrap()}
+        onReload={() => loadBootstrap({ silent: true })}
         onLogout={logout}
       />
     );
@@ -4678,6 +6934,8 @@ function App() {
         favorites={favorites}
         setFavorites={setFavorites}
         settings={settings}
+        profile={profile}
+        orders={clientOrders}
         catalogPolicy={catalogPolicy}
         showFullCatalog={showFullCatalog}
         setShowFullCatalog={setShowFullCatalog}
@@ -4697,6 +6955,8 @@ function App() {
         catalogPolicy={catalogPolicy}
         matrixProductCount={products.length}
         fullCatalogCount={fullCatalogProducts.length}
+        reconciliationRequests={reconciliationRequests}
+        onReload={() => loadBootstrap({ silent: true })}
         onNew={openNew}
         onEdit={openEdit}
         onRepeat={openRepeat}
@@ -4710,6 +6970,7 @@ function App() {
     <>
       <style>{APP_STYLES}</style>
       {content}
+      <InstallPrompt />
       {syncError && (
         <div className="server-banner">{syncError}</div>
       )}

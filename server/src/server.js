@@ -1,8 +1,9 @@
 import "dotenv/config";
-import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, unlinkSync } from "node:fs";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { networkInterfaces } from "node:os";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -26,7 +27,32 @@ import {
   listExchangeAudit,
   getOrderById,
   updateOrderPayload,
+  updateClientByManager,
   writeAudit,
+  markUserLogin,
+  setUserEmailVerified,
+  setUserApprovalStatus,
+  updateUserPassword,
+  revokeOtherSessions,
+  createAuthToken,
+  consumeAuthToken,
+  createReconciliationRequest,
+  getReconciliationRequestInternal,
+  listReconciliationRequests,
+  updateReconciliationRequest,
+  upsertPushSubscription,
+  listPushSubscriptions,
+  deletePushSubscription,
+  listManagerNotifications,
+  markManagerNotificationRead,
+  markAllManagerNotificationsRead,
+  listPasskeys,
+  getPasskey,
+  savePasskey,
+  updatePasskeyCounter,
+  deletePasskey,
+  createWebAuthnChallenge,
+  consumeWebAuthnChallenge,
 } from "./db.js";
 import {
   DEFAULT_PRODUCTS,
@@ -56,6 +82,66 @@ import {
   sanitizeOneCConfig,
   testOneCConnection,
 } from "./oneC.js";
+import {
+  autoLinkCloverProducts,
+  buildOneCProductCandidates,
+  buildOneCProductsSummary,
+  linkCloverProduct,
+  mergeProductsPreservingOneCLinks,
+  normalizeOneCProduct,
+  normalizeOneCProducts,
+  selectRelevantOneCProducts,
+} from "./oneCProducts.js";
+import {
+  autoLinkCloverClients,
+  buildOneCClientCandidates,
+  buildOneCClientsSummary,
+  linkCloverClient,
+  mergeClientLinksPreservingOneCLinks,
+  normalizeOneCClient,
+  normalizeOneCClients,
+  selectRelevantOneCClients,
+} from "./oneCClients.js";
+import {
+  enrichProductWithPurchasePrices,
+  hasPurchasePrice,
+  normalizeDefaultPricingConfig,
+  normalizePersonalPriceConfig,
+  resolveClientProductPricing,
+} from "./pricing.js";
+import {
+  buildAllPriceRequirements,
+  buildOrderPriceRequirements,
+  buildPriceRequest,
+  extractOneCDatabase,
+  isTestDatabase,
+  mergePurchasePrices,
+  priceMaxAgeMs,
+  validatePriceRequirements,
+} from "./oneCPriceSync.js";
+import {
+  publicMailStatus,
+  resetPasswordEmail,
+  sendCloverMail,
+  verificationEmail,
+  reconciliationReadyEmail,
+  approvalEmail,
+} from "./mailer.js";
+import {
+  publicPushStatus,
+  sendOrderPush,
+  sendPromotionPush,
+} from "./push.js";
+import {
+  registrationOptions,
+  verifyPasskeyRegistration,
+  authenticationOptions,
+  verifyPasskeyAuthentication,
+} from "./passkeys.js";
+import {
+  notifyManagers,
+  publicManagerNotificationStatus,
+} from "./managerNotifications.js";
 
 const app = express();
 const ONE_C_STATE_KEY = "oneCIntegration";
@@ -92,20 +178,57 @@ const imageUpload = multer({
     callback(null, true);
   },
 });
-const port = Number(process.env.PORT || 4000);
-const host = process.env.HOST || "0.0.0.0";
-const jwtSecret =
-  process.env.JWT_SECRET ||
-  "clover-local-development-secret-change-before-production";
+const reconciliationDirectory = path.resolve(uploadsDirectory, "reconciliation");
+mkdirSync(reconciliationDirectory, { recursive: true });
 
-app.use(helmet());
-app.use(
-  cors({
-    origin: true,
-    credentials: false,
-  })
-);
-app.use(express.json({ limit: "8mb" }));
+const reconciliationUpload = multer({
+  storage: multer.diskStorage({
+    destination: reconciliationDirectory,
+    filename(req, file, callback) {
+      callback(null, `act-${String(req.params.requestId || "request")}-${Date.now()}-${randomUUID()}.pdf`);
+    },
+  }),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter(req, file, callback) {
+    if (file.mimetype !== "application/pdf") {
+      return callback(new Error("Разрешён только PDF-файл акта сверки."));
+    }
+    callback(null, true);
+  },
+});
+
+const port = Number(process.env.PORT || 4100);
+const host = process.env.HOST || "0.0.0.0";
+const jwtSecret = String(process.env.JWT_SECRET || "").trim();
+if (jwtSecret.length < 32 || /^(?:change-this.*|development-secret.*|clover-local-development-secret-change-before-production)$/i.test(jwtSecret)) {
+  throw new Error("JWT_SECRET must be a unique secret of at least 32 characters in server/.env.");
+}
+
+function allowedCorsOrigin(origin) {
+  if (!origin) return true;
+  const configured = String(process.env.APP_PUBLIC_URL || "").trim().replace(/\/$/, "");
+  if (configured && origin === configured) return true;
+  try {
+    const url = new URL(origin);
+    if (url.port !== "5273") return false;
+    if (["localhost", "127.0.0.1", "::1"].includes(url.hostname)) return true;
+    return String(process.env.ALLOW_LAN_ORIGINS || "true") === "true" &&
+      (/^192\.168\./.test(url.hostname) || /^10\./.test(url.hostname) || /^172\.(1[6-9]|2\d|3[01])\./.test(url.hostname));
+  } catch {
+    return false;
+  }
+}
+
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+app.use(cors({
+  origin(origin, callback) {
+    const allowed = allowedCorsOrigin(origin);
+    callback(allowed ? null : new Error("CORS origin is not allowed."), allowed);
+  },
+  credentials: false,
+}));
+app.use(express.json({ limit: "24mb" }));
+app.use("/uploads/reconciliation", (req, res) => res.status(404).end());
 app.use("/uploads", express.static(uploadsDirectory, { maxAge: "1h" }));
 
 const loginAttempts = new Map();
@@ -119,6 +242,8 @@ function publicUser(user) {
     id: user.id,
     email: user.email,
     role: user.role,
+    emailVerified: Boolean(user.email_verified),
+    approvalStatus: user.approval_status || "approved",
   };
 }
 
@@ -149,12 +274,49 @@ function removeUploadedImage(imageUrl) {
   }
 }
 
+function tokenHash(value) {
+  return createHash("sha256").update(String(value || "")).digest("hex");
+}
+
+function createPlainToken() {
+  return randomBytes(32).toString("base64url");
+}
+
+function publicBaseUrl(req) {
+  const configured = String(process.env.APP_PUBLIC_URL || "").trim().replace(/\/$/, "");
+  if (configured) return configured;
+  return `${req.protocol}://${req.get("host")}`.replace(/\/$/, "");
+}
+
+function allowDevelopmentAuthLinks(req) {
+  if (String(process.env.ALLOW_DEV_AUTH_LINKS || "true") !== "true") return false;
+  const hostName = String(req.hostname || "").toLowerCase();
+  const remoteAddress = String(req.socket?.remoteAddress || "");
+  const loopbackHost = ["localhost", "127.0.0.1", "::1"].includes(hostName);
+  const loopbackClient = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(remoteAddress);
+  return loopbackHost && loopbackClient;
+}
+
+function quarterRange(year, quarter) {
+  const starts = { q1: [1, 1], q2: [4, 1], q3: [7, 1], q4: [10, 1] };
+  const ends = { q1: [3, 31], q2: [6, 30], q3: [9, 30], q4: [12, 31] };
+  const start = starts[quarter];
+  const end = ends[quarter];
+  if (!start || !end) return null;
+  const pad = (value) => String(value).padStart(2, "0");
+  return {
+    dateFrom: `${year}-${pad(start[0])}-${pad(start[1])}`,
+    dateTo: `${year}-${pad(end[0])}-${pad(end[1])}`,
+  };
+}
+
 function signToken(user) {
   return jwt.sign(
     {
       sub: user.id,
       role: user.role,
       email: user.email,
+      sessionEpoch: String(user.password_changed_at || ""),
     },
     jwtSecret,
     {
@@ -188,6 +350,11 @@ function authRequired(req, res, next) {
     if (!user) {
       return res.status(401).json({
         error: "Аккаунт больше не существует.",
+      });
+    }
+    if (String(payload.sessionEpoch || "") !== String(user.password_changed_at || "")) {
+      return res.status(401).json({
+        error: "Сессия завершена. Войдите снова.",
       });
     }
 
@@ -234,6 +401,118 @@ function clearLoginLimit(email) {
   loginAttempts.delete(normalizeEmail(email));
 }
 
+
+function secureEqual(left, right) {
+  const a = Buffer.from(String(left || ""));
+  const b = Buffer.from(String(right || ""));
+  return a.length === b.length && a.length > 0 && timingSafeEqual(a, b);
+}
+
+function isPlaceholderSecret(value) {
+  return /^(?:change[_-]?me(?:[_-].*)?|secret|development-secret|clover-local-development-secret-change-before-production)$/i
+    .test(String(value || "").trim());
+}
+
+function normalizeRemoteAddress(value) {
+  return String(value || "").replace(/^::ffff:/, "").split("%")[0];
+}
+
+function localMachineAddresses() {
+  const addresses = new Set(["127.0.0.1", "::1"]);
+  for (const entries of Object.values(networkInterfaces())) {
+    for (const item of entries || []) {
+      if (item?.address) addresses.add(normalizeRemoteAddress(item.address));
+    }
+  }
+  return addresses;
+}
+
+const oneCLocalAddresses = localMachineAddresses();
+
+function oneCAuthRequired(req, res, next) {
+  const configuredKey = String(process.env.ONEC_API_KEY || "").trim();
+  const bearer = String(req.headers.authorization || "").startsWith("Bearer ")
+    ? String(req.headers.authorization).slice(7)
+    : "";
+  const supplied = String(req.headers["x-clover-key"] || bearer || "").trim();
+
+  if (configuredKey.length >= 24 && !isPlaceholderSecret(configuredKey)) {
+    if (secureEqual(supplied, configuredKey)) return next();
+    writeAudit({ action: "one-c.auth.denied", details: { ip: req.ip || "", mode: "api-key" } });
+    return res.status(401).json({ error: "Неверный ключ обмена Clover." });
+  }
+
+  const allowLocal = String(process.env.ONEC_ALLOW_LOCAL_WITHOUT_KEY || "true").toLowerCase() === "true";
+  const remoteAddress = normalizeRemoteAddress(req.socket?.remoteAddress || req.ip);
+  if (allowLocal && oneCLocalAddresses.has(remoteAddress)) {
+    return next();
+  }
+
+  writeAudit({ action: "one-c.auth.denied", details: { ip: req.ip || "", mode: "local-only" } });
+  return res.status(503).json({
+    error: "Ключ обмена с 1С не настроен. Без ключа разрешён только локальный обмен на этом компьютере.",
+  });
+}
+
+function orderItemsSignature(order) {
+  return JSON.stringify((Array.isArray(order?.items) ? order.items : [])
+    .map((item) => ({
+      productId: String(item.productId ?? item.id ?? ""),
+      custom: Boolean(item.custom),
+      name: String(item.name || ""),
+      unit: String(item.unit || "piece"),
+      quantity: Number(item.quantity) || 0,
+      unitPrice: Number(item.unitPrice) || 0,
+    }))
+    .sort((a, b) => `${a.productId}:${a.name}:${a.unit}`.localeCompare(`${b.productId}:${b.name}:${b.unit}`)));
+}
+
+function customItemsSignature(order) {
+  return JSON.stringify((Array.isArray(order?.customItems) ? order.customItems : [])
+    .map((item) => ({
+      id: String(item.id || ""),
+      name: String(item.name || ""),
+      unit: String(item.unit || ""),
+      quantity: Number(item.quantity) || 0,
+      details: String(item.details || ""),
+      photoUrl: String(item.photoUrl || item.imageUrl || ""),
+    }))
+    .sort((a, b) => `${a.id}:${a.name}`.localeCompare(`${b.id}:${b.name}`)));
+}
+
+function clientOrderSignature(order) {
+  return JSON.stringify({
+    items: orderItemsSignature(order),
+    customItems: customItemsSignature(order),
+    delivery: String(order?.firstDeliveryDate || ""),
+    address: String(order?.address || ""),
+    comment: String(order?.clientComment || ""),
+  });
+}
+
+function orderPositionCount(order) {
+  return (Array.isArray(order?.items) ? order.items.length : 0) +
+    (Array.isArray(order?.customItems) ? order.customItems.length : 0);
+}
+
+function reconciliationPeriodText(request) {
+  const labels = { q1: "1 квартал", q2: "2 квартал", q3: "3 квартал", q4: "4 квартал", all: "за весь период", custom: "указанный период" };
+  const label = labels[request?.periodType] || "указанный период";
+  if (["q1", "q2", "q3", "q4"].includes(request?.periodType) && request?.year) {
+    return `${label} ${request.year}`;
+  }
+  if (request?.periodType === "custom" && request?.dateFrom && request?.dateTo) {
+    return `${request.dateFrom} — ${request.dateTo}`;
+  }
+  return label;
+}
+
+function queueManagerNotification(event) {
+  notifyManagers(event).catch((error) => {
+    console.error("Manager notification error", error?.message || error);
+  });
+}
+
 const registerSchema = z.object({
   companyName: z.string().trim().min(2).max(160),
   contactName: z.string().trim().min(2).max(120),
@@ -242,98 +521,178 @@ const registerSchema = z.object({
   password: z.string().min(8).max(200),
 });
 
+const managerCreateSchema = z.object({
+  email: z.string().trim().email().max(200),
+  password: z.string().min(12).max(200),
+});
+
 const loginSchema = z.object({
   email: z.string().trim().email().max(200),
   password: z.string().min(1).max(200),
 });
 
+const tokenSchema = z.object({
+  token: z.string().trim().min(20).max(500),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().trim().email().max(200),
+});
+
+const resetPasswordSchema = tokenSchema.extend({
+  password: z.string().min(8).max(200),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(200),
+  newPassword: z.string().min(8).max(200),
+});
+
+const passkeyAuthenticationOptionsSchema = z.object({
+  email: z.string().trim().email().max(200),
+});
+
+const passkeyCeremonySchema = z.object({
+  ceremonyId: z.string().uuid(),
+  response: z.record(z.string(), z.any()).or(z.any()),
+});
+
+const passkeyAuthenticationVerifySchema = passkeyCeremonySchema.extend({
+  email: z.string().trim().email().max(200),
+});
+
+const reconciliationSchema = z.object({
+  periodType: z.enum(["q1", "q2", "q3", "q4", "all", "custom"]),
+  year: z.number().int().min(2000).max(2100).nullable().optional(),
+  dateFrom: z.string().trim().max(20).optional().default(""),
+  dateTo: z.string().trim().max(20).optional().default(""),
+  comment: z.string().trim().max(1000).optional().default(""),
+});
+
+const reconciliationManagerSchema = z.object({
+  status: z.enum(["new", "processing", "ready", "rejected"]),
+  managerComment: z.string().trim().max(2000).optional().default(""),
+});
+
+const pushSubscriptionSchema = z.object({
+  subscription: z.object({
+    endpoint: z.string().url().max(4000),
+    expirationTime: z.number().nullable().optional(),
+    keys: z.object({
+      p256dh: z.string().min(1).max(1000),
+      auth: z.string().min(1).max(1000),
+    }),
+  }),
+  preferences: z.object({
+    orderEvents: z.boolean().optional().default(true),
+    promotions: z.boolean().optional().default(false),
+  }).optional().default({ orderEvents: true, promotions: false }),
+});
+
+const managerClientAddressSchema = z.object({
+  id: z.string().trim().min(1).max(160),
+  label: z.string().trim().min(1).max(120),
+  address: z.string().trim().min(3).max(500),
+  isDefault: z.boolean().optional().default(false),
+});
+
+const managerClientUpdateSchema = z.object({
+  profile: z.object({
+    companyName: z.string().trim().max(160),
+    contactName: z.string().trim().max(120),
+    phone: z.string().trim().max(50),
+    email: z.string().trim().email().max(200),
+  }),
+  addresses: z.array(managerClientAddressSchema).max(50),
+  managerNote: z.string().trim().max(2000).optional().default(""),
+});
+
+function normalizeManagerClientAddresses(addresses) {
+  const normalized = addresses.map((item) => ({
+    id: String(item.id || randomUUID()),
+    label: String(item.label || "Адрес").trim(),
+    address: String(item.address || "").trim(),
+    isDefault: Boolean(item.isDefault),
+  }));
+
+  if (!normalized.length) return [];
+
+  const defaultIndex = normalized.findIndex((item) => item.isDefault);
+  const selectedIndex = defaultIndex >= 0 ? defaultIndex : 0;
+
+  return normalized.map((item, index) => ({
+    ...item,
+    isDefault: index === selectedIndex,
+  }));
+}
+
 
 function normalizeClientLink(value) {
   const link = value && typeof value === "object" ? value : {};
+  const defaultPricing = normalizeDefaultPricingConfig(link);
 
   return {
     ...EMPTY_LINK,
     ...link,
+    matched1C: Boolean(link.matched1C || String(link.oneCId || "").trim()),
     matrixProductIds: Array.isArray(link.matrixProductIds)
       ? link.matrixProductIds
       : [],
     allowFullCatalog: Boolean(link.allowFullCatalog),
+    defaultPricingMode: defaultPricing.source,
+    defaultMarkupPercent: defaultPricing.markupPercent,
     personalPrices:
       link.personalPrices &&
       typeof link.personalPrices === "object"
-        ? link.personalPrices
+        ? Object.fromEntries(
+            Object.entries(link.personalPrices)
+              .map(([productId, config]) => [
+                productId,
+                normalizePersonalPriceConfig(config),
+              ])
+              .filter(([, config]) => config.source !== "inherit")
+          )
         : {},
   };
 }
 
-function readPersonalPrice(priceConfig, unit) {
-  const value = priceConfig?.[unit];
-
-  if (value === "" || value === null || value === undefined) {
-    return null;
-  }
-
-  const numericValue = Number(value);
-
-  return Number.isFinite(numericValue)
-    ? Math.max(0, numericValue)
-    : null;
+function oneCProductsById(items) {
+  return new Map(
+    normalizeOneCProducts(items).map((item) => [String(item.id), item])
+  );
 }
 
-function applyClientPrices(product, link, isMatrixProduct) {
+function applyClientPrices(product, link, isMatrixProduct, oneCById = new Map()) {
   const priceConfig =
     link.personalPrices?.[String(product.id)] ||
     link.personalPrices?.[product.id] ||
     {};
-
-  const piecePrice = readPersonalPrice(priceConfig, "piece");
-  const packPrice = readPersonalPrice(priceConfig, "pack");
-  const bundlePrice = readPersonalPrice(priceConfig, "bundle");
-  const source = priceConfig.source || "manual";
+  const oneCItem = oneCById.get(String(product.oneCId || "")) || null;
+  const pricing = resolveClientProductPricing(product, priceConfig, oneCItem, link);
 
   return {
-    ...product,
+    ...enrichProductWithPurchasePrices(product, oneCItem),
     isMatrixProduct,
     basePricePiece: Number(product.pricePiece) || 0,
     basePricePack: Number(product.pricePack) || 0,
     basePriceBundle: Number(product.priceBundle) || 0,
-    pricePiece:
-      piecePrice === null
-        ? Number(product.pricePiece) || 0
-        : piecePrice,
-    pricePack:
-      packPrice === null
-        ? Number(product.pricePack) || 0
-        : packPrice,
-    priceBundle:
-      bundlePrice === null
-        ? Number(product.priceBundle) || 0
-        : bundlePrice,
-    priceSources: {
-      piece:
-        piecePrice === null
-          ? Number(product.pricePiece) > 0
-            ? "base"
-            : "unspecified"
-          : source,
-      pack:
-        packPrice === null
-          ? Number(product.pricePack) > 0
-            ? "base"
-            : "unspecified"
-          : source,
-      bundle:
-        bundlePrice === null
-          ? Number(product.priceBundle) > 0
-            ? "base"
-            : "unspecified"
-          : source,
-    },
+    pricePiece: pricing.prices.piece,
+    pricePack: pricing.prices.pack,
+    priceBundle: pricing.prices.bundle,
+    priceSources: pricing.priceSources,
+    clientPriceMode: pricing.source,
+    clientPriceOverrideMode: pricing.overrideSource,
+    markupPercent: pricing.markupPercent,
+    defaultPricingMode: pricing.defaultPricingMode,
+    defaultMarkupPercent: pricing.defaultMarkupPercent,
+    purchasePrices: pricing.purchasePrices,
+    purchasePriceUpdatedAt: pricing.purchasePriceUpdatedAt,
   };
 }
 
-function resolveClientCatalog(products, rawLink) {
+function resolveClientCatalog(products, rawLink, oneCProducts = []) {
   const link = normalizeClientLink(rawLink);
+  const oneCById = oneCProductsById(oneCProducts);
   const activeProducts = (Array.isArray(products) ? products : []).filter(
     (product) => product.active !== false
   );
@@ -358,16 +717,19 @@ function resolveClientCatalog(products, rawLink) {
     ? activeProducts
     : matrixProducts;
 
+  const { managerNote: _managerNote, ...publicLink } = link;
+
   return {
-    link,
+    link: publicLink,
     matrixProducts: matrixProducts.map((product) =>
-      applyClientPrices(product, link, true)
+      applyClientPrices(product, link, true, oneCById)
     ),
     fullCatalogProducts: fullCatalog.map((product) =>
       applyClientPrices(
         product,
         link,
-        matrixIds.has(String(product.id))
+        matrixIds.has(String(product.id)),
+        oneCById
       )
     ),
     policy: {
@@ -379,10 +741,274 @@ function resolveClientCatalog(products, rawLink) {
   };
 }
 
+function stripRuntimeProductPricing(product = {}) {
+  const {
+    purchasePrices,
+    purchasePriceUpdatedAt,
+    purchasePriceReceivedAt,
+    purchasePriceSourceUpdatedAt,
+    purchasePriceSourceDatabase,
+    purchasePriceUnit,
+    purchasePriceAvailable,
+    clientPriceMode,
+    clientPriceOverrideMode,
+    markupPercent,
+    defaultPricingMode,
+    defaultMarkupPercent,
+    priceSources,
+    basePricePiece,
+    basePricePack,
+    basePriceBundle,
+    isMatrixProduct,
+    ...stored
+  } = product;
+  return stored;
+}
+
+function priceForOrderUnit(product, unit) {
+  if (unit === "pack") return Number(product.pricePack) || 0;
+  if (unit === "bundle") return Number(product.priceBundle) || 0;
+  return Number(product.pricePiece) || 0;
+}
+
+function purchasePriceForOrderUnit(product, unit) {
+  return product.purchasePrices?.[unit] ?? null;
+}
+
+function repriceOrderWithCurrentOneC(order, products, rawLink, oneCProducts = []) {
+  const link = normalizeClientLink(rawLink);
+  const oneCById = oneCProductsById(oneCProducts);
+  const productsById = new Map(
+    (Array.isArray(products) ? products : []).map((product) => [String(product.id), product])
+  );
+  const issues = [];
+
+  const items = (Array.isArray(order?.items) ? order.items : []).map((item) => {
+    const product = productsById.get(String(item.productId ?? item.id));
+    if (!product) return item;
+
+    const priced = applyClientPrices(product, link, true, oneCById);
+    const unit = ["piece", "pack", "bundle"].includes(item.unit) ? item.unit : "piece";
+    const unitPrice = priceForOrderUnit(priced, unit);
+    const source = priced.priceSources?.[unit] || "unspecified";
+
+    if (source === "purchase_missing") {
+      issues.push({
+        productId: product.id,
+        productName: product.name,
+        message: "В 1С ещё нет свежей закупочной цены.",
+      });
+      return item;
+    }
+
+    const quantity = Math.max(0, Number(item.quantity) || 0);
+    return {
+      ...item,
+      unitPrice,
+      lineTotal: unitPrice * quantity,
+      priceSource: source,
+      markupPercent: Number(priced.markupPercent) || 0,
+      purchasePrice: purchasePriceForOrderUnit(priced, unit),
+      purchasePriceUpdatedAt: priced.purchasePriceUpdatedAt || "",
+      repricedAt: new Date().toISOString(),
+    };
+  });
+
+  return {
+    order: {
+      ...order,
+      items,
+      pricingUpdatedAt: new Date().toISOString(),
+    },
+    issues,
+  };
+}
+
+function oneCQueueTimestamp(order) {
+  const exchange = normalizeExchangeState(order?.exchange);
+  const values = [
+    exchange.checkedAt,
+    exchange.lastAttemptAt,
+    order?.updatedAt,
+    order?.createdAt,
+    order?.date,
+  ];
+
+  for (const value of values) {
+    const timestamp = Date.parse(String(value || ""));
+    if (Number.isFinite(timestamp)) return timestamp;
+  }
+
+  return 0;
+}
+
+function nextOrderForOneC() {
+  const eligible = [...listOrders()].filter((order) => {
+    const status = normalizeExchangeState(order.exchange).status;
+
+    // 1С получает только заказ, который менеджер явно поставил в очередь.
+    // Обычные новые заказы не должны попадать в 1С автоматически.
+    return status === "ready";
+  });
+
+  eligible.sort((left, right) => {
+    // Последний явно подготовленный заказ обрабатывается первым.
+    const timeDifference =
+      oneCQueueTimestamp(right) - oneCQueueTimestamp(left);
+    if (timeDifference !== 0) return timeDifference;
+
+    return String(right.id || "").localeCompare(String(left.id || ""), "ru");
+  });
+
+  return eligible[0] || null;
+}
+
+function isSimulationExchange(value = {}) {
+  const exchange = normalizeExchangeState(value);
+  return (
+    exchange.channel === "simulation" ||
+    /^TEST-1C-/i.test(String(exchange.receipt || "")) ||
+    String(exchange.message || "").includes("Тестовая передача") ||
+    String(exchange.message || "").includes("Реальное подключение к 1С пока не включено")
+  );
+}
+
+function receiptUsedByAnotherOrder(order = {}) {
+  const orderId = String(order.id || "");
+  const receipt = String(normalizeExchangeState(order.exchange).receipt || "").trim();
+  if (!receipt) return false;
+
+  return listOrders().some((candidate) => {
+    if (String(candidate.id || "") === orderId) return false;
+    return String(normalizeExchangeState(candidate.exchange).receipt || "").trim() === receipt;
+  });
+}
+
+function canReturnOrderToOneCQueue(order = {}) {
+  const exchange = normalizeExchangeState(order.exchange);
+  return (
+    exchange.status !== "sent" ||
+    isSimulationExchange(exchange) ||
+    receiptUsedByAnotherOrder(order)
+  );
+}
+
+function oneCQueueSnapshot() {
+  const rows = [...listOrders()]
+    .map((order) => {
+      const exchange = normalizeExchangeState(order.exchange);
+      return {
+        id: order.id,
+        number: order.number,
+        customerName: order.customerName || "",
+        status: exchange.status,
+        attempts: exchange.attempts,
+        checkedAt: exchange.checkedAt,
+        lastAttemptAt: exchange.lastAttemptAt,
+        sentAt: exchange.sentAt,
+        receipt: exchange.receipt,
+      };
+    })
+    .filter((row) => row.status === "ready")
+    .sort((left, right) =>
+      String(right.checkedAt || right.lastAttemptAt || "").localeCompare(
+        String(left.checkedAt || left.lastAttemptAt || "")
+      )
+    );
+
+  return {
+    count: rows.length,
+    nextOrderId: rows[0]?.id || "",
+    nextOrderNumber: rows[0]?.number || "",
+    rows,
+  };
+}
+
+function linkedOneCProductIds(products = []) {
+  return new Set(
+    (Array.isArray(products) ? products : [])
+      .map((product) => String(product.oneCId || "").trim())
+      .filter(Boolean)
+  );
+}
+
+function receivePurchasePrices({ items, database, receivedAt = new Date().toISOString() }) {
+  if (!isTestDatabase(database)) {
+    const error = new Error("Закупочные цены принимаются только из базы 1С TEST.");
+    error.status = 403;
+    throw error;
+  }
+
+  const products = getGlobalState("products", DEFAULT_PRODUCTS);
+  const currentOneCProducts = getGlobalState("oneCProducts", []);
+  const merged = mergePurchasePrices(currentOneCProducts, items, {
+    database,
+    receivedAt,
+    allowedIds: linkedOneCProductIds(products),
+  });
+
+  setGlobalState("oneCProducts", merged.products);
+  const previousMeta = getGlobalState("oneCProductsMeta", {});
+  setGlobalState("oneCProductsMeta", {
+    ...previousMeta,
+    lastPriceSyncAt: receivedAt,
+    lastPriceSyncDatabase: "TEST",
+    lastPriceSyncAccepted: merged.accepted.length,
+    lastPriceSyncRejected: merged.rejected.length,
+  });
+  writeAudit({
+    action: "one-c.purchase-prices.receive",
+    details: {
+      database: "TEST",
+      accepted: merged.accepted.length,
+      rejected: merged.rejected.length,
+    },
+  });
+
+  return merged;
+}
+
+function freshPriceIssuesForOrders(orders, products, clientLinks, oneCProducts) {
+  const requirements = [];
+  for (const order of Array.isArray(orders) ? orders : []) {
+    const exchangeStatus = normalizeExchangeState(order.exchange).status;
+    if (order.status !== "Новый" || ["sent", "sending"].includes(exchangeStatus)) continue;
+    requirements.push(
+      ...buildOrderPriceRequirements(
+        order,
+        products,
+        clientLinks?.[order.clientId] || {}
+      )
+    );
+  }
+
+  const unique = new Map();
+  for (const item of requirements) {
+    unique.set(`${item.productId}:${item.id}`, item);
+  }
+  return validatePriceRequirements([...unique.values()], oneCProducts, {
+    maxAgeMs: priceMaxAgeMs(),
+  });
+}
+
+function repriceClientOrders(orders, products, rawLink, oneCProducts = []) {
+  const issues = [];
+  const repriced = (Array.isArray(orders) ? orders : []).map((order) => {
+    const exchangeStatus = normalizeExchangeState(order.exchange).status;
+    if (order.status !== "Новый" || ["sent", "sending"].includes(exchangeStatus)) {
+      return order;
+    }
+    const result = repriceOrderWithCurrentOneC(order, products, rawLink, oneCProducts);
+    issues.push(...result.issues);
+    return result.order;
+  });
+  return { orders: repriced, issues };
+}
+
 app.get("/api/health", (req, res) => {
   res.json({
     ok: true,
-    service: "clover-server", version: "1.9.0",
+    service: "clover-server", version: "4.0.4",
     time: new Date().toISOString(),
   });
 });
@@ -399,11 +1025,12 @@ app.post("/api/auth/register", async (req, res, next) => {
     }
 
     const passwordHash = await bcrypt.hash(input.password, 12);
-
     const user = createUser({
       email,
       passwordHash,
       role: "client",
+      emailVerified: false,
+      approvalStatus: "pending",
       profile: {
         companyName: input.companyName,
         contactName: input.contactName,
@@ -412,18 +1039,160 @@ app.post("/api/auth/register", async (req, res, next) => {
       },
     });
 
+    const plainToken = createPlainToken();
+    createAuthToken({
+      userId: user.id,
+      type: "verify_email",
+      tokenHash: tokenHash(plainToken),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    });
+    const verifyUrl = `${publicBaseUrl(req)}/?verify=${encodeURIComponent(plainToken)}`;
+    const message = verificationEmail({ companyName: input.companyName, verifyUrl });
+    let mail = { sent: false, reason: "unknown" };
+    try {
+      mail = await sendCloverMail({ to: email, ...message });
+    } catch (mailError) {
+      console.error("Не удалось отправить письмо подтверждения", mailError);
+      mail = { sent: false, reason: "send_failed" };
+    }
+
     writeAudit({
       userId: user.id,
       userEmail: user.email,
       userRole: user.role,
       action: "auth.register",
-      details: { companyName: input.companyName },
+      details: { companyName: input.companyName, mailSent: Boolean(mail.sent) },
+    });
+
+    queueManagerNotification({
+      type: "client_registration",
+      title: "Новая регистрация клиента",
+      body: `${input.companyName} · ${input.contactName} · ${input.phone}`,
+      url: `/?managerTab=clients&client=${encodeURIComponent(user.id)}`,
+      sourceId: user.id,
     });
 
     res.status(201).json({
-      token: signToken(user),
-      user: publicUser(user),
+      ok: true,
+      requiresEmailVerification: true,
+      message: mail.sent
+        ? "Регистрация создана. Подтвердите электронную почту по ссылке из письма."
+        : "Регистрация создана. Отправка писем пока не настроена — используйте тестовую ссылку на этом компьютере.",
+      mail: { sent: Boolean(mail.sent), status: publicMailStatus() },
+      developmentLink: allowDevelopmentAuthLinks(req) ? verifyUrl : undefined,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/auth/verify-email", (req, res, next) => {
+  try {
+    const input = tokenSchema.parse(req.body);
+    const token = consumeAuthToken({ type: "verify_email", tokenHash: tokenHash(input.token) });
+    if (!token) {
+      return res.status(400).json({ error: "Ссылка подтверждения недействительна или уже использована." });
+    }
+    const user = setUserEmailVerified(token.userId, true);
+    writeAudit({
+      userId: user?.id || token.userId,
+      userEmail: user?.email || "",
+      userRole: user?.role || "client",
+      action: "auth.email.verify",
+      details: {},
+    });
+    res.json({
+      ok: true,
+      message: user?.approval_status === "approved"
+        ? "Электронная почта подтверждена. Теперь можно войти."
+        : "Электронная почта подтверждена. Аккаунт ожидает подтверждения менеджера.",
+      approvalStatus: user?.approval_status || "pending",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/auth/resend-verification", async (req, res, next) => {
+  try {
+    const input = forgotPasswordSchema.parse(req.body);
+    const email = normalizeEmail(input.email);
+    const user = findUserByEmail(email);
+    let developmentLink;
+    if (user && !user.email_verified) {
+      const plainToken = createPlainToken();
+      createAuthToken({
+        userId: user.id,
+        type: "verify_email",
+        tokenHash: tokenHash(plainToken),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      });
+      const verifyUrl = `${publicBaseUrl(req)}/?verify=${encodeURIComponent(plainToken)}`;
+      const companyName = user.role === "client"
+        ? getClientState(user.id).profile?.companyName
+        : "Менеджер Clover";
+      const message = verificationEmail({ companyName, verifyUrl });
+      try { await sendCloverMail({ to: email, ...message }); } catch (error) { console.error(error); }
+      if (allowDevelopmentAuthLinks(req)) developmentLink = verifyUrl;
+    }
+    res.json({
+      ok: true,
+      message: "Если аккаунт существует и почта ещё не подтверждена, новое письмо отправлено.",
+      developmentLink,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/auth/forgot-password", async (req, res, next) => {
+  try {
+    const input = forgotPasswordSchema.parse(req.body);
+    const email = normalizeEmail(input.email);
+    const user = findUserByEmail(email);
+    let developmentLink;
+    if (user) {
+      const plainToken = createPlainToken();
+      createAuthToken({
+        userId: user.id,
+        type: "reset_password",
+        tokenHash: tokenHash(plainToken),
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      });
+      const resetUrl = `${publicBaseUrl(req)}/?reset=${encodeURIComponent(plainToken)}`;
+      const message = resetPasswordEmail({ resetUrl });
+      try { await sendCloverMail({ to: email, ...message }); } catch (error) { console.error(error); }
+      if (allowDevelopmentAuthLinks(req)) developmentLink = resetUrl;
+      writeAudit({
+        userId: user.id, userEmail: user.email, userRole: user.role,
+        action: "auth.password.reset.request", details: {},
+      });
+    }
+    res.json({
+      ok: true,
+      message: "Если аккаунт существует, на его почту отправлена ссылка для восстановления пароля.",
+      developmentLink,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/auth/reset-password", async (req, res, next) => {
+  try {
+    const input = resetPasswordSchema.parse(req.body);
+    const token = consumeAuthToken({ type: "reset_password", tokenHash: tokenHash(input.token) });
+    if (!token) {
+      return res.status(400).json({ error: "Ссылка восстановления недействительна или уже использована." });
+    }
+    const passwordHash = await bcrypt.hash(input.password, 12);
+    updateUserPassword(token.userId, passwordHash);
+    const user = findUserById(token.userId);
+    writeAudit({
+      userId: user?.id || token.userId, userEmail: user?.email || "", userRole: user?.role || "",
+      action: "auth.password.reset.complete", details: {},
+    });
+    res.json({ ok: true, message: "Новый пароль сохранён. Теперь можно войти." });
   } catch (error) {
     next(error);
   }
@@ -436,38 +1205,260 @@ app.post("/api/auth/login", async (req, res, next) => {
 
     if (!checkLoginLimit(email)) {
       return res.status(429).json({
-        error:
-          "Слишком много попыток входа. Попробуйте через несколько минут.",
+        error: "Слишком много попыток входа. Попробуйте через несколько минут.",
       });
     }
 
     const user = findUserByEmail(email);
-
-    if (
-      !user ||
-      !(await bcrypt.compare(
-        input.password,
-        user.password_hash
-      ))
-    ) {
-      return res.status(401).json({
-        error: "Неверная почта или пароль.",
+    if (!user || !(await bcrypt.compare(input.password, user.password_hash))) {
+      return res.status(401).json({ error: "Неверная почта или пароль." });
+    }
+    if (!user.email_verified) {
+      return res.status(403).json({
+        code: "EMAIL_NOT_VERIFIED",
+        error: "Подтвердите электронную почту по ссылке из письма.",
+      });
+    }
+    if (user.role === "client" && user.approval_status !== "approved") {
+      return res.status(403).json({
+        code: user.approval_status === "rejected" ? "ACCOUNT_REJECTED" : "ACCOUNT_PENDING",
+        error: user.approval_status === "rejected"
+          ? "Регистрация отклонена. Свяжитесь с менеджером."
+          : "Регистрация подтверждена по почте и ожидает одобрения менеджера.",
       });
     }
 
     clearLoginLimit(email);
+    markUserLogin(user.id);
+    writeAudit({
+      userId: user.id, userEmail: user.email, userRole: user.role,
+      action: "auth.login", details: {},
+    });
+    res.json({ token: signToken(user), user: publicUser(user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/auth/change-password", authRequired, async (req, res, next) => {
+  try {
+    const input = changePasswordSchema.parse(req.body);
+    const user = findUserByEmail(req.user.email);
+    if (!user || !(await bcrypt.compare(input.currentPassword, user.password_hash))) {
+      return res.status(400).json({ error: "Текущий пароль указан неверно." });
+    }
+    if (input.currentPassword === input.newPassword) {
+      return res.status(400).json({ error: "Новый пароль должен отличаться от текущего." });
+    }
+    const passwordHash = await bcrypt.hash(input.newPassword, 12);
+    const updatedUser = updateUserPassword(user.id, passwordHash);
+    auditFromRequest(req, "auth.password.change", { otherSessionsEnded: true });
+    res.json({
+      ok: true,
+      message: "Пароль изменён. Другие сессии завершены.",
+      token: signToken(updatedUser),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+app.post("/api/auth/logout-other-sessions", authRequired, (req, res) => {
+  const updatedUser = revokeOtherSessions(req.user.id);
+  auditFromRequest(req, "auth.sessions.revoke_other", {});
+  res.json({
+    ok: true,
+    message: "Другие сессии завершены.",
+    token: signToken(updatedUser),
+  });
+});
+
+app.post("/api/admin/managers", authRequired, roleRequired("manager"), async (req, res, next) => {
+  try {
+    const input = managerCreateSchema.parse(req.body);
+    const email = normalizeEmail(input.email);
+    if (findUserByEmail(email)) {
+      return res.status(409).json({ error: "Аккаунт с такой почтой уже существует." });
+    }
+    const passwordHash = await bcrypt.hash(input.password, 12);
+    const user = createUser({
+      email,
+      passwordHash,
+      role: "manager",
+      emailVerified: false,
+      approvalStatus: "approved",
+    });
+    const plainToken = createPlainToken();
+    createAuthToken({
+      userId: user.id,
+      type: "verify_email",
+      tokenHash: tokenHash(plainToken),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    });
+    const verifyUrl = `${publicBaseUrl(req)}/?verify=${encodeURIComponent(plainToken)}`;
+    let mail = { sent: false };
+    try {
+      mail = await sendCloverMail({
+        to: email,
+        ...verificationEmail({ companyName: "Менеджер Clover", verifyUrl }),
+      });
+    } catch (mailError) {
+      console.error("Manager verification email error", mailError);
+    }
+    auditFromRequest(req, "manager.create", { managerId: user.id, mailSent: Boolean(mail.sent) });
+    res.status(201).json({
+      ok: true,
+      manager: publicUser(user),
+      requiresEmailVerification: true,
+      mail: { sent: Boolean(mail.sent) },
+      developmentLink: allowDevelopmentAuthLinks(req) ? verifyUrl : undefined,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+app.get("/api/passkeys", authRequired, (req, res) => {
+  res.json({
+    passkeys: listPasskeys(req.user.id).map((credential) => ({
+      id: credential.id,
+      transports: credential.transports,
+      deviceType: credential.deviceType,
+      backedUp: credential.backedUp,
+      createdAt: credential.createdAt,
+    })),
+  });
+});
+
+app.post("/api/passkeys/registration/options", authRequired, async (req, res, next) => {
+  try {
+    const options = await registrationOptions({
+      req,
+      user: req.user,
+      credentials: listPasskeys(req.user.id),
+    });
+    const ceremony = createWebAuthnChallenge({
+      userId: req.user.id,
+      type: "registration",
+      challenge: options.challenge,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    });
+    res.json({ ceremonyId: ceremony.id, options });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/passkeys/registration/verify", authRequired, async (req, res, next) => {
+  try {
+    const input = passkeyCeremonySchema.parse(req.body);
+    const ceremony = consumeWebAuthnChallenge(input.ceremonyId, "registration");
+    if (!ceremony || ceremony.userId !== String(req.user.id)) {
+      return res.status(400).json({ error: "Запрос регистрации ключа доступа истёк. Повторите попытку." });
+    }
+    const verification = await verifyPasskeyRegistration({
+      req,
+      response: input.response,
+      challenge: ceremony.challenge,
+    });
+    if (!verification.verified || !verification.registrationInfo) {
+      return res.status(400).json({ error: "Не удалось подтвердить ключ доступа." });
+    }
+    const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
+    const saved = savePasskey({
+      id: credential.id,
+      userId: req.user.id,
+      publicKey: credential.publicKey,
+      counter: credential.counter,
+      transports: credential.transports || input.response?.response?.transports || [],
+      deviceType: credentialDeviceType || "",
+      backedUp: Boolean(credentialBackedUp),
+      webauthnUserID: String(req.user.id),
+    });
+    auditFromRequest(req, "auth.passkey.register", { credentialId: saved.id });
+    res.json({
+      ok: true,
+      message: "Вход по Face ID, отпечатку или коду устройства включён.",
+      passkey: {
+        id: saved.id,
+        transports: saved.transports,
+        deviceType: saved.deviceType,
+        backedUp: saved.backedUp,
+        createdAt: saved.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/passkeys/:credentialId", authRequired, (req, res) => {
+  const credential = getPasskey(req.params.credentialId);
+  if (!credential || credential.userId !== String(req.user.id)) {
+    return res.status(404).json({ error: "Ключ доступа не найден." });
+  }
+  deletePasskey(req.user.id, credential.id);
+  auditFromRequest(req, "auth.passkey.delete", { credentialId: credential.id });
+  res.json({ ok: true });
+});
+
+app.post("/api/passkeys/authentication/options", async (req, res, next) => {
+  try {
+    const input = passkeyAuthenticationOptionsSchema.parse(req.body);
+    const email = normalizeEmail(input.email);
+    const user = findUserByEmail(email);
+    const credentials = user ? listPasskeys(user.id) : [];
+    if (!user || !user.email_verified || (user.role === "client" && user.approval_status !== "approved") || !credentials.length) {
+      return res.status(400).json({ error: "Для этого аккаунта вход по Face ID или ключу доступа пока не настроен." });
+    }
+    const options = await authenticationOptions({ req, credentials });
+    const ceremony = createWebAuthnChallenge({
+      userId: user.id,
+      type: "authentication",
+      challenge: options.challenge,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    });
+    res.json({ ceremonyId: ceremony.id, options });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/passkeys/authentication/verify", async (req, res, next) => {
+  try {
+    const input = passkeyAuthenticationVerifySchema.parse(req.body);
+    const email = normalizeEmail(input.email);
+    const user = findUserByEmail(email);
+    const ceremony = consumeWebAuthnChallenge(input.ceremonyId, "authentication");
+    const credential = getPasskey(input.response?.id || "");
+    if (!user || !ceremony || ceremony.userId !== String(user.id) || !credential || credential.userId !== String(user.id)) {
+      return res.status(400).json({ error: "Не удалось подтвердить вход. Повторите попытку." });
+    }
+    if (!user.email_verified || (user.role === "client" && user.approval_status !== "approved")) {
+      return res.status(403).json({ error: "Для аккаунта пока недоступен вход." });
+    }
+    const verification = await verifyPasskeyAuthentication({
+      req,
+      response: input.response,
+      challenge: ceremony.challenge,
+      credential,
+    });
+    if (!verification.verified) {
+      return res.status(401).json({ error: "Ключ доступа не подтверждён." });
+    }
+    updatePasskeyCounter(credential.id, verification.authenticationInfo.newCounter);
+    clearLoginLimit(email);
+    markUserLogin(user.id);
     writeAudit({
       userId: user.id,
       userEmail: user.email,
       userRole: user.role,
-      action: "auth.login",
-      details: {},
+      action: "auth.login.passkey",
+      details: { credentialId: credential.id },
     });
-
-    res.json({
-      token: signToken(user),
-      user: publicUser(user),
-    });
+    res.json({ token: signToken(user), user: publicUser(user) });
   } catch (error) {
     next(error);
   }
@@ -486,6 +1477,16 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     "clientLinks",
     {}
   );
+  const oneCProducts = normalizeOneCProducts(
+    getGlobalState("oneCProducts", [])
+  );
+  const oneCById = oneCProductsById(oneCProducts);
+  const managerProducts = products.map((product) =>
+    enrichProductWithPurchasePrices(
+      product,
+      oneCById.get(String(product.oneCId || "")) || null
+    )
+  );
 
   if (req.user.role === "manager") {
     const normalizedClientLinks = Object.fromEntries(
@@ -497,8 +1498,8 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
 
     return res.json({
       user: publicUser(req.user),
-      products,
-      fullCatalogProducts: products,
+      products: managerProducts,
+      fullCatalogProducts: managerProducts,
       catalogPolicy: {
         matrixMode: "all",
         allowFullCatalog: true,
@@ -512,13 +1513,21 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
       settings,
       clientLinks: normalizedClientLinks,
       clients: listClients(),
+      reconciliationRequests: listReconciliationRequests(),
+      managerNotifications: listManagerNotifications({ limit: 100 }),
+      services: {
+        mail: publicMailStatus(),
+        push: publicPushStatus(),
+        managerNotifications: publicManagerNotificationStatus(settings),
+      },
     });
   }
 
   const state = getClientState(req.user.id);
   const catalog = resolveClientCatalog(
     products,
-    allClientLinks[req.user.id]
+    allClientLinks[req.user.id],
+    oneCProducts
   );
 
   return res.json({
@@ -535,13 +1544,42 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
       [req.user.id]: catalog.link,
     },
     clients: [],
+    reconciliationRequests: listReconciliationRequests(req.user.id),
+    services: { mail: publicMailStatus(), push: publicPushStatus() },
   });
 });
 
-app.put("/api/state/orders", authRequired, (req, res) => {
-  const orders = Array.isArray(req.body?.orders)
+app.put("/api/state/orders", authRequired, async (req, res) => {
+  const incomingOrders = Array.isArray(req.body?.orders)
     ? req.body.orders
     : [];
+  const previousOrders = req.user.role === "manager" ? listOrders() : listOrders(req.user.id);
+  const previousById = new Map(previousOrders.map((order) => [String(order.id), order]));
+  let orders = incomingOrders;
+
+  if (req.user.role === "client") {
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const links = getGlobalState("clientLinks", {});
+    const oneCProducts = getGlobalState("oneCProducts", []);
+
+    // Не блокируем оформление только из-за возраста уже известной цены.
+    // Обязательная проверка свежести выполняется непосредственно перед
+    // передачей заказа в закрытую базу 1С TEST.
+    const repriced = repriceClientOrders(
+      incomingOrders,
+      products,
+      links[req.user.id],
+      oneCProducts
+    );
+    if (repriced.issues.length) {
+      return res.status(409).json({
+        code: "PURCHASE_PRICE_MISSING",
+        error: "Для части товаров не получена закупочная цена из 1С TEST.",
+        items: repriced.issues,
+      });
+    }
+    orders = repriced.orders;
+  }
 
   replaceOrders({
     orders,
@@ -550,9 +1588,514 @@ app.put("/api/state/orders", authRequired, (req, res) => {
   });
   auditFromRequest(req, "orders.save", { count: orders.length });
 
-  res.json({ ok: true });
+  if (req.user.role === "client") {
+    const currentById = new Map(orders.map((order) => [String(order.id), order]));
+
+    for (const order of orders) {
+      const previous = previousById.get(String(order.id));
+      const customerName = String(order.customerName || getClientState(req.user.id).profile?.companyName || req.user.email || "Клиент");
+      const orderNumber = String(order.number || order.id || "");
+      const customItems = Array.isArray(order.customItems) ? order.customItems : [];
+
+      if (!previous) {
+        queueManagerNotification({
+          type: "new_order",
+          title: `Новый заказ №${orderNumber}`,
+          body: `${customerName} · ${orderPositionCount(order)} поз. · доставка ${order.firstDeliveryDate || "не указана"}`,
+          url: `/?managerTab=orders&order=${encodeURIComponent(order.id)}`,
+          sourceId: String(order.id),
+        });
+      } else if (clientOrderSignature(previous) !== clientOrderSignature(order)) {
+        const changeHash = createHash("sha256")
+          .update(clientOrderSignature(order))
+          .digest("hex")
+          .slice(0, 16);
+        queueManagerNotification({
+          type: "order_changed",
+          title: `Клиент изменил заказ №${orderNumber}`,
+          body: `${customerName} · обновлены состав или условия доставки`,
+          url: `/?managerTab=orders&order=${encodeURIComponent(order.id)}`,
+          sourceId: `${order.id}:${order.updatedAt || changeHash}:${changeHash}`,
+        });
+      }
+
+      const previousCustomIds = new Set(
+        (Array.isArray(previous?.customItems) ? previous.customItems : [])
+          .map((item) => String(item.id || `${item.name}:${item.createdAt || ""}`))
+      );
+      for (const item of customItems) {
+        const itemKey = String(item.id || `${item.name}:${item.createdAt || order.createdAt || ""}`);
+        if (previousCustomIds.has(itemKey)) continue;
+        queueManagerNotification({
+          type: "custom_item",
+          title: "Новый товар вне матрицы",
+          body: `${customerName} · заказ №${orderNumber}: ${item.name || "Без названия"}, ${item.quantity || 1} ${item.unit || "шт."}${item.photoUrl || item.imageUrl ? " · приложено фото" : ""}`,
+          url: `/?managerTab=orders&order=${encodeURIComponent(order.id)}`,
+          sourceId: `${order.id}:${itemKey}`,
+        });
+      }
+    }
+
+    for (const previous of previousOrders) {
+      if (currentById.has(String(previous.id))) continue;
+      const orderNumber = String(previous.number || previous.id || "");
+      queueManagerNotification({
+        type: "order_deleted",
+        title: `Клиент удалил заказ №${orderNumber}`,
+        body: `${previous.customerName || req.user.email || "Клиент"} · заказ был удалён до принятия менеджером`,
+        url: "/?managerTab=orders",
+        sourceId: `${previous.id}:${previous.updatedAt || previous.createdAt || "deleted"}`,
+      });
+    }
+  }
+
+  if (req.user.role === "manager") {
+    for (const order of orders) {
+      const previous = previousById.get(String(order.id));
+      if (!previous) continue;
+      const changes = [];
+      if (previous.status !== order.status) changes.push(`статус: ${order.status}`);
+      if (orderItemsSignature(previous) !== orderItemsSignature(order)) changes.push("изменён состав заказа");
+      if (String(previous.managerComment || "") !== String(order.managerComment || "")) {
+        changes.push(order.managerComment ? "новое сообщение менеджера" : "сообщение менеджера удалено");
+      }
+      const previousExchange = normalizeExchangeState(previous.exchange);
+      const currentExchange = normalizeExchangeState(order.exchange);
+      if (previousExchange.status !== "error" && currentExchange.status === "error") {
+        queueManagerNotification({
+          type: "onec_error",
+          title: `Ошибка обмена с 1С по заказу №${order.number || order.id || ""}`,
+          body: currentExchange.error || currentExchange.message || "Проверьте журнал обмена и настройки подключения.",
+          url: `/?managerTab=exchange&order=${encodeURIComponent(order.id)}`,
+          sourceId: `${order.id}:${currentExchange.updatedAt || order.updatedAt || Date.now()}`,
+        });
+      }
+      if (!changes.length) continue;
+      const comment = String(order.managerComment || "").trim();
+      sendOrderPush(order.clientId, {
+        title: `Заказ №${order.number || ""} обновлён`,
+        body: comment && changes.some((item) => item.includes("сообщение"))
+          ? comment.slice(0, 180)
+          : changes.join("; "),
+        url: `/?order=${encodeURIComponent(order.id)}`,
+        tag: `order-${order.id}`,
+      }).catch((error) => console.error("Push order update error", error));
+    }
+  }
+
+  res.json({ ok: true, orders });
+});
+async function handleOneCTestOrder(req, res, next) {
+  try {
+    const database = extractOneCDatabase(req);
+    if (!isTestDatabase(database)) {
+      return res.status(403).json({
+        error: "Получение заказа разрешено только из базы 1С TEST.",
+      });
+    }
+
+    const protocolVersion = String(req.headers["x-clover-protocol"] || "").trim();
+    const legacyProtocol = protocolVersion === "";
+    if (!legacyProtocol && protocolVersion !== "2") {
+      return res.status(426).json({
+        code: "ONEC_EXTENSION_UPDATE_REQUIRED",
+        error: "Версия протокола расширения 1С не поддерживается.",
+      });
+    }
+
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const clientLinks = getGlobalState("clientLinks", {});
+    const productsById = new Map(
+      products.map((product) => [String(product.id), product])
+    );
+
+    if (Array.isArray(req.body?.items) && req.body.items.length) {
+      receivePurchasePrices({
+        items: req.body.items,
+        database: extractOneCDatabase(req),
+      });
+    }
+
+    let realOrder = nextOrderForOneC();
+
+    if (!realOrder) {
+      return res.status(404).json({
+        error: "Нет заказов, поставленных в очередь для 1С TEST.",
+      });
+    }
+
+    const currentOneCProducts = getGlobalState("oneCProducts", []);
+    const priceRequirements = buildOrderPriceRequirements(
+      realOrder,
+      products,
+      clientLinks[realOrder.clientId] || {}
+    );
+    const freshnessIssues = validatePriceRequirements(
+      priceRequirements,
+      currentOneCProducts,
+      { maxAgeMs: priceMaxAgeMs() }
+    );
+    if (freshnessIssues.length) {
+      return res.status(409).json({
+        code: "PURCHASE_PRICE_REFRESH_REQUIRED",
+        error: "Перед передачей заказа 1С TEST должна отправить свежие закупочные цены.",
+        items: freshnessIssues,
+        priceRequest: buildPriceRequest({
+          scope: "next-order",
+          order: realOrder,
+          products,
+          clientLinks,
+          maxAgeMs: priceMaxAgeMs(),
+        }),
+      });
+    }
+
+    // Цена уже согласована клиентом в заказе и фиксируется при постановке
+    // в очередь. Свежая закупочная цена из 1С обязательна для контроля и
+    // расчёта следующих заказов, но не меняет сумму уже созданного заказа.
+    const lockedOrderTotal = (realOrder.items || []).reduce(
+      (sum, item) => sum + (Number(item.lineTotal) || 0),
+      0
+    );
+
+    const items = (realOrder.items || []).map((item) => {
+      const product = productsById.get(String(item.productId ?? item.id));
+      const oneCId = String(item.oneCId || product?.oneCId || "").trim();
+      const quantity = Number(item.quantity) || 1;
+      const price =
+        Number(item.unitPrice) ||
+        (Number(item.lineTotal) || 0) / quantity;
+
+      const unit = ["piece", "pack", "bundle"].includes(item.unit)
+        ? item.unit
+        : "piece";
+      const multiplier = Math.max(1, Number(item.multiplier) || 1);
+
+      return {
+        id: oneCId,
+        code: item.oneCCode || product?.oneCCode || item.code || product?.code || "",
+        name: item.oneCName || product?.oneCName || item.name || product?.name || "",
+        displayName: item.name || product?.name || "",
+        unit,
+        unitName: unit === "pack" ? "Упаковка" : unit === "bundle" ? "Пачка" : "Штука",
+        multiplier,
+        totalPieces: quantity * multiplier,
+        quantity,
+        price,
+      };
+    });
+
+    const missingItems = items.filter((item) => !item.id);
+    if (missingItems.length) {
+      return res.status(409).json({
+        error: "Не все товары заказа связаны с номенклатурой 1С.",
+        items: missingItems.map((item) => item.displayName || item.name),
+      });
+    }
+
+    const clientLink = normalizeClientLink(clientLinks[realOrder.clientId]);
+
+    if (legacyProtocol) {
+      writeAudit({
+        action: "one-c.order.legacy-protocol",
+        details: {
+          orderId: realOrder.id,
+          orderNumber: realOrder.number || "",
+          database: "TEST",
+        },
+      });
+    }
+
+    return res.json({
+      ok: true,
+      protocol: legacyProtocol ? "legacy-v5" : "2",
+      pricingPolicy: "order-locked",
+      lockedOrderTotal,
+      order: {
+        id: realOrder.id,
+        number: realOrder.number,
+        date: realOrder.createdAt || new Date().toISOString(),
+        deliveryDate: realOrder.firstDeliveryDate || "",
+        address: realOrder.address || "",
+        status: realOrder.status || "Новый",
+        clientComment: realOrder.clientComment || "",
+        managerComment: realOrder.managerComment || "",
+        customer: {
+          cloverId: realOrder.clientId || "",
+          id: clientLink.oneCId || "",
+          code: clientLink.oneCCode || clientLink.oneCMatchCode || "",
+          name:
+            clientLink.oneCName ||
+            clientLink.oneCMatchName ||
+            realOrder.customerName ||
+            "Покупатель Clover",
+          displayName: realOrder.customerName || "Покупатель Clover",
+          contactName: realOrder.customerContact || "",
+          phone: clientLink.oneCMatchPhone || realOrder.customerPhone || "",
+          email: clientLink.oneCMatchEmail || realOrder.customerEmail || "",
+          address: realOrder.address || "",
+          inn: clientLink.oneCInn || clientLink.oneCMatchInn || "",
+          lookupRequired: !clientLink.oneCId,
+        },
+        items,
+        total: items.reduce(
+          (sum, item) => sum + item.quantity * item.price,
+          0
+        ),
+        comment: `Заказ Clover № ${realOrder.number}`,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+app.use("/api/one-c", oneCAuthRequired);
+
+app.get("/api/one-c/queue-status", (req, res) => {
+  const database = extractOneCDatabase(req);
+  if (database && !isTestDatabase(database)) {
+    return res.status(403).json({
+      error: "Этот обмен разрешён только для базы 1С TEST.",
+    });
+  }
+
+  res.json({
+    ok: true,
+    database: "TEST",
+    queue: oneCQueueSnapshot(),
+  });
 });
 
+app.get("/api/one-c/purchase-price-request", (req, res) => {
+  const database = extractOneCDatabase(req);
+  if (database && !isTestDatabase(database)) {
+    return res.status(403).json({
+      error: "Этот обмен разрешён только для базы 1С TEST.",
+    });
+  }
+
+  const products = getGlobalState("products", DEFAULT_PRODUCTS);
+  const clientLinks = getGlobalState("clientLinks", {});
+  const orders = listOrders();
+  const scope = String(req.query.scope || "next-order") === "all" ? "all" : "next-order";
+  const order = scope === "next-order" ? nextOrderForOneC() : null;
+  const request = buildPriceRequest({
+    scope,
+    order,
+    products,
+    clientLinks,
+    orders,
+    maxAgeMs: priceMaxAgeMs(),
+  });
+
+  const requirements = scope === "all"
+    ? buildAllPriceRequirements(products, clientLinks, orders)
+    : request.items;
+  const issues = validatePriceRequirements(
+    requirements,
+    getGlobalState("oneCProducts", []),
+    { maxAgeMs: priceMaxAgeMs() }
+  );
+
+  res.json({
+    ...request,
+    refreshRequired: issues.length > 0,
+    issues,
+  });
+});
+
+app.post("/api/one-c/purchase-prices", (req, res, next) => {
+  try {
+    const merged = receivePurchasePrices({
+      items: req.body?.items,
+      database: extractOneCDatabase(req),
+    });
+    res.json({
+      ok: true,
+      database: "TEST",
+      receivedAt: merged.receivedAt,
+      accepted: merged.accepted.length,
+      rejected: merged.rejected,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/one-c/test-order", handleOneCTestOrder);
+app.post("/api/one-c/test-order", handleOneCTestOrder);
+
+app.post("/api/one-c/orders/:orderId/ack", (req, res) => {
+  const stored = getOrderById(req.params.orderId);
+
+  if (!stored) {
+    return res.status(404).json({
+      error: "Заказ не найден.",
+    });
+  }
+
+  const database = extractOneCDatabase(req);
+  if (!isTestDatabase(database)) {
+    return res.status(403).json({
+      error: "Подтверждение заказа разрешено только из базы 1С TEST.",
+    });
+  }
+
+  const previous = normalizeExchangeState(stored.payload.exchange);
+  const expectedOrderNumber = String(stored.payload.number || "").trim();
+  const providedOrderNumber = String(req.body?.orderNumber || "").trim();
+  const legacyAck = providedOrderNumber === "";
+  const receivedOrderNumber = providedOrderNumber || expectedOrderNumber;
+  const documentNumber = String(
+    req.body?.documentNumber || req.body?.documentId || ""
+  ).trim();
+
+  if (!expectedOrderNumber) {
+    return res.status(422).json({
+      error: "Подтверждение отклонено: у заказа Clover отсутствует номер.",
+    });
+  }
+
+  if (receivedOrderNumber !== expectedOrderNumber) {
+    return res.status(409).json({
+      error: "Подтверждение относится к другому заказу Clover.",
+      expectedOrderNumber,
+    });
+  }
+
+  if (!documentNumber) {
+    return res.status(422).json({
+      error: "1С не передала номер созданного документа.",
+    });
+  }
+
+  if (previous.status === "sent") {
+    if (String(previous.receipt || "").trim() === documentNumber) {
+      return res.json({
+        ok: true,
+        orderId: stored.id,
+        status: "sent",
+        duplicateAck: true,
+      });
+    }
+    return res.status(409).json({
+      error: "Заказ уже подтверждён другим номером документа 1С.",
+    });
+  }
+
+  if (previous.status !== "ready") {
+    return res.status(409).json({
+      error: "Подтверждение отклонено: заказ не находится в очереди 1С TEST.",
+    });
+  }
+
+  const duplicateReceiptOrder = listOrders().find((candidate) => {
+    if (String(candidate.id || "") === String(stored.id || "")) return false;
+    return (
+      String(normalizeExchangeState(candidate.exchange).receipt || "").trim() ===
+      documentNumber
+    );
+  });
+
+  if (duplicateReceiptOrder) {
+    return res.status(409).json({
+      error:
+        "Этот номер документа 1С уже связан с другим заказом Clover. Подтверждение отклонено для защиты от ложного дубля.",
+      conflictingOrderNumber: duplicateReceiptOrder.number || "",
+    });
+  }
+
+  const acknowledgedAt = new Date().toISOString();
+  const acknowledgedCustomer =
+    req.body?.customer && typeof req.body.customer === "object"
+      ? req.body.customer
+      : {};
+  const customer = normalizeOneCClient({
+    ...acknowledgedCustomer,
+    id:
+      acknowledgedCustomer.id ||
+      acknowledgedCustomer.oneCId ||
+      req.body?.counterpartyId ||
+      req.body?.clientId ||
+      req.body?.customerId,
+    code:
+      acknowledgedCustomer.code ||
+      acknowledgedCustomer.oneCCode ||
+      req.body?.counterpartyCode ||
+      req.body?.clientCode,
+    name:
+      acknowledgedCustomer.name ||
+      acknowledgedCustomer.oneCName ||
+      req.body?.counterpartyName ||
+      req.body?.clientName ||
+      req.body?.customerName ||
+      stored.payload.customerName,
+    inn:
+      acknowledgedCustomer.inn ||
+      acknowledgedCustomer.oneCInn ||
+      req.body?.counterpartyInn ||
+      req.body?.clientInn,
+    phone:
+      acknowledgedCustomer.phone ||
+      req.body?.counterpartyPhone ||
+      req.body?.clientPhone ||
+      stored.payload.customerPhone,
+    email:
+      acknowledgedCustomer.email ||
+      req.body?.counterpartyEmail ||
+      req.body?.clientEmail ||
+      stored.payload.customerEmail,
+  });
+
+  if (stored.payload.clientId && customer.id && customer.name) {
+    const currentLinks = getGlobalState("clientLinks", {});
+    const updatedLinks = linkCloverClient(
+      currentLinks,
+      stored.payload.clientId,
+      customer,
+      acknowledgedAt
+    );
+    setGlobalState("clientLinks", updatedLinks);
+  }
+
+  const exchange = {
+    ...previous,
+    status: "sent",
+    checkedAt: acknowledgedAt,
+    lastAttemptAt: acknowledgedAt,
+    sentAt: acknowledgedAt,
+    receipt: documentNumber,
+    channel: "onec-pull",
+    message: "Заказ получен и создан в 1С.",
+  };
+
+  updateOrderPayload(stored.id, {
+    ...stored.payload,
+    exchange,
+    updatedAt: acknowledgedAt,
+  });
+
+  writeAudit({
+    action: "one-c.order.ack",
+    details: {
+      orderId: stored.id,
+      orderNumber: expectedOrderNumber,
+      documentNumber,
+      database: "TEST",
+      legacyAck,
+    },
+  });
+
+  res.json({
+    ok: true,
+    orderId: stored.id,
+    orderNumber: expectedOrderNumber,
+    status: "sent",
+    legacyAckAccepted: legacyAck,
+    clientLinked: Boolean(stored.payload.clientId && customer.id && customer.name),
+  });
+});
 app.put(
   "/api/state/profile",
   authRequired,
@@ -607,13 +2150,19 @@ app.put(
   authRequired,
   roleRequired("manager"),
   (req, res) => {
-    const products = Array.isArray(req.body?.products)
-      ? req.body.products
+    const incomingProducts = Array.isArray(req.body?.products)
+      ? req.body.products.map(stripRuntimeProductPricing)
       : DEFAULT_PRODUCTS;
+    const storedProducts = getGlobalState("products", DEFAULT_PRODUCTS);
+    const products = mergeProductsPreservingOneCLinks(
+      incomingProducts,
+      storedProducts
+    );
+
     setGlobalState("products", products);
     auditFromRequest(req, "products.save", { count: products.length });
 
-    res.json({ ok: true });
+    res.json({ ok: true, products });
   }
 );
 
@@ -632,18 +2181,78 @@ app.put(
   }
 );
 
+
+app.put(
+  "/api/admin/clients/:clientId",
+  authRequired,
+  roleRequired("manager"),
+  (req, res, next) => {
+    try {
+      const parsed = managerClientUpdateSchema.parse({
+        profile: req.body?.profile || {},
+        addresses: Array.isArray(req.body?.addresses)
+          ? req.body.addresses
+          : [],
+        managerNote: req.body?.managerNote || "",
+      });
+      const clientUser = findUserById(req.params.clientId);
+
+      if (!clientUser || clientUser.role !== "client") {
+        return res.status(404).json({
+          error: "Клиент Clover не найден.",
+        });
+      }
+
+      const emailOwner = findUserByEmail(parsed.profile.email);
+      if (emailOwner && String(emailOwner.id) !== String(clientUser.id)) {
+        return res.status(409).json({
+          error: "Этот email уже используется другим аккаунтом.",
+        });
+      }
+
+      const addresses = normalizeManagerClientAddresses(parsed.addresses);
+      const client = updateClientByManager({
+        clientId: clientUser.id,
+        profile: parsed.profile,
+        addresses,
+        managerNote: parsed.managerNote,
+      });
+
+      auditFromRequest(req, "client.profile.manager_update", {
+        clientId: clientUser.id,
+        changedEmail: normalizeEmail(clientUser.email) !== normalizeEmail(parsed.profile.email),
+        addresses: addresses.length,
+        managerNoteLength: parsed.managerNote.length,
+      });
+
+      res.json({
+        ok: true,
+        client,
+        oneCSync: false,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 app.put(
   "/api/state/client-links",
   authRequired,
   roleRequired("manager"),
   (req, res) => {
-    const clientLinks = req.body?.clientLinks || {};
+    const incomingLinks = req.body?.clientLinks || {};
+    const storedLinks = getGlobalState("clientLinks", {});
+    const clientLinks = mergeClientLinksPreservingOneCLinks(
+      incomingLinks,
+      storedLinks
+    );
     setGlobalState("clientLinks", clientLinks);
     auditFromRequest(req, "client.matrix.save", {
       clients: Object.keys(clientLinks).length,
     });
 
-    res.json({ ok: true });
+    res.json({ ok: true, clientLinks });
   }
 );
 
@@ -972,6 +2581,587 @@ app.post(
     }
   }
 );
+app.post("/api/one-c/products-preview", async (req, res, next) => {
+  try {
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    const receivedAt = new Date().toISOString();
+    const sourceDatabase = extractOneCDatabase(req);
+    if (sourceDatabase && !isTestDatabase(sourceDatabase)) {
+      return res.status(403).json({
+        error: "Выгрузка номенклатуры разрешена только из базы 1С TEST.",
+      });
+    }
+    const verifiedTestSource = isTestDatabase(sourceDatabase);
+    const allOneCProducts = normalizeOneCProducts(req.body?.items).map((item) => ({
+      ...item,
+      purchasePriceUpdatedAt:
+        item.purchasePriceUpdatedAt || (hasPurchasePrice(item) ? receivedAt : ""),
+      purchasePriceReceivedAt:
+        hasPurchasePrice(item) && verifiedTestSource ? receivedAt : "",
+      purchasePriceSourceDatabase:
+        hasPurchasePrice(item) && verifiedTestSource ? "TEST" : "",
+    }));
+    const currentProducts = getGlobalState("products", DEFAULT_PRODUCTS);
+    const candidateMap = buildOneCProductCandidates(
+      currentProducts,
+      allOneCProducts
+    );
+    const oneCProducts = selectRelevantOneCProducts(
+      currentProducts,
+      allOneCProducts,
+      candidateMap
+    );
+
+    const retainedIds = new Set(oneCProducts.map((item) => item.id));
+    const preliminaryCandidateMap = Object.fromEntries(
+      Object.entries(candidateMap).map(([productId, items]) => [
+        productId,
+        (Array.isArray(items) ? items : [])
+          .filter((item) => retainedIds.has(item.id))
+          .map(({ score, reason, ...item }) => ({ item, score, reason })),
+      ])
+    );
+
+    const previewDirectory = path.resolve(
+      serverDirectory,
+      "data",
+      "one-c-preview"
+    );
+    mkdirSync(previewDirectory, { recursive: true });
+
+    const filePath = path.resolve(
+      previewDirectory,
+      "products-preview.json"
+    );
+    writeFileSync(
+      filePath,
+      JSON.stringify(
+        {
+          receivedAt,
+          data: {
+            sourceCount: allOneCProducts.length,
+            retainedCount: oneCProducts.length,
+            candidateProducts: Object.values(preliminaryCandidateMap).filter(
+              (items) => Array.isArray(items) && items.length
+            ).length,
+            mode: "clover-products-and-candidates-only",
+            items: oneCProducts,
+          },
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    const linked = autoLinkCloverProducts(
+      currentProducts,
+      oneCProducts,
+      receivedAt
+    );
+
+    const unmatchedProductIds = new Set(
+      linked.products
+        .filter((product) => !String(product.oneCId || "").trim())
+        .map((product) => String(product.id))
+    );
+    const cleanCandidateMap = Object.fromEntries(
+      Object.entries(preliminaryCandidateMap).filter(
+        ([productId, items]) => unmatchedProductIds.has(String(productId)) && Array.isArray(items) && items.length
+      )
+    );
+
+    setGlobalState("oneCProducts", linked.oneCProducts);
+    setGlobalState("oneCProductCandidates", cleanCandidateMap);
+    if (linked.changed) {
+      setGlobalState("products", linked.products);
+    }
+
+    const meta = {
+      receivedAt,
+      lastAutoLinkAt: receivedAt,
+      lastReport: linked.report,
+      candidateMap: cleanCandidateMap,
+    };
+    setGlobalState("oneCProductsMeta", meta);
+
+    writeAudit({
+      action: "one-c.products.receive",
+      details: {
+        scanned: allOneCProducts.length,
+        received: linked.oneCProducts.length,
+        candidateProducts: Object.values(cleanCandidateMap).filter(
+          (items) => Array.isArray(items) && items.length
+        ).length,
+        autoLinked: linked.report.autoLinked,
+        newlyLinked: linked.report.newlyLinked,
+        ambiguous: linked.report.ambiguous,
+        unmatched: linked.report.unmatched,
+      },
+    });
+
+    res.json({
+      ok: true,
+      scanned: allOneCProducts.length,
+      received: linked.oneCProducts.length,
+      candidateProducts: Object.values(cleanCandidateMap).filter(
+        (items) => Array.isArray(items) && items.length
+      ).length,
+      mode: "clover-products-and-candidates-only",
+      autoLink: linked.report,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get(
+  "/api/admin/one-c/products",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const items = normalizeOneCProducts(
+      getGlobalState("oneCProducts", [])
+    );
+    const meta = getGlobalState("oneCProductsMeta", {});
+    const search = String(req.query.search || "")
+      .trim()
+      .toLocaleLowerCase("ru-RU");
+    const limit = Math.min(
+      200,
+      Math.max(1, Number(req.query.limit) || 50)
+    );
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+
+    const linksByOneCId = new Map();
+    products.forEach((product) => {
+      const oneCId = String(product.oneCId || "").trim();
+      if (!oneCId) return;
+      linksByOneCId.set(oneCId, {
+        productId: product.id,
+        productName: product.name,
+        linkMode: product.oneCLinkMode || "manual",
+      });
+    });
+
+    const filtered = search
+      ? items.filter((item) =>
+          `${item.name} ${item.code} ${item.id}`
+            .toLocaleLowerCase("ru-RU")
+            .includes(search)
+        )
+      : items;
+
+    res.json({
+      items: filtered.slice(offset, offset + limit).map((item) => ({
+        ...item,
+        cloverLink: linksByOneCId.get(item.id) || null,
+      })),
+      total: filtered.length,
+      offset,
+      limit,
+      summary: buildOneCProductsSummary(products, items, meta),
+    });
+  }
+);
+
+app.get(
+  "/api/admin/one-c/products/:productId/candidates",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const product = products.find(
+      (item) => String(item.id) === String(req.params.productId)
+    );
+    if (!product) return res.status(404).json({ error: "Товар Clover не найден." });
+
+    const candidateMap = getGlobalState("oneCProductCandidates", {});
+    const items = Array.isArray(candidateMap[String(product.id)])
+      ? candidateMap[String(product.id)]
+      : [];
+    const linksByOneCId = new Map(
+      products
+        .filter((item) => String(item.oneCId || "").trim())
+        .map((item) => [String(item.oneCId), {
+          productId: item.id,
+          productName: item.name,
+          linkMode: item.oneCLinkMode || "manual",
+        }])
+    );
+
+    res.json({
+      product: {
+        id: product.id,
+        name: product.name,
+        query: product.oneCSearchQuery || product.oneCMatchName || product.name,
+      },
+      items: items.map((entry) => ({
+        ...(entry.item || entry),
+        score: Number(entry.score) || 0,
+        reason: entry.reason || "similar",
+        cloverLink: linksByOneCId.get(String((entry.item || entry).id)) || null,
+      })),
+      total: items.length,
+    });
+  }
+);
+
+app.post(
+  "/api/admin/one-c/products/:productId/request",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const productIndex = products.findIndex(
+      (item) => String(item.id) === String(req.params.productId)
+    );
+    if (productIndex < 0) return res.status(404).json({ error: "Товар Clover не найден." });
+
+    const requestedAt = new Date().toISOString();
+    const query = String(req.body?.query || products[productIndex].name || "").trim();
+    const oneCMatchCode = String(req.body?.code || products[productIndex].oneCMatchCode || "").trim();
+    const oneCMatchName = String(req.body?.name || products[productIndex].oneCMatchName || "").trim();
+    if (!query && !oneCMatchCode && !oneCMatchName) {
+      return res.status(400).json({ error: "Укажите название или код для поиска в 1С." });
+    }
+
+    const updatedProduct = {
+      ...products[productIndex],
+      oneCSearchQuery: query,
+      oneCSearchRequestedAt: requestedAt,
+      oneCMatchCode,
+      oneCMatchName,
+    };
+    const updatedProducts = products.map((item, index) =>
+      index === productIndex ? updatedProduct : item
+    );
+    setGlobalState("products", updatedProducts);
+    auditFromRequest(req, "one-c.product.request", {
+      productId: updatedProduct.id,
+      productName: updatedProduct.name,
+      query,
+      code: oneCMatchCode,
+    });
+
+    res.json({
+      ok: true,
+      product: updatedProduct,
+      message: "Запрос сохранён. После следующей выгрузки из 1С Clover оставит только подходящие варианты.",
+    });
+  }
+);
+
+app.post(
+  "/api/admin/one-c/products/:productId/link",
+  authRequired,
+  roleRequired("manager"),
+  (req, res, next) => {
+    try {
+      const products = getGlobalState("products", DEFAULT_PRODUCTS);
+      const oneCProducts = normalizeOneCProducts(getGlobalState("oneCProducts", []));
+      const requestedId = String(req.body?.oneCId || req.body?.id || "").trim();
+      const item = oneCProducts.find((entry) => entry.id === requestedId) ||
+        normalizeOneCProduct(req.body?.item || req.body || {});
+      const linkedAt = new Date().toISOString();
+      const updatedProducts = linkCloverProduct(
+        products,
+        req.params.productId,
+        item,
+        linkedAt
+      );
+      setGlobalState("products", updatedProducts);
+
+      const candidateMap = getGlobalState("oneCProductCandidates", {});
+      if (candidateMap[String(req.params.productId)]) {
+        const nextCandidateMap = { ...candidateMap };
+        delete nextCandidateMap[String(req.params.productId)];
+        setGlobalState("oneCProductCandidates", nextCandidateMap);
+        const meta = getGlobalState("oneCProductsMeta", {});
+        setGlobalState("oneCProductsMeta", { ...meta, candidateMap: nextCandidateMap });
+      }
+
+      const product = updatedProducts.find(
+        (entry) => String(entry.id) === String(req.params.productId)
+      );
+      auditFromRequest(req, "one-c.product.link", {
+        productId: product?.id,
+        productName: product?.name,
+        oneCId: item.id,
+        oneCName: item.name,
+      });
+      res.json({ ok: true, product, products: updatedProducts });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  "/api/admin/one-c/products/auto-link",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const currentProducts = getGlobalState("products", DEFAULT_PRODUCTS);
+    const oneCProducts = getGlobalState("oneCProducts", []);
+    const linkedAt = new Date().toISOString();
+    const linked = autoLinkCloverProducts(
+      currentProducts,
+      oneCProducts,
+      linkedAt
+    );
+
+    if (linked.changed) {
+      setGlobalState("products", linked.products);
+    }
+
+    const previousMeta = getGlobalState("oneCProductsMeta", {});
+    const meta = {
+      ...previousMeta,
+      lastAutoLinkAt: linkedAt,
+      lastReport: linked.report,
+    };
+    setGlobalState("oneCProductsMeta", meta);
+
+    auditFromRequest(req, "one-c.products.auto-link", linked.report);
+
+    res.json({
+      ok: true,
+      products: linked.products,
+      report: linked.report,
+      summary: buildOneCProductsSummary(
+        linked.products,
+        linked.oneCProducts,
+        meta
+      ),
+    });
+  }
+);
+
+app.post("/api/one-c/clients-preview", async (req, res, next) => {
+  try {
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    const receivedAt = new Date().toISOString();
+    const allOneCClients = normalizeOneCClients(req.body?.items);
+    const clients = listClients();
+    const currentLinks = getGlobalState("clientLinks", {});
+    const candidateMap = buildOneCClientCandidates(
+      clients,
+      currentLinks,
+      allOneCClients
+    );
+    const oneCClients = selectRelevantOneCClients(
+      clients,
+      currentLinks,
+      allOneCClients,
+      candidateMap
+    );
+    const retainedIds = new Set(oneCClients.map((item) => item.id));
+    const cleanCandidateMap = Object.fromEntries(
+      Object.entries(candidateMap).map(([clientId, items]) => [
+        clientId,
+        (Array.isArray(items) ? items : [])
+          .filter((item) => retainedIds.has(item.id))
+          .map(({ score, reason, ...item }) => ({ item, score, reason })),
+      ])
+    );
+
+    const linked = autoLinkCloverClients(
+      clients,
+      currentLinks,
+      oneCClients,
+      receivedAt
+    );
+    setGlobalState("oneCClients", linked.oneCClients);
+    setGlobalState("oneCClientCandidates", cleanCandidateMap);
+    if (linked.changed) setGlobalState("clientLinks", linked.clientLinks);
+
+    const meta = {
+      receivedAt,
+      lastAutoLinkAt: receivedAt,
+      lastReport: linked.report,
+      candidateMap: cleanCandidateMap,
+    };
+    setGlobalState("oneCClientsMeta", meta);
+
+    const previewDirectory = path.resolve(serverDirectory, "data", "one-c-preview");
+    mkdirSync(previewDirectory, { recursive: true });
+    writeFileSync(
+      path.resolve(previewDirectory, "clients-preview.json"),
+      JSON.stringify({
+        receivedAt,
+        data: {
+          sourceCount: allOneCClients.length,
+          retainedCount: linked.oneCClients.length,
+          mode: "clover-clients-and-candidates-only",
+          items: linked.oneCClients,
+        },
+      }, null, 2),
+      "utf8"
+    );
+
+    writeAudit({
+      action: "one-c.clients.receive",
+      details: {
+        scanned: allOneCClients.length,
+        received: linked.oneCClients.length,
+        autoLinked: linked.report.autoLinked,
+        candidateClients: Object.values(cleanCandidateMap).filter(
+          (items) => Array.isArray(items) && items.length
+        ).length,
+      },
+    });
+
+    res.json({
+      ok: true,
+      scanned: allOneCClients.length,
+      received: linked.oneCClients.length,
+      mode: "clover-clients-and-candidates-only",
+      autoLink: linked.report,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get(
+  "/api/admin/one-c/clients",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const clients = listClients();
+    const clientLinks = getGlobalState("clientLinks", {});
+    const items = normalizeOneCClients(getGlobalState("oneCClients", []));
+    const meta = getGlobalState("oneCClientsMeta", {});
+    const search = String(req.query.search || "").trim().toLocaleLowerCase("ru-RU");
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const linksByOneCId = new Map(
+      Object.entries(clientLinks)
+        .filter(([, link]) => String(link?.oneCId || "").trim())
+        .map(([clientId, link]) => [String(link.oneCId), {
+          clientId,
+          clientName: clients.find((client) => String(client.id) === String(clientId))?.companyName || "",
+          linkMode: link.oneCLinkMode || "manual",
+        }])
+    );
+    const filtered = search
+      ? items.filter((item) => `${item.name} ${item.code} ${item.id} ${item.inn} ${item.phone} ${item.email}`
+          .toLocaleLowerCase("ru-RU").includes(search))
+      : items;
+
+    res.json({
+      items: filtered.slice(offset, offset + limit).map((item) => ({
+        ...item,
+        cloverLink: linksByOneCId.get(item.id) || null,
+      })),
+      total: filtered.length,
+      offset,
+      limit,
+      summary: buildOneCClientsSummary(clients, clientLinks, items, meta),
+    });
+  }
+);
+
+app.get(
+  "/api/admin/one-c/clients/:clientId/candidates",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const clients = listClients();
+    const client = clients.find((item) => String(item.id) === String(req.params.clientId));
+    if (!client) return res.status(404).json({ error: "Клиент Clover не найден." });
+    const candidateMap = getGlobalState("oneCClientCandidates", {});
+    const items = Array.isArray(candidateMap[String(client.id)])
+      ? candidateMap[String(client.id)]
+      : [];
+    const clientLinks = getGlobalState("clientLinks", {});
+    const linksByOneCId = new Map(
+      Object.entries(clientLinks)
+        .filter(([, link]) => String(link?.oneCId || "").trim())
+        .map(([clientId, link]) => [String(link.oneCId), {
+          clientId,
+          clientName: clients.find((item) => String(item.id) === String(clientId))?.companyName || "",
+          linkMode: link.oneCLinkMode || "manual",
+        }])
+    );
+    res.json({
+      client,
+      items: items.map((entry) => ({
+        ...(entry.item || entry),
+        score: Number(entry.score) || 0,
+        reason: entry.reason || "similar",
+        cloverLink: linksByOneCId.get(String((entry.item || entry).id)) || null,
+      })),
+      total: items.length,
+    });
+  }
+);
+
+app.post(
+  "/api/admin/one-c/clients/:clientId/link",
+  authRequired,
+  roleRequired("manager"),
+  (req, res, next) => {
+    try {
+      const links = getGlobalState("clientLinks", {});
+      const oneCClients = normalizeOneCClients(getGlobalState("oneCClients", []));
+      const requestedId = String(req.body?.oneCId || req.body?.id || "").trim();
+      const item = oneCClients.find((entry) => entry.id === requestedId) ||
+        normalizeOneCClient(req.body?.item || req.body || {});
+      const updatedLinks = linkCloverClient(
+        links,
+        req.params.clientId,
+        item,
+        new Date().toISOString()
+      );
+      setGlobalState("clientLinks", updatedLinks);
+
+      const candidateMap = getGlobalState("oneCClientCandidates", {});
+      if (candidateMap[String(req.params.clientId)]) {
+        const nextCandidateMap = { ...candidateMap };
+        delete nextCandidateMap[String(req.params.clientId)];
+        setGlobalState("oneCClientCandidates", nextCandidateMap);
+        const meta = getGlobalState("oneCClientsMeta", {});
+        setGlobalState("oneCClientsMeta", { ...meta, candidateMap: nextCandidateMap });
+      }
+
+      auditFromRequest(req, "one-c.client.link", {
+        clientId: req.params.clientId,
+        oneCId: item.id,
+        oneCName: item.name,
+      });
+      res.json({ ok: true, clientLink: updatedLinks[req.params.clientId], clientLinks: updatedLinks });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  "/api/admin/one-c/clients/auto-link",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const clients = listClients();
+    const links = getGlobalState("clientLinks", {});
+    const oneCClients = getGlobalState("oneCClients", []);
+    const linkedAt = new Date().toISOString();
+    const linked = autoLinkCloverClients(clients, links, oneCClients, linkedAt);
+    if (linked.changed) setGlobalState("clientLinks", linked.clientLinks);
+    const previousMeta = getGlobalState("oneCClientsMeta", {});
+    const meta = { ...previousMeta, lastAutoLinkAt: linkedAt, lastReport: linked.report };
+    setGlobalState("oneCClientsMeta", meta);
+    auditFromRequest(req, "one-c.clients.auto-link", linked.report);
+    res.json({
+      ok: true,
+      clientLinks: linked.clientLinks,
+      report: linked.report,
+      summary: buildOneCClientsSummary(clients, linked.clientLinks, linked.oneCClients, meta),
+    });
+  }
+);
 
 app.get(
   "/api/admin/one-c/preview/:type",
@@ -1194,12 +3384,16 @@ app.post(
       clientLinks,
     });
     const previous = normalizeExchangeState(stored.payload.exchange);
+    const checkedAt = new Date().toISOString();
     const exchange = {
       ...previous,
-      status: validation.ready ? "ready" : "error",
-      checkedAt: new Date().toISOString(),
+      // Проверка не ставит заказ в очередь. Передача выполняется отдельной кнопкой.
+      status: validation.ready
+        ? (["sent", "draft"].includes(previous.status) ? previous.status : "not_sent")
+        : "error",
+      checkedAt,
       message: validation.ready
-        ? "Заказ готов к тестовой передаче в 1С."
+        ? "Проверка пройдена. Нажмите «Передать в 1С TEST»."
         : validation.issues.join(" "),
     };
     const order = updateOrderPayload(stored.id, {
@@ -1227,6 +3421,13 @@ app.post(
     const stored = getOrderById(req.params.orderId);
     if (!stored) return res.status(404).json({ error: "Заказ не найден." });
 
+    if (!canReturnOrderToOneCQueue(stored.payload)) {
+      return res.status(409).json({
+        error:
+          "Заказ уже подтверждён уникальным документом 1С. Повторная постановка в очередь заблокирована для защиты от дубля.",
+      });
+    }
+
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const clientLinks = getGlobalState("clientLinks", {});
     const validation = validateOrderFor1C({
@@ -1236,19 +3437,20 @@ app.post(
     });
     const previous = normalizeExchangeState(stored.payload.exchange);
     const attemptedAt = new Date().toISOString();
-    const receipt = validation.ready
-      ? `TEST-1C-${Date.now()}-${String(stored.payload.number || stored.id).replace(/[^a-zA-Z0-9_-]/g, "")}`
-      : "";
     const exchange = {
       ...previous,
-      status: validation.ready ? "sent" : "error",
+      // Заказ считается переданным только после подтверждения от 1С (ACK).
+      // До этого момента он находится в очереди и доступен GET /api/one-c/test-order.
+      status: validation.ready ? "ready" : "error",
       attempts: previous.attempts + 1,
       checkedAt: attemptedAt,
       lastAttemptAt: attemptedAt,
-      sentAt: validation.ready ? attemptedAt : previous.sentAt,
-      receipt,
+      sentAt: validation.ready ? "" : previous.sentAt,
+      receipt: validation.ready ? "" : previous.receipt,
+      remoteDocument: validation.ready ? null : previous.remoteDocument,
+      channel: validation.ready ? "onec-pull" : previous.channel,
       message: validation.ready
-        ? "Тестовая передача выполнена. Реальное подключение к 1С пока не включено."
+        ? "Заказ поставлен в очередь. Теперь в 1С TEST нажмите «Получить тестовый заказ из Clover»."
         : validation.issues.join(" "),
     };
     const order = updateOrderPayload(stored.id, {
@@ -1260,7 +3462,7 @@ app.post(
     auditFromRequest(req, validation.ready ? "exchange.send.test" : "exchange.send.error", {
       orderId: order.id,
       orderNumber: order.number,
-      receipt,
+      queued: validation.ready,
       issues: validation.issues,
       attempts: exchange.attempts,
     });
@@ -1272,6 +3474,7 @@ app.post(
       validation,
       exchange,
       testMode: true,
+      queued: validation.ready,
     });
   }
 );
@@ -1283,6 +3486,13 @@ app.post(
   (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) return res.status(404).json({ error: "Заказ не найден." });
+
+    if (!canReturnOrderToOneCQueue(stored.payload)) {
+      return res.status(409).json({
+        error:
+          "Заказ уже подтверждён уникальным документом 1С. Сброс заблокирован для защиты от дубля.",
+      });
+    }
 
     const previous = normalizeExchangeState(stored.payload.exchange);
     const exchange = {
@@ -1390,6 +3600,271 @@ app.get(
   }
 );
 
+app.get("/api/one-c/reconciliation/requests", (req, res) => {
+  const status = String(req.query.status || "new");
+  const requests = listReconciliationRequests().filter((item) => !status || item.status === status);
+  res.json({ ok: true, requests });
+});
+
+app.post("/api/one-c/reconciliation/:requestId/result", (req, res, next) => {
+  try {
+    const current = getReconciliationRequestInternal(req.params.requestId);
+    if (!current) return res.status(404).json({ error: "Запрос акта сверки не найден." });
+    const base64 = String(req.body?.fileBase64 || "").replace(/^data:application\/pdf;base64,/, "");
+    if (!base64) return res.status(400).json({ error: "1С не передала PDF-файл." });
+    const buffer = Buffer.from(base64, "base64");
+    if (buffer.length < 5 || buffer.length > 15 * 1024 * 1024 || buffer.subarray(0, 5).toString("ascii") !== "%PDF-") {
+      return res.status(400).json({ error: "Передан некорректный PDF-файл." });
+    }
+    if (current.file_path && existsSync(current.file_path)) unlinkSync(current.file_path);
+    const filePath = path.resolve(reconciliationDirectory, `act-${current.id}-${Date.now()}-${randomUUID()}.pdf`);
+    writeFileSync(filePath, buffer, { flag: "wx" });
+    const request = updateReconciliationRequest(current.id, {
+      status: "ready",
+      fileName: String(req.body?.fileName || `Акт-сверки-${current.id}.pdf`).slice(0, 240),
+      filePath,
+      managerComment: String(req.body?.managerComment || "Акт получен автоматически из 1С.").slice(0, 2000),
+    });
+    writeAudit({ action: "one-c.reconciliation.receive", details: { requestId: request.id, bytes: buffer.length } });
+    sendOrderPush(request.userId, {
+      title: "Акт сверки готов",
+      body: "PDF получен из 1С и доступен в Clover.",
+      url: "/?section=reconciliation",
+      tag: `reconciliation-${request.id}`,
+    }).catch((error) => console.error(error));
+    res.json({ ok: true, requestId: request.id, status: request.status });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/reconciliation", authRequired, (req, res) => {
+  const requests = req.user.role === "manager"
+    ? listReconciliationRequests()
+    : listReconciliationRequests(req.user.id);
+  res.json({ requests });
+});
+
+app.post("/api/reconciliation", authRequired, roleRequired("client"), (req, res, next) => {
+  try {
+    const input = reconciliationSchema.parse(req.body);
+    const year = Number(input.year || new Date().getFullYear());
+    let dateFrom = input.dateFrom;
+    let dateTo = input.dateTo;
+    if (["q1", "q2", "q3", "q4"].includes(input.periodType)) {
+      const range = quarterRange(year, input.periodType);
+      dateFrom = range.dateFrom;
+      dateTo = range.dateTo;
+    } else if (input.periodType === "all") {
+      dateFrom = "";
+      dateTo = "";
+    } else if (!/^\d{4}-\d{2}-\d{2}$/.test(dateFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(dateTo) || dateFrom > dateTo) {
+      return res.status(400).json({ error: "Укажите корректный период: дата начала не должна быть позже даты окончания." });
+    }
+    const request = createReconciliationRequest({
+      userId: req.user.id, periodType: input.periodType, year, dateFrom, dateTo, clientComment: input.comment,
+    });
+    auditFromRequest(req, "reconciliation.create", { requestId: request.id, periodType: request.periodType, dateFrom, dateTo });
+    const clientProfile = getClientState(req.user.id).profile || {};
+    queueManagerNotification({
+      type: "reconciliation_request",
+      title: "Новый запрос акта сверки",
+      body: `${clientProfile.companyName || req.user.email || "Клиент"} · ${reconciliationPeriodText(request)}${request.clientComment ? ` · ${request.clientComment}` : ""}`,
+      url: `/?managerTab=acts&request=${encodeURIComponent(request.id)}`,
+      sourceId: request.id,
+    });
+    res.status(201).json({ ok: true, request });
+  } catch (error) { next(error); }
+});
+
+app.patch("/api/admin/reconciliation/:requestId", authRequired, roleRequired("manager"), (req, res, next) => {
+  try {
+    const input = reconciliationManagerSchema.parse(req.body);
+    const request = updateReconciliationRequest(req.params.requestId, {
+      status: input.status, managerComment: input.managerComment,
+    });
+    if (!request) return res.status(404).json({ error: "Запрос акта сверки не найден." });
+    auditFromRequest(req, "reconciliation.update", { requestId: request.id, status: request.status });
+    sendOrderPush(request.userId, {
+      title: "Акт сверки",
+      body: request.status === "ready" ? "Акт сверки готов к скачиванию." : `Статус запроса: ${request.status}`,
+      url: "/?section=reconciliation",
+      tag: `reconciliation-${request.id}`,
+    }).catch((error) => console.error(error));
+    res.json({ ok: true, request });
+  } catch (error) { next(error); }
+});
+
+app.post(
+  "/api/admin/reconciliation/:requestId/file",
+  authRequired, roleRequired("manager"), reconciliationUpload.single("file"),
+  async (req, res, next) => {
+    try {
+      if (!req.file?.path) {
+        return res.status(400).json({ error: "Выберите PDF-файл акта сверки." });
+      }
+      const header = readFileSync(req.file.path).subarray(0, 5).toString("ascii");
+      if (header !== "%PDF-") {
+        unlinkSync(req.file.path);
+        return res.status(400).json({ error: "Файл не является корректным PDF." });
+      }
+      const current = getReconciliationRequestInternal(req.params.requestId);
+      if (!current) {
+        if (req.file?.path && existsSync(req.file.path)) unlinkSync(req.file.path);
+        return res.status(404).json({ error: "Запрос акта сверки не найден." });
+      }
+      if (current.file_path && existsSync(current.file_path)) unlinkSync(current.file_path);
+      const request = updateReconciliationRequest(current.id, {
+        status: "ready",
+        fileName: req.file?.originalname || "Акт-сверки.pdf",
+        filePath: req.file?.path || "",
+        managerComment: String(req.body?.managerComment || current.manager_comment || ""),
+      });
+      auditFromRequest(req, "reconciliation.file.upload", { requestId: request.id, fileName: request.fileName });
+      sendOrderPush(request.userId, {
+        title: "Акт сверки готов", body: "Откройте Clover, чтобы скачать PDF.",
+        url: "/?section=reconciliation", tag: `reconciliation-${request.id}`,
+      }).catch((error) => console.error(error));
+
+      const clientUser = findUserById(request.userId);
+      let mail = { sent: false, reason: "account_not_found" };
+      if (clientUser?.email) {
+        const clientState = getClientState(clientUser.id);
+        const period = request.periodType === "all"
+          ? "за весь период"
+          : request.dateFrom && request.dateTo
+            ? `${request.dateFrom} — ${request.dateTo}`
+            : "";
+        const message = reconciliationReadyEmail({
+          companyName: clientState.profile?.companyName || "",
+          period,
+        });
+        try {
+          mail = await sendCloverMail({
+            to: clientUser.email,
+            ...message,
+            attachments: [{
+              filename: request.fileName || "Акт-сверки.pdf",
+              path: req.file.path,
+              contentType: "application/pdf",
+            }],
+          });
+        } catch (mailError) {
+          console.error("Reconciliation email error", mailError);
+          mail = { sent: false, reason: "send_failed" };
+        }
+      }
+      res.json({ ok: true, request, mail: { sent: Boolean(mail.sent) } });
+    } catch (error) { next(error); }
+  }
+);
+
+app.get("/api/reconciliation/:requestId/file", authRequired, (req, res) => {
+  const request = getReconciliationRequestInternal(req.params.requestId);
+  if (!request) return res.status(404).json({ error: "Запрос акта сверки не найден." });
+  if (req.user.role !== "manager" && String(request.user_id) !== String(req.user.id)) {
+    return res.status(403).json({ error: "Недостаточно прав для скачивания этого файла." });
+  }
+  if (!request.file_path || !existsSync(request.file_path)) {
+    return res.status(404).json({ error: "PDF-файл ещё не прикреплён." });
+  }
+  auditFromRequest(req, "reconciliation.file.download", { requestId: request.id });
+  return res.download(request.file_path, request.file_name || "Акт-сверки.pdf");
+});
+
+app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("manager"), async (req, res) => {
+  const status = String(req.body?.status || "");
+  if (!["pending", "approved", "rejected"].includes(status)) {
+    return res.status(400).json({ error: "Недопустимый статус регистрации." });
+  }
+  const user = setUserApprovalStatus(req.params.clientId, status);
+  if (!user) return res.status(404).json({ error: "Клиент не найден." });
+  auditFromRequest(req, "client.approval", { clientId: user.id, status });
+  let mail = { sent: false };
+  if (["approved", "rejected"].includes(status) && user.email) {
+    try {
+      mail = await sendCloverMail({ to: user.email, ...approvalEmail({ approved: status === "approved" }) });
+    } catch (mailError) {
+      console.error("Approval email error", mailError);
+    }
+  }
+  res.json({ ok: true, user: publicUser(user), clients: listClients(), mail: { sent: Boolean(mail.sent) } });
+});
+
+app.get("/api/admin/notifications", authRequired, roleRequired("manager"), (req, res) => {
+  const unreadOnly = String(req.query?.unread || "") === "1";
+  const limit = Number(req.query?.limit || 100);
+  const settings = getGlobalState("settings", DEFAULT_SETTINGS);
+  res.json({
+    notifications: listManagerNotifications({ unreadOnly, limit }),
+    status: publicManagerNotificationStatus(settings),
+  });
+});
+
+app.patch("/api/admin/notifications/:notificationId/read", authRequired, roleRequired("manager"), (req, res) => {
+  const notification = markManagerNotificationRead(req.params.notificationId);
+  if (!notification) return res.status(404).json({ error: "Уведомление не найдено." });
+  auditFromRequest(req, "manager.notification.read", { notificationId: notification.id });
+  res.json({ ok: true, notification });
+});
+
+app.post("/api/admin/notifications/read-all", authRequired, roleRequired("manager"), (req, res) => {
+  const result = markAllManagerNotificationsRead();
+  auditFromRequest(req, "manager.notification.read_all", result);
+  res.json({ ok: true, ...result });
+});
+
+app.post("/api/admin/notifications/test", authRequired, roleRequired("manager"), async (req, res, next) => {
+  try {
+    const result = await notifyManagers({
+      type: "test",
+      title: "Тестовое уведомление Clover",
+      body: "Каналы уведомлений менеджера настроены и работают.",
+      url: "/?managerTab=settings",
+      sourceId: `test-${randomUUID()}`,
+    });
+    auditFromRequest(req, "manager.notification.test", { delivery: result.delivery || [] });
+    res.json({ ok: true, result, status: publicManagerNotificationStatus() });
+  } catch (error) { next(error); }
+});
+
+app.get("/api/push/status", authRequired, (req, res) => {
+  const status = publicPushStatus();
+  const subscriptions = listPushSubscriptions(req.user.id);
+  res.json({ ...status, subscriptions: subscriptions.map((item) => ({
+    endpoint: item.endpoint, orderEvents: item.orderEvents, promotions: item.promotions,
+  })) });
+});
+
+app.post("/api/push/subscribe", authRequired, (req, res, next) => {
+  try {
+    const input = pushSubscriptionSchema.parse(req.body);
+    const subscription = upsertPushSubscription({
+      userId: req.user.id, subscription: input.subscription, preferences: input.preferences,
+    });
+    auditFromRequest(req, "push.subscribe", { promotions: subscription.promotions });
+    res.json({ ok: true, subscription });
+  } catch (error) { next(error); }
+});
+
+app.post("/api/push/unsubscribe", authRequired, (req, res) => {
+  const endpoint = String(req.body?.endpoint || "");
+  if (endpoint) deletePushSubscription(req.user.id, endpoint);
+  auditFromRequest(req, "push.unsubscribe", {});
+  res.json({ ok: true });
+});
+
+app.post("/api/admin/push/promotion", authRequired, roleRequired("manager"), async (req, res, next) => {
+  try {
+    const title = String(req.body?.title || "Новость Clover").trim().slice(0, 100);
+    const body = String(req.body?.body || "").trim().slice(0, 300);
+    if (!body) return res.status(400).json({ error: "Введите текст уведомления." });
+    const result = await sendPromotionPush({ title, body, url: "/?section=promotions", tag: `promotion-${Date.now()}` });
+    auditFromRequest(req, "push.promotion", { title, ...result });
+    res.json({ ok: true, result });
+  } catch (error) { next(error); }
+});
+
 app.get(
   "/api/admin/audit",
   authRequired,
@@ -1417,22 +3892,29 @@ app.post(
 app.use((error, req, res, next) => {
   console.error(error);
 
+  if (Number.isInteger(error?.status) && error.status >= 400 && error.status < 600) {
+    return res.status(error.status).json({ error: error.message });
+  }
+
   if (error instanceof z.ZodError) {
     return res.status(400).json({
       error:
-        "Проверьте заполнение полей. Пароль должен содержать не менее 8 символов.",
+        "Проверьте заполнение полей и формат email.",
       details: error.issues,
     });
   }
 
   if (error?.code === "LIMIT_FILE_SIZE") {
     return res.status(400).json({
-      error: "Фотография слишком большая. Максимальный размер — 5 МБ.",
+      error: req.path.includes("reconciliation")
+        ? "PDF-файл слишком большой. Максимальный размер — 15 МБ."
+        : "Фотография слишком большая. Максимальный размер — 5 МБ.",
     });
   }
 
   if (
     String(error?.message || "").includes("JPG") ||
+    String(error?.message || "").includes("PDF") ||
     String(error?.message || "").includes("резервной копии") ||
     String(error?.message || "").includes("раздел") ||
     String(error?.message || "").includes("адрес 1С") ||
@@ -1469,17 +3951,11 @@ try {
 
 app.listen(port, host, () => {
   console.log("");
-  console.log("Clover Server 2.2 запущен");
+  console.log("Clover Server V18.1 (4.0.4 legacy-ack-bridge) запущен");
   console.log(`API: http://localhost:${port}/api/health`);
-  console.log(
-    `Менеджер: ${
-      process.env.MANAGER_EMAIL || "manager@clover.local"
-    }`
-  );
-  console.log(
-    `Пароль: ${
-      process.env.MANAGER_PASSWORD || "Clover123!"
-    }`
-  );
+  if (process.env.MANAGER_EMAIL) {
+    console.log(`Менеджер: ${process.env.MANAGER_EMAIL}`);
+  }
+  console.log("Пароли и ключи в журнал не выводятся.");
   console.log("");
 });
