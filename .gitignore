@@ -75,6 +75,11 @@ README_BIG_2_0_2_2.txt
 backups/
 payload/
 _clover_onec_queue_update/
+_clover_big_*/
+_clover_fix_*/
+_stage2/
+_stage3/
+_stage3_*/
 clover-source.zip
 *.xlsx
 .clover-primary
@@ -85,3 +90,14 @@ ONEC_QUEUE_DIAGNOSTIC*.txt
 PROJECT_REPORT.txt
 CHECKSUMS_SHA256.txt
 repair-order.mjs
+GITIGNORE_ADD.txt
+MATRIX_TEST.txt
+VERIFICATION.txt
+README_STAGE*.txt
+README_BIG_*.txt
+README_FIX_*.txt
+README_FIXED.txt
+INSTALL_STAGE*.bat
+INSTALL_UPDATE_STAGE*.bat
+INSTALL_BIG_*.bat
+INSTALL_FIX_*.bat
