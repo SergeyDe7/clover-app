@@ -11,6 +11,11 @@ function Decode-Utf8B64([string]$b64) {
   return [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($b64))
 }
 
+$ModuleFile = [System.Environment]::ExpandEnvironmentVariables($ModuleFile).Trim().Trim('"')
+if (-not [System.IO.Path]::IsPathRooted($ModuleFile)) {
+  $ModuleFile = Join-Path (Get-Location).Path $ModuleFile
+}
+
 if (-not (Test-Path -LiteralPath $ModuleFile)) {
   throw ("File not found: " + $ModuleFile)
 }
