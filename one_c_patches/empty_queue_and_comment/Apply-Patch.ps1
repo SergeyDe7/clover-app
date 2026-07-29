@@ -1,4 +1,5 @@
 #Requires -Version 5.1
+# ASCII-only for Windows PowerShell 5.1
 param(
   [Parameter(Mandatory = $true)]
   [string]$ModuleFile
@@ -6,144 +7,135 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if (-not (Test-Path -LiteralPath $ModuleFile)) {
-  throw "Файл не найден: $ModuleFile"
+function Decode-Utf8B64([string]$b64) {
+  return [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($b64))
 }
 
-$backup = "$ModuleFile.bak-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-Copy-Item -LiteralPath $ModuleFile -Destination $backup -Force
+if (-not (Test-Path -LiteralPath $ModuleFile)) {
+  throw ("File not found: " + $ModuleFile)
+}
 
-# Read as bytes then detect UTF-8 / UTF-16 LE
-$bytes = [System.IO.File]::ReadAllBytes($ModuleFile)
+$fullPath = (Resolve-Path -LiteralPath $ModuleFile).Path
+$backup = "$fullPath.bak-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+Copy-Item -LiteralPath $fullPath -Destination $backup -Force
+
+$bytes = [System.IO.File]::ReadAllBytes($fullPath)
 $utf8 = New-Object System.Text.UTF8Encoding $false
 $utf16 = [System.Text.Encoding]::Unicode
+$mode = "utf8"
+
 if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
   $text = $utf16.GetString($bytes, 2, $bytes.Length - 2)
-  $encoding = $utf16
-  $writeBom = $true
+  $mode = "utf16bom"
 } elseif ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
   $text = $utf8.GetString($bytes, 3, $bytes.Length - 3)
-  $encoding = $utf8
-  $writeBom = $true
+  $mode = "utf8bom"
+} elseif ($bytes.Length -gt 4 -and $bytes[1] -eq 0 -and $bytes[3] -eq 0) {
+  $text = $utf16.GetString($bytes)
+  $mode = "utf16bom"
 } else {
   $text = $utf8.GetString($bytes)
-  $encoding = $utf8
-  $writeBom = $false
+  $mode = "utf8"
 }
 
 $original = $text
-$changes = @()
+$changes = New-Object System.Collections.Generic.List[string]
 
-function Replace-All([string]$src, [string]$old, [string]$new, [string]$label) {
-  if ($src.Contains($old)) {
-    $count = ([regex]::Matches($src, [regex]::Escape($old))).Count
-    $script:changes += "$label : $count"
-    return $src.Replace($old, $new)
+function Apply-Replace([ref]$src, [string]$old, [string]$new, [string]$label) {
+  if ([string]::IsNullOrEmpty($old)) { return }
+  if ($src.Value.IndexOf($old) -lt 0) { return }
+  $count = 0
+  $pos = 0
+  while (($i = $src.Value.IndexOf($old, $pos)) -ge 0) {
+    $count++
+    $pos = $i + $old.Length
   }
-  return $src
+  $src.Value = $src.Value.Replace($old, $new)
+  [void]$changes.Add("$label x$count")
 }
 
-# 1) Short empty-queue user messages (common variants)
-$text = Replace-All $text `
-  'Товары переданы, но заказ не создан: ' `
-  '' `
-  'Убран префикс «Товары переданы...»'
+# Base64 UTF-8 payloads (generated)
+$oldPrefix = Decode-Utf8B64 "0KLQvtCy0LDRgNGLINC/0LXRgNC10LTQsNC90YssINC90L4g0LfQsNC60LDQtyDQvdC1INGB0L7Qt9C00LDQvTog"
+$oldTitle  = Decode-Utf8B64 "0KLQvtCy0LDRgNGLINC/0LXRgNC10LTQsNC90YssINC90L4g0LfQsNC60LDQtyDQvdC1INGB0L7Qt9C00LDQvQ=="
+$oldApi1   = Decode-Utf8B64 "0J3QtdGCINC30LDQutCw0LfQvtCyLCDQv9C+0YHRgtCw0LLQu9C10L3QvdGL0YUg0LIg0L7Rh9C10YDQtdC00Ywg0LTQu9GPIDHQoSBURVNULg=="
+$oldApi2   = Decode-Utf8B64 "0J3QtdGCINC30LDQutCw0LfQvtCyLCDQv9C+0YHRgtCw0LLQu9C10L3QvdGL0YUg0LIg0L7Rh9C10YDQtdC00Ywg0LTQu9GPIDFDIFRFU1Qu"
+$newShort  = Decode-Utf8B64 "0J3QtdGCINC90L7QstGL0YUg0LfQsNC60LDQt9C+0LI="
 
-# If code builds long exception text for 404, prefer short message constants
-$text = Replace-All $text `
-  'Нет заказов, поставленных в очередь для 1С TEST.' `
-  'Нет новых заказов' `
-  'Текст пустой очереди (старый API)'
+$oldCloverLine  = Decode-Utf8B64 "ICsg0KHQuNC80LLQvtC70Ysu0J/QoSArICJbQ0xPVkVSOiI="
+$newCloverLine  = ' + "" + "[CLOVER_SKIP:"'
+$oldCloverLine2 = Decode-Utf8B64 "0KHQuNC80LLQvtC70Ysu0J/QoSArICJbQ0xPVkVSOiI="
+$newCloverLine2 = '"" + "[CLOVER_SKIP:"'
+$oldCloverLit   = '"[CLOVER:" +'
+$newCloverLit   = '"" + "'
 
-$text = Replace-All $text `
-  'Нет заказов, поставленных в очередь для 1C TEST.' `
-  'Нет новых заказов' `
-  'Текст пустой очереди (латиница C)'
+$oldAddr = Decode-Utf8B64 "0JDQtNGA0LXRgSDQtNC+0YHRgtCw0LLQutC4OiAi"
+$newAddr = Decode-Utf8B64 "0JDQtNGA0LXRgdCU0L7RgdGC0LDQstC60LjQodC70YPQttC10LHQvdC+OiAi"
 
-# Soften typical template if present as one string
-$text = Replace-All $text `
-  'Товары переданы, но заказ не создан' `
-  'Нет новых заказов' `
-  'Заголовок ошибки пустой очереди'
+$oldCommentUuid = Decode-Utf8B64 "0JrQvtC80LzQtdC90YLQsNGA0LjQuSA9INCa0L7QvNC80LXQvdGC0LDRgNC40LkgKyDQodC40LzQstC+0LvRiy7Qn9ChICsgIltDTE9WRVI6IiArINCY0LTQtdC90YLQuNGE0LjQutCw0YLQvtGAQ2xvdmVyICsgIl0iOw=="
+$newCommentUuid = "// Clover patch: skip UUID in document comment"
+$oldCommentAddr = Decode-Utf8B64 "0JrQvtC80LzQtdC90YLQsNGA0LjQuSA9INCa0L7QvNC80LXQvdGC0LDRgNC40LkgKyDQodC40LzQstC+0LvRiy7Qn9ChICsgItCQ0LTRgNC10YEg0LTQvtGB0YLQsNCy0LrQuDogIiArINCQ0LTRgNC10YHQlNC+0YHRgtCw0LLQutC4Ow=="
+$newCommentAddr = "// Clover patch: skip address in document comment"
 
-# 2) Comment field: stop appending CLOVER uuid / address into document comment
-# Common concatenation patterns (best-effort; safe no-op if absent)
-$commentPatterns = @(
-  @{
-    Old = ' + Символы.ПС + "[CLOVER:"'
-    New = ' + "" + "[CLOVER_SKIP:"'
-    Label = 'Отключена склейка [CLOVER:] через перевод строки'
-  },
-  @{
-    Old = 'Символы.ПС + "[CLOVER:"'
-    New = '"" + "[CLOVER_SKIP:"'
-    Label = 'Отключена склейка [CLOVER:]'
-  },
-  @{
-    Old = '"[CLOVER:" +'
-    New = '"" + "'
-    Label = 'Убран литерал [CLOVER:'
-  },
-  @{
-    Old = 'Адрес доставки: "'
-    New = 'АдресДоставкиСлужебно: "'
-    Label = 'Помечен служебный префикс адреса в комментарии'
+$textRef = [ref]$text
+
+# 1) Collapse "Товары переданы...: <details>" to short message first
+$longMsgStart = Decode-Utf8B64 "0KLQvtCy0LDRgNGLINC/0LXRgNC10LTQsNC90YssINC90L4g0LfQsNC60LDQtyDQvdC1INGB0L7Qt9C00LDQvTog"
+if ($textRef.Value.IndexOf($longMsgStart) -ge 0) {
+  $sb = New-Object System.Text.StringBuilder
+  $i = 0
+  $src = $textRef.Value
+  $replaced = 0
+  while ($i -lt $src.Length) {
+    $p = $src.IndexOf($longMsgStart, $i)
+    if ($p -lt 0) {
+      [void]$sb.Append($src.Substring($i))
+      break
+    }
+    [void]$sb.Append($src.Substring($i, $p - $i))
+    [void]$sb.Append($newShort)
+    $j = $p + $longMsgStart.Length
+    while ($j -lt $src.Length -and $src[$j] -ne [char]34 -and $src[$j] -ne "`n" -and $src[$j] -ne "`r") { $j++ }
+    $i = $j
+    $replaced++
   }
-)
-
-foreach ($p in $commentPatterns) {
-  $before = $text
-  $text = Replace-All $text $p.Old $p.New $p.Label
-}
-
-# Stronger: if there is an explicit multi-line comment assembly, try known template
-$oldBlock = @"
-Заказ Clover №
-"@
-
-# Prefer keeping only order.comment from JSON — if module sets Comment = comment + uuid + address,
-# rewrite frequent Russian templates:
-$templates = @(
-  @{
-    Old = 'Комментарий = Комментарий + Символы.ПС + "[CLOVER:" + ИдентификаторClover + "]"';
-    New = '// Clover patch: UUID не пишем в комментарий документа' + [Environment]::NewLine + '// ' + 'Комментарий = Комментарий + Символы.ПС + "[CLOVER:" + ИдентификаторClover + "]"';'
-    Label = 'Закомментирована строка UUID в комментарии'
-  },
-  @{
-    Old = 'Комментарий = Комментарий + Символы.ПС + "Адрес доставки: " + АдресДоставки;'
-    New = '// Clover patch: адрес не пишем в комментарий документа' + [Environment]::NewLine + '// ' + 'Комментарий = Комментарий + Символы.ПС + "Адрес доставки: " + АдресДоставки;'
-    Label = 'Закомментирована строка адреса в комментарии'
-  }
-)
-
-foreach ($t in $templates) {
-  if ($text.Contains($t.Old)) {
-    $text = $text.Replace($t.Old, $t.New)
-    $changes += $t.Label
+  if ($replaced -gt 0) {
+    $textRef.Value = $sb.ToString()
+    [void]$changes.Add("collapse-long-empty-msg x$replaced")
   }
 }
+
+# 2) Exact phrase leftovers / API texts
+Apply-Replace $textRef $oldTitle $newShort "empty-queue-title"
+Apply-Replace $textRef $oldApi1 $newShort "empty-queue-api-cyr"
+Apply-Replace $textRef $oldApi2 $newShort "empty-queue-api-lat"
+
+# 3) Comment assembly
+Apply-Replace $textRef $oldCloverLine $newCloverLine "disable-clover-concat-1"
+Apply-Replace $textRef $oldCloverLine2 $newCloverLine2 "disable-clover-concat-2"
+Apply-Replace $textRef $oldCloverLit $newCloverLit "disable-clover-literal"
+Apply-Replace $textRef $oldAddr $newAddr "disable-address-literal"
+Apply-Replace $textRef $oldCommentUuid $newCommentUuid "comment-out-uuid-assign"
+Apply-Replace $textRef $oldCommentAddr $newCommentAddr "comment-out-address-assign"
+$text = $textRef.Value
 
 if ($text -eq $original) {
-  Write-Host "ВНИМАНИЕ: автоматические замены не сработали."
-  Write-Host "Файл сохранён без изменений логики (backup всё равно создан)."
-  Write-Host "Backup: $backup"
-  Write-Host "Откройте выгруженный модуль в Блокноте и пришлите @dsd фрагмент около строки с «Товары переданы» и «CLOVER» — сделаем точечный патч."
+  Write-Host "WARNING: no automatic replacements matched."
+  Write-Host ("Backup still created: " + $backup)
+  Write-Host "Send the exported Clover_ObmenKlient.bsl to @dsd for a precise patch."
   exit 2
 }
 
-if ($writeBom -and $encoding -eq $utf16) {
+if ($mode -eq "utf16bom") {
   $outBytes = $utf16.GetPreamble() + $utf16.GetBytes($text)
-  [System.IO.File]::WriteAllBytes($ModuleFile, $outBytes)
-} elseif ($writeBom -and $encoding -eq $utf8) {
-  $outBytes = $utf8.GetPreamble() + $utf8.GetBytes($text)
-  [System.IO.File]::WriteAllBytes($ModuleFile, $outBytes)
+} elseif ($mode -eq "utf8bom") {
+  $outBytes = ([byte[]](0xEF, 0xBB, 0xBF)) + $utf8.GetBytes($text)
 } else {
-  [System.IO.File]::WriteAllBytes($ModuleFile, $encoding.GetBytes($text))
+  $outBytes = $utf8.GetBytes($text)
 }
+[System.IO.File]::WriteAllBytes($fullPath, $outBytes)
 
-Write-Host "OK. Патч применён к: $ModuleFile"
-Write-Host "Backup: $backup"
-Write-Host "Изменения:"
-$changes | ForEach-Object { Write-Host " - $_" }
-Write-Host ""
-Write-Host "Дальше: в конфигураторе загрузите этот файл обратно в модуль (см. ИНСТРУКЦИЯ_КОНФИГУРАТОР.txt)."
+Write-Host ("OK. Patched: " + $fullPath)
+Write-Host ("Backup: " + $backup)
+Write-Host "Changes:"
+foreach ($c in $changes) { Write-Host (" - " + $c) }
+Write-Host "Next: load this file back into the 1C module (instruction part F)."
