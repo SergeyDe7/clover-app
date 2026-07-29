@@ -13,7 +13,8 @@
 
 Скрипты:
 
-- `tools/Install-CloverWindowsService.ps1` — автозапуск как задача Windows
+- `tools/Install-CloverAutostart.ps1` — автозапуск через **Планировщик заданий** Windows (`schtasks`), не службу NSSM
+- `tools/Install-CloverWindowsService.ps1` — алиас на тот же скрипт (старое имя)
 - `tools/Health-Check.ps1` — проверка health
 - `tools/Daily-Backup.ps1` — ежедневный backup
 - `START_CLOVER_V18.bat` / `STOP_CLOVER_V18.bat` — ручной старт/стоп

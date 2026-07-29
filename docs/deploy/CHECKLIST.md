@@ -29,7 +29,8 @@
 ## D. Автозапуск и backup
 
 1. Запустить от администратора:  
-   `powershell -ExecutionPolicy Bypass -File tools\Install-CloverWindowsService.ps1`
+   `powershell -ExecutionPolicy Bypass -File tools\Install-CloverAutostart.ps1`  
+   (создаёт задачу Планировщика `CloverAutostart`, не Windows Service)
 2. Проверить автозапуск после перезагрузки.
 3. Настроить `tools\Daily-Backup.ps1` по расписанию (Планировщик заданий).
 4. Проверить health: `tools\Health-Check.ps1`.

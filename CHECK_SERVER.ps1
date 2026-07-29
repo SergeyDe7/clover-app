@@ -13,7 +13,7 @@ try {
     Write-Host "Время сервера:" $response.time
 } catch {
     Write-Host "Сервер Clover не отвечает на порту 4100." -ForegroundColor Red
-    Write-Host "Сначала запустите START_CLOVER.bat"
+    Write-Host "Сначала запустите START_CLOVER_V18.bat"
 }
 
 Write-Host ""
