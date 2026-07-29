@@ -1720,7 +1720,9 @@ async function handleOneCTestOrder(req, res, next) {
 
     if (!realOrder) {
       return res.status(404).json({
-        error: "Нет заказов, поставленных в очередь для 1С TEST.",
+        code: "EMPTY_QUEUE",
+        error: "Нет новых заказов",
+        userMessage: "Нет новых заказов",
       });
     }
 

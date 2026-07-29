@@ -32,7 +32,7 @@ if (-not $serverReady) { throw "Clover Server did not start on port 4100. See lo
 
 $DistIndex = Join-Path $Root "dist\index.html"
 if (-not (Test-Path $DistIndex)) {
-  Write-Host "dist отсутствует — выполняю npm run build..."
+  Write-Host "dist missing - running npm run build..."
   Push-Location $Root
   try {
     npm run build
