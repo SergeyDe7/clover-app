@@ -12,8 +12,7 @@
 
 ## Документация
 
-Вся техническая документация: папка [`docs/technical/`](docs/technical/README.md).
-
-Агенты Cursor: [`docs/agents/README_DSD.md`](docs/agents/README_DSD.md) — точка входа `@dsd`.
-
-Правила команды: [`AGENTS.md`](AGENTS.md).
+- Техническая: [`docs/technical/`](docs/technical/README.md)
+- Датацентр / сервер без домена: [`docs/deploy/`](docs/deploy/README.md)
+- Агенты Cursor: [`docs/agents/README_DSD.md`](docs/agents/README_DSD.md) — оркестратор `@dsd` (писать `@dsd` каждый раз не обязательно)
+- Правила команды: [`AGENTS.md`](AGENTS.md)

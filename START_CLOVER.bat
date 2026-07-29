@@ -1,4 +1,4 @@
 @echo off
 chcp 65001 > nul
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\Start-Clover.ps1" -OpenBrowser
-if errorlevel 1 pause
+REM Единая точка старта — делегирует в START_CLOVER_V18.bat (без дублирования логики).
+call "%~dp0START_CLOVER_V18.bat"

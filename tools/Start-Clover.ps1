@@ -30,6 +30,18 @@ for ($attempt = 0; $attempt -lt 45; $attempt++) {
 }
 if (-not $serverReady) { throw "Clover Server did not start on port 4100. See logs\server.log" }
 
+$DistIndex = Join-Path $Root "dist\index.html"
+if (-not (Test-Path $DistIndex)) {
+  Write-Host "dist отсутствует — выполняю npm run build..."
+  Push-Location $Root
+  try {
+    npm run build
+    if ($LASTEXITCODE -ne 0) { throw "npm run build failed. See console output." }
+  } finally {
+    Pop-Location
+  }
+}
+
 if (-not (Test-CloverFrontend)) {
   $frontCommand = "cd /d `"$Root`" && npm run preview -- --host 0.0.0.0 --port 5273 >> `"$Logs\frontend.log`" 2>&1"
   Start-Process -FilePath "cmd.exe" -ArgumentList "/d", "/c", $frontCommand -WindowStyle Minimized | Out-Null
