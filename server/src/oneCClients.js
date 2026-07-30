@@ -357,8 +357,37 @@ export function mergeClientLinksPreservingOneCLinks(incomingLinks, storedLinks) 
       incoming[clientId] && typeof incoming[clientId] === "object"
         ? incoming[clientId]
         : {};
-    // Deep-merge полей клиента: partial update не обнуляет matrix*/prices.
+    // Nested-merge: partial / пустые nested не затирают matrixProductIds и personalPrices.
     const next = { ...previous, ...rawIncoming };
+    if (Object.prototype.hasOwnProperty.call(rawIncoming, "personalPrices")) {
+      const prevPrices =
+        previous.personalPrices &&
+        typeof previous.personalPrices === "object" &&
+        !Array.isArray(previous.personalPrices)
+          ? previous.personalPrices
+          : {};
+      const incPrices =
+        rawIncoming.personalPrices &&
+        typeof rawIncoming.personalPrices === "object" &&
+        !Array.isArray(rawIncoming.personalPrices)
+          ? rawIncoming.personalPrices
+          : {};
+      next.personalPrices = { ...prevPrices, ...incPrices };
+    }
+    if (Object.prototype.hasOwnProperty.call(rawIncoming, "matrixProductIds")) {
+      const prevIds = Array.isArray(previous.matrixProductIds)
+        ? previous.matrixProductIds
+        : [];
+      const incIds = Array.isArray(rawIncoming.matrixProductIds)
+        ? rawIncoming.matrixProductIds
+        : null;
+      // Пустой массив во входящем partial не очищает сохранённую матрицу.
+      if (incIds === null || (incIds.length === 0 && prevIds.length > 0)) {
+        next.matrixProductIds = prevIds;
+      } else {
+        next.matrixProductIds = incIds;
+      }
+    }
     const incomingId = cleanText(next.oneCId);
     const storedId = cleanText(previous.oneCId);
     const explicitClear = next.oneCLinkMode === "manual-cleared";

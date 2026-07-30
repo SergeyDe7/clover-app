@@ -89,6 +89,44 @@ assert.equal(partialMatrix["client-1"].oneCId, "onec-client-1");
 assert.equal(partialMatrix["client-2"].oneCId, "keep-me");
 assert.deepEqual(partialMatrix["client-2"].matrixProductIds, ["x1"]);
 
+// M1: пустые nested в partial не затирают цены/матрицу.
+const emptyNestedWipe = mergeClientLinksPreservingOneCLinks(
+  {
+    "client-1": {
+      matrixMode: "selected",
+      matrixProductIds: [],
+      personalPrices: {},
+    },
+  },
+  {
+    "client-1": {
+      ...manual["client-1"],
+      matrixMode: "selected",
+      matrixProductIds: ["p1", "p2"],
+      personalPrices: { p1: { source: "fixed", price: 10 }, p2: { source: "fixed", price: 20 } },
+    },
+  }
+);
+assert.deepEqual(emptyNestedWipe["client-1"].matrixProductIds, ["p1", "p2"]);
+assert.equal(emptyNestedWipe["client-1"].personalPrices.p1.price, 10);
+assert.equal(emptyNestedWipe["client-1"].personalPrices.p2.price, 20);
+
+// Partial personalPrices дополняет, не затирает соседние ключи.
+const pricePatch = mergeClientLinksPreservingOneCLinks(
+  {
+    "client-1": {
+      personalPrices: { p2: { source: "fixed", price: 25 } },
+    },
+  },
+  {
+    "client-1": {
+      personalPrices: { p1: { source: "fixed", price: 10 } },
+    },
+  }
+);
+assert.equal(pricePatch["client-1"].personalPrices.p1.price, 10);
+assert.equal(pricePatch["client-1"].personalPrices.p2.price, 25);
+
 console.log("Проверка сопоставления клиентов 1С и полного каталога для поиска пройдена успешно.");
 console.log(
   `Просканировано: ${catalog.length}; для поиска: ${storedForSearch.length}; релевантных кандидатов: ${retained.length}; связано: ${auto.report.linked}.`
