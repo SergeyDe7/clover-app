@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Component, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import cloverLogo from "./assets/clover-logo.png";
 import { startPasskeyAuthentication, startPasskeyRegistration } from "./utils/webauthn";
@@ -8,6 +8,41 @@ import {
   getApiToken,
   setApiToken,
 } from "./serverApi";
+
+class PanelErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error) {
+    console.error(this.props.label || "Ошибка панели Clover", error);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="sync-error" style={{ marginTop: 12 }}>
+          <strong>{this.props.label || "Не удалось показать блок"}.</strong>
+          <div style={{ marginTop: 8 }}>{String(this.state.error?.message || this.state.error)}</div>
+          <button
+            className="secondary-button"
+            type="button"
+            style={{ marginTop: 10 }}
+            onClick={() => this.setState({ error: null })}
+          >
+            Попробовать снова
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const MANAGER_ACTIVE_TAB_KEY = "clover-manager-active-tab-v1";
 const MANAGER_OPEN_CLIENT_KEY = "clover-manager-open-client-v1";
@@ -1170,9 +1205,10 @@ function getOrCreateClientId() {
 }
 
 function normalizeProduct(product) {
-  const saleUnits = Array.isArray(product.saleUnits) && product.saleUnits.length
+  const filteredSaleUnits = Array.isArray(product.saleUnits)
     ? product.saleUnits.filter((unit) => UNIT_ORDER.includes(unit))
-    : ["piece"];
+    : [];
+  const saleUnits = filteredSaleUnits.length ? filteredSaleUnits : ["piece"];
   const numericId = Number(product.id);
   const hasNumericId = Number.isFinite(numericId) && numericId > 0;
 
@@ -2899,6 +2935,7 @@ function ClientMatrixPanel({
         </p>
       )}
 
+      {catalogPolicy?.matrixMode !== "pending" && (
       <div className="client-matrix-toolbar">
         <div className="catalog-filter-row">
           <input
@@ -2908,7 +2945,7 @@ function ClientMatrixPanel({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          {settings.showFavorites && (
+          {settings?.showFavorites && (
             <button
               className={favoritesOnly ? "category-button active" : "category-button"}
               type="button"
@@ -2931,17 +2968,22 @@ function ClientMatrixPanel({
           ))}
         </div>
       </div>
+      )}
 
       <section className="product-grid">
         {filtered.map((product) => {
-          const unit = product.saleUnits?.[0] || "piece";
+          const allowedUnits = UNIT_ORDER.filter((item) =>
+            (product.saleUnits || []).includes(item)
+          );
+          const unit = allowedUnits[0] || "piece";
+          const unitMeta = UNIT_CONFIG[unit] || UNIT_CONFIG.piece;
           const price = getUnitPrice(product, unit);
           const multiplier = getUnitMultiplier(product, unit);
           return (
             <article className="product-card" key={product.id}>
               <div className="product-card-top">
                 <span className="product-category">{product.category || "Без категории"}</span>
-                {settings.showFavorites && (
+                {settings?.showFavorites && (
                   <button
                     className={favorites.includes(product.id) ? "favorite-button active" : "favorite-button"}
                     type="button"
@@ -2967,24 +3009,24 @@ function ClientMatrixPanel({
               <h2>{product.name}</h2>
               <p className="product-code">Код: {product.code || "—"}</p>
               <p className="product-price">
-                {settings.showPrices && price > 0 ? (
+                {settings?.showPrices && price > 0 ? (
                   <>
-                    {formatMoney(price)} <small>/ {UNIT_CONFIG[unit]?.shortLabel || unit}</small>
+                    {formatMoney(price)} <small>/ {unitMeta.shortLabel || unit}</small>
                   </>
                 ) : (
                   "Цена уточняется"
                 )}
               </p>
               <div className="unit-choice">
-                {UNIT_ORDER.filter((item) => (product.saleUnits || []).includes(item)).map((item) => (
+                {allowedUnits.map((item) => (
                   <span className="category-button" key={item} style={{ cursor: "default" }}>
-                    {UNIT_CONFIG[item].label}
+                    {(UNIT_CONFIG[item] || UNIT_CONFIG.piece).label}
                   </span>
                 ))}
               </div>
               <p className="unit-hint">
                 {multiplier > 1
-                  ? `1 ${UNIT_CONFIG[unit].label.toLowerCase()} = ${multiplier} шт.`
+                  ? `1 ${unitMeta.label.toLowerCase()} = ${multiplier} шт.`
                   : "Количество считается поштучно"}
               </p>
             </article>
@@ -2992,9 +3034,11 @@ function ClientMatrixPanel({
         })}
         {!filtered.length && (
           <div className="empty-box">
-            {activeProducts.length
-              ? "В этой категории товаров нет."
-              : "В вашей матрице пока нет товаров."}
+            {catalogPolicy?.matrixMode === "pending"
+              ? "Менеджер ещё не закрепил товары в вашей матрице. Когда матрица будет готова, позиции появятся здесь."
+              : activeProducts.length
+                ? "В этой категории товаров нет."
+                : "В вашей матрице пока нет товаров. Попросите менеджера добавить позиции."}
           </div>
         )}
       </section>
@@ -3651,6 +3695,149 @@ function OneCClientPicker({ client, link, onChange }) {
   );
 }
 
+function MatrixOneCProductAdd({ clientId, link, setProducts, setClientLinks, onAfterAdd }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const runSearch = async (query = search) => {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await api.getOneCProducts({
+        search: String(query || "").trim(),
+        limit: 50,
+        offset: 0,
+      });
+      setItems(result.items || []);
+      setTotal(Number(result.total) || 0);
+    } catch (searchError) {
+      setError(searchError.message);
+      setItems([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openPicker = async () => {
+    setOpen(true);
+    setNotice("");
+    await runSearch(search);
+  };
+
+  const selectItem = async (item) => {
+    setLoading(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await api.createProductFromOneCCatalog({
+        oneCId: item.id,
+        item,
+        clientId,
+      });
+      if (Array.isArray(result.products)) {
+        setProducts(result.products.map(normalizeProduct));
+      }
+      if (result.clientLinks) {
+        setClientLinks(result.clientLinks);
+      } else if (result.clientLink) {
+        setClientLinks((current) => ({
+          ...current,
+          [clientId]: {
+            ...EMPTY_LINK,
+            ...(current[clientId] || {}),
+            ...result.clientLink,
+          },
+        }));
+      }
+      setNotice(
+        result.created
+          ? `Товар «${result.product?.name || item.name}» добавлен в Clover и в матрицу.`
+          : `Товар уже был в Clover — добавлен в матрицу: «${result.product?.name || item.name}».`
+      );
+      onAfterAdd?.(result);
+      setOpen(false);
+    } catch (selectError) {
+      setError(selectError.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="matrix-onec-add" style={{ marginTop: 12 }}>
+      <div className="toolbar two">
+        <p className="muted small" style={{ margin: 0 }}>
+          Можно взять позицию прямо из каталога 1С: товар появится в разделе «Товары» и в матрице клиента.
+          {link.matrixMode === "all" ? " В режиме «все товары» позиция сразу доступна клиенту." : ""}
+        </p>
+        <button className="secondary-button" type="button" onClick={openPicker} disabled={loading}>
+          Добавить из 1С
+        </button>
+      </div>
+      {notice && <div className="matrix-save-message saved" style={{ marginTop: 8 }}>{notice}</div>}
+      {open && (
+        <div className="one-c-picker" style={{ marginTop: 10 }}>
+          <div className="one-c-products-search">
+            <input
+              type="search"
+              value={search}
+              placeholder="Название или код номенклатуры 1С"
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  runSearch();
+                }
+              }}
+            />
+            <button className="secondary-button" type="button" disabled={loading} onClick={() => runSearch()}>
+              {loading ? "Поиск..." : "Найти"}
+            </button>
+            <button className="secondary-button" type="button" onClick={() => setOpen(false)}>Закрыть</button>
+          </div>
+          {error && <div className="sync-error">{error}</div>}
+          <p className="muted small">Найдено: {total}. Показаны первые {items.length || 0}.</p>
+          <div className="one-c-products-list one-c-picker-list">
+            {items.map((item) => {
+              const alreadyInClover = Boolean(item.cloverLink?.productId);
+              return (
+                <article key={item.id}>
+                  <div>
+                    <strong>{item.name}</strong>
+                    <span>Код: {item.code || "—"}</span>
+                    {alreadyInClover && (
+                      <span className="muted small">
+                        Уже в Clover: {item.cloverLink.productName || `ID ${item.cloverLink.productId}`}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    className="primary-button"
+                    type="button"
+                    disabled={loading}
+                    onClick={() => selectItem(item)}
+                  >
+                    {alreadyInClover ? "В матрицу" : "Добавить"}
+                  </button>
+                </article>
+              );
+            })}
+            {!loading && !items.length && (
+              <div className="empty-box">Номенклатура не найдена. Уточните запрос или обновите выгрузку из 1С.</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function normalizeManagerClientAddresses(addresses = []) {
   const normalized = (Array.isArray(addresses) ? addresses : [])
     .map((item, index) => {
@@ -3937,6 +4124,7 @@ function ManagerClientEditor({ client, onReload }) {
 function ManagerClients({
   clients,
   products,
+  setProducts,
   clientLinks,
   setClientLinks,
   onReload,
@@ -3956,6 +4144,9 @@ function ManagerClients({
     if (!target) return;
 
     restoredOpenClient.current = true;
+    if (target instanceof HTMLDetailsElement) {
+      target.open = true;
+    }
     window.requestAnimationFrame(() => {
       target.scrollIntoView({ block: "start" });
     });
@@ -4132,6 +4323,7 @@ function ManagerClients({
   };
 
   return (
+    <PanelErrorBoundary label="Ошибка раздела «Клиенты»">
     <section>
       <div className="toolbar two">
         <input
@@ -4149,27 +4341,35 @@ function ManagerClients({
       {visible.length ? (
         <div className="client-list">
           {visible.map((client) => {
-            const link = {
+            const rawLink = {
               ...EMPTY_LINK,
               ...(clientLinks[client.id] || {}),
-              personalPrices: {
-                ...((clientLinks[client.id] || {}).personalPrices || {}),
-              },
             };
+            const link = {
+              ...rawLink,
+              matrixProductIds: Array.isArray(rawLink.matrixProductIds)
+                ? rawLink.matrixProductIds
+                : [],
+              personalPrices:
+                rawLink.personalPrices && typeof rawLink.personalPrices === "object"
+                  ? { ...rawLink.personalPrices }
+                  : {},
+            };
+            const matrixProductIds = link.matrixProductIds;
             const orderedIds = [
               ...new Set(
-                client.orders.flatMap((order) =>
+                (Array.isArray(client.orders) ? client.orders : []).flatMap((order) =>
                   (order.items || []).map(
                     (item) => item.productId ?? item.id
                   )
                 )
               ),
             ];
-            const matrixProducts = products.filter(
+            const matrixProducts = (Array.isArray(products) ? products : []).filter(
               (product) =>
-                product.active &&
+                product.active !== false &&
                 (!matrixSearch ||
-                  product.name
+                  String(product.name || "")
                     .toLowerCase()
                     .includes(matrixSearch.toLowerCase()) ||
                   String(product.code || "")
@@ -4179,6 +4379,7 @@ function ManagerClients({
             const personalPriceCount = Object.keys(
               link.personalPrices || {}
             ).length;
+            const matrixOpen = String(openClientId) === String(client.id);
 
             return (
               <article className="client-card" key={client.id}>
@@ -4228,9 +4429,8 @@ function ManagerClients({
                     <span>Товаров в матрице</span>
                     <strong>
                       {link.matrixMode === "all"
-                        ? products.filter((item) => item.active)
-                            .length
-                        : link.matrixProductIds.length}
+                        ? products.filter((item) => item.active !== false).length
+                        : matrixProductIds.length}
                     </strong>
                   </article>
                   <article>
@@ -4264,12 +4464,11 @@ function ManagerClients({
                   id={`client-matrix-${client.id}`}
                   className="order-details"
                   style={{ marginTop: 15 }}
-                  open={String(openClientId) === String(client.id)}
                   onToggle={(event) => {
-                    const nextId = event.currentTarget.open ? String(client.id) : "";
+                    const isOpen = Boolean(event.currentTarget.open);
                     setOpenClientId((current) => {
-                      const value = event.currentTarget.open
-                        ? nextId
+                      const value = isOpen
+                        ? String(client.id)
                         : String(current) === String(client.id)
                           ? ""
                           : current;
@@ -4282,6 +4481,8 @@ function ManagerClients({
                     Товарная матрица, цены и связь с 1С
                   </summary>
 
+                  {matrixOpen && (
+                  <PanelErrorBoundary label="Ошибка блока матрицы клиента">
                   <OneCClientPicker
                     client={client}
                     link={link}
@@ -4437,6 +4638,12 @@ function ManagerClients({
 
                   {link.matrixMode !== "pending" && (
                     <div style={{ marginTop: 14 }}>
+                      <MatrixOneCProductAdd
+                        clientId={client.id}
+                        link={link}
+                        setProducts={setProducts}
+                        setClientLinks={setClientLinks}
+                      />
                       <div className="toolbar two">
                         <input
                           type="search"
@@ -4470,7 +4677,7 @@ function ManagerClients({
                         <span>
                           {link.matrixMode === "all"
                             ? `Товаров в матрице: ${products.filter((item) => item.active).length}`
-                            : `Выбрано: ${link.matrixProductIds.length}`}
+                            : `Выбрано: ${matrixProductIds.length}`}
                         </span>
                         <span>
                           Индивидуальных исключений: {personalPriceCount}
@@ -4542,7 +4749,9 @@ function ManagerClients({
                             ] || {};
                           const selected =
                             link.matrixMode === "all" ||
-                            link.matrixProductIds.includes(product.id);
+                            matrixProductIds.some(
+                              (id) => String(id) === String(product.id)
+                            );
                           const priceMode = ["manual", "purchase_markup"].includes(
                             price.source
                           )
@@ -4582,12 +4791,12 @@ function ManagerClients({
                                         event.target.checked
                                           ? [
                                               ...new Set([
-                                                ...link.matrixProductIds,
+                                                ...matrixProductIds,
                                                 product.id,
                                               ]),
                                             ]
-                                          : link.matrixProductIds.filter(
-                                              (id) => id !== product.id
+                                          : matrixProductIds.filter(
+                                              (id) => String(id) !== String(product.id)
                                             ),
                                     })
                                   }
@@ -4613,8 +4822,9 @@ function ManagerClients({
                                       : unit === "pack"
                                         ? "pricePack"
                                         : "priceBundle";
-                                  const unitAllowed =
-                                    product.saleUnits.includes(unit);
+                                  const unitAllowed = Array.isArray(product.saleUnits)
+                                    ? product.saleUnits.includes(unit)
+                                    : false;
                                   const purchasePrice =
                                     product.purchasePrices?.[unit];
                                   const calculatedPrice =
@@ -4802,16 +5012,22 @@ function ManagerClients({
                   >
                     <strong>Адреса клиента</strong>
                     <p>
-                      {client.addresses.length
-                        ? client.addresses
-                            .map((item) =>
-                              typeof item === "string" ? item : item.address
-                            )
-                            .filter(Boolean)
-                            .join("; ")
-                        : "Нет адресов"}
+                      {(() => {
+                        const addresses = Array.isArray(client.addresses)
+                          ? client.addresses
+                          : [];
+                        const text = addresses
+                          .map((item) =>
+                            typeof item === "string" ? item : item?.address
+                          )
+                          .filter(Boolean)
+                          .join("; ");
+                        return text || "Нет адресов";
+                      })()}
                     </p>
                   </div>
+                  </PanelErrorBoundary>
+                  )}
                 </details>
               </article>
             );
@@ -4821,6 +5037,7 @@ function ManagerClients({
         <div className="empty-box">Клиенты не найдены.</div>
       )}
     </section>
+    </PanelErrorBoundary>
   );
 }
 
@@ -6546,7 +6763,7 @@ function ManagerDashboard({ orders, products, setProducts, profile, addresses, s
       <nav className="manager-nav">{MANAGER_TABS.map(([id,label]) => <button className={tab === id ? "active" : ""} type="button" key={id} onClick={() => selectTab(id)}>{label}</button>)}</nav>
       {tab === "orders" && <ManagerOrders orders={orders} settings={settings} onUpdateOrder={onUpdateOrder} onBulkUpdateOrders={onBulkUpdateOrders} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} onReload={onReload} />}
       {tab === "exchange" && <ManagerExchange onReload={onReload} onNavigate={selectTab} />}
-      {tab === "clients" && <ManagerClients clients={clients} products={products} clientLinks={clientLinks} setClientLinks={setClientLinks} onReload={onReload} />}
+      {tab === "clients" && <ManagerClients clients={clients} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} onReload={onReload} />}
       {tab === "acts" && <ManagerReconciliation requests={reconciliationRequests} onReload={onReload} />}
       {tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}
       {tab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} />}

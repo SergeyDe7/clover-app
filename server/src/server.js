@@ -83,9 +83,11 @@ import {
   testOneCConnection,
 } from "./oneC.js";
 import {
+  addProductIdToClientMatrix,
   autoLinkCloverProducts,
   buildOneCProductCandidates,
   buildOneCProductsSummary,
+  createOrReuseCloverProductFromOneC,
   linkCloverProduct,
   mergeProductsPreservingOneCLinks,
   normalizeOneCProduct,
@@ -2770,6 +2772,68 @@ app.get(
       limit,
       summary: buildOneCProductsSummary(products, items, meta),
     });
+  }
+);
+
+app.post(
+  "/api/admin/one-c/products/from-catalog",
+  authRequired,
+  roleRequired("manager"),
+  (req, res, next) => {
+    try {
+      const products = getGlobalState("products", DEFAULT_PRODUCTS);
+      const oneCProducts = normalizeOneCProducts(getGlobalState("oneCProducts", []));
+      const requestedId = String(req.body?.oneCId || req.body?.id || "").trim();
+      const item =
+        oneCProducts.find((entry) => entry.id === requestedId) ||
+        normalizeOneCProduct(req.body?.item || req.body || {});
+      const linkedAt = new Date().toISOString();
+      const result = createOrReuseCloverProductFromOneC(products, item, linkedAt);
+      setGlobalState("products", result.products);
+
+      let clientLink = null;
+      let clientLinks = getGlobalState("clientLinks", {});
+      const clientId = String(req.body?.clientId || "").trim();
+      if (clientId) {
+        const clients = listClients();
+        const client = clients.find((entry) => String(entry.id) === clientId);
+        if (!client) {
+          return res.status(404).json({ error: "Клиент Clover не найден." });
+        }
+        const matrixUpdate = addProductIdToClientMatrix(
+          clientLinks,
+          clientId,
+          result.product.id
+        );
+        clientLinks = matrixUpdate.clientLinks;
+        clientLink = normalizeClientLink(matrixUpdate.clientLink);
+        setGlobalState("clientLinks", clientLinks);
+      }
+
+      auditFromRequest(req, "one-c.product.from-catalog", {
+        productId: result.product.id,
+        productName: result.product.name,
+        oneCId: item.id,
+        oneCName: item.name,
+        created: result.created,
+        clientId: clientId || null,
+      });
+
+      res.json({
+        ok: true,
+        created: result.created,
+        product: result.product,
+        products: result.products,
+        clientId: clientId || null,
+        clientLink,
+        clientLinks: clientId ? clientLinks : undefined,
+        message: result.created
+          ? "Товар создан в Clover и связан с 1С."
+          : "Товар уже был в Clover — использована существующая связь.",
+      });
+    } catch (error) {
+      next(error);
+    }
   }
 );
 

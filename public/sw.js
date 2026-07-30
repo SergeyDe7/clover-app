@@ -1,4 +1,4 @@
-const CACHE_NAME = "clover-v18-shell-v1";
+const CACHE_NAME = "clover-v18-shell-v2";
 const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -16,15 +16,28 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
-  if (new URL(request.url).pathname.startsWith("/api/") || new URL(request.url).pathname.startsWith("/uploads/")) return;
+
+  const path = new URL(request.url).pathname;
+  if (path.startsWith("/api/") || path.startsWith("/uploads/")) return;
+
   event.respondWith(
     fetch(request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        }
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match("/")))
+      .catch(async () => {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        // Нельзя отдавать HTML вместо JS/CSS — это даёт пустой экран.
+        if (request.mode === "navigate") {
+          return (await caches.match("/")) || Response.error();
+        }
+        return Response.error();
+      })
   );
 });
 

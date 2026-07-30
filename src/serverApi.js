@@ -356,6 +356,13 @@ export const api = {
     });
   },
 
+  createProductFromOneCCatalog({ oneCId, item = null, clientId = "" } = {}) {
+    return request("/admin/one-c/products/from-catalog", {
+      method: "POST",
+      body: { oneCId, item, clientId: clientId || undefined },
+    });
+  },
+
   getOneCClients({ search = "", limit = 50, offset = 0 } = {}) {
     const params = new URLSearchParams({
       search,

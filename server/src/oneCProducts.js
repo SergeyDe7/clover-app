@@ -464,6 +464,110 @@ export function linkCloverProduct(products, productId, rawOneCProduct, now = new
   );
 }
 
+function nextCloverProductId(products) {
+  return Math.max(0, ...(Array.isArray(products) ? products : []).map((item) => Number(item.id) || 0)) + 1;
+}
+
+/**
+ * Создаёт товар Clover из позиции каталога 1С или возвращает уже связанный.
+ * Не дублирует oneCId: при существующей связи переиспользует товар.
+ */
+export function createOrReuseCloverProductFromOneC(
+  products,
+  rawOneCProduct,
+  now = new Date().toISOString()
+) {
+  const item = normalizeOneCProduct(rawOneCProduct);
+  if (!item.id || !item.name) {
+    throw new Error("Не удалось определить выбранную позицию 1С.");
+  }
+
+  const source = Array.isArray(products) ? products : [];
+  const existing = source.find((product) => cleanText(product.oneCId) === item.id);
+  if (existing) {
+    return {
+      products: source,
+      product: existing,
+      created: false,
+    };
+  }
+
+  const id = nextCloverProductId(source);
+  const product = {
+    id,
+    category: "Из 1С",
+    name: item.name,
+    code: item.code || `CL-${String(id).padStart(4, "0")}`,
+    oneCId: item.id,
+    oneCCode: item.code,
+    oneCName: item.name,
+    oneCMatchCode: item.code,
+    oneCMatchName: item.name,
+    oneCSearchQuery: "",
+    oneCSearchRequestedAt: "",
+    oneCLinkMode: "manual-from-catalog",
+    oneCLinkedAt: now,
+    active: true,
+    pieceSize: 1,
+    packSize: 1,
+    bundleSize: 1,
+    pricePiece: 0,
+    pricePack: 0,
+    priceBundle: 0,
+    saleUnits: ["piece"],
+  };
+
+  return {
+    products: [...source, product],
+    product,
+    created: true,
+  };
+}
+
+/** Добавляет productId в матрицу клиента; pending → selected. */
+export function addProductIdToClientMatrix(clientLinks, clientId, productId) {
+  const links = clientLinks && typeof clientLinks === "object" ? { ...clientLinks } : {};
+  const key = String(clientId || "").trim();
+  if (!key) throw new Error("Не указан клиент Clover.");
+
+  const current = links[key] && typeof links[key] === "object" ? links[key] : {};
+  const matrixProductIds = Array.isArray(current.matrixProductIds)
+    ? current.matrixProductIds.map(String)
+    : [];
+  const id = String(productId);
+  const nextIds = matrixProductIds.includes(id)
+    ? matrixProductIds
+    : [...matrixProductIds, id];
+
+  let matrixMode = cleanText(current.matrixMode) || "pending";
+  if (matrixMode === "pending" || !matrixMode) {
+    matrixMode = "selected";
+  }
+
+  const nextLink = {
+    ...current,
+    matrixMode,
+    matrixProductIds:
+      matrixMode === "all"
+        ? Array.isArray(current.matrixProductIds)
+          ? current.matrixProductIds
+          : []
+        : nextIds.map((value) => {
+            const numeric = Number(value);
+            return Number.isFinite(numeric) && String(numeric) === String(value)
+              ? numeric
+              : value;
+          }),
+  };
+
+  links[key] = nextLink;
+  return {
+    clientLinks: links,
+    clientLink: nextLink,
+    addedToMatrix: matrixMode === "selected" || matrixMode === "pending",
+  };
+}
+
 export function mergeProductsPreservingOneCLinks(incomingProducts, storedProducts) {
   const storedById = new Map(
     (Array.isArray(storedProducts) ? storedProducts : []).map((product) => [
