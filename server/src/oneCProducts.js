@@ -468,9 +468,156 @@ function nextCloverProductId(products) {
   return Math.max(0, ...(Array.isArray(products) ? products : []).map((item) => Number(item.id) || 0)) + 1;
 }
 
+/** Плейсхолдеры — не считаются «настоящей» категорией для обучения/копирования. */
+export const PLACEHOLDER_PRODUCT_CATEGORIES = new Set(["Из 1С", "Новые товары", ""]);
+
+const CATEGORY_KEYWORD_RULES = [
+  {
+    category: "Перчатки",
+    patterns: [/перчатк/u, /нитрил/u, /латекс/u, /винилов/u],
+  },
+  {
+    category: "Пакеты и пленка",
+    patterns: [
+      /пакет/u,
+      /мешк/u,
+      /пленк/u,
+      /плёнк/u,
+      /пергамент/u,
+      /вакуумн/u,
+      /стрейч/u,
+      /stretch/u,
+    ],
+  },
+  {
+    // Салфетки / уборка — раньше «Упаковка», иначе «в банке» ложно даёт Упаковку.
+    category: "Уборка",
+    patterns: [
+      /салфетк/u,
+      /швабр/u,
+      /\bмоп\b/u,
+      /щетк/u,
+      /губк/u,
+      /ведр/u,
+      /пипидастр/u,
+      /совк/u,
+      /распылител/u,
+      /пульверизатор/u,
+      /тряпк/u,
+      /полотер/u,
+      /диспенсер/u,
+    ],
+  },
+  {
+    category: "Упаковка",
+    patterns: [
+      /банк[аиуы]/u,
+      /крышк/u,
+      /контейнер/u,
+      /бутылк/u,
+      /oneclick/u,
+      /стаканчик/u,
+      /лоток/u,
+      /коробк/u,
+    ],
+  },
+  {
+    category: "Одноразовая продукция",
+    patterns: [/трубочк/u, /вилк/u, /ложк/u, /тарелк/u, /зубочист/u, /шпател/u],
+  },
+  {
+    category: "Канцтовары",
+    patterns: [/кассов/u, /лент/u, /бумаг/u, /ручк/u, /степлер/u, /ножниц/u, /\bа4\b/u],
+  },
+  {
+    category: "Бытовая химия",
+    patterns: [
+      /белизна/u,
+      /санокс/u,
+      /хелп/u,
+      /моющ/u,
+      /чистящ/u,
+      /дезинф/u,
+      /средство для/u,
+      /химия/u,
+    ],
+  },
+  {
+    category: "Текстиль",
+    patterns: [/полотн/u, /вафельн/u, /текстил/u, /полотенц/u, /тряпк[аи] для пола/u],
+  },
+];
+
+function isUsableCategory(category) {
+  const value = cleanText(category);
+  return Boolean(value) && !PLACEHOLDER_PRODUCT_CATEGORIES.has(value);
+}
+
+function inferCategoryByKeywords(name) {
+  const text = cleanText(name).toLocaleLowerCase("ru-RU").replaceAll("ё", "е");
+  if (!text) return "";
+
+  for (const rule of CATEGORY_KEYWORD_RULES) {
+    if (rule.patterns.some((pattern) => pattern.test(text))) {
+      return rule.category;
+    }
+  }
+  return "";
+}
+
+/**
+ * Определяет категорию Clover по названию: похожий товар в каталоге,
+ * иначе ключевые слова, иначе «Новые товары» (не «Из 1С»).
+ */
+export function inferCloverProductCategory(
+  name,
+  products = [],
+  { minimumScore = 0.52, fallback = "Новые товары" } = {}
+) {
+  const query = cleanText(name);
+  if (!query) return fallback;
+
+  let best = null;
+  for (const product of Array.isArray(products) ? products : []) {
+    if (!isUsableCategory(product?.category)) continue;
+    const score = productCandidateScore(query, { name: product.name });
+    if (score < minimumScore) continue;
+    if (
+      !best ||
+      score > best.score ||
+      (score === best.score &&
+        cleanText(product.category).localeCompare(best.category, "ru") < 0)
+    ) {
+      best = { category: cleanText(product.category), score };
+    }
+  }
+  if (best) return best.category;
+
+  const byKeywords = inferCategoryByKeywords(query);
+  if (byKeywords) return byKeywords;
+
+  return fallback;
+}
+
+/** Переназначает категорию у товаров с плейсхолдером «Из 1С» / пустой. */
+export function applyInferredCategories(products) {
+  const source = Array.isArray(products) ? products : [];
+  let changed = 0;
+  const next = source.map((product) => {
+    const current = cleanText(product?.category);
+    if (current && current !== "Из 1С") return product;
+    const inferred = inferCloverProductCategory(product?.name, source);
+    if (inferred === current) return product;
+    changed += 1;
+    return { ...product, category: inferred };
+  });
+  return { products: next, changed };
+}
+
 /**
  * Создаёт товар Clover из позиции каталога 1С или возвращает уже связанный.
  * Не дублирует oneCId: при существующей связи переиспользует товар.
+ * Категория: авто по похожим товарам / ключевым словам (не «Из 1С»).
  */
 export function createOrReuseCloverProductFromOneC(
   products,
@@ -485,9 +632,28 @@ export function createOrReuseCloverProductFromOneC(
   const source = Array.isArray(products) ? products : [];
   const existing = source.find((product) => cleanText(product.oneCId) === item.id);
   if (existing) {
+    const current = cleanText(existing.category);
+    if (current && current !== "Из 1С") {
+      return {
+        products: source,
+        product: existing,
+        created: false,
+      };
+    }
+    const category = inferCloverProductCategory(existing.name || item.name, source);
+    if (category === current) {
+      return {
+        products: source,
+        product: existing,
+        created: false,
+      };
+    }
+    const product = { ...existing, category };
     return {
-      products: source,
-      product: existing,
+      products: source.map((entry) =>
+        String(entry.id) === String(existing.id) ? product : entry
+      ),
+      product,
       created: false,
     };
   }
@@ -495,7 +661,7 @@ export function createOrReuseCloverProductFromOneC(
   const id = nextCloverProductId(source);
   const product = {
     id,
-    category: "Из 1С",
+    category: inferCloverProductCategory(item.name, source),
     name: item.name,
     code: item.code || `CL-${String(id).padStart(4, "0")}`,
     oneCId: item.id,
