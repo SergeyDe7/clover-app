@@ -343,8 +343,22 @@ export function mergeClientLinksPreservingOneCLinks(incomingLinks, storedLinks) 
   const result = {};
 
   for (const clientId of allIds) {
-    const next = { ...(incoming[clientId] || {}) };
-    const previous = stored[clientId] || {};
+    const previous =
+      stored[clientId] && typeof stored[clientId] === "object"
+        ? stored[clientId]
+        : {};
+    // Клиент только в stored и отсутствует во входящей карте — не затираем матрицу.
+    if (!Object.prototype.hasOwnProperty.call(incoming, clientId)) {
+      result[clientId] = previous;
+      continue;
+    }
+
+    const rawIncoming =
+      incoming[clientId] && typeof incoming[clientId] === "object"
+        ? incoming[clientId]
+        : {};
+    // Deep-merge полей клиента: partial update не обнуляет matrix*/prices.
+    const next = { ...previous, ...rawIncoming };
     const incomingId = cleanText(next.oneCId);
     const storedId = cleanText(previous.oneCId);
     const explicitClear = next.oneCLinkMode === "manual-cleared";

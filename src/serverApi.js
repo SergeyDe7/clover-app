@@ -499,6 +499,7 @@ export const api = {
   resetAll() {
     return request("/admin/reset", {
       method: "POST",
+      body: { confirm: "RESET" },
     });
   },
 };

@@ -7,6 +7,11 @@ import {
   normalizeExchangeState,
   sanitizeOrderExchangeForSave,
 } from "../src/exchange.js";
+import {
+  clientMayOrderCatalogProduct,
+  findClientOrderMatrixViolations,
+  isMatrixProductForLink,
+} from "../src/matrixGuard.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const serverSource = readFileSync(path.join(root, "server/src/server.js"), "utf8");
@@ -21,6 +26,30 @@ assert.ok(
   "PUT /api/state/orders должен защищать manager replace от wipe."
 );
 assert.ok(
+  serverSource.includes("findClientOrderMatrixViolations"),
+  "PUT /api/state/orders должен проверять товары клиента по матрице."
+);
+assert.ok(
+  serverSource.includes("MATRIX_PRODUCT_FORBIDDEN"),
+  "Обход матрицы должен возвращать явный код ошибки."
+);
+assert.ok(
+  serverSource.includes("isMatrixProductForLink"),
+  "Пересчёт цен не должен помечать все товары как матричные."
+);
+assert.ok(
+  serverSource.includes("isAdminFullResetAllowed"),
+  "Полный сброс должен быть ограничен kill-switch."
+);
+assert.ok(
+  serverSource.includes("ONEC_CLAIM_ACTIVE"),
+  "Reset обмена должен блокировать активный sending claim."
+);
+assert.ok(
+  appSource.includes('disabled={busy || exchange.status === "sending"}'),
+  "UI reset/send должны быть disabled при sending."
+);
+assert.ok(
   appSource.includes("open={matrixOpen}"),
   "Матрица клиента должна восстанавливать open после F5."
 );
@@ -29,8 +58,110 @@ assert.ok(
   "Автосейв матрицы должен быть отключён."
 );
 assert.ok(
-  appSource.includes("authUser?.role === \"manager\""),
+  appSource.includes('authUser?.role === "manager"'),
   "Кабинет менеджера должен опираться на роль из bootstrap, а не на локальный дефолт."
+);
+
+const migrateManagerIdx = serverSource.indexOf('"/api/migrate/manager"');
+assert.ok(migrateManagerIdx > 0, "migrate/manager должен существовать.");
+const migrateManagerSlice = serverSource.slice(
+  migrateManagerIdx,
+  migrateManagerIdx + 1200
+);
+assert.ok(
+  migrateManagerSlice.includes("mergeProductsPreservingOneCLinks"),
+  "migrate/manager обязан merge'ить products с сохранением 1С-связей."
+);
+assert.ok(
+  migrateManagerSlice.includes("mergeClientLinksPreservingOneCLinks"),
+  "migrate/manager обязан merge'ить clientLinks с сохранением 1С-связей."
+);
+assert.ok(
+  !/setGlobalState\(\s*"products",\s*req\.body\.products\s*\)/.test(
+    migrateManagerSlice
+  ),
+  "migrate/manager не должен писать products сырым телом."
+);
+
+const migrateClientIdx = serverSource.indexOf('"/api/migrate/client"');
+const migrateClientSlice = serverSource.slice(
+  migrateClientIdx,
+  migrateClientIdx + 1800
+);
+assert.ok(
+  migrateClientSlice.includes("previousClientOrders.length === 0"),
+  "migrate/client не должен затирать уже существующие серверные заказы."
+);
+
+const products = [
+  { id: "1", name: "В матрице", active: true },
+  { id: "2", name: "Вне матрицы", active: true },
+];
+
+assert.equal(
+  clientMayOrderCatalogProduct(
+    { matrixMode: "selected", matrixProductIds: ["1"] },
+    "2",
+    products
+  ),
+  false,
+  "selected без id запрещает товар вне матрицы."
+);
+assert.equal(
+  clientMayOrderCatalogProduct(
+    { matrixMode: "selected", matrixProductIds: ["1"] },
+    "1",
+    products
+  ),
+  true
+);
+assert.equal(
+  clientMayOrderCatalogProduct({ matrixMode: "pending" }, "1", products),
+  false,
+  "pending запрещает каталожные позиции."
+);
+assert.equal(
+  clientMayOrderCatalogProduct(
+    { matrixMode: "pending", allowFullCatalog: true },
+    "2",
+    products
+  ),
+  true,
+  "allowFullCatalog разрешает активный каталог."
+);
+assert.equal(
+  clientMayOrderCatalogProduct({ matrixMode: "all" }, "2", products),
+  true
+);
+
+const violations = findClientOrderMatrixViolations(
+  [
+    {
+      id: "o1",
+      items: [{ productId: "2", name: "Вне" }],
+      customItems: [{ name: "Свой товар" }],
+    },
+  ],
+  { matrixMode: "selected", matrixProductIds: ["1"] },
+  products
+);
+assert.equal(violations.length, 1);
+assert.equal(violations[0].productId, "2");
+
+const customOnly = findClientOrderMatrixViolations(
+  [{ id: "o2", items: [], customItems: [{ name: "Свой" }] }],
+  { matrixMode: "pending" },
+  products
+);
+assert.equal(customOnly.length, 0, "Только customItems не нарушают матрицу.");
+
+assert.equal(isMatrixProductForLink({ matrixMode: "all" }, "9"), true);
+assert.equal(
+  isMatrixProductForLink(
+    { matrixMode: "selected", matrixProductIds: ["1"] },
+    "2"
+  ),
+  false
 );
 
 const previousNotSent = {
@@ -110,10 +241,7 @@ assert.equal(wipe.ok, false);
 assert.equal(wipe.status, 409);
 
 const normalDelete = assertSafeManagerOrderReplace(
-  [
-    { id: "a" },
-    { id: "b" },
-  ],
+  [{ id: "a" }, { id: "b" }],
   [{ id: "a" }]
 );
 assert.equal(normalDelete.ok, true);
@@ -125,5 +253,5 @@ const emptyWipe = assertSafeManagerOrderReplace([{ id: "a" }, { id: "b" }], []);
 assert.equal(emptyWipe.ok, false);
 
 console.log(
-  "verify-orders-hardening: exchange sanitize + manager wipe guard + UI gates ok"
+  "verify-orders-hardening: exchange sanitize + matrix guard + migrate merge + wipe guard ok"
 );

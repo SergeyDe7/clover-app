@@ -65,6 +65,30 @@ const cleared = mergeClientLinksPreservingOneCLinks(
 );
 assert.equal(cleared["client-1"].oneCId, "");
 
+const partialMatrix = mergeClientLinksPreservingOneCLinks(
+  { "client-1": { matrixMode: "all" } },
+  {
+    "client-1": {
+      ...manual["client-1"],
+      matrixMode: "selected",
+      matrixProductIds: ["p1", "p2"],
+      allowFullCatalog: false,
+      personalPrices: { p1: { source: "fixed", price: 10 } },
+    },
+    "client-2": {
+      matrixMode: "selected",
+      matrixProductIds: ["x1"],
+      oneCId: "keep-me",
+    },
+  }
+);
+assert.equal(partialMatrix["client-1"].matrixMode, "all");
+assert.deepEqual(partialMatrix["client-1"].matrixProductIds, ["p1", "p2"]);
+assert.equal(partialMatrix["client-1"].personalPrices.p1.price, 10);
+assert.equal(partialMatrix["client-1"].oneCId, "onec-client-1");
+assert.equal(partialMatrix["client-2"].oneCId, "keep-me");
+assert.deepEqual(partialMatrix["client-2"].matrixProductIds, ["x1"]);
+
 console.log("Проверка сопоставления клиентов 1С и полного каталога для поиска пройдена успешно.");
 console.log(
   `Просканировано: ${catalog.length}; для поиска: ${storedForSearch.length}; релевантных кандидатов: ${retained.length}; связано: ${auto.report.linked}.`

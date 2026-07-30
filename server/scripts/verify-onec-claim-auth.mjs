@@ -75,11 +75,46 @@ assert.ok(
   serverSource.includes('previous.status === "sending" && !isOneCClaimExpired(previous)'),
   "Send не должен возвращать активный sending в ready."
 );
+assert.ok(
+  serverSource.includes("ONEC_CLAIM_ACTIVE"),
+  "Reset должен блокировать активный claim с явным кодом."
+);
+assert.ok(
+  serverSource.includes("ONEC_DRAFT_LOCKED") ||
+    serverSource.includes('previous.status === "draft"'),
+  "Reset/re-queue должен учитывать реальный draft 1С."
+);
+assert.ok(
+  serverSource.includes("function isAdminFullResetAllowed"),
+  "Полный сброс должен иметь kill-switch."
+);
+assert.ok(
+  serverSource.includes('confirm === "RESET"') ||
+    serverSource.includes('trim() !== "RESET"'),
+  "Полный сброс требует confirm RESET."
+);
+assert.ok(
+  envExample.includes("ALLOW_ADMIN_FULL_RESET"),
+  ".env.example должен документировать ALLOW_ADMIN_FULL_RESET."
+);
+
+const resetIdx = serverSource.indexOf('"/api/admin/exchange/orders/:orderId/reset"');
+assert.ok(resetIdx > 0, "reset endpoint должен существовать.");
+const resetSlice = serverSource.slice(resetIdx, resetIdx + 900);
+assert.ok(
+  resetSlice.includes("isOneCClaimExpired"),
+  "Reset endpoint обязан проверять lease claim."
+);
 
 const appSource = readFileSync(path.join(root, "src/App.jsx"), "utf8");
 assert.ok(
   appSource.includes('disabled={busy || exchange.status === "sending"}'),
-  "UI не должен давать send при активном sending."
+  "UI не должен давать send/reset при активном sending."
+);
+const apiSource = readFileSync(path.join(root, "src/serverApi.js"), "utf8");
+assert.ok(
+  apiSource.includes('confirm: "RESET"'),
+  "resetAll должен передавать confirm RESET."
 );
 
 const previousSending = {

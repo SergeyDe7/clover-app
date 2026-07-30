@@ -3501,7 +3501,7 @@ function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrders, on
               <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOrder(order, "json")}>JSON</button>
               <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOrder(order, "csv")}>CSV</button>
               <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
-              {exchange.status !== "not_sent" && <button className="secondary-button" disabled={busy} type="button" onClick={() => runExchangeAction(order, "reset")}>Сбросить 1С</button>}
+              {exchange.status !== "not_sent" && <button className="secondary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => runExchangeAction(order, "reset")}>Сбросить 1С</button>}
               {settings.managerCanDeleteOrders && <button className="danger-button" type="button" onClick={() => onDeleteOrder(order)}>Удалить</button>}
             </div>
           </div>
@@ -6574,7 +6574,7 @@ function ManagerExchange({ onReload, onNavigate }) {
             <button className="primary-button" disabled={busy || !runtime.readyForWrite} title={!runtime.readyForWrite ? "Запись пока заблокирована настройками" : ""} type="button" onClick={() => action(row, "draft")}>{modeIsReal ? "Черновик в 1С" : "Черновик в симуляторе"}</button>
             <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "json")}>JSON</button>
             <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "csv")}>CSV</button>
-            {exchange.status !== "not_sent" && <button className="secondary-button" disabled={busy} type="button" onClick={() => action(row, "reset")}>Сбросить</button>}
+            {exchange.status !== "not_sent" && <button className="secondary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => action(row, "reset")}>Сбросить</button>}
           </div>
         </article>;
       })}

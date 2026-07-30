@@ -147,6 +147,10 @@ import {
   notifyManagers,
   publicManagerNotificationStatus,
 } from "./managerNotifications.js";
+import {
+  findClientOrderMatrixViolations,
+  isMatrixProductForLink,
+} from "./matrixGuard.js";
 
 const app = express();
 const ONE_C_STATE_KEY = "oneCIntegration";
@@ -300,6 +304,33 @@ function allowDevelopmentAuthLinks(req) {
   const loopbackHost = ["localhost", "127.0.0.1", "::1"].includes(hostName);
   const loopbackClient = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(remoteAddress);
   return loopbackHost && loopbackClient;
+}
+
+function isConfiguredPublicUrlLocal() {
+  const candidates = [process.env.APP_PUBLIC_URL, process.env.CLOVER_PUBLIC_URL];
+  for (const raw of candidates) {
+    const value = String(raw || "").trim();
+    if (!value) continue;
+    try {
+      const host = new URL(value).hostname.toLowerCase();
+      if (!["localhost", "127.0.0.1", "::1"].includes(host)) return false;
+    } catch {
+      const lower = value.toLowerCase();
+      if (!lower.includes("localhost") && !lower.includes("127.0.0.1")) return false;
+    }
+  }
+  return true;
+}
+
+/** Полный wipe: unset → только loopback; false → запрет; true → явно разрешено. */
+function isAdminFullResetAllowed(req) {
+  const flag = String(process.env.ALLOW_ADMIN_FULL_RESET || "")
+    .trim()
+    .toLowerCase();
+  if (["false", "0", "no"].includes(flag)) return false;
+  if (["true", "1", "yes"].includes(flag)) return true;
+  if (!isConfiguredPublicUrlLocal()) return false;
+  return allowDevelopmentAuthLinks(req);
 }
 
 function quarterRange(year, quarter) {
@@ -807,7 +838,12 @@ function repriceOrderWithCurrentOneC(order, products, rawLink, oneCProducts = []
     const product = productsById.get(String(item.productId ?? item.id));
     if (!product) return item;
 
-    const priced = applyClientPrices(product, link, true, oneCById);
+    const priced = applyClientPrices(
+      product,
+      link,
+      isMatrixProductForLink(link, product.id),
+      oneCById
+    );
     const unit = ["piece", "pack", "bundle"].includes(item.unit) ? item.unit : "piece";
     const unitPrice = priceForOrderUnit(priced, unit);
     const source = priced.priceSources?.[unit] || "unspecified";
@@ -953,11 +989,19 @@ function receiptUsedByAnotherOrder(order = {}) {
 
 function canReturnOrderToOneCQueue(order = {}) {
   const exchange = normalizeExchangeState(order.exchange);
-  return (
-    exchange.status !== "sent" ||
-    isSimulationExchange(exchange) ||
-    receiptUsedByAnotherOrder(order)
-  );
+  if (isSimulationExchange(exchange) || receiptUsedByAnotherOrder(order)) {
+    return true;
+  }
+  if (exchange.status === "sent") return false;
+  // Реальный черновик 1С с номером/id — не сбрасываем и не ставим снова в очередь.
+  if (
+    exchange.status === "draft" &&
+    (String(exchange.receipt || "").trim() ||
+      String(exchange.remoteDocument?.id || exchange.remoteDocument?.number || "").trim())
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function oneCQueueSnapshot() {
@@ -1648,6 +1692,20 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const links = getGlobalState("clientLinks", {});
     const oneCProducts = getGlobalState("oneCProducts", []);
+    const clientLink = normalizeClientLink(links[req.user.id]);
+    const matrixViolations = findClientOrderMatrixViolations(
+      orders,
+      clientLink,
+      products
+    );
+    if (matrixViolations.length) {
+      return res.status(400).json({
+        error:
+          "В заказе есть товары вне вашей матрицы. Уберите их или оформите через «товар вне матрицы».",
+        code: "MATRIX_PRODUCT_FORBIDDEN",
+        items: matrixViolations.slice(0, 20),
+      });
+    }
 
     // Пересчёт цен для новых заказов. Отсутствие закупочной цены
     // не должно блокировать сохранение заказа менеджеру — жёсткая
@@ -1655,7 +1713,7 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     const repriced = repriceClientOrders(
       orders,
       products,
-      links[req.user.id],
+      clientLink,
       oneCProducts
     );
     orders = repriced.orders;
@@ -2410,41 +2468,50 @@ app.post(
     );
 
     const previousClientOrders = listOrders(req.user.id);
-    const previousClientById = new Map(
-      previousClientOrders.map((order) => [String(order.id), order])
-    );
-    replaceOrders({
-      orders: orders.map((order) => {
-        const mapped = {
-          ...order,
-          id: order.id || randomUUID(),
-          clientId: req.user.id,
-          customerName:
-            profile.companyName ||
-            profile.contactName ||
-            order.customerName ||
-            "Клиент",
-          customerContact:
-            profile.contactName ||
-            order.customerContact ||
-            "",
-          customerPhone:
-            profile.phone ||
-            order.customerPhone ||
-            "",
-          customerEmail:
-            profile.email ||
-            req.user.email,
-        };
-        return sanitizeOrderExchangeForSave(
-          mapped,
-          previousClientById.get(String(mapped.id)),
-          "client"
-        );
-      }),
-      userId: req.user.id,
-      managerMode: false,
-    });
+    // One-shot: если на сервере уже есть заказы клиента — не затираем их
+    // устаревшим localStorage после повторного логина.
+    if (previousClientOrders.length === 0 && orders.length) {
+      const previousClientById = new Map(
+        previousClientOrders.map((order) => [String(order.id), order])
+      );
+      replaceOrders({
+        orders: orders.map((order) => {
+          const mapped = {
+            ...order,
+            id: order.id || randomUUID(),
+            clientId: req.user.id,
+            customerName:
+              profile.companyName ||
+              profile.contactName ||
+              order.customerName ||
+              "Клиент",
+            customerContact:
+              profile.contactName ||
+              order.customerContact ||
+              "",
+            customerPhone:
+              profile.phone ||
+              order.customerPhone ||
+              "",
+            customerEmail:
+              profile.email ||
+              req.user.email,
+          };
+          return sanitizeOrderExchangeForSave(
+            mapped,
+            previousClientById.get(String(mapped.id)),
+            "client"
+          );
+        }),
+        userId: req.user.id,
+        managerMode: false,
+      });
+    } else if (previousClientOrders.length > 0 && orders.length) {
+      auditFromRequest(req, "migrate.client.orders-skipped", {
+        existing: previousClientOrders.length,
+        incoming: orders.length,
+      });
+    }
 
     res.json({ ok: true });
   }
@@ -2459,18 +2526,28 @@ app.post(
       Array.isArray(req.body?.products) &&
       req.body.products.length
     ) {
-      setGlobalState("products", req.body.products);
+      const storedProducts = getGlobalState("products", DEFAULT_PRODUCTS);
+      const products = mergeProductsPreservingOneCLinks(
+        req.body.products.map(stripRuntimeProductPricing),
+        storedProducts
+      );
+      setGlobalState("products", products);
     }
 
     if (req.body?.settings) {
-      setGlobalState("settings", req.body.settings);
+      setGlobalState("settings", {
+        ...getGlobalState("settings", DEFAULT_SETTINGS),
+        ...req.body.settings,
+      });
     }
 
     if (req.body?.clientLinks) {
-      setGlobalState(
-        "clientLinks",
-        req.body.clientLinks
+      const storedLinks = getGlobalState("clientLinks", {});
+      const clientLinks = mergeClientLinksPreservingOneCLinks(
+        req.body.clientLinks,
+        storedLinks
       );
+      setGlobalState("clientLinks", clientLinks);
     }
 
     res.json({ ok: true });
@@ -3628,7 +3705,7 @@ app.post(
     if (previous.status === "sending" && !isOneCClaimExpired(previous)) {
       return res.status(409).json({
         error:
-          "Заказ уже выдан 1С TEST и ожидает ACK. Нельзя снова поставить в очередь, пока идёт передача. Дождитесь подтверждения или нажмите «Сбросить 1С».",
+          "Заказ уже выдан 1С TEST и ожидает ACK. Нельзя снова поставить в очередь, пока идёт передача. Дождитесь подтверждения 1С.",
       });
     }
 
@@ -3690,14 +3767,27 @@ app.post(
     const stored = getOrderById(req.params.orderId);
     if (!stored) return res.status(404).json({ error: "Заказ не найден." });
 
-    if (!canReturnOrderToOneCQueue(stored.payload)) {
+    const previous = normalizeExchangeState(stored.payload.exchange);
+    if (previous.status === "sending" && !isOneCClaimExpired(previous)) {
       return res.status(409).json({
         error:
-          "Заказ уже подтверждён уникальным документом 1С. Сброс заблокирован для защиты от дубля.",
+          "Заказ уже выдан 1С TEST и ожидает ACK. Сброс заблокирован, пока активен claim. Дождитесь подтверждения или истечения lease.",
+        code: "ONEC_CLAIM_ACTIVE",
       });
     }
 
-    const previous = normalizeExchangeState(stored.payload.exchange);
+    if (!canReturnOrderToOneCQueue(stored.payload)) {
+      return res.status(409).json({
+        error:
+          previous.status === "draft"
+            ? "У заказа уже есть черновик в 1С. Сброс заблокирован для защиты от дубля."
+            : "Заказ уже подтверждён уникальным документом 1С. Сброс заблокирован для защиты от дубля.",
+        code:
+          previous.status === "draft"
+            ? "ONEC_DRAFT_LOCKED"
+            : "ONEC_SENT_LOCKED",
+      });
+    }
     const exchange = {
       ...previous,
       status: "not_sent",
@@ -4082,6 +4172,20 @@ app.post(
   authRequired,
   roleRequired("manager"),
   (req, res) => {
+    if (!isAdminFullResetAllowed(req)) {
+      return res.status(403).json({
+        error:
+          "Полный сброс запрещён. Для локального TEST оставьте ALLOW_ADMIN_FULL_RESET пустым (только loopback) или задайте true; на сервере укажите false.",
+        code: "ADMIN_RESET_DENIED",
+      });
+    }
+    if (String(req.body?.confirm || "").trim() !== "RESET") {
+      return res.status(400).json({
+        error: "Для полного сброса передайте confirm: \"RESET\".",
+        code: "ADMIN_RESET_CONFIRM_REQUIRED",
+      });
+    }
+
     createServerBackup({
       label: "before-reset",
       reason: "Автоматическая копия перед полным сбросом",
