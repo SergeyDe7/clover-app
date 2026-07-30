@@ -1,16 +1,18 @@
-# React + Vite
+# Clover V18.1
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Рабочая версия приложения: **4.0.4**.
 
-Currently, two official plugins are available:
+## Быстрый старт
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Запуск: `START_CLOVER_V18.bat`
+2. UI: http://localhost:5273/
+3. Health: http://localhost:4100/api/health
 
-## React Compiler
+Настройки 1С, SMTP, Push и Passkey — только в `server/.env` (образец: `server/.env.example`).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Документация
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- Техническая: [`docs/technical/`](docs/technical/README.md)
+- Датацентр / сервер без домена: [`docs/deploy/`](docs/deploy/README.md)
+- Агенты Cursor: [`docs/agents/README_DSD.md`](docs/agents/README_DSD.md) — оркестратор `@dsd` (писать `@dsd` каждый раз не обязательно)
+- Правила команды: [`AGENTS.md`](AGENTS.md)

@@ -24,6 +24,18 @@ export const db = new DatabaseSync(databasePath, {
   enableForeignKeyConstraints: true,
 });
 
+function tableColumns(tableName) {
+  return new Set(
+    db.prepare(`PRAGMA table_info(${tableName})`).all().map((row) => row.name)
+  );
+}
+
+function ensureColumn(tableName, columnName, definition) {
+  if (!tableColumns(tableName).has(columnName)) {
+    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+  }
+}
+
 db.exec(`
   PRAGMA journal_mode = WAL;
   PRAGMA busy_timeout = 5000;
@@ -78,7 +90,109 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_audit_created_at
   ON audit_log(created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS auth_tokens (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    used_at TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) STRICT;
+
+  CREATE INDEX IF NOT EXISTS idx_auth_tokens_lookup
+  ON auth_tokens(type, token_hash, expires_at);
+
+  CREATE TABLE IF NOT EXISTS reconciliation_requests (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    period_type TEXT NOT NULL,
+    year INTEGER,
+    date_from TEXT NOT NULL DEFAULT '',
+    date_to TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'new',
+    client_comment TEXT NOT NULL DEFAULT '',
+    manager_comment TEXT NOT NULL DEFAULT '',
+    file_name TEXT NOT NULL DEFAULT '',
+    file_path TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) STRICT;
+
+  CREATE INDEX IF NOT EXISTS idx_reconciliation_user
+  ON reconciliation_requests(user_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    endpoint TEXT NOT NULL UNIQUE,
+    subscription_json TEXT NOT NULL,
+    order_events INTEGER NOT NULL DEFAULT 1,
+    promotions INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) STRICT;
+
+  CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
+  ON push_subscriptions(user_id);
+
+  CREATE TABLE IF NOT EXISTS manager_notifications (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    url TEXT NOT NULL DEFAULT '',
+    source_id TEXT NOT NULL DEFAULT '',
+    read_at TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+  ) STRICT;
+
+  CREATE INDEX IF NOT EXISTS idx_manager_notifications_created
+  ON manager_notifications(created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_manager_notifications_unread
+  ON manager_notifications(read_at, created_at DESC);
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_manager_notifications_source
+  ON manager_notifications(type, source_id)
+  WHERE source_id <> '';
+
+  CREATE TABLE IF NOT EXISTS passkey_credentials (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    public_key BLOB NOT NULL,
+    counter INTEGER NOT NULL DEFAULT 0,
+    transports_json TEXT NOT NULL DEFAULT '[]',
+    device_type TEXT NOT NULL DEFAULT '',
+    backed_up INTEGER NOT NULL DEFAULT 0,
+    webauthn_user_id TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) STRICT;
+
+  CREATE INDEX IF NOT EXISTS idx_passkey_user
+  ON passkey_credentials(user_id);
+
+  CREATE TABLE IF NOT EXISTS webauthn_challenges (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    challenge TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) STRICT;
 `);
+
+ensureColumn("users", "email_verified", "INTEGER NOT NULL DEFAULT 1");
+ensureColumn("users", "approval_status", "TEXT NOT NULL DEFAULT 'approved'");
+ensureColumn("users", "password_changed_at", "TEXT NOT NULL DEFAULT ''");
+ensureColumn("users", "last_login_at", "TEXT NOT NULL DEFAULT ''");
 
 function parseJson(value, fallback) {
   try {
@@ -122,12 +236,40 @@ export function ensureGlobalState() {
   if (!db.prepare("SELECT 1 FROM app_state WHERE key = ?").get("clientLinks")) {
     setGlobalState("clientLinks", {});
   }
+
+  if (!db.prepare("SELECT 1 FROM app_state WHERE key = ?").get("clientManagerNotes")) {
+    setGlobalState("clientManagerNotes", {});
+  }
+
+  if (!db.prepare("SELECT 1 FROM app_state WHERE key = ?").get("oneCProducts")) {
+    setGlobalState("oneCProducts", []);
+  }
+
+  if (!db.prepare("SELECT 1 FROM app_state WHERE key = ?").get("oneCProductsMeta")) {
+    setGlobalState("oneCProductsMeta", {});
+  }
+
+  if (!db.prepare("SELECT 1 FROM app_state WHERE key = ?").get("oneCProductCandidates")) {
+    setGlobalState("oneCProductCandidates", {});
+  }
+
+  if (!db.prepare("SELECT 1 FROM app_state WHERE key = ?").get("oneCClients")) {
+    setGlobalState("oneCClients", []);
+  }
+
+  if (!db.prepare("SELECT 1 FROM app_state WHERE key = ?").get("oneCClientsMeta")) {
+    setGlobalState("oneCClientsMeta", {});
+  }
+
+  if (!db.prepare("SELECT 1 FROM app_state WHERE key = ?").get("oneCClientCandidates")) {
+    setGlobalState("oneCClientCandidates", {});
+  }
 }
 
 export function findUserByEmail(email) {
   return db
     .prepare(`
-      SELECT id, email, password_hash, role, created_at
+      SELECT id, email, password_hash, role, created_at, email_verified, approval_status, password_changed_at, last_login_at
       FROM users
       WHERE email = ?
     `)
@@ -137,7 +279,7 @@ export function findUserByEmail(email) {
 export function findUserById(id) {
   return db
     .prepare(`
-      SELECT id, email, role, created_at
+      SELECT id, email, role, created_at, email_verified, approval_status, password_changed_at, last_login_at
       FROM users
       WHERE id = ?
     `)
@@ -149,6 +291,8 @@ export function createUser({
   passwordHash,
   role = "client",
   profile = {},
+  emailVerified = false,
+  approvalStatus = role === "manager" ? "approved" : "pending",
 }) {
   const id = randomUUID();
   const createdAt = now();
@@ -157,14 +301,19 @@ export function createUser({
 
   try {
     db.prepare(`
-      INSERT INTO users(id, email, password_hash, role, created_at)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO users(
+        id, email, password_hash, role, created_at,
+        email_verified, approval_status, password_changed_at, last_login_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, '', '')
     `).run(
       id,
       email.toLowerCase(),
       passwordHash,
       role,
-      createdAt
+      createdAt,
+      emailVerified ? 1 : 0,
+      approvalStatus
     );
 
     if (role === "client") {
@@ -191,6 +340,8 @@ export function createUser({
     email: email.toLowerCase(),
     role,
     createdAt,
+    email_verified: emailVerified ? 1 : 0,
+    approval_status: approvalStatus,
   };
 }
 
@@ -389,11 +540,14 @@ export function replaceOrders({
 }
 
 export function listClients() {
+  const managerNotes = getGlobalState("clientManagerNotes", {});
   const rows = db.prepare(`
     SELECT
       users.id,
       users.email,
       users.created_at,
+      users.email_verified,
+      users.approval_status,
       client_state.profile_json,
       client_state.addresses_json
     FROM users
@@ -413,37 +567,502 @@ export function listClients() {
       companyName: profile.companyName || "",
       contactName: profile.contactName || "",
       phone: profile.phone || "",
+      managerNote: String(managerNotes[row.id] || ""),
       addresses,
       createdAt: row.created_at,
+      emailVerified: Boolean(row.email_verified),
+      approvalStatus: row.approval_status || "approved",
     };
   });
 }
 
+export function updateClientByManager({
+  clientId,
+  profile = {},
+  addresses = [],
+  managerNote = "",
+}) {
+  const user = db.prepare(`
+    SELECT id, email, role
+    FROM users
+    WHERE id = ?
+  `).get(String(clientId));
+
+  if (!user || user.role !== "client") {
+    throw new Error("Клиент не найден.");
+  }
+
+  const currentState = getClientState(user.id);
+  const email = String(profile.email || user.email)
+    .trim()
+    .toLowerCase();
+  const nextProfile = {
+    ...currentState.profile,
+    ...profile,
+    email,
+  };
+  const currentManagerNotes = getGlobalState("clientManagerNotes", {});
+  const nextManagerNotes = {
+    ...currentManagerNotes,
+    [user.id]: String(managerNote || "").trim(),
+  };
+  const updatedAt = now();
+
+  db.exec("BEGIN IMMEDIATE");
+
+  try {
+    db.prepare(`
+      UPDATE users
+      SET email = ?
+      WHERE id = ?
+    `).run(email, user.id);
+
+    ensureClientState(user.id);
+
+    db.prepare(`
+      UPDATE client_state
+      SET profile_json = ?, addresses_json = ?, updated_at = ?
+      WHERE user_id = ?
+    `).run(
+      JSON.stringify(nextProfile),
+      JSON.stringify(addresses),
+      updatedAt,
+      user.id
+    );
+
+    setGlobalState("clientManagerNotes", nextManagerNotes);
+
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  return listClients().find(
+    (client) => String(client.id) === String(user.id)
+  ) || null;
+}
+
+export function markUserLogin(userId) {
+  db.prepare(`
+    UPDATE users SET last_login_at = ? WHERE id = ?
+  `).run(now(), String(userId));
+}
+
+export function setUserEmailVerified(userId, verified = true) {
+  db.prepare(`
+    UPDATE users SET email_verified = ? WHERE id = ?
+  `).run(verified ? 1 : 0, String(userId));
+  return findUserById(String(userId));
+}
+
+export function setUserApprovalStatus(userId, status) {
+  const normalized = ["pending", "approved", "rejected"].includes(status)
+    ? status
+    : "pending";
+  db.prepare(`
+    UPDATE users SET approval_status = ? WHERE id = ? AND role = 'client'
+  `).run(normalized, String(userId));
+  return findUserById(String(userId));
+}
+
+export function updateUserPassword(userId, passwordHash) {
+  const changedAt = randomUUID();
+  db.prepare(`
+    UPDATE users
+    SET password_hash = ?, password_changed_at = ?
+    WHERE id = ?
+  `).run(String(passwordHash), changedAt, String(userId));
+  return findUserById(String(userId));
+}
+
+export function revokeOtherSessions(userId) {
+  const changedAt = randomUUID();
+  db.prepare(`
+    UPDATE users SET password_changed_at = ? WHERE id = ?
+  `).run(changedAt, String(userId));
+  return findUserById(String(userId));
+}
+
+export function createAuthToken({ userId, type, tokenHash, expiresAt }) {
+  const createdAt = now();
+  db.prepare(`DELETE FROM auth_tokens WHERE user_id = ? AND type = ?`).run(
+    String(userId), String(type)
+  );
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO auth_tokens(id, user_id, type, token_hash, expires_at, used_at, created_at)
+    VALUES (?, ?, ?, ?, ?, '', ?)
+  `).run(id, String(userId), String(type), String(tokenHash), String(expiresAt), createdAt);
+  return { id, userId: String(userId), type: String(type), expiresAt, createdAt };
+}
+
+export function consumeAuthToken({ type, tokenHash }) {
+  const row = db.prepare(`
+    SELECT id, user_id, type, token_hash, expires_at, used_at, created_at
+    FROM auth_tokens
+    WHERE type = ? AND token_hash = ?
+  `).get(String(type), String(tokenHash));
+  if (!row || row.used_at || Date.parse(row.expires_at) <= Date.now()) return null;
+  db.prepare(`UPDATE auth_tokens SET used_at = ? WHERE id = ?`).run(now(), row.id);
+  return { id: row.id, userId: row.user_id, type: row.type, expiresAt: row.expires_at };
+}
+
+export function createReconciliationRequest({
+  userId,
+  periodType,
+  year = null,
+  dateFrom = "",
+  dateTo = "",
+  clientComment = "",
+}) {
+  const id = randomUUID();
+  const createdAt = now();
+  db.prepare(`
+    INSERT INTO reconciliation_requests(
+      id, user_id, period_type, year, date_from, date_to, status,
+      client_comment, manager_comment, file_name, file_path, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 'new', ?, '', '', '', ?, ?)
+  `).run(
+    id, String(userId), String(periodType), year == null ? null : Number(year),
+    String(dateFrom || ''), String(dateTo || ''), String(clientComment || ''),
+    createdAt, createdAt
+  );
+  return getReconciliationRequest(id);
+}
+
+function reconciliationRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    periodType: row.period_type,
+    year: row.year,
+    dateFrom: row.date_from || "",
+    dateTo: row.date_to || "",
+    status: row.status,
+    clientComment: row.client_comment || "",
+    managerComment: row.manager_comment || "",
+    fileName: row.file_name || "",
+    hasFile: Boolean(row.file_path),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function getReconciliationRequest(id) {
+  return reconciliationRow(db.prepare(`
+    SELECT * FROM reconciliation_requests WHERE id = ?
+  `).get(String(id)));
+}
+
+export function getReconciliationRequestInternal(id) {
+  return db.prepare(`SELECT * FROM reconciliation_requests WHERE id = ?`).get(String(id)) || null;
+}
+
+export function listReconciliationRequests(userId = null) {
+  const rows = userId
+    ? db.prepare(`SELECT * FROM reconciliation_requests WHERE user_id = ? ORDER BY created_at DESC`).all(String(userId))
+    : db.prepare(`SELECT * FROM reconciliation_requests ORDER BY created_at DESC`).all();
+  const clients = new Map(listClients().map((client) => [String(client.id), client]));
+  return rows.map((row) => ({
+    ...reconciliationRow(row),
+    client: clients.get(String(row.user_id)) || null,
+  }));
+}
+
+export function updateReconciliationRequest(id, patch = {}) {
+  const current = getReconciliationRequestInternal(id);
+  if (!current) return null;
+  const status = ["new", "processing", "ready", "rejected"].includes(patch.status)
+    ? patch.status
+    : current.status;
+  const managerComment = patch.managerComment === undefined
+    ? current.manager_comment
+    : String(patch.managerComment || "");
+  const fileName = patch.fileName === undefined ? current.file_name : String(patch.fileName || "");
+  const filePath = patch.filePath === undefined ? current.file_path : String(patch.filePath || "");
+  db.prepare(`
+    UPDATE reconciliation_requests
+    SET status = ?, manager_comment = ?, file_name = ?, file_path = ?, updated_at = ?
+    WHERE id = ?
+  `).run(status, managerComment, fileName, filePath, now(), String(id));
+  return getReconciliationRequest(id);
+}
+
+export function upsertPushSubscription({ userId, subscription, preferences = {} }) {
+  const endpoint = String(subscription?.endpoint || "");
+  if (!endpoint) throw new Error("В push-подписке отсутствует endpoint.");
+  const updatedAt = now();
+  const existing = db.prepare(`SELECT id, created_at FROM push_subscriptions WHERE endpoint = ?`).get(endpoint);
+  const id = existing?.id || randomUUID();
+  const createdAt = existing?.created_at || updatedAt;
+  db.prepare(`
+    INSERT INTO push_subscriptions(
+      id, user_id, endpoint, subscription_json, order_events, promotions, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(endpoint) DO UPDATE SET
+      user_id = excluded.user_id,
+      subscription_json = excluded.subscription_json,
+      order_events = excluded.order_events,
+      promotions = excluded.promotions,
+      updated_at = excluded.updated_at
+  `).run(
+    id, String(userId), endpoint, JSON.stringify(subscription),
+    1,
+    preferences.promotions ? 1 : 0,
+    createdAt, updatedAt
+  );
+  return { id, endpoint, orderEvents: true, promotions: Boolean(preferences.promotions) };
+}
+
+export function listPushSubscriptions(userId = null, kind = "all") {
+  let rows;
+  if (userId) {
+    rows = db.prepare(`SELECT * FROM push_subscriptions WHERE user_id = ?`).all(String(userId));
+  } else if (kind === "promotions") {
+    rows = db.prepare(`SELECT * FROM push_subscriptions WHERE promotions = 1`).all();
+  } else if (kind === "orders") {
+    rows = db.prepare(`SELECT * FROM push_subscriptions WHERE order_events = 1`).all();
+  } else {
+    rows = db.prepare(`SELECT * FROM push_subscriptions`).all();
+  }
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    endpoint: row.endpoint,
+    subscription: parseJson(row.subscription_json, {}),
+    orderEvents: Boolean(row.order_events),
+    promotions: Boolean(row.promotions),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+}
+
+export function deletePushSubscription(userId, endpoint) {
+  db.prepare(`DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?`).run(
+    String(userId), String(endpoint)
+  );
+}
+
+function managerNotificationRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    type: row.type,
+    title: row.title,
+    body: row.body || "",
+    url: row.url || "",
+    sourceId: row.source_id || "",
+    readAt: row.read_at || "",
+    createdAt: row.created_at,
+  };
+}
+
+export function createManagerNotification({
+  type,
+  title,
+  body = "",
+  url = "",
+  sourceId = "",
+}) {
+  const normalizedType = String(type || "general").trim().slice(0, 80) || "general";
+  const normalizedSourceId = String(sourceId || "").trim().slice(0, 240);
+  if (normalizedSourceId) {
+    const existing = db.prepare(`
+      SELECT * FROM manager_notifications
+      WHERE type = ? AND source_id = ?
+    `).get(normalizedType, normalizedSourceId);
+    if (existing) {
+      return { notification: managerNotificationRow(existing), created: false };
+    }
+  }
+
+  const id = randomUUID();
+  const createdAt = now();
+  db.prepare(`
+    INSERT INTO manager_notifications(
+      id, type, title, body, url, source_id, read_at, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, '', ?)
+  `).run(
+    id,
+    normalizedType,
+    String(title || "Новое событие Clover").trim().slice(0, 180),
+    String(body || "").trim().slice(0, 2000),
+    String(url || "").trim().slice(0, 500),
+    normalizedSourceId,
+    createdAt
+  );
+
+  return {
+    notification: managerNotificationRow(db.prepare(`SELECT * FROM manager_notifications WHERE id = ?`).get(id)),
+    created: true,
+  };
+}
+
+export function listManagerNotifications({ unreadOnly = false, limit = 100 } = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 500);
+  const rows = unreadOnly
+    ? db.prepare(`
+        SELECT * FROM manager_notifications
+        WHERE read_at = ''
+        ORDER BY created_at DESC
+        LIMIT ?
+      `).all(safeLimit)
+    : db.prepare(`
+        SELECT * FROM manager_notifications
+        ORDER BY created_at DESC
+        LIMIT ?
+      `).all(safeLimit);
+  return rows.map(managerNotificationRow);
+}
+
+export function markManagerNotificationRead(id) {
+  const readAt = now();
+  db.prepare(`
+    UPDATE manager_notifications
+    SET read_at = CASE WHEN read_at = '' THEN ? ELSE read_at END
+    WHERE id = ?
+  `).run(readAt, String(id));
+  return managerNotificationRow(
+    db.prepare(`SELECT * FROM manager_notifications WHERE id = ?`).get(String(id))
+  );
+}
+
+export function markAllManagerNotificationsRead() {
+  const readAt = now();
+  const result = db.prepare(`
+    UPDATE manager_notifications
+    SET read_at = ?
+    WHERE read_at = ''
+  `).run(readAt);
+  return { changed: Number(result.changes || 0), readAt };
+}
+
+export function listManagerUsers() {
+  return db.prepare(`
+    SELECT id, email, role, email_verified, approval_status, created_at
+    FROM users
+    WHERE role = 'manager'
+    ORDER BY created_at
+  `).all().map((row) => ({
+    id: row.id,
+    email: row.email,
+    role: row.role,
+    emailVerified: Boolean(row.email_verified),
+    approvalStatus: row.approval_status || "approved",
+    createdAt: row.created_at,
+  }));
+}
+
+export function listPasskeys(userId) {
+  return db.prepare(`SELECT * FROM passkey_credentials WHERE user_id = ? ORDER BY created_at`).all(String(userId)).map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    publicKey: new Uint8Array(row.public_key),
+    counter: Number(row.counter || 0),
+    transports: parseJson(row.transports_json, []),
+    deviceType: row.device_type || "",
+    backedUp: Boolean(row.backed_up),
+    webauthnUserID: row.webauthn_user_id || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+}
+
+export function getPasskey(id) {
+  const row = db.prepare(`SELECT * FROM passkey_credentials WHERE id = ?`).get(String(id));
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    publicKey: new Uint8Array(row.public_key),
+    counter: Number(row.counter || 0),
+    transports: parseJson(row.transports_json, []),
+    deviceType: row.device_type || "",
+    backedUp: Boolean(row.backed_up),
+    webauthnUserID: row.webauthn_user_id || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function savePasskey({ id, userId, publicKey, counter = 0, transports = [], deviceType = "", backedUp = false, webauthnUserID = "" }) {
+  const timestamp = now();
+  db.prepare(`
+    INSERT INTO passkey_credentials(
+      id, user_id, public_key, counter, transports_json, device_type,
+      backed_up, webauthn_user_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      public_key = excluded.public_key,
+      counter = excluded.counter,
+      transports_json = excluded.transports_json,
+      device_type = excluded.device_type,
+      backed_up = excluded.backed_up,
+      updated_at = excluded.updated_at
+  `).run(
+    String(id), String(userId), Buffer.from(publicKey), Number(counter || 0),
+    JSON.stringify(transports || []), String(deviceType || ""), backedUp ? 1 : 0,
+    String(webauthnUserID || ""), timestamp, timestamp
+  );
+  return getPasskey(id);
+}
+
+export function updatePasskeyCounter(id, counter) {
+  db.prepare(`UPDATE passkey_credentials SET counter = ?, updated_at = ? WHERE id = ?`).run(
+    Number(counter || 0), now(), String(id)
+  );
+}
+
+export function deletePasskey(userId, id) {
+  db.prepare(`DELETE FROM passkey_credentials WHERE user_id = ? AND id = ?`).run(String(userId), String(id));
+}
+
+export function createWebAuthnChallenge({ id = randomUUID(), userId, type, challenge, expiresAt }) {
+  db.prepare(`DELETE FROM webauthn_challenges WHERE expires_at <= ?`).run(now());
+  db.prepare(`
+    INSERT INTO webauthn_challenges(id, user_id, type, challenge, expires_at, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(String(id), String(userId), String(type), String(challenge), String(expiresAt), now());
+  return { id: String(id), userId: String(userId), type: String(type), challenge: String(challenge), expiresAt };
+}
+
+export function consumeWebAuthnChallenge(id, type) {
+  const row = db.prepare(`SELECT * FROM webauthn_challenges WHERE id = ? AND type = ?`).get(String(id), String(type));
+  if (!row || Date.parse(row.expires_at) <= Date.now()) {
+    if (row) db.prepare(`DELETE FROM webauthn_challenges WHERE id = ?`).run(row.id);
+    return null;
+  }
+  db.prepare(`DELETE FROM webauthn_challenges WHERE id = ?`).run(row.id);
+  return { id: row.id, userId: row.user_id, type: row.type, challenge: row.challenge, expiresAt: row.expires_at };
+}
+
 export function seedManager() {
-  const email = (
-    process.env.MANAGER_EMAIL || "manager@clover.local"
-  ).toLowerCase();
+  const email = String(process.env.MANAGER_EMAIL || "").trim().toLowerCase();
+  const password = String(process.env.MANAGER_PASSWORD || "");
 
-  const existing = findUserByEmail(email);
-
-  if (existing) {
+  if (!email || !password) {
+    const existingManager = db.prepare("SELECT 1 FROM users WHERE role = 'manager' LIMIT 1").get();
+    if (!existingManager) {
+      console.warn("Менеджер не создан: задайте MANAGER_EMAIL и MANAGER_PASSWORD в server/.env.");
+    }
     return;
   }
 
-  const password =
-    process.env.MANAGER_PASSWORD || "Clover123!";
+  const existing = findUserByEmail(email);
+  if (existing) return;
 
   const passwordHash = bcrypt.hashSync(password, 12);
-
   createUser({
     email,
     passwordHash,
     role: "manager",
+    emailVerified: false,
+    approvalStatus: "approved",
   });
 
-  console.log(
-    `Создан тестовый менеджер: ${email} / ${password}`
-  );
+  console.log(`Создан менеджер ${email}. Требуется подтверждение email.`);
 }
 
 export function resetServerData() {
@@ -542,10 +1161,11 @@ export function listExchangeAudit(limit = 300) {
 
 export function exportDatabaseSnapshot() {
   return {
-    version: 2,
+    version: 4,
     exportedAt: now(),
     users: db.prepare(`
-      SELECT id, email, password_hash, role, created_at
+      SELECT id, email, password_hash, role, created_at,
+             email_verified, approval_status, password_changed_at, last_login_at
       FROM users
       ORDER BY created_at
     `).all(),
@@ -569,6 +1189,14 @@ export function exportDatabaseSnapshot() {
       FROM audit_log
       ORDER BY created_at
     `).all(),
+    authTokens: db.prepare(`SELECT * FROM auth_tokens ORDER BY created_at`).all(),
+    reconciliationRequests: db.prepare(`SELECT * FROM reconciliation_requests ORDER BY created_at`).all(),
+    pushSubscriptions: db.prepare(`SELECT * FROM push_subscriptions ORDER BY created_at`).all(),
+    managerNotifications: db.prepare(`SELECT * FROM manager_notifications ORDER BY created_at`).all(),
+    passkeys: db.prepare(`SELECT * FROM passkey_credentials ORDER BY created_at`).all().map((row) => ({
+      ...row,
+      public_key: Buffer.from(row.public_key).toString("base64"),
+    })),
   };
 }
 
@@ -590,11 +1218,19 @@ export function importDatabaseSnapshot(snapshot) {
     db.exec("DELETE FROM client_state");
     db.exec("DELETE FROM users");
     db.exec("DELETE FROM app_state");
+    db.exec("DELETE FROM webauthn_challenges");
+    db.exec("DELETE FROM passkey_credentials");
+    db.exec("DELETE FROM manager_notifications");
+    db.exec("DELETE FROM push_subscriptions");
+    db.exec("DELETE FROM reconciliation_requests");
+    db.exec("DELETE FROM auth_tokens");
     db.exec("DELETE FROM audit_log");
 
     const insertUser = db.prepare(`
-      INSERT INTO users(id, email, password_hash, role, created_at)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO users(
+        id, email, password_hash, role, created_at,
+        email_verified, approval_status, password_changed_at, last_login_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const row of snapshot.users) {
       insertUser.run(
@@ -602,7 +1238,11 @@ export function importDatabaseSnapshot(snapshot) {
         String(row.email).toLowerCase(),
         String(row.password_hash),
         String(row.role),
-        String(row.created_at)
+        String(row.created_at),
+        row.email_verified === undefined ? 1 : Number(Boolean(row.email_verified)),
+        String(row.approval_status || "approved"),
+        String(row.password_changed_at || ""),
+        String(row.last_login_at || "")
       );
     }
 
@@ -671,6 +1311,76 @@ export function importDatabaseSnapshot(snapshot) {
         String(row.action || "restored"),
         String(row.details_json || "{}"),
         String(row.created_at || now())
+      );
+    }
+
+    const insertAuthToken = db.prepare(`
+      INSERT INTO auth_tokens(id, user_id, type, token_hash, expires_at, used_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const row of Array.isArray(snapshot.authTokens) ? snapshot.authTokens : []) {
+      insertAuthToken.run(
+        String(row.id || randomUUID()), String(row.user_id), String(row.type),
+        String(row.token_hash), String(row.expires_at), String(row.used_at || ""),
+        String(row.created_at || now())
+      );
+    }
+
+    const insertReconciliation = db.prepare(`
+      INSERT INTO reconciliation_requests(
+        id, user_id, period_type, year, date_from, date_to, status,
+        client_comment, manager_comment, file_name, file_path, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const row of Array.isArray(snapshot.reconciliationRequests) ? snapshot.reconciliationRequests : []) {
+      insertReconciliation.run(
+        String(row.id || randomUUID()), String(row.user_id), String(row.period_type || "custom"),
+        row.year == null ? null : Number(row.year), String(row.date_from || ""), String(row.date_to || ""),
+        String(row.status || "new"), String(row.client_comment || ""), String(row.manager_comment || ""),
+        String(row.file_name || ""), String(row.file_path || ""),
+        String(row.created_at || now()), String(row.updated_at || row.created_at || now())
+      );
+    }
+
+    const insertPush = db.prepare(`
+      INSERT INTO push_subscriptions(
+        id, user_id, endpoint, subscription_json, order_events, promotions, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const row of Array.isArray(snapshot.pushSubscriptions) ? snapshot.pushSubscriptions : []) {
+      insertPush.run(
+        String(row.id || randomUUID()), String(row.user_id), String(row.endpoint),
+        String(row.subscription_json || "{}"), Number(row.order_events ?? 1), Number(row.promotions ?? 0),
+        String(row.created_at || now()), String(row.updated_at || row.created_at || now())
+      );
+    }
+
+    const insertManagerNotification = db.prepare(`
+      INSERT INTO manager_notifications(
+        id, type, title, body, url, source_id, read_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const row of Array.isArray(snapshot.managerNotifications) ? snapshot.managerNotifications : []) {
+      insertManagerNotification.run(
+        String(row.id || randomUUID()), String(row.type || "general"),
+        String(row.title || "Новое событие Clover"), String(row.body || ""),
+        String(row.url || ""), String(row.source_id || ""), String(row.read_at || ""),
+        String(row.created_at || now())
+      );
+    }
+
+    const insertPasskey = db.prepare(`
+      INSERT INTO passkey_credentials(
+        id, user_id, public_key, counter, transports_json, device_type, backed_up,
+        webauthn_user_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const row of Array.isArray(snapshot.passkeys) ? snapshot.passkeys : []) {
+      insertPasskey.run(
+        String(row.id), String(row.user_id), Buffer.from(String(row.public_key || ""), "base64"),
+        Number(row.counter || 0), String(row.transports_json || "[]"), String(row.device_type || ""),
+        Number(row.backed_up || 0), String(row.webauthn_user_id || ""),
+        String(row.created_at || now()), String(row.updated_at || row.created_at || now())
       );
     }
 

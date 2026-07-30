@@ -39,7 +39,7 @@ async function request(path, options = {}) {
     });
   } catch {
     const error = new Error(
-      "Сервер Clover недоступен. Проверьте, что сервер запущен на порту 4000."
+      "Сервер Clover недоступен. Проверьте, что сервер запущен на порту 4100."
     );
     error.status = 0;
     throw error;
@@ -56,6 +56,8 @@ async function request(path, options = {}) {
       payload.error || `Ошибка сервера: ${response.status}`
     );
     error.status = response.status;
+    error.code = payload.code || "";
+    error.payload = payload;
     throw error;
   }
 
@@ -80,7 +82,7 @@ async function requestBlob(path, options = {}) {
     });
   } catch {
     throw new Error(
-      "Сервер Clover недоступен. Проверьте, что сервер запущен на порту 4000."
+      "Сервер Clover недоступен. Проверьте, что сервер запущен на порту 4100."
     );
   }
 
@@ -104,6 +106,70 @@ export const api = {
     return request("/auth/login", {
       method: "POST",
       body: data,
+    });
+  },
+
+  verifyEmail(token) {
+    return request("/auth/verify-email", { method: "POST", body: { token } });
+  },
+
+  resendVerification(email) {
+    return request("/auth/resend-verification", { method: "POST", body: { email } });
+  },
+
+  forgotPassword(email) {
+    return request("/auth/forgot-password", { method: "POST", body: { email } });
+  },
+
+  resetPassword(token, password) {
+    return request("/auth/reset-password", { method: "POST", body: { token, password } });
+  },
+
+  changePassword(currentPassword, newPassword) {
+    return request("/auth/change-password", {
+      method: "POST",
+      body: { currentPassword, newPassword },
+    });
+  },
+
+  logoutOtherSessions() {
+    return request("/auth/logout-other-sessions", { method: "POST" });
+  },
+
+  createManager(email, password) {
+    return request("/admin/managers", { method: "POST", body: { email, password } });
+  },
+
+  listPasskeys() {
+    return request("/passkeys");
+  },
+
+  getPasskeyRegistrationOptions() {
+    return request("/passkeys/registration/options", { method: "POST" });
+  },
+
+  verifyPasskeyRegistration(ceremonyId, response) {
+    return request("/passkeys/registration/verify", {
+      method: "POST",
+      body: { ceremonyId, response },
+    });
+  },
+
+  deletePasskey(credentialId) {
+    return request(`/passkeys/${encodeURIComponent(credentialId)}`, { method: "DELETE" });
+  },
+
+  getPasskeyAuthenticationOptions(email) {
+    return request("/passkeys/authentication/options", {
+      method: "POST",
+      body: { email },
+    });
+  },
+
+  verifyPasskeyAuthentication(email, ceremonyId, response) {
+    return request("/passkeys/authentication/verify", {
+      method: "POST",
+      body: { email, ceremonyId, response },
     });
   },
 
@@ -157,6 +223,13 @@ export const api = {
     return request("/state/client-links", {
       method: "PUT",
       body: { clientLinks },
+    });
+  },
+
+  updateClient(clientId, data) {
+    return request(`/admin/clients/${encodeURIComponent(clientId)}`, {
+      method: "PUT",
+      body: data,
     });
   },
 
@@ -250,6 +323,72 @@ export const api = {
     );
   },
 
+  getOneCProducts({ search = "", limit = 50, offset = 0 } = {}) {
+    const params = new URLSearchParams({
+      search,
+      limit: String(limit),
+      offset: String(offset),
+    });
+    return request(`/admin/one-c/products?${params.toString()}`);
+  },
+
+  getOneCProductCandidates(productId) {
+    return request(`/admin/one-c/products/${encodeURIComponent(productId)}/candidates`);
+  },
+
+  requestOneCProduct(productId, data = {}) {
+    return request(`/admin/one-c/products/${encodeURIComponent(productId)}/request`, {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  linkOneCProduct(productId, oneCId, item = null) {
+    return request(`/admin/one-c/products/${encodeURIComponent(productId)}/link`, {
+      method: "POST",
+      body: { oneCId, item },
+    });
+  },
+
+  autoLinkOneCProducts() {
+    return request("/admin/one-c/products/auto-link", {
+      method: "POST",
+    });
+  },
+
+  createProductFromOneCCatalog({ oneCId, item = null, clientId = "" } = {}) {
+    return request("/admin/one-c/products/from-catalog", {
+      method: "POST",
+      body: { oneCId, item, clientId: clientId || undefined },
+    });
+  },
+
+  getOneCClients({ search = "", limit = 50, offset = 0 } = {}) {
+    const params = new URLSearchParams({
+      search,
+      limit: String(limit),
+      offset: String(offset),
+    });
+    return request(`/admin/one-c/clients?${params.toString()}`);
+  },
+
+  getOneCClientCandidates(clientId) {
+    return request(`/admin/one-c/clients/${encodeURIComponent(clientId)}/candidates`);
+  },
+
+  linkOneCClient(clientId, oneCId, item = null) {
+    return request(`/admin/one-c/clients/${encodeURIComponent(clientId)}/link`, {
+      method: "POST",
+      body: { oneCId, item },
+    });
+  },
+
+  autoLinkOneCClients() {
+    return request("/admin/one-c/clients/auto-link", {
+      method: "POST",
+    });
+  },
+
   createOneCDraft(orderId) {
     return request(
       `/admin/one-c/orders/${encodeURIComponent(orderId)}/draft`,
@@ -287,9 +426,80 @@ export const api = {
     );
   },
 
+  listReconciliation() {
+    return request("/reconciliation");
+  },
+
+  createReconciliation(data) {
+    return request("/reconciliation", { method: "POST", body: data });
+  },
+
+  updateReconciliation(requestId, data) {
+    return request(`/admin/reconciliation/${encodeURIComponent(requestId)}`, {
+      method: "PATCH", body: data,
+    });
+  },
+
+  uploadReconciliationFile(requestId, file, managerComment = "") {
+    const body = new FormData();
+    body.append("file", file);
+    body.append("managerComment", managerComment);
+    return request(`/admin/reconciliation/${encodeURIComponent(requestId)}/file`, {
+      method: "POST", body,
+    });
+  },
+
+  downloadReconciliationFile(requestId) {
+    return requestBlob(`/reconciliation/${encodeURIComponent(requestId)}/file`);
+  },
+
+  setClientApproval(clientId, status) {
+    return request(`/admin/clients/${encodeURIComponent(clientId)}/approval`, {
+      method: "PATCH", body: { status },
+    });
+  },
+
+  getManagerNotifications({ unreadOnly = false, limit = 100 } = {}) {
+    const params = new URLSearchParams();
+    if (unreadOnly) params.set("unread", "1");
+    params.set("limit", String(limit));
+    return request(`/admin/notifications?${params.toString()}`);
+  },
+
+  readManagerNotification(notificationId) {
+    return request(`/admin/notifications/${encodeURIComponent(notificationId)}/read`, { method: "PATCH" });
+  },
+
+  readAllManagerNotifications() {
+    return request("/admin/notifications/read-all", { method: "POST" });
+  },
+
+  testManagerNotifications() {
+    return request("/admin/notifications/test", { method: "POST" });
+  },
+
+  getPushStatus() {
+    return request("/push/status");
+  },
+
+  subscribePush(subscription, preferences) {
+    return request("/push/subscribe", {
+      method: "POST", body: { subscription, preferences },
+    });
+  },
+
+  unsubscribePush(endpoint) {
+    return request("/push/unsubscribe", { method: "POST", body: { endpoint } });
+  },
+
+  sendPromotion(title, body) {
+    return request("/admin/push/promotion", { method: "POST", body: { title, body } });
+  },
+
   resetAll() {
     return request("/admin/reset", {
       method: "POST",
+      body: { confirm: "RESET" },
     });
   },
 };

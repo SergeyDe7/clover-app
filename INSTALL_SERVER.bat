@@ -1,37 +1,16 @@
 @echo off
 chcp 65001 > nul
-title Установка Clover Server
+title Clover 4.0.4
 
+echo Этот файл не ставит Clover сам по себе.
 echo.
-echo Проверка Node.js...
-node -e "const [major,minor]=process.versions.node.split('.').map(Number); if(major<22 || (major===22 && minor<13)){console.error('Нужен Node.js 22.13 или новее.'); process.exit(1)}; console.log('Node.js', process.versions.node, '- подходит')"
-if errorlevel 1 (
-  echo.
-  echo Установите Node.js 22 LTS или 24 LTS и повторите.
-  pause
-  exit /b 1
-)
-
-cd /d "%~dp0server"
-
-if not exist ".env" (
-  copy ".env.example" ".env" > nul
-  echo Создан server\.env
-)
-
+echo Актуальная установка на сервер (без домена):
+echo   1. Откройте docs\deploy\CHECKLIST.md
+echo   2. Создайте server\.env из docs\deploy\server.env.datacenter.example
+echo   3. Запуск: START_CLOVER_V18.bat
+echo   4. Автозапуск: tools\Install-CloverAutostart.ps1  (от администратора)
 echo.
-echo Установка зависимостей сервера...
-call npm install
-if errorlevel 1 (
-  echo.
-  echo Установка не завершилась. Пришлите скриншот ошибки.
-  pause
-  exit /b 1
-)
-
-echo.
-echo Сервер установлен.
-echo Тестовый менеджер: manager@clover.local
-echo Пароль: Clover123!
+echo Старый INSTALL_CLOVER_V18.bat в этом репозитории не используется.
 echo.
 pause
+exit /b 1

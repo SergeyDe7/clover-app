@@ -1,0 +1,7 @@
+{
+  "server": {
+    "nodemailer": "7.0.5",
+    "web-push": "3.6.7",
+    "@simplewebauthn/server": "13.0.0"
+  }
+}

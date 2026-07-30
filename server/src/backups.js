@@ -61,10 +61,18 @@ export function resolveBackupPath(fileName) {
   return resolved;
 }
 
-function listUploadFiles() {
-  return readdirSync(uploadsDirectory, { withFileTypes: true })
-    .filter((item) => item.isFile())
-    .map((item) => item.name);
+function listUploadFiles(directory = uploadsDirectory, prefix = "") {
+  const files = [];
+  for (const item of readdirSync(directory, { withFileTypes: true })) {
+    const relative = prefix ? path.posix.join(prefix, item.name) : item.name;
+    const fullPath = path.resolve(directory, item.name);
+    if (item.isDirectory()) {
+      files.push(...listUploadFiles(fullPath, relative));
+    } else if (item.isFile()) {
+      files.push(relative);
+    }
+  }
+  return files.sort();
 }
 
 function readZipMetadata(filePath) {
@@ -115,8 +123,9 @@ export function createServerBackup({
     Buffer.from(JSON.stringify(snapshot, null, 2), "utf8")
   );
 
-  for (const fileName of uploadFiles) {
-    zip.addLocalFile(path.resolve(uploadsDirectory, fileName), "uploads");
+  for (const relativeName of uploadFiles) {
+    const filePath = path.resolve(uploadsDirectory, ...relativeName.split("/"));
+    zip.addFile(`uploads/${relativeName}`, readFileSync(filePath));
   }
 
   zip.writeZip(filePath);
@@ -191,19 +200,13 @@ function restorePhotosFromZip(zip) {
   let restored = 0;
 
   for (const entry of zip.getEntries()) {
-    if (entry.isDirectory || !entry.entryName.startsWith("uploads/")) {
-      continue;
-    }
-
-    const safeName = path.basename(entry.entryName);
-    if (!safeName || safeName === "." || safeName === "..") {
-      continue;
-    }
-
-    writeFileSync(
-      path.resolve(uploadsDirectory, safeName),
-      entry.getData()
-    );
+    if (entry.isDirectory || !entry.entryName.startsWith("uploads/")) continue;
+    const relativeName = entry.entryName.slice("uploads/".length).replace(/\\/g, "/");
+    if (!relativeName || relativeName.split("/").some((part) => !part || part === "." || part === "..")) continue;
+    const targetPath = path.resolve(uploadsDirectory, ...relativeName.split("/"));
+    if (!targetPath.startsWith(uploadsDirectory + path.sep)) continue;
+    mkdirSync(path.dirname(targetPath), { recursive: true });
+    writeFileSync(targetPath, entry.getData());
     restored += 1;
   }
 

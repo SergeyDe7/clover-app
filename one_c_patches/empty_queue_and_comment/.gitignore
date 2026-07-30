@@ -1,0 +1,7 @@
+# Exported/patched 1C modules may contain ONEC_API_KEY — never commit.
+*.bsl
+*.bsl.bak-*
+Clover_module*.txt
+*_для_вставки.txt
+!PATCH_NOTES.txt
+!ИНСТРУКЦИЯ_*.txt
