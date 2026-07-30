@@ -89,6 +89,7 @@ import {
 } from "./oneC.js";
 import {
   addProductIdToClientMatrix,
+  applyInferredCategories,
   autoLinkCloverProducts,
   buildOneCProductCandidates,
   buildOneCProductsSummary,
@@ -1581,10 +1582,15 @@ app.post("/api/passkeys/authentication/verify", async (req, res, next) => {
 });
 
 app.get("/api/bootstrap", authRequired, (req, res) => {
-  const products = getGlobalState(
+  const storedProducts = getGlobalState(
     "products",
     DEFAULT_PRODUCTS
   );
+  const reclassified = applyInferredCategories(storedProducts);
+  const products = reclassified.products;
+  if (reclassified.changed) {
+    setGlobalState("products", products);
+  }
   const settings = getGlobalState(
     "settings",
     DEFAULT_SETTINGS
@@ -2858,9 +2864,10 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
       allOneCProducts,
       receivedAt
     );
+    const reclassified = applyInferredCategories(linked.products);
 
     const unmatchedProductIds = new Set(
-      linked.products
+      reclassified.products
         .filter((product) => !String(product.oneCId || "").trim())
         .map((product) => String(product.id))
     );
@@ -2872,8 +2879,8 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
 
     setGlobalState("oneCProducts", linked.oneCProducts);
     setGlobalState("oneCProductCandidates", cleanCandidateMap);
-    if (linked.changed) {
-      setGlobalState("products", linked.products);
+    if (linked.changed || reclassified.changed) {
+      setGlobalState("products", reclassified.products);
     }
 
     const meta = {
@@ -2982,7 +2989,12 @@ app.post(
         normalizeOneCProduct(req.body?.item || req.body || {});
       const linkedAt = new Date().toISOString();
       const result = createOrReuseCloverProductFromOneC(products, item, linkedAt);
-      setGlobalState("products", result.products);
+      const reclassified = applyInferredCategories(result.products);
+      const nextProducts = reclassified.products;
+      const product =
+        nextProducts.find((entry) => String(entry.id) === String(result.product.id)) ||
+        result.product;
+      setGlobalState("products", nextProducts);
 
       let clientLink = null;
       let clientLinks = getGlobalState("clientLinks", {});
@@ -2996,7 +3008,7 @@ app.post(
         const matrixUpdate = addProductIdToClientMatrix(
           clientLinks,
           clientId,
-          result.product.id
+          product.id
         );
         clientLinks = matrixUpdate.clientLinks;
         clientLink = normalizeClientLink(matrixUpdate.clientLink);
@@ -3004,19 +3016,21 @@ app.post(
       }
 
       auditFromRequest(req, "one-c.product.from-catalog", {
-        productId: result.product.id,
-        productName: result.product.name,
+        productId: product.id,
+        productName: product.name,
+        productCategory: product.category,
         oneCId: item.id,
         oneCName: item.name,
         created: result.created,
+        categoriesReclassified: reclassified.changed,
         clientId: clientId || null,
       });
 
       res.json({
         ok: true,
         created: result.created,
-        product: result.product,
-        products: result.products,
+        product,
+        products: nextProducts,
         clientId: clientId || null,
         clientLink,
         clientLinks: clientId ? clientLinks : undefined,
