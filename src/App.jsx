@@ -359,6 +359,7 @@ const EMPTY_LINK = {
 const EXCHANGE_STATUS_LABELS = {
   not_sent: "Не отправлен",
   ready: "В очереди 1С TEST",
+  sending: "Передаётся в 1С TEST",
   sent: "Создан в 1С TEST",
   draft: "Черновик создан в 1С",
   error: "Ошибка",
@@ -385,7 +386,7 @@ function normalizeOrderExchange(value = {}) {
 
 function exchangeBadgeClass(status) {
   if (status === "sent" || status === "draft") return "exchange-sent";
-  if (status === "ready") return "exchange-ready";
+  if (status === "ready" || status === "sending") return "exchange-ready";
   if (status === "error") return "exchange-error";
   return "exchange-pending";
 }
@@ -3496,7 +3497,7 @@ function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrders, on
             </label>
             <div className="exchange-actions" style={{ alignSelf: "end" }}>
               <button className="secondary-button" disabled={busy} type="button" onClick={() => runExchangeAction(order, "check")}>Проверить 1С</button>
-              <button className="primary-button" disabled={busy} type="button" onClick={() => runExchangeAction(order, "send")}>{exchange.status === "ready" ? "Обновить очередь" : exchange.status === "sent" || exchange.status === "error" ? "Передать повторно" : "Передать в 1С TEST"}</button>
+              <button className="primary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => runExchangeAction(order, "send")}>{exchange.status === "sending" ? "Ожидает ACK 1С" : exchange.status === "ready" ? "Обновить очередь" : exchange.status === "sent" || exchange.status === "error" ? "Передать повторно" : "Передать в 1С TEST"}</button>
               <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOrder(order, "json")}>JSON</button>
               <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOrder(order, "csv")}>CSV</button>
               <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
@@ -6569,7 +6570,7 @@ function ManagerExchange({ onReload, onNavigate }) {
           {exchange.remoteDocument && <div className="exchange-message">Документ: {exchange.remoteDocument.number || exchange.remoteDocument.id || "—"} · {exchange.remoteDocument.posted ? "проведён" : "не проведён"} · {exchange.remoteDocument.mode === "real" ? "рабочая 1С" : "симулятор"}</div>}
           <div className="exchange-actions">
             <button className="secondary-button" disabled={busy} type="button" onClick={() => action(row, "check")}>Проверить</button>
-            <button className="secondary-button" disabled={busy} type="button" onClick={() => action(row, "send")}>Проверить и передать тестово</button>
+            <button className="secondary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => action(row, "send")}>{exchange.status === "sending" ? "Ожидает ACK 1С" : "Проверить и передать тестово"}</button>
             <button className="primary-button" disabled={busy || !runtime.readyForWrite} title={!runtime.readyForWrite ? "Запись пока заблокирована настройками" : ""} type="button" onClick={() => action(row, "draft")}>{modeIsReal ? "Черновик в 1С" : "Черновик в симуляторе"}</button>
             <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "json")}>JSON</button>
             <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "csv")}>CSV</button>

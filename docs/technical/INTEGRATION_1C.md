@@ -10,8 +10,10 @@
 
 Входящие маршруты `/api/one-c/*` требуют:
 
-- заголовок `X-Clover-Key` (или Bearer) = `ONEC_API_KEY` из `server/.env`, **или**
-- локальный доступ при `ONEC_ALLOW_LOCAL_WITHOUT_KEY=true` (только пока ключ не настроен).
+- заголовок `X-Clover-Key` (или Bearer) = `ONEC_API_KEY` из `server/.env` (≥24 символов, не placeholder), **или**
+- локальный доступ **только** при явном `ONEC_ALLOW_LOCAL_WITHOUT_KEY=true` (по умолчанию в коде `false`).
+
+Обязательный заголовок среды: `X-Clover-Database: TEST` (пустой / другой — `403`).
 
 Ключ **не** публиковать в Git, чат и скриншоты.
 
@@ -19,11 +21,13 @@
 
 | Метод | Путь | Назначение |
 |-------|------|------------|
-| GET | `/api/one-c/queue-status` | Снимок очереди |
+| GET | `/api/one-c/queue-status` | Снимок очереди (`ready` + `sending`) |
 | GET | `/api/one-c/purchase-price-request` | Запрос свежих закупочных цен |
 | POST | `/api/one-c/purchase-prices` | Приём цен из 1С |
-| GET/POST | `/api/one-c/test-order` | Выдача следующего заказа `ready` |
+| GET/POST | `/api/one-c/test-order` | Claim следующего `ready` → `sending` |
 | POST | `/api/one-c/orders/:orderId/ack` | Подтверждение с номером документа 1С |
+| POST | `/api/one-c/products-preview` | Выгрузка номенклатуры (только TEST) |
+| POST | `/api/one-c/clients-preview` | Выгрузка контрагентов (только TEST) |
 
 Менеджер (UI):
 
@@ -36,17 +40,21 @@
 |--------|--------|
 | `not_sent` | Не в очереди |
 | `ready` | В очереди 1С TEST |
+| `sending` | Выдан 1С (claim), ждёт ACK |
 | `sent` | Создан в 1С, ACK принят |
 | `draft` | Черновик через отдельный draft-путь |
 | `error` | Ошибка |
 
+Lease claim: если ACK не пришёл за 15 минут, `sending` снова становится `ready`.
+
 ## Правила ACK
 
-- Только база TEST.
+- Только база TEST (`X-Clover-Database: TEST`).
 - Обязателен номер документа 1С.
 - Сверка номера заказа Clover.
 - Повтор того же receipt — идемпотентен.
 - Чужой номер документа — отказ (409).
+- Принимается из статусов `ready` или `sending`.
 - Заказ снимается с очереди **только после** успешного ACK.
 
 ## Расширение 1С

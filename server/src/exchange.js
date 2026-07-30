@@ -7,10 +7,22 @@ const UNIT_LABELS = {
 export const EXCHANGE_STATUSES = {
   not_sent: "Не отправлен",
   ready: "В очереди 1С TEST",
+  sending: "Передаётся в 1С TEST",
   sent: "Создан в 1С TEST",
   draft: "Черновик создан в 1С",
   error: "Ошибка",
 };
+
+/** Пока 1С не прислала ACK, заказ удерживается в sending. После таймаута снова ready. */
+export const ONEC_CLAIM_LEASE_MS = 15 * 60 * 1000;
+
+export function isOneCClaimExpired(exchange = {}, nowMs = Date.now()) {
+  const state = normalizeExchangeState(exchange);
+  if (state.status !== "sending") return false;
+  const startedAt = Date.parse(String(state.lastAttemptAt || state.checkedAt || ""));
+  if (!Number.isFinite(startedAt)) return true;
+  return nowMs - startedAt >= ONEC_CLAIM_LEASE_MS;
+}
 
 export function normalizeExchangeState(value = {}) {
   const status = Object.hasOwn(EXCHANGE_STATUSES, value?.status)
@@ -31,7 +43,7 @@ export function normalizeExchangeState(value = {}) {
   };
 }
 
-const QUEUE_EXCHANGE_STATUSES = new Set(["ready", "sent", "draft"]);
+const QUEUE_EXCHANGE_STATUSES = new Set(["ready", "sending", "sent", "draft"]);
 
 /**
  * Клиент не управляет очередью 1С. Менеджер меняет exchange только

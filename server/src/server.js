@@ -70,6 +70,7 @@ import {
 import {
   assertSafeManagerOrderReplace,
   build1CPayload,
+  isOneCClaimExpired,
   normalizeExchangeState,
   payloadToCsv,
   sanitizeOrderExchangeForSave,
@@ -446,16 +447,31 @@ function oneCAuthRequired(req, res, next) {
     return res.status(401).json({ error: "Неверный ключ обмена Clover." });
   }
 
-  const allowLocal = String(process.env.ONEC_ALLOW_LOCAL_WITHOUT_KEY || "true").toLowerCase() === "true";
+  // По умолчанию false: локальный bypass только после явного ONEC_ALLOW_LOCAL_WITHOUT_KEY=true.
+  const allowLocal =
+    String(process.env.ONEC_ALLOW_LOCAL_WITHOUT_KEY || "false").toLowerCase() === "true";
   const remoteAddress = normalizeRemoteAddress(req.socket?.remoteAddress || req.ip);
   if (allowLocal && oneCLocalAddresses.has(remoteAddress)) {
     return next();
   }
 
-  writeAudit({ action: "one-c.auth.denied", details: { ip: req.ip || "", mode: "local-only" } });
+  writeAudit({ action: "one-c.auth.denied", details: { ip: req.ip || "", mode: "key-required" } });
   return res.status(503).json({
-    error: "Ключ обмена с 1С не настроен. Без ключа разрешён только локальный обмен на этом компьютере.",
+    error:
+      "Ключ обмена с 1С не настроен. Укажите ONEC_API_KEY или явно разрешите локальный обмен ONEC_ALLOW_LOCAL_WITHOUT_KEY=true.",
   });
+}
+
+function requireOneCTestDatabase(req, res) {
+  const database = extractOneCDatabase(req);
+  if (!isTestDatabase(database)) {
+    res.status(403).json({
+      error:
+        "Этот обмен разрешён только для базы 1С TEST. Укажите заголовок X-Clover-Database: TEST.",
+    });
+    return null;
+  }
+  return database;
 }
 
 function orderItemsSignature(order) {
@@ -846,25 +862,72 @@ function oneCQueueTimestamp(order) {
   return 0;
 }
 
-function nextOrderForOneC() {
+function releaseExpiredOneCClaims() {
+  for (const order of listOrders()) {
+    const exchange = normalizeExchangeState(order.exchange);
+    if (!isOneCClaimExpired(exchange)) continue;
+
+    updateOrderPayload(order.id, {
+      ...order,
+      exchange: {
+        ...exchange,
+        status: "ready",
+        message:
+          "Повторная очередь: предыдущая выдача 1С истекла без ACK.",
+      },
+      updatedAt: new Date().toISOString(),
+    });
+  }
+}
+
+function listReadyOrdersForOneC() {
+  releaseExpiredOneCClaims();
+
   const eligible = [...listOrders()].filter((order) => {
     const status = normalizeExchangeState(order.exchange).status;
-
     // 1С получает только заказ, который менеджер явно поставил в очередь.
-    // Обычные новые заказы не должны попадать в 1С автоматически.
     return status === "ready";
   });
 
   eligible.sort((left, right) => {
-    // Последний явно подготовленный заказ обрабатывается первым.
     const timeDifference =
       oneCQueueTimestamp(right) - oneCQueueTimestamp(left);
     if (timeDifference !== 0) return timeDifference;
-
     return String(right.id || "").localeCompare(String(left.id || ""), "ru");
   });
 
-  return eligible[0] || null;
+  return eligible;
+}
+
+function nextOrderForOneC() {
+  return listReadyOrdersForOneC()[0] || null;
+}
+
+/**
+ * Атомарная выдача: ready → sending до ACK.
+ * Sync-only, чтобы два параллельных pull не получили один заказ.
+ */
+function claimOrderForOneC(orderId) {
+  const stored = getOrderById(orderId);
+  if (!stored) return null;
+
+  const previous = normalizeExchangeState(stored.payload.exchange);
+  if (previous.status !== "ready") return null;
+
+  const claimedAt = new Date().toISOString();
+  return updateOrderPayload(stored.id, {
+    ...stored.payload,
+    exchange: {
+      ...previous,
+      status: "sending",
+      attempts: previous.attempts + 1,
+      checkedAt: claimedAt,
+      lastAttemptAt: claimedAt,
+      channel: "onec-pull",
+      message: "Заказ выдан 1С TEST, ожидается ACK.",
+    },
+    updatedAt: claimedAt,
+  });
 }
 
 function isSimulationExchange(value = {}) {
@@ -898,6 +961,8 @@ function canReturnOrderToOneCQueue(order = {}) {
 }
 
 function oneCQueueSnapshot() {
+  releaseExpiredOneCClaims();
+
   const rows = [...listOrders()]
     .map((order) => {
       const exchange = normalizeExchangeState(order.exchange);
@@ -913,17 +978,21 @@ function oneCQueueSnapshot() {
         receipt: exchange.receipt,
       };
     })
-    .filter((row) => row.status === "ready")
+    .filter((row) => row.status === "ready" || row.status === "sending")
     .sort((left, right) =>
       String(right.checkedAt || right.lastAttemptAt || "").localeCompare(
         String(left.checkedAt || left.lastAttemptAt || "")
       )
     );
 
+  const nextReady = rows.find((row) => row.status === "ready") || null;
+
   return {
     count: rows.length,
-    nextOrderId: rows[0]?.id || "",
-    nextOrderNumber: rows[0]?.number || "",
+    readyCount: rows.filter((row) => row.status === "ready").length,
+    sendingCount: rows.filter((row) => row.status === "sending").length,
+    nextOrderId: nextReady?.id || "",
+    nextOrderNumber: nextReady?.number || "",
     rows,
   };
 }
@@ -1704,12 +1773,7 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
 });
 async function handleOneCTestOrder(req, res, next) {
   try {
-    const database = extractOneCDatabase(req);
-    if (!isTestDatabase(database)) {
-      return res.status(403).json({
-        error: "Получение заказа разрешено только из базы 1С TEST.",
-      });
-    }
+    if (!requireOneCTestDatabase(req, res)) return;
 
     const protocolVersion = String(req.headers["x-clover-protocol"] || "").trim();
     const legacyProtocol = protocolVersion === "";
@@ -1733,9 +1797,8 @@ async function handleOneCTestOrder(req, res, next) {
       });
     }
 
-    let realOrder = nextOrderForOneC();
-
-    if (!realOrder) {
+    const candidates = listReadyOrdersForOneC();
+    if (!candidates.length) {
       return res.status(404).json({
         code: "EMPTY_QUEUE",
         error: "Нет новых заказов",
@@ -1743,31 +1806,83 @@ async function handleOneCTestOrder(req, res, next) {
       });
     }
 
-    const currentOneCProducts = getGlobalState("oneCProducts", []);
-    const priceRequirements = buildOrderPriceRequirements(
-      realOrder,
-      products,
-      clientLinks[realOrder.clientId] || {}
-    );
-    const freshnessIssues = validatePriceRequirements(
-      priceRequirements,
-      currentOneCProducts,
-      { maxAgeMs: priceMaxAgeMs() }
-    );
-    if (freshnessIssues.length) {
-      return res.status(409).json({
-        code: "PURCHASE_PRICE_REFRESH_REQUIRED",
-        error: "Перед передачей заказа 1С TEST должна отправить свежие закупочные цены.",
-        items: freshnessIssues,
-        priceRequest: buildPriceRequest({
-          scope: "next-order",
-          order: realOrder,
-          products,
-          clientLinks,
-          maxAgeMs: priceMaxAgeMs(),
-        }),
+    let realOrder = null;
+    let claimBlockedReason = null;
+
+    for (const candidate of candidates) {
+      const priceRequirements = buildOrderPriceRequirements(
+        candidate,
+        products,
+        clientLinks[candidate.clientId] || {}
+      );
+      const freshnessIssues = validatePriceRequirements(
+        priceRequirements,
+        getGlobalState("oneCProducts", []),
+        { maxAgeMs: priceMaxAgeMs() }
+      );
+      if (freshnessIssues.length) {
+        claimBlockedReason = {
+          status: 409,
+          body: {
+            code: "PURCHASE_PRICE_REFRESH_REQUIRED",
+            error: "Перед передачей заказа 1С TEST должна отправить свежие закупочные цены.",
+            items: freshnessIssues,
+            priceRequest: buildPriceRequest({
+              scope: "next-order",
+              order: candidate,
+              products,
+              clientLinks,
+              maxAgeMs: priceMaxAgeMs(),
+            }),
+          },
+        };
+        break;
+      }
+
+      const draftItems = (candidate.items || []).map((item) => {
+        const product = productsById.get(String(item.productId ?? item.id));
+        return {
+          id: String(item.oneCId || product?.oneCId || "").trim(),
+          displayName: item.name || product?.name || "",
+        };
+      });
+      const missingItems = draftItems.filter((item) => !item.id);
+      if (missingItems.length) {
+        claimBlockedReason = {
+          status: 409,
+          body: {
+            error: "Не все товары заказа связаны с номенклатурой 1С.",
+            items: missingItems.map((item) => item.displayName || item.name),
+          },
+        };
+        break;
+      }
+
+      const claimed = claimOrderForOneC(candidate.id);
+      if (!claimed) continue;
+      realOrder = claimed;
+      break;
+    }
+
+    if (!realOrder) {
+      if (claimBlockedReason) {
+        return res.status(claimBlockedReason.status).json(claimBlockedReason.body);
+      }
+      return res.status(404).json({
+        code: "EMPTY_QUEUE",
+        error: "Нет новых заказов",
+        userMessage: "Нет новых заказов",
       });
     }
+
+    writeAudit({
+      action: "one-c.order.claimed",
+      details: {
+        orderId: realOrder.id,
+        orderNumber: realOrder.number || "",
+        database: "TEST",
+      },
+    });
 
     // Цена уже согласована клиентом в заказе и фиксируется при постановке
     // в очередь. Свежая закупочная цена из 1С обязательна для контроля и
@@ -1804,14 +1919,6 @@ async function handleOneCTestOrder(req, res, next) {
       };
     });
 
-    const missingItems = items.filter((item) => !item.id);
-    if (missingItems.length) {
-      return res.status(409).json({
-        error: "Не все товары заказа связаны с номенклатурой 1С.",
-        items: missingItems.map((item) => item.displayName || item.name),
-      });
-    }
-
     const clientLink = normalizeClientLink(clientLinks[realOrder.clientId]);
 
     if (legacyProtocol) {
@@ -1830,6 +1937,8 @@ async function handleOneCTestOrder(req, res, next) {
       protocol: legacyProtocol ? "legacy-v5" : "2",
       pricingPolicy: "order-locked",
       lockedOrderTotal,
+      claimed: true,
+      exchangeStatus: "sending",
       order: {
         id: realOrder.id,
         number: realOrder.number,
@@ -1872,12 +1981,7 @@ async function handleOneCTestOrder(req, res, next) {
 app.use("/api/one-c", oneCAuthRequired);
 
 app.get("/api/one-c/queue-status", (req, res) => {
-  const database = extractOneCDatabase(req);
-  if (database && !isTestDatabase(database)) {
-    return res.status(403).json({
-      error: "Этот обмен разрешён только для базы 1С TEST.",
-    });
-  }
+  if (!requireOneCTestDatabase(req, res)) return;
 
   res.json({
     ok: true,
@@ -1887,12 +1991,7 @@ app.get("/api/one-c/queue-status", (req, res) => {
 });
 
 app.get("/api/one-c/purchase-price-request", (req, res) => {
-  const database = extractOneCDatabase(req);
-  if (database && !isTestDatabase(database)) {
-    return res.status(403).json({
-      error: "Этот обмен разрешён только для базы 1С TEST.",
-    });
-  }
+  if (!requireOneCTestDatabase(req, res)) return;
 
   const products = getGlobalState("products", DEFAULT_PRODUCTS);
   const clientLinks = getGlobalState("clientLinks", {});
@@ -1954,12 +2053,7 @@ app.post("/api/one-c/orders/:orderId/ack", (req, res) => {
     });
   }
 
-  const database = extractOneCDatabase(req);
-  if (!isTestDatabase(database)) {
-    return res.status(403).json({
-      error: "Подтверждение заказа разрешено только из базы 1С TEST.",
-    });
-  }
+  if (!requireOneCTestDatabase(req, res)) return;
 
   const previous = normalizeExchangeState(stored.payload.exchange);
   const expectedOrderNumber = String(stored.payload.number || "").trim();
@@ -2003,7 +2097,7 @@ app.post("/api/one-c/orders/:orderId/ack", (req, res) => {
     });
   }
 
-  if (previous.status !== "ready") {
+  if (previous.status !== "ready" && previous.status !== "sending") {
     return res.status(409).json({
       error: "Подтверждение отклонено: заказ не находится в очереди 1С TEST.",
     });
@@ -2615,13 +2709,9 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
   try {
     const { mkdirSync, writeFileSync } = await import("node:fs");
     const receivedAt = new Date().toISOString();
-    const sourceDatabase = extractOneCDatabase(req);
-    if (sourceDatabase && !isTestDatabase(sourceDatabase)) {
-      return res.status(403).json({
-        error: "Выгрузка номенклатуры разрешена только из базы 1С TEST.",
-      });
-    }
-    const verifiedTestSource = isTestDatabase(sourceDatabase);
+    const sourceDatabase = requireOneCTestDatabase(req, res);
+    if (!sourceDatabase) return;
+    const verifiedTestSource = true;
     const allOneCProducts = normalizeOneCProducts(req.body?.items).map((item) => ({
       ...item,
       purchasePriceUpdatedAt:
@@ -3039,6 +3129,7 @@ app.post(
 
 app.post("/api/one-c/clients-preview", async (req, res, next) => {
   try {
+    if (!requireOneCTestDatabase(req, res)) return;
     const { mkdirSync, writeFileSync } = await import("node:fs");
     const receivedAt = new Date().toISOString();
     const allOneCClients = normalizeOneCClients(req.body?.items);
@@ -3492,7 +3583,9 @@ app.post(
       ...previous,
       // Проверка не ставит заказ в очередь. Передача выполняется отдельной кнопкой.
       status: validation.ready
-        ? (["sent", "draft"].includes(previous.status) ? previous.status : "not_sent")
+        ? (["sent", "draft", "ready", "sending"].includes(previous.status)
+          ? previous.status
+          : "not_sent")
         : "error",
       checkedAt,
       message: validation.ready
@@ -3531,6 +3624,14 @@ app.post(
       });
     }
 
+    const previous = normalizeExchangeState(stored.payload.exchange);
+    if (previous.status === "sending" && !isOneCClaimExpired(previous)) {
+      return res.status(409).json({
+        error:
+          "Заказ уже выдан 1С TEST и ожидает ACK. Нельзя снова поставить в очередь, пока идёт передача. Дождитесь подтверждения или нажмите «Сбросить 1С».",
+      });
+    }
+
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const clientLinks = getGlobalState("clientLinks", {});
     const validation = validateOrderFor1C({
@@ -3538,12 +3639,11 @@ app.post(
       products,
       clientLinks,
     });
-    const previous = normalizeExchangeState(stored.payload.exchange);
     const attemptedAt = new Date().toISOString();
     const exchange = {
       ...previous,
       // Заказ считается переданным только после подтверждения от 1С (ACK).
-      // До этого момента он находится в очереди и доступен GET /api/one-c/test-order.
+      // До ACK: ready в очереди; после pull: sending (claim), повторный pull не выдаёт тот же заказ.
       status: validation.ready ? "ready" : "error",
       attempts: previous.attempts + 1,
       checkedAt: attemptedAt,
