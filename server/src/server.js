@@ -1562,23 +1562,22 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     const links = getGlobalState("clientLinks", {});
     const oneCProducts = getGlobalState("oneCProducts", []);
 
-    // Не блокируем оформление только из-за возраста уже известной цены.
-    // Обязательная проверка свежести выполняется непосредственно перед
-    // передачей заказа в закрытую базу 1С TEST.
+    // Пересчёт цен для новых заказов. Отсутствие закупочной цены
+    // не должно блокировать сохранение заказа менеджеру — жёсткая
+    // проверка выполняется только перед передачей в 1С TEST.
     const repriced = repriceClientOrders(
       incomingOrders,
       products,
       links[req.user.id],
       oneCProducts
     );
+    orders = repriced.orders;
     if (repriced.issues.length) {
-      return res.status(409).json({
-        code: "PURCHASE_PRICE_MISSING",
-        error: "Для части товаров не получена закупочная цена из 1С TEST.",
-        items: repriced.issues,
+      auditFromRequest(req, "orders.save.price-warning", {
+        count: orders.length,
+        issues: repriced.issues.slice(0, 20),
       });
     }
-    orders = repriced.orders;
   }
 
   replaceOrders({

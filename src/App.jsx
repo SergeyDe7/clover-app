@@ -11,6 +11,7 @@ import {
 
 const MANAGER_ACTIVE_TAB_KEY = "clover-manager-active-tab-v1";
 const MANAGER_OPEN_CLIENT_KEY = "clover-manager-open-client-v1";
+const CLIENT_ACTIVE_TAB_KEY = "clover-client-active-tab-v1";
 
 const MANAGER_TABS = [
   ["orders", "Заказы"],
@@ -21,6 +22,15 @@ const MANAGER_TABS = [
   ["settings", "Настройки"],
   ["backup", "Резервные копии"],
   ["audit", "Журнал действий"],
+];
+
+const CLIENT_TABS = [
+  ["home", "Новый заказ"],
+  ["matrix", "Матрица"],
+  ["orders", "Мои заказы"],
+  ["acts", "Акт сверки"],
+  ["addresses", "Мои адреса"],
+  ["settings", "Настройки"],
 ];
 
 function readManagerActiveTab() {
@@ -38,6 +48,36 @@ function writeManagerActiveTab(value) {
   } catch (error) {
     console.error("Не удалось сохранить раздел менеджера", error);
   }
+}
+
+function readClientActiveTab() {
+  try {
+    const value = localStorage.getItem(CLIENT_ACTIVE_TAB_KEY) || "home";
+    return CLIENT_TABS.some(([id]) => id === value) ? value : "home";
+  } catch {
+    return "home";
+  }
+}
+
+function writeClientActiveTab(value) {
+  try {
+    localStorage.setItem(CLIENT_ACTIVE_TAB_KEY, value);
+  } catch (error) {
+    console.error("Не удалось сохранить раздел клиента", error);
+  }
+}
+
+function clientTabFromSection(section) {
+  if (!section) return "";
+  if (section === "reconciliation" || section === "acts") return "acts";
+  if (section === "addresses" || section === "address") return "addresses";
+  if (section === "settings" || section === "profile" || section === "security" || section === "push") {
+    return "settings";
+  }
+  if (section === "orders" || section === "history") return "orders";
+  if (section === "matrix" || section === "catalog-matrix") return "matrix";
+  if (section === "home" || section === "order" || section === "catalog") return "home";
+  return "";
 }
 
 function readOpenManagerClientId() {
@@ -781,9 +821,15 @@ textarea { resize: vertical; }
 .custom-request-photo-manager { width: min(320px, 100%); aspect-ratio: 4 / 3; }
 
 
-.manager-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
-.manager-nav button { padding: 10px 15px; border: 1px solid #d7e1d4; border-radius: 12px; background: #fff; color: #5d695d; font-weight: 800; }
-.manager-nav button.active { border-color: #5b9d57; background: #5b9d57; color: #fff; }
+.manager-nav, .client-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 24px; padding: 0 0 2px; }
+.manager-nav button, .client-nav button { padding: 10px 15px; border: 1px solid #d7e1d4; border-radius: 12px; background: #fff; color: #5d695d; font-weight: 800; cursor: pointer; }
+.manager-nav button.active, .client-nav button.active { border-color: #5b9d57; background: #5b9d57; color: #fff; }
+.client-nav { position: sticky; top: 0; z-index: 20; background: #f4f8f2; padding-top: 8px; padding-bottom: 10px; }
+.client-home-gate { margin-bottom: 16px; }
+.client-settings-stack { display: grid; gap: 18px; }
+.client-matrix-toolbar { display: grid; gap: 12px; margin-bottom: 18px; }
+.client-matrix-meta { color: #737d73; font-size: 14px; }
+button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 0; }
 .manager-grid { display: grid; gap: 16px; }
 .manager-order-controls { display: grid; grid-template-columns: 210px minmax(0,1fr); gap: 12px; margin-top: 15px; }
 .manager-textareas { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 12px; }
@@ -989,7 +1035,7 @@ textarea { resize: vertical; }
 .import-label input { display: none; }
 
 @media print {
-  .app-header, .manager-nav, .client-order-actions, .toolbar, button { display: none !important; }
+  .app-header, .manager-nav, .client-nav, .client-order-actions, .toolbar, button { display: none !important; }
   .page-content { width: 100%; padding: 0; }
   .order-card { box-shadow: none; page-break-inside: avoid; }
 }
@@ -2072,6 +2118,7 @@ function OrderEditor({
   setShowFullCatalog,
   onClose,
   onSave,
+  embedded = false,
 }) {
   const initialOrder = session.order || null;
   const defaultAddress = addresses.find((item) => item.isDefault) || addresses[0];
@@ -2182,15 +2229,20 @@ function OrderEditor({
     localStorage.removeItem(STORAGE.draft);
   };
 
-  return (
-    <main className="clover-app">
-      <Header title={session.mode === "edit" ? "Редактирование заказа" : session.mode === "repeat" ? "Повтор заказа" : "Новый заказ"}>
-        <ManagerContact settings={settings} profile={profile} orders={orders} />
-        <button className="header-button" type="button" onClick={onClose}>← В кабинет</button>
-      </Header>
-      <section className="catalog-content">
+  const catalogBody = (
+      <section className={embedded ? "catalog-content embedded-catalog" : "catalog-content"}>
         <div className="page-title-row">
-          <div><p className="eyebrow">Каталог</p><h1>Выберите товары</h1><p>Количество можно вводить вручную или менять кнопками.</p></div>
+          <div>
+            <p className="eyebrow">Каталог</p>
+            <h1>
+              {session.mode === "edit"
+                ? "Редактирование заказа"
+                : session.mode === "repeat"
+                  ? "Повтор заказа"
+                  : "Новый заказ"}
+            </h1>
+            <p>Выберите товары — справа состав, дата, адрес и оформление.</p>
+          </div>
           <div className="mini-card"><span className="mini-label">Позиций</span><strong>{selectedItems.length + customItems.length}</strong></div>
         </div>
 
@@ -2319,6 +2371,19 @@ function OrderEditor({
           </form>
         </div>
       </section>
+  );
+
+  if (embedded) {
+    return catalogBody;
+  }
+
+  return (
+    <main className="clover-app">
+      <Header title={session.mode === "edit" ? "Редактирование заказа" : session.mode === "repeat" ? "Повтор заказа" : "Новый заказ"}>
+        <ManagerContact settings={settings} profile={profile} orders={orders} />
+        <button className="header-button" type="button" onClick={onClose}>← В кабинет</button>
+      </Header>
+      {catalogBody}
     </main>
   );
 }
@@ -2722,6 +2787,176 @@ function InstallPrompt() {
   return <div className="install-prompt"><div><strong>Установить Clover</strong><span>{isIos && !promptEvent ? "Добавьте ярлык на экран iPhone" : "Открывайте как обычное приложение"}</span></div><button type="button" onClick={install}>Установить</button><button className="install-close" type="button" onClick={() => setDismissed(true)}>×</button></div>;
 }
 
+function ClientMatrixPanel({
+  products = [],
+  settings,
+  catalogPolicy,
+  favorites = [],
+  setFavorites,
+  onCreateOrder,
+}) {
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("Все");
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+
+  const activeProducts = useMemo(
+    () => (Array.isArray(products) ? products : []).filter((item) => item.active !== false),
+    [products]
+  );
+
+  const categories = useMemo(
+    () => ["Все", ...new Set(activeProducts.map((item) => item.category).filter(Boolean))],
+    [activeProducts]
+  );
+
+  const filtered = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return activeProducts.filter((item) => {
+      const byCategory = category === "Все" || item.category === category;
+      const bySearch =
+        !needle ||
+        String(item.name || "").toLowerCase().includes(needle) ||
+        String(item.code || "").toLowerCase().includes(needle);
+      const byFavorite = !favoritesOnly || favorites.includes(item.id);
+      return byCategory && bySearch && byFavorite;
+    });
+  }, [activeProducts, search, category, favoritesOnly, favorites]);
+
+  useEffect(() => {
+    if (category !== "Все" && !categories.includes(category)) {
+      setCategory("Все");
+    }
+  }, [categories, category]);
+
+  return (
+    <section className="panel">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Персональный каталог</p>
+          <h2>Матрица товаров</h2>
+          <p>Товары, закреплённые за вами менеджером. Категории — как при оформлении заказа.</p>
+        </div>
+        <button className="primary-button" type="button" onClick={onCreateOrder}>
+          + Новый заказ
+        </button>
+      </div>
+
+      {catalogPolicy?.matrixMode === "pending" ? (
+        <div className="matrix-catalog-note pending">
+          <strong>Матрица ещё готовится</strong>
+          <br />
+          Менеджер закрепит постоянные товары и цены. Пока список может быть пустым.
+        </div>
+      ) : (
+        <p className="client-matrix-meta">
+          В матрице: <strong>{activeProducts.length}</strong> поз.
+          {category !== "Все" ? ` · категория «${category}»: ${filtered.length}` : ""}
+        </p>
+      )}
+
+      <div className="client-matrix-toolbar">
+        <div className="catalog-filter-row">
+          <input
+            className="catalog-search"
+            type="search"
+            placeholder="Поиск по названию или коду"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          {settings.showFavorites && (
+            <button
+              className={favoritesOnly ? "category-button active" : "category-button"}
+              type="button"
+              onClick={() => setFavoritesOnly((value) => !value)}
+            >
+              ★ Избранное
+            </button>
+          )}
+        </div>
+        <div className="category-list">
+          {categories.map((item) => (
+            <button
+              className={category === item ? "category-button active" : "category-button"}
+              type="button"
+              key={item}
+              onClick={() => setCategory(item)}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <section className="product-grid">
+        {filtered.map((product) => {
+          const unit = product.saleUnits?.[0] || "piece";
+          const price = getUnitPrice(product, unit);
+          const multiplier = getUnitMultiplier(product, unit);
+          return (
+            <article className="product-card" key={product.id}>
+              <div className="product-card-top">
+                <span className="product-category">{product.category || "Без категории"}</span>
+                {settings.showFavorites && (
+                  <button
+                    className={favorites.includes(product.id) ? "favorite-button active" : "favorite-button"}
+                    type="button"
+                    onClick={() =>
+                      setFavorites((current) =>
+                        current.includes(product.id)
+                          ? current.filter((id) => id !== product.id)
+                          : [...current, product.id]
+                      )
+                    }
+                  >
+                    ★
+                  </button>
+                )}
+              </div>
+              <div className="product-image-wrap">
+                {product.imageUrl ? (
+                  <img className="product-image" src={product.imageUrl} alt={product.name} />
+                ) : (
+                  <span className="product-image-placeholder">Фото товара пока не загружено</span>
+                )}
+              </div>
+              <h2>{product.name}</h2>
+              <p className="product-code">Код: {product.code || "—"}</p>
+              <p className="product-price">
+                {settings.showPrices && price > 0 ? (
+                  <>
+                    {formatMoney(price)} <small>/ {UNIT_CONFIG[unit]?.shortLabel || unit}</small>
+                  </>
+                ) : (
+                  "Цена уточняется"
+                )}
+              </p>
+              <div className="unit-choice">
+                {UNIT_ORDER.filter((item) => (product.saleUnits || []).includes(item)).map((item) => (
+                  <span className="category-button" key={item} style={{ cursor: "default" }}>
+                    {UNIT_CONFIG[item].label}
+                  </span>
+                ))}
+              </div>
+              <p className="unit-hint">
+                {multiplier > 1
+                  ? `1 ${UNIT_CONFIG[unit].label.toLowerCase()} = ${multiplier} шт.`
+                  : "Количество считается поштучно"}
+              </p>
+            </article>
+          );
+        })}
+        {!filtered.length && (
+          <div className="empty-box">
+            {activeProducts.length
+              ? "В этой категории товаров нет."
+              : "В вашей матрице пока нет товаров."}
+          </div>
+        )}
+      </section>
+    </section>
+  );
+}
+
 function ClientDashboard({
   profile,
   setProfile,
@@ -2739,17 +2974,51 @@ function ClientDashboard({
   onRepeat,
   onDelete,
   onLogout,
+  catalogSession,
+  products,
+  matrixProducts,
+  favorites,
+  setFavorites,
+  showFullCatalog,
+  setShowFullCatalog,
+  onSaveOrder,
+  onCloseCatalog,
+  canCreateOrder,
+  profileComplete,
 }) {
+  const [tab, setTab] = useState(() => readClientActiveTab());
   const [filter, setFilter] = useState("Все");
   const visibleOrders = orders.filter((order) => filter === "Все" || order.status === filter);
   const active = orders.filter((order) => !["Выполнен", "Отменён"].includes(order.status));
   const nextOrder = [...active].sort((a, b) => String(a.firstDeliveryDate).localeCompare(String(b.firstDeliveryDate)))[0];
+  const orderSession = catalogSession || { mode: "new" };
+  const orderEditorKey = `${orderSession.mode}-${orderSession.order?.id || "new"}`;
+
+  const selectTab = (id) => {
+    setTab(id);
+    writeClientActiveTab(id);
+    if (id === "home") {
+      onNew?.({ silent: true });
+    }
+  };
+
+  useEffect(() => {
+    if (catalogSession && (catalogSession.mode === "edit" || catalogSession.mode === "repeat")) {
+      setTab("home");
+      writeClientActiveTab("home");
+    }
+  }, [catalogSession]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const section = params.get("section");
     const orderId = params.get("order");
-    const targetId = orderId ? `order-${orderId}` : section;
+    const mapped = orderId ? "orders" : clientTabFromSection(section);
+    if (mapped) {
+      setTab(mapped);
+      writeClientActiveTab(mapped);
+    }
+    const targetId = orderId ? `order-${orderId}` : section === "reconciliation" ? "reconciliation" : "";
     if (!targetId) return;
     const timer = window.setTimeout(() => {
       document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2763,97 +3032,197 @@ function ClientDashboard({
         <ManagerContact settings={settings} />
       </Header>
       <section className="page-content">
-        <div className="page-title-row">
-          <div><p className="eyebrow">Clover</p><h1>Заказы и доставка</h1><p>Создавайте, повторяйте и отслеживайте заказы.</p></div>
-          <button className="primary-button" type="button" onClick={onNew}>+ Создать заказ</button>
-        </div>
-        <div className="stats-grid">
-          <article className="stat-card"><span>Ближайшая доставка</span><strong>{nextOrder ? formatDate(nextOrder.firstDeliveryDate) : "—"}</strong></article>
-          <article className="stat-card"><span>Активные заказы</span><strong>{active.length}</strong></article>
-          <article className="stat-card"><span>Выполнено</span><strong>{orders.filter((item) => item.status === "Выполнен").length}</strong></article>
-          <article className="stat-card"><span>Всего заказов</span><strong>{orders.length}</strong></article>
-        </div>
+        <nav className="client-nav" aria-label="Разделы кабинета">
+          {CLIENT_TABS.map(([id, label]) => (
+            <button
+              className={tab === id ? "active" : ""}
+              type="button"
+              key={id}
+              onClick={() => selectTab(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
 
-        <div
-          className={
-            catalogPolicy.matrixMode === "pending"
-              ? "matrix-catalog-note pending"
-              : "matrix-catalog-note"
-          }
-        >
-          {catalogPolicy.matrixMode === "pending" ? (
-            <>
-              <strong>Персональная матрица подготавливается</strong>
-              <br />
-              Менеджер закрепит ваши постоянные товары и цены.
-              Заказ отсутствующей позиции уже можно отправить через
-              каталог.
-            </>
-          ) : (
-            <>
-              <strong>Ваш персональный каталог готов</strong>
-              <br />
-              Постоянных позиций: {matrixProductCount}.
-              {catalogPolicy.allowFullCatalog &&
-                ` Доступен также весь каталог: ${fullCatalogCount} позиций.`}
-            </>
-          )}
-        </div>
+        {tab === "home" && (
+          <>
+            <div className="stats-grid">
+              <article className="stat-card"><span>Ближайшая доставка</span><strong>{nextOrder ? formatDate(nextOrder.firstDeliveryDate) : "—"}</strong></article>
+              <article className="stat-card"><span>Активные заказы</span><strong>{active.length}</strong></article>
+              <article className="stat-card"><span>Выполнено</span><strong>{orders.filter((item) => item.status === "Выполнен").length}</strong></article>
+              <article className="stat-card"><span>Всего заказов</span><strong>{orders.length}</strong></article>
+            </div>
 
-        <ProfilePanel profile={profile} onChange={setProfile} />
-        <AddressesPanel addresses={addresses} onChange={setAddresses} />
-        <ReconciliationPanel requests={reconciliationRequests} onReload={onReload} />
-        <PushSettings />
-        <PasswordSecurityPanel />
+            <div
+              className={
+                catalogPolicy.matrixMode === "pending"
+                  ? "matrix-catalog-note pending"
+                  : "matrix-catalog-note"
+              }
+            >
+              {catalogPolicy.matrixMode === "pending" ? (
+                <>
+                  <strong>Персональная матрица подготавливается</strong>
+                  <br />
+                  Менеджер закрепит ваши постоянные товары и цены.
+                  Заказ отсутствующей позиции уже можно отправить через
+                  каталог.
+                </>
+              ) : (
+                <>
+                  <strong>Ваш персональный каталог готов</strong>
+                  <br />
+                  Постоянных позиций: {matrixProductCount}.
+                  {catalogPolicy.allowFullCatalog &&
+                    ` Доступен также весь каталог: ${fullCatalogCount} позиций.`}
+                </>
+              )}
+            </div>
 
-        <section className="panel">
-          <div className="panel-heading"><div><p className="eyebrow">История</p><h2>Мои заказы</h2><p>Статусы и комментарии менеджера обновляются в карточке заказа.</p></div></div>
-          <div className="category-list" style={{ marginBottom: 18 }}>
-            {["Все", ...ORDER_STATUSES].map((status) => <button className={filter === status ? "category-button active" : "category-button"} type="button" key={status} onClick={() => setFilter(status)}>{status}</button>)}
-          </div>
+            {!canCreateOrder && (
+              <div className="warning-box client-home-gate">
+                {!profileComplete && settings.requireProfile && (
+                  <p>
+                    Сначала заполните профиль организации во вкладке{" "}
+                    <button className="linkish" type="button" onClick={() => selectTab("settings")}>Настройки</button>.
+                  </p>
+                )}
+                {settings.requireAddress && !addresses.length && (
+                  <p>
+                    Добавьте адрес доставки во вкладке{" "}
+                    <button className="linkish" type="button" onClick={() => selectTab("addresses")}>Мои адреса</button>.
+                  </p>
+                )}
+              </div>
+            )}
 
-          {visibleOrders.length ? <div className="order-list">
-            {visibleOrders.map((order) => {
-              const total = getOrderTotal(order);
-              const canEdit = settings.allowClientEdit && order.status === "Новый";
-              const canDelete = settings.allowClientDelete && order.status === "Новый";
-              return (
-                <article className="order-card" id={`order-${order.id}`} key={order.id}>
-                  <div className="order-card-header">
-                    <div><span className={`badge ${statusClass(order.status)}`}>{order.status}</span><h3>Заказ № {order.number}</h3><p>Создан: {formatDateTime(order.createdAt)}</p></div>
-                    <div className="nowrap"><strong className="success-text">{settings.showPrices && total > 0 ? formatMoney(total) : `${getPositionCount(order)} поз.`}</strong></div>
-                  </div>
-                  <div className="order-meta">
-                    <div><span>Дата доставки</span><strong>{formatDate(order.firstDeliveryDate)}</strong></div>
-                    <div><span>Адрес</span><strong>{order.address}</strong></div>
-                    <div><span>Позиций</span><strong>{getPositionCount(order)}</strong></div>
-                    <div><span>Обновлён</span><strong>{formatDateTime(order.updatedAt || order.createdAt)}</strong></div>
-                  </div>
-                  <details className="order-details">
-                    <summary>Посмотреть состав заказа</summary>
-                    <div className="order-products">
-                      {(order.items || []).map((item) => <div className="order-product" key={`${order.id}-${item.productId ?? item.id}`}><span>{item.name}<small>{item.code || item.category}</small></span><strong>{item.quantity} {UNIT_CONFIG[item.unit]?.shortLabel || item.unit}<small>{item.multiplier > 1 ? `${item.quantity * item.multiplier} шт. всего` : ""}</small></strong></div>)}
-                      {(order.customItems || []).map((item) => (
-                        <div className="order-product custom-line custom-request-order-row" key={`${order.id}-${item.id}`}>
-                          <CustomRequestPhoto photo={item.photo} className="custom-request-photo-order" />
-                          <span><span className="badge yellow">{item.requestStatus || "Новый запрос"}</span>{item.name}<small>{item.details}</small>{item.managerComment && <small>Менеджер: {item.managerComment}</small>}</span>
-                          <strong>{item.quantity} {item.unit}<small>{Number(item.unitPrice) > 0 ? formatMoney(Number(item.unitPrice) * item.quantity) : "Цена уточняется"}</small></strong>
-                        </div>
-                      ))}
+            {canCreateOrder ? (
+              <OrderEditor
+                key={orderEditorKey}
+                embedded
+                session={orderSession}
+                products={products}
+                addresses={addresses}
+                favorites={favorites}
+                setFavorites={setFavorites}
+                settings={settings}
+                profile={profile}
+                orders={orders}
+                catalogPolicy={catalogPolicy}
+                showFullCatalog={showFullCatalog}
+                setShowFullCatalog={setShowFullCatalog}
+                onClose={onCloseCatalog}
+                onSave={(payload) => {
+                  onSaveOrder(payload);
+                  setTab("orders");
+                  writeClientActiveTab("orders");
+                }}
+              />
+            ) : (
+              <div className="empty-box">Оформление заказа станет доступно после заполнения обязательных данных.</div>
+            )}
+          </>
+        )}
+
+        {tab === "matrix" && (
+          <ClientMatrixPanel
+            products={matrixProducts}
+            settings={settings}
+            catalogPolicy={catalogPolicy}
+            favorites={favorites}
+            setFavorites={setFavorites}
+            onCreateOrder={() => {
+              onNew({ forceNew: true });
+              setTab("home");
+              writeClientActiveTab("home");
+            }}
+          />
+        )}
+
+        {tab === "orders" && (
+          <section className="panel">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">История</p>
+                <h2>Мои заказы</h2>
+                <p>Статусы и комментарии менеджера обновляются в карточке заказа.</p>
+              </div>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => {
+                  onNew({ forceNew: true });
+                  setTab("home");
+                  writeClientActiveTab("home");
+                }}
+              >
+                + Новый заказ
+              </button>
+            </div>
+            <div className="category-list" style={{ marginBottom: 18 }}>
+              {["Все", ...ORDER_STATUSES].map((status) => <button className={filter === status ? "category-button active" : "category-button"} type="button" key={status} onClick={() => setFilter(status)}>{status}</button>)}
+            </div>
+
+            {visibleOrders.length ? <div className="order-list">
+              {visibleOrders.map((order) => {
+                const total = getOrderTotal(order);
+                const canEdit = settings.allowClientEdit && order.status === "Новый";
+                const canDelete = settings.allowClientDelete && order.status === "Новый";
+                return (
+                  <article className="order-card" id={`order-${order.id}`} key={order.id}>
+                    <div className="order-card-header">
+                      <div><span className={`badge ${statusClass(order.status)}`}>{order.status}</span><h3>Заказ № {order.number}</h3><p>Создан: {formatDateTime(order.createdAt)}</p></div>
+                      <div className="nowrap"><strong className="success-text">{settings.showPrices && total > 0 ? formatMoney(total) : `${getPositionCount(order)} поз.`}</strong></div>
                     </div>
-                    {(order.clientComment || order.managerComment) && <div className="order-comments">{order.clientComment && <div className="comment-box"><strong>Ваш комментарий</strong><p>{order.clientComment}</p></div>}{order.managerComment && <div className="comment-box"><strong>Комментарий менеджера</strong><p>{order.managerComment}</p></div>}</div>}<OrderTimeline order={order} />
-                  </details>
-                  <div className="client-order-actions">
-                    {canEdit && <button className="secondary-button" type="button" onClick={() => onEdit(order)}>Редактировать</button>}
-                    {settings.allowRepeatOrder && <button className="secondary-button" type="button" onClick={() => onRepeat(order)}>Повторить заказ</button>}
-                    <button className="secondary-button" type="button" onClick={() => window.print()}>Печать</button>
-                    {canDelete && <button className="danger-button" type="button" onClick={() => onDelete(order)}>Удалить</button>}
-                  </div>
-                </article>
-              );
-            })}
-          </div> : <div className="empty-box">Заказов с таким статусом пока нет.</div>}
-        </section>
+                    <div className="order-meta">
+                      <div><span>Дата доставки</span><strong>{formatDate(order.firstDeliveryDate)}</strong></div>
+                      <div><span>Адрес</span><strong>{order.address}</strong></div>
+                      <div><span>Позиций</span><strong>{getPositionCount(order)}</strong></div>
+                      <div><span>Обновлён</span><strong>{formatDateTime(order.updatedAt || order.createdAt)}</strong></div>
+                    </div>
+                    <details className="order-details">
+                      <summary>Посмотреть состав заказа</summary>
+                      <div className="order-products">
+                        {(order.items || []).map((item) => <div className="order-product" key={`${order.id}-${item.productId ?? item.id}`}><span>{item.name}<small>{item.code || item.category}</small></span><strong>{item.quantity} {UNIT_CONFIG[item.unit]?.shortLabel || item.unit}<small>{item.multiplier > 1 ? `${item.quantity * item.multiplier} шт. всего` : ""}</small></strong></div>)}
+                        {(order.customItems || []).map((item) => (
+                          <div className="order-product custom-line custom-request-order-row" key={`${order.id}-${item.id}`}>
+                            <CustomRequestPhoto photo={item.photo} className="custom-request-photo-order" />
+                            <span><span className="badge yellow">{item.requestStatus || "Новый запрос"}</span>{item.name}<small>{item.details}</small>{item.managerComment && <small>Менеджер: {item.managerComment}</small>}</span>
+                            <strong>{item.quantity} {item.unit}<small>{Number(item.unitPrice) > 0 ? formatMoney(Number(item.unitPrice) * item.quantity) : "Цена уточняется"}</small></strong>
+                          </div>
+                        ))}
+                      </div>
+                      {(order.clientComment || order.managerComment) && <div className="order-comments">{order.clientComment && <div className="comment-box"><strong>Ваш комментарий</strong><p>{order.clientComment}</p></div>}{order.managerComment && <div className="comment-box"><strong>Комментарий менеджера</strong><p>{order.managerComment}</p></div>}</div>}<OrderTimeline order={order} />
+                    </details>
+                    <div className="client-order-actions">
+                      {canEdit && <button className="secondary-button" type="button" onClick={() => onEdit(order)}>Редактировать</button>}
+                      {settings.allowRepeatOrder && <button className="secondary-button" type="button" onClick={() => onRepeat(order)}>Повторить заказ</button>}
+                      <button className="secondary-button" type="button" onClick={() => window.print()}>Печать</button>
+                      {canDelete && <button className="danger-button" type="button" onClick={() => onDelete(order)}>Удалить</button>}
+                    </div>
+                  </article>
+                );
+              })}
+            </div> : <div className="empty-box">Заказов с таким статусом пока нет.</div>}
+          </section>
+        )}
+
+        {tab === "acts" && (
+          <ReconciliationPanel requests={reconciliationRequests} onReload={onReload} />
+        )}
+
+        {tab === "addresses" && (
+          <AddressesPanel addresses={addresses} onChange={setAddresses} />
+        )}
+
+        {tab === "settings" && (
+          <div className="client-settings-stack">
+            <ProfilePanel profile={profile} onChange={setProfile} />
+            <PushSettings />
+            <PasswordSecurityPanel />
+          </div>
+        )}
       </section>
     </main>
   );
@@ -6577,7 +6946,29 @@ function App() {
     return true;
   };
 
-  const openNew = () => {
+  const openNew = (options = {}) => {
+    const silent = Boolean(options?.silent);
+    const forceNew = Boolean(options?.forceNew);
+
+    if (forceNew) {
+      if (!validateNewOrder()) return;
+      setCatalogSession({ mode: "new" });
+      return;
+    }
+
+    if (silent) {
+      if (
+        (settings.requireProfile && !profileComplete) ||
+        (settings.requireAddress && !addresses.length)
+      ) {
+        return;
+      }
+      if (!catalogSession || catalogSession.mode === "new") {
+        setCatalogSession({ mode: "new" });
+      }
+      return;
+    }
+
     if (validateNewOrder()) {
       setCatalogSession({ mode: "new" });
     }
@@ -6598,36 +6989,37 @@ function App() {
   };
 
   const saveOrder = (payload) => {
-    if (catalogSession.mode === "edit") {
-      setOrders((current) =>
-        current.map((order) => {
-          if (order.id !== catalogSession.order.id) return order;
+    const session = catalogSession || { mode: "new" };
+    let nextOrders = orders;
 
-          const updatedAt = new Date().toISOString();
-          const history = appendOrderHistory(
-            order,
-            makeOrderHistoryEvent(
-              "client.edit",
-              "Клиент изменил состав или условия заказа",
-              profile.contactName || "Клиент"
-            )
-          );
+    if (session.mode === "edit") {
+      nextOrders = orders.map((order) => {
+        if (order.id !== session.order.id) return order;
 
-          return {
-            ...order,
-            ...payload,
-            history,
-            updatedAt,
-          };
-        })
-      );
+        const updatedAt = new Date().toISOString();
+        const history = appendOrderHistory(
+          order,
+          makeOrderHistoryEvent(
+            "client.edit",
+            "Клиент изменил состав или условия заказа",
+            profile.contactName || "Клиент"
+          )
+        );
+
+        return {
+          ...order,
+          ...payload,
+          history,
+          updatedAt,
+        };
+      });
     } else {
       const timestamp = Date.now();
       const identifiers = makeOrderIdentifiers(timestamp);
       const createdAt = new Date().toISOString();
       const orderId = makeId("order");
 
-      setOrders((current) => [
+      nextOrders = [
         {
           id: orderId,
           externalId: identifiers.externalId,
@@ -6658,11 +7050,21 @@ function App() {
           ],
           ...payload,
         },
-        ...current,
-      ]);
+        ...orders,
+      ];
     }
 
+    setOrders(nextOrders);
     setCatalogSession(null);
+
+    api
+      .saveOrders(nextOrders)
+      .then(() => setSyncError(""))
+      .catch((error) => {
+        const message = `${error.message}. Заказ виден у вас, но сервер его не сохранил — менеджер его не увидит.`;
+        setSyncError(message);
+        alert(message);
+      });
   };
 
   const deleteClientOrder = (order) => {
@@ -6925,25 +7327,11 @@ function App() {
         onLogout={logout}
       />
     );
-  } else if (catalogSession) {
-    content = (
-      <OrderEditor
-        session={catalogSession}
-        products={catalogProducts}
-        addresses={addresses}
-        favorites={favorites}
-        setFavorites={setFavorites}
-        settings={settings}
-        profile={profile}
-        orders={clientOrders}
-        catalogPolicy={catalogPolicy}
-        showFullCatalog={showFullCatalog}
-        setShowFullCatalog={setShowFullCatalog}
-        onClose={() => setCatalogSession(null)}
-        onSave={saveOrder}
-      />
-    );
   } else {
+    const canCreateOrder =
+      !(settings.requireProfile && !profileComplete) &&
+      !(settings.requireAddress && !addresses.length);
+
     content = (
       <ClientDashboard
         profile={profile}
@@ -6962,6 +7350,17 @@ function App() {
         onRepeat={openRepeat}
         onDelete={deleteClientOrder}
         onLogout={logout}
+        catalogSession={catalogSession}
+        products={catalogProducts}
+        matrixProducts={products}
+        favorites={favorites}
+        setFavorites={setFavorites}
+        showFullCatalog={showFullCatalog}
+        setShowFullCatalog={setShowFullCatalog}
+        onSaveOrder={saveOrder}
+        onCloseCatalog={() => setCatalogSession(null)}
+        canCreateOrder={canCreateOrder}
+        profileComplete={profileComplete}
       />
     );
   }

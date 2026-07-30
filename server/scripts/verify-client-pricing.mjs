@@ -105,8 +105,19 @@ const missing = resolveClientProductPricing(
   null,
   { defaultPricingMode: "purchase_markup", defaultMarkupPercent: 15 }
 );
-assert.equal(missing.prices.piece, 0);
-assert.equal(missing.priceSources.piece, "purchase_missing");
+assert.equal(missing.prices.piece, 120);
+assert.equal(missing.priceSources.piece, "base_fallback");
+assert.equal(missing.prices.pack, 12000);
+assert.equal(missing.priceSources.pack, "base_fallback");
+
+const missingNoBase = resolveClientProductPricing(
+  { ...product, pricePiece: 0, pricePack: 0, priceBundle: 0 },
+  {},
+  null,
+  { defaultPricingMode: "purchase_markup", defaultMarkupPercent: 15 }
+);
+assert.equal(missingNoBase.prices.piece, 0);
+assert.equal(missingNoBase.priceSources.piece, "purchase_missing");
 
 const directUnits = normalizeOneCProduct({
   id: "onec-direct",

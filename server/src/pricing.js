@@ -147,8 +147,16 @@ export function resolveClientProductPricing(
 
     if (source === "purchase_markup") {
       const calculated = calculateMarkupPrice(purchase, markupPercent);
-      result.prices[unit] = calculated === null ? 0 : calculated;
-      result.priceSources[unit] = calculated === null ? "purchase_missing" : "purchase_markup";
+      if (calculated !== null) {
+        result.prices[unit] = calculated;
+        result.priceSources[unit] = "purchase_markup";
+      } else {
+        // Нет закупочной из 1С — не обнуляем витрину: показываем базовую цену каталога.
+        const fallback = Math.max(0, Number(product[baseField]) || 0);
+        result.prices[unit] = fallback;
+        result.priceSources[unit] =
+          fallback > 0 ? "base_fallback" : "purchase_missing";
+      }
       continue;
     }
 
