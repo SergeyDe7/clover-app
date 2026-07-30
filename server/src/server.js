@@ -2607,13 +2607,15 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
       currentProducts,
       allOneCProducts
     );
-    const oneCProducts = selectRelevantOneCProducts(
+    // Кандидаты для подсказок — по-прежнему «релевантные»;
+    // для поиска менеджера храним полную выгрузку TEST.
+    const relevantOneCProducts = selectRelevantOneCProducts(
       currentProducts,
       allOneCProducts,
       candidateMap
     );
 
-    const retainedIds = new Set(oneCProducts.map((item) => item.id));
+    const retainedIds = new Set(relevantOneCProducts.map((item) => item.id));
     const preliminaryCandidateMap = Object.fromEntries(
       Object.entries(candidateMap).map(([productId, items]) => [
         productId,
@@ -2641,12 +2643,13 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
           receivedAt,
           data: {
             sourceCount: allOneCProducts.length,
-            retainedCount: oneCProducts.length,
+            retainedCount: allOneCProducts.length,
+            relevantCount: relevantOneCProducts.length,
             candidateProducts: Object.values(preliminaryCandidateMap).filter(
               (items) => Array.isArray(items) && items.length
             ).length,
-            mode: "clover-products-and-candidates-only",
-            items: oneCProducts,
+            mode: "full-catalog-for-search",
+            items: allOneCProducts,
           },
         },
         null,
@@ -2657,7 +2660,7 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
 
     const linked = autoLinkCloverProducts(
       currentProducts,
-      oneCProducts,
+      allOneCProducts,
       receivedAt
     );
 
@@ -2691,6 +2694,7 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
       details: {
         scanned: allOneCProducts.length,
         received: linked.oneCProducts.length,
+        relevant: relevantOneCProducts.length,
         candidateProducts: Object.values(cleanCandidateMap).filter(
           (items) => Array.isArray(items) && items.length
         ).length,
@@ -2698,6 +2702,7 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
         newlyLinked: linked.report.newlyLinked,
         ambiguous: linked.report.ambiguous,
         unmatched: linked.report.unmatched,
+        mode: "full-catalog-for-search",
       },
     });
 
@@ -2705,10 +2710,11 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
       ok: true,
       scanned: allOneCProducts.length,
       received: linked.oneCProducts.length,
+      relevant: relevantOneCProducts.length,
       candidateProducts: Object.values(cleanCandidateMap).filter(
         (items) => Array.isArray(items) && items.length
       ).length,
-      mode: "clover-products-and-candidates-only",
+      mode: "full-catalog-for-search",
       autoLink: linked.report,
     });
   } catch (error) {
@@ -2952,13 +2958,14 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
       currentLinks,
       allOneCClients
     );
-    const oneCClients = selectRelevantOneCClients(
+    // Кандидаты для подсказок — выборочно; для поиска менеджера — полный список.
+    const relevantOneCClients = selectRelevantOneCClients(
       clients,
       currentLinks,
       allOneCClients,
       candidateMap
     );
-    const retainedIds = new Set(oneCClients.map((item) => item.id));
+    const retainedIds = new Set(relevantOneCClients.map((item) => item.id));
     const cleanCandidateMap = Object.fromEntries(
       Object.entries(candidateMap).map(([clientId, items]) => [
         clientId,
@@ -2971,7 +2978,7 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
     const linked = autoLinkCloverClients(
       clients,
       currentLinks,
-      oneCClients,
+      allOneCClients,
       receivedAt
     );
     setGlobalState("oneCClients", linked.oneCClients);
@@ -2994,9 +3001,10 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
         receivedAt,
         data: {
           sourceCount: allOneCClients.length,
-          retainedCount: linked.oneCClients.length,
-          mode: "clover-clients-and-candidates-only",
-          items: linked.oneCClients,
+          retainedCount: allOneCClients.length,
+          relevantCount: relevantOneCClients.length,
+          mode: "full-catalog-for-search",
+          items: allOneCClients,
         },
       }, null, 2),
       "utf8"
@@ -3007,10 +3015,12 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
       details: {
         scanned: allOneCClients.length,
         received: linked.oneCClients.length,
+        relevant: relevantOneCClients.length,
         autoLinked: linked.report.autoLinked,
         candidateClients: Object.values(cleanCandidateMap).filter(
           (items) => Array.isArray(items) && items.length
         ).length,
+        mode: "full-catalog-for-search",
       },
     });
 
@@ -3018,7 +3028,8 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
       ok: true,
       scanned: allOneCClients.length,
       received: linked.oneCClients.length,
-      mode: "clover-clients-and-candidates-only",
+      relevant: relevantOneCClients.length,
+      mode: "full-catalog-for-search",
       autoLink: linked.report,
     });
   } catch (error) {

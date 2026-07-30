@@ -30,10 +30,22 @@ assert.equal(catalog.length, 1000);
 
 const candidates = buildOneCClientCandidates(clients, links, catalog);
 const retained = selectRelevantOneCClients(clients, links, catalog, candidates);
-assert.ok(retained.length <= 30, "Полная клиентская база не должна сохраняться");
+assert.ok(retained.length <= 30, "Релевантный список кандидатов остаётся выборочным");
+assert.ok(!retained.some((item) => item.id === "other-500"));
 
-const auto = autoLinkCloverClients(clients, links, retained, "2026-07-24T22:00:00.000Z");
+const storedForSearch = catalog;
+assert.equal(storedForSearch.length, 1000);
+assert.ok(storedForSearch.some((item) => item.id === "other-500"));
+const searchHit = storedForSearch.filter((item) =>
+  `${item.name} ${item.code} ${item.id}`
+    .toLocaleLowerCase("ru-RU")
+    .includes("посторонний контрагент 500")
+);
+assert.equal(searchHit.length, 1);
+
+const auto = autoLinkCloverClients(clients, links, catalog, "2026-07-24T22:00:00.000Z");
 assert.equal(auto.report.linked, 3);
+assert.equal(auto.oneCClients.length, 1000);
 assert.equal(auto.clientLinks["client-1"].oneCId, "onec-client-1");
 assert.equal(auto.clientLinks["client-2"].oneCId, "onec-client-2");
 assert.equal(auto.clientLinks["client-3"].oneCId, "onec-client-3");
@@ -53,5 +65,7 @@ const cleared = mergeClientLinksPreservingOneCLinks(
 );
 assert.equal(cleared["client-1"].oneCId, "");
 
-console.log("Проверка выборочного сопоставления клиентов 1С пройдена успешно.");
-console.log(`Просканировано: ${catalog.length}; сохранено выборочно: ${retained.length}; связано: ${auto.report.linked}.`);
+console.log("Проверка сопоставления клиентов 1С и полного каталога для поиска пройдена успешно.");
+console.log(
+  `Просканировано: ${catalog.length}; для поиска: ${storedForSearch.length}; релевантных кандидатов: ${retained.length}; связано: ${auto.report.linked}.`
+);

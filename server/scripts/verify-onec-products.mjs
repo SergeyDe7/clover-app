@@ -85,20 +85,36 @@ assert.ok((candidates["27"] || []).some((item) => item.id === "onec-candidate-1"
 assert.ok((candidates["28"] || []).some((item) => item.id === "onec-candidate-2"));
 
 const retained = selectRelevantOneCProducts(cloverProducts, fullCatalog, candidates);
-assert.ok(retained.length < 220, "Полный каталог 1С не должен сохраняться");
+assert.ok(retained.length < 220, "Релевантный список кандидатов остаётся выборочным");
 assert.ok(retained.some((item) => item.id === "onec-candidate-1"));
 assert.ok(!retained.some((item) => item.id === "distractor-3500"));
 
-const linked = autoLinkCloverProducts(cloverProducts, retained, "2026-07-24T22:00:00.000Z");
+// Для поиска менеджера хранится полная выгрузка TEST.
+const storedForSearch = fullCatalog;
+assert.equal(storedForSearch.length, 3629);
+assert.ok(storedForSearch.some((item) => item.id === "distractor-3500"));
+const searchHit = storedForSearch.filter((item) =>
+  `${item.name} ${item.code} ${item.id}`
+    .toLocaleLowerCase("ru-RU")
+    .includes("посторонняя номенклатура 3500")
+);
+assert.equal(searchHit.length, 1);
+
+const linked = autoLinkCloverProducts(
+  cloverProducts,
+  fullCatalog,
+  "2026-07-24T22:00:00.000Z"
+);
 assert.equal(linked.report.linked, 26);
 assert.equal(linked.report.autoLinked, 24);
+assert.equal(linked.oneCProducts.length, 3629);
 assert.equal(linked.products.find((item) => item.id === 1).oneCId, "onec-exact-1");
 assert.equal(linked.products.find((item) => item.id === 27).oneCId, "");
 
 const manuallyLinked = linkCloverProduct(
   linked.products,
   27,
-  retained.find((item) => item.id === "onec-candidate-1"),
+  storedForSearch.find((item) => item.id === "onec-candidate-1"),
   "2026-07-24T22:01:00.000Z"
 );
 assert.equal(manuallyLinked.find((item) => item.id === 27).oneCId, "onec-candidate-1");
@@ -124,4 +140,6 @@ const clearedLink = mergeProductsPreservingOneCLinks(
 assert.equal(clearedLink.find((item) => item.id === 27).oneCId, "");
 
 console.log("Проверка точного и адресного сопоставления номенклатуры 1С пройдена успешно.");
-console.log(`Просканировано: ${fullCatalog.length}; сохранено выборочно: ${retained.length}; найдено кандидатов для товаров: ${candidateProductIds.length}.`);
+console.log(
+  `Просканировано: ${fullCatalog.length}; для поиска сохраняется полный каталог: ${storedForSearch.length}; релевантных кандидатов: ${retained.length}; товаров с кандидатами: ${candidateProductIds.length}.`
+);

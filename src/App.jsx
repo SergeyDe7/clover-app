@@ -5011,10 +5011,10 @@ function ProductEditor({ product, onClose, onSave }) {
             </div>
           ) : (
             <div className="one-c-link-empty one-c-match-hints">
-              <p>
-                Название для сайта может отличаться от названия в 1С. Укажите код
-                или точное внутреннее название из 1С TEST. После следующей выгрузки
-                Clover сохранит только подходящую позицию и свяжет её автоматически.
+                  <p>
+                Название для сайта может отличаться от названия в 1С. Выберите
+                позицию из полной выгрузки 1С TEST или укажите код / точное
+                название — после выгрузки Clover сможет связать автоматически.
               </p>
               <div className="form-grid one-c-match-fields">
                 <label className="field">Код товара в 1С
@@ -5042,7 +5042,7 @@ function ProductEditor({ product, onClose, onSave }) {
               <div className="one-c-products-search">
                 <input
                   type="search"
-                  placeholder="Поиск среди сохранённых позиций: название, код или ID"
+                  placeholder="Поиск по выгрузке 1С TEST: название, код или ID"
                   value={oneCSearch}
                   onChange={(event) => setOneCSearch(event.target.value)}
                   onKeyDown={(event) => {
@@ -5090,7 +5090,7 @@ function ProductEditor({ product, onClose, onSave }) {
                 })}
                 {!oneCLoading && !oneCResults.length && (
                   <div className="empty-box">
-                    <p>Подходящих сохранённых позиций пока нет.</p>
+                    <p>В текущей выгрузке 1С подходящих позиций нет.</p>
                     <button className="primary-button" type="button" onClick={requestOneCSearch}>
                       Сохранить запрос для следующей выгрузки из 1С
                     </button>
@@ -5351,7 +5351,7 @@ function OneCProductsPanel({ products, setProducts }) {
           >
             <input
               type="search"
-              placeholder="Поиск среди сохранённых позиций: название, код или ID"
+              placeholder="Поиск по выгрузке 1С TEST: название, код или ID"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
