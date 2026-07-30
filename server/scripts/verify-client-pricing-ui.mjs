@@ -41,8 +41,15 @@ assert.ok(
 );
 
 assert.ok(
-  source.includes('await api.saveClientLinks(nextLinks)') &&
-    source.includes('saveClientMatrix(client.id, link)'),
+  source.includes("prefillManualPriceFromProduct") &&
+    source.includes("hasManualUnitValue") &&
+    source.includes("выбрана фиксированная цена, но сумма не указана"),
+  "Фиксированная цена должна подставлять базу каталога и не сохраняться пустой."
+);
+
+assert.ok(
+  source.includes("await api.saveClientLinks(nextLinks)") &&
+    source.includes("saveClientMatrix(client.id, link)"),
   "Матрица должна иметь явную кнопку сохранения на сервер."
 );
 

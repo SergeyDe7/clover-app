@@ -1305,6 +1305,51 @@ function hasPurchasePrice(value) {
   );
 }
 
+function hasManualUnitValue(price = {}) {
+  return UNIT_ORDER.some(
+    (unit) =>
+      price?.[unit] !== null &&
+      price?.[unit] !== undefined &&
+      price?.[unit] !== ""
+  );
+}
+
+/** При выборе «Фиксированная» подставляет базу каталога в пустые единицы продажи. */
+function prefillManualPriceFromProduct(product, currentPrice = {}) {
+  const next = {
+    source: "manual",
+    markupPercent: Math.max(0, Number(currentPrice.markupPercent) || 0),
+    piece:
+      currentPrice.piece !== null && currentPrice.piece !== undefined
+        ? Number(currentPrice.piece)
+        : null,
+    pack:
+      currentPrice.pack !== null && currentPrice.pack !== undefined
+        ? Number(currentPrice.pack)
+        : null,
+    bundle:
+      currentPrice.bundle !== null && currentPrice.bundle !== undefined
+        ? Number(currentPrice.bundle)
+        : null,
+  };
+
+  const saleUnits = Array.isArray(product?.saleUnits) ? product.saleUnits : [];
+  for (const unit of UNIT_ORDER) {
+    if (!saleUnits.includes(unit)) continue;
+    if (next[unit] !== null) continue;
+    const priceField =
+      unit === "piece"
+        ? "pricePiece"
+        : unit === "pack"
+          ? "pricePack"
+          : "priceBundle";
+    const base = Math.max(0, Number(product?.[priceField]) || 0);
+    if (base > 0) next[unit] = base;
+  }
+
+  return next;
+}
+
 function calculateMarkupPreview(purchasePrice, markupPercent) {
   const purchase = Number(purchasePrice);
   if (!Number.isFinite(purchase) || purchase < 0) return 0;
@@ -3949,7 +3994,8 @@ function ManagerClients({
     clientId,
     link,
     productId,
-    patch
+    patch,
+    product = null
   ) => {
     const key = String(productId);
     const currentPrice = {
@@ -3957,10 +4003,14 @@ function ManagerClients({
       ...(link.personalPrices?.[key] || {}),
     };
 
-    const nextPrice = {
+    let nextPrice = {
       ...currentPrice,
       ...patch,
     };
+
+    if (nextPrice.source === "manual" && product) {
+      nextPrice = prefillManualPriceFromProduct(product, nextPrice);
+    }
 
     const nextPrices = {
       ...(link.personalPrices || {}),
@@ -4021,6 +4071,31 @@ function ManagerClients({
           markupPercent: normalizePercentInput(rawValue),
         };
       }
+    }
+
+    const productsById = new Map(
+      (Array.isArray(products) ? products : []).map((item) => [
+        String(item.id),
+        item,
+      ])
+    );
+    for (const [productId, config] of Object.entries(nextLink.personalPrices)) {
+      if (config?.source !== "manual") continue;
+      const product = productsById.get(String(productId));
+      if (!product) continue;
+      const filled = prefillManualPriceFromProduct(product, config);
+      if (!hasManualUnitValue(filled)) {
+        setMatrixSaveState((current) => ({
+          ...current,
+          [clientId]: {
+            status: "error",
+            message:
+              `Для «${product.name}» выбрана фиксированная цена, но сумма не указана. Введите цену или верните «По умолчанию клиента».`,
+          },
+        }));
+        return;
+      }
+      nextLink.personalPrices[productId] = filled;
     }
 
     const nextLinks = {
@@ -4645,7 +4720,8 @@ function ManagerClients({
                                         product.id,
                                         {
                                           source: event.target.value,
-                                        }
+                                        },
+                                        product
                                       )
                                     }
                                   >
