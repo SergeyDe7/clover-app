@@ -24,6 +24,26 @@ export function isOneCClaimExpired(exchange = {}, nowMs = Date.now()) {
   return nowMs - startedAt >= ONEC_CLAIM_LEASE_MS;
 }
 
+/** Интервал фонового requeue истёкших claim (не только на pull). */
+export const ONEC_CLAIM_REQUEUE_INTERVAL_MS = 30 * 1000;
+
+export const ONEC_CLAIM_EXPIRED_REQUEUE_MESSAGE =
+  "Повторная очередь: предыдущая выдача 1С истекла без ACK.";
+
+/**
+ * Если claim истёк — возвращает exchange со status ready.
+ * Активный claim не трогает (null).
+ */
+export function releaseExpiredClaimExchange(exchange = {}, nowMs = Date.now()) {
+  const state = normalizeExchangeState(exchange);
+  if (!isOneCClaimExpired(state, nowMs)) return null;
+  return {
+    ...state,
+    status: "ready",
+    message: ONEC_CLAIM_EXPIRED_REQUEUE_MESSAGE,
+  };
+}
+
 export function normalizeExchangeState(value = {}) {
   const status = Object.hasOwn(EXCHANGE_STATUSES, value?.status)
     ? value.status

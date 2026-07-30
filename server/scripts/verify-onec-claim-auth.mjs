@@ -5,7 +5,10 @@ import { fileURLToPath } from "node:url";
 import {
   isOneCClaimExpired,
   normalizeExchangeState,
+  ONEC_CLAIM_EXPIRED_REQUEUE_MESSAGE,
   ONEC_CLAIM_LEASE_MS,
+  ONEC_CLAIM_REQUEUE_INTERVAL_MS,
+  releaseExpiredClaimExchange,
   sanitizeOrderExchangeForSave,
 } from "../src/exchange.js";
 
@@ -69,6 +72,53 @@ assert.equal(
   }),
   false,
   "Свежий claim не должен быть expired."
+);
+
+const nowMs = Date.now();
+const activeRelease = releaseExpiredClaimExchange(
+  {
+    status: "sending",
+    lastAttemptAt: new Date(nowMs).toISOString(),
+    attempts: 2,
+  },
+  nowMs
+);
+assert.equal(activeRelease, null, "Активный claim не должен requeue.");
+
+const expiredRelease = releaseExpiredClaimExchange(
+  {
+    status: "sending",
+    lastAttemptAt: new Date(nowMs - ONEC_CLAIM_LEASE_MS - 1000).toISOString(),
+    attempts: 2,
+    channel: "onec-pull",
+  },
+  nowMs
+);
+assert.ok(expiredRelease, "Истёкший claim должен requeue в ready.");
+assert.equal(expiredRelease.status, "ready");
+assert.equal(expiredRelease.attempts, 2);
+assert.equal(expiredRelease.message, ONEC_CLAIM_EXPIRED_REQUEUE_MESSAGE);
+assert.equal(
+  releaseExpiredClaimExchange({ status: "ready" }, nowMs),
+  null,
+  "ready не должен requeue."
+);
+
+assert.ok(
+  Number.isFinite(ONEC_CLAIM_REQUEUE_INTERVAL_MS) && ONEC_CLAIM_REQUEUE_INTERVAL_MS >= 5_000,
+  "Интервал auto-requeue должен быть задан."
+);
+assert.ok(
+  serverSource.includes("startOneCClaimRequeueTimer"),
+  "Сервер должен запускать фоновый auto-requeue timer."
+);
+assert.ok(
+  serverSource.includes("one-c.claim.expired-requeue"),
+  "Requeue должен писать audit."
+);
+assert.ok(
+  serverSource.includes("releaseExpiredClaimExchange"),
+  "Сервер должен использовать общий helper releaseExpiredClaimExchange."
 );
 
 assert.ok(
