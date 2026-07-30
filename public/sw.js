@@ -1,4 +1,4 @@
-const CACHE_NAME = "clover-v18-shell-v2";
+const CACHE_NAME = "clover-v18-shell-v3";
 const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -20,12 +20,18 @@ self.addEventListener("fetch", (event) => {
   const path = new URL(request.url).pathname;
   if (path.startsWith("/api/") || path.startsWith("/uploads/")) return;
 
+  // JS/CSS с хэшем не кэшируем — иначе после обновления остаётся старый кабинет.
+  if (path.startsWith("/assets/")) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
   event.respondWith(
     fetch(request)
       .then((response) => {
-        if (response.ok) {
+        if (response.ok && (path === "/" || SHELL.includes(path))) {
           const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => undefined);
         }
         return response;
       })

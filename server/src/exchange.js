@@ -31,6 +31,96 @@ export function normalizeExchangeState(value = {}) {
   };
 }
 
+const QUEUE_EXCHANGE_STATUSES = new Set(["ready", "sent", "draft"]);
+
+/**
+ * Клиент не управляет очередью 1С. Менеджер меняет exchange только
+ * через dedicated endpoints; bulk PUT /api/state/orders не должен
+ * ставить ready/sent и не затирает уже подтверждённый обмен.
+ */
+export function sanitizeOrderExchangeForSave(order, previousOrder, role) {
+  const previousExchange = previousOrder
+    ? normalizeExchangeState(previousOrder.exchange)
+    : null;
+
+  if (role === "client") {
+    return {
+      ...order,
+      exchange: previousExchange || normalizeExchangeState({ status: "not_sent" }),
+    };
+  }
+
+  if (previousExchange) {
+    return {
+      ...order,
+      exchange: previousExchange,
+    };
+  }
+
+  const incoming = normalizeExchangeState(order?.exchange);
+  if (QUEUE_EXCHANGE_STATUSES.has(incoming.status)) {
+    return {
+      ...order,
+      exchange: normalizeExchangeState({
+        ...incoming,
+        status: "not_sent",
+        message:
+          incoming.message ||
+          "Статус обмена сброшен: очередь 1С только через «Передать в 1С TEST».",
+      }),
+    };
+  }
+
+  return {
+    ...order,
+    exchange: incoming,
+  };
+}
+
+/**
+ * Защита от случайного wipe: неполный локальный snapshot менеджера
+ * не должен удалить все существующие заказы одним PUT.
+ */
+export function assertSafeManagerOrderReplace(previousOrders, incomingOrders) {
+  const previous = Array.isArray(previousOrders) ? previousOrders : [];
+  const incoming = Array.isArray(incomingOrders) ? incomingOrders : [];
+
+  if (previous.length === 0) {
+    return { ok: true };
+  }
+
+  if (incoming.length === 0) {
+    if (previous.length === 1) {
+      return { ok: true };
+    }
+
+    return {
+      ok: false,
+      status: 409,
+      error:
+        "Нельзя сохранить пустой список заказов поверх существующей базы. Обновите страницу.",
+    };
+  }
+
+  const incomingIds = new Set(
+    incoming.map((order) => String(order?.id || "")).filter(Boolean)
+  );
+  const retained = previous.filter((order) =>
+    incomingIds.has(String(order.id))
+  );
+
+  if (previous.length >= 2 && retained.length === 0) {
+    return {
+      ok: false,
+      status: 409,
+      error:
+        "Отказ записи: локальный список заказов неполный и затёр бы всю базу. Обновите страницу и повторите.",
+    };
+  }
+
+  return { ok: true };
+}
+
 function productMap(products) {
   return new Map((products || []).map((product) => [String(product.id), product]));
 }

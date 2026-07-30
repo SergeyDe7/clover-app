@@ -4179,6 +4179,14 @@ function ManagerClients({
         ...patch,
       },
     }));
+    setMatrixSaveState((current) => ({
+      ...current,
+      [clientId]: {
+        status: "dirty",
+        message:
+          "Есть несохранённые изменения. Нажмите «Сохранить матрицу», иначе после F5 они пропадут.",
+      },
+    }));
   };
 
   const updatePersonalPrice = (
@@ -4464,6 +4472,7 @@ function ManagerClients({
                   id={`client-matrix-${client.id}`}
                   className="order-details"
                   style={{ marginTop: 15 }}
+                  open={matrixOpen}
                   onToggle={(event) => {
                     const isOpen = Boolean(event.currentTarget.open);
                     setOpenClientId((current) => {
@@ -4711,34 +4720,6 @@ function ManagerClients({
                             </button>
                           </>
                         )}
-                      </div>
-
-                      <div className="matrix-save-bar">
-                        <div>
-                          <strong>Сохранение товарной матрицы</strong>
-                          <small>
-                            После изменения цен, процентов или состава нажмите кнопку справа.
-                          </small>
-                          {matrixSaveState[client.id]?.message && (
-                            <span
-                              className={`matrix-save-message ${
-                                matrixSaveState[client.id]?.status || ""
-                              }`}
-                            >
-                              {matrixSaveState[client.id].message}
-                            </span>
-                          )}
-                        </div>
-                        <button
-                          className="primary-button"
-                          type="button"
-                          disabled={matrixSaveState[client.id]?.status === "saving"}
-                          onClick={() => saveClientMatrix(client.id, link)}
-                        >
-                          {matrixSaveState[client.id]?.status === "saving"
-                            ? "Сохраняем..."
-                            : "Сохранить матрицу"}
-                        </button>
                       </div>
 
                       <div className="matrix-editor-list">
@@ -5005,6 +4986,35 @@ function ManagerClients({
                       </div>
                     </div>
                   )}
+
+                  <div className="matrix-save-bar" style={{ marginTop: 14 }}>
+                    <div>
+                      <strong>Сохранение товарной матрицы</strong>
+                      <small>
+                        После изменения режима, цен или состава нажмите кнопку справа.
+                        Добавление из каталога 1С и выбор контрагента пишутся сразу.
+                      </small>
+                      {matrixSaveState[client.id]?.message && (
+                        <span
+                          className={`matrix-save-message ${
+                            matrixSaveState[client.id]?.status || ""
+                          }`}
+                        >
+                          {matrixSaveState[client.id].message}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      className="primary-button"
+                      type="button"
+                      disabled={matrixSaveState[client.id]?.status === "saving"}
+                      onClick={() => saveClientMatrix(client.id, link)}
+                    >
+                      {matrixSaveState[client.id]?.status === "saving"
+                        ? "Сохраняем..."
+                        : "Сохранить матрицу"}
+                    </button>
+                  </div>
 
                   <div
                     className="comment-box"
@@ -6896,8 +6906,16 @@ function App() {
         setAuthUser(null);
         setIsLoggedIn(false);
         setHydrated(false);
+        setRole("client");
       } else {
         setSyncError(error.message);
+        // Без успешного bootstrap не показываем кабинет на локальных дефолтах:
+        // иначе manager-токен может открыть client UI и затереть заказы.
+        if (!hydrated) {
+          setIsLoggedIn(false);
+          setAuthUser(null);
+          setRole("client");
+        }
       }
     } finally {
       if (shouldBlockScreen) {
@@ -7025,14 +7043,6 @@ function App() {
 
     return scheduleSync(() => api.saveSettings(settings));
   }, [settings, hydrated, authUser?.role]);
-
-  useEffect(() => {
-    if (!hydrated || authUser?.role !== "manager") {
-      return undefined;
-    }
-
-    return scheduleSync(() => api.saveClientLinks(clientLinks));
-  }, [clientLinks, hydrated, authUser?.role]);
 
   const handleAuth = async (form) => {
     setAuthBusy(true);
@@ -7201,6 +7211,7 @@ function App() {
     setManagerNotifications([]);
     setCatalogSession(null);
     setAuthUser(null);
+    setRole("client");
     setIsLoggedIn(false);
     setHydrated(false);
     setProducts(DEFAULT_PRODUCTS.map(normalizeProduct));
@@ -7282,6 +7293,11 @@ function App() {
   };
 
   const saveOrder = (payload) => {
+    if (!hydrated || !authUser) {
+      alert("Данные с сервера ещё не загружены. Обновите страницу и повторите заказ.");
+      return;
+    }
+
     const session = catalogSession || { mode: "new" };
     let nextOrders = orders;
 
@@ -7590,7 +7606,7 @@ function App() {
         authError={authError}
       />
     );
-  } else if (role === "manager") {
+  } else if (authUser?.role === "manager") {
     content = (
       <ManagerDashboard
         orders={orders}

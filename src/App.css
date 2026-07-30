@@ -388,6 +388,10 @@ button{cursor:pointer}
   color: #2f6d2d;
 }
 
+.matrix-save-message.dirty {
+  color: #8a5a12;
+}
+
 .matrix-save-message.error {
   color: #9b2e2e;
 }

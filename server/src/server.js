@@ -68,9 +68,11 @@ import {
   restoreServerBackup,
 } from "./backups.js";
 import {
+  assertSafeManagerOrderReplace,
   build1CPayload,
   normalizeExchangeState,
   payloadToCsv,
+  sanitizeOrderExchangeForSave,
   summarizeExchange,
   validateOrderFor1C,
 } from "./exchange.js";
@@ -1557,7 +1559,21 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     : [];
   const previousOrders = req.user.role === "manager" ? listOrders() : listOrders(req.user.id);
   const previousById = new Map(previousOrders.map((order) => [String(order.id), order]));
-  let orders = incomingOrders;
+
+  if (req.user.role === "manager") {
+    const safety = assertSafeManagerOrderReplace(previousOrders, incomingOrders);
+    if (!safety.ok) {
+      return res.status(safety.status || 409).json({ error: safety.error });
+    }
+  }
+
+  let orders = incomingOrders.map((order) =>
+    sanitizeOrderExchangeForSave(
+      order,
+      previousById.get(String(order?.id || "")),
+      req.user.role
+    )
+  );
 
   if (req.user.role === "client") {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -1568,7 +1584,7 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     // не должно блокировать сохранение заказа менеджеру — жёсткая
     // проверка выполняется только перед передачей в 1С TEST.
     const repriced = repriceClientOrders(
-      incomingOrders,
+      orders,
       products,
       links[req.user.id],
       oneCProducts
@@ -2299,28 +2315,39 @@ app.post(
       favorites
     );
 
+    const previousClientOrders = listOrders(req.user.id);
+    const previousClientById = new Map(
+      previousClientOrders.map((order) => [String(order.id), order])
+    );
     replaceOrders({
-      orders: orders.map((order) => ({
-        ...order,
-        id: order.id || randomUUID(),
-        clientId: req.user.id,
-        customerName:
-          profile.companyName ||
-          profile.contactName ||
-          order.customerName ||
-          "Клиент",
-        customerContact:
-          profile.contactName ||
-          order.customerContact ||
-          "",
-        customerPhone:
-          profile.phone ||
-          order.customerPhone ||
-          "",
-        customerEmail:
-          profile.email ||
-          req.user.email,
-      })),
+      orders: orders.map((order) => {
+        const mapped = {
+          ...order,
+          id: order.id || randomUUID(),
+          clientId: req.user.id,
+          customerName:
+            profile.companyName ||
+            profile.contactName ||
+            order.customerName ||
+            "Клиент",
+          customerContact:
+            profile.contactName ||
+            order.customerContact ||
+            "",
+          customerPhone:
+            profile.phone ||
+            order.customerPhone ||
+            "",
+          customerEmail:
+            profile.email ||
+            req.user.email,
+        };
+        return sanitizeOrderExchangeForSave(
+          mapped,
+          previousClientById.get(String(mapped.id)),
+          "client"
+        );
+      }),
       userId: req.user.id,
       managerMode: false,
     });
