@@ -1,10 +1,10 @@
 *{box-sizing:border-box}
 html,body,#root{min-width:320px;min-height:100%}
-body{margin:0;min-height:100vh;font-family:Arial,Helvetica,sans-serif;color:#263326;background:radial-gradient(circle at top left,#eef8eb 0,transparent 40%),linear-gradient(135deg,#f9fcf7,#e5f2df)}
+body{margin:0;min-height:100vh;font-family:"Manrope","Segoe UI",system-ui,sans-serif;color:#293329;background:#f4f8f2}
 button,input{font:inherit}
 button{cursor:pointer}
-.page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:30px 16px}
-.login-card{width:100%;max-width:440px;padding:42px 38px;background:rgba(255,255,255,.96);border:1px solid rgba(86,156,80,.15);border-radius:28px;box-shadow:0 24px 60px rgba(62,110,57,.16);text-align:center}
+.page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:30px 16px;background:radial-gradient(circle at top left,#eef8eb 0,transparent 42%),linear-gradient(135deg,#f9fcf7,#e5f2df)}
+.login-card{width:100%;max-width:440px;padding:42px 38px;background:rgba(255,255,255,.96);border:1px solid rgba(86,156,80,.15);border-radius:16px;box-shadow:0 14px 36px rgba(48,82,45,.1);text-align:center}
 .logo{width:230px;max-width:85%;height:auto;margin-bottom:22px}
 .login-card h1{margin:0 0 10px;font-size:30px;color:#386f37}
 .subtitle{margin:0 0 30px;color:#6d786d;line-height:1.5}
@@ -495,6 +495,132 @@ button{cursor:pointer}
 
 .approval-box p { margin: 4px 0 0; color: #766a48; font-size: 12px; }
 
+.approval-box-rejected {
+  border-color: #e6c7c7;
+  background: #fdf4f4;
+}
+
+.approval-box-rejected p {
+  color: #8a5555;
+}
+
+.client-access-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--clover-border-soft, #e4ebe1);
+  border-radius: 12px;
+  background: var(--clover-surface-soft, #f7faf5);
+}
+
+.client-access-row strong {
+  display: block;
+  color: var(--clover-text, #293329);
+  font-size: 13px;
+}
+
+.client-access-row p {
+  margin: 4px 0 0;
+  color: var(--clover-muted, #5f6b5f);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.client-card-header-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.client-card-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.client-card-menu-trigger {
+  width: 38px;
+  height: 38px;
+  border: 1px solid #d7e1d4;
+  border-radius: 12px;
+  background: #fff;
+  color: #3f4b3f;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.client-card-menu-trigger:hover,
+.client-card-menu-trigger[aria-expanded="true"] {
+  border-color: #5b9d57;
+  background: #eef7eb;
+}
+
+.client-card-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid #d7e1d4;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 14px 36px rgba(48, 82, 45, 0.12);
+}
+
+.client-card-menu-item {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #394639;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.client-card-menu-item:hover:not(:disabled) {
+  background: #f4f8f2;
+}
+
+.client-card-menu-item.danger {
+  color: #a54f4f;
+}
+
+.client-card-menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.client-profile-panel {
+  margin-top: 15px;
+  padding: 16px;
+  border: 1px solid #e1e9de;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.client-profile-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.client-profile-panel-head h3 {
+  margin: 2px 0 4px;
+  color: #394639;
+  font-size: 18px;
+}
+
 .manager-message-template {
   margin: 0 0 12px;
   padding: 10px;
@@ -559,7 +685,8 @@ button{cursor:pointer}
   .manager-reconciliation-row { grid-template-columns: 1fr; }
   .reconciliation-row { grid-template-columns: 1fr; }
   .reconciliation-row button { width: 100%; }
-  .approval-box { align-items: stretch; flex-direction: column; }
+  .approval-box,
+  .client-access-row { align-items: stretch; flex-direction: column; }
   .install-prompt { grid-template-columns: minmax(0, 1fr) auto; }
   .install-prompt .install-close { position: absolute; top: 2px; right: 3px; }
 }

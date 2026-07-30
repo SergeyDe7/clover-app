@@ -33,6 +33,9 @@ import {
   setUserEmailVerified,
   setUserApprovalStatus,
   updateUserPassword,
+  updateUserRole,
+  listStaffUsers,
+  countUsersByRole,
   revokeOtherSessions,
   createAuthToken,
   consumeAuthToken,
@@ -45,6 +48,7 @@ import {
   deletePushSubscription,
   listManagerNotifications,
   markManagerNotificationRead,
+  markManagerNotificationsReadBySource,
   markAllManagerNotificationsRead,
   listPasskeys,
   getPasskey,
@@ -79,6 +83,10 @@ import {
   validateOrderFor1C,
 } from "./exchange.js";
 import { releaseExpiredOneCClaims } from "./onecClaimRequeue.js";
+import { applyOrderStatusPolicy, buildStatusUpdatedOrder } from "./orderStatus.js";
+import { hasRole, isClientRole, isStaffRole } from "./roles.js";
+import { publicClientSettings } from "./clientSettings.js";
+import { searchOneCProductsIndexed } from "./oneCSearchIndex.js";
 import {
   DEFAULT_ONE_C_CONFIG,
   createOneCDraft,
@@ -406,9 +414,10 @@ function authRequired(req, res, next) {
   }
 }
 
-function roleRequired(role) {
+function roleRequired(...roles) {
+  const allowed = roles.length ? roles : [];
   return (req, res, next) => {
-    if (req.user?.role !== role) {
+    if (!hasRole(req.user?.role, allowed)) {
       return res.status(403).json({
         error: "Недостаточно прав для этого действия.",
       });
@@ -1245,7 +1254,7 @@ app.post("/api/auth/resend-verification", async (req, res, next) => {
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       });
       const verifyUrl = `${publicBaseUrl(req)}/?verify=${encodeURIComponent(plainToken)}`;
-      const companyName = user.role === "client"
+      const companyName = isClientRole(user.role)
         ? getClientState(user.id).profile?.companyName
         : "Менеджер Clover";
       const message = verificationEmail({ companyName, verifyUrl });
@@ -1336,7 +1345,7 @@ app.post("/api/auth/login", async (req, res, next) => {
         error: "Подтвердите электронную почту по ссылке из письма.",
       });
     }
-    if (user.role === "client" && user.approval_status !== "approved") {
+  if (isClientRole(user.role) && user.approval_status !== "approved") {
       return res.status(403).json({
         code: user.approval_status === "rejected" ? "ACCOUNT_REJECTED" : "ACCOUNT_PENDING",
         error: user.approval_status === "rejected"
@@ -1436,6 +1445,89 @@ app.post("/api/admin/managers", authRequired, roleRequired("manager"), async (re
   }
 });
 
+app.get("/api/admin/staff", authRequired, roleRequired("manager"), (req, res) => {
+  const adminCount = countUsersByRole("admin");
+  const canManageRoles =
+    isStaffRole(req.user.role) &&
+    (req.user.role === "admin" || adminCount === 0);
+  res.json({
+    ok: true,
+    staff: listStaffUsers(),
+    adminCount,
+    canManageRoles,
+    adminRoleSupported: true,
+  });
+});
+
+app.post(
+  "/api/admin/users/:userId/role",
+  authRequired,
+  roleRequired("manager"),
+  (req, res, next) => {
+    try {
+      const targetId = String(req.params.userId || "").trim();
+      const nextRole = String(req.body?.role || "").trim().toLowerCase();
+      if (!["manager", "admin"].includes(nextRole)) {
+        return res.status(400).json({
+          error: "Допустимы роли manager или admin.",
+          code: "ROLE_INVALID",
+        });
+      }
+
+      const adminCount = countUsersByRole("admin");
+      const actorIsAdmin = req.user.role === "admin";
+      if (adminCount > 0 && !actorIsAdmin) {
+        return res.status(403).json({
+          error: "Назначать роли может только администратор.",
+          code: "ADMIN_REQUIRED",
+        });
+      }
+
+      const target = findUserById(targetId);
+      if (!target) {
+        return res.status(404).json({ error: "Пользователь не найден." });
+      }
+      if (!["manager", "admin"].includes(String(target.role))) {
+        return res.status(409).json({
+          error: "Роль можно менять только у менеджера или администратора.",
+          code: "ROLE_TARGET_FORBIDDEN",
+        });
+      }
+
+      if (String(target.id) === String(req.user.id) && nextRole !== "admin" && adminCount <= 1 && target.role === "admin") {
+        return res.status(409).json({
+          error: "Нельзя снять роль с единственного администратора.",
+          code: "LAST_ADMIN",
+        });
+      }
+
+      let updated;
+      try {
+        updated = updateUserRole(target.id, nextRole);
+      } catch (error) {
+        const message = String(error?.message || error);
+        if (/CHECK|constraint|role/i.test(message)) {
+          return res.status(409).json({
+            error:
+              "База ещё не поддерживает роль admin. Нужна миграция (подтвердите «да» на migrate-admin-role).",
+            code: "ADMIN_ROLE_MIGRATION_REQUIRED",
+          });
+        }
+        throw error;
+      }
+
+      auditFromRequest(req, "user.role.change", {
+        userId: updated.id,
+        from: target.role,
+        to: updated.role,
+      });
+
+      res.json({ ok: true, user: publicUser(updated) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 app.get("/api/passkeys", authRequired, (req, res) => {
   res.json({
@@ -1527,7 +1619,7 @@ app.post("/api/passkeys/authentication/options", async (req, res, next) => {
     const email = normalizeEmail(input.email);
     const user = findUserByEmail(email);
     const credentials = user ? listPasskeys(user.id) : [];
-    if (!user || !user.email_verified || (user.role === "client" && user.approval_status !== "approved") || !credentials.length) {
+    if (!user || !user.email_verified || (isClientRole(user.role) && user.approval_status !== "approved") || !credentials.length) {
       return res.status(400).json({ error: "Для этого аккаунта вход по Face ID или ключу доступа пока не настроен." });
     }
     const options = await authenticationOptions({ req, credentials });
@@ -1553,7 +1645,7 @@ app.post("/api/passkeys/authentication/verify", async (req, res, next) => {
     if (!user || !ceremony || ceremony.userId !== String(user.id) || !credential || credential.userId !== String(user.id)) {
       return res.status(400).json({ error: "Не удалось подтвердить вход. Повторите попытку." });
     }
-    if (!user.email_verified || (user.role === "client" && user.approval_status !== "approved")) {
+    if (!user.email_verified || (isClientRole(user.role) && user.approval_status !== "approved")) {
       return res.status(403).json({ error: "Для аккаунта пока недоступен вход." });
     }
     const verification = await verifyPasskeyAuthentication({
@@ -1610,7 +1702,7 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     )
   );
 
-  if (req.user.role === "manager") {
+  if (isStaffRole(req.user.role)) {
     const normalizedClientLinks = Object.fromEntries(
       Object.entries(allClientLinks).map(([clientId, link]) => [
         clientId,
@@ -1621,7 +1713,7 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     return res.json({
       user: publicUser(req.user),
       products: managerProducts,
-      fullCatalogProducts: managerProducts,
+      // fullCatalogProducts намеренно не дублируем — клиент UI берёт products
       catalogPolicy: {
         matrixMode: "all",
         allowFullCatalog: true,
@@ -1652,33 +1744,42 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     oneCProducts
   );
 
-  return res.json({
+  const clientPayload = {
     user: publicUser(req.user),
     products: catalog.matrixProducts,
-    fullCatalogProducts: catalog.fullCatalogProducts,
     catalogPolicy: catalog.policy,
     orders: listOrders(req.user.id),
     profile: state.profile,
     addresses: state.addresses,
     favorites: state.favorites,
-    settings,
+    settings: publicClientSettings(settings),
     clientLinks: {
       [req.user.id]: catalog.link,
     },
     clients: [],
     reconciliationRequests: listReconciliationRequests(req.user.id),
     services: { mail: publicMailStatus(), push: publicPushStatus() },
-  });
+  };
+
+  // Полный каталог только если матрица узкая и разрешён полный каталог.
+  if (
+    catalog.policy?.allowFullCatalog &&
+    catalog.policy?.matrixMode !== "all"
+  ) {
+    clientPayload.fullCatalogProducts = catalog.fullCatalogProducts;
+  }
+
+  return res.json(clientPayload);
 });
 
 app.put("/api/state/orders", authRequired, async (req, res) => {
   const incomingOrders = Array.isArray(req.body?.orders)
     ? req.body.orders
     : [];
-  const previousOrders = req.user.role === "manager" ? listOrders() : listOrders(req.user.id);
+  const previousOrders = isStaffRole(req.user.role) ? listOrders() : listOrders(req.user.id);
   const previousById = new Map(previousOrders.map((order) => [String(order.id), order]));
 
-  if (req.user.role === "manager") {
+  if (isStaffRole(req.user.role)) {
     const safety = assertSafeManagerOrderReplace(previousOrders, incomingOrders);
     if (!safety.ok) {
       return res.status(safety.status || 409).json({ error: safety.error });
@@ -1693,7 +1794,24 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     )
   );
 
-  if (req.user.role === "client") {
+  const statusPolicy = applyOrderStatusPolicy({
+    previousById,
+    orders,
+    role: req.user.role,
+  });
+  if (!statusPolicy.ok) {
+    return res.status(statusPolicy.statusCode || 409).json({
+      error: statusPolicy.error,
+      code: statusPolicy.code,
+      orderId: statusPolicy.orderId,
+      from: statusPolicy.from,
+      to: statusPolicy.to,
+      allowed: statusPolicy.allowed,
+    });
+  }
+  orders = statusPolicy.orders;
+
+  if (isClientRole(req.user.role)) {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const links = getGlobalState("clientLinks", {});
     const oneCProducts = getGlobalState("oneCProducts", []);
@@ -1733,11 +1851,11 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
   replaceOrders({
     orders,
     userId: req.user.id,
-    managerMode: req.user.role === "manager",
+    managerMode: isStaffRole(req.user.role),
   });
   auditFromRequest(req, "orders.save", { count: orders.length });
 
-  if (req.user.role === "client") {
+  if (isClientRole(req.user.role)) {
     const currentById = new Map(orders.map((order) => [String(order.id), order]));
 
     for (const order of orders) {
@@ -1798,7 +1916,7 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     }
   }
 
-  if (req.user.role === "manager") {
+  if (isStaffRole(req.user.role)) {
     for (const order of orders) {
       const previous = previousById.get(String(order.id));
       if (!previous) continue;
@@ -1834,6 +1952,130 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
 
   res.json({ ok: true, orders });
 });
+
+function notifyClientOrderStatusChanged(order, previousStatus) {
+  const clientId = order.clientId || order.user_id;
+  if (!clientId) return;
+  sendOrderPush(clientId, {
+    title: `Заказ №${order.number || ""} обновлён`,
+    body: `статус: ${order.status}`,
+    url: `/?order=${encodeURIComponent(order.id)}`,
+    tag: `order-${order.id}`,
+  }).catch((error) => console.error("Push order status error", error));
+}
+
+app.patch(
+  "/api/orders/:orderId/status",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const stored = getOrderById(req.params.orderId);
+    if (!stored) {
+      return res.status(404).json({ error: "Заказ не найден.", code: "ORDER_NOT_FOUND" });
+    }
+
+    const built = buildStatusUpdatedOrder(stored.payload, req.body?.status, {
+      role: req.user.role,
+      actor: isStaffRole(req.user.role) ? "Менеджер" : "Клиент",
+      historyType: "status.changed",
+      historyId: randomUUID(),
+    });
+    if (!built.ok) {
+      return res.status(built.statusCode || 409).json({
+        error: built.error,
+        code: built.code,
+        from: built.from,
+        to: built.to,
+        allowed: built.allowed,
+      });
+    }
+
+    if (built.unchanged) {
+      return res.json({ ok: true, unchanged: true, order: stored.payload });
+    }
+
+    const previousStatus = stored.payload.status;
+    const order = updateOrderPayload(stored.id, built.order);
+    auditFromRequest(req, "orders.status.patch", {
+      orderId: order.id,
+      orderNumber: order.number,
+      from: previousStatus,
+      to: order.status,
+    });
+    notifyClientOrderStatusChanged(order, previousStatus);
+    res.json({ ok: true, unchanged: false, order });
+  }
+);
+
+app.post(
+  "/api/orders/status/bulk",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const orderIds = Array.isArray(req.body?.orderIds) ? req.body.orderIds : [];
+    const status = req.body?.status;
+    if (!orderIds.length) {
+      return res.status(400).json({ error: "Не выбраны заказы.", code: "ORDER_IDS_REQUIRED" });
+    }
+
+    const updated = [];
+    const skipped = [];
+    const errors = [];
+
+    for (const orderId of orderIds) {
+      const stored = getOrderById(orderId);
+      if (!stored) {
+        errors.push({ orderId: String(orderId), code: "ORDER_NOT_FOUND", error: "Заказ не найден." });
+        continue;
+      }
+      const built = buildStatusUpdatedOrder(stored.payload, status, {
+        role: req.user.role,
+        actor: "Менеджер",
+        historyType: "status.bulk",
+        historyId: randomUUID(),
+      });
+      if (!built.ok) {
+        skipped.push({
+          orderId: String(stored.id),
+          code: built.code,
+          error: built.error,
+          from: built.from,
+          to: built.to,
+          allowed: built.allowed,
+        });
+        continue;
+      }
+      if (built.unchanged) {
+        skipped.push({
+          orderId: String(stored.id),
+          code: "ORDER_STATUS_UNCHANGED",
+          error: "Статус уже установлен.",
+        });
+        continue;
+      }
+      const previousStatus = stored.payload.status;
+      const order = updateOrderPayload(stored.id, built.order);
+      notifyClientOrderStatusChanged(order, previousStatus);
+      updated.push(order);
+    }
+
+    auditFromRequest(req, "orders.status.bulk", {
+      status,
+      updated: updated.map((order) => order.id),
+      skippedCount: skipped.length,
+      errorCount: errors.length,
+    });
+
+    res.json({
+      ok: errors.length === 0 && (updated.length > 0 || skipped.length === orderIds.length),
+      status,
+      updated,
+      skipped,
+      errors,
+    });
+  }
+);
+
 async function handleOneCTestOrder(req, res, next) {
   try {
     if (!requireOneCTestDatabase(req, res)) return;
@@ -2954,20 +3196,14 @@ app.get(
       });
     });
 
-    const filtered = search
-      ? items.filter((item) =>
-          `${item.name} ${item.code} ${item.id}`
-            .toLocaleLowerCase("ru-RU")
-            .includes(search)
-        )
-      : items;
+    const found = searchOneCProductsIndexed(items, { search, limit, offset });
 
     res.json({
-      items: filtered.slice(offset, offset + limit).map((item) => ({
+      items: found.items.map((item) => ({
         ...item,
         cloverLink: linksByOneCId.get(item.id) || null,
       })),
-      total: filtered.length,
+      total: found.total,
       offset,
       limit,
       summary: buildOneCProductsSummary(products, items, meta),
@@ -3945,7 +4181,7 @@ app.post("/api/one-c/reconciliation/:requestId/result", (req, res, next) => {
 });
 
 app.get("/api/reconciliation", authRequired, (req, res) => {
-  const requests = req.user.role === "manager"
+  const requests = isStaffRole(req.user.role)
     ? listReconciliationRequests()
     : listReconciliationRequests(req.user.id);
   res.json({ requests });
@@ -4068,7 +4304,7 @@ app.post(
 app.get("/api/reconciliation/:requestId/file", authRequired, (req, res) => {
   const request = getReconciliationRequestInternal(req.params.requestId);
   if (!request) return res.status(404).json({ error: "Запрос акта сверки не найден." });
-  if (req.user.role !== "manager" && String(request.user_id) !== String(req.user.id)) {
+  if (!isStaffRole(req.user.role) && String(request.user_id) !== String(req.user.id)) {
     return res.status(403).json({ error: "Недостаточно прав для скачивания этого файла." });
   }
   if (!request.file_path || !existsSync(request.file_path)) {
@@ -4086,6 +4322,9 @@ app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("m
   const user = setUserApprovalStatus(req.params.clientId, status);
   if (!user) return res.status(404).json({ error: "Клиент не найден." });
   auditFromRequest(req, "client.approval", { clientId: user.id, status });
+  if (["approved", "rejected"].includes(status)) {
+    markManagerNotificationsReadBySource("client_registration", user.id);
+  }
   let mail = { sent: false };
   if (["approved", "rejected"].includes(status) && user.email) {
     try {
@@ -4094,7 +4333,13 @@ app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("m
       console.error("Approval email error", mailError);
     }
   }
-  res.json({ ok: true, user: publicUser(user), clients: listClients(), mail: { sent: Boolean(mail.sent) } });
+  res.json({
+    ok: true,
+    user: publicUser(user),
+    clients: listClients(),
+    mail: { sent: Boolean(mail.sent) },
+    managerNotifications: listManagerNotifications({ limit: 100 }),
+  });
 });
 
 app.get("/api/admin/notifications", authRequired, roleRequired("manager"), (req, res) => {

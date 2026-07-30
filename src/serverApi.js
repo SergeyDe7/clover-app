@@ -45,11 +45,22 @@ async function request(path, options = {}) {
     throw error;
   }
 
-  const payload = await response
-    .json()
-    .catch(() => ({
-      error: "Сервер вернул ответ, который не удалось прочитать.",
-    }));
+  let payload = {};
+  const rawText = await response.text();
+  if (rawText) {
+    try {
+      payload = JSON.parse(rawText);
+    } catch {
+      payload = {
+        error: `Сервер вернул не JSON (HTTP ${response.status}). Обновите страницу (Ctrl+F5) или войдите снова.`,
+        raw: rawText.slice(0, 120),
+      };
+    }
+  } else if (!response.ok) {
+    payload = {
+      error: `Пустой ответ сервера (HTTP ${response.status}). Войдите снова или перезапустите backend.`,
+    };
+  }
 
   if (!response.ok) {
     const error = new Error(
@@ -181,6 +192,31 @@ export const api = {
     return request("/state/orders", {
       method: "PUT",
       body: { orders },
+    });
+  },
+
+  patchOrderStatus(orderId, status) {
+    return request(`/orders/${encodeURIComponent(orderId)}/status`, {
+      method: "PATCH",
+      body: { status },
+    });
+  },
+
+  bulkPatchOrderStatus(orderIds, status) {
+    return request("/orders/status/bulk", {
+      method: "POST",
+      body: { orderIds, status },
+    });
+  },
+
+  getStaffUsers() {
+    return request("/admin/staff");
+  },
+
+  setUserRole(userId, role) {
+    return request(`/admin/users/${encodeURIComponent(userId)}/role`, {
+      method: "POST",
+      body: { role },
     });
   },
 

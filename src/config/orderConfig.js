@@ -21,4 +21,20 @@ export const ORDER_STATUSES = [
   "Собирается",
   "Готов к доставке",
   "Выполнен",
+  "Отменён",
 ];
+
+export const ORDER_STATUS_TRANSITIONS = {
+  Новый: ["Принят", "Отменён"],
+  Принят: ["Собирается", "Отменён"],
+  Собирается: ["Готов к доставке", "Отменён"],
+  "Готов к доставке": ["Выполнен", "Отменён"],
+  Выполнен: [],
+  Отменён: [],
+};
+
+export function allowedNextOrderStatuses(from) {
+  const current = ORDER_STATUSES.includes(from) ? from : "Новый";
+  const next = ORDER_STATUS_TRANSITIONS[current] || [];
+  return [current, ...next.filter((status) => status !== current)];
+}

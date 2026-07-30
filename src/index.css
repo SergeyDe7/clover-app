@@ -1,9 +1,10 @@
 :root {
-  font-family: Arial, Helvetica, sans-serif;
-  color: #263326;
+  font-family: "Manrope", "Segoe UI", system-ui, sans-serif;
+  color: #293329;
   background: #f4f8f2;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 html,
@@ -16,9 +17,12 @@ body,
 body {
   margin: 0;
   min-height: 100vh;
+  background: #f4f8f2;
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }

@@ -44,7 +44,7 @@ db.exec(`
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
-    role TEXT NOT NULL CHECK(role IN ('client', 'manager')),
+    role TEXT NOT NULL CHECK(role IN ('client', 'manager', 'admin')),
     created_at TEXT NOT NULL
   ) STRICT;
 
@@ -292,7 +292,7 @@ export function createUser({
   role = "client",
   profile = {},
   emailVerified = false,
-  approvalStatus = role === "manager" ? "approved" : "pending",
+  approvalStatus = role === "manager" || role === "admin" ? "approved" : "pending",
 }) {
   const id = randomUUID();
   const createdAt = now();
@@ -676,6 +676,46 @@ export function updateUserPassword(userId, passwordHash) {
   return findUserById(String(userId));
 }
 
+export function updateUserRole(userId, role) {
+  const nextRole = String(role || "").trim().toLowerCase();
+  if (!["client", "manager", "admin"].includes(nextRole)) {
+    throw new Error("Недопустимая роль.");
+  }
+  db.prepare(`
+    UPDATE users
+    SET role = ?
+    WHERE id = ?
+  `).run(nextRole, String(userId));
+  return findUserById(String(userId));
+}
+
+export function listStaffUsers() {
+  return db
+    .prepare(`
+      SELECT id, email, role, email_verified, approval_status, created_at, last_login_at
+      FROM users
+      WHERE role IN ('manager', 'admin')
+      ORDER BY role DESC, email ASC
+    `)
+    .all()
+    .map((row) => ({
+      id: row.id,
+      email: row.email,
+      role: row.role,
+      emailVerified: Boolean(row.email_verified),
+      approvalStatus: row.approval_status || "approved",
+      createdAt: row.created_at,
+      lastLoginAt: row.last_login_at || "",
+    }));
+}
+
+export function countUsersByRole(role) {
+  const row = db
+    .prepare(`SELECT COUNT(*) AS count FROM users WHERE role = ?`)
+    .get(String(role));
+  return Number(row?.count) || 0;
+}
+
 export function revokeOtherSessions(userId) {
   const changedAt = randomUUID();
   db.prepare(`
@@ -927,6 +967,22 @@ export function markManagerNotificationRead(id) {
   return managerNotificationRow(
     db.prepare(`SELECT * FROM manager_notifications WHERE id = ?`).get(String(id))
   );
+}
+
+/** Пометить прочитанными уведомления по типу и source_id (например, после одобрения клиента). */
+export function markManagerNotificationsReadBySource(type, sourceId) {
+  const normalizedType = String(type || "").trim();
+  const normalizedSourceId = String(sourceId || "").trim();
+  if (!normalizedType || !normalizedSourceId) {
+    return { changed: 0, readAt: "" };
+  }
+  const readAt = now();
+  const result = db.prepare(`
+    UPDATE manager_notifications
+    SET read_at = ?
+    WHERE type = ? AND source_id = ? AND read_at = ''
+  `).run(readAt, normalizedType, normalizedSourceId);
+  return { changed: Number(result.changes || 0), readAt };
 }
 
 export function markAllManagerNotificationsRead() {
