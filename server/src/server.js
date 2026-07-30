@@ -72,7 +72,9 @@ import {
   build1CPayload,
   isOneCClaimExpired,
   normalizeExchangeState,
+  ONEC_CLAIM_REQUEUE_INTERVAL_MS,
   payloadToCsv,
+  releaseExpiredClaimExchange,
   sanitizeOrderExchangeForSave,
   summarizeExchange,
   validateOrderFor1C,
@@ -898,22 +900,44 @@ function oneCQueueTimestamp(order) {
   return 0;
 }
 
-function releaseExpiredOneCClaims() {
+function releaseExpiredOneCClaims(nowMs = Date.now()) {
+  let released = 0;
   for (const order of listOrders()) {
-    const exchange = normalizeExchangeState(order.exchange);
-    if (!isOneCClaimExpired(exchange)) continue;
+    const nextExchange = releaseExpiredClaimExchange(order.exchange, nowMs);
+    if (!nextExchange) continue;
 
     updateOrderPayload(order.id, {
       ...order,
-      exchange: {
-        ...exchange,
-        status: "ready",
-        message:
-          "Повторная очередь: предыдущая выдача 1С истекла без ACK.",
-      },
-      updatedAt: new Date().toISOString(),
+      exchange: nextExchange,
+      updatedAt: new Date(nowMs).toISOString(),
     });
+    writeAudit({
+      action: "one-c.claim.expired-requeue",
+      details: {
+        orderId: order.id,
+        number: order.number || "",
+        previousStatus: "sending",
+        nextStatus: "ready",
+      },
+    });
+    released += 1;
   }
+  return released;
+}
+
+function startOneCClaimRequeueTimer() {
+  const raw = Number(process.env.ONEC_CLAIM_REQUEUE_INTERVAL_MS);
+  const intervalMs =
+    Number.isFinite(raw) && raw >= 5_000 ? raw : ONEC_CLAIM_REQUEUE_INTERVAL_MS;
+  const timer = setInterval(() => {
+    try {
+      releaseExpiredOneCClaims();
+    } catch (error) {
+      console.error("one-c claim auto-requeue failed", error);
+    }
+  }, intervalMs);
+  if (typeof timer.unref === "function") timer.unref();
+  return timer;
 }
 
 function listReadyOrdersForOneC() {
@@ -4257,6 +4281,7 @@ try {
 }
 
 app.listen(port, host, () => {
+  startOneCClaimRequeueTimer();
   console.log("");
   console.log("Clover Server V18.1 (4.0.4 legacy-ack-bridge) запущен");
   console.log(`API: http://localhost:${port}/api/health`);
