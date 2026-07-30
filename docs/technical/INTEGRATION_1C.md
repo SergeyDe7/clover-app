@@ -46,6 +46,7 @@
 | `error` | Ошибка |
 
 Lease claim: если ACK не пришёл за 15 минут, `sending` снова становится `ready`.
+Возврат в очередь выполняется на pull/snapshot **и** фоновым timer (~30 с, `ONEC_CLAIM_REQUEUE_INTERVAL_MS`, минимум 5 с) — без ожидания следующего запроса 1С. Audit: `one-c.claim.expired-requeue`.
 
 ## Правила ACK
 

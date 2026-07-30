@@ -113,12 +113,26 @@ assert.ok(
   "Сервер должен запускать фоновый auto-requeue timer."
 );
 assert.ok(
-  serverSource.includes("one-c.claim.expired-requeue"),
+  serverSource.includes('from "./onecClaimRequeue.js"') ||
+    serverSource.includes("from './onecClaimRequeue.js'"),
+  "Сервер должен брать releaseExpiredOneCClaims из onecClaimRequeue.js."
+);
+assert.ok(
+  serverSource.includes("releaseExpiredOneCClaims"),
+  "Сервер должен вызывать releaseExpiredOneCClaims."
+);
+
+const requeueSource = readFileSync(
+  path.join(root, "server/src/onecClaimRequeue.js"),
+  "utf8"
+);
+assert.ok(
+  requeueSource.includes("one-c.claim.expired-requeue"),
   "Requeue должен писать audit."
 );
 assert.ok(
-  serverSource.includes("releaseExpiredClaimExchange"),
-  "Сервер должен использовать общий helper releaseExpiredClaimExchange."
+  requeueSource.includes("releaseExpiredClaimExchange"),
+  "Requeue должен использовать общий helper releaseExpiredClaimExchange."
 );
 
 assert.ok(
