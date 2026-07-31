@@ -83,7 +83,11 @@ import {
   validateOrderFor1C,
 } from "./exchange.js";
 import { releaseExpiredOneCClaims } from "./onecClaimRequeue.js";
-import { applyOrderStatusPolicy, buildStatusUpdatedOrder } from "./orderStatus.js";
+import {
+  applyOneCAcceptedStatus,
+  applyOrderStatusPolicy,
+  buildStatusUpdatedOrder,
+} from "./orderStatus.js";
 import { hasRole, isClientRole, isStaffRole } from "./roles.js";
 import { publicClientSettings } from "./clientSettings.js";
 import { searchOneCProductsIndexed } from "./oneCSearchIndex.js";
@@ -2514,6 +2518,150 @@ app.post("/api/one-c/orders/:orderId/ack", (req, res) => {
     clientLinked: Boolean(stored.payload.clientId && customer.id && customer.name),
   });
 });
+
+/**
+ * 1С: после ручной смены СостояниеЗаказа → бизнес-статус клиента «Принят».
+ * Требует exchange.status=sent (ACK уже был). Не откатывает статусы дальше «Новый».
+ */
+app.post("/api/one-c/orders/accepted", (req, res) => {
+  if (!requireOneCTestDatabase(req, res)) return;
+
+  const orderNumber = String(req.body?.orderNumber || "").trim();
+  const documentNumber = String(req.body?.documentNumber || "").trim();
+  const oneCState = String(req.body?.oneCState || "").trim();
+  const orderIdHint = String(req.body?.orderId || "").trim();
+
+  if (!orderNumber && !orderIdHint) {
+    return res.status(422).json({
+      error: "Укажите orderNumber или orderId заказа Clover.",
+      code: "ORDER_REF_REQUIRED",
+    });
+  }
+
+  if (!oneCState) {
+    return res.status(422).json({
+      error: "1С не передала новое состояние заказа (oneCState).",
+      code: "ONEC_STATE_REQUIRED",
+    });
+  }
+
+  let stored = orderIdHint ? getOrderById(orderIdHint) : null;
+  if (!stored && orderNumber) {
+    const matches = listOrders().filter(
+      (order) => String(order.number || "").trim() === orderNumber
+    );
+    if (matches.length > 1 && !documentNumber) {
+      return res.status(409).json({
+        error: "Найдено несколько заказов с этим номером. Укажите documentNumber.",
+        code: "ORDER_NUMBER_AMBIGUOUS",
+      });
+    }
+    let match = null;
+    if (matches.length === 1) {
+      match = matches[0];
+    } else if (matches.length > 1) {
+      match =
+        matches.find(
+          (order) =>
+            String(normalizeExchangeState(order.exchange).receipt || "").trim() ===
+            documentNumber
+        ) || null;
+    }
+    if (match) {
+      stored = { id: match.id, payload: match };
+    }
+  }
+
+  if (!stored?.id || !stored?.payload) {
+    return res.status(404).json({
+      error: "Заказ Clover не найден.",
+      code: "ORDER_NOT_FOUND",
+    });
+  }
+
+  const payload = stored.payload;
+  const orderId = String(stored.id);
+
+  if (orderNumber && String(payload.number || "").trim() !== orderNumber) {
+    return res.status(409).json({
+      error: "orderNumber не совпадает с заказом.",
+      code: "ORDER_NUMBER_MISMATCH",
+      expectedOrderNumber: String(payload.number || "").trim(),
+    });
+  }
+
+  const exchange = normalizeExchangeState(payload.exchange);
+  if (exchange.status !== "sent") {
+    return res.status(409).json({
+      error:
+        "Статус «Принят» из 1С принимается только после ACK (exchange.status=sent).",
+      code: "ORDER_NOT_ACKED",
+      exchangeStatus: exchange.status,
+    });
+  }
+
+  if (
+    documentNumber &&
+    String(exchange.receipt || "").trim() &&
+    String(exchange.receipt || "").trim() !== documentNumber
+  ) {
+    return res.status(409).json({
+      error: "Номер документа 1С не совпадает с подтверждённым ACK.",
+      code: "DOCUMENT_NUMBER_MISMATCH",
+      expectedDocumentNumber: String(exchange.receipt || "").trim(),
+    });
+  }
+
+  const built = applyOneCAcceptedStatus(payload, {
+    historyId: randomUUID(),
+    oneCState,
+    actor: "1С",
+  });
+  if (!built.ok) {
+    return res.status(built.statusCode || 409).json({
+      error: built.error,
+      code: built.code,
+      from: built.from,
+      to: built.to,
+      allowed: built.allowed,
+    });
+  }
+
+  if (built.unchanged) {
+    return res.json({
+      ok: true,
+      unchanged: true,
+      orderId,
+      orderNumber: String(payload.number || "").trim(),
+      status: payload.status || "Новый",
+    });
+  }
+
+  const previousStatus = payload.status;
+  const order = updateOrderPayload(orderId, built.order);
+  writeAudit({
+    action: "one-c.order.accepted",
+    details: {
+      orderId,
+      orderNumber: String(order.number || "").trim(),
+      documentNumber: documentNumber || String(exchange.receipt || "").trim(),
+      oneCState,
+      from: previousStatus,
+      to: order.status,
+      database: "TEST",
+    },
+  });
+  notifyClientOrderStatusChanged(order, previousStatus);
+
+  res.json({
+    ok: true,
+    unchanged: false,
+    orderId,
+    orderNumber: String(order.number || "").trim(),
+    status: order.status,
+  });
+});
+
 app.put(
   "/api/state/profile",
   authRequired,

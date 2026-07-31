@@ -89,14 +89,7 @@ export function enforceOrderStatusChange({ previous = null, incoming, role }) {
   // Legacy / грязный статус вне словаря: клиент не меняет; staff может один раз поставить известный.
   if (!previousStatus) {
     if (role === "client") {
-      if (next && next !== previousRaw) {
-        return {
-          ok: false,
-          statusCode: 403,
-          error: "Клиент не может менять статус заказа.",
-          code: "ORDER_STATUS_CLIENT_FORBIDDEN",
-        };
-      }
+      // Клиент не меняет статус — сохраняем как на сервере, не валим весь PUT.
       return { ok: true, status: previousRaw || "Новый" };
     }
     if (role !== "manager" && role !== "admin") {
@@ -116,14 +109,9 @@ export function enforceOrderStatusChange({ previous = null, incoming, role }) {
   const resolvedNext = next || previousStatus;
 
   if (role === "client") {
-    if (resolvedNext !== previousStatus) {
-      return {
-        ok: false,
-        statusCode: 403,
-        error: "Клиент не может менять статус заказа.",
-        code: "ORDER_STATUS_CLIENT_FORBIDDEN",
-      };
-    }
+    // Клиент не может менять статус. При рассинхроне UI (локально «Новый»,
+    // на сервере уже «Принят» от 1С/менеджера) не отклоняем сохранение заказа —
+    // оставляем серверный статус.
     return { ok: true, status: previousStatus };
   }
 
@@ -240,4 +228,45 @@ export function buildStatusUpdatedOrder(
       updatedAt: new Date().toISOString(),
     },
   };
+}
+
+/**
+ * Callback из 1С: ручная смена состояния документа → бизнес-статус «Принят».
+ * Только из «Новый»; более поздние статусы не откатываем (идемпотентно).
+ */
+export function applyOneCAcceptedStatus(
+  previous,
+  { historyId = "", oneCState = "", actor = "1С" } = {}
+) {
+  if (!previous) {
+    return {
+      ok: false,
+      statusCode: 404,
+      error: "Заказ не найден.",
+      code: "ORDER_NOT_FOUND",
+    };
+  }
+
+  const current = normalizeOrderStatus(previous.status) || "Новый";
+  if (current !== "Новый") {
+    return { ok: true, unchanged: true, order: previous };
+  }
+
+  const built = buildStatusUpdatedOrder(previous, "Принят", {
+    role: "admin",
+    actor,
+    historyType: "status.changed",
+    historyId,
+  });
+  if (!built.ok || built.unchanged) return built;
+
+  const stateNote = String(oneCState || "").trim();
+  if (stateNote && Array.isArray(built.order.history) && built.order.history.length) {
+    const history = [...built.order.history];
+    const last = { ...history[history.length - 1] };
+    last.label = `Статус изменён: Новый → Принят (1С: ${stateNote})`;
+    history[history.length - 1] = last;
+    return { ...built, order: { ...built.order, history } };
+  }
+  return built;
 }

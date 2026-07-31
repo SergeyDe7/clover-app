@@ -83,6 +83,17 @@
       "method": "POST",
       "path": "/api/one-c/orders/{orderId}/ack"
     },
+    "orderAccepted": {
+      "method": "POST",
+      "path": "/api/one-c/orders/accepted",
+      "body": {
+        "orderNumber": "Clover order number",
+        "documentNumber": "1C document number (optional if unique)",
+        "oneCState": "Manual СостояниеЗаказа label",
+        "orderId": "optional Clover UUID"
+      },
+      "effect": "Business status Новый → Принят after ACK; idempotent otherwise"
+    },
     "reconciliationRequests": {
       "method": "GET",
       "path": "/api/one-c/reconciliation/requests"

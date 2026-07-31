@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   ORDER_STATUSES,
   allowedNextOrderStatuses,
+  applyOneCAcceptedStatus,
   applyOrderStatusPolicy,
   buildStatusUpdatedOrder,
   canTransitionOrderStatus,
@@ -33,14 +34,13 @@ assert.equal(canTransitionOrderStatus("Принят", "Принят"), true);
 assert.equal(canTransitionOrderStatus("Выполнен", "Отменён"), false);
 assert.deepEqual(allowedNextOrderStatuses("Новый"), ["Новый", "Принят", "Отменён"]);
 
-assert.equal(
-  enforceOrderStatusChange({
-    previous: { status: "Новый" },
-    incoming: { status: "Принят" },
-    role: "client",
-  }).code,
-  "ORDER_STATUS_CLIENT_FORBIDDEN"
-);
+const clientKeep = enforceOrderStatusChange({
+  previous: { status: "Принят" },
+  incoming: { status: "Новый" },
+  role: "client",
+});
+assert.equal(clientKeep.ok, true);
+assert.equal(clientKeep.status, "Принят");
 
 assert.equal(
   enforceOrderStatusChange({
@@ -126,6 +126,13 @@ const forbiddenPatch = buildStatusUpdatedOrder(
 );
 assert.equal(forbiddenPatch.ok, false);
 assert.equal(forbiddenPatch.code, "ORDER_STATUS_TRANSITION_FORBIDDEN");
+
+const fromOneC = applyOneCAcceptedStatus(
+  { id: "o2", status: "Новый", history: [] },
+  { historyId: "onec-1", oneCState: "В работе" }
+);
+assert.equal(fromOneC.ok, true);
+assert.equal(fromOneC.order.status, "Принят");
 
 assert.equal(normalizeRole("Admin"), ROLES.ADMIN);
 assert.equal(isStaffRole("manager"), true);

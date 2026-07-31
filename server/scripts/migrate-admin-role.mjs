@@ -77,8 +77,14 @@ try {
   );
   db.exec("DROP TABLE users_old_admin_mig");
   db.exec("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)");
+  // Внимание: SQLite RENAME users переписывает FK дочерних таблиц на
+  // users_old_admin_mig. После DROP их чинит server/src/db.js
+  // (repairStaleUsersForeignKeys) при старте сервера.
   db.exec("COMMIT");
   console.log("MIGRATE_ADMIN_ROLE_OK", { columns: shared });
+  console.log(
+    "NOTE: перезапустите Clover API — db.js восстановит FK child-таблиц на users."
+  );
 } catch (error) {
   try {
     db.exec("ROLLBACK");
