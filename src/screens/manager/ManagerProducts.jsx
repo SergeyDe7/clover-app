@@ -702,7 +702,7 @@ export function ManagerProducts({ products, setProducts }) {
       <div className="product-manager-list" style={{ marginTop: 14 }}>
         <VirtualList
           items={visible}
-          itemHeight={148}
+          itemHeight={200}
           height={Math.min(640, typeof window !== "undefined" ? Math.floor(window.innerHeight * 0.65) : 640)}
           getItemKey={(product) => product.id}
           renderItem={(product) => (
