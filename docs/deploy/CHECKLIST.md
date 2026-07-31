@@ -49,3 +49,22 @@
 - Подключение VLAVKA / production 1С (код очереди сейчас принимает только базу имени **TEST**).
 - Реальные клиентские заказы в рабочую 1С.
 - `git push` / merge в main без подтверждения.
+
+## G. После merge ветки `agent/p1-status-fsm-roles` (не выполнять без «да»)
+
+Изменения ветки: FSM статусов заказов + роли (`admin`), admin tooling, split экранов, UX nav, split ManagerScreen, verify scan `src/**`.
+
+1. Backup кода + `server/data` + `server/.env` (см. [ROLLBACK.md](./ROLLBACK.md)).
+2. Выкат кода на сервер (git pull нужной ветки / релизный пакет с checksum).
+3. `npm ci` в корне и в `server/` при смене lockfile.
+4. Dry-run миграции admin-роли:  
+   `node server/scripts/migrate-admin-role.mjs`  
+   Apply только после явного «да»:  
+   `node server/scripts/migrate-admin-role.mjs --apply`
+5. Перезапуск: `STOP_CLOVER_V18.bat` → `START_CLOVER_V18.bat` (или Планировщик).
+6. Health: `http://127.0.0.1:4100/api/health` → версия **4.0.4**.
+7. Локальные проверки на сервере:  
+   `cd server && npm run check && npm run test:manager-tabs && npm run test:v18`
+8. Приёмка UI: вкладки менеджера Заказы / Клиенты / Товары / 1С / Ещё (Акты, Настройки, Backup, Журнал).
+9. Один тестовый заказ → очередь → 1С **TEST** → ACK (не prod).
+10. Откат при сбое — по [ROLLBACK.md](./ROLLBACK.md).
