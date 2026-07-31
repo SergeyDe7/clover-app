@@ -653,31 +653,6 @@ button{cursor:pointer}
 
 .checkbox-line input { width: auto; }
 
-.install-prompt {
-  position: fixed;
-  z-index: 1000;
-  right: max(14px, env(safe-area-inset-right));
-  bottom: max(14px, env(safe-area-inset-bottom));
-  left: max(14px, env(safe-area-inset-left));
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 12px;
-  max-width: 620px;
-  margin-left: auto;
-  padding: 13px 14px;
-  border: 1px solid rgba(91, 157, 87, .35);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, .97);
-  box-shadow: 0 14px 44px rgba(39, 72, 37, .22);
-  backdrop-filter: blur(12px);
-}
-
-.install-prompt > div { display: grid; gap: 3px; }
-.install-prompt span { color: #6f796f; font-size: 11px; }
-.install-prompt button { min-height: 38px; }
-.install-prompt .install-close { padding: 4px 9px; border: 0; background: transparent; color: #7b857b; font-size: 22px; }
-
 .clover-app,
 .page { padding-bottom: env(safe-area-inset-bottom); }
 
@@ -687,8 +662,6 @@ button{cursor:pointer}
   .reconciliation-row button { width: 100%; }
   .approval-box,
   .client-access-row { align-items: stretch; flex-direction: column; }
-  .install-prompt { grid-template-columns: minmax(0, 1fr) auto; }
-  .install-prompt .install-close { position: absolute; top: 2px; right: 3px; }
 }
 
 .passkey-login-button {
