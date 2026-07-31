@@ -13,9 +13,11 @@ import {
   isMatrixProductForLink,
 } from "../src/matrixGuard.js";
 
+import { readFrontendUiSource } from "./readFrontendUiSource.mjs";
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const serverSource = readFileSync(path.join(root, "server/src/server.js"), "utf8");
-const appSource = readFileSync(path.join(root, "src/App.jsx"), "utf8");
+const appSource = readFrontendUiSource(root);
 
 assert.ok(
   serverSource.includes("sanitizeOrderExchangeForSave"),

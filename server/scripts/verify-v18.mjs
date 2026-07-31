@@ -4,10 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
+import { readFrontendUiSource } from "./readFrontendUiSource.mjs";
+
 const projectDirectory = path.resolve(import.meta.dirname, "../..");
 const serverSource = readFileSync(path.join(projectDirectory, "server/src/server.js"), "utf8");
 const dbSource = readFileSync(path.join(projectDirectory, "server/src/db.js"), "utf8");
-const appSource = readFileSync(path.join(projectDirectory, "src/App.jsx"), "utf8");
+const appSource = readFrontendUiSource(projectDirectory);
 const apiSource = readFileSync(path.join(projectDirectory, "src/serverApi.js"), "utf8");
 const manifestSource = readFileSync(path.join(projectDirectory, "public/manifest.webmanifest"), "utf8");
 const workerSource = readFileSync(path.join(projectDirectory, "public/sw.js"), "utf8");
