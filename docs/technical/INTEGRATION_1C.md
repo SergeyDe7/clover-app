@@ -26,6 +26,7 @@
 | POST | `/api/one-c/purchase-prices` | Приём цен из 1С |
 | GET/POST | `/api/one-c/test-order` | Claim следующего `ready` → `sending` |
 | POST | `/api/one-c/orders/:orderId/ack` | Подтверждение с номером документа 1С |
+| POST | `/api/one-c/orders/accepted` | Ручная смена состояния в 1С → бизнес-статус `Принят` |
 | POST | `/api/one-c/products-preview` | Выгрузка номенклатуры (только TEST) |
 | POST | `/api/one-c/clients-preview` | Выгрузка контрагентов (только TEST) |
 
@@ -57,6 +58,22 @@ Lease claim: если ACK не пришёл за 15 минут, `sending` сно
 - Чужой номер документа — отказ (409).
 - Принимается из статусов `ready` или `sending`.
 - Заказ снимается с очереди **только после** успешного ACK.
+
+## Статус «Принят» из 1С
+
+После ACK менеджер вручную меняет **СостояниеЗаказа** в документе 1С.
+1С вызывает `POST /api/one-c/orders/accepted` с телом:
+
+```json
+{ "orderNumber": "…", "documentNumber": "…", "oneCState": "Обработан" }
+```
+
+Правила:
+
+- Только TEST + ключ обмена.
+- `exchange.status` должен быть `sent` (иначе 409).
+- Бизнес-статус Clover: только `Новый` → `Принят`; уже продвинутые статусы не откатываются.
+- При создании документа из Clover состояние в 1С **не** заполняется (патч модуля + подписки: `one_c_patches/empty_queue_and_comment/ИНСТРУКЦИЯ_СТАТУС_ПРИНЯТ.txt`).
 
 ## Расширение 1С
 

@@ -15,6 +15,7 @@ ONEC_ALLOW_LOCAL_WITHOUT_KEY=false
 - POST /api/one-c/purchase-prices
 - GET/POST /api/one-c/test-order
 - POST /api/one-c/orders/{orderId}/ack
+- POST /api/one-c/orders/accepted
 - POST /api/one-c/products-preview
 - POST /api/one-c/clients-preview
 - GET /api/one-c/reconciliation/requests

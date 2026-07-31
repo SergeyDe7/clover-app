@@ -194,6 +194,154 @@ ensureColumn("users", "approval_status", "TEXT NOT NULL DEFAULT 'approved'");
 ensureColumn("users", "password_changed_at", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("users", "last_login_at", "TEXT NOT NULL DEFAULT ''");
 
+/**
+ * Миграция admin-role переименовывала users → users_old_admin_mig.
+ * SQLite при RENAME обновляет FK дочерних таблиц на старое имя;
+ * после DROP users_old_admin_mig DELETE/INSERT в orders падает:
+ * "no such table: main.users_old_admin_mig".
+ * Пересоздаём затронутые таблицы с FK на users.
+ */
+function repairStaleUsersForeignKeys() {
+  const stale = db
+    .prepare(
+      `SELECT name, sql FROM sqlite_master
+       WHERE type = 'table'
+         AND sql LIKE '%users_old_admin_mig%'`
+    )
+    .all();
+  if (!stale.length) return;
+
+  const definitions = {
+    client_state: `CREATE TABLE client_state (
+      user_id TEXT PRIMARY KEY,
+      profile_json TEXT NOT NULL DEFAULT '{}',
+      addresses_json TEXT NOT NULL DEFAULT '[]',
+      favorites_json TEXT NOT NULL DEFAULT '[]',
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) STRICT`,
+    orders: `CREATE TABLE orders (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) STRICT`,
+    auth_tokens: `CREATE TABLE auth_tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      used_at TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) STRICT`,
+    reconciliation_requests: `CREATE TABLE reconciliation_requests (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      period_type TEXT NOT NULL,
+      year INTEGER,
+      date_from TEXT NOT NULL DEFAULT '',
+      date_to TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'new',
+      client_comment TEXT NOT NULL DEFAULT '',
+      manager_comment TEXT NOT NULL DEFAULT '',
+      file_name TEXT NOT NULL DEFAULT '',
+      file_path TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) STRICT`,
+    push_subscriptions: `CREATE TABLE push_subscriptions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      endpoint TEXT NOT NULL UNIQUE,
+      subscription_json TEXT NOT NULL,
+      order_events INTEGER NOT NULL DEFAULT 1,
+      promotions INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) STRICT`,
+    passkey_credentials: `CREATE TABLE passkey_credentials (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      public_key BLOB NOT NULL,
+      counter INTEGER NOT NULL DEFAULT 0,
+      transports_json TEXT NOT NULL DEFAULT '[]',
+      device_type TEXT NOT NULL DEFAULT '',
+      backed_up INTEGER NOT NULL DEFAULT 0,
+      webauthn_user_id TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) STRICT`,
+    webauthn_challenges: `CREATE TABLE webauthn_challenges (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      challenge TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) STRICT`,
+  };
+
+  const indexes = [
+    "CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)",
+    "CREATE INDEX IF NOT EXISTS idx_auth_tokens_lookup ON auth_tokens(type, token_hash, expires_at)",
+    "CREATE INDEX IF NOT EXISTS idx_reconciliation_user ON reconciliation_requests(user_id, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id)",
+    "CREATE INDEX IF NOT EXISTS idx_passkey_user ON passkey_credentials(user_id)",
+  ];
+
+  db.exec("PRAGMA foreign_keys = OFF");
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    for (const row of stale) {
+      const tableName = String(row.name || "");
+      const createSql = definitions[tableName];
+      if (!createSql) {
+        throw new Error(
+          `Неизвестная таблица со stale FK users_old_admin_mig: ${tableName}`
+        );
+      }
+      const tempName = `${tableName}__fk_fix`;
+      db.exec(createSql.replace(`CREATE TABLE ${tableName}`, `CREATE TABLE ${tempName}`));
+      const cols = db
+        .prepare(`PRAGMA table_info(${tableName})`)
+        .all()
+        .map((c) => c.name);
+      const colList = cols.join(", ");
+      db.exec(
+        `INSERT INTO ${tempName} (${colList}) SELECT ${colList} FROM ${tableName}`
+      );
+      db.exec(`DROP TABLE ${tableName}`);
+      db.exec(`ALTER TABLE ${tempName} RENAME TO ${tableName}`);
+    }
+    for (const indexSql of indexes) {
+      db.exec(indexSql);
+    }
+    db.exec("COMMIT");
+    console.log(
+      `Clover DB: восстановлены FK на users (${stale.map((r) => r.name).join(", ")})`
+    );
+  } catch (error) {
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      /* ignore */
+    }
+    throw error;
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
+repairStaleUsersForeignKeys();
+
 function parseJson(value, fallback) {
   try {
     return value ? JSON.parse(value) : fallback;
