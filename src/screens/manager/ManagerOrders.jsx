@@ -1,5 +1,5 @@
 // Раздел менеджера: заказы клиентов.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../serverApi";
 import { ORDER_STATUSES, allowedNextOrderStatuses } from "../../config/orderConfig";
 import { VirtualList } from "../../components/VirtualList";
@@ -10,10 +10,12 @@ import {
   EXCHANGE_STATUS_LABELS,
   normalizeOrderExchange,
   exchangeBadgeClass,
+  buildOrderSearchHaystack,
+  getOrderOneCDocumentRef,
+  isOrderAlreadyInOneC,
   downloadBlobFile,
   printOrderDocument,
   formatDate,
-  formatDateTime,
   formatMoney,
   getOrderTotal,
   getPositionCount,
@@ -28,10 +30,24 @@ const CUSTOM_STATUSES = [
   "Отклонён",
 ];
 
-export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onCreateProductFromCustom, onReload, headerSearch = "" }) {
+export function ManagerOrders({
+  orders,
+  settings,
+  onUpdateOrder,
+  onBulkUpdateOrders,
+  onDeleteOrder,
+  onCreateProductFromCustom,
+  onReload,
+  onNavigate,
+  headerSearch = "",
+  statusFilter = "Все",
+  onStatusFilterChange,
+  exchangeFilter: exchangeFilterProp = "all",
+  onExchangeFilterChange,
+}) {
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("Все");
-  const [exchangeFilter, setExchangeFilter] = useState("all");
+  const [status, setStatus] = useState(statusFilter || "Все");
+  const [exchangeFilter, setExchangeFilter] = useState(exchangeFilterProp || "all");
   const [sort, setSort] = useState("newest");
   const [busyOrderId, setBusyOrderId] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
@@ -39,11 +55,40 @@ export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrd
   const [bulkBusy, setBulkBusy] = useState(false);
   const effectiveSearch = headerSearch.trim() || search;
 
+  useEffect(() => {
+    if (statusFilter) setStatus(statusFilter);
+  }, [statusFilter]);
+
+  useEffect(() => {
+    if (exchangeFilterProp) setExchangeFilter(exchangeFilterProp);
+  }, [exchangeFilterProp]);
+
+  const setStatusFilter = (next) => {
+    setStatus(next);
+    onStatusFilterChange?.(next);
+  };
+
+  const setExchangeFilterValue = (next) => {
+    setExchangeFilter(next);
+    onExchangeFilterChange?.(next);
+  };
+
+  const hasActiveFilters =
+    status !== "Все" ||
+    exchangeFilter !== "all" ||
+    Boolean(effectiveSearch.trim());
+
+  const resetFilters = () => {
+    setSearch("");
+    setStatusFilter("Все");
+    setExchangeFilterValue("all");
+  };
+
   const visible = useMemo(() => {
     const needle = effectiveSearch.trim().toLowerCase();
     return [...orders].filter((order) => {
       const exchange = normalizeOrderExchange(order.exchange);
-      const haystack = `${order.number} ${order.externalId || ""} ${order.customerName} ${order.customerContact} ${order.customerPhone} ${order.customerEmail} ${order.address}`.toLowerCase();
+      const haystack = buildOrderSearchHaystack(order);
       return (!needle || haystack.includes(needle))
         && (status === "Все" || order.status === status)
         && (exchangeFilter === "all" || exchange.status === exchangeFilter);
@@ -155,45 +200,78 @@ export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrd
     <section>
       <div className="toolbar four">
         {!headerSearch.trim() && (
-          <input type="search" placeholder="Поиск по заказу, клиенту, телефону или ID" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input
+            type="search"
+            placeholder="№ Clover, № 1С, клиент, телефон…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Поиск заказов по номеру Clover или 1С"
+          />
         )}
-        <select value={status} onChange={(e) => setStatus(e.target.value)}><option>Все</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
-        <select value={exchangeFilter} onChange={(e) => setExchangeFilter(e.target.value)}><option value="all">Все статусы 1С</option>{Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select>
+        <select value={status} onChange={(e) => setStatusFilter(e.target.value)}><option>Все</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
+        <select value={exchangeFilter} onChange={(e) => setExchangeFilterValue(e.target.value)}><option value="all">Все статусы 1С</option>{Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select>
         <select value={sort} onChange={(e) => setSort(e.target.value)}><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="delivery">По дате доставки</option></select>
       </div>
-      <div className="panel" style={{ marginTop: 14, marginBottom: 18, padding: 16 }}>
+      <div className="manager-orders-toolbar-meta">
+        <span className="muted small">Найдено: {visible.length}</span>
+        <div className="manager-orders-quick-filters">
+          <button
+            className={`chip-button${exchangeFilter === "sent" ? " active" : ""}`}
+            type="button"
+            onClick={() => setExchangeFilterValue(exchangeFilter === "sent" ? "all" : "sent")}
+          >
+            Уже в 1С
+          </button>
+          <button
+            className={`chip-button${exchangeFilter === "error" ? " active" : ""}`}
+            type="button"
+            onClick={() => setExchangeFilterValue(exchangeFilter === "error" ? "all" : "error")}
+          >
+            Ошибки 1С
+          </button>
+          {hasActiveFilters && (
+            <button className="chip-button chip-button--ghost" type="button" onClick={resetFilters}>
+              Сбросить
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="panel manager-bulk-panel" style={{ marginTop: 10, marginBottom: 12, padding: 12 }}>
         <div className="toolbar four">
           <button className="secondary-button" type="button" onClick={selectVisible}>
             {visible.length > 0 && visible.every((order) => selectedIds.includes(order.id))
-              ? "Снять выбор с видимых"
-              : "Выбрать все видимые"}
+              ? "Снять выбор"
+              : "Выбрать видимые"}
           </button>
           <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
             {ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}
           </select>
           <button className="primary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={applyBulkStatus}>
-            Изменить статус ({selectedIds.length})
+            Статус ({selectedIds.length})
           </button>
           <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => runBulkExchange("check")}>
-            Проверить выбранные в 1С
+            Проверить 1С
           </button>
         </div>
-        <div className="exchange-actions" style={{ marginTop: 10 }}>
+        <div className="exchange-actions" style={{ marginTop: 8 }}>
           <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => runBulkExchange("send")}>
-            Тестово передать выбранные
+            Передать выбранные
           </button>
-          {selectedIds.length > 0 && <button className="secondary-button" type="button" onClick={() => setSelectedIds([])}>Очистить выбор</button>}
-          <span className="muted small">Выбрано заказов: {selectedIds.length}</span>
+          {selectedIds.length > 0 && <button className="secondary-button" type="button" onClick={() => setSelectedIds([])}>Очистить</button>}
+          <span className="muted small">Выбрано: {selectedIds.length}</span>
         </div>
       </div>
 
-      {visible.length ? <VirtualList className="manager-grid" items={visible} itemHeight={400} height={Math.min(720, typeof window !== "undefined" ? Math.floor(window.innerHeight * 0.72) : 720)} getItemKey={(order) => order.id} renderItem={(order) => {
+      {visible.length ? <VirtualList className="manager-grid manager-orders-list" items={visible} itemHeight={268} height={Math.min(900, typeof window !== "undefined" ? Math.floor(window.innerHeight * 0.82) : 900)} getItemKey={(order) => order.id} renderItem={(order) => {
         const exchange = normalizeOrderExchange(order.exchange);
         const busy = busyOrderId === order.id;
+        const oneCDoc = getOrderOneCDocumentRef(exchange);
+        const alreadyInOneC = isOrderAlreadyInOneC(exchange);
+        const needsAccept = order.status === "Новый" && (exchange.status === "sent" || exchange.status === "draft");
         return (
-        <article className="order-card" key={order.id}>
+        <article className={`order-card order-card--compact${alreadyInOneC ? " order-card--in-onec" : ""}`} key={order.id}>
           <div className="order-card-header">
-            <label style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
               <input
                 type="checkbox"
                 checked={selectedIds.includes(order.id)}
@@ -203,20 +281,26 @@ export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrd
             </label>
             <div>
               <div className="exchange-status-line"><span className={`badge ${statusClass(order.status)}`}>{order.status}</span><span className={`badge ${exchangeBadgeClass(exchange.status)}`}>1С: {EXCHANGE_STATUS_LABELS[exchange.status]}</span></div>
-              <h3>Заказ № {order.number} · {order.customerName || "Клиент"}</h3>
-              <p>{order.customerContact} · {order.customerPhone} · {order.customerEmail}</p>
-              <p className="small">Внешний ID: {order.externalId || order.id}</p>
+              <h3>№ {order.number} · {order.customerName || "Клиент"}</h3>
+              <p className="order-card-sub">{order.customerPhone || order.customerEmail || order.customerContact || "—"}</p>
             </div>
             <strong className="success-text">{settings.showPrices && getOrderTotal(order) > 0 ? formatMoney(getOrderTotal(order)) : `${getPositionCount(order)} поз.`}</strong>
           </div>
-          <div className="order-meta">
+          {alreadyInOneC && (
+            <div className={`order-in-onec-banner${exchange.status === "sent" ? " order-in-onec-banner--sent" : ""}${needsAccept ? " order-in-onec-banner--warn" : ""}`}>
+              <strong>Уже в 1С</strong>
+              {oneCDoc ? <span className="order-in-onec-doc">{oneCDoc}</span> : <span className="order-in-onec-doc">{EXCHANGE_STATUS_LABELS[exchange.status]}</span>}
+              {needsAccept ? <span className="order-in-onec-hint">Поставьте статус «Принят»</span> : null}
+            </div>
+          )}
+          <div className="order-meta order-meta--compact">
             <div><span>Доставка</span><strong>{formatDate(order.firstDeliveryDate)}</strong></div>
             <div><span>Адрес</span><strong>{order.address}</strong></div>
-            <div><span>Позиций</span><strong>{getPositionCount(order)}</strong></div>
-            <div><span>Создан</span><strong>{formatDateTime(order.createdAt)}</strong></div>
+            <div><span>Clover ID</span><strong className="order-id-value">{order.externalId || order.id || "—"}</strong></div>
+            <div><span>№ 1С</span><strong className="order-id-value">{oneCDoc || "—"}</strong></div>
           </div>
-          <div className="manager-order-controls">
-            <label className="field">Статус заказа
+          <div className="manager-order-controls manager-order-controls--compact">
+            <label className="field">Статус
               <select value={order.status} onChange={(e) => onUpdateOrder(order.id, { status: e.target.value, updatedAt: new Date().toISOString() })}>{allowedNextOrderStatuses(order.status).map((item) => <option key={item}>{item}</option>)}</select>
             </label>
             <div className="exchange-actions" style={{ alignSelf: "end" }}>
@@ -224,16 +308,51 @@ export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrd
               {settings.managerCanDeleteOrders && <button className="danger-button" type="button" onClick={() => onDeleteOrder(order)}>Удалить</button>}
             </div>
           </div>
-          <div className="order-onec-box">
-            <strong className="order-onec-title">Обмен с 1С · {EXCHANGE_STATUS_LABELS[exchange.status]} · попыток {exchange.attempts}</strong>
-            {exchange.message && <div className="exchange-message">{exchange.message}{exchange.receipt ? ` · квитанция ${exchange.receipt}` : ""}</div>}
-            <div className="exchange-actions">
-              <button className="secondary-button" disabled={busy} type="button" onClick={() => runExchangeAction(order, "check")}>Проверить</button>
-              <button className="primary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => runExchangeAction(order, "send")}>{exchange.status === "sending" ? "Ожидает ACK 1С" : exchange.status === "ready" ? "Обновить очередь" : exchange.status === "sent" || exchange.status === "error" ? "Передать повторно" : "Передать в 1С TEST"}</button>
-              <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOrder(order, "json")}>JSON</button>
-              <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOrder(order, "csv")}>CSV</button>
-              {exchange.status !== "not_sent" && <button className="secondary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => runExchangeAction(order, "reset")}>Сбросить</button>}
+            <div className={`order-onec-box${exchange.status === "sent" ? " order-onec-box--done" : ""}`}>
+            <div className="order-onec-head">
+              <span className="order-onec-label">1С</span>
+              <span className={`badge ${exchangeBadgeClass(exchange.status)}`}>
+                {EXCHANGE_STATUS_LABELS[exchange.status]}
+              </span>
+              {oneCDoc ? (
+                <span className="order-onec-receipt">{oneCDoc}</span>
+              ) : null}
+              {exchange.status !== "sent" ? (
+                <span className="order-onec-meta">попыток {exchange.attempts}</span>
+              ) : null}
             </div>
+            {exchange.status !== "sent" && exchange.message ? (
+              <div className="exchange-message">{exchange.message}</div>
+            ) : null}
+            {exchange.status === "sent" ? null : (
+              <div className="exchange-actions order-onec-primary">
+                <button
+                  className="primary-button"
+                  disabled={busy || exchange.status === "sending"}
+                  type="button"
+                  onClick={() => runExchangeAction(order, "send")}
+                >
+                  {exchange.status === "sending"
+                    ? "Ожидает ACK 1С"
+                    : exchange.status === "ready"
+                      ? "Обновить очередь"
+                      : exchange.status === "error"
+                        ? "Передать повторно"
+                        : "Передать в 1С TEST"}
+                </button>
+              </div>
+            )}
+            <details className="order-more-actions">
+              <summary>Ещё</summary>
+              <div className="exchange-actions">
+                <button className="secondary-button" disabled={busy} type="button" onClick={() => runExchangeAction(order, "check")}>Проверить</button>
+                <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOrder(order, "json")}>JSON</button>
+                <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOrder(order, "csv")}>CSV</button>
+                {exchange.status !== "not_sent" && exchange.status !== "sent" && (
+                  <button className="secondary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => runExchangeAction(order, "reset")}>Сбросить</button>
+                )}
+              </div>
+            </details>
           </div>
           <details className="order-details" open={false}>
             <summary>Состав и обработка заказа</summary>
@@ -258,7 +377,7 @@ export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrd
                     <label className="field">Комментарий клиенту
                       <input value={item.managerComment || ""} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, managerComment: e.target.value } : value) })} />
                     </label>
-                    <div className="field"><span>Действие</span><button className="primary-button" type="button" onClick={() => onCreateProductFromCustom(order, item)}>Создать товар в каталоге</button></div>
+                    <div className="field"><span>Действие</span><button className="secondary-button" type="button" onClick={() => onCreateProductFromCustom(order, item)}>Создать товар в каталоге</button></div>
                   </div>
                 </div>
               ))}
@@ -274,7 +393,20 @@ export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrd
             <OrderTimeline order={order} />
           </details>
         </article>
-      );}} /> : <div className="empty-box">Заказы не найдены.</div>}
+      );}} /> : (
+        <div className="empty-box">
+          <p>Заказы не найдены.</p>
+          {hasActiveFilters ? (
+            <button className="primary-button" type="button" onClick={resetFilters}>
+              Сбросить фильтры
+            </button>
+          ) : (
+            <button className="secondary-button" type="button" onClick={() => onNavigate?.("exchange")}>
+              Открыть вкладку 1С
+            </button>
+          )}
+        </div>
+      )}
     </section>
   );
 }

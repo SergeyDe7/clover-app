@@ -26,12 +26,51 @@ function ManagerDashboard({ authUser, orders, products, setProducts, profile, ad
   const [moreTab, setMoreTab] = useState(readManagerMoreTab);
   const [headerSearch, setHeaderSearch] = useState("");
   const [bellOpen, setBellOpen] = useState(false);
+  const [ordersStatusFilter, setOrdersStatusFilter] = useState("Все");
+  const [ordersExchangeFilter, setOrdersExchangeFilter] = useState("all");
 
   const selectTab = (nextTab) => {
     setTab(nextTab);
     writeManagerActiveTab(nextTab);
     if (nextTab !== "orders") setHeaderSearch("");
   };
+
+  const openNewOrders = () => {
+    setOrdersStatusFilter("Новый");
+    setOrdersExchangeFilter("all");
+    selectTab("orders");
+  };
+
+  const openExchangeErrors = () => {
+    setOrdersStatusFilter("Все");
+    setOrdersExchangeFilter("error");
+    selectTab("orders");
+  };
+
+  const openUnread = () => {
+    setBellOpen(true);
+  };
+
+  const renderStatCard = ({ label, value, hint, onActivate, title }) => (
+    <article
+      className="stat-card stat-card-action"
+      role="button"
+      tabIndex={0}
+      onClick={onActivate}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onActivate();
+        }
+      }}
+      title={title}
+    >
+      <span>{label}</span>
+      <strong>{value}</strong>
+      {hint ? <small className="stat-card-hint">{hint}</small> : null}
+      <small className="stat-card-open">Открыть →</small>
+    </article>
+  );
 
   const selectMoreTab = (nextTab) => {
     setMoreTab(nextTab);
@@ -95,6 +134,11 @@ function ManagerDashboard({ authUser, orders, products, setProducts, profile, ad
   }, [orders, serverClients]);
 
   const newCount = orders.filter((order) => order.status === "Новый").length;
+  const newAlreadyInOneC = orders.filter((order) => {
+    if (order.status !== "Новый") return false;
+    const exchangeStatus = normalizeOrderExchange(order.exchange).status;
+    return exchangeStatus === "sent" || exchangeStatus === "sending" || exchangeStatus === "draft";
+  }).length;
   const exchangeErrors = orders.filter((order) => normalizeOrderExchange(order.exchange).status === "error").length;
   const unreadCount = (managerNotifications || []).filter((item) => !item.readAt).length;
 
@@ -104,13 +148,13 @@ function ManagerDashboard({ authUser, orders, products, setProducts, profile, ad
         <input
           className="manager-search-input"
           type="search"
-          placeholder="Поиск заказов…"
+          placeholder="№ Clover / № 1С / клиент…"
           value={headerSearch}
           onChange={(e) => {
             setHeaderSearch(e.target.value);
             if (tab !== "orders") selectTab("orders");
           }}
-          aria-label="Поиск заказов"
+          aria-label="Поиск заказов по номеру Clover или 1С"
         />
         <ManagerNotificationBell
           notifications={managerNotifications}
@@ -144,12 +188,44 @@ function ManagerDashboard({ authUser, orders, products, setProducts, profile, ad
         </div>
       )}
       <div className="stats-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-        <article className="stat-card"><span>Новые заказы</span><strong>{newCount}</strong></article>
-        <article className="stat-card"><span>Ошибки 1С</span><strong>{exchangeErrors}</strong></article>
-        <article className="stat-card"><span>Непрочитано</span><strong>{unreadCount}</strong></article>
+        {renderStatCard({
+          label: "Новые заказы",
+          value: newCount,
+          hint: newAlreadyInOneC > 0 ? `уже в 1С без «Принят»: ${newAlreadyInOneC}` : "",
+          onActivate: openNewOrders,
+          title: "Открыть заказы со статусом «Новый»",
+        })}
+        {renderStatCard({
+          label: "Ошибки 1С",
+          value: exchangeErrors,
+          onActivate: openExchangeErrors,
+          title: "Открыть заказы с ошибкой обмена 1С",
+        })}
+        {renderStatCard({
+          label: "Непрочитано",
+          value: unreadCount,
+          onActivate: openUnread,
+          title: "Открыть уведомления",
+        })}
       </div>
       <nav className="manager-nav">{MANAGER_TABS.map(([id,label]) => <button className={[tab === id ? "active" : "", id === "more" ? "nav-service" : ""].filter(Boolean).join(" ")} type="button" key={id} onClick={() => selectTab(id)}>{label}</button>)}</nav>
-      {tab === "orders" && <ManagerOrders orders={orders} settings={settings} onUpdateOrder={onUpdateOrder} onBulkUpdateOrders={onBulkUpdateOrders} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} onReload={onReload} headerSearch={headerSearch} />}
+      {tab === "orders" && (
+        <ManagerOrders
+          orders={orders}
+          settings={settings}
+          onUpdateOrder={onUpdateOrder}
+          onBulkUpdateOrders={onBulkUpdateOrders}
+          onDeleteOrder={onDeleteOrder}
+          onCreateProductFromCustom={onCreateProductFromCustom}
+          onReload={onReload}
+          onNavigate={selectTab}
+          headerSearch={headerSearch}
+          statusFilter={ordersStatusFilter}
+          onStatusFilterChange={setOrdersStatusFilter}
+          exchangeFilter={ordersExchangeFilter}
+          onExchangeFilterChange={setOrdersExchangeFilter}
+        />
+      )}
       {tab === "exchange" && <ManagerExchange onReload={onReload} onNavigate={selectTab} />}
       {tab === "clients" && <ManagerClients clients={clients} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} onReload={onReload} />}
       {tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}

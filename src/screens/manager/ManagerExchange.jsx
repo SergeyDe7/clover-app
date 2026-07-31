@@ -363,9 +363,14 @@ export function ManagerExchange({ onReload, onNavigate }) {
     </div>
 
     <section className="panel">
-      <div className="panel-heading"><div><p className="eyebrow">История</p><h2>Журнал обмена</h2></div></div>
-      <div className="exchange-log">
-        {(data?.log || []).map((item) => <article className="exchange-log-row" key={item.id}><h4>{AUDIT_ACTION_LABELS[item.action] || item.action}</h4><p>{formatDateTime(item.createdAt)} · заказ № {item.details?.orderNumber || "—"} · {item.userEmail || "Система"}</p></article>)}
+      <div className="panel-heading"><div><p className="eyebrow">История</p><h2>Журнал Clover ↔ 1С</h2><p>Последние операции обмена по заказам.</p></div></div>
+      <div className="exchange-log clover-onec-journal">
+        {(data?.log || []).map((item) => (
+          <article className="exchange-log-row clover-onec-journal-row" key={item.id}>
+            <h4>{AUDIT_ACTION_LABELS[item.action] || item.action}</h4>
+            <p>{formatDateTime(item.createdAt)} · заказ № {item.details?.orderNumber || "—"} · {item.userEmail || "Система"}{item.details?.receipt ? ` · 1С: ${item.details.receipt}` : ""}</p>
+          </article>
+        ))}
         {!(data?.log || []).length && <div className="empty-box">Операций обмена пока нет.</div>}
       </div>
     </section>

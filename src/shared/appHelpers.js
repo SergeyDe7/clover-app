@@ -371,6 +371,46 @@ export function exchangeBadgeClass(status) {
   return "exchange-pending";
 }
 
+/** Номер документа 1С (квитанция ACK или remoteDocument). */
+export function getOrderOneCDocumentRef(exchange) {
+  const normalized = normalizeOrderExchange(exchange);
+  return String(
+    normalized.receipt
+      || normalized.remoteDocument?.number
+      || normalized.remoteDocument?.id
+      || ""
+  ).trim();
+}
+
+/** Текст для поиска менеджера: № Clover, ID, № 1С, клиент. */
+export function buildOrderSearchHaystack(order) {
+  const exchange = normalizeOrderExchange(order?.exchange);
+  const oneCDoc = getOrderOneCDocumentRef(exchange);
+  return [
+    order?.number,
+    order?.id,
+    order?.externalId,
+    order?.customerName,
+    order?.customerContact,
+    order?.customerPhone,
+    order?.customerEmail,
+    order?.address,
+    oneCDoc,
+    exchange.remoteDocument?.number,
+    exchange.remoteDocument?.id,
+    exchange.message,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+export function isOrderAlreadyInOneC(exchange) {
+  const normalized = normalizeOrderExchange(exchange);
+  if (normalized.status === "sent" || normalized.status === "draft") return true;
+  return Boolean(getOrderOneCDocumentRef(normalized));
+}
+
 export function downloadBlobFile(blob, fileName) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
