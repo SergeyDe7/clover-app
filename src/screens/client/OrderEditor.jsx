@@ -15,6 +15,28 @@ import {
 import { ManagerContact } from "./ManagerContact";
 import { CustomItemForm } from "./CustomItemForm";
 
+function capitalizeRu(value) {
+  if (!value) return "";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function getDeliveryDateParts(value) {
+  if (!value) return null;
+  try {
+    const date = new Date(`${value}T12:00:00`);
+    if (Number.isNaN(date.getTime())) return null;
+    return {
+      day: String(date.getDate()),
+      weekday: capitalizeRu(new Intl.DateTimeFormat("ru-RU", { weekday: "long" }).format(date)),
+      monthYear: capitalizeRu(
+        new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(date)
+      ),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function OrderEditor({
   session,
   products,
@@ -62,6 +84,7 @@ export function OrderEditor({
       : initialSource.customItems || []
   );
   const [deliveryDate, setDeliveryDate] = useState(initialSource.firstDeliveryDate || "");
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [addressId, setAddressId] = useState(initialSource.addressId || defaultAddress?.id || "");
   const [clientComment, setClientComment] = useState(initialSource.clientComment || "");
 
@@ -102,6 +125,7 @@ export function OrderEditor({
 
   const total = selectedItems.reduce((sum, item) => sum + item.lineTotal, 0) + customItems.reduce((sum, item) => sum + (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0), 0);
   const selectedAddress = addresses.find((item) => item.id === addressId);
+  const deliveryDateParts = getDeliveryDateParts(deliveryDate);
 
   useEffect(() => {
     if (session.mode !== "new" || !settings.enableDrafts) return;
@@ -208,9 +232,45 @@ export function OrderEditor({
               </div>
             )}
 
-            <label className="field">Дата доставки
-              <input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} required />
-            </label>
+            <div className="field delivery-date-field">
+              <span>Дата доставки</span>
+              <input
+                className="delivery-date-input-desktop"
+                type="date"
+                value={deliveryDate}
+                onChange={(e) => setDeliveryDate(e.target.value)}
+              />
+              <button
+                className={`delivery-date-trigger${deliveryDateParts ? " is-selected" : ""}`}
+                type="button"
+                onClick={() => setDatePickerOpen(true)}
+              >
+                {deliveryDateParts ? (
+                  <>
+                    <span className="delivery-date-day" aria-hidden="true">{deliveryDateParts.day}</span>
+                    <span className="delivery-date-text">
+                      <strong>{deliveryDateParts.weekday}</strong>
+                      <small>{deliveryDateParts.monthYear}</small>
+                    </span>
+                    <span className="delivery-date-action">Изменить</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="delivery-date-day is-empty" aria-hidden="true">—</span>
+                    <span className="delivery-date-text">
+                      <strong>Выберите дату</strong>
+                      <small>Когда привезти заказ</small>
+                    </span>
+                    <span className="delivery-date-action">Календарь</span>
+                  </>
+                )}
+              </button>
+              {deliveryDateParts && (
+                <p className="delivery-date-desktop-hint muted small">
+                  Выбрано: {deliveryDateParts.weekday}, {deliveryDateParts.monthYear}
+                </p>
+              )}
+            </div>
             <label className="field" style={{ marginTop: 10 }}>Адрес доставки
               <select value={addressId} onChange={(e) => setAddressId(e.target.value)} required>
                 <option value="">Выберите адрес</option>
@@ -300,6 +360,43 @@ export function OrderEditor({
             {session.mode === "edit" ? "Сохранить" : "Оформить"}
           </button>
         </div>
+
+        {datePickerOpen && (
+          <div className="delivery-date-sheet" role="dialog" aria-modal="true" aria-label="Дата доставки">
+            <button
+              className="delivery-date-sheet-backdrop"
+              type="button"
+              aria-label="Закрыть выбор даты"
+              onClick={() => setDatePickerOpen(false)}
+            />
+            <div className="delivery-date-sheet-panel">
+              <div className="delivery-date-sheet-head">
+                <strong>Дата доставки</strong>
+                <button className="header-button" type="button" onClick={() => setDatePickerOpen(false)}>
+                  Готово
+                </button>
+              </div>
+              {deliveryDateParts && (
+                <div className="delivery-date-preview">
+                  <span className="delivery-date-day" aria-hidden="true">{deliveryDateParts.day}</span>
+                  <span className="delivery-date-text">
+                    <strong>{deliveryDateParts.weekday}</strong>
+                    <small>{deliveryDateParts.monthYear}</small>
+                  </span>
+                </div>
+              )}
+              <label className="field">
+                Выберите день
+                <input
+                  type="date"
+                  value={deliveryDate}
+                  onChange={(e) => setDeliveryDate(e.target.value)}
+                  autoFocus
+                />
+              </label>
+            </div>
+          </div>
+        )}
       </section>
   );
 

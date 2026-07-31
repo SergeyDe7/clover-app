@@ -781,6 +781,15 @@ textarea { resize: vertical; }
 .product-card { display: flex; min-height: 390px; padding: 18px; border: 1px solid #e1e9de; border-radius: 18px; background: #fff; flex-direction: column; box-shadow: 0 8px 20px rgba(56,97,52,.04); }
 .product-image-wrap { display: grid; place-items: center; width: 100%; height: 145px; margin: 10px 0 2px; overflow: hidden; border-radius: 14px; background: #f2f6ef; }
 .mobile-checkout-bar { display: none; }
+.delivery-date-trigger { display: none; }
+.delivery-date-sheet { display: none; }
+.delivery-date-desktop-hint {
+  margin: 2px 0 0;
+  color: #5f6f5f;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
 .product-image { width: 100%; height: 100%; object-fit: contain; }
 .product-image-placeholder { color: #9aaa98; font-size: 12px; font-weight: 700; text-align: center; }
 .product-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
@@ -1122,11 +1131,138 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     top: auto;
     padding: 14px;
     border-radius: 16px;
+    overflow: visible;
+    min-width: 0;
   }
   .order-summary h2 { margin: 0 0 10px; font-size: 18px; }
   .summary-list { max-height: 140px; margin-bottom: 10px; }
   .order-summary .save-order-button { display: none; }
   .order-summary .summary-note { display: none; }
+  .order-summary .field { min-width: 0; max-width: 100%; }
+  .order-summary .field input,
+  .order-summary .field select,
+  .order-summary .field textarea {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .delivery-date-field { gap: 7px; }
+  .delivery-date-input-desktop { display: none !important; }
+  .delivery-date-desktop-hint { display: none !important; }
+  .delivery-date-trigger {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 56px;
+    padding: 10px 12px;
+    border: 1px solid #d6e0d3;
+    border-radius: 14px;
+    background: #fff;
+    color: #394639;
+    text-align: left;
+    font: inherit;
+    box-shadow: 0 4px 12px rgba(56, 97, 52, 0.04);
+  }
+  .delivery-date-trigger.is-selected {
+    border-color: #b9d7b5;
+    background: linear-gradient(180deg, #f4faf2 0%, #eef7eb 100%);
+  }
+  .delivery-date-day {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: #5b9d57;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .delivery-date-day.is-empty {
+    background: #e8efe5;
+    color: #8a9688;
+    font-size: 18px;
+  }
+  .delivery-date-text {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+  .delivery-date-text strong {
+    color: #394639;
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+  .delivery-date-text small {
+    color: #5f6f5f;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+  .delivery-date-action {
+    color: #5b9d57;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+  .delivery-date-preview {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding: 12px;
+    border: 1px solid #b9d7b5;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #f4faf2 0%, #eef7eb 100%);
+  }
+  .delivery-date-sheet {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+  }
+  .delivery-date-sheet-backdrop {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    background: rgba(30, 42, 30, 0.45);
+    cursor: pointer;
+  }
+  .delivery-date-sheet-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+    border-radius: 18px 18px 0 0;
+    background: #fff;
+    box-shadow: 0 -12px 36px rgba(40, 64, 40, 0.18);
+  }
+  .delivery-date-sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .delivery-date-sheet-head strong { color: #394639; font-size: 16px; }
+  .delivery-date-sheet-panel input[type="date"] {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 48px;
+    box-sizing: border-box;
+    font-size: 16px;
+  }
   .product-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
   .product-card {
     min-height: 0;
