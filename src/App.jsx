@@ -260,31 +260,6 @@ function LoginView({ onAuth, authBusy, authError }) {
   );
 }
 
-function InstallPrompt() {
-  const [promptEvent, setPromptEvent] = useState(null);
-  const [dismissed, setDismissed] = useState(false);
-  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const standalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone;
-
-  useEffect(() => {
-    const handler = (event) => { event.preventDefault(); setPromptEvent(event); };
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
-
-  if (standalone || dismissed || (!promptEvent && !isIos)) return null;
-  const install = async () => {
-    if (promptEvent) {
-      await promptEvent.prompt();
-      await promptEvent.userChoice;
-      setPromptEvent(null);
-    } else {
-      alert("На iPhone откройте меню «Поделиться» в Safari и выберите «На экран Домой». Затем включите «Открыть как веб-приложение».");
-    }
-  };
-  return <div className="install-prompt"><div><strong>Установить Clover</strong><span>{isIos && !promptEvent ? "Добавьте ярлык на экран iPhone" : "Открывайте как обычное приложение"}</span></div><button type="button" onClick={install}>Установить</button><button className="install-close" type="button" onClick={() => setDismissed(true)}>×</button></div>;
-}
-
 function App() {
   const [role, setRole] = useState("client");
   const [authUser, setAuthUser] = useState(null);
@@ -1254,7 +1229,6 @@ function App() {
     <>
       <style>{APP_STYLES}</style>
       {content}
-      <InstallPrompt />
       {syncError && (
         <div className="server-banner">{syncError}</div>
       )}
