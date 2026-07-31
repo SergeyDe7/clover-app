@@ -1,11 +1,11 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { projectRoot, readFrontendUiSource } from "./readFrontendUiSource.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const appPath = path.resolve(scriptDir, "../../src/App.jsx");
 const exchangePath = path.resolve(scriptDir, "../src/exchange.js");
-const source = await readFile(appPath, "utf8");
+const source = readFrontendUiSource(projectRoot);
 const exchangeSource = await readFile(exchangePath, "utf8");
 
 const checks = [

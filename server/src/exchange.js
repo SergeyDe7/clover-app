@@ -70,12 +70,16 @@ const QUEUE_EXCHANGE_STATUSES = new Set(["ready", "sending", "sent", "draft"]);
  * через dedicated endpoints; bulk PUT /api/state/orders не должен
  * ставить ready/sent и не затирает уже подтверждённый обмен.
  */
+function isClientSaveRole(role) {
+  return String(role || "").trim().toLowerCase() === "client";
+}
+
 export function sanitizeOrderExchangeForSave(order, previousOrder, role) {
   const previousExchange = previousOrder
     ? normalizeExchangeState(previousOrder.exchange)
     : null;
 
-  if (role === "client") {
+  if (isClientSaveRole(role)) {
     return {
       ...order,
       exchange: previousExchange || normalizeExchangeState({ status: "not_sent" }),

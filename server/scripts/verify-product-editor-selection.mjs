@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFrontendUiSource } from "./readFrontendUiSource.mjs";
 
-const currentFile = fileURLToPath(import.meta.url);
-const appPath = path.resolve(path.dirname(currentFile), "../../src/App.jsx");
-const source = fs.readFileSync(appPath, "utf8");
+const source = readFrontendUiSource();
 const start = source.indexOf("const selectOneCProduct =");
 const end = source.indexOf("const requestOneCSearch =", start);
 assert.ok(start >= 0 && end > start, "Product editor selection handler was not found.");

@@ -170,7 +170,8 @@ assert.ok(
   "Reset endpoint обязан проверять lease claim."
 );
 
-const appSource = readFileSync(path.join(root, "src/App.jsx"), "utf8");
+const { readFrontendUiSource } = await import("./readFrontendUiSource.mjs");
+const appSource = readFrontendUiSource(root);
 assert.ok(
   appSource.includes('disabled={busy || exchange.status === "sending"}'),
   "UI не должен давать send/reset при активном sending."

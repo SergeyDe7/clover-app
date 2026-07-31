@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFrontendUiSource } from "./readFrontendUiSource.mjs";
 
-const currentFile = fileURLToPath(import.meta.url);
-const appPath = path.resolve(path.dirname(currentFile), "..", "..", "src", "App.jsx");
-const source = readFileSync(appPath, "utf8");
+const source = readFrontendUiSource();
 
 for (const required of [
   'defaultPricingMode: "base"',
