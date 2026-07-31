@@ -4,7 +4,6 @@ import { api } from "../../serverApi";
 import { PanelErrorBoundary } from "../../shared/SharedPanels";
 import {
   EMPTY_LINK,
-  readOpenManagerClientId,
   writeOpenManagerClientId,
   UNIT_ORDER,
   UNIT_CONFIG,
@@ -670,25 +669,15 @@ export function ManagerClients({
   const [defaultMarkupDrafts, setDefaultMarkupDrafts] = useState({});
   const [individualMarkupDrafts, setIndividualMarkupDrafts] = useState({});
   const [matrixSaveState, setMatrixSaveState] = useState({});
-  const [openClientId, setOpenClientId] = useState(readOpenManagerClientId);
+  // После F5 / новой загрузки матрица всегда свёрнута (не восстанавливаем из localStorage).
+  const [openClientId, setOpenClientId] = useState("");
   const [approvalBusyId, setApprovalBusyId] = useState("");
   const [openMenuId, setOpenMenuId] = useState("");
   const [profileOpenId, setProfileOpenId] = useState("");
-  const restoredOpenClient = useRef(false);
 
   useEffect(() => {
-    if (restoredOpenClient.current || !openClientId) return;
-    const target = document.getElementById(`client-matrix-${openClientId}`);
-    if (!target) return;
-
-    restoredOpenClient.current = true;
-    if (target instanceof HTMLDetailsElement) {
-      target.open = true;
-    }
-    window.requestAnimationFrame(() => {
-      target.scrollIntoView({ block: "start" });
-    });
-  }, [openClientId, clients]);
+    writeOpenManagerClientId("");
+  }, []);
 
   const setApproval = async (client, status) => {
     setApprovalBusyId(client.id);
@@ -873,8 +862,8 @@ export function ManagerClients({
     <section>
       <div className="toolbar two">
         <input
+          placeholder="Имя, телефон, email, ИНН…"
           type="search"
-          placeholder="Поиск клиента"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
@@ -928,7 +917,7 @@ export function ManagerClients({
             const matrixOpen = String(openClientId) === String(client.id);
 
             return (
-              <article className="client-card" key={client.id}>
+              <article className="client-card client-card--compact" key={client.id}>
                 <div className="client-card-header">
                   <div>
                     <span
@@ -981,19 +970,15 @@ export function ManagerClients({
                           id: "matrix",
                           label: "Матрица и 1С",
                           onSelect: () => {
-                            setOpenClientId(client.id);
-                            writeOpenManagerClientId(client.id);
+                            setOpenClientId(String(client.id));
+                            writeOpenManagerClientId("");
                             window.setTimeout(() => {
-                              const target = document.getElementById(
-                                `client-matrix-${client.id}`
-                              );
-                              if (target instanceof HTMLDetailsElement) {
-                                target.open = true;
-                              }
-                              target?.scrollIntoView({
-                                behavior: "smooth",
-                                block: "start",
-                              });
+                              document
+                                .getElementById(`client-matrix-${client.id}`)
+                                ?.scrollIntoView({
+                                  behavior: "smooth",
+                                  block: "start",
+                                });
                             }, 50);
                           },
                         },
@@ -1181,7 +1166,8 @@ export function ManagerClients({
                         : String(current) === String(client.id)
                           ? ""
                           : current;
-                      writeOpenManagerClientId(value);
+                      // Не пишем в localStorage — после F5 матрица должна быть свёрнута.
+                      writeOpenManagerClientId("");
                       return value;
                     });
                   }}
@@ -1744,7 +1730,18 @@ export function ManagerClients({
           })}
         </div>
       ) : (
-        <div className="empty-box">Клиенты не найдены.</div>
+        <div className="empty-box">
+          <p>Клиенты не найдены.</p>
+          {search.trim() ? (
+            <button className="primary-button" type="button" onClick={() => setSearch("")}>
+              Сбросить поиск
+            </button>
+          ) : (
+            <p className="muted small" style={{ margin: 0 }}>
+              Клиенты появятся после регистрации или первого заказа.
+            </p>
+          )}
+        </div>
       )}
     </section>
     </PanelErrorBoundary>

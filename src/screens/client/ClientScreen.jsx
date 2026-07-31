@@ -1,6 +1,5 @@
 // Экран клиента: заказ, история, кабинет.
 import { useEffect, useState } from "react";
-import { ORDER_STATUSES } from "../../config/orderConfig";
 import {
   OrderTimeline,
   Header,
@@ -19,6 +18,7 @@ import {
   getOrderTotal,
   getPositionCount,
   statusClass,
+  printOrderDocument,
 } from "../../shared/appHelpers";
 import { ManagerContact } from "./ManagerContact";
 import { ProfilePanel } from "./ProfilePanel";
@@ -280,7 +280,7 @@ function ClientDashboard({
               </button>
             </div>
             <div className="category-list" style={{ marginBottom: 18 }}>
-              {["Активные", "Все", ...ORDER_STATUSES].map((status) => (
+              {["Активные", "Все", "Выполнен", "Отменён"].map((status) => (
                 <button
                   className={
                     filter === status
@@ -291,7 +291,11 @@ function ClientDashboard({
                   key={status}
                   onClick={() => setFilter(status)}
                 >
-                  {status}
+                  {status === "Выполнен"
+                    ? "Выполненные"
+                    : status === "Отменён"
+                      ? "Отменённые"
+                      : status}
                 </button>
               ))}
             </div>
@@ -420,6 +424,15 @@ function ClientDashboard({
                           </div>
                         )}
                         <OrderTimeline order={order} />
+                        <div className="client-order-actions" style={{ marginTop: 14 }}>
+                          <button
+                            className="secondary-button"
+                            type="button"
+                            onClick={() => printOrderDocument(order, settings)}
+                          >
+                            Печать заказа
+                          </button>
+                        </div>
                       </details>
                       <div className="client-order-actions">
                         {canEdit && (
@@ -440,13 +453,6 @@ function ClientDashboard({
                             Повторить заказ
                           </button>
                         )}
-                        <button
-                          className="secondary-button"
-                          type="button"
-                          onClick={() => window.print()}
-                        >
-                          Печать
-                        </button>
                         {canDelete && (
                           <button
                             className="danger-button"

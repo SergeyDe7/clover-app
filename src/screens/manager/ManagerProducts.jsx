@@ -700,13 +700,35 @@ export function ManagerProducts({ products, setProducts }) {
         Фото загружается на сервер и автоматически появляется в личном кабинете клиента. Поддерживаются JPG, PNG и WEBP до 5 МБ.
       </div>
       <div className="product-manager-list" style={{ marginTop: 14 }}>
+        {visible.length === 0 ? (
+          <div className="empty-box">
+            <p>Товары не найдены.</p>
+            {(search || category !== "Все" || visibility !== "Все") ? (
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setCategory("Все");
+                  setVisibility("Все");
+                }}
+              >
+                Сбросить фильтры
+              </button>
+            ) : (
+              <button className="primary-button" type="button" onClick={() => setEditorProduct(null)}>
+                Добавить товар
+              </button>
+            )}
+          </div>
+        ) : (
         <VirtualList
           items={visible}
-          itemHeight={200}
-          height={Math.min(640, typeof window !== "undefined" ? Math.floor(window.innerHeight * 0.65) : 640)}
+          itemHeight={118}
+          height={Math.min(760, typeof window !== "undefined" ? Math.floor(window.innerHeight * 0.72) : 760)}
           getItemKey={(product) => product.id}
           renderItem={(product) => (
-        <article className={product.active ? "product-manager-row" : "product-manager-row inactive"} key={product.id}>
+        <article className={product.active ? "product-manager-row product-manager-row--compact" : "product-manager-row product-manager-row--compact inactive"} key={product.id}>
           <div className="product-manager-thumb">
             {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <span>Нет фото</span>}
           </div>
@@ -717,21 +739,18 @@ export function ManagerProducts({ products, setProducts }) {
               {product.oneCId
                 ? `1С: ${product.oneCCode || "без кода"} · ${product.oneCId}`
                 : "1С: не связан"}
-              {product.oneCLinkMode === "auto" ? " · автоматически" : product.oneCId ? " · вручную" : ""}
+              {product.oneCLinkMode === "auto" ? " · авто" : product.oneCId ? " · вручную" : ""}
             </p>
-            <div className="product-purchase-summary">
+            <div className="product-purchase-summary product-purchase-summary--compact">
               {UNIT_ORDER.map((unit) => {
                 const value = product.purchasePrices?.[unit];
                 return (
                   <span key={unit}>
-                    <strong>{UNIT_CONFIG[unit].label}:</strong>{" "}
+                    <strong>{UNIT_CONFIG[unit].shortLabel}:</strong>{" "}
                     {hasPurchasePrice(value) ? formatMoney(value) : "—"}
                   </span>
                 );
               })}
-              <span className="product-purchase-updated">
-                Закупка 1С обновлена: {formatDateTime(product.purchasePriceUpdatedAt)}
-              </span>
             </div>
           </div>
           <span className={product.active ? "badge green" : "badge gray"}>{product.active ? "Активен" : "Скрыт"}</span>
@@ -757,6 +776,7 @@ export function ManagerProducts({ products, setProducts }) {
         </article>
           )}
         />
+        )}
       </div>
       {editorProduct !== undefined && <ProductEditor product={editorProduct} onClose={() => setEditorProduct(undefined)} onSave={save} />}
     </section>
