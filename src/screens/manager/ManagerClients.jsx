@@ -1555,7 +1555,7 @@ export function ManagerClients({
                                           disabled={!unitAllowed}
                                           placeholder={
                                             unitAllowed
-                                              ? `База: ${
+                                              ? `Цена: ${
                                                   Number(product[priceField]) || 0
                                                 }`
                                               : "Не продаётся"

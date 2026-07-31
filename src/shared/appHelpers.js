@@ -1013,7 +1013,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 }
 
 .product-manager-list { display: grid; gap: 10px; }
-.product-manager-row { display: grid; grid-template-columns: 74px minmax(0,1fr) 110px 100px 180px; align-items: center; gap: 12px; padding: 14px; border: 1px solid #e1e9de; border-radius: 14px; background: #fff; }
+.product-manager-row { display: grid; grid-template-columns: 74px minmax(0,1fr) 110px 100px 180px; align-items: start; gap: 12px; padding: 14px; border: 1px solid #e1e9de; border-radius: 14px; background: #fff; box-sizing: border-box; min-height: 0; }
 .product-manager-thumb { display: grid; place-items: center; width: 70px; height: 70px; overflow: hidden; border-radius: 12px; background: #f2f6ef; color: #9aaa98; font-size: 10px; text-align: center; }
 .product-manager-thumb img { width: 100%; height: 100%; object-fit: contain; }
 .image-actions { display: flex; flex-wrap: wrap; gap: 7px; }
@@ -1022,10 +1022,10 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 .product-manager-row h3 { margin: 0 0 4px; color: #394639; font-size: 14px; }
 .product-manager-row p { margin: 0; color: #7a847a; font-size: 10px; }
 .product-manager-row.inactive { opacity: .58; }
-.product-purchase-summary { display: flex; flex-wrap: wrap; gap: 5px 10px; margin-top: 7px; color: #526852; font-size: 10px; line-height: 1.4; }
+.product-purchase-summary { display: flex; flex-wrap: wrap; gap: 5px 10px; margin-top: 7px; margin-bottom: 2px; color: #526852; font-size: 10px; line-height: 1.45; }
 .product-purchase-summary span { white-space: nowrap; }
 .product-purchase-summary strong { color: #315f31; font-size: 10px; }
-.product-purchase-updated { width: 100%; color: #7a847a; }
+.product-purchase-updated { display: block; width: 100%; color: #7a847a; line-height: 1.45; padding-bottom: 1px; }
 .purchase-price-card { margin-top: 14px; padding: 15px; border: 1px solid #dce7d9; border-radius: 14px; background: #f8fbf6; }
 .purchase-price-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
 .purchase-price-card-head h3 { margin: 0; color: #394639; font-size: 14px; }

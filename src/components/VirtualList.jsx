@@ -79,6 +79,9 @@ export function VirtualList({
                 left: 0,
                 right: 0,
                 height: rowHeight,
+                boxSizing: "border-box",
+                paddingBottom: 10,
+                overflow: "hidden",
               }}
             >
               {renderItem(item, index)}
