@@ -15,6 +15,28 @@ import {
 import { ManagerContact } from "./ManagerContact";
 import { CustomItemForm } from "./CustomItemForm";
 
+function capitalizeRu(value) {
+  if (!value) return "";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function getDeliveryDateParts(value) {
+  if (!value) return null;
+  try {
+    const date = new Date(`${value}T12:00:00`);
+    if (Number.isNaN(date.getTime())) return null;
+    return {
+      day: String(date.getDate()),
+      weekday: capitalizeRu(new Intl.DateTimeFormat("ru-RU", { weekday: "long" }).format(date)),
+      monthYear: capitalizeRu(
+        new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(date)
+      ),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function OrderEditor({
   session,
   products,
@@ -62,6 +84,7 @@ export function OrderEditor({
       : initialSource.customItems || []
   );
   const [deliveryDate, setDeliveryDate] = useState(initialSource.firstDeliveryDate || "");
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [addressId, setAddressId] = useState(initialSource.addressId || defaultAddress?.id || "");
   const [clientComment, setClientComment] = useState(initialSource.clientComment || "");
 
@@ -102,6 +125,7 @@ export function OrderEditor({
 
   const total = selectedItems.reduce((sum, item) => sum + item.lineTotal, 0) + customItems.reduce((sum, item) => sum + (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0), 0);
   const selectedAddress = addresses.find((item) => item.id === addressId);
+  const deliveryDateParts = getDeliveryDateParts(deliveryDate);
 
   useEffect(() => {
     if (session.mode !== "new" || !settings.enableDrafts) return;
@@ -152,7 +176,7 @@ export function OrderEditor({
                   ? "Повтор заказа"
                   : "Новый заказ"}
             </h1>
-            <p>Выберите товары — справа состав, дата, адрес и оформление.</p>
+            <p>Сверху — заказ и оформление, ниже — каталог товаров.</p>
           </div>
           <div className="mini-card"><span className="mini-label">Позиций</span><strong>{selectedItems.length + customItems.length}</strong></div>
         </div>
@@ -185,6 +209,82 @@ export function OrderEditor({
         )}
 
         <div className="catalog-layout">
+          <form className="order-summary" id="order-summary" onSubmit={submit}>
+            <h2>Ваш заказ</h2>
+            {!selectedItems.length && !customItems.length ? <p className="summary-empty">Добавьте товар из каталога или запросите отсутствующую позицию.</p> : (
+              <div className="summary-list">
+                {selectedItems.map((item) => (
+                  <div className="summary-item" key={item.productId}>
+                    <span>{item.name}<small>{item.multiplier > 1 ? `${item.quantity * item.multiplier} шт. всего` : item.category}</small></span>
+                    <strong>{item.quantity} {UNIT_CONFIG[item.unit].shortLabel}<small>{settings.showPrices && item.lineTotal > 0 ? formatMoney(item.lineTotal) : ""}</small></strong>
+                  </div>
+                ))}
+                {customItems.map((item) => (
+                  <div className="summary-item custom-line" key={item.id}>
+                    <span>
+                      {item.name}
+                      <small>Товар вне матрицы · {item.details || "без уточнений"}</small>
+                      <CustomRequestPhoto photo={item.photo} className="custom-request-photo-small" />
+                    </span>
+                    <strong>{item.quantity} {item.unit}<button className="danger-text" style={{ border: 0, background: "transparent", fontSize: 9 }} type="button" onClick={() => setCustomItems((current) => current.filter((value) => value.id !== item.id))}>Убрать</button></strong>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="field delivery-date-field">
+              <span>Дата доставки</span>
+              <input
+                className="delivery-date-input-desktop"
+                type="date"
+                value={deliveryDate}
+                onChange={(e) => setDeliveryDate(e.target.value)}
+              />
+              <button
+                className={`delivery-date-trigger${deliveryDateParts ? " is-selected" : ""}`}
+                type="button"
+                onClick={() => setDatePickerOpen(true)}
+              >
+                {deliveryDateParts ? (
+                  <>
+                    <span className="delivery-date-day" aria-hidden="true">{deliveryDateParts.day}</span>
+                    <span className="delivery-date-text">
+                      <strong>{deliveryDateParts.weekday}</strong>
+                      <small>{deliveryDateParts.monthYear}</small>
+                    </span>
+                    <span className="delivery-date-action">Изменить</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="delivery-date-day is-empty" aria-hidden="true">—</span>
+                    <span className="delivery-date-text">
+                      <strong>Выберите дату</strong>
+                      <small>Когда привезти заказ</small>
+                    </span>
+                    <span className="delivery-date-action">Календарь</span>
+                  </>
+                )}
+              </button>
+              {deliveryDateParts && (
+                <p className="delivery-date-desktop-hint muted small">
+                  Выбрано: {deliveryDateParts.weekday}, {deliveryDateParts.monthYear}
+                </p>
+              )}
+            </div>
+            <label className="field" style={{ marginTop: 10 }}>Адрес доставки
+              <select value={addressId} onChange={(e) => setAddressId(e.target.value)} required>
+                <option value="">Выберите адрес</option>
+                {addresses.map((item) => <option value={item.id} key={item.id}>{item.label}{item.isDefault ? " — основной" : ""} · {item.address}</option>)}
+              </select>
+            </label>
+            <label className="field" style={{ marginTop: 10 }}>Комментарий к заказу
+              <textarea rows="3" placeholder="Например: позвонить перед доставкой" value={clientComment} onChange={(e) => setClientComment(e.target.value)} />
+            </label>
+            <div className="summary-total"><span>Итого</span><strong>{settings.showPrices && total > 0 ? formatMoney(total) : `${selectedItems.length + customItems.length} поз.`}</strong></div>
+            {settings.enableDrafts && session.mode === "new" && <p className="summary-note">Черновик автоматически сохраняется в этом браузере.</p>}
+            <button className="save-order-button" type="submit">{session.mode === "edit" ? "Сохранить изменения" : "Оформить заказ"}</button>
+          </form>
+
           <div>
             <div className="catalog-toolbar">
               <div className="catalog-filter-row">
@@ -240,47 +340,63 @@ export function OrderEditor({
               {settings.allowCustomItems && <CustomItemForm onAdd={(item) => setCustomItems((current) => [...current, item])} />}
             </section>
           </div>
-
-          <form className="order-summary" onSubmit={submit}>
-            <h2>Ваш заказ</h2>
-            {!selectedItems.length && !customItems.length ? <p className="summary-empty">Добавьте товар из каталога или запросите отсутствующую позицию.</p> : (
-              <div className="summary-list">
-                {selectedItems.map((item) => (
-                  <div className="summary-item" key={item.productId}>
-                    <span>{item.name}<small>{item.multiplier > 1 ? `${item.quantity * item.multiplier} шт. всего` : item.category}</small></span>
-                    <strong>{item.quantity} {UNIT_CONFIG[item.unit].shortLabel}<small>{settings.showPrices && item.lineTotal > 0 ? formatMoney(item.lineTotal) : ""}</small></strong>
-                  </div>
-                ))}
-                {customItems.map((item) => (
-                  <div className="summary-item custom-line" key={item.id}>
-                    <span>
-                      {item.name}
-                      <small>Товар вне матрицы · {item.details || "без уточнений"}</small>
-                      <CustomRequestPhoto photo={item.photo} className="custom-request-photo-small" />
-                    </span>
-                    <strong>{item.quantity} {item.unit}<button className="danger-text" style={{ border: 0, background: "transparent", fontSize: 9 }} type="button" onClick={() => setCustomItems((current) => current.filter((value) => value.id !== item.id))}>Убрать</button></strong>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <label className="field">Дата доставки
-              <input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} required />
-            </label>
-            <label className="field" style={{ marginTop: 10 }}>Адрес доставки
-              <select value={addressId} onChange={(e) => setAddressId(e.target.value)} required>
-                <option value="">Выберите адрес</option>
-                {addresses.map((item) => <option value={item.id} key={item.id}>{item.label}{item.isDefault ? " — основной" : ""} · {item.address}</option>)}
-              </select>
-            </label>
-            <label className="field" style={{ marginTop: 10 }}>Комментарий к заказу
-              <textarea rows="3" placeholder="Например: позвонить перед доставкой" value={clientComment} onChange={(e) => setClientComment(e.target.value)} />
-            </label>
-            <div className="summary-total"><span>Итого</span><strong>{settings.showPrices && total > 0 ? formatMoney(total) : `${selectedItems.length + customItems.length} поз.`}</strong></div>
-            {settings.enableDrafts && session.mode === "new" && <p className="summary-note">Черновик автоматически сохраняется в этом браузере.</p>}
-            <button className="save-order-button" type="submit">{session.mode === "edit" ? "Сохранить изменения" : "Оформить заказ"}</button>
-          </form>
         </div>
+
+        <div className="mobile-checkout-bar" aria-label="Быстрое оформление">
+          <div className="mobile-checkout-bar-info">
+            <strong>{selectedItems.length + customItems.length} поз.</strong>
+            <span>{settings.showPrices && total > 0 ? formatMoney(total) : "Сумма уточняется"}</span>
+          </div>
+          <button
+            className="mobile-checkout-bar-button"
+            type="button"
+            onClick={() => {
+              const form = document.getElementById("order-summary");
+              if (!form) return;
+              if (typeof form.requestSubmit === "function") form.requestSubmit();
+              else form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+            }}
+          >
+            {session.mode === "edit" ? "Сохранить" : "Оформить"}
+          </button>
+        </div>
+
+        {datePickerOpen && (
+          <div className="delivery-date-sheet" role="dialog" aria-modal="true" aria-label="Дата доставки">
+            <button
+              className="delivery-date-sheet-backdrop"
+              type="button"
+              aria-label="Закрыть выбор даты"
+              onClick={() => setDatePickerOpen(false)}
+            />
+            <div className="delivery-date-sheet-panel">
+              <div className="delivery-date-sheet-head">
+                <strong>Дата доставки</strong>
+                <button className="header-button" type="button" onClick={() => setDatePickerOpen(false)}>
+                  Готово
+                </button>
+              </div>
+              {deliveryDateParts && (
+                <div className="delivery-date-preview">
+                  <span className="delivery-date-day" aria-hidden="true">{deliveryDateParts.day}</span>
+                  <span className="delivery-date-text">
+                    <strong>{deliveryDateParts.weekday}</strong>
+                    <small>{deliveryDateParts.monthYear}</small>
+                  </span>
+                </div>
+              )}
+              <label className="field">
+                Выберите день
+                <input
+                  type="date"
+                  value={deliveryDate}
+                  onChange={(e) => setDeliveryDate(e.target.value)}
+                  autoFocus
+                />
+              </label>
+            </div>
+          </div>
+        )}
       </section>
   );
 

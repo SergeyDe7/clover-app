@@ -81,7 +81,7 @@ export function OrderTimeline({ order }) {
 export function Header({ title, subtitle, onLogout, children }) {
   return (
     <header className="app-header">
-      <img className="app-header-logo" src={cloverLogo} alt="Clover" width="168" height="113" />
+      <img className="app-header-logo" src={cloverLogo} alt="Clover" width="120" height="52" />
       <div className="app-header-actions">
         <div className="app-header-titles">
           <strong>{title}</strong>
