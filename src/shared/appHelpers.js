@@ -1612,17 +1612,53 @@ textarea { resize: vertical; }
 
 .order-thankyou {
   position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
-  z-index: 12000;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  z-index: 2147483000;
   display: grid;
   place-items: center;
-  padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  padding: max(20px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
   background:
     radial-gradient(circle at 20% 18%, rgba(126, 196, 108, 0.45), transparent 42%),
     radial-gradient(circle at 82% 78%, rgba(74, 148, 78, 0.38), transparent 48%),
     linear-gradient(160deg, #eef7ea 0%, #d9ecd4 45%, #c7e0c2 100%);
   animation: order-thankyou-fade-in 0.45s ease-out both;
   cursor: pointer;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
+  touch-action: none;
+}
+html.clover-thankyou-open,
+body.clover-thankyou-open {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  height: 100% !important;
+}
+html.clover-thankyou-open #root {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+html.clover-thankyou-open .order-thankyou {
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+html.clover-thankyou-open .mobile-checkout-bar,
+html.clover-thankyou-open .cart-sheet,
+html.clover-thankyou-open .client-bottom-nav,
+html.clover-thankyou-open .app-header {
+  display: none !important;
+  visibility: hidden !important;
 }
 .order-thankyou-glow {
   position: absolute;
@@ -1661,6 +1697,19 @@ textarea { resize: vertical; }
   text-align: center;
   cursor: default;
   animation: order-thankyou-card-in 0.7s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+.order-thankyou-mobile .order-thankyou-card {
+  animation: order-thankyou-fade-in 0.45s ease-out both;
+}
+.order-thankyou-mobile .order-thankyou-logo {
+  width: min(200px, 55vw);
+}
+.order-thankyou-mobile .order-thankyou-title {
+  font-size: clamp(24px, 7vw, 32px);
+}
+.order-thankyou-mobile .order-thankyou-button {
+  width: min(280px, 100%);
+  min-height: 52px;
 }
 .order-thankyou-logo {
   width: min(168px, 58vw);
@@ -1891,6 +1940,15 @@ textarea { resize: vertical; }
   .client-cabinet-nav .category-button { width: 100%; text-align: center; }
   .page-content-client { padding-bottom: 24px; }
   .exchange-summary-strip { grid-template-columns: 1fr; }
+  .order-thankyou {
+    width: 100vw;
+    width: 100dvw;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100vh;
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
+  }
   .order-thankyou-card {
     padding: 24px 18px 20px;
     border-radius: 18px;
@@ -2574,6 +2632,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     font-size: 12px;
   }
   .app-header-titles {
+    display: none !important;
     min-width: 0;
     max-width: 100%;
   }

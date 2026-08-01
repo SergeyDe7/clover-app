@@ -1,5 +1,6 @@
 // Компоненты, общие для экрана клиента и экрана менеджера.
 import { Component, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import cloverLogo from "../assets/clover-logo.png";
 import { startPasskeyRegistration } from "../utils/webauthn";
 import { api, setApiToken } from "../serverApi";
@@ -79,12 +80,30 @@ export function OrderTimeline({ order }) {
 }
 
 export function Header({ title, subtitle, onLogout, onLogoClick, children }) {
+  const [compactHeader, setCompactHeader] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(max-width: 900px)").matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const media = window.matchMedia("(max-width: 900px)");
+    const sync = () => setCompactHeader(media.matches);
+    sync();
+    if (media.addEventListener) {
+      media.addEventListener("change", sync);
+      return () => media.removeEventListener("change", sync);
+    }
+    media.addListener(sync);
+    return () => media.removeListener(sync);
+  }, []);
+
   const logo = (
     <img className="app-header-logo" src={cloverLogo} alt="Clover" width="120" height="52" />
   );
 
   return (
-    <header className="app-header">
+    <header className={`app-header${compactHeader ? " app-header-compact" : ""}`}>
       {onLogoClick ? (
         <button
           type="button"
@@ -98,10 +117,12 @@ export function Header({ title, subtitle, onLogout, onLogoClick, children }) {
         logo
       )}
       <div className="app-header-actions">
-        <div className="app-header-titles">
-          <strong>{title}</strong>
-          {subtitle && <div className="small muted">{subtitle}</div>}
-        </div>
+        {!compactHeader && (
+          <div className="app-header-titles">
+            <strong>{title}</strong>
+            {subtitle && <div className="small muted">{subtitle}</div>}
+          </div>
+        )}
         {children}
       </div>
       {onLogout && (
@@ -408,6 +429,23 @@ export function PushSettings() {
 export function OrderThankYouOverlay({ open, onDone }) {
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(max-width: 900px)").matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const media = window.matchMedia("(max-width: 900px)");
+    const sync = () => setIsMobile(media.matches);
+    sync();
+    if (media.addEventListener) {
+      media.addEventListener("change", sync);
+      return () => media.removeEventListener("change", sync);
+    }
+    media.addListener(sync);
+    return () => media.removeListener(sync);
+  }, []);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -415,26 +453,95 @@ export function OrderThankYouOverlay({ open, onDone }) {
     const onKey = (event) => {
       if (event.key === "Escape") finish();
     };
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const html = document.documentElement;
+    const body = document.body;
+    const previous = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyPosition: body.style.position,
+      bodyWidth: body.style.width,
+      bodyHeight: body.style.height,
+      bodyTop: body.style.top,
+    };
+    html.classList.add("clover-thankyou-open");
+    body.classList.add("clover-thankyou-open");
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    // iOS: фиксируем body, чтобы под оверлеем ничего не просвечивало.
+    body.style.position = "fixed";
+    body.style.width = "100%";
+    body.style.height = "100%";
+    body.style.top = "0";
     window.addEventListener("keydown", onKey);
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
     const timer = window.setTimeout(finish, reduceMotion ? 1600 : 5000);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      html.classList.remove("clover-thankyou-open");
+      body.classList.remove("clover-thankyou-open");
+      html.style.overflow = previous.htmlOverflow;
+      body.style.overflow = previous.bodyOverflow;
+      body.style.position = previous.bodyPosition;
+      body.style.width = previous.bodyWidth;
+      body.style.height = previous.bodyHeight;
+      body.style.top = previous.bodyTop;
       window.removeEventListener("keydown", onKey);
       window.clearTimeout(timer);
     };
   }, [open]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  const overlayStyle = {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: "100%",
+    height: "100%",
+    minHeight: "100dvh",
+    zIndex: 2147483000,
+    margin: 0,
+    padding: 0,
+    boxSizing: "border-box",
+    display: "grid",
+    placeItems: "center",
+    background:
+      "radial-gradient(circle at 20% 18%, rgba(126, 196, 108, 0.45), transparent 42%), radial-gradient(circle at 82% 78%, rgba(74, 148, 78, 0.38), transparent 48%), linear-gradient(160deg, #eef7ea 0%, #d9ecd4 45%, #c7e0c2 100%)",
+    cursor: "pointer",
+    overflow: "hidden",
+    touchAction: "none",
+  };
+
+  const cardStyle = isMobile
+    ? {
+        width: "100%",
+        height: "100%",
+        minHeight: "100%",
+        maxWidth: "none",
+        borderRadius: 0,
+        border: "none",
+        boxShadow: "none",
+        background: "transparent",
+        padding:
+          "max(28px, env(safe-area-inset-top, 0px)) 24px max(28px, env(safe-area-inset-bottom, 0px))",
+        display: "grid",
+        alignContent: "center",
+        justifyItems: "center",
+        gap: "14px",
+      }
+    : {
+        width: "min(420px, calc(100% - 32px))",
+        maxWidth: "100%",
+      };
+
+  return createPortal(
     <div
-      className="order-thankyou"
+      className={`order-thankyou${isMobile ? " order-thankyou-mobile" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="order-thankyou-title"
+      style={overlayStyle}
       onClick={() => onDoneRef.current?.()}
     >
       <div className="order-thankyou-glow" aria-hidden="true" />
@@ -443,6 +550,7 @@ export function OrderThankYouOverlay({ open, onDone }) {
       <span className="order-thankyou-spark order-thankyou-spark-c" aria-hidden="true" />
       <div
         className="order-thankyou-card"
+        style={cardStyle}
         onClick={(event) => event.stopPropagation()}
       >
         <img
@@ -462,7 +570,8 @@ export function OrderThankYouOverlay({ open, onDone }) {
           К моим заказам
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

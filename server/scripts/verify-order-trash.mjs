@@ -15,6 +15,7 @@ try {
     canPurgeOrder,
     isOrderTrashed,
     preserveTrashedOrders,
+    lockOrderTrashFields,
   } = await import("../../src/shared/orderTrash.js");
 
   const active = {
@@ -55,6 +56,41 @@ try {
   assert.equal(preserved.length, 2);
   assert.ok(preserved.some((order) => order.id === "ord-1" && isOrderTrashed(order)));
   assert.ok(preserved.some((order) => order.id === "ord-2"));
+
+  // PUT не должен выставлять deletedAt у активного / ready заказа.
+  const ready = {
+    id: "ord-ready",
+    status: "Новый",
+    exchange: { status: "ready" },
+    deletedAt: "",
+  };
+  const bypassTrash = lockOrderTrashFields(
+    [
+      {
+        ...ready,
+        deletedAt: "2026-08-01T15:00:00.000Z",
+        deletedBy: { userId: "x", role: "client" },
+      },
+    ],
+    new Map([["ord-ready", ready]])
+  );
+  assert.equal(isOrderTrashed(bypassTrash[0]), false);
+  assert.equal(bypassTrash[0].deletedBy, null);
+
+  // PUT не должен self-restore trashed заказа.
+  const lockedRestore = lockOrderTrashFields(
+    [{ ...trashed, deletedAt: "", deletedBy: null }],
+    new Map([["ord-1", trashed]])
+  );
+  assert.equal(isOrderTrashed(lockedRestore[0]), true);
+  assert.equal(lockedRestore[0].deletedAt, trashed.deletedAt);
+
+  // Новый заказ с deletedAt в теле — сброс.
+  const forgedNew = lockOrderTrashFields(
+    [{ id: "ord-new", status: "Новый", deletedAt: "2026-08-01T15:00:00.000Z" }],
+    new Map()
+  );
+  assert.equal(isOrderTrashed(forgedNew[0]), false);
 
   const db = await import("../src/db.js");
   const user = db.createUser({
@@ -113,7 +149,9 @@ try {
   assert.equal(db.getOrderById("trash-1"), null);
   assert.equal(db.listOrders(user.id).length, 1);
 
-  console.log("Order trash verified: rules, preserve, list, restore, purge.");
+  console.log(
+    "Order trash verified: rules, preserve, lock PUT fields, list, restore, purge."
+  );
 } catch (error) {
   console.error(error);
   process.exitCode = 1;

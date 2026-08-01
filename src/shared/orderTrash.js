@@ -108,3 +108,40 @@ export function preserveTrashedOrders(previousOrders, incomingOrders) {
   );
   return [...incoming, ...preserved];
 }
+
+/**
+ * deletedAt / deletedBy нельзя менять через PUT /state/orders —
+ * только через dedicated trash / restore endpoints.
+ * Для новых заказов входящий soft-delete сбрасывается.
+ */
+export function lockOrderTrashFields(orders, previousById) {
+  const map =
+    previousById instanceof Map
+      ? previousById
+      : new Map(
+          (Array.isArray(previousById) ? previousById : []).map((order) => [
+            String(order?.id || ""),
+            order,
+          ])
+        );
+
+  return (Array.isArray(orders) ? orders : []).map((order) => {
+    const id = String(order?.id || "");
+    const previous = id ? map.get(id) : null;
+    if (!previous) {
+      if (!isOrderTrashed(order) && order?.deletedBy == null) {
+        return order;
+      }
+      return {
+        ...order,
+        deletedAt: "",
+        deletedBy: null,
+      };
+    }
+    return {
+      ...order,
+      deletedAt: String(previous.deletedAt || ""),
+      deletedBy: previous.deletedBy ?? null,
+    };
+  });
+}

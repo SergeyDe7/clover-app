@@ -168,6 +168,7 @@ import {
 import {
   findClientOrderMatrixViolations,
   isMatrixProductForLink,
+  ordersRequiringMatrixCheck,
 } from "./matrixGuard.js";
 import { matchesTextSearch } from "../../src/shared/appHelpers.js";
 import { validateDeliveryDate } from "../../src/shared/deliveryDateRules.js";
@@ -176,6 +177,7 @@ import {
   canRestoreOrder,
   canTrashOrder,
   isOrderTrashed,
+  lockOrderTrashFields,
   preserveTrashedOrders,
 } from "../../src/shared/orderTrash.js";
 
@@ -1864,7 +1866,10 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     }
   }
 
-  let orders = preserveTrashedOrders(previousOrders, incomingOrders).map((order) =>
+  let orders = lockOrderTrashFields(
+    preserveTrashedOrders(previousOrders, incomingOrders),
+    previousById
+  ).map((order) =>
     sanitizeOrderExchangeForSave(
       order,
       previousById.get(String(order?.id || "")),
@@ -1912,14 +1917,19 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     const oneCProducts = getGlobalState("oneCProducts", []);
     const clientLink = normalizeClientLink(links[req.user.id]);
     const matrixViolations = findClientOrderMatrixViolations(
-      orders,
+      ordersRequiringMatrixCheck(orders, previousById),
       clientLink,
       products
     );
     if (matrixViolations.length) {
+      const names = matrixViolations
+        .map((item) => item.name || item.productId)
+        .filter(Boolean)
+        .slice(0, 5);
+      const suffix = names.length ? ` (${names.join(", ")})` : "";
       return res.status(400).json({
         error:
-          "В заказе есть товары вне вашей матрицы. Уберите их или оформите через «товар вне матрицы».",
+          `В заказе есть товары вне вашей матрицы${suffix}. Уберите их или оформите через «товар вне матрицы».`,
         code: "MATRIX_PRODUCT_FORBIDDEN",
         items: matrixViolations.slice(0, 20),
       });

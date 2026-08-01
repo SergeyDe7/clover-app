@@ -616,8 +616,13 @@ function ClientDashboard({
                 setShowFullCatalog={setShowFullCatalog}
                 onClose={onCloseCatalog}
                 onSave={(payload) => {
-                  onSaveOrder(payload);
-                  setThankYouOpen(true);
+                  Promise.resolve(onSaveOrder(payload))
+                    .then(() => {
+                      setThankYouOpen(true);
+                    })
+                    .catch(() => {
+                      // Ошибка уже показана в saveOrder (alert).
+                    });
                 }}
               />
             ) : (

@@ -397,13 +397,15 @@ function App() {
     setAuthUser(data.user);
     setRole(data.user.role);
     setProducts(
-      (data.products || DEFAULT_PRODUCTS).map(normalizeProduct)
+      (Array.isArray(data.products) ? data.products : []).map(normalizeProduct)
     );
     setFullCatalogProducts(
       (
-        data.fullCatalogProducts ||
-        data.products ||
-        DEFAULT_PRODUCTS
+        Array.isArray(data.fullCatalogProducts)
+          ? data.fullCatalogProducts
+          : Array.isArray(data.products)
+            ? data.products
+            : []
       ).map(normalizeProduct)
     );
     setCatalogPolicy({
@@ -968,10 +970,11 @@ function App() {
   const saveOrder = (payload) => {
     if (!hydrated || !authUser) {
       alert("Данные с сервера ещё не загружены. Обновите страницу и повторите заказ.");
-      return;
+      return Promise.reject(new Error("not_hydrated"));
     }
 
     const session = catalogSession || { mode: "new" };
+    const previousOrders = orders;
     let nextOrders = orders;
 
     if (session.mode === "edit") {
@@ -1039,7 +1042,7 @@ function App() {
     setOrders(nextOrders);
     setCatalogSession(null);
 
-    api
+    return api
       .saveOrders(nextOrders)
       .then((result) => {
         if (Array.isArray(result?.orders)) {
@@ -1047,11 +1050,43 @@ function App() {
           setOrders(result.orders);
         }
         setSyncError("");
+        return result;
       })
-      .catch((error) => {
-        const message = `${error.message}. Заказ виден у вас, но сервер его не сохранил — менеджер его не увидит.`;
+      .catch(async (error) => {
+        skipNextOrdersSyncRef.current = true;
+        setOrders(previousOrders);
+        if (error?.code === "MATRIX_PRODUCT_FORBIDDEN") {
+          try {
+            const data = await api.bootstrap();
+            skipNextOrdersSyncRef.current = true;
+            if (Array.isArray(data.orders)) {
+              setOrders(data.orders);
+            }
+            if (Array.isArray(data.products)) {
+              setProducts(data.products.map(normalizeProduct));
+            }
+            if (Array.isArray(data.fullCatalogProducts)) {
+              setFullCatalogProducts(data.fullCatalogProducts.map(normalizeProduct));
+            } else if (Array.isArray(data.products)) {
+              setFullCatalogProducts(data.products.map(normalizeProduct));
+            }
+            if (data.catalogPolicy) {
+              setCatalogPolicy({
+                matrixMode: "pending",
+                allowFullCatalog: false,
+                matrixReady: false,
+                matrixProductIds: [],
+                ...data.catalogPolicy,
+              });
+            }
+          } catch {
+            // оставляем откат к previousOrders
+          }
+        }
+        const message = `${error.message} Заказ не сохранён на сервере — менеджер его не увидит.`;
         setSyncError(message);
         alert(message);
+        throw error;
       });
   };
 
