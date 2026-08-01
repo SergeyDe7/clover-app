@@ -19,6 +19,8 @@ import {
   getGlobalState,
   listClients,
   listOrders,
+  listTrashedOrders,
+  deleteOrderById,
   replaceOrders,
   resetServerData,
   setClientStateField,
@@ -169,6 +171,13 @@ import {
 } from "./matrixGuard.js";
 import { matchesTextSearch } from "../../src/shared/appHelpers.js";
 import { validateDeliveryDate } from "../../src/shared/deliveryDateRules.js";
+import {
+  canPurgeOrder,
+  canRestoreOrder,
+  canTrashOrder,
+  isOrderTrashed,
+  preserveTrashedOrders,
+} from "../../src/shared/orderTrash.js";
 
 const app = express();
 const ONE_C_STATE_KEY = "oneCIntegration";
@@ -563,6 +572,64 @@ function clientOrderSignature(order) {
 function orderPositionCount(order) {
   return (Array.isArray(order?.items) ? order.items.length : 0) +
     (Array.isArray(order?.customItems) ? order.customItems.length : 0);
+}
+
+function orderMoneyTotal(order) {
+  const itemsTotal = (Array.isArray(order?.items) ? order.items : []).reduce(
+    (sum, item) => sum + (Number(item?.lineTotal) || 0),
+    0
+  );
+  const customTotal = (Array.isArray(order?.customItems) ? order.customItems : []).reduce(
+    (sum, item) => sum + (Number(item?.unitPrice) || 0) * (Number(item?.quantity) || 0),
+    0
+  );
+  return itemsTotal + customTotal;
+}
+
+function formatOrderMoney(value) {
+  const amount = Number(value) || 0;
+  return `${amount.toLocaleString("ru-RU", {
+    minimumFractionDigits: amount % 1 ? 2 : 0,
+    maximumFractionDigits: 2,
+  })} ₽`;
+}
+
+function formatOrderRuDate(value) {
+  if (!value) return "не указана";
+  const raw = String(value).slice(0, 10);
+  try {
+    return new Intl.DateTimeFormat("ru-RU").format(new Date(`${raw}T12:00:00`));
+  } catch {
+    return raw;
+  }
+}
+
+function formatOrderRuDateTime(value) {
+  if (!value) return "не указана";
+  try {
+    return new Intl.DateTimeFormat("ru-RU", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return formatOrderRuDate(value);
+  }
+}
+
+function managerOrderNotificationCopy(order, customerName) {
+  const orderNumber = String(order?.number || order?.id || "");
+  const total = orderMoneyTotal(order);
+  const lines = [
+    `Сумма: ${total > 0 ? formatOrderMoney(total) : "уточняется"}`,
+    `Кол-во позиций: ${orderPositionCount(order)}`,
+    `Дата доставки: ${formatOrderRuDate(order?.firstDeliveryDate)}`,
+    `Дата заказа: ${formatOrderRuDateTime(order?.createdAt)}`,
+    `№ ${orderNumber || "—"}`,
+  ];
+  return {
+    title: String(customerName || "Клиент").trim() || "Клиент",
+    body: lines.join("\n"),
+  };
 }
 
 function reconciliationPeriodText(request) {
@@ -1728,6 +1795,7 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
         matrixProductIds: [],
       },
       orders: listOrders(),
+      trashedOrders: listTrashedOrders(),
       profile: {},
       addresses: [],
       favorites: [],
@@ -1756,6 +1824,7 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     products: catalog.matrixProducts,
     catalogPolicy: catalog.policy,
     orders: listOrders(req.user.id),
+    trashedOrders: [],
     profile: state.profile,
     addresses: state.addresses,
     favorites: state.favorites,
@@ -1783,7 +1852,9 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
   const incomingOrders = Array.isArray(req.body?.orders)
     ? req.body.orders
     : [];
-  const previousOrders = isStaffRole(req.user.role) ? listOrders() : listOrders(req.user.id);
+  const previousOrders = isStaffRole(req.user.role)
+    ? listOrders(null, { includeDeleted: true })
+    : listOrders(req.user.id, { includeDeleted: true });
   const previousById = new Map(previousOrders.map((order) => [String(order.id), order]));
 
   if (isStaffRole(req.user.role)) {
@@ -1793,7 +1864,7 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     }
   }
 
-  let orders = incomingOrders.map((order) =>
+  let orders = preserveTrashedOrders(previousOrders, incomingOrders).map((order) =>
     sanitizeOrderExchangeForSave(
       order,
       previousById.get(String(order?.id || "")),
@@ -1889,10 +1960,11 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
       const customItems = Array.isArray(order.customItems) ? order.customItems : [];
 
       if (!previous) {
+        const copy = managerOrderNotificationCopy(order, customerName);
         queueManagerNotification({
           type: "new_order",
-          title: `Новый заказ №${orderNumber}`,
-          body: `${customerName} · ${orderPositionCount(order)} поз. · доставка ${order.firstDeliveryDate || "не указана"}`,
+          title: copy.title,
+          body: copy.body,
           url: `/?managerTab=orders&order=${encodeURIComponent(order.id)}`,
           sourceId: String(order.id),
         });
@@ -1901,10 +1973,11 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
           .update(clientOrderSignature(order))
           .digest("hex")
           .slice(0, 16);
+        const copy = managerOrderNotificationCopy(order, customerName);
         queueManagerNotification({
           type: "order_changed",
-          title: `Клиент изменил заказ №${orderNumber}`,
-          body: `${customerName} · обновлены состав или условия доставки`,
+          title: copy.title,
+          body: `Изменён\n${copy.body}`,
           url: `/?managerTab=orders&order=${encodeURIComponent(order.id)}`,
           sourceId: `${order.id}:${order.updatedAt || changeHash}:${changeHash}`,
         });
@@ -1974,8 +2047,170 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     }
   }
 
-  res.json({ ok: true, orders });
+  res.json({
+    ok: true,
+    orders: orders.filter((order) => !isOrderTrashed(order)),
+    trashedOrders: isStaffRole(req.user.role)
+      ? orders.filter((order) => isOrderTrashed(order))
+      : [],
+  });
 });
+
+app.post("/api/state/orders/:orderId/trash", authRequired, (req, res) => {
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    ...getGlobalState("settings", DEFAULT_SETTINGS),
+  };
+  const stored = getOrderById(req.params.orderId);
+  if (!stored) {
+    return res.status(404).json({ error: "Заказ не найден.", code: "ORDER_NOT_FOUND" });
+  }
+
+  const order = stored.payload;
+  const isStaff = isStaffRole(req.user.role);
+  const isOwner =
+    isClientRole(req.user.role) && String(stored.userId) === String(req.user.id);
+
+  if (!isStaff && !isOwner) {
+    return res.status(403).json({ error: "Недостаточно прав.", code: "FORBIDDEN" });
+  }
+
+  if (isStaff && settings.managerCanDeleteOrders === false) {
+    return res.status(403).json({
+      error: "Удаление заказов менеджером отключено в настройках.",
+      code: "DELETE_DISABLED",
+    });
+  }
+
+  if (isOwner && settings.allowClientDelete === false) {
+    return res.status(403).json({
+      error: "Удаление заказов клиентом отключено в настройках.",
+      code: "DELETE_DISABLED",
+    });
+  }
+
+  const role = isStaff ? "manager" : "client";
+  const gate = canTrashOrder(order, role);
+  if (!gate.ok) {
+    return res.status(409).json({ error: gate.error, code: gate.code });
+  }
+
+  const deletedAt = new Date().toISOString();
+  const updated = updateOrderPayload(stored.id, {
+    ...order,
+    deletedAt,
+    deletedBy: {
+      userId: req.user.id,
+      role: req.user.role,
+    },
+    updatedAt: deletedAt,
+  });
+
+  auditFromRequest(req, "order.trash", {
+    orderId: stored.id,
+    orderNumber: order.number,
+    role: req.user.role,
+  });
+
+  const customerName = String(
+    order.customerName ||
+      (isOwner ? getClientState(req.user.id).profile?.companyName : "") ||
+      req.user.email ||
+      "Клиент"
+  );
+  const orderNumber = String(order.number || order.id || "");
+  queueManagerNotification({
+    type: "order_deleted",
+    title: `Заказ №${orderNumber} в корзине`,
+    body: `${customerName} · заказ перемещён в корзину (${isStaff ? "менеджер" : "клиент"})`,
+    url: "/?managerTab=orders&ordersView=trash",
+    sourceId: `${stored.id}:${deletedAt}:trash`,
+  });
+
+  res.json({
+    ok: true,
+    order: updated,
+    orders: listOrders(isStaff ? null : req.user.id),
+    trashedOrders: isStaff ? listTrashedOrders() : [],
+  });
+});
+
+app.post(
+  "/api/admin/orders/:orderId/restore",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const stored = getOrderById(req.params.orderId);
+    if (!stored) {
+      return res.status(404).json({ error: "Заказ не найден.", code: "ORDER_NOT_FOUND" });
+    }
+
+    const gate = canRestoreOrder(stored.payload);
+    if (!gate.ok) {
+      return res.status(409).json({ error: gate.error, code: gate.code });
+    }
+
+    const restoredAt = new Date().toISOString();
+    const updated = updateOrderPayload(stored.id, {
+      ...stored.payload,
+      deletedAt: "",
+      deletedBy: null,
+      updatedAt: restoredAt,
+    });
+
+    auditFromRequest(req, "order.restore", {
+      orderId: stored.id,
+      orderNumber: stored.payload.number,
+    });
+
+    res.json({
+      ok: true,
+      order: updated,
+      orders: listOrders(),
+      trashedOrders: listTrashedOrders(),
+    });
+  }
+);
+
+app.delete(
+  "/api/admin/orders/:orderId",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    if (settings.managerCanDeleteOrders === false) {
+      return res.status(403).json({
+        error: "Удаление заказов менеджером отключено в настройках.",
+        code: "DELETE_DISABLED",
+      });
+    }
+
+    const stored = getOrderById(req.params.orderId);
+    if (!stored) {
+      return res.status(404).json({ error: "Заказ не найден.", code: "ORDER_NOT_FOUND" });
+    }
+
+    const gate = canPurgeOrder(stored.payload);
+    if (!gate.ok) {
+      return res.status(409).json({ error: gate.error, code: gate.code });
+    }
+
+    deleteOrderById(stored.id);
+    auditFromRequest(req, "order.purge", {
+      orderId: stored.id,
+      orderNumber: stored.payload.number,
+    });
+
+    res.json({
+      ok: true,
+      orders: listOrders(),
+      trashedOrders: listTrashedOrders(),
+    });
+  }
+);
 
 function notifyClientOrderStatusChanged(order, previousStatus) {
   const clientId = order.clientId || order.user_id;
@@ -2672,6 +2907,9 @@ app.post("/api/one-c/orders/accepted", (req, res) => {
     },
   });
   notifyClientOrderStatusChanged(order, previousStatus);
+  // Не создаём in-app уведомление менеджеру здесь: после «Передать в 1С»
+  // баннер уже снят, а статус «Принят» виден в карточке заказа через live-refresh.
+  // Иначе ACK 1С сразу создаёт новое непрочитанное и кажется, что уведомление «не исчезает».
 
   res.json({
     ok: true,

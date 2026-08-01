@@ -19,18 +19,28 @@ import { ManagerProducts } from "./ManagerProducts";
 import { ManagerSettings } from "./ManagerSettings";
 import { ManagerBackup } from "./ManagerBackup";
 import { ManagerAudit } from "./ManagerAudit";
-import { managerNotificationTab, ManagerNotificationBell } from "./ManagerNotifications";
+import { managerNotificationTab, ManagerNotificationBell, parseManagerNotification, ManagerOrderSummaryLines } from "./ManagerNotifications";
 
-function ManagerDashboard({ authUser, orders, products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onLogout }) {
+function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onRestoreOrder, onPurgeOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onLogout }) {
   const [tab, setTab] = useState(readManagerActiveTab);
   const [moreTab, setMoreTab] = useState(readManagerMoreTab);
   const [headerSearch, setHeaderSearch] = useState("");
   const [bellOpen, setBellOpen] = useState(false);
+  const [ordersView, setOrdersView] = useState("active");
 
   const selectTab = (nextTab) => {
     setTab(nextTab);
     writeManagerActiveTab(nextTab);
     if (nextTab !== "orders") setHeaderSearch("");
+  };
+
+  const goHome = () => {
+    selectTab("orders");
+    setBellOpen(false);
+    setHeaderSearch("");
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   const selectMoreTab = (nextTab) => {
@@ -99,12 +109,17 @@ function ManagerDashboard({ authUser, orders, products, setProducts, profile, ad
   const unreadCount = (managerNotifications || []).filter((item) => !item.readAt).length;
 
   return <main className="clover-app">
-    <Header title="Кабинет менеджера" subtitle="Заказы · клиенты · товары · 1С" onLogout={onLogout}>
+    <Header
+      title="Кабинет менеджера"
+      subtitle="Заказы · клиенты · товары · 1С"
+      onLogoClick={goHome}
+      onLogout={onLogout}
+    >
       <div className="manager-header-tools">
         <input
           className="manager-search-input"
           type="search"
-          placeholder="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
+          placeholder="Поиск заказа"
           value={headerSearch}
           onChange={(e) => {
             setHeaderSearch(e.target.value);
@@ -123,15 +138,36 @@ function ManagerDashboard({ authUser, orders, products, setProducts, profile, ad
       </div>
     </Header>
     <section className="page-content">
-      {managerNotice && (
-        <div className="exchange-notice" style={{ marginBottom: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+      {managerNotice && (() => {
+        const parsed = parseManagerNotification(managerNotice);
+        const hasOrderSummary = Boolean(
+          parsed.clientName || parsed.amount || parsed.positions || parsed.deliveryDate || parsed.orderDate || parsed.orderNumber
+        );
+        return (
+        <div className="exchange-notice manager-home-notice">
+          <div className="manager-home-notice-row">
             <div>
-              <strong>{managerNotice.title}</strong>
-              {managerNotice.body && <div>{managerNotice.body}</div>}
-              <div>{formatDateTime(managerNotice.createdAt)}</div>
+              {hasOrderSummary ? (
+                <ManagerOrderSummaryLines
+                  clientName={parsed.clientName || parsed.headline}
+                  amount={parsed.amount}
+                  positions={parsed.positions}
+                  deliveryDate={parsed.deliveryDate}
+                  orderDate={parsed.orderDate}
+                  orderNumber={parsed.orderNumber}
+                  detail={parsed.detail}
+                />
+              ) : (
+                <>
+                  <strong>{managerNotice.title}</strong>
+                  {parsed.detail && <div className="manager-notification-meta">{parsed.detail}</div>}
+                </>
+              )}
+              {!parsed.hideFooterTime && (
+                <div className="manager-notification-time">{formatDateTime(managerNotice.createdAt)}</div>
+              )}
               {managerNotice.pendingCount > 1 && (
-                <div>Непросмотренных событий: {managerNotice.pendingCount}</div>
+                <div className="muted small">Ещё непросмотренных: {managerNotice.pendingCount - 1}</div>
               )}
             </div>
             <div className="exchange-actions">
@@ -142,14 +178,33 @@ function ManagerDashboard({ authUser, orders, products, setProducts, profile, ad
             </div>
           </div>
         </div>
-      )}
-      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+        );
+      })()}
+      <div className="stats-grid manager-stats-strip" aria-label="Сводка">
         <article className="stat-card"><span>Новые заказы</span><strong>{newCount}</strong></article>
         <article className="stat-card"><span>Ошибки 1С</span><strong>{exchangeErrors}</strong></article>
         <article className="stat-card"><span>Непрочитано</span><strong>{unreadCount}</strong></article>
       </div>
-      <nav className="manager-nav">{MANAGER_TABS.map(([id,label]) => <button className={[tab === id ? "active" : "", id === "more" ? "nav-service" : ""].filter(Boolean).join(" ")} type="button" key={id} onClick={() => selectTab(id)}>{label}</button>)}</nav>
-      {tab === "orders" && <ManagerOrders orders={orders} settings={settings} clientLinks={clientLinks} onUpdateOrder={onUpdateOrder} onBulkUpdateOrders={onBulkUpdateOrders} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} onReload={onReload} onApplyManagerNotifications={onApplyManagerNotifications} headerSearch={headerSearch} />}
+      <nav className="manager-nav" aria-label="Разделы менеджера">{MANAGER_TABS.map(([id,label]) => <button className={[tab === id ? "active" : "", id === "more" ? "nav-service" : ""].filter(Boolean).join(" ")} type="button" key={id} onClick={() => selectTab(id)}>{label}</button>)}</nav>
+      {tab === "orders" && (
+        <ManagerOrders
+          orders={orders}
+          trashedOrders={trashedOrders}
+          ordersView={ordersView}
+          onOrdersViewChange={setOrdersView}
+          settings={settings}
+          clientLinks={clientLinks}
+          onUpdateOrder={onUpdateOrder}
+          onBulkUpdateOrders={onBulkUpdateOrders}
+          onDeleteOrder={onDeleteOrder}
+          onRestoreOrder={onRestoreOrder}
+          onPurgeOrder={onPurgeOrder}
+          onCreateProductFromCustom={onCreateProductFromCustom}
+          onReload={onReload}
+          onApplyManagerNotifications={onApplyManagerNotifications}
+          headerSearch={headerSearch}
+        />
+      )}
       {tab === "exchange" && <ManagerExchange onReload={onReload} onApplyManagerNotifications={onApplyManagerNotifications} onNavigate={selectTab} />}
       {tab === "clients" && <ManagerClients clients={clients} orders={orders} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} onReload={onReload} />}
       {tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}

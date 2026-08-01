@@ -1,5 +1,5 @@
 // Компоненты, общие для экрана клиента и экрана менеджера.
-import { Component, useEffect, useState } from "react";
+import { Component, useEffect, useRef, useState } from "react";
 import cloverLogo from "../assets/clover-logo.png";
 import { startPasskeyRegistration } from "../utils/webauthn";
 import { api, setApiToken } from "../serverApi";
@@ -78,22 +78,37 @@ export function OrderTimeline({ order }) {
   );
 }
 
-export function Header({ title, subtitle, onLogout, children }) {
+export function Header({ title, subtitle, onLogout, onLogoClick, children }) {
+  const logo = (
+    <img className="app-header-logo" src={cloverLogo} alt="Clover" width="120" height="52" />
+  );
+
   return (
     <header className="app-header">
-      <img className="app-header-logo" src={cloverLogo} alt="Clover" width="120" height="52" />
+      {onLogoClick ? (
+        <button
+          type="button"
+          className="app-header-logo-button"
+          onClick={onLogoClick}
+          aria-label="На главный экран"
+        >
+          {logo}
+        </button>
+      ) : (
+        logo
+      )}
       <div className="app-header-actions">
         <div className="app-header-titles">
           <strong>{title}</strong>
           {subtitle && <div className="small muted">{subtitle}</div>}
         </div>
         {children}
-        {onLogout && (
-          <button className="header-button" type="button" onClick={onLogout}>
-            Выйти
-          </button>
-        )}
       </div>
+      {onLogout && (
+        <button className="header-button header-logout" type="button" onClick={onLogout}>
+          Выйти
+        </button>
+      )}
     </header>
   );
 }
@@ -388,3 +403,66 @@ export function PushSettings() {
     </section>
   );
 }
+
+/** Полноэкранная благодарность после оформления заказа (браузер и телефон). */
+export function OrderThankYouOverlay({ open, onDone }) {
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const finish = () => onDoneRef.current?.();
+    const onKey = (event) => {
+      if (event.key === "Escape") finish();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    const timer = window.setTimeout(finish, reduceMotion ? 1600 : 5000);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+      window.clearTimeout(timer);
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="order-thankyou"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="order-thankyou-title"
+      onClick={() => onDoneRef.current?.()}
+    >
+      <div className="order-thankyou-glow" aria-hidden="true" />
+      <span className="order-thankyou-spark order-thankyou-spark-a" aria-hidden="true" />
+      <span className="order-thankyou-spark order-thankyou-spark-b" aria-hidden="true" />
+      <span className="order-thankyou-spark order-thankyou-spark-c" aria-hidden="true" />
+      <div
+        className="order-thankyou-card"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <img
+          className="order-thankyou-logo"
+          src={cloverLogo}
+          alt=""
+          width="160"
+          height="70"
+        />
+        <h2 id="order-thankyou-title" className="order-thankyou-title">
+          Благодарим за Ваш заказ!
+        </h2>
+        <p className="order-thankyou-text">
+          Мы уже начали его обрабатывать.
+        </p>
+        <button className="primary-button order-thankyou-button" type="button" onClick={() => onDoneRef.current?.()}>
+          К моим заказам
+        </button>
+      </div>
+    </div>
+  );
+}
+

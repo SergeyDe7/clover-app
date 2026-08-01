@@ -6,6 +6,7 @@ import {
   CustomRequestPhoto,
   PasswordSecurityPanel,
   PushSettings,
+  OrderThankYouOverlay,
 } from "../../shared/SharedPanels";
 import {
   CLIENT_TABS,
@@ -24,6 +25,7 @@ import {
   getPositionCount,
   statusClass,
 } from "../../shared/appHelpers";
+import { canTrashOrder } from "../../shared/orderTrash";
 import { ManagerContact } from "./ManagerContact";
 import { ProfilePanel } from "./ProfilePanel";
 import { AddressesPanel } from "./AddressesPanel";
@@ -60,8 +62,6 @@ function ClientDashboard({
   orders,
   settings,
   catalogPolicy,
-  matrixProductCount,
-  fullCatalogCount,
   reconciliationRequests,
   onReload,
   onNew,
@@ -85,6 +85,7 @@ function ClientDashboard({
   const [tab, setTab] = useState("home");
   const [cabinetSection, setCabinetSection] = useState(readClientCabinetSection);
   const [filter, setFilter] = useState("Активные");
+  const [thankYouOpen, setThankYouOpen] = useState(false);
   const active = orders.filter(
     (order) => !["Выполнен", "Отменён"].includes(order.status)
   );
@@ -111,6 +112,11 @@ function ClientDashboard({
     }
     setTab("orders");
     writeClientActiveTab("orders");
+  };
+
+  const finishOrderThankYou = () => {
+    setThankYouOpen(false);
+    openOrders();
   };
 
   const selectTab = (id) => {
@@ -228,8 +234,13 @@ function ClientDashboard({
     </>
   );
 
+  const openNewOrder = () => {
+    onNew({ forceNew: true });
+    selectTab("home");
+  };
+
   const ordersPanel = (
-    <section className="panel">
+    <section className="panel client-orders-panel">
       <div className="panel-heading">
         <div>
           <p className="eyebrow">История</p>
@@ -241,16 +252,6 @@ function ClientDashboard({
               : ""}
           </p>
         </div>
-        <button
-          className="primary-button"
-          type="button"
-          onClick={() => {
-            onNew({ forceNew: true });
-            selectTab("home");
-          }}
-        >
-          + Новый заказ
-        </button>
       </div>
       <div className="category-list order-history-filters" style={{ marginBottom: 18 }}>
         {ORDER_HISTORY_FILTERS.map((status) => (
@@ -274,7 +275,7 @@ function ClientDashboard({
             const canEdit =
               settings.allowClientEdit && order.status === "Новый";
             const canDelete =
-              settings.allowClientDelete && order.status === "Новый";
+              settings.allowClientDelete && canTrashOrder(order, "client").ok;
             return (
               <article
                 className="order-card"
@@ -402,7 +403,7 @@ function ClientDashboard({
                   )}
                   {settings.allowRepeatOrder && (
                     <button
-                      className="primary-button"
+                      className="secondary-button"
                       type="button"
                       onClick={() => onRepeat(order)}
                     >
@@ -435,20 +436,16 @@ function ClientDashboard({
           {filter === "Активные"
             ? "Активных заказов нет."
             : "Заказов с таким статусом пока нет."}
-          <div>
-            <button
-              className="primary-button"
-              type="button"
-              onClick={() => {
-                onNew({ forceNew: true });
-                selectTab("home");
-              }}
-            >
-              Оформить заказ
-            </button>
-          </div>
         </div>
       )}
+
+      <button
+        className="client-new-order-fab"
+        type="button"
+        onClick={openNewOrder}
+      >
+        + Новый заказ
+      </button>
     </section>
   );
 
@@ -565,32 +562,6 @@ function ClientDashboard({
 
         {tab === "home" && (
           <>
-            {(catalogPolicy.matrixMode === "pending" ||
-              matrixProductCount > 0) && (
-              <div
-                className={
-                  catalogPolicy.matrixMode === "pending"
-                    ? "matrix-catalog-note pending client-home-note"
-                    : "matrix-catalog-note client-home-note"
-                }
-              >
-                {catalogPolicy.matrixMode === "pending" ? (
-                  <>
-                    <strong>Ваш каталог готовится</strong>
-                    <br />
-                    Менеджер закрепит постоянные товары и цены. Заказ можно
-                    оформить уже сейчас.
-                  </>
-                ) : (
-                  <>
-                    <strong>Ваши товары: {matrixProductCount}</strong>
-                    {catalogPolicy.allowFullCatalog &&
-                      ` · доступен весь каталог (${fullCatalogCount})`}
-                  </>
-                )}
-              </div>
-            )}
-
             {!canCreateOrder && (
               <div className="warning-box client-home-gate">
                 {!profileComplete && settings.requireProfile && (
@@ -646,7 +617,7 @@ function ClientDashboard({
                 onClose={onCloseCatalog}
                 onSave={(payload) => {
                   onSaveOrder(payload);
-                  openOrders();
+                  setThankYouOpen(true);
                 }}
               />
             ) : (
@@ -674,6 +645,7 @@ function ClientDashboard({
 
         {tab === "cabinet" && (isNarrow ? cabinetMobile : cabinetDesktop)}
       </section>
+      <OrderThankYouOverlay open={thankYouOpen} onDone={finishOrderThankYou} />
     </main>
   );
 }

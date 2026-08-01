@@ -309,14 +309,45 @@ body:has(.clover-app) {
   flex-shrink: 0;
 }
 
+.app-header-logo-button {
+  display: block;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.app-header-logo-button:focus-visible {
+  outline: 2px solid var(--clover-green);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
 .app-header-actions {
   align-items: center !important;
   gap: 10px !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  justify-content: flex-end !important;
+}
+
+.header-logout {
+  flex: 0 0 auto !important;
+  align-self: center !important;
+  min-height: 42px !important;
+  order: 30;
 }
 
 .app-header-actions > div:first-of-type,
 .app-header-titles {
   order: 1;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-end !important;
   text-align: right;
 }
 
@@ -379,10 +410,15 @@ body:has(.clover-app) {
 }
 
 .manager-nav button.nav-service:not(.active),
-.client-nav button.nav-service:not(.active),
 .client-bottom-nav button.nav-service:not(.active) {
   color: var(--clover-muted) !important;
   border-style: dashed !important;
+}
+
+.client-nav button.nav-service:not(.active) {
+  color: var(--clover-muted) !important;
+  border-style: solid !important;
+  border-color: var(--clover-border) !important;
 }
 
 .manager-more-nav .category-button.active {
@@ -396,9 +432,20 @@ body:has(.clover-app) {
   margin-bottom: 16px !important;
 }
 
+.clover-app .stats-grid.manager-stats-strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  margin-bottom: 12px !important;
+}
+
 .clover-app .stat-card {
   padding: 14px 16px !important;
   border-radius: var(--radius-sm) !important;
+}
+
+.clover-app .stats-grid.manager-stats-strip .stat-card {
+  padding: 10px 12px !important;
+  box-shadow: none !important;
 }
 
 .clover-app .stat-card span {
@@ -412,8 +459,26 @@ body:has(.clover-app) {
   color: var(--clover-green-deep) !important;
 }
 
+.clover-app .stats-grid.manager-stats-strip .stat-card strong {
+  font-size: 18px !important;
+  line-height: 1.1 !important;
+}
+
+.clover-app .manager-home-notice {
+  margin-bottom: 12px !important;
+}
+
+.clover-app .manager-home-notice-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .clover-app .manager-grid .order-card,
-.clover-app .order-list .order-card {
+.clover-app .order-list .order-card,
+.clover-app .manager-order-card-item {
   padding: 14px 16px !important;
   border-radius: var(--radius-sm) !important;
 }
@@ -424,18 +489,53 @@ body:has(.clover-app) {
   font-size: 17px !important;
 }
 
-.clover-app .manager-grid .order-meta,
-.clover-app .order-list .order-meta {
-  margin: 10px 0 !important;
-  padding: 10px 12px !important;
-  gap: 8px !important;
-  border-radius: var(--radius-sm) !important;
-  background: var(--clover-surface-soft) !important;
+.clover-app .manager-order-client {
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  margin: 4px 0 2px !important;
+}
+
+.clover-app .manager-order-sum {
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  color: var(--clover-green-deep) !important;
+  white-space: nowrap !important;
+}
+
+.clover-app .manager-order-card-header {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  gap: 16px !important;
+}
+
+.clover-app .manager-order-select {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+
+.clover-app .manager-order-card-item > .order-meta {
+  margin: 12px 0 !important;
 }
 
 .clover-app .manager-order-controls {
-  margin-top: 10px !important;
+  margin: 0 0 8px !important;
   gap: 8px !important;
+}
+
+.clover-app .manager-order-controls .exchange-actions {
+  width: auto !important;
+  flex-wrap: wrap !important;
+}
+
+.clover-app .manager-send-onec-button {
+  width: auto !important;
+  min-width: 180px !important;
+  min-height: 40px !important;
 }
 
 .clover-app .order-onec-box {
@@ -446,8 +546,122 @@ body:has(.clover-app) {
   border-color: var(--clover-border) !important;
 }
 
-.clover-app .page-content {
-  padding-top: 22px !important;
+.clover-app .page-content-client {
+  width: min(1440px, 90%) !important;
+  max-width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* Вложенный каталог не сужается второй раз — одна вертикаль с вкладками */
+.clover-app .page-content-client .embedded-catalog.catalog-content {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 0 70px !important;
+  box-sizing: border-box !important;
+}
+
+.clover-app .client-nav {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  margin: 0 0 20px !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+.clover-app .client-nav button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  min-height: 42px !important;
+  line-height: 1.2 !important;
+  box-sizing: border-box !important;
+}
+
+.clover-app .app-header {
+  align-items: center !important;
+  padding-left: 5% !important;
+  padding-right: 5% !important;
+}
+
+.clover-app .app-header-actions {
+  align-items: center !important;
+}
+
+.clover-app .app-header-actions > div:first-of-type,
+.clover-app .app-header-titles {
+  justify-content: center !important;
+  min-height: 42px !important;
+}
+
+.clover-app .header-logout,
+.clover-app .header-contact-btn {
+  align-self: center !important;
+  min-height: 42px !important;
+}
+
+.clover-app .catalog-layout > .order-summary {
+  align-self: start !important;
+  position: sticky !important;
+  top: 105px !important;
+  z-index: 15 !important;
+}
+
+.clover-app .client-new-order-fab {
+  position: fixed !important;
+  right: max(20px, calc((100vw - min(1440px, 90vw)) / 2 + 12px)) !important;
+  bottom: 28px !important;
+  z-index: 35 !important;
+  min-height: 54px !important;
+  padding: 14px 28px !important;
+  border: none !important;
+  border-radius: 999px !important;
+  background: #3f8f3c !important;
+  color: #fff !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  box-shadow: 0 14px 32px rgba(47, 125, 50, 0.42), 0 2px 0 rgba(255, 255, 255, 0.2) inset !important;
+}
+
+.clover-app .catalog-main > .page-title-row {
+  margin-bottom: 18px !important;
+}
+
+.clover-app .product-grid {
+  align-items: stretch !important;
+}
+
+.clover-app .product-card {
+  height: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.clover-app .product-image-wrap {
+  flex: 0 0 auto !important;
+  height: 145px !important;
+}
+
+.clover-app .product-card-controls,
+.clover-app .unit-choice,
+.clover-app .quantity-control {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.clover-app .unit-choice button {
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 /* —— Client mobile: compact header, stronger order focus —— */
@@ -475,6 +689,10 @@ body:has(.clover-app) {
     flex-wrap: nowrap !important;
   }
 
+  .clover-app .app-header-logo-button {
+    flex: 0 0 auto !important;
+  }
+
   .clover-app .app-header-logo {
     width: 56px !important;
     max-width: 56px !important;
@@ -496,12 +714,194 @@ body:has(.clover-app) {
     display: none !important;
   }
 
+  .clover-app .manager-header-tools {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    order: 2 !important;
+  }
+
+  .clover-app .manager-search-input {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+  }
+
+  .clover-app .manager-bell .secondary-button,
+  .clover-app .manager-bell-trigger {
+    min-height: 32px !important;
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+  }
+
+  .clover-app .manager-bell-label-full {
+    display: none !important;
+  }
+
+  .clover-app .manager-bell-label-short {
+    display: inline !important;
+  }
+
+  .clover-app .manager-bell-panel {
+    position: fixed !important;
+    left: 10px !important;
+    right: 10px !important;
+    top: 52px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: min(68vh, 480px) !important;
+    padding: 8px !important;
+    border-radius: 14px !important;
+    z-index: 90 !important;
+  }
+
+  .clover-app .manager-notification-header {
+    margin-bottom: 6px !important;
+  }
+
+  .clover-app .manager-notification-header strong {
+    font-size: 12px !important;
+  }
+
+  .clover-app .manager-notification-item {
+    padding: 8px !important;
+    gap: 6px !important;
+    border-radius: 10px !important;
+  }
+
+  .clover-app .manager-notification-client {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+  }
+
+  .clover-app .manager-notification-amount {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+  }
+
+  .clover-app .manager-notification-order,
+  .clover-app .manager-notification-meta {
+    font-size: 10px !important;
+  }
+
+  .clover-app .manager-notification-actions .primary-button,
+  .clover-app .manager-notification-actions .secondary-button {
+    flex: 1 1 auto;
+    min-height: 30px !important;
+    font-size: 11px !important;
+  }
+
   .clover-app .header-button,
+  .clover-app .header-logout,
   .clover-app .manager-contact-trigger {
     flex-shrink: 0 !important;
     min-height: 32px !important;
     padding: 5px 8px !important;
     font-size: 11px !important;
+  }
+
+  .clover-app .header-logout {
+    order: unset !important;
+    margin-left: 2px !important;
+  }
+
+  .clover-app .stats-grid.manager-stats-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .clover-app .stats-grid.manager-stats-strip .stat-card {
+    padding: 6px 6px !important;
+    border-radius: 10px !important;
+    min-width: 0 !important;
+  }
+
+  .clover-app .stats-grid.manager-stats-strip .stat-card span {
+    margin-bottom: 1px !important;
+    font-size: 9px !important;
+    line-height: 1.15 !important;
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .clover-app .stats-grid.manager-stats-strip .stat-card strong {
+    font-size: 15px !important;
+  }
+
+  .clover-app .manager-nav {
+    gap: 6px !important;
+    margin: 0 0 10px !important;
+  }
+
+  .clover-app .manager-nav button {
+    padding: 7px 10px !important;
+    font-size: 12px !important;
+    border-radius: 10px !important;
+  }
+
+  .clover-app .manager-orders-filters {
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .clover-app .manager-orders-tools {
+    gap: 6px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .clover-app .manager-filters-toggle,
+  .clover-app .manager-bulk-toggle {
+    min-height: 36px !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+
+  .clover-app .manager-send-onec-button {
+    width: auto !important;
+    min-width: min(100%, 200px) !important;
+    min-height: 42px !important;
+    font-size: 14px !important;
+  }
+
+  .clover-app .manager-order-client {
+    font-size: 16px !important;
+  }
+
+  .clover-app .manager-order-sum {
+    font-size: 15px !important;
+  }
+
+  .clover-app .manager-bulk-panel {
+    padding: 10px !important;
+  }
+
+  .clover-app .manager-home-notice {
+    margin-bottom: 8px !important;
+    padding: 10px 12px !important;
+  }
+
+  .clover-app .manager-home-notice-row {
+    gap: 8px !important;
+  }
+
+  .clover-app .manager-home-notice .exchange-actions {
+    gap: 6px !important;
+  }
+
+  .clover-app .manager-home-notice .primary-button,
+  .clover-app .manager-home-notice .secondary-button {
+    min-height: 34px !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
   }
 
   .clover-app .page-content,

@@ -550,7 +550,8 @@ export function setClientStateField(userId, field, value) {
   `).run(JSON.stringify(value), now(), userId);
 }
 
-export function listOrders(userId = null) {
+export function listOrders(userId = null, options = {}) {
+  const includeDeleted = options?.includeDeleted === true;
   const rows = userId
     ? db.prepare(`
         SELECT payload_json
@@ -564,7 +565,22 @@ export function listOrders(userId = null) {
         ORDER BY created_at DESC
       `).all();
 
-  return rows.map((row) => parseJson(row.payload_json, {}));
+  const orders = rows.map((row) => parseJson(row.payload_json, {}));
+  if (includeDeleted) return orders;
+  return orders.filter((order) => !String(order?.deletedAt || "").trim());
+}
+
+export function listTrashedOrders(userId = null) {
+  return listOrders(userId, { includeDeleted: true }).filter((order) =>
+    Boolean(String(order?.deletedAt || "").trim())
+  );
+}
+
+export function deleteOrderById(orderId) {
+  const id = String(orderId || "").trim();
+  if (!id) return { changed: 0 };
+  const result = db.prepare(`DELETE FROM orders WHERE id = ?`).run(id);
+  return { changed: Number(result.changes || 0) };
 }
 
 export function getOrderById(orderId) {

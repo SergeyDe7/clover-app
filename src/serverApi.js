@@ -195,6 +195,24 @@ export const api = {
     });
   },
 
+  trashOrder(orderId) {
+    return request(`/state/orders/${encodeURIComponent(orderId)}/trash`, {
+      method: "POST",
+    });
+  },
+
+  restoreOrder(orderId) {
+    return request(`/admin/orders/${encodeURIComponent(orderId)}/restore`, {
+      method: "POST",
+    });
+  },
+
+  purgeOrder(orderId) {
+    return request(`/admin/orders/${encodeURIComponent(orderId)}`, {
+      method: "DELETE",
+    });
+  },
+
   patchOrderStatus(orderId, status) {
     return request(`/orders/${encodeURIComponent(orderId)}/status`, {
       method: "PATCH",
