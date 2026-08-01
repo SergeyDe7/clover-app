@@ -42,6 +42,12 @@ export const CLIENT_CABINET_SECTIONS = [
 
 export const CLIENT_CABINET_SECTION_KEY = "clover-client-cabinet-section-v1";
 
+/** Навигация/кабинет клиента (см. APP_STYLES @media 820px). */
+export const CLIENT_NARROW_MQ = "(max-width: 820px)";
+
+/** Корзина/каталог заказа (см. APP_STYLES @media 900px — скрыт .order-summary). */
+export const CATALOG_NARROW_MQ = "(max-width: 900px)";
+
 export function readManagerActiveTab() {
   try {
     const value = localStorage.getItem(MANAGER_ACTIVE_TAB_KEY) || "orders";
@@ -1052,7 +1058,198 @@ textarea { resize: vertical; }
 .product-image-wrap { display: flex; align-items: center; justify-content: center; width: 100%; height: 145px; margin: 10px 0 2px; overflow: hidden; border-radius: 0; background: #fff; }
 .mobile-checkout-bar { display: none; }
 .delivery-date-trigger { display: none; }
-.delivery-date-sheet { display: none; }
+.delivery-date-trigger-desktop {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 12px;
+  border: 1px solid #d6e0d3;
+  border-radius: 14px;
+  background: #fff;
+  color: #394639;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(56, 97, 52, 0.04);
+}
+.delivery-date-trigger-desktop.is-selected {
+  border-color: #b9d7b5;
+  background: linear-gradient(180deg, #f4faf2 0%, #eef7eb 100%);
+}
+.delivery-date-trigger-desktop .delivery-date-day {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #5b9d57;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+}
+.delivery-date-trigger-desktop .delivery-date-day.is-empty {
+  background: #e8efe5;
+  color: #8a9688;
+  font-size: 18px;
+}
+.delivery-date-trigger-desktop .delivery-date-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.delivery-date-trigger-desktop .delivery-date-text strong {
+  color: #394639;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+.delivery-date-trigger-desktop .delivery-date-text small {
+  color: #5f6f5f;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.delivery-date-trigger-desktop .delivery-date-action {
+  color: #5b9d57;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.delivery-date-sheet {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+}
+.delivery-date-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(30, 42, 30, 0.45);
+  cursor: pointer;
+}
+.delivery-date-sheet-panel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100% - 32px));
+  max-height: min(90vh, 640px);
+  overflow: auto;
+  padding: 18px 16px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(40, 64, 40, 0.22);
+}
+.delivery-date-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.delivery-date-sheet-head strong { color: #394639; font-size: 16px; }
+.delivery-date-preview {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid #b9d7b5;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f4faf2 0%, #eef7eb 100%);
+}
+.delivery-date-preview .delivery-date-day {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #5b9d57;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+}
+.delivery-date-preview .delivery-date-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.delivery-date-preview .delivery-date-text strong {
+  color: #394639;
+  font-size: 15px;
+  font-weight: 800;
+}
+.delivery-date-preview .delivery-date-text small {
+  color: #5f6f5f;
+  font-size: 12px;
+  font-weight: 600;
+}
+.delivery-calendar { display: grid; gap: 10px; }
+.delivery-calendar-nav {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+}
+.delivery-calendar-nav strong {
+  text-align: center;
+  color: #394639;
+  font-size: 15px;
+}
+.delivery-calendar-weekdays,
+.delivery-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+.delivery-calendar-weekdays span {
+  text-align: center;
+  color: #7a8778;
+  font-size: 11px;
+  font-weight: 700;
+}
+.delivery-calendar-weekdays .is-sunday-label { color: #b56b6b; }
+.delivery-calendar-cell {
+  min-height: 42px;
+  border: 1px solid #d8e2d5;
+  border-radius: 12px;
+  background: #fff;
+  color: #394639;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.delivery-calendar-cell.is-empty {
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+.delivery-calendar-cell.is-selected {
+  border-color: #5b9d57;
+  background: #5b9d57;
+  color: #fff;
+}
+.delivery-calendar-cell.is-disabled,
+.delivery-calendar-cell.is-sunday {
+  border-color: #ececec;
+  background: #f5f5f5;
+  color: #a0a0a0;
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+.delivery-calendar-cell.is-disabled.is-selected,
+.delivery-calendar-cell.is-sunday.is-selected {
+  background: #f5f5f5;
+  color: #a0a0a0;
+  border-color: #ececec;
+}
+.delivery-calendar-note { margin: 0; }
 .delivery-date-desktop-hint {
   margin: 2px 0 0;
   color: #5f6f5f;
@@ -1456,9 +1653,9 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     box-sizing: border-box;
   }
   .delivery-date-field { gap: 7px; }
-  .delivery-date-input-desktop { display: none !important; }
   .delivery-date-desktop-hint { display: none !important; }
-  .delivery-date-trigger {
+  .delivery-date-trigger,
+  .delivery-date-trigger-desktop {
     display: grid;
     grid-template-columns: 48px minmax(0, 1fr) auto;
     align-items: center;
@@ -1474,7 +1671,8 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     font: inherit;
     box-shadow: 0 4px 12px rgba(56, 97, 52, 0.04);
   }
-  .delivery-date-trigger.is-selected {
+  .delivery-date-trigger.is-selected,
+  .delivery-date-trigger-desktop.is-selected {
     border-color: #b9d7b5;
     background: linear-gradient(180deg, #f4faf2 0%, #eef7eb 100%);
   }
@@ -1549,7 +1747,11 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     position: absolute;
     left: 0;
     right: 0;
+    top: auto;
     bottom: 0;
+    transform: none;
+    width: 100%;
+    max-height: min(88vh, 720px);
     padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
     border-radius: 18px 18px 0 0;
     background: #fff;
@@ -1563,14 +1765,6 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     margin-bottom: 14px;
   }
   .delivery-date-sheet-head strong { color: #394639; font-size: 16px; }
-  .delivery-date-sheet-panel input[type="date"] {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    min-height: 48px;
-    box-sizing: border-box;
-    font-size: 16px;
-  }
   .catalog-lead { display: none; }
   .embedded-catalog .page-title-row {
     display: none;

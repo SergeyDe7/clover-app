@@ -10,6 +10,7 @@ import {
 import {
   CLIENT_TABS,
   CLIENT_CABINET_SECTIONS,
+  CLIENT_NARROW_MQ,
   writeClientActiveTab,
   readClientCabinetSection,
   writeClientCabinetSection,
@@ -30,7 +31,7 @@ import { OrderEditor } from "./OrderEditor";
 import { ReconciliationPanel } from "./ReconciliationPanel";
 import { ClientMatrixPanel } from "./ClientMatrixPanel";
 
-const NARROW_MQ = "(max-width: 820px)";
+const NARROW_MQ = CLIENT_NARROW_MQ;
 const ORDER_HISTORY_FILTERS = ["Активные", "Все", "Выполнен", "Отменён"];
 
 function useIsNarrow() {

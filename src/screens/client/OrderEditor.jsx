@@ -11,9 +11,15 @@ import {
   formatMoney,
   getUnitMultiplier,
   getUnitPrice,
+  CATALOG_NARROW_MQ,
 } from "../../shared/appHelpers";
+import {
+  getEarliestDeliveryDateIso,
+  validateDeliveryDate,
+} from "../../shared/deliveryDateRules";
 import { ManagerContact } from "./ManagerContact";
 import { CustomItemForm } from "./CustomItemForm";
+import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
 
 function capitalizeRu(value) {
   if (!value) return "";
@@ -83,7 +89,11 @@ export function OrderEditor({
         }))
       : initialSource.customItems || []
   );
-  const [deliveryDate, setDeliveryDate] = useState(initialSource.firstDeliveryDate || "");
+  const [deliveryDate, setDeliveryDate] = useState(() => {
+    const initial = initialSource.firstDeliveryDate || "";
+    if (!initial) return "";
+    return validateDeliveryDate(initial).ok ? initial : "";
+  });
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [cartSheetOpen, setCartSheetOpen] = useState(false);
   const [addressId, setAddressId] = useState(initialSource.addressId || defaultAddress?.id || "");
@@ -93,10 +103,29 @@ export function OrderEditor({
   const summaryAddressFieldRef = useRef(null);
   const cartDateFieldRef = useRef(null);
   const cartAddressFieldRef = useRef(null);
+  const earliestDeliveryDate = getEarliestDeliveryDateIso();
 
   const updateDeliveryDate = (value) => {
+    if (!value) {
+      setDeliveryDate("");
+      return;
+    }
+    const check = validateDeliveryDate(value);
+    if (!check.ok) {
+      alert(check.message);
+      return;
+    }
     setDeliveryDate(value);
-    if (value) setMissingFields((current) => ({ ...current, date: false }));
+    setMissingFields((current) => ({ ...current, date: false }));
+  };
+
+  const handleCalendarPick = (result) => {
+    if (!result.ok) {
+      alert(result.message);
+      return;
+    }
+    updateDeliveryDate(result.value);
+    setDatePickerOpen(false);
   };
 
   const updateAddressId = (value) => {
@@ -109,7 +138,7 @@ export function OrderEditor({
     const isNarrow =
       typeof window !== "undefined" &&
       window.matchMedia &&
-      window.matchMedia("(max-width: 900px)").matches;
+      window.matchMedia(CATALOG_NARROW_MQ).matches;
 
     if (isNarrow) {
       setCartSheetOpen(true);
@@ -221,6 +250,12 @@ export function OrderEditor({
       if (dateMissing) return alert("Укажите дату доставки.");
       return alert("Укажите адрес доставки.");
     }
+    const dateCheck = validateDeliveryDate(deliveryDate);
+    if (!dateCheck.ok) {
+      focusMissingFields(true, false);
+      setDeliveryDate("");
+      return alert(dateCheck.message);
+    }
     setMissingFields({ date: false, address: false });
     onSave({
       items: selectedItems,
@@ -313,15 +348,8 @@ export function OrderEditor({
               ref={summaryDateFieldRef}
             >
               <span>Дата доставки</span>
-              <input
-                className="delivery-date-input-desktop"
-                type="date"
-                value={deliveryDate}
-                onChange={(e) => updateDeliveryDate(e.target.value)}
-                aria-invalid={missingFields.date}
-              />
               <button
-                className={`delivery-date-trigger${deliveryDateParts ? " is-selected" : ""}${missingFields.date ? " is-invalid" : ""}`}
+                className={`delivery-date-trigger delivery-date-trigger-desktop${deliveryDateParts ? " is-selected" : ""}${missingFields.date ? " is-invalid" : ""}`}
                 type="button"
                 onClick={() => setDatePickerOpen(true)}
                 aria-invalid={missingFields.date}
@@ -351,6 +379,9 @@ export function OrderEditor({
                   Выбрано: {deliveryDateParts.weekday}, {deliveryDateParts.monthYear}
                 </p>
               )}
+              <p className="muted small" style={{ marginTop: 6 }}>
+                Ближайшая доставка: с {earliestDeliveryDate.split("-").reverse().join(".")}. Воскресенье недоступно.
+              </p>
               {missingFields.date && (
                 <p className="field-error-hint">Укажите дату доставки</p>
               )}
@@ -677,15 +708,11 @@ export function OrderEditor({
                   </span>
                 </div>
               )}
-              <label className="field">
-                Выберите день
-                <input
-                  type="date"
-                  value={deliveryDate}
-                  onChange={(e) => updateDeliveryDate(e.target.value)}
-                  autoFocus
-                />
-              </label>
+              <DeliveryDateCalendar
+                value={deliveryDate}
+                earliestIso={earliestDeliveryDate}
+                onPick={handleCalendarPick}
+              />
             </div>
           </div>
         )}
