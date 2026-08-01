@@ -51,13 +51,44 @@ try {
     throw new Error("Уведомление не отмечено прочитанным.");
   }
 
+  const orderA = "ORDER-A";
+  const orderB = "ORDER-B";
+  await notifyManagers({
+    type: "new_order",
+    title: "Новый заказ A",
+    sourceId: orderA,
+    url: `/?managerTab=orders&order=${orderA}`,
+  });
+  await notifyManagers({
+    type: "order_changed",
+    title: "Изменён заказ A",
+    sourceId: `${orderA}:hash1`,
+    url: `/?managerTab=orders&order=${orderA}`,
+  });
+  await notifyManagers({
+    type: "new_order",
+    title: "Новый заказ B",
+    sourceId: orderB,
+    url: `/?managerTab=orders&order=${orderB}`,
+  });
+
+  const cleared = db.markManagerNotificationsReadForOrder(orderA);
+  if (cleared.changed !== 2) {
+    throw new Error(`Ожидали очистить 2 уведомления по заказу A, получили ${cleared.changed}.`);
+  }
+  const afterClear = db.listManagerNotifications({ unreadOnly: true });
+  const unreadSources = afterClear.map((item) => item.sourceId).sort();
+  if (unreadSources.join(",") !== orderB) {
+    throw new Error(`После очистки заказа A непрочитанными должны остаться только ${orderB}, получили: ${unreadSources.join(",") || "(пусто)"}`);
+  }
+
   const snapshot = db.exportDatabaseSnapshot();
-  if (!Array.isArray(snapshot.managerNotifications) || snapshot.managerNotifications.length !== 1) {
+  if (!Array.isArray(snapshot.managerNotifications) || snapshot.managerNotifications.length < 1) {
     throw new Error("Уведомления не вошли в резервную копию базы.");
   }
 
   db.importDatabaseSnapshot(snapshot);
-  if (db.listManagerNotifications().length !== 1) {
+  if (db.listManagerNotifications().length < 1) {
     throw new Error("Уведомления не восстановились из резервной копии.");
   }
 
@@ -66,7 +97,7 @@ try {
     throw new Error("Публичный статус каналов сформирован неверно.");
   }
 
-  console.log("Manager notifications verified: in-app, dedupe, read state, backup/restore, channel status.");
+  console.log("Manager notifications verified: in-app, dedupe, read state, clear-on-order, backup/restore, channel status.");
 } finally {
   // Windows can keep SQLite/WAL files locked briefly after the test.
   // Close the database explicitly and never fail a successful functional test

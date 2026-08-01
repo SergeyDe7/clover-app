@@ -49,6 +49,7 @@ import {
   listManagerNotifications,
   markManagerNotificationRead,
   markManagerNotificationsReadBySource,
+  markManagerNotificationsReadForOrder,
   markAllManagerNotificationsRead,
   listPasskeys,
   getPasskey,
@@ -166,6 +167,7 @@ import {
   findClientOrderMatrixViolations,
   isMatrixProductForLink,
 } from "./matrixGuard.js";
+import { matchesTextSearch } from "../../src/shared/appHelpers.js";
 
 const app = express();
 const ONE_C_STATE_KEY = "oneCIntegration";
@@ -3702,7 +3704,7 @@ app.get(
     const clientLinks = getGlobalState("clientLinks", {});
     const items = normalizeOneCClients(getGlobalState("oneCClients", []));
     const meta = getGlobalState("oneCClientsMeta", {});
-    const search = String(req.query.search || "").trim().toLocaleLowerCase("ru-RU");
+    const search = String(req.query.search || "").trim();
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
     const offset = Math.max(0, Number(req.query.offset) || 0);
     const linksByOneCId = new Map(
@@ -3715,8 +3717,10 @@ app.get(
         }])
     );
     const filtered = search
-      ? items.filter((item) => `${item.name} ${item.code} ${item.id} ${item.inn} ${item.phone} ${item.email}`
-          .toLocaleLowerCase("ru-RU").includes(search))
+      ? items.filter((item) => matchesTextSearch(
+          `${item.name} ${item.code} ${item.id} ${item.inn} ${item.phone} ${item.email}`,
+          search
+        ))
       : items;
 
     res.json({
@@ -4136,12 +4140,19 @@ app.post(
       updatedAt: attemptedAt,
     });
 
+    let notificationsCleared = { changed: 0, readAt: "" };
+    if (validation.ready) {
+      // Очередь уведомлений в ЛК менеджера: new_order и связанные по этому заказу.
+      notificationsCleared = markManagerNotificationsReadForOrder(order.id);
+    }
+
     auditFromRequest(req, validation.ready ? "exchange.send.test" : "exchange.send.error", {
       orderId: order.id,
       orderNumber: order.number,
       queued: validation.ready,
       issues: validation.issues,
       attempts: exchange.attempts,
+      notificationsCleared: notificationsCleared.changed,
     });
 
     res.status(validation.ready ? 200 : 422).json({
@@ -4152,6 +4163,8 @@ app.post(
       exchange,
       testMode: true,
       queued: validation.ready,
+      notificationsCleared: notificationsCleared.changed,
+      managerNotifications: listManagerNotifications({ limit: 100 }),
     });
   }
 );

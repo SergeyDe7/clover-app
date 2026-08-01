@@ -18,6 +18,8 @@ import {
   getOrderTotal,
   getPositionCount,
   statusClass,
+  matchesTextSearch,
+  buildOrderSearchHaystack,
 } from "../../shared/appHelpers";
 
 const CUSTOM_STATUSES = [
@@ -28,7 +30,7 @@ const CUSTOM_STATUSES = [
   "Отклонён",
 ];
 
-export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onCreateProductFromCustom, onReload, headerSearch = "" }) {
+export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onCreateProductFromCustom, onReload, onApplyManagerNotifications, headerSearch = "", clientLinks = {} }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Все");
   const [exchangeFilter, setExchangeFilter] = useState("all");
@@ -40,11 +42,12 @@ export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrd
   const effectiveSearch = headerSearch.trim() || search;
 
   const visible = useMemo(() => {
-    const needle = effectiveSearch.trim().toLowerCase();
+    const needle = effectiveSearch.trim();
     return [...orders].filter((order) => {
       const exchange = normalizeOrderExchange(order.exchange);
-      const haystack = `${order.number} ${order.externalId || ""} ${order.customerName} ${order.customerContact} ${order.customerPhone} ${order.customerEmail} ${order.address}`.toLowerCase();
-      return (!needle || haystack.includes(needle))
+      const link = clientLinks[order.clientId] || {};
+      const haystack = buildOrderSearchHaystack(order, link);
+      return (!needle || matchesTextSearch(haystack, needle))
         && (status === "Все" || order.status === status)
         && (exchangeFilter === "all" || exchange.status === exchangeFilter);
     }).sort((a, b) => {
@@ -52,7 +55,7 @@ export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrd
       if (sort === "oldest") return String(a.createdAt).localeCompare(String(b.createdAt));
       return String(b.createdAt).localeCompare(String(a.createdAt));
     });
-  }, [orders, effectiveSearch, status, exchangeFilter, sort]);
+  }, [orders, effectiveSearch, status, exchangeFilter, sort, clientLinks]);
 
   const runExchangeAction = async (order, action) => {
     setBusyOrderId(order.id);
@@ -64,6 +67,9 @@ export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrd
           : (result.validation?.issues || []).join("\n"));
       } else if (action === "send") {
         const result = await api.sendExchangeOrder(order.id);
+        if (Array.isArray(result.managerNotifications)) {
+          onApplyManagerNotifications?.(result.managerNotifications);
+        }
         alert(result.exchange?.message || "Тестовая передача выполнена.");
       } else if (action === "reset") {
         await api.resetExchangeOrder(order.id);
@@ -135,7 +141,10 @@ export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrd
           if (action === "check") await api.checkExchangeOrder(orderId);
           if (action === "send") {
             await api.checkExchangeOrder(orderId);
-            await api.sendExchangeOrder(orderId);
+            const result = await api.sendExchangeOrder(orderId);
+            if (Array.isArray(result.managerNotifications)) {
+              onApplyManagerNotifications?.(result.managerNotifications);
+            }
           }
         } catch (error) {
           errors.push(error.message);
@@ -155,7 +164,15 @@ export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrd
     <section>
       <div className="toolbar four">
         {!headerSearch.trim() && (
-          <input type="search" placeholder="Поиск по заказу, клиенту, телефону или ID" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <div className="manager-search-block">
+            <input
+              type="search"
+              placeholder="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
+            />
+          </div>
         )}
         <select value={status} onChange={(e) => setStatus(e.target.value)}><option>Все</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
         <select value={exchangeFilter} onChange={(e) => setExchangeFilter(e.target.value)}><option value="all">Все статусы 1С</option>{Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select>

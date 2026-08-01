@@ -1133,6 +1133,31 @@ export function markManagerNotificationsReadBySource(type, sourceId) {
   return { changed: Number(result.changes || 0), readAt };
 }
 
+/**
+ * Пометить прочитанными все непрочитанные уведомления менеджера по заказу:
+ * new_order (source_id = orderId) и связанные (source_id = orderId:…).
+ * Вызывается после «Передать в 1С», чтобы очередь в колокольчике исчезла.
+ */
+export function markManagerNotificationsReadForOrder(orderId) {
+  const normalizedOrderId = String(orderId || "").trim();
+  if (!normalizedOrderId) {
+    return { changed: 0, readAt: "" };
+  }
+  const readAt = now();
+  // source_id вида "uuid" или "uuid:…" — экранируем % и _ для LIKE.
+  const likePrefix = `${normalizedOrderId.replace(/([%_\\])/g, "\\$1")}:%`;
+  const result = db.prepare(`
+    UPDATE manager_notifications
+    SET read_at = ?
+    WHERE read_at = ''
+      AND (
+        source_id = ?
+        OR source_id LIKE ? ESCAPE '\\'
+      )
+  `).run(readAt, normalizedOrderId, likePrefix);
+  return { changed: Number(result.changes || 0), readAt };
+}
+
 export function markAllManagerNotificationsRead() {
   const readAt = now();
   const result = db.prepare(`

@@ -1184,6 +1184,7 @@ function App() {
         onClearOrders={clearOrders}
         onResetAll={resetAll}
         onReload={() => loadBootstrap({ silent: true })}
+        onApplyManagerNotifications={applyManagerNotificationList}
         onLogout={logout}
       />
     );

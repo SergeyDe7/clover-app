@@ -1,5 +1,5 @@
 // Редактор заказа клиента: каталог, корзина и оформление.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Header, CustomRequestPhoto } from "../../shared/SharedPanels";
 import {
   UNIT_CONFIG,
@@ -85,8 +85,45 @@ export function OrderEditor({
   );
   const [deliveryDate, setDeliveryDate] = useState(initialSource.firstDeliveryDate || "");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [cartSheetOpen, setCartSheetOpen] = useState(false);
   const [addressId, setAddressId] = useState(initialSource.addressId || defaultAddress?.id || "");
   const [clientComment, setClientComment] = useState(initialSource.clientComment || "");
+  const [missingFields, setMissingFields] = useState({ date: false, address: false });
+  const summaryDateFieldRef = useRef(null);
+  const summaryAddressFieldRef = useRef(null);
+  const cartDateFieldRef = useRef(null);
+  const cartAddressFieldRef = useRef(null);
+
+  const updateDeliveryDate = (value) => {
+    setDeliveryDate(value);
+    if (value) setMissingFields((current) => ({ ...current, date: false }));
+  };
+
+  const updateAddressId = (value) => {
+    setAddressId(value);
+    if (value) setMissingFields((current) => ({ ...current, address: false }));
+  };
+
+  const focusMissingFields = (dateMissing, addressMissing) => {
+    setMissingFields({ date: dateMissing, address: addressMissing });
+    const isNarrow =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(max-width: 900px)").matches;
+
+    if (isNarrow) {
+      setCartSheetOpen(true);
+    }
+
+    window.setTimeout(() => {
+      const target = dateMissing
+        ? (isNarrow ? cartDateFieldRef.current : summaryDateFieldRef.current)
+        : (isNarrow ? cartAddressFieldRef.current : summaryAddressFieldRef.current);
+      if (target && typeof target.scrollIntoView === "function") {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, isNarrow ? 80 : 0);
+  };
 
   const categories = useMemo(() => ["Все", ...new Set(products.map((item) => item.category))], [products]);
   const filtered = useMemo(() => {
@@ -124,6 +161,7 @@ export function OrderEditor({
     }), [products, cart, units]);
 
   const total = selectedItems.reduce((sum, item) => sum + item.lineTotal, 0) + customItems.reduce((sum, item) => sum + (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0), 0);
+  const cartCount = selectedItems.length + customItems.length;
   const selectedAddress = addresses.find((item) => item.id === addressId);
   const deliveryDateParts = getDeliveryDateParts(deliveryDate);
 
@@ -148,10 +186,42 @@ export function OrderEditor({
     });
   };
 
-  const submit = (event) => {
-    event.preventDefault();
-    if (!selectedItems.length && !customItems.length) return alert("Добавьте хотя бы один товар.");
-    if (!deliveryDate || !selectedAddress) return alert("Укажите дату и адрес доставки.");
+  const setItemQuantity = (id, value) => {
+    const nextValue = Math.max(0, Number.parseInt(value, 10) || 0);
+    setCart((current) => {
+      const next = { ...current };
+      if (nextValue) next[id] = nextValue; else delete next[id];
+      return next;
+    });
+  };
+
+  const changeCustomQuantity = (id, delta) => {
+    setCustomItems((current) =>
+      current
+        .map((item) => {
+          if (item.id !== id) return item;
+          const quantity = Math.max(0, (Number(item.quantity) || 0) + delta);
+          return { ...item, quantity };
+        })
+        .filter((item) => Number(item.quantity) > 0)
+    );
+  };
+
+  const submitOrder = () => {
+    if (!selectedItems.length && !customItems.length) {
+      return alert("Добавьте хотя бы один товар.");
+    }
+    const dateMissing = !deliveryDate;
+    const addressMissing = !selectedAddress;
+    if (dateMissing || addressMissing) {
+      focusMissingFields(dateMissing, addressMissing);
+      if (dateMissing && addressMissing) {
+        return alert("Укажите дату и адрес доставки.");
+      }
+      if (dateMissing) return alert("Укажите дату доставки.");
+      return alert("Укажите адрес доставки.");
+    }
+    setMissingFields({ date: false, address: false });
     onSave({
       items: selectedItems,
       customItems,
@@ -162,6 +232,12 @@ export function OrderEditor({
       clientComment: clientComment.trim(),
     });
     localStorage.removeItem(STORAGE.draft);
+    setCartSheetOpen(false);
+  };
+
+  const submit = (event) => {
+    event.preventDefault();
+    submitOrder();
   };
 
   const catalogBody = (
@@ -176,9 +252,9 @@ export function OrderEditor({
                   ? "Повтор заказа"
                   : "Новый заказ"}
             </h1>
-            <p>Сверху — заказ и оформление, ниже — каталог товаров.</p>
+            <p className="catalog-lead">Сверху — заказ и оформление, ниже — каталог товаров.</p>
           </div>
-          <div className="mini-card"><span className="mini-label">Позиций</span><strong>{selectedItems.length + customItems.length}</strong></div>
+          <div className="mini-card"><span className="mini-label">Позиций</span><strong>{cartCount}</strong></div>
         </div>
 
         {catalogPolicy.matrixMode === "pending" && (
@@ -232,18 +308,23 @@ export function OrderEditor({
               </div>
             )}
 
-            <div className="field delivery-date-field">
+            <div
+              className={`field delivery-date-field${missingFields.date ? " is-invalid" : ""}`}
+              ref={summaryDateFieldRef}
+            >
               <span>Дата доставки</span>
               <input
                 className="delivery-date-input-desktop"
                 type="date"
                 value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
+                onChange={(e) => updateDeliveryDate(e.target.value)}
+                aria-invalid={missingFields.date}
               />
               <button
-                className={`delivery-date-trigger${deliveryDateParts ? " is-selected" : ""}`}
+                className={`delivery-date-trigger${deliveryDateParts ? " is-selected" : ""}${missingFields.date ? " is-invalid" : ""}`}
                 type="button"
                 onClick={() => setDatePickerOpen(true)}
+                aria-invalid={missingFields.date}
               >
                 {deliveryDateParts ? (
                   <>
@@ -270,12 +351,28 @@ export function OrderEditor({
                   Выбрано: {deliveryDateParts.weekday}, {deliveryDateParts.monthYear}
                 </p>
               )}
+              {missingFields.date && (
+                <p className="field-error-hint">Укажите дату доставки</p>
+              )}
             </div>
-            <label className="field" style={{ marginTop: 10 }}>Адрес доставки
-              <select value={addressId} onChange={(e) => setAddressId(e.target.value)} required>
+            <label
+              className={`field${missingFields.address ? " is-invalid" : ""}`}
+              style={{ marginTop: 10 }}
+              ref={summaryAddressFieldRef}
+            >
+              Адрес доставки
+              <select
+                value={addressId}
+                onChange={(e) => updateAddressId(e.target.value)}
+                required
+                aria-invalid={missingFields.address}
+              >
                 <option value="">Выберите адрес</option>
                 {addresses.map((item) => <option value={item.id} key={item.id}>{item.label}{item.isDefault ? " — основной" : ""} · {item.address}</option>)}
               </select>
+              {missingFields.address && (
+                <span className="field-error-hint">Укажите адрес доставки</span>
+              )}
             </label>
             <label className="field" style={{ marginTop: 10 }}>Комментарий к заказу
               <textarea rows="3" placeholder="Например: позвонить перед доставкой" value={clientComment} onChange={(e) => setClientComment(e.target.value)} />
@@ -289,7 +386,18 @@ export function OrderEditor({
             <div className="catalog-toolbar">
               <div className="catalog-filter-row">
                 <input className="catalog-search" type="search" placeholder="Поиск по названию или коду" value={search} onChange={(e) => setSearch(e.target.value)} />
-                {settings.showFavorites && <button className={favoritesOnly ? "category-button active" : "category-button"} type="button" onClick={() => setFavoritesOnly((value) => !value)}>★ Избранное</button>}
+                {settings.showFavorites && (
+                  <button
+                    className={favoritesOnly ? "category-button active" : "category-button"}
+                    type="button"
+                    onClick={() => setFavoritesOnly((value) => !value)}
+                    aria-label="Избранное"
+                    title="Избранное"
+                  >
+                    <span className="fav-label-full">★ Избранное</span>
+                    <span className="fav-label-short">★</span>
+                  </button>
+                )}
               </div>
               <div className="category-list">
                 {categories.map((item) => <button className={category === item ? "category-button active" : "category-button"} type="button" key={item} onClick={() => setCategory(item)}>{item}</button>)}
@@ -322,16 +430,29 @@ export function OrderEditor({
                         ? <>{formatMoney(price)} <small>/ {UNIT_CONFIG[unit].shortLabel}</small></>
                         : "Цена уточняется"}
                     </p>
-                    <div className="unit-choice">
-                      {UNIT_ORDER.filter((item) => product.saleUnits.includes(item)).map((item) => (
-                        <button className={unit === item ? "active" : ""} type="button" key={item} onClick={() => setUnits((current) => ({ ...current, [product.id]: item }))}>{UNIT_CONFIG[item].label}</button>
-                      ))}
-                    </div>
-                    <p className="unit-hint">{multiplier > 1 ? `1 ${UNIT_CONFIG[unit].label.toLowerCase()} = ${multiplier} шт.` : "Количество считается поштучно"}</p>
-                    <div className="quantity-control">
-                      <button type="button" onClick={() => changeQuantity(product.id, -1)}>−</button>
-                      <div className="quantity-input-wrap"><input className="quantity-input" type="number" min="0" value={quantity || ""} placeholder="0" onChange={(e) => setCart((current) => ({ ...current, [product.id]: Math.max(0, Number.parseInt(e.target.value, 10) || 0) }))} /><small>{UNIT_CONFIG[unit].shortLabel}</small></div>
-                      <button type="button" onClick={() => changeQuantity(product.id, 1)}>+</button>
+                    <div className="product-card-controls">
+                      <div className="unit-choice">
+                        {UNIT_ORDER.filter((item) => product.saleUnits.includes(item)).map((item) => (
+                          <button className={unit === item ? "active" : ""} type="button" key={item} onClick={() => setUnits((current) => ({ ...current, [product.id]: item }))}>{UNIT_CONFIG[item].label}</button>
+                        ))}
+                      </div>
+                      <p className="unit-hint">{multiplier > 1 ? `1 ${UNIT_CONFIG[unit].label.toLowerCase()} = ${multiplier} шт.` : "Количество считается поштучно"}</p>
+                      <div className="quantity-control">
+                        <button type="button" onClick={() => changeQuantity(product.id, -1)} aria-label="Уменьшить">−</button>
+                        <div className="quantity-input-wrap">
+                          <input
+                            className="quantity-input"
+                            type="number"
+                            min="0"
+                            inputMode="numeric"
+                            value={quantity || ""}
+                            placeholder="0"
+                            onChange={(e) => setItemQuantity(product.id, e.target.value)}
+                          />
+                          <small>{UNIT_CONFIG[unit].shortLabel}</small>
+                        </div>
+                        <button type="button" onClick={() => changeQuantity(product.id, 1)} aria-label="Увеличить">+</button>
+                      </div>
                     </div>
                   </article>
                 );
@@ -344,22 +465,193 @@ export function OrderEditor({
 
         <div className="mobile-checkout-bar" aria-label="Быстрое оформление">
           <div className="mobile-checkout-bar-info">
-            <strong>{selectedItems.length + customItems.length} поз.</strong>
+            <strong>{cartCount} поз.</strong>
             <span>{settings.showPrices && total > 0 ? formatMoney(total) : "Сумма уточняется"}</span>
           </div>
           <button
+            className="mobile-checkout-bar-cart"
+            type="button"
+            onClick={() => setCartSheetOpen(true)}
+          >
+            Корзина
+          </button>
+          <button
             className="mobile-checkout-bar-button"
             type="button"
-            onClick={() => {
-              const form = document.getElementById("order-summary");
-              if (!form) return;
-              if (typeof form.requestSubmit === "function") form.requestSubmit();
-              else form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-            }}
+            onClick={submitOrder}
           >
             {session.mode === "edit" ? "Сохранить" : "Оформить"}
           </button>
         </div>
+
+        {cartSheetOpen && (
+          <div className="cart-sheet" role="dialog" aria-modal="true" aria-label="Корзина заказа">
+            <button
+              className="cart-sheet-backdrop"
+              type="button"
+              aria-label="Закрыть корзину"
+              onClick={() => setCartSheetOpen(false)}
+            />
+            <div className="cart-sheet-panel">
+              <div className="cart-sheet-head">
+                <div>
+                  <strong>Корзина</strong>
+                  <p className="muted small">{cartCount ? `${cartCount} поз.` : "Пока пусто"}</p>
+                </div>
+                <button className="header-button" type="button" onClick={() => setCartSheetOpen(false)}>
+                  Закрыть
+                </button>
+              </div>
+
+              {!cartCount ? (
+                <p className="summary-empty">Добавьте товары из каталога — они появятся здесь для быстрой правки.</p>
+              ) : (
+                <div className="cart-sheet-list">
+                  {selectedItems.map((item) => (
+                    <div className="cart-sheet-item" key={item.productId}>
+                      <div className="cart-sheet-item-main">
+                        <strong>{item.name}</strong>
+                        <small>
+                          {UNIT_CONFIG[item.unit].label}
+                          {item.multiplier > 1 ? ` · ${item.quantity * item.multiplier} шт. всего` : ""}
+                          {settings.showPrices && item.lineTotal > 0 ? ` · ${formatMoney(item.lineTotal)}` : ""}
+                        </small>
+                        <div className="unit-choice cart-sheet-units">
+                          {UNIT_ORDER.filter((unitId) => {
+                            const product = products.find((row) => String(row.id) === String(item.productId));
+                            return product?.saleUnits?.includes(unitId);
+                          }).map((unitId) => (
+                            <button
+                              className={item.unit === unitId ? "active" : ""}
+                              type="button"
+                              key={unitId}
+                              onClick={() => setUnits((current) => ({ ...current, [item.productId]: unitId }))}
+                            >
+                              {UNIT_CONFIG[unitId].label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="quantity-control cart-sheet-qty">
+                        <button type="button" onClick={() => changeQuantity(item.productId, -1)} aria-label="Уменьшить">−</button>
+                        <div className="quantity-input-wrap">
+                          <input
+                            className="quantity-input"
+                            type="number"
+                            min="0"
+                            inputMode="numeric"
+                            value={item.quantity || ""}
+                            onChange={(e) => setItemQuantity(item.productId, e.target.value)}
+                          />
+                          <small>{UNIT_CONFIG[item.unit].shortLabel}</small>
+                        </div>
+                        <button type="button" onClick={() => changeQuantity(item.productId, 1)} aria-label="Увеличить">+</button>
+                      </div>
+                    </div>
+                  ))}
+                  {customItems.map((item) => (
+                    <div className="cart-sheet-item" key={item.id}>
+                      <div className="cart-sheet-item-main">
+                        <strong>{item.name}</strong>
+                        <small>Товар вне матрицы · {item.unit || "шт."}</small>
+                      </div>
+                      <div className="quantity-control cart-sheet-qty">
+                        <button type="button" onClick={() => changeCustomQuantity(item.id, -1)} aria-label="Уменьшить">−</button>
+                        <div className="quantity-input-wrap">
+                          <input
+                            className="quantity-input"
+                            type="number"
+                            min="0"
+                            inputMode="numeric"
+                            value={item.quantity || ""}
+                            onChange={(e) => {
+                              const quantity = Math.max(0, Number.parseInt(e.target.value, 10) || 0);
+                              setCustomItems((current) =>
+                                current
+                                  .map((row) => (row.id === item.id ? { ...row, quantity } : row))
+                                  .filter((row) => Number(row.quantity) > 0)
+                              );
+                            }}
+                          />
+                          <small>{item.unit || "шт."}</small>
+                        </div>
+                        <button type="button" onClick={() => changeCustomQuantity(item.id, 1)} aria-label="Увеличить">+</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div
+                className={`field delivery-date-field cart-sheet-date${missingFields.date ? " is-invalid" : ""}`}
+                ref={cartDateFieldRef}
+              >
+                <span>Дата доставки</span>
+                <button
+                  className={`delivery-date-trigger${deliveryDateParts ? " is-selected" : ""}${missingFields.date ? " is-invalid" : ""}`}
+                  type="button"
+                  onClick={() => setDatePickerOpen(true)}
+                  aria-invalid={missingFields.date}
+                >
+                  {deliveryDateParts ? (
+                    <>
+                      <span className="delivery-date-day" aria-hidden="true">{deliveryDateParts.day}</span>
+                      <span className="delivery-date-text">
+                        <strong>{deliveryDateParts.weekday}</strong>
+                        <small>{deliveryDateParts.monthYear}</small>
+                      </span>
+                      <span className="delivery-date-action">Изменить</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="delivery-date-day is-empty" aria-hidden="true">—</span>
+                      <span className="delivery-date-text">
+                        <strong>Выберите дату</strong>
+                        <small>Когда привезти заказ</small>
+                      </span>
+                      <span className="delivery-date-action">Календарь</span>
+                    </>
+                  )}
+                </button>
+                {missingFields.date && (
+                  <p className="field-error-hint">Укажите дату доставки</p>
+                )}
+              </div>
+
+              <label
+                className={`field cart-sheet-address${missingFields.address ? " is-invalid" : ""}`}
+                ref={cartAddressFieldRef}
+              >
+                Адрес доставки
+                <select
+                  value={addressId}
+                  onChange={(e) => updateAddressId(e.target.value)}
+                  aria-invalid={missingFields.address}
+                >
+                  <option value="">Выберите адрес</option>
+                  {addresses.map((item) => (
+                    <option value={item.id} key={item.id}>
+                      {item.label}{item.isDefault ? " — основной" : ""} · {item.address}
+                    </option>
+                  ))}
+                </select>
+                {missingFields.address && (
+                  <span className="field-error-hint">Укажите адрес доставки</span>
+                )}
+              </label>
+
+              <div className="cart-sheet-footer">
+                <div className="cart-sheet-total">
+                  <span>Итого</span>
+                  <strong>{settings.showPrices && total > 0 ? formatMoney(total) : `${cartCount} поз.`}</strong>
+                </div>
+                <button className="save-order-button" type="button" onClick={submitOrder}>
+                  {session.mode === "edit" ? "Сохранить изменения" : "Оформить заказ"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {datePickerOpen && (
           <div className="delivery-date-sheet" role="dialog" aria-modal="true" aria-label="Дата доставки">
@@ -390,7 +682,7 @@ export function OrderEditor({
                 <input
                   type="date"
                   value={deliveryDate}
-                  onChange={(e) => setDeliveryDate(e.target.value)}
+                  onChange={(e) => updateDeliveryDate(e.target.value)}
                   autoFocus
                 />
               </label>
@@ -407,7 +699,7 @@ export function OrderEditor({
   return (
     <main className="clover-app">
       <Header title={session.mode === "edit" ? "Редактирование заказа" : session.mode === "repeat" ? "Повтор заказа" : "Новый заказ"}>
-        <ManagerContact settings={settings} profile={profile} orders={orders} />
+        <ManagerContact settings={settings} />
         <button className="header-button" type="button" onClick={onClose}>← В кабинет</button>
       </Header>
       {catalogBody}

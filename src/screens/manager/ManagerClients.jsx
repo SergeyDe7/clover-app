@@ -1,5 +1,5 @@
 // Раздел менеджера: клиенты, матрицы товаров и связи с 1С.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../serverApi";
 import { PanelErrorBoundary } from "../../shared/SharedPanels";
 import {
@@ -15,6 +15,9 @@ import {
   formatMoney,
   formatDateTime,
   normalizeProduct,
+  matchesTextSearch,
+  buildClientSearchHaystack,
+  buildOrderSearchHaystack,
 } from "../../shared/appHelpers";
 
 function OneCClientPicker({ client, link, onChange }) {
@@ -659,6 +662,7 @@ function ClientCardMenu({ open, onToggle, onClose, items = [] }) {
 
 export function ManagerClients({
   clients,
+  orders = [],
   products,
   setProducts,
   clientLinks,
@@ -675,6 +679,17 @@ export function ManagerClients({
   const [openMenuId, setOpenMenuId] = useState("");
   const [profileOpenId, setProfileOpenId] = useState("");
   const restoredOpenClient = useRef(false);
+
+  const ordersByClientId = useMemo(() => {
+    const map = {};
+    for (const order of orders) {
+      const clientId = order?.clientId;
+      if (!clientId) continue;
+      if (!map[clientId]) map[clientId] = [];
+      map[clientId].push(order);
+    }
+    return map;
+  }, [orders]);
 
   useEffect(() => {
     if (restoredOpenClient.current || !openClientId) return;
@@ -702,11 +717,17 @@ export function ManagerClients({
     }
   };
 
-  const visible = clients.filter((client) =>
-    `${client.companyName} ${client.contactName} ${client.phone} ${client.email}`
-      .toLowerCase()
-      .includes(search.trim().toLowerCase())
-  );
+  const visible = clients.filter((client) => {
+    const needle = search.trim();
+    if (!needle) return true;
+    const link = clientLinks[client.id] || {};
+    if (matchesTextSearch(buildClientSearchHaystack(client, link), needle)) {
+      return true;
+    }
+    return (ordersByClientId[client.id] || []).some((order) =>
+      matchesTextSearch(buildOrderSearchHaystack(order, link), needle)
+    );
+  });
 
   const updateLink = (clientId, patch) => {
     setClientLinks((current) => ({
@@ -872,12 +893,15 @@ export function ManagerClients({
     <PanelErrorBoundary label="Ошибка раздела «Клиенты»">
     <section>
       <div className="toolbar two">
-        <input
-          type="search"
-          placeholder="Поиск клиента"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
+        <div className="manager-search-block">
+          <input
+            type="search"
+            placeholder="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            aria-label="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
+          />
+        </div>
         <div className="mini-card">
           <span className="mini-label">Клиентов</span>
           <strong>{clients.length}</strong>

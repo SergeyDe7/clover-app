@@ -11,7 +11,7 @@ import {
 } from "../../shared/appHelpers";
 import { AUDIT_ACTION_LABELS } from "./ManagerAudit";
 
-export function ManagerExchange({ onReload, onNavigate }) {
+export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavigate }) {
   const [data, setData] = useState(null);
   const [oneC, setOneC] = useState(null);
   const [configForm, setConfigForm] = useState({
@@ -115,6 +115,9 @@ export function ManagerExchange({ onReload, onNavigate }) {
       if (type === "send") {
         await api.checkExchangeOrder(row.id);
         result = await api.sendExchangeOrder(row.id);
+        if (Array.isArray(result?.managerNotifications)) {
+          onApplyManagerNotifications?.(result.managerNotifications);
+        }
       }
       if (type === "draft") {
         await api.checkExchangeOrder(row.id);
