@@ -21,7 +21,7 @@ import { ManagerBackup } from "./ManagerBackup";
 import { ManagerAudit } from "./ManagerAudit";
 import { managerNotificationTab, ManagerNotificationBell } from "./ManagerNotifications";
 
-function ManagerDashboard({ authUser, orders, products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onLogout }) {
+function ManagerDashboard({ authUser, orders, products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onLogout }) {
   const [tab, setTab] = useState(readManagerActiveTab);
   const [moreTab, setMoreTab] = useState(readManagerMoreTab);
   const [headerSearch, setHeaderSearch] = useState("");
@@ -104,13 +104,13 @@ function ManagerDashboard({ authUser, orders, products, setProducts, profile, ad
         <input
           className="manager-search-input"
           type="search"
-          placeholder="Поиск заказов…"
+          placeholder="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
           value={headerSearch}
           onChange={(e) => {
             setHeaderSearch(e.target.value);
             if (tab !== "orders") selectTab("orders");
           }}
-          aria-label="Поиск заказов"
+          aria-label="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
         />
         <ManagerNotificationBell
           notifications={managerNotifications}
@@ -149,9 +149,9 @@ function ManagerDashboard({ authUser, orders, products, setProducts, profile, ad
         <article className="stat-card"><span>Непрочитано</span><strong>{unreadCount}</strong></article>
       </div>
       <nav className="manager-nav">{MANAGER_TABS.map(([id,label]) => <button className={[tab === id ? "active" : "", id === "more" ? "nav-service" : ""].filter(Boolean).join(" ")} type="button" key={id} onClick={() => selectTab(id)}>{label}</button>)}</nav>
-      {tab === "orders" && <ManagerOrders orders={orders} settings={settings} onUpdateOrder={onUpdateOrder} onBulkUpdateOrders={onBulkUpdateOrders} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} onReload={onReload} headerSearch={headerSearch} />}
-      {tab === "exchange" && <ManagerExchange onReload={onReload} onNavigate={selectTab} />}
-      {tab === "clients" && <ManagerClients clients={clients} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} onReload={onReload} />}
+      {tab === "orders" && <ManagerOrders orders={orders} settings={settings} clientLinks={clientLinks} onUpdateOrder={onUpdateOrder} onBulkUpdateOrders={onBulkUpdateOrders} onDeleteOrder={onDeleteOrder} onCreateProductFromCustom={onCreateProductFromCustom} onReload={onReload} onApplyManagerNotifications={onApplyManagerNotifications} headerSearch={headerSearch} />}
+      {tab === "exchange" && <ManagerExchange onReload={onReload} onApplyManagerNotifications={onApplyManagerNotifications} onNavigate={selectTab} />}
+      {tab === "clients" && <ManagerClients clients={clients} orders={orders} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} onReload={onReload} />}
       {tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}
       {tab === "more" && (
         <section>

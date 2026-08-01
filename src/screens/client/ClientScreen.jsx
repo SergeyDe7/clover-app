@@ -1,6 +1,5 @@
 // Экран клиента: заказ, история, кабинет.
 import { useEffect, useState } from "react";
-import { ORDER_STATUSES } from "../../config/orderConfig";
 import {
   OrderTimeline,
   Header,
@@ -10,8 +9,12 @@ import {
 } from "../../shared/SharedPanels";
 import {
   CLIENT_TABS,
+  CLIENT_CABINET_SECTIONS,
   writeClientActiveTab,
+  readClientCabinetSection,
+  writeClientCabinetSection,
   clientTabFromSection,
+  clientCabinetSectionFromQuery,
   UNIT_CONFIG,
   formatDate,
   formatDateTime,
@@ -26,6 +29,27 @@ import { AddressesPanel } from "./AddressesPanel";
 import { OrderEditor } from "./OrderEditor";
 import { ReconciliationPanel } from "./ReconciliationPanel";
 import { ClientMatrixPanel } from "./ClientMatrixPanel";
+
+const NARROW_MQ = "(max-width: 820px)";
+const ORDER_HISTORY_FILTERS = ["Активные", "Все", "Выполнен", "Отменён"];
+
+function useIsNarrow() {
+  const [isNarrow, setIsNarrow] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia(NARROW_MQ).matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const media = window.matchMedia(NARROW_MQ);
+    const onChange = () => setIsNarrow(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  return isNarrow;
+}
 
 function ClientDashboard({
   profile,
@@ -56,7 +80,9 @@ function ClientDashboard({
   canCreateOrder,
   profileComplete,
 }) {
+  const isNarrow = useIsNarrow();
   const [tab, setTab] = useState("home");
+  const [cabinetSection, setCabinetSection] = useState(readClientCabinetSection);
   const [filter, setFilter] = useState("Активные");
   const active = orders.filter(
     (order) => !["Выполнен", "Отменён"].includes(order.status)
@@ -70,11 +96,34 @@ function ClientDashboard({
   const orderSession = catalogSession || { mode: "new" };
   const orderEditorKey = `${orderSession.mode}-${orderSession.order?.id || "new"}`;
 
+  const selectCabinetSection = (id) => {
+    setCabinetSection(id);
+    writeClientCabinetSection(id);
+  };
+
+  const openOrders = () => {
+    if (isNarrow) {
+      setTab("cabinet");
+      writeClientActiveTab("cabinet");
+      selectCabinetSection("history");
+      return;
+    }
+    setTab("orders");
+    writeClientActiveTab("orders");
+  };
+
   const selectTab = (id) => {
+    if (isNarrow && id === "orders") {
+      openOrders();
+      return;
+    }
     setTab(id);
     writeClientActiveTab(id);
     if (id === "home") {
       onNew?.({ silent: true });
+    }
+    if (id === "cabinet" && isNarrow && !cabinetSection) {
+      selectCabinetSection("history");
     }
   };
 
@@ -95,10 +144,29 @@ function ClientDashboard({
 
     if (orderId || section) {
       const mapped = orderId ? "orders" : clientTabFromSection(section);
-      if (mapped) {
+      const cabinetMapped =
+        orderId
+          ? "history"
+          : clientCabinetSectionFromQuery(section) || readClientCabinetSection();
+
+      if (mapped === "orders" || mapped === "cabinet") {
+        if (window.matchMedia?.(NARROW_MQ).matches && (mapped === "orders" || orderId)) {
+          setTab("cabinet");
+          writeClientActiveTab("cabinet");
+          selectCabinetSection("history");
+        } else if (mapped === "cabinet") {
+          setTab("cabinet");
+          writeClientActiveTab("cabinet");
+          if (cabinetMapped) selectCabinetSection(cabinetMapped);
+        } else if (mapped) {
+          setTab(mapped);
+          writeClientActiveTab(mapped);
+        }
+      } else if (mapped) {
         setTab(mapped);
         writeClientActiveTab(mapped);
       }
+
       const targetId = orderId
         ? `order-${orderId}`
         : section === "reconciliation"
@@ -119,11 +187,35 @@ function ClientDashboard({
     return undefined;
   }, []);
 
+  useEffect(() => {
+    if (!isNarrow && tab === "cabinet" && cabinetSection === "history") {
+      setTab("orders");
+      writeClientActiveTab("orders");
+    }
+    if (isNarrow && tab === "orders") {
+      setTab("cabinet");
+      writeClientActiveTab("cabinet");
+      selectCabinetSection("history");
+    }
+  }, [isNarrow]);
+
+  const primaryTabs = isNarrow
+    ? [
+        ["home", "Заказ"],
+        ["cabinet", "Кабинет"],
+      ]
+    : CLIENT_TABS;
+
   const navButtons = (
     <>
-      {CLIENT_TABS.map(([id, label]) => (
+      {primaryTabs.map(([id, label]) => (
         <button
-          className={[tab === id ? "active" : "", id === "cabinet" ? "nav-service" : ""].filter(Boolean).join(" ")}
+          className={[
+            tab === id ? "active" : "",
+            id === "cabinet" ? "nav-service" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
           type="button"
           key={id}
           onClick={() => selectTab(id)}
@@ -133,6 +225,323 @@ function ClientDashboard({
         </button>
       ))}
     </>
+  );
+
+  const ordersPanel = (
+    <section className="panel">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">История</p>
+          <h2>Мои заказы</h2>
+          <p>
+            Активных: {active.length}
+            {active[0]
+              ? ` · ближайшая доставка ${formatDate(active[0].firstDeliveryDate)}`
+              : ""}
+          </p>
+        </div>
+        <button
+          className="primary-button"
+          type="button"
+          onClick={() => {
+            onNew({ forceNew: true });
+            selectTab("home");
+          }}
+        >
+          + Новый заказ
+        </button>
+      </div>
+      <div className="category-list order-history-filters" style={{ marginBottom: 18 }}>
+        {ORDER_HISTORY_FILTERS.map((status) => (
+          <button
+            className={
+              filter === status ? "category-button active" : "category-button"
+            }
+            type="button"
+            key={status}
+            onClick={() => setFilter(status)}
+          >
+            {status}
+          </button>
+        ))}
+      </div>
+
+      {visibleOrders.length ? (
+        <div className="order-list">
+          {visibleOrders.map((order) => {
+            const total = getOrderTotal(order);
+            const canEdit =
+              settings.allowClientEdit && order.status === "Новый";
+            const canDelete =
+              settings.allowClientDelete && order.status === "Новый";
+            return (
+              <article
+                className="order-card"
+                id={`order-${order.id}`}
+                key={order.id}
+              >
+                <div className="order-card-header">
+                  <div>
+                    <span className={`badge ${statusClass(order.status)}`}>
+                      {order.status}
+                    </span>
+                    <h3>Заказ № {order.number}</h3>
+                    <p>Создан: {formatDateTime(order.createdAt)}</p>
+                  </div>
+                  <div className="nowrap">
+                    <strong className="success-text">
+                      {settings.showPrices && total > 0
+                        ? formatMoney(total)
+                        : `${getPositionCount(order)} поз.`}
+                    </strong>
+                  </div>
+                </div>
+                <div className="order-meta">
+                  <div>
+                    <span>Дата доставки</span>
+                    <strong>{formatDate(order.firstDeliveryDate)}</strong>
+                  </div>
+                  <div>
+                    <span>Адрес</span>
+                    <strong>{order.address}</strong>
+                  </div>
+                  <div>
+                    <span>Позиций</span>
+                    <strong>{getPositionCount(order)}</strong>
+                  </div>
+                  <div>
+                    <span>Обновлён</span>
+                    <strong>
+                      {formatDateTime(order.updatedAt || order.createdAt)}
+                    </strong>
+                  </div>
+                </div>
+                <details className="order-details">
+                  <summary>Посмотреть состав заказа</summary>
+                  <div className="order-products">
+                    {(order.items || []).map((item) => (
+                      <div
+                        className="order-product"
+                        key={`${order.id}-${item.productId ?? item.id}`}
+                      >
+                        <span>
+                          {item.name}
+                          <small>{item.code || item.category}</small>
+                        </span>
+                        <strong>
+                          {item.quantity}{" "}
+                          {UNIT_CONFIG[item.unit]?.shortLabel || item.unit}
+                          <small>
+                            {item.multiplier > 1
+                              ? `${item.quantity * item.multiplier} шт. всего`
+                              : ""}
+                          </small>
+                        </strong>
+                      </div>
+                    ))}
+                    {(order.customItems || []).map((item) => (
+                      <div
+                        className="order-product custom-line custom-request-order-row"
+                        key={`${order.id}-${item.id}`}
+                      >
+                        <CustomRequestPhoto
+                          photo={item.photo}
+                          className="custom-request-photo-order"
+                        />
+                        <span>
+                          <span className="badge yellow">
+                            {item.requestStatus || "Новый запрос"}
+                          </span>
+                          {item.name}
+                          <small>{item.details}</small>
+                          {item.managerComment && (
+                            <small>Менеджер: {item.managerComment}</small>
+                          )}
+                        </span>
+                        <strong>
+                          {item.quantity} {item.unit}
+                          <small>
+                            {Number(item.unitPrice) > 0
+                              ? formatMoney(
+                                  Number(item.unitPrice) * item.quantity
+                                )
+                              : "Цена уточняется"}
+                          </small>
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+                  {(order.clientComment || order.managerComment) && (
+                    <div className="order-comments">
+                      {order.clientComment && (
+                        <div className="comment-box">
+                          <strong>Ваш комментарий</strong>
+                          <p>{order.clientComment}</p>
+                        </div>
+                      )}
+                      {order.managerComment && (
+                        <div className="comment-box">
+                          <strong>Комментарий менеджера</strong>
+                          <p>{order.managerComment}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <OrderTimeline order={order} />
+                </details>
+                <div className="client-order-actions">
+                  {canEdit && (
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      onClick={() => onEdit(order)}
+                    >
+                      Редактировать
+                    </button>
+                  )}
+                  {settings.allowRepeatOrder && (
+                    <button
+                      className="primary-button"
+                      type="button"
+                      onClick={() => onRepeat(order)}
+                    >
+                      Повторить заказ
+                    </button>
+                  )}
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => window.print()}
+                  >
+                    Печать
+                  </button>
+                  {canDelete && (
+                    <button
+                      className="danger-button"
+                      type="button"
+                      onClick={() => onDelete(order)}
+                    >
+                      Удалить
+                    </button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="empty-box">
+          {filter === "Активные"
+            ? "Активных заказов нет."
+            : "Заказов с таким статусом пока нет."}
+          <div>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => {
+                onNew({ forceNew: true });
+                selectTab("home");
+              }}
+            >
+              Оформить заказ
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+
+  const cabinetDesktop = (
+    <div className="client-cabinet-stack">
+      <ProfilePanel profile={profile} onChange={setProfile} />
+      <AddressesPanel addresses={addresses} onChange={setAddresses} />
+      <ReconciliationPanel
+        requests={reconciliationRequests}
+        onReload={onReload}
+      />
+      <details className="panel" style={{ padding: 16 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 800 }}>
+          Мои товары (справочно)
+        </summary>
+        <div style={{ marginTop: 14 }}>
+          <ClientMatrixPanel
+            products={matrixProducts}
+            settings={settings}
+            catalogPolicy={catalogPolicy}
+            favorites={favorites}
+            setFavorites={setFavorites}
+            onCreateOrder={() => {
+              onNew({ forceNew: true });
+              selectTab("home");
+            }}
+          />
+        </div>
+      </details>
+      <PushSettings />
+      <PasswordSecurityPanel />
+    </div>
+  );
+
+  const cabinetMobile = (
+    <div className="client-cabinet-stack">
+      <nav className="client-cabinet-nav" aria-label="Разделы кабинета">
+        {CLIENT_CABINET_SECTIONS.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={
+              cabinetSection === id
+                ? "category-button active"
+                : "category-button"
+            }
+            onClick={() => selectCabinetSection(id)}
+          >
+            {label}
+            {id === "history" && active.length > 0 ? ` (${active.length})` : ""}
+          </button>
+        ))}
+      </nav>
+
+      {cabinetSection === "history" && ordersPanel}
+      {cabinetSection === "matrix" && (
+        <div className="panel" style={{ padding: 16 }}>
+          <div className="panel-heading" style={{ marginBottom: 14 }}>
+            <div>
+              <p className="eyebrow">Каталог</p>
+              <h2>Товарная матрица</h2>
+              <p className="muted small">Ваши постоянные товары и цены</p>
+            </div>
+          </div>
+          <ClientMatrixPanel
+            products={matrixProducts}
+            settings={settings}
+            catalogPolicy={catalogPolicy}
+            favorites={favorites}
+            setFavorites={setFavorites}
+            onCreateOrder={() => {
+              onNew({ forceNew: true });
+              selectTab("home");
+            }}
+          />
+        </div>
+      )}
+      {cabinetSection === "addresses" && (
+        <AddressesPanel addresses={addresses} onChange={setAddresses} />
+      )}
+      {cabinetSection === "reconciliation" && (
+        <ReconciliationPanel
+          requests={reconciliationRequests}
+          onReload={onReload}
+        />
+      )}
+      {cabinetSection === "settings" && (
+        <div className="client-settings-stack">
+          <ProfilePanel profile={profile} onChange={setProfile} />
+          <PushSettings />
+          <PasswordSecurityPanel />
+        </div>
+      )}
+    </div>
   );
 
   return (
@@ -148,11 +557,8 @@ function ClientDashboard({
       >
         <ManagerContact settings={settings} />
       </Header>
-      <section className="page-content">
-        <nav
-          className="client-nav client-nav-desktop"
-          aria-label="Разделы кабинета"
-        >
+      <section className="page-content page-content-client">
+        <nav className="client-nav" aria-label="Разделы кабинета">
           {navButtons}
         </nav>
 
@@ -192,7 +598,10 @@ function ClientDashboard({
                     <button
                       className="linkish"
                       type="button"
-                      onClick={() => selectTab("cabinet")}
+                      onClick={() => {
+                        selectTab("cabinet");
+                        if (isNarrow) selectCabinetSection("settings");
+                      }}
                     >
                       Кабинете
                     </button>
@@ -205,7 +614,10 @@ function ClientDashboard({
                     <button
                       className="linkish"
                       type="button"
-                      onClick={() => selectTab("cabinet")}
+                      onClick={() => {
+                        selectTab("cabinet");
+                        if (isNarrow) selectCabinetSection("addresses");
+                      }}
                     >
                       Кабинете
                     </button>
@@ -233,18 +645,21 @@ function ClientDashboard({
                 onClose={onCloseCatalog}
                 onSave={(payload) => {
                   onSaveOrder(payload);
-                  setTab("orders");
-                  writeClientActiveTab("orders");
+                  openOrders();
                 }}
               />
             ) : (
               <div className="empty-box">
-                Оформление заказа станет доступно после заполнения обязательных данных.
+                Оформление заказа станет доступно после заполнения обязательных
+                данных.
                 <div>
                   <button
                     className="primary-button"
                     type="button"
-                    onClick={() => selectTab("cabinet")}
+                    onClick={() => {
+                      selectTab("cabinet");
+                      if (isNarrow) selectCabinetSection("settings");
+                    }}
                   >
                     Открыть кабинет
                   </button>
@@ -254,270 +669,10 @@ function ClientDashboard({
           </>
         )}
 
-        {tab === "orders" && (
-          <section className="panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">История</p>
-                <h2>Мои заказы</h2>
-                <p>
-                  Активных: {active.length}
-                  {active[0]
-                    ? ` · ближайшая доставка ${formatDate(active[0].firstDeliveryDate)}`
-                    : ""}
-                </p>
-              </div>
-              <button
-                className="primary-button"
-                type="button"
-                onClick={() => {
-                  onNew({ forceNew: true });
-                  setTab("home");
-                  writeClientActiveTab("home");
-                }}
-              >
-                + Новый заказ
-              </button>
-            </div>
-            <div className="category-list" style={{ marginBottom: 18 }}>
-              {["Активные", "Все", ...ORDER_STATUSES].map((status) => (
-                <button
-                  className={
-                    filter === status
-                      ? "category-button active"
-                      : "category-button"
-                  }
-                  type="button"
-                  key={status}
-                  onClick={() => setFilter(status)}
-                >
-                  {status}
-                </button>
-              ))}
-            </div>
+        {tab === "orders" && !isNarrow && ordersPanel}
 
-            {visibleOrders.length ? (
-              <div className="order-list">
-                {visibleOrders.map((order) => {
-                  const total = getOrderTotal(order);
-                  const canEdit =
-                    settings.allowClientEdit && order.status === "Новый";
-                  const canDelete =
-                    settings.allowClientDelete && order.status === "Новый";
-                  return (
-                    <article
-                      className="order-card"
-                      id={`order-${order.id}`}
-                      key={order.id}
-                    >
-                      <div className="order-card-header">
-                        <div>
-                          <span
-                            className={`badge ${statusClass(order.status)}`}
-                          >
-                            {order.status}
-                          </span>
-                          <h3>Заказ № {order.number}</h3>
-                          <p>Создан: {formatDateTime(order.createdAt)}</p>
-                        </div>
-                        <div className="nowrap">
-                          <strong className="success-text">
-                            {settings.showPrices && total > 0
-                              ? formatMoney(total)
-                              : `${getPositionCount(order)} поз.`}
-                          </strong>
-                        </div>
-                      </div>
-                      <div className="order-meta">
-                        <div>
-                          <span>Дата доставки</span>
-                          <strong>{formatDate(order.firstDeliveryDate)}</strong>
-                        </div>
-                        <div>
-                          <span>Адрес</span>
-                          <strong>{order.address}</strong>
-                        </div>
-                        <div>
-                          <span>Позиций</span>
-                          <strong>{getPositionCount(order)}</strong>
-                        </div>
-                        <div>
-                          <span>Обновлён</span>
-                          <strong>
-                            {formatDateTime(order.updatedAt || order.createdAt)}
-                          </strong>
-                        </div>
-                      </div>
-                      <details className="order-details">
-                        <summary>Посмотреть состав заказа</summary>
-                        <div className="order-products">
-                          {(order.items || []).map((item) => (
-                            <div
-                              className="order-product"
-                              key={`${order.id}-${item.productId ?? item.id}`}
-                            >
-                              <span>
-                                {item.name}
-                                <small>{item.code || item.category}</small>
-                              </span>
-                              <strong>
-                                {item.quantity}{" "}
-                                {UNIT_CONFIG[item.unit]?.shortLabel || item.unit}
-                                <small>
-                                  {item.multiplier > 1
-                                    ? `${item.quantity * item.multiplier} шт. всего`
-                                    : ""}
-                                </small>
-                              </strong>
-                            </div>
-                          ))}
-                          {(order.customItems || []).map((item) => (
-                            <div
-                              className="order-product custom-line custom-request-order-row"
-                              key={`${order.id}-${item.id}`}
-                            >
-                              <CustomRequestPhoto
-                                photo={item.photo}
-                                className="custom-request-photo-order"
-                              />
-                              <span>
-                                <span className="badge yellow">
-                                  {item.requestStatus || "Новый запрос"}
-                                </span>
-                                {item.name}
-                                <small>{item.details}</small>
-                                {item.managerComment && (
-                                  <small>Менеджер: {item.managerComment}</small>
-                                )}
-                              </span>
-                              <strong>
-                                {item.quantity} {item.unit}
-                                <small>
-                                  {Number(item.unitPrice) > 0
-                                    ? formatMoney(
-                                        Number(item.unitPrice) * item.quantity
-                                      )
-                                    : "Цена уточняется"}
-                                </small>
-                              </strong>
-                            </div>
-                          ))}
-                        </div>
-                        {(order.clientComment || order.managerComment) && (
-                          <div className="order-comments">
-                            {order.clientComment && (
-                              <div className="comment-box">
-                                <strong>Ваш комментарий</strong>
-                                <p>{order.clientComment}</p>
-                              </div>
-                            )}
-                            {order.managerComment && (
-                              <div className="comment-box">
-                                <strong>Комментарий менеджера</strong>
-                                <p>{order.managerComment}</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <OrderTimeline order={order} />
-                      </details>
-                      <div className="client-order-actions">
-                        {canEdit && (
-                          <button
-                            className="secondary-button"
-                            type="button"
-                            onClick={() => onEdit(order)}
-                          >
-                            Редактировать
-                          </button>
-                        )}
-                        {settings.allowRepeatOrder && (
-                          <button
-                            className="primary-button"
-                            type="button"
-                            onClick={() => onRepeat(order)}
-                          >
-                            Повторить заказ
-                          </button>
-                        )}
-                        <button
-                          className="secondary-button"
-                          type="button"
-                          onClick={() => window.print()}
-                        >
-                          Печать
-                        </button>
-                        {canDelete && (
-                          <button
-                            className="danger-button"
-                            type="button"
-                            onClick={() => onDelete(order)}
-                          >
-                            Удалить
-                          </button>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="empty-box">
-                {filter === "Активные"
-                  ? "Активных заказов нет."
-                  : "Заказов с таким статусом пока нет."}
-                <div>
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={() => {
-                      onNew({ forceNew: true });
-                      selectTab("home");
-                    }}
-                  >
-                    Оформить заказ
-                  </button>
-                </div>
-              </div>
-            )}
-          </section>
-        )}
-
-        {tab === "cabinet" && (
-          <div className="client-cabinet-stack">
-            <ProfilePanel profile={profile} onChange={setProfile} />
-            <AddressesPanel addresses={addresses} onChange={setAddresses} />
-            <ReconciliationPanel
-              requests={reconciliationRequests}
-              onReload={onReload}
-            />
-            <details className="panel" style={{ padding: 16 }}>
-              <summary style={{ cursor: "pointer", fontWeight: 800 }}>
-                Мои товары (справочно)
-              </summary>
-              <div style={{ marginTop: 14 }}>
-                <ClientMatrixPanel
-                  products={matrixProducts}
-                  settings={settings}
-                  catalogPolicy={catalogPolicy}
-                  favorites={favorites}
-                  setFavorites={setFavorites}
-                  onCreateOrder={() => {
-                    onNew({ forceNew: true });
-                    selectTab("home");
-                  }}
-                />
-              </div>
-            </details>
-            <PushSettings />
-            <PasswordSecurityPanel />
-          </div>
-        )}
+        {tab === "cabinet" && (isNarrow ? cabinetMobile : cabinetDesktop)}
       </section>
-
-      <nav className="client-bottom-nav" aria-label="Главное меню">
-        {navButtons}
-      </nav>
     </main>
   );
 }
