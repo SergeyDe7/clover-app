@@ -168,6 +168,7 @@ import {
   isMatrixProductForLink,
 } from "./matrixGuard.js";
 import { matchesTextSearch } from "../../src/shared/appHelpers.js";
+import { validateDeliveryDate } from "../../src/shared/deliveryDateRules.js";
 
 const app = express();
 const ONE_C_STATE_KEY = "oneCIntegration";
@@ -1818,6 +1819,23 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
   orders = statusPolicy.orders;
 
   if (isClientRole(req.user.role)) {
+    for (const order of orders) {
+      const previous = previousById.get(String(order?.id || ""));
+      const deliveryDate = String(order?.firstDeliveryDate || "").trim();
+      const previousDelivery = String(previous?.firstDeliveryDate || "").trim();
+      const isNew = !previous;
+      const dateChanged = deliveryDate !== previousDelivery;
+      if (!deliveryDate || (!isNew && !dateChanged)) continue;
+      const dateCheck = validateDeliveryDate(deliveryDate);
+      if (!dateCheck.ok) {
+        return res.status(400).json({
+          error: dateCheck.message,
+          code: "INVALID_DELIVERY_DATE",
+          orderId: order?.id || null,
+        });
+      }
+    }
+
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const links = getGlobalState("clientLinks", {});
     const oneCProducts = getGlobalState("oneCProducts", []);

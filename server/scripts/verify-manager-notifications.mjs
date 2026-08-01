@@ -82,14 +82,34 @@ try {
     throw new Error(`После очистки заказа A непрочитанными должны остаться только ${orderB}, получили: ${unreadSources.join(",") || "(пусто)"}`);
   }
 
+  // После сценария: TEST-1 + A + A:hash1 + B = 4 записи (часть прочитана).
+  const expectedNotificationCount = 4;
+  const beforeBackup = db.listManagerNotifications();
+  if (beforeBackup.length !== expectedNotificationCount) {
+    throw new Error(
+      `Перед backup ожидали ${expectedNotificationCount} уведомлений, получили ${beforeBackup.length}.`
+    );
+  }
+
   const snapshot = db.exportDatabaseSnapshot();
-  if (!Array.isArray(snapshot.managerNotifications) || snapshot.managerNotifications.length < 1) {
-    throw new Error("Уведомления не вошли в резервную копию базы.");
+  if (!Array.isArray(snapshot.managerNotifications) || snapshot.managerNotifications.length !== expectedNotificationCount) {
+    throw new Error(
+      `Уведомления в snapshot: ожидали ${expectedNotificationCount}, получили ${snapshot.managerNotifications?.length ?? "нет массива"}.`
+    );
   }
 
   db.importDatabaseSnapshot(snapshot);
-  if (db.listManagerNotifications().length < 1) {
-    throw new Error("Уведомления не восстановились из резервной копии.");
+  const restored = db.listManagerNotifications();
+  if (restored.length !== expectedNotificationCount) {
+    throw new Error(
+      `После restore ожидали ${expectedNotificationCount} уведомлений, получили ${restored.length}.`
+    );
+  }
+  const restoredUnread = restored.filter((item) => !item.readAt).map((item) => item.sourceId).sort();
+  if (restoredUnread.join(",") !== orderB) {
+    throw new Error(
+      `После restore непрочитанным должен остаться только ${orderB}, получили: ${restoredUnread.join(",") || "(пусто)"}`
+    );
   }
 
   const status = publicManagerNotificationStatus();
