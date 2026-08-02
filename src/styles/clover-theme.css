@@ -806,6 +806,124 @@ body:has(.clover-app) {
   flex-wrap: wrap;
 }
 
+/* Вкладка «1С»: блоки в одну колонку, без «летающих» окон */
+.clover-app .manager-exchange {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.clover-app .manager-exchange > .exchange-notice,
+.clover-app .manager-exchange > .exchange-summary-strip {
+  margin-bottom: 0;
+}
+
+.clover-app .manager-exchange-block {
+  margin-top: 0 !important;
+  padding: 18px 20px !important;
+}
+
+.clover-app .manager-exchange-summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--clover-text);
+  list-style: none;
+}
+
+.clover-app .manager-exchange-summary::-webkit-details-marker {
+  display: none;
+}
+
+.clover-app .manager-exchange-block-body {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.clover-app .manager-exchange-nested {
+  margin: 0;
+}
+
+.clover-app .manager-exchange-nested .form-grid {
+  margin-top: 12px;
+}
+
+.clover-app .manager-exchange-status-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.clover-app .manager-exchange-status-row .warning-box {
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.clover-app .manager-exchange-batch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+}
+
+.clover-app .manager-exchange-batch select {
+  min-height: 42px;
+  min-width: min(100%, 220px);
+  padding: 8px 12px;
+  border: 1px solid var(--clover-border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--clover-surface);
+}
+
+.clover-app .manager-exchange-match-note {
+  margin: 0 0 4px;
+  padding: 10px 12px;
+}
+
+.clover-app .manager-exchange-block .exchange-order-list {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--clover-border-soft);
+}
+
+.clover-app .manager-exchange-block .exchange-grid {
+  margin-bottom: 14px;
+}
+
+.clover-app .manager-exchange-preview-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.clover-app .manager-exchange-preview-item {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--clover-border-soft);
+}
+
+.clover-app .manager-exchange-preview-list small,
+.clover-app .manager-exchange-preview-item small {
+  display: block;
+  color: var(--clover-muted, #778177);
+}
+
+.clover-app .manager-exchange-block .comment-box .secondary-button {
+  margin-top: 12px;
+}
+
+@media (max-width: 720px) {
+  .clover-app .manager-exchange-batch {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .clover-app .manager-exchange-batch select,
+  .clover-app .manager-exchange-batch .secondary-button {
+    width: 100%;
+  }
+}
+
 .clover-app .manager-grid .order-card,
 .clover-app .order-list .order-card,
 .clover-app .manager-order-card-item {
