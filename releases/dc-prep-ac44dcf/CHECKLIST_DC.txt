@@ -1,0 +1,57 @@
+Чеклист ДЦ (сжатый) — код ac44dcf / 4.0.4
+==========================================
+
+A. До установки
+1. Windows Server / Win10+ VM в ДЦ.
+2. Внутренний IP Clover: _______________
+3. Где 1С TEST: _______________
+4. Сначала только TEST (не VLAVKA).
+5. ONEC_API_KEY ≥ 24 символов (новый).
+6. Путь: C:\Clover\clover-app (или иной): _______________
+7. Ежедневный backup (диск/сеть).
+
+B. Установка ПО (только после «ставить»)
+1. Node.js ≥ 22.13.
+2. Код main @ ac44dcf без чужого server\.env / чужой sqlite
+   (или осознанный перенос TEST-базы).
+3. npm ci в корне и в server\.
+4. server\.env из server.env.template.
+5. ONEC_ALLOW_LOCAL_WITHOUT_KEY=false.
+6. ONEC_WRITE_ENABLED=false до отдельного решения.
+
+C. Сеть
+1. LAN: TCP 5273 (UI), TCP 4100 (API) — см. docs\deploy\FIREWALL.md.
+2. С ПК менеджера: http://<IP>:5273/ и http://<IP>:4100/api/health.
+3. 1С TEST → http://<IP>:4100/api/one-c/... с ключом.
+4. Не публиковать 4100/5273 в интернет без proxy+HTTPS.
+
+D. Автозапуск и backup
+1. powershell -ExecutionPolicy Bypass -File tools\Install-CloverAutostart.ps1
+2. Проверка после перезагрузки.
+3. tools\Daily-Backup.ps1 по расписанию.
+4. tools\Health-Check.ps1.
+
+E. Приёмка TEST
+1. Health → версия 4.0.4.
+2. Логин менеджера / клиента.
+3. Тестовый заказ → очередь → документ 1С TEST → ACK.
+4. Повторный заказ (регресс).
+5. Зафиксировать номера в журнале.
+
+F. НЕ делать без отдельного «да»
+- Домен / SSL / публикация в интернет.
+- VLAVKA / 1С production.
+- Реальные клиентские заказы в рабочую 1С.
+- Merge/force-push вне процесса Git.
+
+G. Этап домена (отдельно, после LAN)
+Домен: clover-order.ru
+DNS сейчас: A → 81.177.141.15 (сверить: наш сервер или парковка).
+HTTPS сейчас: НЕТ. HTTP: 404.
+После «да» на HTTPS:
+  1) A-запись на сервер Clover.
+  2) Caddy / IIS ARR / nginx + Let's Encrypt.
+  3) .env: APP_PUBLIC_URL / CLOVER_PUBLIC_URL / PASSKEY_* = https://clover-order.ru
+  4) VAPID по docs\deploy\PUSH_ENABLE.md → /api/push/status enabled:true
+  5) Закрыть прямой WAN-доступ к 5273/4100.
+  6) Телефон: PWA + «Включить уведомления» + тестовый заказ.

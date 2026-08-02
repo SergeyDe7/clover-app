@@ -173,211 +173,239 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       : "Требуется адрес публикации"
     : "Безопасный симулятор";
 
-  return <section>
-    <div className="exchange-summary-strip">
-      <article className="stat-card"><span>Очередь / не отправлено</span><strong>{summary.notSent || 0}</strong></article>
-      <article className="stat-card"><span>Ошибки обмена</span><strong>{summary.error || 0}</strong></article>
-      <article className="stat-card"><span>Связь 1С</span><strong>{connectionLabel}</strong></article>
-    </div>
-    <div className="exchange-notice">
-      <strong>Действия по заказу</strong> — в карточке заказа (вкладка «Заказы»). Здесь сводка очереди, подключение и пакетные операции.
-    </div>
-
-    <details className="panel" style={{ marginTop: 0, padding: 16 }} open={!modeIsReal || !runtime.readyForRead}>
-      <summary style={{ cursor: "pointer", fontWeight: 800 }}>
-        Подключение к 1С · {connectionLabel}
-      </summary>
-      <div style={{ marginTop: 14 }}>
-      <div className="form-grid">
-        <label className="field">
-          Режим подключения
-          <select value={configForm.mode} onChange={(event) => setConfigForm({ ...configForm, mode: event.target.value })}>
-            <option value="simulation">Безопасный симулятор</option>
-            <option value="real">Реальная 1С по локальной сети</option>
-          </select>
-        </label>
-        <label className="field">
-          Адрес опубликованной базы 1С
-          <input
-            value={configForm.baseUrl || ""}
-            disabled={Boolean(runtime.baseUrlFromEnv)}
-            placeholder="http://192.168.1.10/clover"
-            onChange={(event) => setConfigForm({ ...configForm, baseUrl: event.target.value })}
-          />
-        </label>
-        <label className="field">
-          Пользователь обмена 1С
-          <input
-            value={configForm.username || ""}
-            disabled={Boolean(runtime.usernameFromEnv)}
-            placeholder="CloverExchange"
-            onChange={(event) => setConfigForm({ ...configForm, username: event.target.value })}
-          />
-        </label>
-        <label className="field">
-          Тайм-аут, мс
-          <input
-            type="number"
-            min="3000"
-            max="30000"
-            value={configForm.timeoutMs || 10000}
-            onChange={(event) => setConfigForm({ ...configForm, timeoutMs: Number(event.target.value) || 10000 })}
-          />
-        </label>
+  return (
+    <section className="manager-exchange">
+      <div className="exchange-notice">
+        <strong>Действия по заказу</strong> — в карточке заказа (вкладка «Заказы»). Здесь сводка очереди, подключение и пакетные операции.
       </div>
 
-      <details style={{ marginTop: 12 }}>
-        <summary className="section-toggle">Технические пути HTTP-сервиса</summary>
-        <div className="form-grid" style={{ marginTop: 12 }}>
-          <label className="field">Проверка связи<input value={configForm.healthPath || ""} onChange={(event) => setConfigForm({ ...configForm, healthPath: event.target.value })} /></label>
-          <label className="field">Контрагенты<input value={configForm.clientsPath || ""} onChange={(event) => setConfigForm({ ...configForm, clientsPath: event.target.value })} /></label>
-          <label className="field">Номенклатура<input value={configForm.productsPath || ""} onChange={(event) => setConfigForm({ ...configForm, productsPath: event.target.value })} /></label>
-          <label className="field">Черновик заказа<input value={configForm.draftOrderPath || ""} onChange={(event) => setConfigForm({ ...configForm, draftOrderPath: event.target.value })} /></label>
+      <div className="exchange-summary-strip">
+        <article className="stat-card"><span>Очередь / не отправлено</span><strong>{summary.notSent || 0}</strong></article>
+        <article className="stat-card"><span>Ошибки обмена</span><strong>{summary.error || 0}</strong></article>
+        <article className="stat-card"><span>Связь 1С</span><strong>{connectionLabel}</strong></article>
+      </div>
+
+      <details className="panel manager-exchange-block" open={!modeIsReal || !runtime.readyForRead}>
+        <summary className="manager-exchange-summary">
+          Подключение к 1С · {connectionLabel}
+        </summary>
+        <div className="manager-exchange-block-body">
+          <div className="form-grid">
+            <label className="field">
+              Режим подключения
+              <select value={configForm.mode} onChange={(event) => setConfigForm({ ...configForm, mode: event.target.value })}>
+                <option value="simulation">Безопасный симулятор</option>
+                <option value="real">Реальная 1С по локальной сети</option>
+              </select>
+            </label>
+            <label className="field">
+              Адрес опубликованной базы 1С
+              <input
+                value={configForm.baseUrl || ""}
+                disabled={Boolean(runtime.baseUrlFromEnv)}
+                placeholder="http://192.168.1.10/clover"
+                onChange={(event) => setConfigForm({ ...configForm, baseUrl: event.target.value })}
+              />
+            </label>
+            <label className="field">
+              Пользователь обмена 1С
+              <input
+                value={configForm.username || ""}
+                disabled={Boolean(runtime.usernameFromEnv)}
+                placeholder="CloverExchange"
+                onChange={(event) => setConfigForm({ ...configForm, username: event.target.value })}
+              />
+            </label>
+            <label className="field">
+              Тайм-аут, мс
+              <input
+                type="number"
+                min="3000"
+                max="30000"
+                value={configForm.timeoutMs || 10000}
+                onChange={(event) => setConfigForm({ ...configForm, timeoutMs: Number(event.target.value) || 10000 })}
+              />
+            </label>
+          </div>
+
+          <details className="manager-exchange-nested">
+            <summary className="section-toggle">Технические пути HTTP-сервиса</summary>
+            <div className="form-grid">
+              <label className="field">Проверка связи<input value={configForm.healthPath || ""} onChange={(event) => setConfigForm({ ...configForm, healthPath: event.target.value })} /></label>
+              <label className="field">Контрагенты<input value={configForm.clientsPath || ""} onChange={(event) => setConfigForm({ ...configForm, clientsPath: event.target.value })} /></label>
+              <label className="field">Номенклатура<input value={configForm.productsPath || ""} onChange={(event) => setConfigForm({ ...configForm, productsPath: event.target.value })} /></label>
+              <label className="field">Черновик заказа<input value={configForm.draftOrderPath || ""} onChange={(event) => setConfigForm({ ...configForm, draftOrderPath: event.target.value })} /></label>
+            </div>
+          </details>
+
+          <div className="setting-card">
+            <div>
+              <h3>Разрешить создание черновика</h3>
+              <p>Даже после включения здесь рабочая запись останется заблокированной, пока в server/.env не установлено ONEC_WRITE_ENABLED=true.</p>
+            </div>
+            <button
+              className={configForm.allowDraftCreation ? "toggle active" : "toggle"}
+              type="button"
+              onClick={() => setConfigForm({ ...configForm, allowDraftCreation: !configForm.allowDraftCreation })}
+              aria-label="Разрешить создание черновика"
+            ><span /></button>
+          </div>
+
+          <div className="exchange-actions">
+            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={saveConnection}>Сохранить настройки</button>
+            <button className="primary-button" disabled={Boolean(busyConnection)} type="button" onClick={testConnection}>{busyConnection === "test" ? "Проверяем…" : "Проверить связь"}</button>
+            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={() => loadPreview("clients")}>Контрагенты</button>
+            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={() => loadPreview("products")}>Номенклатура</button>
+          </div>
+
+          <div className="manager-exchange-status-row">
+            <div className="warning-box">Секрет в server/.env: {runtime.secretConfigured ? "настроен" : "не настроен"}</div>
+            <div className="warning-box">Чтение: {runtime.readyForRead ? "доступно" : "не готово"}</div>
+            <div className="warning-box">Запись: {runtime.readyForWrite ? "разрешена" : "заблокирована"}</div>
+            <div className="warning-box">База: УНФ 1.6 · документ ЗаказПокупателя</div>
+          </div>
+
+          {connectionResult && (
+            <div className={connectionResult.ok === false ? "auth-error" : "success-box"}>
+              {connectionResult.ok === false
+                ? connectionResult.message
+                : <><strong>Связь работает.</strong> {connectionResult.configuration || "1С:УНФ"}{connectionResult.database ? ` · база ${connectionResult.database}` : ""}{connectionResult.extensionVersion ? ` · расширение ${connectionResult.extensionVersion}` : ""}</>}
+            </div>
+          )}
+
+          {preview && (
+            <div className="comment-box">
+              <strong>{preview.type === "clients" ? "Контрагенты" : "Номенклатура"}: {preview.count || 0}</strong>
+              <p className="muted small">Только просмотр. Данные Clover пока не изменяются.</p>
+              <div className="manager-exchange-preview-list">
+                {(preview.items || []).map((item, index) => (
+                  <div key={item.id || index} className="manager-exchange-preview-item">
+                    <strong>{item.name || item.presentation || item.code || "Без названия"}</strong>
+                    <small>ID: {item.id || "—"}{item.article ? ` · артикул ${item.article}` : ""}{item.inn ? ` · ИНН ${item.inn}` : ""}</small>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </details>
 
-      <div className="setting-card" style={{ marginTop: 12 }}>
-        <div>
-          <h3>Разрешить создание черновика</h3>
-          <p>Даже после включения здесь рабочая запись останется заблокированной, пока в server/.env не установлено ONEC_WRITE_ENABLED=true.</p>
-        </div>
-        <button
-          className={configForm.allowDraftCreation ? "toggle active" : "toggle"}
-          type="button"
-          onClick={() => setConfigForm({ ...configForm, allowDraftCreation: !configForm.allowDraftCreation })}
-          aria-label="Разрешить создание черновика"
-        ><span /></button>
-      </div>
-
-      <div className="exchange-actions">
-        <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={saveConnection}>Сохранить настройки</button>
-        <button className="primary-button" disabled={Boolean(busyConnection)} type="button" onClick={testConnection}>{busyConnection === "test" ? "Проверяем…" : "Проверить связь"}</button>
-        <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={() => loadPreview("clients")}>Контрагенты</button>
-        <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={() => loadPreview("products")}>Номенклатура</button>
-      </div>
-
-      <div className="toolbar four" style={{ marginTop: 12 }}>
-        <div className="warning-box" style={{ padding: 10 }}>Секрет в server/.env: {runtime.secretConfigured ? "настроен" : "не настроен"}</div>
-        <div className="warning-box" style={{ padding: 10 }}>Чтение: {runtime.readyForRead ? "доступно" : "не готово"}</div>
-        <div className="warning-box" style={{ padding: 10 }}>Запись: {runtime.readyForWrite ? "разрешена" : "заблокирована"}</div>
-        <div className="warning-box" style={{ padding: 10 }}>База: УНФ 1.6 · документ ЗаказПокупателя</div>
-      </div>
-
-      {connectionResult && (
-        <div className={connectionResult.ok === false ? "auth-error" : "success-box"} style={{ marginTop: 12 }}>
-          {connectionResult.ok === false
-            ? connectionResult.message
-            : <><strong>Связь работает.</strong> {connectionResult.configuration || "1С:УНФ"}{connectionResult.database ? ` · база ${connectionResult.database}` : ""}{connectionResult.extensionVersion ? ` · расширение ${connectionResult.extensionVersion}` : ""}</>}
-        </div>
-      )}
-
-      {preview && (
-        <div className="comment-box" style={{ marginTop: 12 }}>
-          <strong>{preview.type === "clients" ? "Контрагенты" : "Номенклатура"}: {preview.count || 0}</strong>
-          <p className="muted small">Только просмотр. Данные Clover пока не изменяются.</p>
-          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-            {(preview.items || []).map((item, index) => (
-              <div key={item.id || index} style={{ paddingBottom: 8, borderBottom: "1px solid #e5ebe3" }}>
-                <strong>{item.name || item.presentation || item.code || "Без названия"}</strong>
-                <small style={{ display: "block" }}>ID: {item.id || "—"}{item.article ? ` · артикул ${item.article}` : ""}{item.inn ? ` · ИНН ${item.inn}` : ""}</small>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      </div>
-    </details>
-
-    <div className="panel-heading">
-      <div>
-        <p className="eyebrow">Интеграция</p>
-        <h2>Очередь обмена</h2>
-        <p>Сводка и пакетные операции. Передача отдельного заказа — в карточке на вкладке «Заказы».</p>
-      </div>
-      <button className="secondary-button" type="button" onClick={load}>Обновить</button>
-    </div>
-    {error && <div className="auth-error">{error}</div>}
-    <div className="exchange-grid">
-      <article><span>Не отправлено</span><strong>{summary.notSent || 0}</strong></article>
-      <article><span>Готово</span><strong>{summary.ready || 0}</strong></article>
-      <article><span>Передано тестово</span><strong>{summary.sent || 0}</strong></article>
-      <article><span>Черновики 1С</span><strong>{summary.draft || 0}</strong></article>
-      <article><span>Ошибки</span><strong>{summary.error || 0}</strong></article>
-    </div>
-    <div className="toolbar four">
-      <select value={batchStatus} onChange={(e) => setBatchStatus(e.target.value)}><option value="all">Все заказы</option>{Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select>
-      <button className="secondary-button" type="button" onClick={() => downloadBatch("json")}>Скачать пакет JSON</button>
-      <button className="secondary-button" type="button" onClick={() => downloadBatch("csv")}>Скачать пакет CSV</button>
-      <div className="warning-box" style={{ padding: 10 }}>Не сопоставлено клиентов: {summary.missingClientLinks || 0} · товаров: {summary.missingProductLinks || 0}</div>
-    </div>
-
-    {(data?.matching?.clients?.length || data?.matching?.products?.length) > 0 && (
-      <section className="panel" style={{ marginTop: 16 }}>
+      <section className="panel manager-exchange-block">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">Подготовка данных</p>
-            <h2>Мастер сопоставления с 1С</h2>
-            <p>Показаны только клиенты и товары, которые используются в заказах и ещё не имеют ID из 1С.</p>
+            <p className="eyebrow">Интеграция</p>
+            <h2>Очередь обмена</h2>
+            <p>Сводка и пакетные операции. Передача отдельного заказа — в карточке на вкладке «Заказы».</p>
           </div>
+          <button className="secondary-button" type="button" onClick={load}>Обновить</button>
         </div>
-        <div className="form-grid">
-          <div className="comment-box">
-            <strong>Клиенты без связи с 1С: {data?.matching?.clients?.length || 0}</strong>
-            <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-              {(data?.matching?.clients || []).slice(0, 8).map((client) => (
-                <div key={client.id}>
-                  <strong>{client.companyName || client.email}</strong>
-                  <small style={{ display: "block" }}>{client.contactName || "Контакт не указан"} · {client.email}</small>
+        {error && <div className="auth-error">{error}</div>}
+        <div className="exchange-grid">
+          <article><span>Не отправлено</span><strong>{summary.notSent || 0}</strong></article>
+          <article><span>Готово</span><strong>{summary.ready || 0}</strong></article>
+          <article><span>Передано тестово</span><strong>{summary.sent || 0}</strong></article>
+          <article><span>Черновики 1С</span><strong>{summary.draft || 0}</strong></article>
+          <article><span>Ошибки</span><strong>{summary.error || 0}</strong></article>
+        </div>
+        <div className="manager-exchange-batch">
+          <select value={batchStatus} onChange={(e) => setBatchStatus(e.target.value)} aria-label="Фильтр пакета заказов">
+            <option value="all">Все заказы</option>
+            {Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}
+          </select>
+          <button className="secondary-button" type="button" onClick={() => downloadBatch("json")}>Скачать пакет JSON</button>
+          <button className="secondary-button" type="button" onClick={() => downloadBatch("csv")}>Скачать пакет CSV</button>
+        </div>
+        <div className="warning-box manager-exchange-match-note">
+          Не сопоставлено клиентов: {summary.missingClientLinks || 0} · товаров: {summary.missingProductLinks || 0}
+        </div>
+        <div className="exchange-order-list">
+          {(data?.rows || []).map((row) => {
+            const exchange = normalizeOrderExchange(row.exchange);
+            const busy = busyId === row.id;
+            return (
+              <article className="exchange-order-row" key={row.id}>
+                <div className="exchange-order-head">
+                  <div>
+                    <span className={`badge ${exchangeBadgeClass(exchange.status)}`}>{EXCHANGE_STATUS_LABELS[exchange.status]}</span>
+                    <h3>Заказ № {row.number} · {row.customerName}</h3>
+                    <p className="muted small">Создан {formatDateTime(row.createdAt)} · доставка {formatDate(row.deliveryDate)} · статус заказа: {row.orderStatus}</p>
+                  </div>
+                  <strong>{row.validation?.ready ? "Готов" : `${row.validation?.issues?.length || 0} ошибок`}</strong>
                 </div>
-              ))}
-            </div>
-            <button className="secondary-button" style={{ marginTop: 12 }} type="button" onClick={() => onNavigate("clients")}>Открыть клиентов</button>
-          </div>
-          <div className="comment-box">
-            <strong>Товары без ID номенклатуры: {data?.matching?.products?.length || 0}</strong>
-            <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-              {(data?.matching?.products || []).slice(0, 8).map((product) => (
-                <div key={product.id}>
-                  <strong>{product.name}</strong>
-                  <small style={{ display: "block" }}>{product.code || "Без внутреннего кода"}</small>
+                {row.validation?.issues?.length > 0 && <ul className="exchange-issues">{row.validation.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>}
+                {exchange.message && <div className="exchange-message">{exchange.message}{exchange.receipt ? ` · ${exchange.receipt}` : ""}</div>}
+                {exchange.remoteDocument && <div className="exchange-message">Документ: {exchange.remoteDocument.number || exchange.remoteDocument.id || "—"} · {exchange.remoteDocument.posted ? "проведён" : "не проведён"} · {exchange.remoteDocument.mode === "real" ? "рабочая 1С" : "симулятор"}</div>}
+                <div className="exchange-actions">
+                  <button className="secondary-button" disabled={busy} type="button" onClick={() => action(row, "check")}>Проверить</button>
+                  <button className="secondary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => action(row, "send")}>{exchange.status === "sending" ? "Ожидает ACK 1С" : "Проверить и передать тестово"}</button>
+                  <button className="primary-button" disabled={busy || !runtime.readyForWrite} title={!runtime.readyForWrite ? "Запись пока заблокирована настройками" : ""} type="button" onClick={() => action(row, "draft")}>{modeIsReal ? "Черновик в 1С" : "Черновик в симуляторе"}</button>
+                  <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "json")}>JSON</button>
+                  <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "csv")}>CSV</button>
+                  {exchange.status !== "not_sent" && <button className="secondary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => action(row, "reset")}>Сбросить</button>}
                 </div>
-              ))}
-            </div>
-            <button className="secondary-button" style={{ marginTop: 12 }} type="button" onClick={() => onNavigate("products")}>Открыть товары</button>
-          </div>
+              </article>
+            );
+          })}
+          {!loadingExchange && !(data?.rows || []).length && !error && <div className="empty-box">Заказов для обмена пока нет.</div>}
+          {loadingExchange && <div className="empty-box">Загружаем центр обмена...</div>}
         </div>
       </section>
-    )}
 
-    <div className="exchange-order-list">
-      {(data?.rows || []).map((row) => {
-        const exchange = normalizeOrderExchange(row.exchange);
-        const busy = busyId === row.id;
-        return <article className="exchange-order-row" key={row.id}>
-          <div className="exchange-order-head"><div><span className={`badge ${exchangeBadgeClass(exchange.status)}`}>{EXCHANGE_STATUS_LABELS[exchange.status]}</span><h3>Заказ № {row.number} · {row.customerName}</h3><p className="muted small">Создан {formatDateTime(row.createdAt)} · доставка {formatDate(row.deliveryDate)} · статус заказа: {row.orderStatus}</p></div><strong>{row.validation?.ready ? "Готов" : `${row.validation?.issues?.length || 0} ошибок`}</strong></div>
-          {row.validation?.issues?.length > 0 && <ul className="exchange-issues">{row.validation.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>}
-          {exchange.message && <div className="exchange-message">{exchange.message}{exchange.receipt ? ` · ${exchange.receipt}` : ""}</div>}
-          {exchange.remoteDocument && <div className="exchange-message">Документ: {exchange.remoteDocument.number || exchange.remoteDocument.id || "—"} · {exchange.remoteDocument.posted ? "проведён" : "не проведён"} · {exchange.remoteDocument.mode === "real" ? "рабочая 1С" : "симулятор"}</div>}
-          <div className="exchange-actions">
-            <button className="secondary-button" disabled={busy} type="button" onClick={() => action(row, "check")}>Проверить</button>
-            <button className="secondary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => action(row, "send")}>{exchange.status === "sending" ? "Ожидает ACK 1С" : "Проверить и передать тестово"}</button>
-            <button className="primary-button" disabled={busy || !runtime.readyForWrite} title={!runtime.readyForWrite ? "Запись пока заблокирована настройками" : ""} type="button" onClick={() => action(row, "draft")}>{modeIsReal ? "Черновик в 1С" : "Черновик в симуляторе"}</button>
-            <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "json")}>JSON</button>
-            <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "csv")}>CSV</button>
-            {exchange.status !== "not_sent" && <button className="secondary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => action(row, "reset")}>Сбросить</button>}
+      {(data?.matching?.clients?.length || data?.matching?.products?.length) > 0 && (
+        <section className="panel manager-exchange-block">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Подготовка данных</p>
+              <h2>Мастер сопоставления с 1С</h2>
+              <p>Показаны только клиенты и товары, которые используются в заказах и ещё не имеют ID из 1С.</p>
+            </div>
           </div>
-        </article>;
-      })}
-      {!loadingExchange && !(data?.rows || []).length && !error && <div className="empty-box">Заказов для обмена пока нет.</div>}
-      {loadingExchange && <div className="empty-box">Загружаем центр обмена...</div>}
-    </div>
+          <div className="form-grid">
+            <div className="comment-box">
+              <strong>Клиенты без связи с 1С: {data?.matching?.clients?.length || 0}</strong>
+              <div className="manager-exchange-preview-list">
+                {(data?.matching?.clients || []).slice(0, 8).map((client) => (
+                  <div key={client.id}>
+                    <strong>{client.companyName || client.email}</strong>
+                    <small>{client.contactName || "Контакт не указан"} · {client.email}</small>
+                  </div>
+                ))}
+              </div>
+              <button className="secondary-button" type="button" onClick={() => onNavigate("clients")}>Открыть клиентов</button>
+            </div>
+            <div className="comment-box">
+              <strong>Товары без ID номенклатуры: {data?.matching?.products?.length || 0}</strong>
+              <div className="manager-exchange-preview-list">
+                {(data?.matching?.products || []).slice(0, 8).map((product) => (
+                  <div key={product.id}>
+                    <strong>{product.name}</strong>
+                    <small>{product.code || "Без внутреннего кода"}</small>
+                  </div>
+                ))}
+              </div>
+              <button className="secondary-button" type="button" onClick={() => onNavigate("products")}>Открыть товары</button>
+            </div>
+          </div>
+        </section>
+      )}
 
-    <section className="panel">
-      <div className="panel-heading"><div><p className="eyebrow">История</p><h2>Журнал обмена</h2></div></div>
-      <div className="exchange-log">
-        {(data?.log || []).map((item) => <article className="exchange-log-row" key={item.id}><h4>{AUDIT_ACTION_LABELS[item.action] || item.action}</h4><p>{formatDateTime(item.createdAt)} · заказ № {item.details?.orderNumber || "—"} · {item.userEmail || "Система"}</p></article>)}
-        {!(data?.log || []).length && <div className="empty-box">Операций обмена пока нет.</div>}
-      </div>
+      <section className="panel manager-exchange-block">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">История</p>
+            <h2>Журнал обмена</h2>
+          </div>
+        </div>
+        <div className="exchange-log">
+          {(data?.log || []).map((item) => (
+            <article className="exchange-log-row" key={item.id}>
+              <h4>{AUDIT_ACTION_LABELS[item.action] || item.action}</h4>
+              <p>{formatDateTime(item.createdAt)} · заказ № {item.details?.orderNumber || "—"} · {item.userEmail || "Система"}</p>
+            </article>
+          ))}
+          {!(data?.log || []).length && <div className="empty-box">Операций обмена пока нет.</div>}
+        </div>
+      </section>
     </section>
-  </section>;
+  );
 }

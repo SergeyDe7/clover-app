@@ -1,0 +1,24 @@
+[Unit]
+Description=Clover API (Node.js)
+After=network.target
+# Install: copy to /etc/systemd/system/ and systemctl enable --now clover-api
+
+[Service]
+Type=simple
+User=clover
+Group=clover
+WorkingDirectory=/opt/clover/clover-app/server
+Environment=NODE_ENV=production
+# Loads secrets from server/.env via dotenv in the app; do not put secrets here.
+# Если node не в /usr/bin/node — подставить путь из `which node` (nvm/fnm лучше
+# поставить системный Node 22+ или symlink).
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=5
+
+# Hardening (safe defaults; relax if backup tools need more)
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

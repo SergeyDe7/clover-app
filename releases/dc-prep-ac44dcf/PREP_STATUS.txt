@@ -1,0 +1,29 @@
+Статус подготовки (ждём Андрея / «ставить»)
+===========================================
+Дата: 2026-08-03
+Код:  main @ ac44dcf / 4.0.4 (+ PR #15 layout после merge)
+Полный минимум: ac44dcf6e734fa3dc96d592729263aa5cc54042b
+
+Архитектура этапа 1:
+  [x] Clover в ДЦ, база 1С остаётся на компе1 (решение заказчика)
+
+Пакет для Андрея (эта папка):
+  [x] LETTER_ANDREY.txt      ★ короткое письмо
+  [x] INSTALL_FOR_ANDREY.txt  ★ главная инструкция
+  [x] ARCHITECTURE.txt
+  [x] server.env.for-dc
+  [x] ANDREY_FILL_ME.txt
+  [x] LINUX_INSTALL_ANDREY.txt
+  [x] systemd/*.service
+  [x] nginx/*.example
+  [x] caddy/Caddyfile.example
+  [x] scripts/health-check.sh
+  [x] server.env.template
+
+Ещё можно сделать после ответов / по «да»:
+  [ ] Подставить IP/hostname в .env и юниты
+  [ ] Установка на VM («ставить»)
+  [ ] Этап 2: HTTPS + VAPID на clover-order.ru
+
+Не трогаем без «да»:
+  ДЦ установка, production, 1С prod, DNS/публикация, реальные push
