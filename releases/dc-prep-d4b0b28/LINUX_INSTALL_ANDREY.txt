@@ -1,0 +1,208 @@
+Clover — установка на Linux VM (черновик для Андрея)
+=====================================================
+Код:     main @ d4b0b28  |  версия 4.0.4
+Домен:   clover-order.ru (ЭТАП 2, не в первой установке)
+Backup:  средствами гипервизора (снимок VM / диска)
+Статус:  ПОДГОТОВКА — на сервер не ставить, пока заказчик не скажет «ставить»
+
+Значения в угловых скобках <...> — заполнить на месте.
+Остальное можно выполнять по порядку.
+
+
+0. Что такое ONEC_API_KEY
+-------------------------
+Общий секрет Clover ↔ расширение 1С для HTTP /api/one-c/*.
+В .env сервера: ONEC_API_KEY=<случайная строка ≥24 символов>
+В 1С: тот же ключ в заголовке X-Clover-Key.
+Плюс X-Clover-Database: TEST.
+Это НЕ ключ GitHub/домена/регистратора. Сгенерировать при установке:
+
+
+  openssl rand -hex 32
+
+
+1. Требования к VM
+------------------
+- Linux x86_64 (рекомендуем Ubuntu 22.04/24.04 LTS или Debian 12)
+- Node.js ≥ 22.13 (LTS)
+- git (или архив кода)
+- Исходящий HTTPS желателен (npm, позже certbot)
+- Backup: гипервизор; перед снимком лучше systemctl stop clover*
+
+
+2. Предлагаемые имена (можно заменить)
+--------------------------------------
+Hostname:     clover-test
+Путь кода:    /opt/clover/clover-app
+Пользователь: clover  (не root)
+Порты LAN:    4100 (API), 5273 (UI preview)  — этап 1
+Этап 2:       443 → reverse-proxy, 4100/5273 не с WAN
+
+
+3. Создание пользователя и каталога
+-----------------------------------
+  sudo useradd -r -m -d /opt/clover -s /bin/bash clover
+  sudo mkdir -p /opt/clover/clover-app
+  sudo chown -R clover:clover /opt/clover
+
+
+4. Код (один из способов)
+-------------------------
+A) git (предпочтительно):
+
+  sudo -u clover -H bash -lc '
+    cd /opt/clover &&
+    git clone https://github.com/SergeyDe7/clover-app.git clover-app &&
+    cd clover-app &&
+    git checkout d4b0b28
+  '
+
+B) архив с машины разработки — распаковать в /opt/clover/clover-app
+   БЕЗ server/.env и БЕЗ чужой sqlite, если старт «с нуля».
+
+Проверка:
+
+  cd /opt/clover/clover-app && git rev-parse HEAD
+  # ожидание: d4b0b283fb668d60858ca57e0f685f8ccac53b9c
+
+
+5. Node.js ≥ 22.13
+------------------
+Пример (NodeSource / nvm / пакет дистрибутива — на ваш выбор).
+Проверка: node -v  →  v22.13+ 
+
+
+6. Зависимости и сборка UI
+--------------------------
+  cd /opt/clover/clover-app
+  sudo -u clover npm ci
+  cd server && sudo -u clover npm ci && cd ..
+  sudo -u clover npm run build
+
+
+7. Файл окружения
+-----------------
+  sudo -u clover cp releases/dc-prep-d4b0b28/server.env.template server/.env
+  # или: docs/deploy/server.env.datacenter.example → server/.env
+
+Отредактировать server/.env (обязательно):
+
+  APP_PUBLIC_URL=http://<ВНУТРЕННИЙ_IP>:5273
+  CLOVER_PUBLIC_URL=http://<ВНУТРЕННИЙ_IP>:5273
+  JWT_SECRET=<openssl rand -hex 32>
+  ONEC_API_KEY=<openssl rand -hex 32>
+  ONEC_ALLOW_LOCAL_WITHOUT_KEY=false
+  ONEC_WRITE_ENABLED=false
+  PASSKEY_RP_ID=<ВНУТРЕННИЙ_IP>
+  PASSKEY_ORIGIN=http://<ВНУТРЕННИЙ_IP>:5273
+
+Если есть исходящий HTTP к 1С TEST — заполнить ONEC_BASE_URL / USER / PASSWORD.
+Иначе можно оставить заглушки до настройки pull из 1С.
+
+Секреты не коммитить. Права:
+
+  chmod 600 /opt/clover/clover-app/server/.env
+  chown clover:clover /opt/clover/clover-app/server/.env
+
+
+8. systemd (этап 1: API + vite preview)
+---------------------------------------
+Юниты лежат рядом:
+  systemd/clover-api.service
+  systemd/clover-ui.service
+
+  sudo cp releases/dc-prep-d4b0b28/systemd/*.service /etc/systemd/system/
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now clover-api clover-ui
+  sudo systemctl status clover-api clover-ui --no-pager
+
+
+9. Firewall (этап 1, LAN)
+-------------------------
+Разрешить с подсети менеджеров:
+  TCP 5273  — UI
+  TCP 4100  — API (+ 1С TEST на /api/one-c)
+Не публиковать эти порты в интернет без reverse-proxy + HTTPS.
+
+
+10. Проверки
+------------
+  curl -sS http://127.0.0.1:4100/api/health
+  # {"ok":true,"service":"clover-server","version":"4.0.4",...}
+
+  curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:5273/
+  # 200
+
+С другого ПК LAN:
+  http://<ВНУТРЕННИЙ_IP>:5273/
+  http://<ВНУТРЕННИЙ_IP>:4100/api/health
+
+
+11. 1С TEST (после сети)
+------------------------
+- В расширении Clover: URL http://<ВНУТРЕННИЙ_IP>:4100
+- Заголовок X-Clover-Key = тот же ONEC_API_KEY
+- X-Clover-Database: TEST
+- Приёмка: тестовый заказ → очередь → документ в 1С TEST → ACK
+- База VLAVKA / production — ЗАПРЕЩЕНО без отдельного «да» заказчика
+
+
+12. Backup гипервизором
+-----------------------
+Перед снимком:
+
+  sudo systemctl stop clover-ui clover-api
+  # снимок VM / диска
+  sudo systemctl start clover-api clover-ui
+
+Каталоги данных: server/data , server/uploads , server/.env
+
+
+13. ЭТАП 2 — домен + HTTPS + push (отдельное «да»)
+-------------------------------------------------
+Домен: clover-order.ru
+DNS сейчас: A → 81.177.141.15 (сверить: эта VM / другой хост / парковка).
+HTTPS сейчас: нет.
+
+Когда будет «да»:
+  - A-запись на эту VM
+  - Caddy или nginx + Let's Encrypt (черновик: caddy/Caddyfile.example)
+  - В .env:
+      APP_PUBLIC_URL=https://clover-order.ru
+      CLOVER_PUBLIC_URL=https://clover-order.ru
+      PASSKEY_RP_ID=clover-order.ru
+      PASSKEY_ORIGIN=https://clover-order.ru
+  - VAPID: cd server && npx --yes web-push generate-vapid-keys
+  - Закрыть 4100/5273 с WAN; снаружи только 443
+  - docs/deploy/PUSH_ENABLE.md
+
+
+14. Откат
+---------
+  sudo systemctl stop clover-ui clover-api
+  # вернуть снимок гипервизора ИЛИ восстановить data+.env из копии
+  sudo systemctl start clover-api clover-ui
+  curl -sS http://127.0.0.1:4100/api/health
+
+
+15. Что заполнить Андрею и вернуть заказчику
+--------------------------------------------
+После установки (или до, если уже известно) прислать:
+
+  [ ] Дистрибутив и версия ОС
+  [ ] Hostname
+  [ ] Внутренний IP
+  [ ] git HEAD на сервере
+  [ ] Вывод /api/health
+  [ ] ONEC_API_KEY задан (не присылать сам ключ в открытый чат — подтвердить «задан»)
+  [ ] Где 1С TEST и доступен ли :4100 с хоста 1С
+  [ ] 81.177.141.15 — эта VM / нет
+  [ ] Пустая sqlite или перенос данных
+
+
+Ограничения заказчика
+---------------------
+- Не 1С prod / VLAVKA без явного «да»
+- ONEC_WRITE_ENABLED=false до отдельного «да»
+- Не публикация в интернет / не HTTPS на домен без «да»
+- Не коммитить server/.env

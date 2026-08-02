@@ -1,0 +1,60 @@
+MANIFEST — dc-prep-d4b0b28
+=========================
+
+Дата:        2026-08-02
+Назначение:  подготовка установки ДЦ (без фактической установки)
+Git branch:  main
+Git HEAD:    d4b0b283fb668d60858ca57e0f685f8ccac53b9c
+App version: 4.0.4
+Домен (этап 2): clover-order.ru
+DNS snapshot:   A clover-order.ru → 81.177.141.15 (HTTPS нет, HTTP 404)
+Чеклист ДЦ:     пользователь подтвердил «на бумаге ок»
+
+Содержимое этой папки:
+  LETTER_ANDREY.txt        ★ короткое письмо Андрею
+  INSTALL_FOR_ANDREY.txt   ★ главный файл для Андрея
+  ARCHITECTURE.txt         ★ схема: 1С на компе1, Clover в ДЦ
+  server.env.for-dc
+  ANDREY_FILL_ME.txt
+  README_FIRST.txt
+  PREP_STATUS.txt
+  CHECKLIST_DC.txt
+  server.env.template
+  ROLLBACK.txt
+  MANIFEST.txt
+  CHECKSUMS_SHA256.txt
+  LINUX_INSTALL_ANDREY.txt
+  systemd/clover-api.service
+  systemd/clover-ui.service
+  nginx/clover-lan.conf.example
+  nginx/clover-https.conf.example
+  caddy/Caddyfile.example
+  scripts/health-check.sh
+
+Ключевые скрипты в репозитории (хеши в CHECKSUMS_SHA256.txt):
+  START_CLOVER_V18.bat
+  STOP_CLOVER_V18.bat
+  INSTALL_SERVER.bat
+  tools\Start-Clover.ps1
+  tools\Stop-Clover.ps1
+  tools\Health-Check.ps1
+  tools\Daily-Backup.ps1
+  tools\Install-CloverAutostart.ps1
+  docs\deploy\CHECKLIST.md
+  docs\deploy\FIREWALL.md
+  docs\deploy\ROLLBACK.md
+  docs\deploy\AFTER_DOMAIN.md
+  docs\deploy\PUSH_ENABLE.md
+  docs\deploy\server.env.datacenter.example
+
+НЕ включено (намеренно):
+  server\.env (секреты)
+  server\data\*.sqlite (рабочие данные)
+  node_modules
+  полный zip репозитория (создаётся после ответов пользователя при «ставить»)
+
+PR в составе main:
+  #11 trash/notify — MERGED
+  #12 push badge / PUSH_ENABLE.md — MERGED
+  #13 UI polish — MERGED
+  #14 UX empty/offline — MERGED

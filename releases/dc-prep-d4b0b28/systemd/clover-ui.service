@@ -1,0 +1,22 @@
+[Unit]
+Description=Clover UI (Vite preview on 5273)
+After=network.target clover-api.service
+Wants=clover-api.service
+# Этап 1: vite preview с proxy /api → :4100 (как на Windows).
+# Этап 2: лучше nginx/Caddy раздаёт dist/ и проксирует /api — тогда этот unit можно отключить.
+
+[Service]
+Type=simple
+User=clover
+Group=clover
+WorkingDirectory=/opt/clover/clover-app
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run preview -- --host 0.0.0.0 --port 5273
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

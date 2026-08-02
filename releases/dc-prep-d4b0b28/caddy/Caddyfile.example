@@ -1,0 +1,16 @@
+# Черновик для ЭТАПА 2 (после «да» на HTTPS). Сейчас НЕ включать.
+# Подставить email и убедиться, что DNS A clover-order.ru → эта VM.
+
+clover-order.ru {
+        encode gzip
+        reverse_proxy /api/* 127.0.0.1:4100
+        reverse_proxy /uploads/* 127.0.0.1:4100
+        root * /opt/clover/clover-app/dist
+        try_files {path} /index.html
+        file_server
+}
+
+# www → основной хост (раскомментировать при необходимости):
+# www.clover-order.ru {
+#         redir https://clover-order.ru{uri}
+# }

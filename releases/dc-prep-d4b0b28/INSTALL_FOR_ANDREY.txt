@@ -1,0 +1,330 @@
+================================================================================
+CLOVER — ФАЙЛ УСТАНОВКИ В ДЦ (Linux)
+Для: Андрей
+От:  команда Clover / @dsd
+Дата файла: 2026-08-02
+================================================================================
+
+КАК ЧИТАТЬ
+----------
+• Всё БЕЗ пометки 【АНДРЕЙ】 — уже решено заказчиком / зафиксировано. Не менять
+  без согласования.
+• Поля 【АНДРЕЙ: …】 — заполнить/выполнить вам на месте.
+• Секреты (пароли, JWT, ONEC_API_KEY) в чат/почту НЕ присылать — только факт
+  «задан».
+• Ставить на сервер только после явного «ставить» от заказчика.
+  До этого файл можно изучать и готовить VM.
+
+
+================================================================================
+ЧАСТЬ A. УЖЕ ЗАФИКСИРОВАНО (не зависит от вас)
+================================================================================
+
+Продукт:          Clover (заказы → менеджер → 1С УНФ TEST)
+Версия:           4.0.4
+Git:              ветка main, коммит d4b0b28
+                  полный: d4b0b283fb668d60858ca57e0f685f8ccac53b9c
+Репозиторий:      https://github.com/SergeyDe7/clover-app
+PR в составе:     #11-#14 MERGED (install: main @ d4b0b28)
+                  LETTER_ANDREY.txt — короткое письмо Андрею
+
+Среда первой установки:  только TEST (не production, не VLAVKA)
+ОС целевая:              отдельная Linux VM (не Windows)
+Backup Clover:           снимки гипервизора (VM/диск)
+Домен (этап 2, позже):   clover-order.ru
+DNS сейчас (факт):       A clover-order.ru → 81.177.141.15
+                         HTTPS нет; HTTP 404 (приложение там ещё не крутится)
+
+Архитектура этапа 1 (решение заказчика) — см. ARCHITECTURE.txt:
+  • В ДЦ ставится ТОЛЬКО Clover.
+  • База 1С остаётся на компе1 в офисе как сейчас; рабочие места 1С НЕ трогать.
+  • Комп1 — 24/7 (без него Clover жив, обмен с 1С встаёт).
+  • Нужен канал офис ↔ ДЦ (обычно VPN), чтобы 1С на компе1 видела
+    http://<IP_Clover>:4100 . RDP для Linux-VM Clover НЕ нужен (SSH/SFTP).
+  • Бэкапы 1С: на компе1 + по желанию копии в хранилище ДЦ (не часть
+    установки Clover; живая база в ДЦ не переносится).
+
+Рекомендуемые имена (можно заменить только через 【АНДРЕЙ】 ниже):
+  hostname:     clover-test
+  путь:         /opt/clover/clover-app
+  пользователь: clover (не root)
+  порты этап 1: TCP 4100 (API), TCP 5273 (UI)
+
+Ограничения заказчика (обязательны):
+  • ONEC_WRITE_ENABLED=false до отдельного «да»
+  • база 1С в обмене только с именем TEST
+  • не публиковать 4100/5273 в интернет без reverse-proxy + HTTPS
+  • этап домена/HTTPS/VAPID — только после отдельного «да»
+  • server/.env не коммитить в Git
+  • не переносить и не «поднимать заново» рабочую 1С в ДЦ на этом этапе
+
+Что такое ONEC_API_KEY:
+  Общий секрет Clover ↔ расширение 1С для HTTP /api/one-c/*.
+  В .env: ONEC_API_KEY=...
+  В 1С: заголовок X-Clover-Key = тот же ключ
+  Плюс X-Clover-Database: TEST
+  Это НЕ ключ GitHub/домена/регистратора.
+  Генерация:  openssl rand -hex 32
+
+
+================================================================================
+ЧАСТЬ B. ЗАПОЛНИТЬ АНДРЕЮ (только это зависит от вас)
+================================================================================
+
+Скопируйте блок, заполните, верните заказчику после установки (или до — что уже
+известно).
+
+--- B1. VM ---
+【АНДРЕЙ: дистрибутив и версия ОС】 _______________________
+【АНДРЕЙ: hostname】 _______________________  (предложение: clover-test)
+【АНДРЕЙ: vCPU / RAM / диск】 _______________________
+【АНДРЕЙ: внутренний IP VM】 _______________________
+【АНДРЕЙ: шлюз / DNS】 _______________________
+【АНДРЕЙ: интернет с VM для npm/git/certbot】 да / нет
+【АНДРЕЙ: как дают SSH (ключ, VPN, jump)】 _______________________
+
+--- B2. Сеть ---
+【АНДРЕЙ: подсеть/откуда ходят менеджеры к Clover】 _______________________
+【АНДРЕЙ: firewall — кто открывает 4100 и 5273】 _______________________
+【АНДРЕЙ: канал офис ↔ ДЦ (VPN/другое) кто настраивает】 _______________________
+【АНДРЕЙ: IP 81.177.141.15 — эта VM / другой хост / парковка】 ___________
+
+--- B3. 1С (остаётся на компе1, не переносить) ---
+【АНДРЕЙ: IP/имя компа1 с 1С】 _______________________
+【АНДРЕЙ: база для обмена этапа 1 = TEST】 да / нет / уточнить у заказчика
+【АНДРЕЙ: канал комп1 → Clover:4100 проверен】 да / нет / ещё нет
+         (ping/curl с компа1 или с той же сети: curl http://<IP_Clover>:4100/api/health)
+【АНДРЕЙ: кто меняет URL Clover в расширении 1С на компе1】
+         Андрей / заказчик / ______
+【АНДРЕЙ: нужен ли исходящий Clover→1С (ONEC_BASE_URL) на этапе 1】
+         да (URL http://… с компа1, доступный ИЗ ДЦ) / нет, только pull / не знаю
+【АНДРЕЙ: бэкап копий 1С в ДЦ — в scope этой установки】 нет / да (описать)
+
+--- B4. Данные ---
+【АНДРЕЙ: старт】 пустая sqlite  /  перенос с моноблока заказчика
+【АНДРЕЙ: перенос uploads】 да / нет
+【АНДРЕЙ: частота снимков гипервизора】 _______________________
+
+--- B5. Доступ к коду ---
+【АНДРЕЙ: способ】 git clone с GitHub  /  архив от заказчика
+【АНДРЕЙ: доступ к репо есть】 да / нужен deploy key / архив
+
+--- B6. После установки (факт) ---
+【АНДРЕЙ: git rev-parse HEAD】 _______________________
+【АНДРЕЙ: node -v】 _______________________
+【АНДРЕЙ: curl health — version】 _______________________
+【АНДРЕЙ: UI :5273 → 200】 да / нет
+【АНДРЕЙ: JWT_SECRET задан】 да / нет
+【АНДРЕЙ: ONEC_API_KEY задан в .env и передан в 1С】 да / нет
+【АНДРЕЙ: тест-заказ → очередь → 1С TEST → ACK】 да / нет / ещё нет
+
+
+================================================================================
+ЧАСТЬ C. ПОШАГОВАЯ УСТАНОВКА (ЭТАП 1 — LAN / TEST)
+================================================================================
+
+C0. Перед стартом
+  □ Заказчик сказал «ставить»
+  □ Заполнены B1–B3 хотя бы по IP и 1С (можно уточнять по ходу)
+  □ Снимок «пустой» VM на гипервизоре (по желанию)
+
+C1. Пользователь и каталог
+  sudo useradd -r -m -d /opt/clover -s /bin/bash clover || true
+  sudo mkdir -p /opt/clover/clover-app
+  sudo chown -R clover:clover /opt/clover
+  【АНДРЕЙ: задать hostname】
+  sudo hostnamectl set-hostname clover-test   # или ваше имя из B1
+
+C2. Node.js ≥ 22.13
+  【АНДРЕЙ: установить Node 22+ удобным способом дистрибутива】
+  node -v    # должно быть ≥ v22.13.0
+  which node # запомнить путь для systemd (часто /usr/bin/node)
+
+C3. Код @ d4b0b28
+  Вариант A — git:
+    sudo -u clover -H bash -lc '
+      cd /opt/clover &&
+      git clone https://github.com/SergeyDe7/clover-app.git clover-app &&
+      cd clover-app &&
+      git fetch origin &&
+      git checkout d4b0b28
+    '
+  Вариант B — архив от заказчика → распаковать в /opt/clover/clover-app
+    БЕЗ чужого server/.env; sqlite — только если согласован перенос (B4).
+
+  Проверка:
+    cd /opt/clover/clover-app && git rev-parse HEAD
+    # ожидание начинается с d4b0b28
+
+C4. Зависимости и сборка UI
+  cd /opt/clover/clover-app
+  sudo -u clover npm ci
+  cd server && sudo -u clover npm ci && cd ..
+  sudo -u clover npm run build
+  test -f dist/index.html
+
+C5. server/.env
+  В репозитории шаблон:
+    releases/dc-prep-d4b0b28/server.env.template
+  или рядом с этим файлом: server.env.for-dc (тот же смысл)
+
+  sudo -u clover cp releases/dc-prep-d4b0b28/server.env.template server/.env
+  sudo -u clover chmod 600 server/.env
+
+  Обязательно выставить (подставить 【АНДРЕЙ: внутренний IP】):
+
+    PORT=4100
+    HOST=0.0.0.0
+    APP_PUBLIC_URL=http://【IP】:5273
+    CLOVER_PUBLIC_URL=http://【IP】:5273
+    ALLOW_DEV_AUTH_LINKS=false
+    JWT_SECRET=【 openssl rand -hex 32 】
+    ONEC_API_KEY=【 openssl rand -hex 32 】
+    ONEC_ALLOW_LOCAL_WITHOUT_KEY=false
+    ONEC_WRITE_ENABLED=false
+    PASSKEY_RP_NAME=Clover
+    PASSKEY_RP_ID=【IP】
+    PASSKEY_ORIGIN=http://【IP】:5273
+    VAPID_PUBLIC_KEY=          # пусто до этапа 2
+    VAPID_PRIVATE_KEY=         # пусто до этапа 2
+    VAPID_SUBJECT=mailto:admin@clover-order.ru
+
+  Если на этапе 1 нужен исходящий вызов в 1С (B3):
+    ONEC_BASE_URL=【URL базы TEST】
+    ONEC_USERNAME=CloverExchange
+    ONEC_PASSWORD=【пароль】
+  Иначе оставить заглушки — обмен pull из 1С всё равно требует ключ в 1С.
+
+C6. systemd
+  Файлы в пакете:
+    releases/dc-prep-d4b0b28/systemd/clover-api.service
+    releases/dc-prep-d4b0b28/systemd/clover-ui.service
+
+  【АНДРЕЙ: если `which node` ≠ /usr/bin/node — поправить ExecStart в юнитах】
+  【АНДРЕЙ: если `which npm` ≠ /usr/bin/npm — поправить clover-ui.service】
+
+  sudo cp releases/dc-prep-d4b0b28/systemd/clover-api.service /etc/systemd/system/
+  sudo cp releases/dc-prep-d4b0b28/systemd/clover-ui.service  /etc/systemd/system/
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now clover-api clover-ui
+  sudo systemctl status clover-api clover-ui --no-pager
+
+C7. Firewall (LAN)
+  Открыть с подсети менеджеров и с хоста 1С:
+    TCP 5273 — UI
+    TCP 4100 — API (+ /api/one-c)
+  Не открывать эти порты в интернет (WAN).
+
+C8. Проверки на VM
+  curl -sS http://127.0.0.1:4100/api/health
+  # ожидается: "ok":true, "service":"clover-server", "version":"4.0.4"
+
+  curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:5273/
+  # ожидается: 200
+
+  Или скрипт:
+    bash releases/dc-prep-d4b0b28/scripts/health-check.sh
+
+C9. Проверки с другого ПК LAN
+  http://【IP】:5273/
+  http://【IP】:4100/api/health
+
+C10. 1С на компе1 (базу НЕ переносить)
+  С компа1 (или через VPN) должен открываться health Clover в ДЦ.
+  В расширении Clover НА КОМПЕ1:
+    URL API:  http://【IP_Clover_в_ДЦ】:4100
+    X-Clover-Key: <тот же ONEC_API_KEY>
+    X-Clover-Database: TEST
+  Рабочие места 1С не перенастраивать.
+  Приёмка:
+    логин в Clover → тестовый заказ → очередь → документ в 1С TEST на компе1 → ACK
+  Повторный заказ (регресс).
+
+C11. Backup гипервизором
+  Перед снимком:
+    sudo systemctl stop clover-ui clover-api
+    # снимок
+    sudo systemctl start clover-api clover-ui
+  Критичные данные: server/data , server/uploads , server/.env
+
+
+================================================================================
+ЧАСТЬ D. ЭТАП 2 — ДОМЕН / HTTPS / PUSH (НЕ ДЕЛАТЬ БЕЗ «ДА»)
+================================================================================
+
+Домен: clover-order.ru
+
+Когда заказчик скажет «да» на HTTPS:
+  1. Убедиться, что A-запись clover-order.ru → ЭТА VM (сейчас 81.177.141.15 —
+     сверить с B2).
+  2. Поставить Caddy или nginx + Let's Encrypt.
+     Черновики в пакете:
+       releases/dc-prep-d4b0b28/caddy/Caddyfile.example
+       releases/dc-prep-d4b0b28/nginx/clover-https.conf.example
+  3. В server/.env:
+       APP_PUBLIC_URL=https://clover-order.ru
+       CLOVER_PUBLIC_URL=https://clover-order.ru
+       PASSKEY_RP_ID=clover-order.ru
+       PASSKEY_ORIGIN=https://clover-order.ru
+  4. VAPID:
+       cd /opt/clover/clover-app/server
+       npx --yes web-push generate-vapid-keys
+       # прописать VAPID_* в .env, перезапуск clover-api
+       # GET /api/push/status → "enabled": true  (под авторизацией)
+  5. С WAN закрыть прямые 4100/5273; снаружи только 443.
+  6. Можно отключить clover-ui.service и отдавать dist/ через Caddy/nginx
+     (см. nginx/clover-lan.conf.example как образец proxy /api).
+  7. Телефон: PWA → «Включить уведомления» → тестовый заказ.
+  Документы в репо: docs/deploy/AFTER_DOMAIN.md , docs/deploy/PUSH_ENABLE.md
+
+
+================================================================================
+ЧАСТЬ E. ОТКАТ
+================================================================================
+
+  sudo systemctl stop clover-ui clover-api
+  # вернуть снимок гипервизора ИЛИ data + .env из копии
+  sudo systemctl start clover-api clover-ui
+  curl -sS http://127.0.0.1:4100/api/health
+
+
+================================================================================
+ЧАСТЬ F. СОСТАВ ПАКЕТА (рядом с этим файлом)
+================================================================================
+
+Каталог в репозитории: releases/dc-prep-d4b0b28/
+
+  LETTER_ANDREY.txt           ← короткое письмо Андрею
+  INSTALL_FOR_ANDREY.txt      ← ЭТОТ ФАЙЛ (главный)
+  ARCHITECTURE.txt            ← 1С на компе1 / Clover в ДЦ / VPN
+  ANDREY_FILL_ME.txt          ← короткая анкета (дублирует часть B)
+  LINUX_INSTALL_ANDREY.txt    ← краткая копия шагов
+  server.env.for-dc           ← .env с пометками
+  server.env.template         ← запасной шаблон .env
+  systemd/clover-api.service
+  systemd/clover-ui.service
+  scripts/health-check.sh
+  nginx/clover-lan.conf.example
+  nginx/clover-https.conf.example
+  caddy/Caddyfile.example
+  CHECKLIST_DC.txt
+  ROLLBACK.txt
+  PREP_STATUS.txt
+  MANIFEST.txt
+  CHECKSUMS_SHA256.txt
+
+  Готовый zip: releases/clover-dc-prep-d4b0b28-for-andrey.zip
+
+
+================================================================================
+ЧАСТЬ G. КРИТЕРИЙ «УСТАНОВКА ЭТАПА 1 ГОТОВА»
+================================================================================
+
+  □ health version 4.0.4
+  □ UI открывается по LAN IP:5273
+  □ git HEAD = d4b0b28…
+  □ .env: ONEC_WRITE_ENABLED=false, ключ ≥24 символов
+  □ заполнен блок B (хотя бы факты после установки)
+  □ (желательно) один тест-заказ с ACK в 1С TEST
+
+Конец файла.

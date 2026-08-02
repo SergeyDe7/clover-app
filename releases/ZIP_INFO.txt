@@ -1,0 +1,16 @@
+﻿ZIP для Андрея
+==============
+Файл: clover-dc-prep-d4b0b28-for-andrey.zip
+Дата: 2026-08-02
+SHA256: 7F157FD1FF39871CCB589A85D04F379ED44789FEF0C2EAA3AF77BB29B88989DC
+Размер: 36772 байт
+Код: main @ d4b0b28
+
+Главное внутри:
+  dc-prep-d4b0b28/LETTER_ANDREY.txt     ← короткое письмо
+  dc-prep-d4b0b28/INSTALL_FOR_ANDREY.txt
+  dc-prep-d4b0b28/ARCHITECTURE.txt
+  dc-prep-d4b0b28/ANDREY_FILL_ME.txt
+
+Секретов нет. Ставить — только после «ставить» от заказчика.
+Старый пакет 766ea88 оставлен рядом как архив; актуальный — d4b0b28.

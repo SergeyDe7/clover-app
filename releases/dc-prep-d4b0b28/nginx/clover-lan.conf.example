@@ -1,0 +1,36 @@
+# Черновик nginx для ЭТАПА 1 (LAN по IP) — опционально вместо vite preview :5273.
+# Если используете этот конфиг: соберите dist (npm run build), отключите clover-ui.service,
+# слушайте :80 на внутреннем IP, API остаётся на 127.0.0.1:4100.
+#
+# Подставить: <ВНУТРЕННИЙ_IP>
+
+server {
+    listen <ВНУТРЕННИЙ_IP>:80;
+    server_name <ВНУТРЕННИЙ_IP>;
+
+    root /opt/clover/clover-app/dist;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:4100;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /uploads/ {
+        proxy_pass http://127.0.0.1:4100;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+# ЭТАП 2 (HTTPS clover-order.ru): лучше Caddy (caddy/Caddyfile.example)
+# или отдельный server { listen 443 ssl; ... } + certbot.
+# Тогда APP_PUBLIC_URL=https://clover-order.ru и закрыть :80/:5273/:4100 с WAN.
