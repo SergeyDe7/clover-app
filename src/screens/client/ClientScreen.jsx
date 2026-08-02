@@ -26,6 +26,7 @@ import {
   statusClass,
 } from "../../shared/appHelpers";
 import { canTrashOrder } from "../../shared/orderTrash";
+import { EmptyState } from "../../shared/uxFeedback";
 import { ManagerContact } from "./ManagerContact";
 import { ProfilePanel } from "./ProfilePanel";
 import { AddressesPanel } from "./AddressesPanel";
@@ -432,11 +433,16 @@ function ClientDashboard({
           })}
         </div>
       ) : (
-        <div className="empty-box">
-          {filter === "Активные"
-            ? "Активных заказов нет."
-            : "Заказов с таким статусом пока нет."}
-        </div>
+        <EmptyState
+          title={filter === "Активные" ? "Пока нет заказов" : "Заказы не найдены"}
+          message={
+            filter === "Активные"
+              ? "Создайте первый заказ — он появится здесь."
+              : "По этому фильтру заказов нет. Попробуйте другой статус."
+          }
+          actionLabel="Новый заказ"
+          onAction={openNewOrder}
+        />
       )}
 
       <button

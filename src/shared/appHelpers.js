@@ -541,11 +541,11 @@ export const EMPTY_LINK = {
 
 export const EXCHANGE_STATUS_LABELS = {
   not_sent: "Не отправлен",
-  ready: "В очереди 1С TEST",
-  sending: "Передаётся в 1С TEST",
-  sent: "Создан в 1С TEST",
+  ready: "В очереди на передачу в 1С",
+  sending: "Передаётся в 1С",
+  sent: "Принят в 1С",
   draft: "Черновик создан в 1С",
-  error: "Ошибка",
+  error: "Не удалось передать",
 };
 
 export function normalizeOrderExchange(value = {}) {

@@ -21,6 +21,7 @@ import {
 } from "../../shared/appHelpers";
 import { canTrashOrder } from "../../shared/orderTrash";
 import { appAlert } from "../../shared/AppModal";
+import { EmptyState } from "../../shared/uxFeedback";
 
 const CUSTOM_STATUSES = [
   "Новый запрос",
@@ -74,10 +75,49 @@ export function ManagerOrders({
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkPanelOpen, setBulkPanelOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [clientQuickFilter, setClientQuickFilter] = useState(null);
   const effectiveSearch = headerSearch.trim();
-  const filtersActive = status !== "Все" || exchangeFilter !== "all" || sort !== "newest";
+  const filtersActive = status !== "Все" || exchangeFilter !== "all" || sort !== "newest" || Boolean(clientQuickFilter);
   const inTrash = ordersView === "trash";
   const sourceOrders = inTrash ? trashedOrders : orders;
+
+  const waitingOneCCount = useMemo(
+    () => orders.filter((order) => {
+      const exchange = normalizeOrderExchange(order.exchange);
+      return exchange.status === "not_sent" || exchange.status === "error";
+    }).length,
+    [orders]
+  );
+
+  const queuedOneCCount = useMemo(
+    () => orders.filter((order) => {
+      const exchange = normalizeOrderExchange(order.exchange);
+      return exchange.status === "ready" || exchange.status === "sending";
+    }).length,
+    [orders]
+  );
+
+  const recentClients = useMemo(() => {
+    const sorted = [...orders].sort((a, b) =>
+      String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
+    );
+    const seen = new Set();
+    const list = [];
+    for (const order of sorted) {
+      const name = String(order.customerName || "").trim();
+      const clientId = order.clientId != null ? String(order.clientId) : "";
+      const key = clientId || name.toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      list.push({
+        key,
+        clientId,
+        name: name || "Клиент",
+      });
+      if (list.length >= 5) break;
+    }
+    return list;
+  }, [orders]);
 
   const visible = useMemo(() => {
     const needle = effectiveSearch.trim();
@@ -85,15 +125,23 @@ export function ManagerOrders({
       const exchange = normalizeOrderExchange(order.exchange);
       const link = clientLinks[order.clientId] || {};
       const haystack = buildOrderSearchHaystack(order, link);
+      const matchesClientQuick = !clientQuickFilter || (
+        (clientQuickFilter.clientId && String(order.clientId) === String(clientQuickFilter.clientId))
+        || (!clientQuickFilter.clientId && String(order.customerName || "").trim().toLowerCase() === String(clientQuickFilter.name || "").trim().toLowerCase())
+      );
       return (!needle || matchesTextSearch(haystack, needle))
+        && matchesClientQuick
         && (inTrash || status === "Все" || order.status === status)
-        && (inTrash || exchangeFilter === "all" || exchange.status === exchangeFilter);
+        && (inTrash || exchangeFilter === "all"
+          || (exchangeFilter === "waiting" && (exchange.status === "not_sent" || exchange.status === "error"))
+          || (exchangeFilter === "queued" && (exchange.status === "ready" || exchange.status === "sending"))
+          || exchange.status === exchangeFilter);
     }).sort((a, b) => {
       if (sort === "delivery") return String(a.firstDeliveryDate).localeCompare(String(b.firstDeliveryDate));
       if (sort === "oldest") return String(a.createdAt).localeCompare(String(b.createdAt));
       return String(b.createdAt || b.deletedAt || "").localeCompare(String(a.createdAt || a.deletedAt || ""));
     });
-  }, [sourceOrders, effectiveSearch, status, exchangeFilter, sort, clientLinks, inTrash]);
+  }, [sourceOrders, effectiveSearch, status, exchangeFilter, sort, clientLinks, inTrash, clientQuickFilter]);
 
   const runExchangeAction = async (order, action) => {
     const exchange = normalizeOrderExchange(order.exchange);
@@ -235,10 +283,72 @@ export function ManagerOrders({
       </div>
       )}
 
+      {!inTrash && (
+        <div className="manager-orders-quick-chips category-list" role="group" aria-label="Быстрые фильтры 1С">
+          <button
+            className={exchangeFilter === "waiting" ? "category-button active" : "category-button"}
+            type="button"
+            onClick={() => {
+              setExchangeFilter((current) => (current === "waiting" ? "all" : "waiting"));
+              setFiltersOpen(true);
+            }}
+          >
+            Ждут 1С ({waitingOneCCount})
+          </button>
+          <button
+            className={exchangeFilter === "queued" ? "category-button active" : "category-button"}
+            type="button"
+            onClick={() => {
+              setExchangeFilter((current) => (current === "queued" ? "all" : "queued"));
+              setFiltersOpen(true);
+            }}
+          >
+            В очереди ({queuedOneCCount})
+          </button>
+        </div>
+      )}
+
+      {!inTrash && recentClients.length > 0 && (
+        <div className="manager-orders-recent-clients category-list" role="group" aria-label="Недавние клиенты">
+          <p className="manager-orders-recent-label">Недавние клиенты</p>
+          {recentClients.map((client) => {
+            const active = clientQuickFilter?.key === client.key;
+            return (
+              <button
+                key={client.key}
+                className={active ? "category-button active" : "category-button"}
+                type="button"
+                onClick={() => setClientQuickFilter(active ? null : client)}
+              >
+                {client.name}
+              </button>
+            );
+          })}
+          {clientQuickFilter && (
+            <button
+              className="category-button"
+              type="button"
+              onClick={() => setClientQuickFilter(null)}
+            >
+              Сбросить клиента
+            </button>
+          )}
+        </div>
+      )}
+
       {!inTrash && filtersOpen && (
         <div className="toolbar three manager-orders-filters">
           <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Фильтр статуса заказа"><option>Все</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
-          <select value={exchangeFilter} onChange={(e) => setExchangeFilter(e.target.value)} aria-label="Фильтр статуса 1С"><option value="all">Все статусы 1С</option>{Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select>
+          <select
+            value={exchangeFilter}
+            onChange={(e) => setExchangeFilter(e.target.value)}
+            aria-label="Фильтр статуса 1С"
+          >
+            <option value="all">Все статусы 1С</option>
+            <option value="waiting">Ждут 1С</option>
+            <option value="queued">В очереди</option>
+            {Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}
+          </select>
           <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Сортировка заказов"><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="delivery">По дате доставки</option></select>
         </div>
       )}
@@ -514,9 +624,16 @@ export function ManagerOrders({
           })}
         </div>
       ) : (
-        <div className="empty-box">
-          {inTrash ? "Корзина пуста." : "Заказы не найдены."}
-        </div>
+        <EmptyState
+          title={inTrash ? "Удалённых заказов нет" : "Заказы не найдены"}
+          message={
+            inTrash
+              ? "Здесь появятся заказы, которые вы удалите."
+              : clientQuickFilter || exchangeFilter !== "all" || status !== "Все"
+                ? "По текущим фильтрам ничего нет. Сбросьте фильтр или выберите другой."
+                : "Когда клиенты оформят заказы, они появятся в этом списке."
+          }
+        />
       )}
     </section>
   );

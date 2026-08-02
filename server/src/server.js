@@ -2038,8 +2038,8 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
       if (previousExchange.status !== "error" && currentExchange.status === "error") {
         queueManagerNotification({
           type: "onec_error",
-          title: `Ошибка обмена с 1С по заказу №${order.number || order.id || ""}`,
-          body: currentExchange.error || currentExchange.message || "Проверьте журнал обмена и настройки подключения.",
+          title: `Не удалось передать в 1С заказ №${order.number || order.id || ""}`,
+          body: currentExchange.error || currentExchange.message || "Проверьте подключение к 1С и статус заказа.",
           url: `/?managerTab=exchange&order=${encodeURIComponent(order.id)}`,
           sourceId: `${order.id}:${currentExchange.updatedAt || order.updatedAt || Date.now()}`,
         });

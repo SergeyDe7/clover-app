@@ -34,6 +34,7 @@ import {
 import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
 import { appAlert, appConfirm } from "./shared/AppModal";
 import { canTrashOrder } from "./shared/orderTrash";
+import { SoftBanner, ListSkeleton } from "./shared/uxFeedback";
 
 function LoginView({ onAuth, authBusy, authError }) {
   const params = new URLSearchParams(window.location.search);
@@ -356,6 +357,10 @@ function App() {
   const [loading, setLoading] = useState(Boolean(getApiToken()));
   const [hydrated, setHydrated] = useState(false);
   const [syncError, setSyncError] = useState("");
+  const [isOffline, setIsOffline] = useState(
+    typeof navigator !== "undefined" ? !navigator.onLine : false
+  );
+  const [updateAvailable, setUpdateAvailable] = useState(false);
 
   const [products, setProducts] = useState(
     DEFAULT_PRODUCTS.map(normalizeProduct)
@@ -514,6 +519,20 @@ function App() {
     }
 
     loadBootstrap();
+  }, []);
+
+  useEffect(() => {
+    const onOnline = () => setIsOffline(false);
+    const onOffline = () => setIsOffline(true);
+    const onUpdateAvailable = () => setUpdateAvailable(true);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    window.addEventListener("clover:update-available", onUpdateAvailable);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("clover:update-available", onUpdateAvailable);
+    };
   }, []);
 
   useEffect(() => {
@@ -1503,8 +1522,9 @@ function App() {
     return (
       <>
         <style>{APP_STYLES}</style>
-        <main className="loading-page loading-page-quiet" aria-busy="true" aria-label="Загрузка">
+        <main className="loading-page loading-page-quiet clover-app" aria-busy="true" aria-label="Загрузка">
           <div className="loading-quiet-bar" aria-hidden="true" />
+          {getApiToken() ? <ListSkeleton rows={5} variant="orders" /> : null}
         </main>
       </>
     );
@@ -1597,8 +1617,31 @@ function App() {
     <>
       <style>{APP_STYLES}</style>
       {content}
-      {syncError && (
-        <div className="server-banner">{syncError}</div>
+      {isOffline && (
+        <SoftBanner
+          tone="warn"
+          title="Нет связи"
+          message="Проверьте интернет. Можно продолжать смотреть уже загруженные данные."
+        />
+      )}
+      {!isOffline && updateAvailable && (
+        <SoftBanner
+          tone="info"
+          title="Доступна новая версия"
+          message="Обновите страницу, чтобы получить последние изменения."
+          actionLabel="Обновить"
+          onAction={() => window.location.reload()}
+        />
+      )}
+      {!isOffline && !updateAvailable && syncError && (
+        <SoftBanner
+          tone="danger"
+          title="Проблема связи"
+          message={syncError}
+          actionLabel="Повторить"
+          onAction={() => loadBootstrap()}
+          onDismiss={() => setSyncError("")}
+        />
       )}
     </>
   );
