@@ -17,8 +17,11 @@
 2) ARCHITECTURE.txt — схема
 3) ANDREY_FILL_ME.txt — короткая анкета (вернуть заказчику; секреты не писать)
 
-Код для checkout: main @ d4b0b28
-(полный: d4b0b283fb668d60858ca57e0f685f8ccac53b9c)
+Код для checkout (после merge PR #15 в main):
+  git fetch origin && git checkout main && git pull
+  Проверка базы: коммит не старше ac44dcf (#16 matrix units, #17 bulk alerts)
+  полный минимум: ac44dcf6e734fa3dc96d592729263aa5cc54042b
+  В том же main будет layout вкладки менеджера «1С» и эта папка releases/dc-prep-ac44dcf/
 
 Ставить на сервер — только после явного «ставить» от заказчика.
 Домен / HTTPS / push — этап 2, отдельным согласованием.

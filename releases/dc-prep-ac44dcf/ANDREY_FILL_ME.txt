@@ -28,7 +28,7 @@ ONEC_API_KEY задан в .env и в 1С: да / нет
 
 --- Установка Clover ---
 Путь: /opt/clover/clover-app или _______________
-git HEAD: _______________ (ожидание d4b0b28…)
+git HEAD: _______________ (ожидание ac44dcf…)
 node -v: _______________
 systemd api+ui: да / нет
 health 4.0.4: да / нет

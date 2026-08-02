@@ -1,10 +1,10 @@
-MANIFEST — dc-prep-d4b0b28
+MANIFEST — dc-prep-ac44dcf
 =========================
 
-Дата:        2026-08-02
+Дата:        2026-08-03
 Назначение:  подготовка установки ДЦ (без фактической установки)
 Git branch:  main
-Git HEAD:    d4b0b283fb668d60858ca57e0f685f8ccac53b9c
+Git HEAD:    ac44dcf6e734fa3dc96d592729263aa5cc54042b
 App version: 4.0.4
 Домен (этап 2): clover-order.ru
 DNS snapshot:   A clover-order.ru → 81.177.141.15 (HTTPS нет, HTTP 404)
@@ -58,3 +58,6 @@ PR в составе main:
   #12 push badge / PUSH_ENABLE.md — MERGED
   #13 UI polish — MERGED
   #14 UX empty/offline — MERGED
+  #16 client matrix unit select — MERGED
+  #17 manager bulk status alerts — MERGED
+  #15 manager 1C layout + this pack — merge pending / then MERGED

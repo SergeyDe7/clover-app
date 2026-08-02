@@ -1,6 +1,6 @@
 Clover — установка на Linux VM (черновик для Андрея)
 =====================================================
-Код:     main @ d4b0b28  |  версия 4.0.4
+Код:     main (после PR #15; предок ≥ ac44dcf)  |  версия 4.0.4
 Домен:   clover-order.ru (ЭТАП 2, не в первой установке)
 Backup:  средствами гипервизора (снимок VM / диска)
 Статус:  ПОДГОТОВКА — на сервер не ставить, пока заказчик не скажет «ставить»
@@ -54,7 +54,9 @@ A) git (предпочтительно):
     cd /opt/clover &&
     git clone https://github.com/SergeyDe7/clover-app.git clover-app &&
     cd clover-app &&
-    git checkout d4b0b28
+    git fetch origin &&
+    git checkout main &&
+    git pull
   '
 
 B) архив с машины разработки — распаковать в /opt/clover/clover-app
@@ -63,7 +65,8 @@ B) архив с машины разработки — распаковать в
 Проверка:
 
   cd /opt/clover/clover-app && git rev-parse HEAD
-  # ожидание: d4b0b283fb668d60858ca57e0f685f8ccac53b9c
+  git merge-base --is-ancestor ac44dcf HEAD && echo "OK: ac44dcf ancestor"
+  # ожидание: main с PR #15 (layout 1С) и releases/dc-prep-ac44dcf/
 
 
 5. Node.js ≥ 22.13
@@ -82,7 +85,7 @@ B) архив с машины разработки — распаковать в
 
 7. Файл окружения
 -----------------
-  sudo -u clover cp releases/dc-prep-d4b0b28/server.env.template server/.env
+  sudo -u clover cp releases/dc-prep-ac44dcf/server.env.template server/.env
   # или: docs/deploy/server.env.datacenter.example → server/.env
 
 Отредактировать server/.env (обязательно):
@@ -111,7 +114,7 @@ B) архив с машины разработки — распаковать в
   systemd/clover-api.service
   systemd/clover-ui.service
 
-  sudo cp releases/dc-prep-d4b0b28/systemd/*.service /etc/systemd/system/
+  sudo cp releases/dc-prep-ac44dcf/systemd/*.service /etc/systemd/system/
   sudo systemctl daemon-reload
   sudo systemctl enable --now clover-api clover-ui
   sudo systemctl status clover-api clover-ui --no-pager

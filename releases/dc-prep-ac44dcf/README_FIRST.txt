@@ -2,7 +2,7 @@ Clover — подготовка установки в датацентр (НЕ �
 =========================================================
 
 Версия кода: 4.0.4
-Git HEAD:    d4b0b28 (main, PR #11-#14 merged; install target d4b0b28)
+Git HEAD:    main после PR #15 (минимум предок ac44dcf; #11-#17 + layout 1С)
 Дата prep:   2026-08-02
 Домен (позже): clover-order.ru
 
@@ -23,7 +23,7 @@ Git HEAD:    d4b0b28 (main, PR #11-#14 merged; install target d4b0b28)
 -----------------------------------------------
 Этап 1 — LAN / TEST (без публикации в интернет):
   1) Backup (если на сервере уже что-то есть).
-  2) Код main @ d4b0b28 (git clone/pull или архив) БЕЗ чужого server\.env.
+  2) Код main после PR #15 (git clone/pull или архив) БЕЗ чужого server\.env.
   3) npm ci в корне и в server\.
   4) server\.env из server.env.template (подставить IP и секреты).
   5) ONEC_WRITE_ENABLED=false до отдельного «да».
@@ -41,7 +41,7 @@ Git HEAD:    d4b0b28 (main, PR #11-#14 merged; install target d4b0b28)
   INSTALL_FOR_ANDREY.txt   — установка
   ARCHITECTURE.txt         — 1С на компе1, Clover в ДЦ, VPN, бэкапы
   server.env.for-dc + systemd/
-  Zip для отправки: ../clover-dc-prep-d4b0b28-for-andrey.zip
+  Zip для отправки: ../clover-dc-prep-ac44dcf-for-andrey.zip
 
 
 Файлы в этой папке

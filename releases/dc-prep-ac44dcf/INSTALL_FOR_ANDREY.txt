@@ -22,10 +22,10 @@ CLOVER — ФАЙЛ УСТАНОВКИ В ДЦ (Linux)
 
 Продукт:          Clover (заказы → менеджер → 1С УНФ TEST)
 Версия:           4.0.4
-Git:              ветка main, коммит d4b0b28
-                  полный: d4b0b283fb668d60858ca57e0f685f8ccac53b9c
+Git:              ветка main, коммит ac44dcf
+                  полный: ac44dcf6e734fa3dc96d592729263aa5cc54042b
 Репозиторий:      https://github.com/SergeyDe7/clover-app
-PR в составе:     #11-#14 MERGED (install: main @ d4b0b28)
+PR в составе:     #11-#14 MERGED (install: main @ ac44dcf)
                   LETTER_ANDREY.txt — короткое письмо Андрею
 
 Среда первой установки:  только TEST (не production, не VLAVKA)
@@ -140,21 +140,23 @@ C2. Node.js ≥ 22.13
   node -v    # должно быть ≥ v22.13.0
   which node # запомнить путь для systemd (часто /usr/bin/node)
 
-C3. Код @ d4b0b28
+C3. Код main (после merge PR #15; минимум предок ac44dcf)
   Вариант A — git:
     sudo -u clover -H bash -lc '
       cd /opt/clover &&
       git clone https://github.com/SergeyDe7/clover-app.git clover-app &&
       cd clover-app &&
       git fetch origin &&
-      git checkout d4b0b28
+      git checkout main &&
+      git pull
     '
   Вариант B — архив от заказчика → распаковать в /opt/clover/clover-app
     БЕЗ чужого server/.env; sqlite — только если согласован перенос (B4).
 
   Проверка:
     cd /opt/clover/clover-app && git rev-parse HEAD
-    # ожидание начинается с d4b0b28
+    git merge-base --is-ancestor ac44dcf HEAD && echo "OK: ac44dcf ancestor"
+    # ожидание: main с layout вкладки 1С (PR #15) и пакетом dc-prep-ac44dcf
 
 C4. Зависимости и сборка UI
   cd /opt/clover/clover-app
@@ -165,10 +167,10 @@ C4. Зависимости и сборка UI
 
 C5. server/.env
   В репозитории шаблон:
-    releases/dc-prep-d4b0b28/server.env.template
+    releases/dc-prep-ac44dcf/server.env.template
   или рядом с этим файлом: server.env.for-dc (тот же смысл)
 
-  sudo -u clover cp releases/dc-prep-d4b0b28/server.env.template server/.env
+  sudo -u clover cp releases/dc-prep-ac44dcf/server.env.template server/.env
   sudo -u clover chmod 600 server/.env
 
   Обязательно выставить (подставить 【АНДРЕЙ: внутренний IP】):
@@ -197,14 +199,14 @@ C5. server/.env
 
 C6. systemd
   Файлы в пакете:
-    releases/dc-prep-d4b0b28/systemd/clover-api.service
-    releases/dc-prep-d4b0b28/systemd/clover-ui.service
+    releases/dc-prep-ac44dcf/systemd/clover-api.service
+    releases/dc-prep-ac44dcf/systemd/clover-ui.service
 
   【АНДРЕЙ: если `which node` ≠ /usr/bin/node — поправить ExecStart в юнитах】
   【АНДРЕЙ: если `which npm` ≠ /usr/bin/npm — поправить clover-ui.service】
 
-  sudo cp releases/dc-prep-d4b0b28/systemd/clover-api.service /etc/systemd/system/
-  sudo cp releases/dc-prep-d4b0b28/systemd/clover-ui.service  /etc/systemd/system/
+  sudo cp releases/dc-prep-ac44dcf/systemd/clover-api.service /etc/systemd/system/
+  sudo cp releases/dc-prep-ac44dcf/systemd/clover-ui.service  /etc/systemd/system/
   sudo systemctl daemon-reload
   sudo systemctl enable --now clover-api clover-ui
   sudo systemctl status clover-api clover-ui --no-pager
@@ -223,7 +225,7 @@ C8. Проверки на VM
   # ожидается: 200
 
   Или скрипт:
-    bash releases/dc-prep-d4b0b28/scripts/health-check.sh
+    bash releases/dc-prep-ac44dcf/scripts/health-check.sh
 
 C9. Проверки с другого ПК LAN
   http://【IP】:5273/
@@ -259,8 +261,8 @@ C11. Backup гипервизором
      сверить с B2).
   2. Поставить Caddy или nginx + Let's Encrypt.
      Черновики в пакете:
-       releases/dc-prep-d4b0b28/caddy/Caddyfile.example
-       releases/dc-prep-d4b0b28/nginx/clover-https.conf.example
+       releases/dc-prep-ac44dcf/caddy/Caddyfile.example
+       releases/dc-prep-ac44dcf/nginx/clover-https.conf.example
   3. В server/.env:
        APP_PUBLIC_URL=https://clover-order.ru
        CLOVER_PUBLIC_URL=https://clover-order.ru
@@ -292,7 +294,7 @@ C11. Backup гипервизором
 ЧАСТЬ F. СОСТАВ ПАКЕТА (рядом с этим файлом)
 ================================================================================
 
-Каталог в репозитории: releases/dc-prep-d4b0b28/
+Каталог в репозитории: releases/dc-prep-ac44dcf/
 
   LETTER_ANDREY.txt           ← короткое письмо Андрею
   INSTALL_FOR_ANDREY.txt      ← ЭТОТ ФАЙЛ (главный)
@@ -313,7 +315,7 @@ C11. Backup гипервизором
   MANIFEST.txt
   CHECKSUMS_SHA256.txt
 
-  Готовый zip: releases/clover-dc-prep-d4b0b28-for-andrey.zip
+  Готовый zip: releases/clover-dc-prep-ac44dcf-for-andrey.zip
 
 
 ================================================================================
@@ -322,7 +324,7 @@ C11. Backup гипервизором
 
   □ health version 4.0.4
   □ UI открывается по LAN IP:5273
-  □ git HEAD = d4b0b28…
+  □ git merge-base --is-ancestor ac44dcf HEAD…
   □ .env: ONEC_WRITE_ENABLED=false, ключ ≥24 символов
   □ заполнен блок B (хотя бы факты после установки)
   □ (желательно) один тест-заказ с ACK в 1С TEST
