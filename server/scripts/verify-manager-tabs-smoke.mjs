@@ -17,11 +17,11 @@ const MAIN_TAB_TO_PANEL = {
   clients: "ManagerClients",
   products: "ManagerProducts",
   exchange: "ManagerExchange",
+  acts: "ManagerReconciliation",
   more: null,
 };
 
 const MORE_TAB_TO_PANEL = {
-  acts: "ManagerReconciliation",
   settings: "ManagerSettings",
   backup: "ManagerBackup",
   audit: "ManagerAudit",
