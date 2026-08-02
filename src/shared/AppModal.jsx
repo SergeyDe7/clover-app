@@ -62,6 +62,7 @@ export async function appConfirm({
 
 /**
  * Alert в стиле Clover вместо window.alert.
+ * @param {{ summary?: string, lines?: string[] }} [options.expandable] — длинный список по запросу
  * @returns {Promise<void>}
  */
 export async function appAlert({
@@ -69,10 +70,14 @@ export async function appAlert({
   message = "",
   confirmLabel = "Понятно",
   tone = "default",
+  expandable = null,
 } = {}) {
   const host = await ensureHost();
   if (!host) {
-    window.alert([title, message].filter(Boolean).join("\n\n"));
+    const expandText = expandable?.lines?.length
+      ? `\n\n${expandable.summary || "Подробности"}:\n${expandable.lines.join("\n")}`
+      : "";
+    window.alert([title, message].filter(Boolean).join("\n\n") + expandText);
     return;
   }
   await host({
@@ -82,6 +87,7 @@ export async function appAlert({
     confirmLabel,
     cancelLabel: "",
     tone,
+    expandable,
   });
 }
 
