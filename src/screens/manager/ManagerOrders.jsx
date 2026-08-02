@@ -168,24 +168,50 @@ export function ManagerOrders({
   const applyBulkStatus = async () => {
     if (!selectedIds.length) return;
     const selected = orders.filter((order) => selectedIds.includes(order.id));
+    const alreadySame = selected.filter((order) => order.status === bulkStatus);
     const allowedIds = selected
-      .filter((order) => allowedNextOrderStatuses(order.status).includes(bulkStatus))
+      .filter(
+        (order) =>
+          order.status !== bulkStatus
+          && allowedNextOrderStatuses(order.status).includes(bulkStatus)
+      )
       .map((order) => order.id);
-    const skipped = selected.length - allowedIds.length;
+    const forbidden = selected.length - alreadySame.length - allowedIds.length;
+
     if (!allowedIds.length) {
+      if (alreadySame.length === selected.length) {
+        await appAlert({
+          title: "Без изменений",
+          message: `Все выбранные заказы уже в статусе «${bulkStatus}».`,
+        });
+        return;
+      }
       await appAlert({
         title: "Статус не изменён",
-        message: `Статус «${bulkStatus}» недоступен ни для одного выбранного заказа.`,
+        message: [
+          `Статус «${bulkStatus}» недоступен для выбранных заказов.`,
+          alreadySame.length ? `Уже в этом статусе: ${alreadySame.length}.` : "",
+          forbidden ? `Нельзя сменить: ${forbidden}.` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
         tone: "warn",
       });
       return;
     }
+
     onBulkUpdateOrders(allowedIds, { status: bulkStatus });
     setSelectedIds([]);
-    if (skipped > 0) {
+    if (forbidden > 0 || alreadySame.length > 0) {
       await appAlert({
         title: "Статус обновлён частично",
-        message: `Обновлено: ${allowedIds.length}. Пропущено (запрещённый переход): ${skipped}.`,
+        message: [
+          `К обновлению: ${allowedIds.length}.`,
+          alreadySame.length ? `Уже в этом статусе: ${alreadySame.length}.` : "",
+          forbidden ? `Нельзя сменить: ${forbidden}.` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
         tone: "warn",
       });
     }
