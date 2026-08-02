@@ -40,9 +40,13 @@ for (const fragment of [
   "Запросить акт сверки",
   "1 квартал",
   "За весь период",
-  "Установить Clover",
   "Связаться с менеджером",
 ]) assert.ok(appSource.includes(fragment), `Missing UI fragment ${fragment}`);
+assert.equal(
+  appSource.includes("Установить Clover"),
+  false,
+  "PWA install banner text «Установить Clover» must stay removed"
+);
 for (const method of ["getPasskeyAuthenticationOptions", "createReconciliation", "subscribePush", "logoutOtherSessions"]) {
   assert.ok(apiSource.includes(method), `Missing API method ${method}`);
 }
