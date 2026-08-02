@@ -2227,6 +2227,74 @@ html.clover-thankyou-open .app-header {
 .client-settings-stack { display: grid; gap: 18px; }
 .client-matrix-toolbar { display: grid; gap: 12px; margin-bottom: 18px; }
 .client-matrix-meta { color: #737d73; font-size: 14px; }
+.client-matrix-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.client-matrix-card {
+  min-height: 0;
+  padding: 10px;
+  border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(56, 97, 52, 0.04);
+}
+.client-matrix-card .product-image-wrap {
+  height: 88px;
+  margin: 6px 0 0;
+}
+.client-matrix-card .product-image-placeholder {
+  font-size: 11px;
+  padding: 8px;
+  text-align: center;
+}
+.client-matrix-card h2 {
+  margin: 8px 0 4px;
+  font-size: 13px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.client-matrix-card .product-code {
+  margin: 0 0 4px;
+  font-size: 11px;
+}
+.client-matrix-card .product-price {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #386f37;
+}
+.client-matrix-card .product-category {
+  padding: 3px 7px;
+  font-size: 10px;
+}
+.client-matrix-card .product-card-controls {
+  gap: 5px;
+}
+.client-matrix-card .unit-choice {
+  min-height: 30px;
+  gap: 5px;
+}
+.client-matrix-card .unit-choice button {
+  min-height: 30px;
+  padding: 4px 2px;
+  font-size: 10px;
+  border-radius: 8px;
+}
+.client-matrix-card .unit-hint {
+  min-height: 14px;
+  font-size: 9px;
+}
+@media (max-width: 1100px) {
+  .client-matrix-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 820px) {
+  .client-matrix-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .client-matrix-card { padding: 8px; }
+  .client-matrix-card .product-image-wrap { height: 72px; }
+  .client-matrix-card h2 { font-size: 12px; }
+}
 button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 0; }
 .manager-grid { display: grid; gap: 16px; }
 .manager-textareas { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 12px; }

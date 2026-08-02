@@ -1,5 +1,5 @@
 // Панель персональной матрицы товаров клиента.
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   UNIT_CONFIG,
   UNIT_ORDER,
@@ -19,6 +19,7 @@ export function ClientMatrixPanel({
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Все");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [units, setUnits] = useState({});
 
   const activeProducts = useMemo(
     () => (Array.isArray(products) ? products : []).filter((item) => item.active !== false),
@@ -30,10 +31,12 @@ export function ClientMatrixPanel({
     [activeProducts]
   );
 
+  const activeCategory = categories.includes(category) ? category : "Все";
+
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return activeProducts.filter((item) => {
-      const byCategory = category === "Все" || item.category === category;
+      const byCategory = activeCategory === "Все" || item.category === activeCategory;
       const bySearch =
         !needle ||
         String(item.name || "").toLowerCase().includes(needle) ||
@@ -41,16 +44,10 @@ export function ClientMatrixPanel({
       const byFavorite = !favoritesOnly || favorites.includes(item.id);
       return byCategory && bySearch && byFavorite;
     });
-  }, [activeProducts, search, category, favoritesOnly, favorites]);
-
-  useEffect(() => {
-    if (category !== "Все" && !categories.includes(category)) {
-      setCategory("Все");
-    }
-  }, [categories, category]);
+  }, [activeProducts, search, activeCategory, favoritesOnly, favorites]);
 
   return (
-    <section className="panel">
+    <section className="panel client-matrix-panel">
       <div className="panel-heading">
         <div>
           <p className="eyebrow">Персональный каталог</p>
@@ -71,7 +68,7 @@ export function ClientMatrixPanel({
       ) : (
         <p className="client-matrix-meta">
           В матрице: <strong>{activeProducts.length}</strong> поз.
-          {category !== "Все" ? ` · категория «${category}»: ${filtered.length}` : ""}
+          {activeCategory !== "Все" ? ` · категория «${activeCategory}»: ${filtered.length}` : ""}
         </p>
       )}
 
@@ -98,7 +95,7 @@ export function ClientMatrixPanel({
         <div className="category-list">
           {categories.map((item) => (
             <button
-              className={category === item ? "category-button active" : "category-button"}
+              className={activeCategory === item ? "category-button active" : "category-button"}
               type="button"
               key={item}
               onClick={() => setCategory(item)}
@@ -110,17 +107,17 @@ export function ClientMatrixPanel({
       </div>
       )}
 
-      <section className="product-grid">
+      <section className="product-grid client-matrix-grid">
         {filtered.map((product) => {
           const allowedUnits = UNIT_ORDER.filter((item) =>
             (product.saleUnits || []).includes(item)
           );
-          const unit = allowedUnits[0] || "piece";
+          const unit = units[product.id] || allowedUnits[0] || "piece";
           const unitMeta = UNIT_CONFIG[unit] || UNIT_CONFIG.piece;
           const price = getUnitPrice(product, unit);
           const multiplier = getUnitMultiplier(product, unit);
           return (
-            <article className="product-card" key={product.id}>
+            <article className="product-card client-matrix-card" key={product.id}>
               <div className="product-card-top">
                 <span className="product-category">{product.category || "Без категории"}</span>
                 {settings?.showFavorites && (
@@ -143,7 +140,7 @@ export function ClientMatrixPanel({
                 {product.imageUrl ? (
                   <img className="product-image" src={product.imageUrl} alt={product.name} />
                 ) : (
-                  <span className="product-image-placeholder">Фото товара пока не загружено</span>
+                  <span className="product-image-placeholder">Нет фото</span>
                 )}
               </div>
               <h2>{product.name}</h2>
@@ -157,18 +154,27 @@ export function ClientMatrixPanel({
                   "Цена уточняется"
                 )}
               </p>
-              <div className="unit-choice">
-                {allowedUnits.map((item) => (
-                  <span className="category-button" key={item} style={{ cursor: "default" }}>
-                    {(UNIT_CONFIG[item] || UNIT_CONFIG.piece).label}
-                  </span>
-                ))}
+              <div className="product-card-controls">
+                <div className="unit-choice">
+                  {allowedUnits.map((item) => (
+                    <button
+                      className={unit === item ? "active" : ""}
+                      type="button"
+                      key={item}
+                      onClick={() =>
+                        setUnits((current) => ({ ...current, [product.id]: item }))
+                      }
+                    >
+                      {(UNIT_CONFIG[item] || UNIT_CONFIG.piece).label}
+                    </button>
+                  ))}
+                </div>
+                <p className="unit-hint">
+                  {multiplier > 1
+                    ? `1 ${unitMeta.label.toLowerCase()} = ${multiplier} шт.`
+                    : "Количество считается поштучно"}
+                </p>
               </div>
-              <p className="unit-hint">
-                {multiplier > 1
-                  ? `1 ${unitMeta.label.toLowerCase()} = ${multiplier} шт.`
-                  : "Количество считается поштучно"}
-              </p>
             </article>
           );
         })}
