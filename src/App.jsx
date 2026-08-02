@@ -1281,21 +1281,41 @@ function App() {
             current.map((order) => byId.get(String(order.id)) || order)
           );
           setSyncError("");
-          if ((result.skipped || []).length || (result.errors || []).length) {
-            const details = [
-              ...(result.skipped || []).map(
-                (item) => `${item.orderId}: ${item.error || item.code}`
-              ),
-              ...(result.errors || []).map(
-                (item) => `${item.orderId}: ${item.error || item.code}`
-              ),
-            ];
-            void appAlert({
-              title: "Частичное обновление",
-              message: `Обновлено: ${(result.updated || []).length}.\nНе изменено:\n${details.join("\n")}`,
-              tone: "warn",
-            });
+          const updatedCount = (result.updated || []).length;
+          const unchanged = (result.skipped || []).filter(
+            (item) => item.code === "ORDER_STATUS_UNCHANGED"
+          );
+          const blocked = (result.skipped || []).filter(
+            (item) => item.code !== "ORDER_STATUS_UNCHANGED"
+          );
+          const failed = result.errors || [];
+          if (!blocked.length && !failed.length) {
+            if (!updatedCount && unchanged.length) {
+              void appAlert({
+                title: "Без изменений",
+                message: `Все выбранные заказы уже в статусе «${patch.status}».`,
+              });
+            }
+            return;
           }
+          const details = [
+            ...blocked.map((item) => `${item.orderId}: ${item.error || item.code}`),
+            ...failed.map((item) => `${item.orderId}: ${item.error || item.code}`),
+          ];
+          void appAlert({
+            title: "Статус обновлён частично",
+            message: [
+              `Обновлено: ${updatedCount}.`,
+              unchanged.length ? `Уже в этом статусе: ${unchanged.length}.` : "",
+              `Нельзя сменить: ${details.length}.`,
+            ]
+              .filter(Boolean)
+              .join(" "),
+            tone: "warn",
+            expandable: details.length
+              ? { summary: `Подробности (${details.length})`, lines: details }
+              : null,
+          });
         } catch (error) {
           setSyncError(error.message);
           void appAlert({ title: "Ошибка обновления", message: error.message, tone: "danger" });
