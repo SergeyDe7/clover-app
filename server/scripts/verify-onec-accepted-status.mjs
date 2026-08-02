@@ -30,6 +30,12 @@ assert.ok(
   "Должен быть POST /api/one-c/orders/accepted."
 );
 assert.ok(
+  !/app\.post\(\s*"\/api\/one-c\/orders\/accepted"[\s\S]*?queueManagerNotification\(\s*\{[\s\S]*?Статус заказа/.test(
+    serverSource
+  ),
+  "ACK 1С не должен создавать in-app уведомление менеджеру (иначе баннер снова появляется после передачи)."
+);
+assert.ok(
   serverSource.includes("applyOneCAcceptedStatus"),
   "Endpoint accepted должен вызывать applyOneCAcceptedStatus."
 );

@@ -31,6 +31,7 @@ import {
   appendOrderHistory,
 } from "./shared/appHelpers";
 import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
+import { canTrashOrder } from "./shared/orderTrash";
 
 function LoginView({ onAuth, authBusy, authError }) {
   const params = new URLSearchParams(window.location.search);
@@ -261,6 +262,89 @@ function LoginView({ onAuth, authBusy, authError }) {
   );
 }
 
+/** Интервал тихого обновления заказов без перезагрузки страницы. */
+const LIVE_ORDERS_REFRESH_MS = 5000;
+
+function orderLiveSignature(order) {
+  const exchange = normalizeOrderExchange(order?.exchange);
+  return [
+    String(order?.id || ""),
+    String(order?.status || ""),
+    String(exchange.status || ""),
+    String(exchange.sentAt || ""),
+    String(exchange.receipt || ""),
+    String(exchange.message || ""),
+    String(order?.updatedAt || ""),
+  ].join("|");
+}
+
+function ordersLiveSignature(orders) {
+  return (Array.isArray(orders) ? orders : [])
+    .map((order) => orderLiveSignature(order))
+    .sort()
+    .join(";");
+}
+
+/**
+ * Сервер — источник правды по составу списка, статусу и exchange.
+ * Локальные комментарии менеджера сохраняем только если статус/обмен не менялись.
+ */
+function mergeOrdersFromServer(previous, incoming, { clientMode = false } = {}) {
+  const prevList = Array.isArray(previous) ? previous : [];
+  const nextList = Array.isArray(incoming) ? incoming : [];
+
+  // Клиент не редактирует чужие поля заказа в списке — берём сервер как есть.
+  if (clientMode) {
+    if (ordersLiveSignature(prevList) === ordersLiveSignature(nextList)) {
+      return prevList;
+    }
+    return nextList;
+  }
+
+  const prevById = new Map(prevList.map((order) => [String(order?.id || ""), order]));
+
+  const merged = nextList.map((remote) => {
+    const local = prevById.get(String(remote?.id || ""));
+    if (!local) return remote;
+
+    const sameStatus = local.status === remote.status;
+    const sameExchange =
+      JSON.stringify(normalizeOrderExchange(local.exchange)) ===
+      JSON.stringify(normalizeOrderExchange(remote.exchange));
+
+    // Статус/обмен с сервера всегда побеждают.
+    if (!sameStatus || !sameExchange) {
+      return {
+        ...remote,
+        managerComment: local.managerComment,
+        internalNote: local.internalNote,
+        customItems: Array.isArray(local.customItems) ? local.customItems : remote.customItems,
+        status: remote.status,
+        exchange: remote.exchange,
+        updatedAt: remote.updatedAt || local.updatedAt,
+      };
+    }
+
+    const localTime = Date.parse(local.updatedAt || "") || 0;
+    const remoteTime = Date.parse(remote.updatedAt || "") || 0;
+    if (localTime <= remoteTime) return remote;
+
+    return {
+      ...remote,
+      managerComment: local.managerComment,
+      internalNote: local.internalNote,
+      customItems: local.customItems,
+      status: remote.status,
+      exchange: remote.exchange,
+    };
+  });
+
+  if (ordersLiveSignature(prevList) === ordersLiveSignature(merged)) {
+    return prevList;
+  }
+  return merged;
+}
+
 function App() {
   const [role, setRole] = useState("client");
   const [authUser, setAuthUser] = useState(null);
@@ -285,6 +369,7 @@ function App() {
   });
   const [showFullCatalog, setShowFullCatalog] = useState(false);
   const [orders, setOrders] = useState([]);
+  const [trashedOrders, setTrashedOrders] = useState([]);
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [addresses, setAddresses] = useState([]);
   const [favorites, setFavorites] = useState([]);
@@ -296,6 +381,7 @@ function App() {
   const [catalogSession, setCatalogSession] = useState(null);
   const [managerNotice, setManagerNotice] = useState(null);
   const skipNextOrdersSyncRef = useRef(false);
+  const pendingDeletedOrderIdsRef = useRef(new Set());
 
   const applyManagerNotificationList = (items) => {
     const incomingNotifications = Array.isArray(items) ? items : [];
@@ -313,13 +399,15 @@ function App() {
     setAuthUser(data.user);
     setRole(data.user.role);
     setProducts(
-      (data.products || DEFAULT_PRODUCTS).map(normalizeProduct)
+      (Array.isArray(data.products) ? data.products : []).map(normalizeProduct)
     );
     setFullCatalogProducts(
       (
-        data.fullCatalogProducts ||
-        data.products ||
-        DEFAULT_PRODUCTS
+        Array.isArray(data.fullCatalogProducts)
+          ? data.fullCatalogProducts
+          : Array.isArray(data.products)
+            ? data.products
+            : []
       ).map(normalizeProduct)
     );
     setCatalogPolicy({
@@ -337,9 +425,11 @@ function App() {
 
     if (data.user.role === "manager" || data.user.role === "admin") {
       applyManagerNotificationList(data.managerNotifications);
+      setTrashedOrders(Array.isArray(data.trashedOrders) ? data.trashedOrders : []);
     } else {
       setManagerNotifications([]);
       setManagerNotice(null);
+      setTrashedOrders([]);
       clearAppBadge();
     }
 
@@ -425,21 +515,54 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!isLoggedIn || !hydrated || (authUser?.role !== "manager" && authUser?.role !== "admin")) {
+    if (!isLoggedIn || !hydrated || !authUser) {
       return undefined;
     }
 
     let active = true;
     let requestInProgress = false;
 
-    const refreshNotifications = async () => {
+    const refreshLiveOrders = async () => {
       if (requestInProgress) return;
+      if (typeof document !== "undefined" && document.hidden) return;
       requestInProgress = true;
 
       try {
-        const data = await api.getManagerNotifications({ limit: 100 });
+        const data = await api.bootstrap();
         if (!active) return;
-        applyManagerNotificationList(data.notifications);
+
+        const incomingOrders = Array.isArray(data.orders) ? data.orders : [];
+        const clientMode = data.user?.role === "client";
+        const pendingDeleted = pendingDeletedOrderIdsRef.current;
+        if (clientMode && pendingDeleted.size) {
+          for (const id of [...pendingDeleted]) {
+            if (!incomingOrders.some((order) => String(order.id) === id)) {
+              pendingDeleted.delete(id);
+            }
+          }
+        }
+        const filteredIncoming = clientMode && pendingDeleted.size
+          ? incomingOrders.filter((order) => !pendingDeleted.has(String(order.id)))
+          : incomingOrders;
+        setOrders((prev) => {
+          const next = mergeOrdersFromServer(prev, filteredIncoming, { clientMode });
+          if (next !== prev) {
+            skipNextOrdersSyncRef.current = true;
+          }
+          return next;
+        });
+
+        if (data.user?.role === "manager" || data.user?.role === "admin") {
+          applyManagerNotificationList(data.managerNotifications);
+          setTrashedOrders(Array.isArray(data.trashedOrders) ? data.trashedOrders : []);
+          if (Array.isArray(data.reconciliationRequests)) {
+            setReconciliationRequests(data.reconciliationRequests);
+          }
+          if (Array.isArray(data.clients)) {
+            setServerClients(data.clients);
+          }
+        }
+
         setSyncError("");
       } catch (error) {
         if (!active) return;
@@ -456,24 +579,31 @@ function App() {
       }
     };
 
-    // В фоне обновляем только список уведомлений менеджера.
-    // Полная загрузка кабинета больше не запускается по таймеру и не меняет экран в режиме ожидания.
-    const intervalId = window.setInterval(refreshNotifications, 30000);
-    const handleFocus = () => refreshNotifications();
+    // Онлайн-статусы: тихий bootstrap по таймеру и при возврате во вкладку/приложение.
+    const intervalId = window.setInterval(refreshLiveOrders, LIVE_ORDERS_REFRESH_MS);
+    const handleFocus = () => {
+      refreshLiveOrders();
+    };
     const handleVisibility = () => {
-      if (!document.hidden) refreshNotifications();
+      if (!document.hidden) refreshLiveOrders();
+    };
+    const handlePageShow = () => {
+      refreshLiveOrders();
     };
 
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pageshow", handlePageShow);
+    refreshLiveOrders();
 
     return () => {
       active = false;
       window.clearInterval(intervalId);
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pageshow", handlePageShow);
     };
-  }, [isLoggedIn, hydrated, authUser?.role]);
+  }, [isLoggedIn, hydrated, authUser?.id, authUser?.role]);
 
   const scheduleSync = (callback, delay = 650) => {
     const timeoutId = window.setTimeout(async () => {
@@ -496,8 +626,60 @@ function App() {
       skipNextOrdersSyncRef.current = false;
       return undefined;
     }
-    return scheduleSync(() => api.saveOrders(orders));
-  }, [orders, hydrated, authUser?.id]);
+    const isStaff = authUser.role === "manager" || authUser.role === "admin";
+    return scheduleSync(async () => {
+      if (!isStaff) {
+        const result = await api.saveOrders(orders);
+        // Сервер мог поправить статус (1С/менеджер) — принимаем ответ в UI.
+        if (Array.isArray(result?.orders)) {
+          skipNextOrdersSyncRef.current = true;
+          setOrders(result.orders);
+        }
+        return;
+      }
+
+      // Перед PUT менеджера подмешиваем серверные заказы,
+      // чтобы устаревший локальный список не стёр новый заказ клиента.
+      const data = await api.bootstrap();
+      const serverOrders = Array.isArray(data.orders) ? data.orders : [];
+      const localById = new Map((orders || []).map((order) => [String(order.id), order]));
+      const localIds = new Set(localById.keys());
+      const serverIds = new Set(serverOrders.map((order) => String(order.id)));
+      const missingOnLocal = serverOrders.filter((order) => !localIds.has(String(order.id)));
+      const removedLocally = [...serverIds].filter((id) => !localIds.has(id));
+      const isIntentionalDelete =
+        removedLocally.length > 0 &&
+        (orders || []).length === serverOrders.length - removedLocally.length &&
+        (orders || []).every((order) => serverIds.has(String(order.id)));
+
+      let payload = orders;
+      if (!isIntentionalDelete) {
+        payload = serverOrders.map((remote) => {
+          const local = localById.get(String(remote.id));
+          if (!local) return remote;
+          const localTime = Date.parse(local.updatedAt || "") || 0;
+          const remoteTime = Date.parse(remote.updatedAt || "") || 0;
+          if (localTime >= remoteTime) {
+            return {
+              ...remote,
+              ...local,
+              exchange: remote.exchange,
+            };
+          }
+          return remote;
+        });
+        for (const local of orders || []) {
+          if (!serverIds.has(String(local.id))) payload.push(local);
+        }
+        if (missingOnLocal.length) {
+          skipNextOrdersSyncRef.current = true;
+          setOrders(payload);
+        }
+      }
+
+      await api.saveOrders(payload);
+    });
+  }, [orders, hydrated, authUser?.id, authUser?.role]);
 
   useEffect(() => {
     if (!hydrated || authUser?.role !== "client") {
@@ -704,6 +886,7 @@ function App() {
     writeOpenManagerClientId("");
     setManagerNotice(null);
     setManagerNotifications([]);
+    setTrashedOrders([]);
     clearAppBadge();
     setCatalogSession(null);
     setAuthUser(null);
@@ -791,10 +974,11 @@ function App() {
   const saveOrder = (payload) => {
     if (!hydrated || !authUser) {
       alert("Данные с сервера ещё не загружены. Обновите страницу и повторите заказ.");
-      return;
+      return Promise.reject(new Error("not_hydrated"));
     }
 
     const session = catalogSession || { mode: "new" };
+    const previousOrders = orders;
     let nextOrders = orders;
 
     if (session.mode === "edit") {
@@ -862,26 +1046,100 @@ function App() {
     setOrders(nextOrders);
     setCatalogSession(null);
 
-    api
+    return api
       .saveOrders(nextOrders)
-      .then(() => setSyncError(""))
-      .catch((error) => {
-        const message = `${error.message}. Заказ виден у вас, но сервер его не сохранил — менеджер его не увидит.`;
+      .then((result) => {
+        if (Array.isArray(result?.orders)) {
+          skipNextOrdersSyncRef.current = true;
+          setOrders(result.orders);
+        }
+        setSyncError("");
+        return result;
+      })
+      .catch(async (error) => {
+        skipNextOrdersSyncRef.current = true;
+        setOrders(previousOrders);
+        if (error?.code === "MATRIX_PRODUCT_FORBIDDEN") {
+          try {
+            const data = await api.bootstrap();
+            skipNextOrdersSyncRef.current = true;
+            if (Array.isArray(data.orders)) {
+              setOrders(data.orders);
+            }
+            if (Array.isArray(data.products)) {
+              setProducts(data.products.map(normalizeProduct));
+            }
+            if (Array.isArray(data.fullCatalogProducts)) {
+              setFullCatalogProducts(data.fullCatalogProducts.map(normalizeProduct));
+            } else if (Array.isArray(data.products)) {
+              setFullCatalogProducts(data.products.map(normalizeProduct));
+            }
+            if (data.catalogPolicy) {
+              setCatalogPolicy({
+                matrixMode: "pending",
+                allowFullCatalog: false,
+                matrixReady: false,
+                matrixProductIds: [],
+                ...data.catalogPolicy,
+              });
+            }
+          } catch {
+            // оставляем откат к previousOrders
+          }
+        }
+        const message = `${error.message} Заказ не сохранён на сервере — менеджер его не увидит.`;
         setSyncError(message);
         alert(message);
+        throw error;
       });
   };
 
   const deleteClientOrder = (order) => {
-    if (order.status !== "Новый") {
-      return alert("Удалить можно только новый заказ.");
+    if (!settings.allowClientDelete) {
+      return alert("Удаление заказов сейчас отключено.");
+    }
+    const gate = canTrashOrder(order, "client");
+    if (!gate.ok) {
+      return alert(gate.error);
     }
 
-    if (window.confirm(`Удалить заказ № ${order.number}?`)) {
-      setOrders((current) =>
-        current.filter((item) => item.id !== order.id)
-      );
+    if (
+      !window.confirm(
+        `Удалить заказ № ${order.number}?\n\nЗаказ исчезнет из вашего списка. Восстановить его сможет менеджер из корзины.`
+      )
+    ) {
+      return;
     }
+
+    const orderId = String(order.id);
+    pendingDeletedOrderIdsRef.current.add(orderId);
+    skipNextOrdersSyncRef.current = true;
+    setOrders((current) => current.filter((item) => String(item.id) !== orderId));
+
+    void (async () => {
+      try {
+        const result = await api.trashOrder(orderId);
+        pendingDeletedOrderIdsRef.current.delete(orderId);
+        skipNextOrdersSyncRef.current = true;
+        if (Array.isArray(result?.orders)) {
+          setOrders(result.orders);
+        }
+        setSyncError("");
+      } catch (error) {
+        pendingDeletedOrderIdsRef.current.delete(orderId);
+        const message = `${error.message}. Заказ не удалён на сервере.`;
+        setSyncError(message);
+        alert(message);
+        try {
+          const data = await api.bootstrap();
+          skipNextOrdersSyncRef.current = true;
+          setOrders(Array.isArray(data.orders) ? data.orders : orders);
+        } catch {
+          skipNextOrdersSyncRef.current = true;
+          setOrders(orders);
+        }
+      }
+    })();
   };
 
   const updateOrder = (id, patch) => {
@@ -1001,11 +1259,92 @@ function App() {
   };
 
   const deleteManagerOrder = (order) => {
-    if (window.confirm(`Удалить заказ № ${order.number}?`)) {
-      setOrders((current) =>
-        current.filter((item) => item.id !== order.id)
-      );
+    if (!settings.managerCanDeleteOrders) {
+      return alert("Удаление заказов менеджером сейчас отключено в настройках.");
     }
+
+    const gate = canTrashOrder(order, "manager");
+    if (!gate.ok) {
+      return alert(gate.error);
+    }
+
+    if (
+      !window.confirm(
+        `Переместить заказ № ${order.number} в корзину?\n\nКлиент перестанет его видеть. Восстановить можно из корзины.`
+      )
+    ) {
+      return;
+    }
+
+    const orderId = String(order.id);
+    skipNextOrdersSyncRef.current = true;
+    setOrders((current) => current.filter((item) => String(item.id) !== orderId));
+
+    void (async () => {
+      try {
+        const result = await api.trashOrder(orderId);
+        skipNextOrdersSyncRef.current = true;
+        if (Array.isArray(result?.orders)) setOrders(result.orders);
+        if (Array.isArray(result?.trashedOrders)) setTrashedOrders(result.trashedOrders);
+        setSyncError("");
+      } catch (error) {
+        const message = `${error.message}. Заказ не перемещён в корзину.`;
+        setSyncError(message);
+        alert(message);
+        try {
+          await loadBootstrap({ silent: true });
+        } catch {
+          /* ignore */
+        }
+      }
+    })();
+  };
+
+  const restoreManagerOrder = (order) => {
+    if (
+      !window.confirm(`Восстановить заказ № ${order.number} из корзины?`)
+    ) {
+      return;
+    }
+    void (async () => {
+      try {
+        const result = await api.restoreOrder(order.id);
+        skipNextOrdersSyncRef.current = true;
+        if (Array.isArray(result?.orders)) setOrders(result.orders);
+        if (Array.isArray(result?.trashedOrders)) setTrashedOrders(result.trashedOrders);
+        setSyncError("");
+      } catch (error) {
+        alert(error.message);
+      }
+    })();
+  };
+
+  const purgeManagerOrder = (order) => {
+    if (
+      !window.confirm(
+        `Удалить заказ № ${order.number} навсегда?\n\nВосстановить будет нельзя без резервной копии.`
+      )
+    ) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `Подтвердите окончательное удаление заказа № ${order.number}.`
+      )
+    ) {
+      return;
+    }
+    void (async () => {
+      try {
+        const result = await api.purgeOrder(order.id);
+        skipNextOrdersSyncRef.current = true;
+        if (Array.isArray(result?.orders)) setOrders(result.orders);
+        if (Array.isArray(result?.trashedOrders)) setTrashedOrders(result.trashedOrders);
+        setSyncError("");
+      } catch (error) {
+        alert(error.message);
+      }
+    })();
   };
 
   const createProductFromCustom = (order, customItem) => {
@@ -1165,6 +1504,7 @@ function App() {
       <ManagerScreen
         authUser={authUser}
         orders={orders}
+        trashedOrders={trashedOrders}
         products={products}
         setProducts={setProducts}
         profile={profile}
@@ -1183,6 +1523,8 @@ function App() {
         onUpdateOrder={updateOrder}
         onBulkUpdateOrders={bulkUpdateOrders}
         onDeleteOrder={deleteManagerOrder}
+        onRestoreOrder={restoreManagerOrder}
+        onPurgeOrder={purgeManagerOrder}
         onCreateProductFromCustom={createProductFromCustom}
         onImport={importBackup}
         onClearOrders={clearOrders}
