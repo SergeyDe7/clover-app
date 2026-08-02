@@ -304,9 +304,12 @@ body:has(.clover-app) {
 }
 
 .app-header-logo {
-  width: min(168px, 38vw) !important;
+  width: 120px !important;
+  max-width: 120px !important;
+  max-height: 52px !important;
   height: auto !important;
-  flex-shrink: 0;
+  object-fit: contain !important;
+  flex-shrink: 0 !important;
 }
 
 .app-header-logo-button {
@@ -533,7 +536,43 @@ body:has(.clover-app) {
 .clover-app .manager-send-onec-button {
   width: auto !important;
   min-width: 180px !important;
-  min-height: 40px !important;
+  min-height: 44px !important;
+  padding: 11px 18px !important;
+  border: none !important;
+  border-radius: var(--radius-sm) !important;
+  font-weight: var(--fw-bold) !important;
+  line-height: 1.2 !important;
+  box-shadow: none !important;
+}
+
+/* До передачи в 1С — заметная, но не «успех» */
+.clover-app .manager-send-onec-button.manager-send-onec-idle {
+  background: #3d6b9e !important;
+  color: #fff !important;
+}
+
+.clover-app .manager-send-onec-button.manager-send-onec-idle:hover:not(:disabled) {
+  background: #345d89 !important;
+}
+
+/* Уже в очереди / принято 1С */
+.clover-app .manager-send-onec-button.manager-send-onec-done {
+  background: var(--clover-green) !important;
+  color: #fff !important;
+  cursor: default;
+}
+
+.clover-app .manager-send-onec-button.manager-send-onec-retry {
+  background: #c9853a !important;
+  color: #fff !important;
+}
+
+.clover-app .manager-send-onec-button.manager-send-onec-retry:hover:not(:disabled) {
+  background: #b57530 !important;
+}
+
+.clover-app .manager-send-onec-button:disabled {
+  opacity: 1 !important;
 }
 
 .clover-app .order-onec-box {
@@ -691,9 +730,9 @@ body:has(.clover-app) {
   }
 
   .clover-app .app-header-logo {
-    width: 56px !important;
-    max-width: 56px !important;
-    max-height: 32px !important;
+    width: 72px !important;
+    max-width: 72px !important;
+    max-height: 40px !important;
     object-fit: contain !important;
   }
 
@@ -1065,10 +1104,24 @@ body:has(.clover-app) {
   color: var(--clover-danger) !important;
 }
 
-/* Auth card radius align */
+/* Auth: логотип крупнее, карточка чуть шире — без перевеса */
 .login-card {
   border-radius: var(--radius-lg) !important;
   box-shadow: var(--shadow-lg) !important;
+  max-width: 460px !important;
+}
+
+.login-card .logo {
+  width: min(280px, 78%) !important;
+  max-width: 280px !important;
+  margin-bottom: 18px !important;
+}
+
+@media (max-width: 500px) {
+  .login-card .logo {
+    width: min(220px, 72%) !important;
+    max-width: 220px !important;
+  }
 }
 
 .login-form input,
@@ -1112,7 +1165,195 @@ html.clover-thankyou-open .app-header {
     border-radius: 0 !important;
     box-shadow: none !important;
     background: transparent !important;
+    overflow: visible !important;
     padding: max(28px, env(safe-area-inset-top, 0px)) 24px max(28px, env(safe-area-inset-bottom, 0px)) !important;
     align-content: center !important;
+  }
+}
+
+/* In-app confirm / alert — в атмосфере Clover (как thank-you) */
+.app-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: grid;
+  place-items: center;
+  padding: max(20px, env(safe-area-inset-top, 0px)) 18px max(20px, env(safe-area-inset-bottom, 0px));
+  background:
+    radial-gradient(circle at 20% 18%, rgba(143, 208, 127, 0.28), transparent 42%),
+    radial-gradient(circle at 82% 78%, rgba(91, 157, 87, 0.22), transparent 46%),
+    rgba(24, 38, 26, 0.48);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: app-modal-fade 0.22s ease-out;
+}
+
+.app-modal-glow {
+  position: absolute;
+  width: min(420px, 88vw);
+  height: min(280px, 50vh);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(143, 208, 127, 0.45), transparent 68%);
+  filter: blur(18px);
+  pointer-events: none;
+  animation: app-modal-pulse 2.6s ease-in-out infinite;
+}
+
+.app-modal-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: min(400px, 100%);
+  padding: 26px 22px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 48px rgba(47, 90, 50, 0.18);
+  text-align: center;
+  animation: app-modal-rise 0.35s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.app-modal-logo {
+  width: min(132px, 46vw);
+  height: auto;
+  margin-bottom: 2px;
+}
+
+.app-modal-title {
+  margin: 2px 0 0;
+  max-width: 22ch;
+  color: #2f3f2f;
+  font-size: clamp(1.15rem, 4.2vw, 1.45rem);
+  font-weight: 800;
+  line-height: 1.28;
+}
+
+.app-modal-message {
+  margin: 4px 0 0;
+  max-width: 34ch;
+  color: #5f6f5f;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+.app-modal-expandable {
+  width: 100%;
+  margin-top: 10px;
+  text-align: left;
+  border: 1px solid rgba(91, 157, 87, 0.28);
+  border-radius: 12px;
+  background: rgba(245, 250, 243, 0.95);
+  overflow: hidden;
+}
+
+.app-modal-expandable summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 10px 12px;
+  color: #2f7d32;
+  font-size: 0.9rem;
+  font-weight: 800;
+  user-select: none;
+}
+
+.app-modal-expandable summary::-webkit-details-marker {
+  display: none;
+}
+
+.app-modal-expandable summary::after {
+  content: "▾";
+  float: right;
+  color: #5b9d57;
+}
+
+.app-modal-expandable[open] summary::after {
+  content: "▴";
+}
+
+.app-modal-expandable-list {
+  margin: 0;
+  padding: 0 12px 12px;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  max-height: min(220px, 36vh);
+  overflow: auto;
+}
+
+.app-modal-expandable-list li {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #e4eee2;
+  color: #3a4a3a;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.app-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  margin-top: 14px;
+}
+
+.app-modal-actions-single {
+  grid-template-columns: 1fr;
+}
+
+.app-modal-btn {
+  width: 100%;
+  min-height: 44px;
+  justify-content: center;
+}
+
+.app-modal-btn-main {
+  min-height: 46px;
+}
+
+.app-modal-tone-warn {
+  box-shadow:
+    0 18px 48px rgba(47, 90, 50, 0.14),
+    0 0 0 1px rgba(234, 217, 181, 0.9);
+}
+
+.app-modal-tone-danger {
+  box-shadow:
+    0 18px 48px rgba(47, 90, 50, 0.14),
+    0 0 0 1px rgba(230, 199, 199, 0.95);
+}
+
+@keyframes app-modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes app-modal-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes app-modal-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.94); }
+  50% { opacity: 0.9; transform: scale(1.04); }
+}
+
+@media (max-width: 480px) {
+  .app-modal-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-modal-overlay,
+  .app-modal-card,
+  .app-modal-glow {
+    animation: none;
   }
 }

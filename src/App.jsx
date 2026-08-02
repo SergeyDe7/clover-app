@@ -29,8 +29,10 @@ import {
   normalizeProduct,
   makeOrderHistoryEvent,
   appendOrderHistory,
+  UNIT_CONFIG,
 } from "./shared/appHelpers";
 import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
+import { appAlert, appConfirm } from "./shared/AppModal";
 import { canTrashOrder } from "./shared/orderTrash";
 
 function LoginView({ onAuth, authBusy, authError }) {
@@ -162,7 +164,7 @@ function LoginView({ onAuth, authBusy, authError }) {
     return (
       <main className="page">
         <section className="login-card">
-          <img className="logo" src={cloverLogo} alt="Логотип Clover" width="230" height="155" />
+          <img className="logo" src={cloverLogo} alt="Логотип Clover" width="280" height="189" />
           <h1>Подтверждаем почту</h1>
           <p className="subtitle">Проверяем ссылку регистрации…</p>
         </section>
@@ -181,7 +183,7 @@ function LoginView({ onAuth, authBusy, authError }) {
   return (
     <main className="page">
       <section className="login-card">
-        <img className="logo" src={cloverLogo} alt="Логотип Clover" width="230" height="155" />
+        <img className="logo" src={cloverLogo} alt="Логотип Clover" width="280" height="189" />
         <h1>{title}</h1>
         {mode !== "login" && (
           <p className="subtitle">
@@ -1094,22 +1096,46 @@ function App() {
       });
   };
 
-  const deleteClientOrder = (order) => {
+  const deleteClientOrder = async (order) => {
     if (!settings.allowClientDelete) {
-      return alert("Удаление заказов сейчас отключено.");
+      await appAlert({
+        title: "Удаление недоступно",
+        message: "Удаление заказов сейчас отключено.",
+        tone: "warn",
+      });
+      return;
     }
     const gate = canTrashOrder(order, "client");
     if (!gate.ok) {
-      return alert(gate.error);
-    }
-
-    if (
-      !window.confirm(
-        `Удалить заказ № ${order.number}?\n\nЗаказ исчезнет из вашего списка. Восстановить его сможет менеджер из корзины.`
-      )
-    ) {
+      await appAlert({ title: "Нельзя удалить", message: gate.error, tone: "warn" });
       return;
     }
+
+    const itemLines = [
+      ...(Array.isArray(order.items) ? order.items : []).map((item) => {
+        const unit = UNIT_CONFIG[item.unit]?.shortLabel || item.unit || "";
+        return `${item.name} — ${item.quantity} ${unit}`.trim();
+      }),
+      ...(Array.isArray(order.customItems) ? order.customItems : []).map((item) => {
+        const unit = item.unit || "";
+        return `${item.name} — ${item.quantity} ${unit}`.trim();
+      }),
+    ].filter(Boolean);
+
+    const ok = await appConfirm({
+      title: `Вы уверены, что хотите удалить Заказ № ${order.number}?`,
+      message: "",
+      confirmLabel: "Удалить",
+      cancelLabel: "Отмена",
+      tone: "danger",
+      expandable: itemLines.length
+        ? {
+            summary: `Состав заказа (${itemLines.length})`,
+            lines: itemLines,
+          }
+        : null,
+    });
+    if (!ok) return;
 
     const orderId = String(order.id);
     pendingDeletedOrderIdsRef.current.add(orderId);
@@ -1258,23 +1284,30 @@ function App() {
     );
   };
 
-  const deleteManagerOrder = (order) => {
+  const deleteManagerOrder = async (order) => {
     if (!settings.managerCanDeleteOrders) {
-      return alert("Удаление заказов менеджером сейчас отключено в настройках.");
+      await appAlert({
+        title: "Корзина отключена",
+        message: "Удаление заказов менеджером сейчас отключено в настройках.",
+        tone: "warn",
+      });
+      return;
     }
 
     const gate = canTrashOrder(order, "manager");
     if (!gate.ok) {
-      return alert(gate.error);
-    }
-
-    if (
-      !window.confirm(
-        `Переместить заказ № ${order.number} в корзину?\n\nКлиент перестанет его видеть. Восстановить можно из корзины.`
-      )
-    ) {
+      await appAlert({ title: "Нельзя переместить", message: gate.error, tone: "warn" });
       return;
     }
+
+    const ok = await appConfirm({
+      title: `Вы уверены, что хотите перенести Заказ № ${order.number} в корзину?`,
+      message: "Клиент перестанет его видеть. Восстановить можно из корзины.",
+      confirmLabel: "В корзину",
+      cancelLabel: "Отмена",
+      tone: "danger",
+    });
+    if (!ok) return;
 
     const orderId = String(order.id);
     skipNextOrdersSyncRef.current = true;
@@ -1300,61 +1333,61 @@ function App() {
     })();
   };
 
-  const restoreManagerOrder = (order) => {
-    if (
-      !window.confirm(`Восстановить заказ № ${order.number} из корзины?`)
-    ) {
-      return;
+  const restoreManagerOrder = async (order) => {
+    const ok = await appConfirm({
+      title: `Восстановить заказ № ${order.number}?`,
+      message: "Заказ снова появится в списке активных и станет виден клиенту.",
+      confirmLabel: "Восстановить",
+      cancelLabel: "Отмена",
+    });
+    if (!ok) return;
+    try {
+      const result = await api.restoreOrder(order.id);
+      skipNextOrdersSyncRef.current = true;
+      if (Array.isArray(result?.orders)) setOrders(result.orders);
+      if (Array.isArray(result?.trashedOrders)) setTrashedOrders(result.trashedOrders);
+      setSyncError("");
+    } catch (error) {
+      await appAlert({ title: "Не удалось восстановить", message: error.message, tone: "danger" });
     }
-    void (async () => {
-      try {
-        const result = await api.restoreOrder(order.id);
-        skipNextOrdersSyncRef.current = true;
-        if (Array.isArray(result?.orders)) setOrders(result.orders);
-        if (Array.isArray(result?.trashedOrders)) setTrashedOrders(result.trashedOrders);
-        setSyncError("");
-      } catch (error) {
-        alert(error.message);
-      }
-    })();
   };
 
-  const purgeManagerOrder = (order) => {
-    if (
-      !window.confirm(
-        `Удалить заказ № ${order.number} навсегда?\n\nВосстановить будет нельзя без резервной копии.`
-      )
-    ) {
-      return;
+  const purgeManagerOrder = async (order) => {
+    const first = await appConfirm({
+      title: `Удалить заказ № ${order.number} навсегда?`,
+      message: "Восстановить будет нельзя без резервной копии.",
+      confirmLabel: "Продолжить",
+      cancelLabel: "Отмена",
+      tone: "danger",
+    });
+    if (!first) return;
+    const second = await appConfirm({
+      title: "Окончательное удаление",
+      message: `Подтвердите удаление заказа № ${order.number}. Это действие необратимо.`,
+      confirmLabel: "Удалить навсегда",
+      cancelLabel: "Отмена",
+      tone: "danger",
+    });
+    if (!second) return;
+    try {
+      const result = await api.purgeOrder(order.id);
+      skipNextOrdersSyncRef.current = true;
+      if (Array.isArray(result?.orders)) setOrders(result.orders);
+      if (Array.isArray(result?.trashedOrders)) setTrashedOrders(result.trashedOrders);
+      setSyncError("");
+    } catch (error) {
+      await appAlert({ title: "Не удалось удалить", message: error.message, tone: "danger" });
     }
-    if (
-      !window.confirm(
-        `Подтвердите окончательное удаление заказа № ${order.number}.`
-      )
-    ) {
-      return;
-    }
-    void (async () => {
-      try {
-        const result = await api.purgeOrder(order.id);
-        skipNextOrdersSyncRef.current = true;
-        if (Array.isArray(result?.orders)) setOrders(result.orders);
-        if (Array.isArray(result?.trashedOrders)) setTrashedOrders(result.trashedOrders);
-        setSyncError("");
-      } catch (error) {
-        alert(error.message);
-      }
-    })();
   };
 
-  const createProductFromCustom = (order, customItem) => {
-    if (
-      !window.confirm(
-        `Создать в каталоге товар «${customItem.name}»?`
-      )
-    ) {
-      return;
-    }
+  const createProductFromCustom = async (order, customItem) => {
+    const ok = await appConfirm({
+      title: "Создать товар в каталоге?",
+      message: `Товар «${customItem.name}» будет добавлен в каталог Clover.`,
+      confirmLabel: "Создать",
+      cancelLabel: "Отмена",
+    });
+    if (!ok) return;
 
     const id =
       Math.max(
@@ -1470,20 +1503,8 @@ function App() {
     return (
       <>
         <style>{APP_STYLES}</style>
-        <main className="loading-page">
-          <section className="loading-card">
-            <img
-              className="loading-logo"
-              src={cloverLogo}
-              alt="Логотип Clover"
-              width="190"
-              height="128"
-            />
-            <h2>Подключаемся к серверу</h2>
-            <p>
-              Загружаем аккаунт, товары, адреса и заказы.
-            </p>
-          </section>
+        <main className="loading-page loading-page-quiet" aria-busy="true" aria-label="Загрузка">
+          <div className="loading-quiet-bar" aria-hidden="true" />
         </main>
       </>
     );

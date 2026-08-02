@@ -34,15 +34,6 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
     if (nextTab !== "orders") setHeaderSearch("");
   };
 
-  const goHome = () => {
-    selectTab("orders");
-    setBellOpen(false);
-    setHeaderSearch("");
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-
   const selectMoreTab = (nextTab) => {
     setMoreTab(nextTab);
     writeManagerMoreTab(nextTab);
@@ -112,7 +103,6 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
     <Header
       title="Кабинет менеджера"
       subtitle="Заказы · клиенты · товары · 1С"
-      onLogoClick={goHome}
       onLogout={onLogout}
     >
       <div className="manager-header-tools">

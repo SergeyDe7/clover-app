@@ -1,5 +1,5 @@
-const CACHE_NAME = "clover-v18-shell-v30";
-const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
+const CACHE_NAME = "clover-v18-shell-v54";
+const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/clover-logo.png"];
 
 async function applyPushBadge(data) {
   if (!self.registration?.setAppBadge) return;

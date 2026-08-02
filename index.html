@@ -14,8 +14,49 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
     <title>Clover</title>
+    <style>
+      #clover-boot-splash {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 2147483646;
+        margin: 0;
+        place-items: center;
+        padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+        background:
+          radial-gradient(circle at 28% 22%, rgba(182, 232, 122, 0.42), transparent 42%),
+          radial-gradient(circle at 78% 78%, rgba(91, 157, 87, 0.28), transparent 46%),
+          linear-gradient(165deg, #eef7ea 0%, #dcefd6 48%, #cfe6c8 100%);
+        transition: opacity 0.38s ease, visibility 0.38s ease;
+      }
+      #clover-boot-splash img {
+        display: block;
+        width: min(220px, 58vw);
+        height: auto;
+        animation: clover-boot-logo-in 0.55s ease-out both;
+      }
+      #clover-boot-splash.is-done {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      @keyframes clover-boot-logo-in {
+        from { opacity: 0; transform: scale(0.92); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      @media (max-width: 900px), (display-mode: standalone), (display-mode: fullscreen) {
+        #clover-boot-splash { display: grid; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #clover-boot-splash img { animation: none; }
+        #clover-boot-splash { transition: none; }
+      }
+    </style>
   </head>
   <body>
+    <div id="clover-boot-splash" aria-hidden="true">
+      <img src="/clover-logo.png" alt="" width="220" height="148" />
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -102,20 +102,25 @@ export function Header({ title, subtitle, onLogout, onLogoClick, children }) {
     <img className="app-header-logo" src={cloverLogo} alt="Clover" width="120" height="52" />
   );
 
+  const handleLogoClick = () => {
+    if (typeof onLogoClick === "function") {
+      onLogoClick();
+      return;
+    }
+    window.location.reload();
+  };
+
   return (
     <header className={`app-header${compactHeader ? " app-header-compact" : ""}`}>
-      {onLogoClick ? (
-        <button
-          type="button"
-          className="app-header-logo-button"
-          onClick={onLogoClick}
-          aria-label="На главный экран"
-        >
-          {logo}
-        </button>
-      ) : (
-        logo
-      )}
+      <button
+        type="button"
+        className="app-header-logo-button"
+        onClick={handleLogoClick}
+        aria-label="Обновить страницу"
+        title="Обновить страницу"
+      >
+        {logo}
+      </button>
       <div className="app-header-actions">
         {!compactHeader && (
           <div className="app-header-titles">
@@ -474,7 +479,7 @@ export function OrderThankYouOverlay({ open, onDone }) {
     body.style.top = "0";
     window.addEventListener("keydown", onKey);
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-    const timer = window.setTimeout(finish, reduceMotion ? 1600 : 5000);
+    const timer = window.setTimeout(finish, reduceMotion ? 1800 : 7000);
     return () => {
       html.classList.remove("clover-thankyou-open");
       body.classList.remove("clover-thankyou-open");
@@ -545,21 +550,28 @@ export function OrderThankYouOverlay({ open, onDone }) {
       onClick={() => onDoneRef.current?.()}
     >
       <div className="order-thankyou-glow" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-a" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-b" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-c" aria-hidden="true" />
+      <span className="order-thankyou-spark order-thankyou-spark-1" aria-hidden="true" />
+      <span className="order-thankyou-spark order-thankyou-spark-2" aria-hidden="true" />
+      <span className="order-thankyou-spark order-thankyou-spark-3" aria-hidden="true" />
+      <span className="order-thankyou-spark order-thankyou-spark-4" aria-hidden="true" />
+      <span className="order-thankyou-spark order-thankyou-spark-5" aria-hidden="true" />
+      <span className="order-thankyou-spark order-thankyou-spark-6" aria-hidden="true" />
+      <span className="order-thankyou-spark order-thankyou-spark-7" aria-hidden="true" />
+      <span className="order-thankyou-spark order-thankyou-spark-8" aria-hidden="true" />
       <div
         className="order-thankyou-card"
         style={cardStyle}
         onClick={(event) => event.stopPropagation()}
       >
-        <img
-          className="order-thankyou-logo"
-          src={cloverLogo}
-          alt=""
-          width="160"
-          height="70"
-        />
+        <div className="order-thankyou-logo-wrap" aria-hidden="true">
+          <img
+            className="order-thankyou-logo"
+            src={cloverLogo}
+            alt=""
+            width="220"
+            height="148"
+          />
+        </div>
         <h2 id="order-thankyou-title" className="order-thankyou-title">
           Благодарим за Ваш заказ!
         </h2>

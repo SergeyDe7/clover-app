@@ -1,6 +1,7 @@
 // Панель управления адресами доставки клиента.
 import { useState } from "react";
 import { makeId } from "../../shared/appHelpers";
+import { appConfirm } from "../../shared/AppModal";
 
 export function AddressesPanel({ addresses, onChange }) {
   const empty = { label: "", address: "" };
@@ -22,8 +23,15 @@ export function AddressesPanel({ addresses, onChange }) {
     close();
   };
 
-  const remove = (item) => {
-    if (!window.confirm(`Удалить адрес «${item.label}»?`)) return;
+  const remove = async (item) => {
+    const ok = await appConfirm({
+      title: `Удалить адрес «${item.label}»?`,
+      message: "Адрес пропадёт из списка. При оформлении заказа его выбрать будет нельзя.",
+      confirmLabel: "Удалить",
+      cancelLabel: "Отмена",
+      tone: "danger",
+    });
+    if (!ok) return;
     const next = addresses.filter((address) => address.id !== item.id);
     if (item.isDefault && next.length) next[0] = { ...next[0], isDefault: true };
     onChange(next);
