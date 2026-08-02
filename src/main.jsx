@@ -10,7 +10,7 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-const CLOVER_UI_BUILD = "ui-20260801-v29";
+const CLOVER_UI_BUILD = "ui-20260802-v30";
 
 async function refreshServiceWorkerIfNeeded() {
   if (!("serviceWorker" in navigator)) return;

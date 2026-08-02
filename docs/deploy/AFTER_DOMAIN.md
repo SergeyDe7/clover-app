@@ -7,9 +7,9 @@
    - `CLOVER_PUBLIC_URL=https://clover.example.ru`
    - `PASSKEY_RP_ID=clover.example.ru` (без схемы)
    - `PASSKEY_ORIGIN=https://clover.example.ru`
-4. Сгенерировать VAPID-ключи для Web Push.
+4. Сгенерировать VAPID-ключи для Web Push и прописать в `.env` (пошагово: [PUSH_ENABLE.md](./PUSH_ENABLE.md)).
 5. Настроить SMTP реального ящика.
 6. Закрыть прямой доступ к 5273/4100 из интернета.
-7. Повторить smoke: логин, заказ, очередь 1С TEST, PWA на телефоне.
+7. Повторить smoke: логин, заказ, очередь 1С TEST, PWA на телефоне, push + цифра на иконке.
 
 До этого этапа LAN по IP — нормальный рабочий режим для внутренних тестов.

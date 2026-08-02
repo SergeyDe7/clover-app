@@ -1,5 +1,21 @@
-const CACHE_NAME = "clover-v18-shell-v29";
+const CACHE_NAME = "clover-v18-shell-v30";
 const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
+
+async function applyPushBadge(data) {
+  if (!self.registration?.setAppBadge) return;
+  const raw = data?.badgeCount;
+  if (raw === undefined || raw === null || raw === "") return;
+  const count = Math.max(0, Math.floor(Number(raw) || 0));
+  try {
+    if (count > 0) {
+      await self.registration.setAppBadge(count);
+    } else if (self.registration.clearAppBadge) {
+      await self.registration.clearAppBadge();
+    }
+  } catch {
+    // Badging API недоступен на этой платформе.
+  }
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)).catch(() => undefined));
@@ -56,9 +72,14 @@ self.addEventListener("push", (event) => {
     icon: "/icon-192.png",
     badge: "/icon-192.png",
     tag: data.tag || "clover-notification",
-    data: { url: data.url || "/" },
+    data: { url: data.url || "/", badgeCount: data.badgeCount },
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(title, options),
+      applyPushBadge(data),
+    ])
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {

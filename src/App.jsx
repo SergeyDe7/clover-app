@@ -30,6 +30,7 @@ import {
   makeOrderHistoryEvent,
   appendOrderHistory,
 } from "./shared/appHelpers";
+import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
 import { canTrashOrder } from "./shared/orderTrash";
 
 function LoginView({ onAuth, authBusy, authError }) {
@@ -391,6 +392,7 @@ function App() {
         ? { ...unreadNotifications[0], pendingCount: unreadNotifications.length }
         : null
     );
+    syncAppBadge(unreadNotifications.length);
   };
 
   const applyBootstrap = (data, { openClientOrderLanding = false } = {}) => {
@@ -428,6 +430,7 @@ function App() {
       setManagerNotifications([]);
       setManagerNotice(null);
       setTrashedOrders([]);
+      clearAppBadge();
     }
 
     setOrders(incomingOrders);
@@ -884,6 +887,7 @@ function App() {
     setManagerNotice(null);
     setManagerNotifications([]);
     setTrashedOrders([]);
+    clearAppBadge();
     setCatalogSession(null);
     setAuthUser(null);
     setRole("client");
