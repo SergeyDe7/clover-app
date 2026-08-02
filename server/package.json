@@ -16,7 +16,8 @@
     "test:all": "npm run check && npm run test:onec && npm run test:v18 && npm run test:runtime && npm run test:manager-notifications && npm run test:manager-tabs",
     "test:runtime": "node scripts/verify-runtime-integrations.mjs",
     "test:manager-notifications": "node scripts/verify-manager-notifications.mjs",
-    "test:manager-tabs": "node scripts/verify-manager-tabs-smoke.mjs"
+    "test:manager-tabs": "node scripts/verify-manager-tabs-smoke.mjs",
+    "test:push-badge": "node scripts/verify-push-badge.mjs"
   },
   "dependencies": {
     "@simplewebauthn/server": "13.0.0",

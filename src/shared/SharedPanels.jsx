@@ -376,13 +376,13 @@ export function PushSettings() {
   const subscribed = Boolean(currentEndpoint && status?.subscriptions?.some((item) => item.endpoint === currentEndpoint));
   return (
     <section className="panel compact-panel">
-      <div className="panel-heading"><div><p className="eyebrow">Уведомления</p><h2>Уведомления на телефоне</h2><p>Статусы заказов и документы — основные; акции можно отключить отдельно.</p></div></div>
+      <div className="panel-heading"><div><p className="eyebrow">Уведомления</p><h2>Уведомления на телефоне</h2><p>Push на экран и, где поддерживается, цифра на иконке приложения. Акции можно отключить отдельно.</p></div></div>
       <label className="checkbox-line"><input type="checkbox" checked={promotions} onChange={(event) => setPromotions(event.target.checked)} /> Получать акции и новинки</label>
       <div className="inline-actions">
         <button className="primary-button" type="button" disabled={busy} onClick={enable}>{busy ? "Сохраняем…" : subscribed ? "Сохранить настройки" : "Включить уведомления"}</button>
         {subscribed && <button className="secondary-button" type="button" disabled={busy} onClick={disable}>Отключить на этом устройстве</button>}
       </div>
-      {!status?.enabled && <p className="muted small">Техническая часть подготовлена. Фактическая отправка включится после домена, HTTPS и добавления VAPID-ключей.</p>}
+      {!status?.enabled && <p className="muted small">Техническая часть подготовлена. Фактическая отправка включится после домена, HTTPS и VAPID-ключей (см. docs/deploy/PUSH_ENABLE.md).</p>}
       {status?.subscriptions?.length > 0 && !subscribed && <p className="muted small">Уведомления уже включены на другом устройстве. На этом телефоне или компьютере их можно включить отдельно.</p>}
       {message && <div className="request-photo-status">{message}</div>}
     </section>

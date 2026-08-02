@@ -30,6 +30,7 @@ import {
   makeOrderHistoryEvent,
   appendOrderHistory,
 } from "./shared/appHelpers";
+import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
 
 function LoginView({ onAuth, authBusy, authError }) {
   const params = new URLSearchParams(window.location.search);
@@ -305,6 +306,7 @@ function App() {
         ? { ...unreadNotifications[0], pendingCount: unreadNotifications.length }
         : null
     );
+    syncAppBadge(unreadNotifications.length);
   };
 
   const applyBootstrap = (data, { openClientOrderLanding = false } = {}) => {
@@ -338,6 +340,7 @@ function App() {
     } else {
       setManagerNotifications([]);
       setManagerNotice(null);
+      clearAppBadge();
     }
 
     setOrders(incomingOrders);
@@ -701,6 +704,7 @@ function App() {
     writeOpenManagerClientId("");
     setManagerNotice(null);
     setManagerNotifications([]);
+    clearAppBadge();
     setCatalogSession(null);
     setAuthUser(null);
     setRole("client");

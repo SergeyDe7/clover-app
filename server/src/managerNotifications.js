@@ -1,6 +1,7 @@
 import {
   createManagerNotification,
   getGlobalState,
+  listManagerNotifications,
   listManagerUsers,
   writeAudit,
 } from "./db.js";
@@ -158,12 +159,14 @@ async function sendManagerPush(notification, settings) {
     return { channel: "push", sent: 0, failed: 0, reason: "disabled" };
   }
   const managers = listManagerUsers();
+  const badgeCount = listManagerNotifications({ unreadOnly: true, limit: 500 }).length;
   const results = await Promise.all(
     managers.map((manager) => sendOrderPush(manager.id, {
       title: notification.title,
       body: notification.body,
       url: notification.url || "/?section=manager-notifications",
       tag: `manager-${notification.type}-${notification.sourceId || notification.id}`,
+      badgeCount,
     }))
   );
   return {
