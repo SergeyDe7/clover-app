@@ -859,6 +859,19 @@ body:has(.clover-app) {
   padding: 10px 12px;
 }
 
+.clover-app .manager-exchange .exchange-notice.manager-home-notice-row p {
+  margin: 0;
+  flex: 1;
+  min-width: min(100%, 240px);
+}
+
+.clover-app .manager-exchange-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .clover-app .manager-exchange-batch {
   display: flex;
   flex-wrap: wrap;

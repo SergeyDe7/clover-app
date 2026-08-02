@@ -33,6 +33,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
   const [busyId, setBusyId] = useState("");
   const [busyConnection, setBusyConnection] = useState("");
   const [batchStatus, setBatchStatus] = useState("all");
+  const [busyBatch, setBusyBatch] = useState("");
 
   const applyOneCState = (result) => {
     setOneC(result);
@@ -156,11 +157,14 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
   };
 
   const downloadBatch = async (format) => {
+    setBusyBatch(format);
     try {
       const blob = await api.downloadExchangeBatch(format, batchStatus);
       downloadBlobFile(blob, `clover-orders-1c.${format}`);
     } catch (downloadError) {
       await appAlert({ title: "Ошибка скачивания", message: downloadError.message, tone: "danger" });
+    } finally {
+      setBusyBatch("");
     }
   };
 
@@ -172,11 +176,18 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       ? "Режим реальной 1С"
       : "Требуется адрес публикации"
     : "Безопасный симулятор";
+  const missingClients = summary.missingClientLinks || 0;
+  const missingProducts = summary.missingProductLinks || 0;
+  const matchingOk = missingClients === 0 && missingProducts === 0;
+  const goToOrders = () => onNavigate?.("orders");
 
   return (
     <section className="manager-exchange">
-      <div className="exchange-notice">
-        <strong>Действия по заказу</strong> — в карточке заказа (вкладка «Заказы»). Здесь сводка очереди, подключение и пакетные операции.
+      <div className="exchange-notice manager-home-notice-row">
+        <p>
+          <strong>Действия по заказу</strong> — в карточке на вкладке «Заказы». Здесь сводка очереди, подключение и пакетные операции.
+        </p>
+        <button className="secondary-button" type="button" onClick={goToOrders}>К заказам</button>
       </div>
 
       <div className="exchange-summary-strip">
@@ -252,10 +263,10 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
           </div>
 
           <div className="exchange-actions">
-            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={saveConnection}>Сохранить настройки</button>
+            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={saveConnection}>{busyConnection === "save" ? "Сохраняем…" : "Сохранить настройки"}</button>
             <button className="primary-button" disabled={Boolean(busyConnection)} type="button" onClick={testConnection}>{busyConnection === "test" ? "Проверяем…" : "Проверить связь"}</button>
-            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={() => loadPreview("clients")}>Контрагенты</button>
-            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={() => loadPreview("products")}>Номенклатура</button>
+            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={() => loadPreview("clients")}>{busyConnection === "clients" ? "Загружаем…" : "Контрагенты"}</button>
+            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={() => loadPreview("products")}>{busyConnection === "products" ? "Загружаем…" : "Номенклатура"}</button>
           </div>
 
           <div className="manager-exchange-status-row">
@@ -297,7 +308,10 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
             <h2>Очередь обмена</h2>
             <p>Сводка и пакетные операции. Передача отдельного заказа — в карточке на вкладке «Заказы».</p>
           </div>
-          <button className="secondary-button" type="button" onClick={load}>Обновить</button>
+          <div className="manager-exchange-heading-actions">
+            <button className="secondary-button" type="button" onClick={goToOrders}>К заказам</button>
+            <button className="secondary-button" type="button" onClick={load} disabled={loadingExchange}>{loadingExchange ? "Обновляем…" : "Обновить"}</button>
+          </div>
         </div>
         {error && <div className="auth-error">{error}</div>}
         <div className="exchange-grid">
@@ -308,15 +322,17 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
           <article><span>Ошибки</span><strong>{summary.error || 0}</strong></article>
         </div>
         <div className="manager-exchange-batch">
-          <select value={batchStatus} onChange={(e) => setBatchStatus(e.target.value)} aria-label="Фильтр пакета заказов">
+          <select value={batchStatus} onChange={(e) => setBatchStatus(e.target.value)} aria-label="Фильтр пакета заказов" disabled={Boolean(busyBatch)}>
             <option value="all">Все заказы</option>
             {Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}
           </select>
-          <button className="secondary-button" type="button" onClick={() => downloadBatch("json")}>Скачать пакет JSON</button>
-          <button className="secondary-button" type="button" onClick={() => downloadBatch("csv")}>Скачать пакет CSV</button>
+          <button className="secondary-button" type="button" disabled={Boolean(busyBatch)} onClick={() => downloadBatch("json")}>{busyBatch === "json" ? "Скачиваем…" : "Скачать пакет JSON"}</button>
+          <button className="secondary-button" type="button" disabled={Boolean(busyBatch)} onClick={() => downloadBatch("csv")}>{busyBatch === "csv" ? "Скачиваем…" : "Скачать пакет CSV"}</button>
         </div>
-        <div className="warning-box manager-exchange-match-note">
-          Не сопоставлено клиентов: {summary.missingClientLinks || 0} · товаров: {summary.missingProductLinks || 0}
+        <div className={`${matchingOk ? "success-box" : "warning-box"} manager-exchange-match-note`}>
+          {matchingOk
+            ? "Сопоставление с 1С: клиенты и товары в очереди связаны."
+            : `Не сопоставлено клиентов: ${missingClients} · товаров: ${missingProducts}`}
         </div>
         <div className="exchange-order-list">
           {(data?.rows || []).map((row) => {
@@ -336,6 +352,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
                 {exchange.message && <div className="exchange-message">{exchange.message}{exchange.receipt ? ` · ${exchange.receipt}` : ""}</div>}
                 {exchange.remoteDocument && <div className="exchange-message">Документ: {exchange.remoteDocument.number || exchange.remoteDocument.id || "—"} · {exchange.remoteDocument.posted ? "проведён" : "не проведён"} · {exchange.remoteDocument.mode === "real" ? "рабочая 1С" : "симулятор"}</div>}
                 <div className="exchange-actions">
+                  <button className="secondary-button" type="button" onClick={goToOrders}>В заказах</button>
                   <button className="secondary-button" disabled={busy} type="button" onClick={() => action(row, "check")}>Проверить</button>
                   <button className="secondary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => action(row, "send")}>{exchange.status === "sending" ? "Ожидает ACK 1С" : "Проверить и передать тестово"}</button>
                   <button className="primary-button" disabled={busy || !runtime.readyForWrite} title={!runtime.readyForWrite ? "Запись пока заблокирована настройками" : ""} type="button" onClick={() => action(row, "draft")}>{modeIsReal ? "Черновик в 1С" : "Черновик в симуляторе"}</button>
@@ -346,8 +363,14 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
               </article>
             );
           })}
-          {!loadingExchange && !(data?.rows || []).length && !error && <div className="empty-box">Заказов для обмена пока нет.</div>}
-          {loadingExchange && <div className="empty-box">Загружаем центр обмена...</div>}
+          {!loadingExchange && !(data?.rows || []).length && !error && (
+            <div className="empty-box">
+              <p>Заказов для обмена пока нет.</p>
+              <p className="muted small">Новые заказы появляются здесь после создания на вкладке «Заказы».</p>
+              <button className="secondary-button" type="button" onClick={goToOrders}>Открыть заказы</button>
+            </div>
+          )}
+          {loadingExchange && <div className="empty-box">Загружаем центр обмена…</div>}
         </div>
       </section>
 
@@ -394,6 +417,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
           <div>
             <p className="eyebrow">История</p>
             <h2>Журнал обмена</h2>
+            <p>Последние операции проверки, передачи и сброса по очереди 1С.</p>
           </div>
         </div>
         <div className="exchange-log">
@@ -403,7 +427,12 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
               <p>{formatDateTime(item.createdAt)} · заказ № {item.details?.orderNumber || "—"} · {item.userEmail || "Система"}</p>
             </article>
           ))}
-          {!(data?.log || []).length && <div className="empty-box">Операций обмена пока нет.</div>}
+          {!(data?.log || []).length && (
+            <div className="empty-box">
+              <p>Операций обмена пока нет.</p>
+              <p className="muted small">Записи появятся после проверки связи или передачи заказа.</p>
+            </div>
+          )}
         </div>
       </section>
     </section>
