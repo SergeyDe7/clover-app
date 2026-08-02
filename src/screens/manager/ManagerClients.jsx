@@ -19,6 +19,7 @@ import {
   buildClientSearchHaystack,
   buildOrderSearchHaystack,
 } from "../../shared/appHelpers";
+import { appAlert, appConfirm } from "../../shared/AppModal";
 
 function OneCClientPicker({ client, link, onChange }) {
   const [open, setOpen] = useState(false);
@@ -711,7 +712,7 @@ export function ManagerClients({
       await api.setClientApproval(client.id, status);
       await onReload();
     } catch (error) {
-      alert(error.message);
+      await appAlert({ title: "Ошибка доступа", message: error.message, tone: "danger" });
     } finally {
       setApprovalBusyId("");
     }
@@ -1029,12 +1030,16 @@ export function ManagerClients({
                                 label: "Заблокировать вход",
                                 danger: true,
                                 disabled: approvalBusyId === client.id,
-                                onSelect: () => {
-                                  if (
-                                    window.confirm(
-                                      "Заблокировать вход этому клиенту? Он не сможет войти в Clover, пока вы снова не разрешите доступ."
-                                    )
-                                  ) {
+                                onSelect: async () => {
+                                  const ok = await appConfirm({
+                                    title: "Заблокировать вход?",
+                                    message:
+                                      "Заблокировать вход этому клиенту? Он не сможет войти в Clover, пока вы снова не разрешите доступ.",
+                                    confirmLabel: "Заблокировать",
+                                    cancelLabel: "Отмена",
+                                    tone: "danger",
+                                  });
+                                  if (ok) {
                                     setApproval(client, "rejected");
                                   }
                                 },
@@ -1070,12 +1075,16 @@ export function ManagerClients({
                                 label: "Отклонить регистрацию",
                                 danger: true,
                                 disabled: approvalBusyId === client.id,
-                                onSelect: () => {
-                                  if (
-                                    window.confirm(
-                                      "Отклонить регистрацию? Клиент не сможет войти, пока доступ не разрешат снова."
-                                    )
-                                  ) {
+                                onSelect: async () => {
+                                  const ok = await appConfirm({
+                                    title: "Отклонить регистрацию?",
+                                    message:
+                                      "Отклонить регистрацию? Клиент не сможет войти, пока доступ не разрешат снова.",
+                                    confirmLabel: "Отклонить",
+                                    cancelLabel: "Отмена",
+                                    tone: "danger",
+                                  });
+                                  if (ok) {
                                     setApproval(client, "rejected");
                                   }
                                 },
@@ -1142,12 +1151,16 @@ export function ManagerClients({
                         className="danger-button"
                         type="button"
                         disabled={approvalBusyId === client.id}
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              "Отклонить регистрацию? Клиент не сможет войти, пока доступ не разрешат снова."
-                            )
-                          ) {
+                        onClick={async () => {
+                          const ok = await appConfirm({
+                            title: "Отклонить регистрацию?",
+                            message:
+                              "Отклонить регистрацию? Клиент не сможет войти, пока доступ не разрешат снова.",
+                            confirmLabel: "Отклонить",
+                            cancelLabel: "Отмена",
+                            tone: "danger",
+                          });
+                          if (ok) {
                             setApproval(client, "rejected");
                           }
                         }}

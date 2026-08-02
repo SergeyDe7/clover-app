@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../serverApi";
 import { formatDateTime } from "../../shared/appHelpers";
+import { appAlert, appConfirm } from "../../shared/AppModal";
 
 function formatFileSize(value) {
   const bytes = Number(value) || 0;
@@ -37,18 +38,28 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
         reason: "Ручная копия из кабинета менеджера",
       });
       await loadBackups();
-      alert("Резервная копия создана на сервере.");
+      await appAlert({
+        title: "Копия создана",
+        message: "Резервная копия создана на сервере.",
+        tone: "success",
+      });
     } catch (createError) {
-      alert(createError.message);
+      await appAlert({ title: "Ошибка", message: createError.message, tone: "danger" });
     } finally {
       setBusy(false);
     }
   };
 
   const cleanupBackups = async () => {
-    if (!window.confirm(
-      "Удалить автоматические копии старше 30 дней и оставить не больше 50 копий? Ручные свежие копии сохранятся."
-    )) {
+    const ok = await appConfirm({
+      title: "Очистить старые копии?",
+      message:
+        "Удалить автоматические копии старше 30 дней и оставить не больше 50 копий? Ручные свежие копии сохранятся.",
+      confirmLabel: "Очистить",
+      cancelLabel: "Отмена",
+      tone: "warn",
+    });
+    if (!ok) {
       return;
     }
 
@@ -59,13 +70,15 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
         automaticMaxAgeDays: 30,
       });
       await loadBackups();
-      alert(
-        result.removed?.length
+      await appAlert({
+        title: "Очистка завершена",
+        message: result.removed?.length
           ? `Удалено старых копий: ${result.removed.length}.`
-          : "Старых копий для удаления нет."
-      );
+          : "Старых копий для удаления нет.",
+        tone: "success",
+      });
     } catch (cleanupError) {
-      alert(cleanupError.message);
+      await appAlert({ title: "Ошибка очистки", message: cleanupError.message, tone: "danger" });
     } finally {
       setBusy(false);
     }
@@ -82,16 +95,21 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
       link.click();
       URL.revokeObjectURL(url);
     } catch (downloadError) {
-      alert(downloadError.message);
+      await appAlert({ title: "Ошибка скачивания", message: downloadError.message, tone: "danger" });
     } finally {
       setBusy(false);
     }
   };
 
   const restoreBackup = async (item) => {
-    if (!window.confirm(
-      `Восстановить данные из копии «${item.fileName}»? Перед восстановлением сервер автоматически создаст страховочную копию.`
-    )) {
+    const ok = await appConfirm({
+      title: "Восстановить данные?",
+      message: `Восстановить данные из копии «${item.fileName}»? Перед восстановлением сервер автоматически создаст страховочную копию.`,
+      confirmLabel: "Восстановить",
+      cancelLabel: "Отмена",
+      tone: "danger",
+    });
+    if (!ok) {
       return;
     }
 
@@ -100,9 +118,13 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
       await api.restoreBackup(item.fileName);
       await onReload();
       await loadBackups();
-      alert("Данные восстановлены. Кабинет обновлён.");
+      await appAlert({
+        title: "Восстановлено",
+        message: "Данные восстановлены. Кабинет обновлён.",
+        tone: "success",
+      });
     } catch (restoreError) {
-      alert(restoreError.message);
+      await appAlert({ title: "Ошибка восстановления", message: restoreError.message, tone: "danger" });
     } finally {
       setBusy(false);
     }
@@ -122,9 +144,17 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
-      try { onImport(JSON.parse(String(reader.result))); alert("JSON-копия загружена."); }
-      catch { alert("Не удалось прочитать файл резервной копии."); }
+    reader.onload = async () => {
+      try {
+        onImport(JSON.parse(String(reader.result)));
+        await appAlert({ title: "Загружено", message: "JSON-копия загружена.", tone: "success" });
+      } catch {
+        await appAlert({
+          title: "Ошибка файла",
+          message: "Не удалось прочитать файл резервной копии.",
+          tone: "danger",
+        });
+      }
       event.target.value = "";
     };
     reader.readAsText(file);

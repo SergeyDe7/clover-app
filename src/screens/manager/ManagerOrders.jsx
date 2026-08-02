@@ -75,9 +75,7 @@ export function ManagerOrders({
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkPanelOpen, setBulkPanelOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [clientQuickFilter, setClientQuickFilter] = useState(null);
   const effectiveSearch = headerSearch.trim();
-  const filtersActive = status !== "Все" || exchangeFilter !== "all" || sort !== "newest" || Boolean(clientQuickFilter);
   const inTrash = ordersView === "trash";
   const sourceOrders = inTrash ? trashedOrders : orders;
 
@@ -97,40 +95,13 @@ export function ManagerOrders({
     [orders]
   );
 
-  const recentClients = useMemo(() => {
-    const sorted = [...orders].sort((a, b) =>
-      String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
-    );
-    const seen = new Set();
-    const list = [];
-    for (const order of sorted) {
-      const name = String(order.customerName || "").trim();
-      const clientId = order.clientId != null ? String(order.clientId) : "";
-      const key = clientId || name.toLowerCase();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      list.push({
-        key,
-        clientId,
-        name: name || "Клиент",
-      });
-      if (list.length >= 5) break;
-    }
-    return list;
-  }, [orders]);
-
   const visible = useMemo(() => {
     const needle = effectiveSearch.trim();
     return [...sourceOrders].filter((order) => {
       const exchange = normalizeOrderExchange(order.exchange);
       const link = clientLinks[order.clientId] || {};
       const haystack = buildOrderSearchHaystack(order, link);
-      const matchesClientQuick = !clientQuickFilter || (
-        (clientQuickFilter.clientId && String(order.clientId) === String(clientQuickFilter.clientId))
-        || (!clientQuickFilter.clientId && String(order.customerName || "").trim().toLowerCase() === String(clientQuickFilter.name || "").trim().toLowerCase())
-      );
       return (!needle || matchesTextSearch(haystack, needle))
-        && matchesClientQuick
         && (inTrash || status === "Все" || order.status === status)
         && (inTrash || exchangeFilter === "all"
           || (exchangeFilter === "waiting" && (exchange.status === "not_sent" || exchange.status === "error"))
@@ -141,7 +112,7 @@ export function ManagerOrders({
       if (sort === "oldest") return String(a.createdAt).localeCompare(String(b.createdAt));
       return String(b.createdAt || b.deletedAt || "").localeCompare(String(a.createdAt || a.deletedAt || ""));
     });
-  }, [sourceOrders, effectiveSearch, status, exchangeFilter, sort, clientLinks, inTrash, clientQuickFilter]);
+  }, [sourceOrders, effectiveSearch, status, exchangeFilter, sort, clientLinks, inTrash]);
 
   const runExchangeAction = async (order, action) => {
     const exchange = normalizeOrderExchange(order.exchange);
@@ -194,7 +165,7 @@ export function ManagerOrders({
     );
   };
 
-  const applyBulkStatus = () => {
+  const applyBulkStatus = async () => {
     if (!selectedIds.length) return;
     const selected = orders.filter((order) => selectedIds.includes(order.id));
     const allowedIds = selected
@@ -202,13 +173,21 @@ export function ManagerOrders({
       .map((order) => order.id);
     const skipped = selected.length - allowedIds.length;
     if (!allowedIds.length) {
-      alert(`Статус «${bulkStatus}» недоступен ни для одного выбранного заказа.`);
+      await appAlert({
+        title: "Статус не изменён",
+        message: `Статус «${bulkStatus}» недоступен ни для одного выбранного заказа.`,
+        tone: "warn",
+      });
       return;
     }
     onBulkUpdateOrders(allowedIds, { status: bulkStatus });
     setSelectedIds([]);
     if (skipped > 0) {
-      alert(`Статус обновлён у ${allowedIds.length}. Пропущено (запрещённый переход): ${skipped}.`);
+      await appAlert({
+        title: "Статус обновлён частично",
+        message: `Обновлено: ${allowedIds.length}. Пропущено (запрещённый переход): ${skipped}.`,
+        tone: "warn",
+      });
     }
   };
 
@@ -233,7 +212,11 @@ export function ManagerOrders({
       }
       await onReload();
       if (errors.length) {
-        alert(`Не все заказы обработаны:\n${errors.join("\n")}`);
+        await appAlert({
+          title: "Не все заказы обработаны",
+          message: errors.join("\n"),
+          tone: "danger",
+        });
       }
       setSelectedIds([]);
     } finally {
@@ -242,97 +225,67 @@ export function ManagerOrders({
   };
 
   return (
-    <section>
-      <div className="manager-orders-view-switch category-list" style={{ marginBottom: 14 }}>
+    <section className="manager-orders-section">
+      <div className="manager-orders-topbar" role="toolbar" aria-label="Заказы и действия">
         <button
-          className={ordersView === "active" ? "category-button active" : "category-button"}
+          className={ordersView === "active" ? "manager-orders-seg active" : "manager-orders-seg"}
           type="button"
           onClick={() => onOrdersViewChange?.("active")}
         >
           Заказы ({orders.length})
         </button>
         <button
-          className={ordersView === "trash" ? "category-button active" : "category-button"}
+          className={ordersView === "trash" ? "manager-orders-seg active" : "manager-orders-seg"}
           type="button"
           onClick={() => onOrdersViewChange?.("trash")}
         >
           Корзина ({trashedOrders.length})
         </button>
+        {!inTrash && (
+          <>
+            <button
+              className={filtersOpen ? "manager-orders-seg manager-filters-toggle active" : "manager-orders-seg manager-filters-toggle"}
+              type="button"
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((open) => !open)}
+            >
+              {filtersOpen ? "Скрыть фильтры" : "Фильтры"}
+            </button>
+            <button
+              className={bulkPanelOpen ? "manager-orders-seg manager-bulk-toggle active" : "manager-orders-seg manager-bulk-toggle"}
+              type="button"
+              aria-expanded={bulkPanelOpen}
+              onClick={() => setBulkPanelOpen((open) => !open)}
+            >
+              {bulkPanelOpen ? "Скрыть действия" : "Массовые действия"}
+              {selectedIds.length > 0 ? ` · ${selectedIds.length}` : ""}
+            </button>
+          </>
+        )}
       </div>
 
       {!inTrash && (
-      <div className="manager-orders-tools">
-        <button
-          className="secondary-button manager-filters-toggle"
-          type="button"
-          aria-expanded={filtersOpen}
-          onClick={() => setFiltersOpen((open) => !open)}
-        >
-          {filtersOpen ? "Скрыть фильтры" : "Фильтры"}
-          {!filtersOpen && filtersActive ? " · изменены" : ""}
-        </button>
-        <button
-          className="secondary-button manager-bulk-toggle"
-          type="button"
-          aria-expanded={bulkPanelOpen}
-          onClick={() => setBulkPanelOpen((open) => !open)}
-        >
-          {bulkPanelOpen ? "Скрыть действия" : "Массовые действия"}
-          {selectedIds.length > 0 ? ` · ${selectedIds.length}` : ""}
-        </button>
-      </div>
-      )}
-
-      {!inTrash && (
-        <div className="manager-orders-quick-chips category-list" role="group" aria-label="Быстрые фильтры 1С">
+        <div className="manager-orders-quick-chips" role="group" aria-label="Быстрые фильтры 1С">
           <button
-            className={exchangeFilter === "waiting" ? "category-button active" : "category-button"}
+            className={exchangeFilter === "waiting" ? "manager-orders-seg active" : "manager-orders-seg"}
             type="button"
             onClick={() => {
+              setFiltersOpen(false);
               setExchangeFilter((current) => (current === "waiting" ? "all" : "waiting"));
-              setFiltersOpen(true);
             }}
           >
-            Ждут 1С ({waitingOneCCount})
+            Ждут передачи в 1С ({waitingOneCCount})
           </button>
           <button
-            className={exchangeFilter === "queued" ? "category-button active" : "category-button"}
+            className={exchangeFilter === "queued" ? "manager-orders-seg active" : "manager-orders-seg"}
             type="button"
             onClick={() => {
+              setFiltersOpen(false);
               setExchangeFilter((current) => (current === "queued" ? "all" : "queued"));
-              setFiltersOpen(true);
             }}
           >
             В очереди ({queuedOneCCount})
           </button>
-        </div>
-      )}
-
-      {!inTrash && recentClients.length > 0 && (
-        <div className="manager-orders-recent-clients category-list" role="group" aria-label="Недавние клиенты">
-          <p className="manager-orders-recent-label">Недавние клиенты</p>
-          {recentClients.map((client) => {
-            const active = clientQuickFilter?.key === client.key;
-            return (
-              <button
-                key={client.key}
-                className={active ? "category-button active" : "category-button"}
-                type="button"
-                onClick={() => setClientQuickFilter(active ? null : client)}
-              >
-                {client.name}
-              </button>
-            );
-          })}
-          {clientQuickFilter && (
-            <button
-              className="category-button"
-              type="button"
-              onClick={() => setClientQuickFilter(null)}
-            >
-              Сбросить клиента
-            </button>
-          )}
         </div>
       )}
 
@@ -345,7 +298,7 @@ export function ManagerOrders({
             aria-label="Фильтр статуса 1С"
           >
             <option value="all">Все статусы 1С</option>
-            <option value="waiting">Ждут 1С</option>
+            <option value="waiting">Ждут передачи в 1С</option>
             <option value="queued">В очереди</option>
             {Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}
           </select>
@@ -357,14 +310,14 @@ export function ManagerOrders({
         <div className="panel manager-bulk-panel">
           <div className="toolbar four">
             <button className="secondary-button" type="button" onClick={selectVisible}>
-              {visible.length > 0 && visible.every((order) => selectedIds.includes(order.id))
-                ? "Снять выбор с видимых"
-                : "Выбрать все видимые"}
+                  {visible.length > 0 && visible.every((order) => selectedIds.includes(order.id))
+                    ? "Снять выбор"
+                    : "Выбрать все"}
             </button>
             <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} aria-label="Статус для массового изменения">
               {ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}
             </select>
-            <button className="primary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={applyBulkStatus}>
+            <button className="primary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => void applyBulkStatus()}>
               Изменить статус ({selectedIds.length})
             </button>
             <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => runBulkExchange("check")}>
@@ -389,14 +342,16 @@ export function ManagerOrders({
         return (
         <article className="order-card manager-order-card-item" key={order.id}>
           <div className="order-card-header manager-order-card-header">
-            <label className="manager-order-select">
+            <div className="manager-order-select">
               <input
+                className="manager-order-checkbox"
                 type="checkbox"
                 checked={selectedIds.includes(order.id)}
                 onChange={() => toggleSelected(order.id)}
+                onClick={(event) => event.stopPropagation()}
                 aria-label={`Выбрать заказ ${order.number}`}
               />
-              <div>
+              <div className="manager-order-select-body">
                 <div className="exchange-status-line">
                   <span className={`badge ${statusClass(order.status)}`}>{order.status}</span>
                   <span className={`badge ${exchangeBadgeClass(exchange.status)}`}>1С: {EXCHANGE_STATUS_LABELS[exchange.status]}</span>
@@ -412,7 +367,7 @@ export function ManagerOrders({
                   </p>
                 )}
               </div>
-            </label>
+            </div>
             <div className="nowrap">
               <strong className="manager-order-sum success-text">
                 {settings.showPrices && getOrderTotal(order) > 0
@@ -629,7 +584,7 @@ export function ManagerOrders({
           message={
             inTrash
               ? "Здесь появятся заказы, которые вы удалите."
-              : clientQuickFilter || exchangeFilter !== "all" || status !== "Все"
+              : exchangeFilter !== "all" || status !== "Все"
                 ? "По текущим фильтрам ничего нет. Сбросьте фильтр или выберите другой."
                 : "Когда клиенты оформят заказы, они появятся в этом списке."
           }

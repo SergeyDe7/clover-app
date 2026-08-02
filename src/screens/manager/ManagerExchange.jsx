@@ -10,6 +10,7 @@ import {
   formatDateTime,
 } from "../../shared/appHelpers";
 import { AUDIT_ACTION_LABELS } from "./ManagerAudit";
+import { appAlert } from "../../shared/AppModal";
 
 export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavigate }) {
   const [data, setData] = useState(null);
@@ -69,9 +70,13 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       applyOneCState(result);
       setConnectionResult(null);
       setPreview(null);
-      alert("Настройки подключения к 1С сохранены.");
+      await appAlert({
+        title: "Сохранено",
+        message: "Настройки подключения к 1С сохранены.",
+        tone: "success",
+      });
     } catch (saveError) {
-      alert(saveError.message);
+      await appAlert({ title: "Ошибка сохранения", message: saveError.message, tone: "danger" });
     } finally {
       setBusyConnection("");
     }
@@ -101,7 +106,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       const result = await api.previewOneCCatalog(type, 20);
       setPreview(result);
     } catch (previewError) {
-      alert(previewError.message);
+      await appAlert({ title: "Ошибка предпросмотра", message: previewError.message, tone: "danger" });
     } finally {
       setBusyConnection("");
     }
@@ -124,11 +129,13 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
         result = await api.createOneCDraft(row.id);
       }
       if (type === "reset") result = await api.resetExchangeOrder(row.id);
-      if (result?.result?.message) alert(result.result.message);
+      if (result?.result?.message) {
+        await appAlert({ title: "Обмен с 1С", message: result.result.message, tone: "success" });
+      }
       await onReload();
       await load();
     } catch (actionError) {
-      alert(actionError.message);
+      await appAlert({ title: "Ошибка обмена", message: actionError.message, tone: "danger" });
       await onReload();
       await load();
     } finally {
@@ -142,7 +149,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       const blob = await api.downloadExchangeOrder(row.id, format);
       downloadBlobFile(blob, `clover-order-${row.number || row.id}-1c.${format}`);
     } catch (downloadError) {
-      alert(downloadError.message);
+      await appAlert({ title: "Ошибка скачивания", message: downloadError.message, tone: "danger" });
     } finally {
       setBusyId("");
     }
@@ -153,7 +160,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       const blob = await api.downloadExchangeBatch(format, batchStatus);
       downloadBlobFile(blob, `clover-orders-1c.${format}`);
     } catch (downloadError) {
-      alert(downloadError.message);
+      await appAlert({ title: "Ошибка скачивания", message: downloadError.message, tone: "danger" });
     }
   };
 

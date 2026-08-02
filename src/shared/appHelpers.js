@@ -12,12 +12,12 @@ export const MANAGER_TABS = [
   ["clients", "Клиенты"],
   ["products", "Товары"],
   ["exchange", "1С"],
+  ["acts", "Акты сверок"],
   ["more", "Ещё"],
 ];
 
 /** Вкладки внутри «Ещё» у менеджера. */
 export const MANAGER_MORE_TABS = [
-  ["acts", "Акты сверки"],
   ["settings", "Настройки"],
   ["backup", "Резервные копии"],
   ["audit", "Журнал"],
@@ -28,19 +28,19 @@ export const MANAGER_MORE_TAB_KEY = "clover-manager-more-tab-v1";
 export const CLIENT_TABS = [
   ["home", "Заказ"],
   ["orders", "Мои заказы"],
-  ["cabinet", "Кабинет"],
+  ["matrix", "Матрица"],
+  ["reconciliation", "Акт сверки"],
+  ["cabinet", "Настройки"],
 ];
 
-/** Подразделы «Кабинета» на мобильном. */
+/** Подразделы «Настроек» на мобильном. */
 export const CLIENT_CABINET_SECTIONS = [
-  ["history", "История"],
-  ["matrix", "Матрица"],
   ["addresses", "Адреса"],
-  ["reconciliation", "Сверка"],
-  ["settings", "Настройки"],
+  ["settings", "Профиль"],
 ];
 
 export const CLIENT_CABINET_SECTION_KEY = "clover-client-cabinet-section-v1";
+export const CLIENT_SEEN_READY_ACTS_KEY = "clover-client-seen-ready-acts-v1";
 
 /** Навигация/кабинет клиента (см. APP_STYLES @media 820px). */
 export const CLIENT_NARROW_MQ = "(max-width: 820px)";
@@ -48,9 +48,47 @@ export const CLIENT_NARROW_MQ = "(max-width: 820px)";
 /** Корзина/каталог заказа (см. APP_STYLES @media 900px — скрыт .order-summary). */
 export const CATALOG_NARROW_MQ = "(max-width: 900px)";
 
+export function readClientSeenReadyActs() {
+  try {
+    const raw = localStorage.getItem(CLIENT_SEEN_READY_ACTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function writeClientSeenReadyActs(ids) {
+  try {
+    const unique = [...new Set((ids || []).map(String))];
+    localStorage.setItem(CLIENT_SEEN_READY_ACTS_KEY, JSON.stringify(unique));
+  } catch (error) {
+    console.error("Не удалось сохранить просмотренные акты сверки", error);
+  }
+}
+
+export function readyReconciliationIds(requests = []) {
+  return (requests || [])
+    .filter((item) => item?.status === "ready" && (item.hasFile || item.fileName))
+    .map((item) => String(item.id));
+}
+
+export function countUnseenReadyActs(requests = [], seenIds = readClientSeenReadyActs()) {
+  const seen = new Set((seenIds || []).map(String));
+  return readyReconciliationIds(requests).filter((id) => !seen.has(id)).length;
+}
+
+export function markReadyActsSeen(requests = []) {
+  const readyIds = readyReconciliationIds(requests);
+  if (!readyIds.length) return;
+  const merged = [...new Set([...readClientSeenReadyActs(), ...readyIds])];
+  writeClientSeenReadyActs(merged);
+}
+
 export function readManagerActiveTab() {
   try {
     const value = localStorage.getItem(MANAGER_ACTIVE_TAB_KEY) || "orders";
+    if (value === "acts") return "acts";
     if (MANAGER_MORE_TABS.some(([id]) => id === value)) return "more";
     return MANAGER_TABS.some(([id]) => id === value) ? value : "orders";
   } catch {
@@ -102,11 +140,12 @@ export function writeClientActiveTab(value) {
 
 export function readClientCabinetSection() {
   try {
-    let value = localStorage.getItem(CLIENT_CABINET_SECTION_KEY) || "history";
+    let value = localStorage.getItem(CLIENT_CABINET_SECTION_KEY) || "settings";
     if (value === "profile") value = "settings";
-    return CLIENT_CABINET_SECTIONS.some(([id]) => id === value) ? value : "history";
+    if (value === "history" || value === "reconciliation" || value === "matrix") value = "settings";
+    return CLIENT_CABINET_SECTIONS.some(([id]) => id === value) ? value : "settings";
   } catch {
-    return "history";
+    return "settings";
   }
 }
 
@@ -120,22 +159,24 @@ export function writeClientCabinetSection(value) {
 
 export function clientTabFromSection(section) {
   if (!section) return "";
+  if (section === "reconciliation" || section === "acts") {
+    return "reconciliation";
+  }
+  if (section === "matrix" || section === "products") {
+    return "matrix";
+  }
   if (
-    section === "reconciliation" ||
-    section === "acts" ||
     section === "addresses" ||
     section === "address" ||
     section === "settings" ||
     section === "profile" ||
     section === "security" ||
     section === "push" ||
-    section === "cabinet" ||
-    section === "history"
+    section === "cabinet"
   ) {
     return "cabinet";
   }
-  if (section === "orders") return "orders";
-  if (section === "matrix") return "cabinet";
+  if (section === "orders" || section === "history") return "orders";
   if (
     section === "home" ||
     section === "order" ||
@@ -149,9 +190,7 @@ export function clientTabFromSection(section) {
 
 export function clientCabinetSectionFromQuery(section) {
   if (!section) return "";
-  if (section === "orders" || section === "history") return "history";
   if (section === "addresses" || section === "address") return "addresses";
-  if (section === "reconciliation" || section === "acts") return "reconciliation";
   if (
     section === "settings" ||
     section === "security" ||
@@ -161,7 +200,6 @@ export function clientCabinetSectionFromQuery(section) {
   ) {
     return "settings";
   }
-  if (section === "matrix" || section === "products") return "matrix";
   return "";
 }
 
@@ -597,7 +635,13 @@ export function escapeHtml(value) {
 export function printOrderDocument(order, settings) {
   const printWindow = window.open("", "_blank", "width=960,height=760");
   if (!printWindow) {
-    alert("Браузер заблокировал окно печати. Разрешите всплывающие окна для localhost.");
+    void import("./AppModal.jsx").then(({ appAlert }) =>
+      appAlert({
+        title: "Печать заблокирована",
+        message: "Браузер заблокировал окно печати. Разрешите всплывающие окна для этого сайта.",
+        tone: "warn",
+      })
+    );
     return;
   }
 
@@ -778,7 +822,7 @@ textarea { resize: vertical; }
   top: 0;
   z-index: 40;
 }
-.app-header-logo { display: block; width: 120px; max-width: 120px; max-height: 52px; height: auto; object-fit: contain; flex: 0 0 auto; }
+.app-header-logo { display: block; width: 152px; max-width: 152px; max-height: 66px; height: auto; object-fit: contain; flex: 0 0 auto; }
 .app-header-logo-button {
   display: block;
   flex: 0 0 auto;
@@ -1027,15 +1071,16 @@ textarea { resize: vertical; }
 .field input, .field select, .field textarea, .toolbar input, .toolbar select {
   width: 100%;
   padding: 11px 12px;
-  border: 1px solid #d6e0d3;
+  border: 1px solid #e6eee3;
   border-radius: 11px;
-  background: #fff;
+  background: #fbfdfb;
   color: #394639;
   outline: none;
 }
 .field input:focus, .field select:focus, .field textarea:focus, .toolbar input:focus, .toolbar select:focus {
-  border-color: #5b9d57;
-  box-shadow: 0 0 0 3px rgba(91,157,87,.1);
+  border-color: rgba(91,157,87,.55);
+  box-shadow: 0 0 0 2px rgba(91,157,87,.1);
+  background: #fff;
 }
 .field.is-invalid {
   color: #b42318;
@@ -1101,19 +1146,41 @@ textarea { resize: vertical; }
 .toolbar.two { grid-template-columns: minmax(220px,1fr) 220px; }
 .toolbar.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .toolbar.four { grid-template-columns: minmax(220px,1fr) 180px 180px 180px; }
-.manager-bulk-wrap { margin: 0 0 14px; }
-.manager-bulk-toggle { width: 100%; min-height: 40px; }
-.manager-bulk-panel { margin: 0 0 14px; padding: 14px; }
-.manager-orders-tools {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 0 0 12px;
+.manager-orders-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
-.manager-filters-toggle,
-.manager-orders-tools .manager-bulk-toggle {
-  width: 100%;
-  min-height: 40px;
+.manager-bulk-panel { margin: 0 0 14px; padding: 14px; }
+.manager-orders-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+.manager-orders-seg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 46px;
+  padding: 11px 17px;
+  border: 1px solid #d7e1d4;
+  border-radius: 13px;
+  background: #fff;
+  color: #5d695d;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+.manager-orders-seg.active {
+  border-color: #5b9d57;
+  background: #5b9d57;
+  color: #fff;
 }
 .manager-orders-filters { margin-bottom: 12px; }
 .manager-send-onec-button {
@@ -1149,8 +1216,18 @@ textarea { resize: vertical; }
   min-width: 0;
   flex: 1 1 auto;
 }
+.manager-order-checkbox {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 4px 0 0;
+  cursor: pointer;
+  accent-color: #5b9d57;
+}
+.manager-order-select-body,
 .manager-order-select > div {
   min-width: 0;
+  flex: 1 1 auto;
 }
 .manager-order-card-header .exchange-status-line {
   margin: 0 0 4px;
@@ -1200,16 +1277,17 @@ textarea { resize: vertical; }
 .manager-search-block input[type="search"] {
   width: 100%;
   padding: 11px 12px;
-  border: 1px solid #d6e0d3;
+  border: 1px solid #e6eee3;
   border-radius: 11px;
-  background: #fff;
+  background: #fbfdfb;
   color: #394639;
   outline: none;
   box-sizing: border-box;
 }
 .manager-search-block input[type="search"]:focus {
-  border-color: #5b9d57;
-  box-shadow: 0 0 0 3px rgba(91,157,87,.1);
+  border-color: rgba(91,157,87,.55);
+  box-shadow: 0 0 0 2px rgba(91,157,87,.1);
+  background: #fff;
 }
 .search-hint {
   margin: 0;
@@ -1279,10 +1357,25 @@ textarea { resize: vertical; }
 }
 .catalog-toolbar { margin-bottom: 20px; }
 .catalog-filter-row { display: grid; grid-template-columns: minmax(220px,1fr) auto; gap: 12px; margin-bottom: 12px; }
-.catalog-search { width: 100%; padding: 12px 14px; border: 1px solid #d8e2d5; border-radius: 12px; outline: none; }
-.catalog-search:focus { border-color: #5b9d57; box-shadow: 0 0 0 3px rgba(91,157,87,.1); }
+.catalog-search { width: 100%; padding: 12px 14px; border: 1px solid #e6eee3; border-radius: 12px; background: #fbfdfb; outline: none; }
+.catalog-search:focus { border-color: rgba(91,157,87,.55); box-shadow: 0 0 0 2px rgba(91,157,87,.1); background: #fff; }
 .category-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.category-button { padding: 8px 12px; border: 1px solid #d8e2d5; border-radius: 999px; background: #fff; color: #657065; font-size: 12px; font-weight: 700; }
+.category-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 15px;
+  border: 1px solid #d7e1d4;
+  border-radius: 12px;
+  background: #fff;
+  color: #5d695d;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  box-sizing: border-box;
+  cursor: pointer;
+}
 .category-button.active { border-color: #5b9d57; background: #5b9d57; color: #fff; }
 .product-grid {
   display: grid;
@@ -1379,6 +1472,7 @@ textarea { resize: vertical; }
   border: 0;
   background: rgba(30, 42, 30, 0.45);
   cursor: pointer;
+  animation: clover-sheet-backdrop-in 0.28s ease-out both;
 }
 .delivery-date-sheet-panel {
   position: absolute;
@@ -1392,6 +1486,7 @@ textarea { resize: vertical; }
   border-radius: 18px;
   background: #fff;
   box-shadow: 0 18px 48px rgba(40, 64, 40, 0.22);
+  animation: clover-sheet-center-in 0.38s cubic-bezier(0.2, 0.9, 0.2, 1) both;
 }
 .delivery-date-sheet-head {
   display: flex;
@@ -1593,13 +1688,20 @@ textarea { resize: vertical; }
   max-width: 100%;
   height: 38px;
   padding: 0 2px;
-  border: none;
+  border: none !important;
   background: transparent;
   color: #394639;
   font-weight: 800;
   text-align: center;
   outline: none;
   box-sizing: border-box;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.quantity-input::-webkit-inner-spin-button,
+.quantity-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 .quantity-input-wrap small {
   flex: 0 0 auto;
@@ -1635,9 +1737,9 @@ textarea { resize: vertical; }
 .request-photo-preview small { color: #7a847a; font-size: 10px; }
 .custom-request-photo { display: block; overflow: hidden; padding: 0; border: 1px solid #dbe5d8; border-radius: 11px; background: #f2f6ef; cursor: zoom-in; appearance: none; }
 .custom-request-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.custom-photo-viewer { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 24px; background: rgba(18, 25, 18, 0.9); cursor: zoom-out; }
-.custom-photo-viewer > img { display: block; width: auto; height: auto; max-width: min(1200px, 94vw); max-height: 90vh; object-fit: contain; border-radius: 12px; background: #fff; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45); cursor: default; }
-.custom-photo-viewer-close { position: fixed; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); z-index: 10001; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid rgba(255, 255, 255, 0.55); border-radius: 50%; background: rgba(255, 255, 255, 0.95); color: #345934; font-size: 30px; line-height: 1; font-weight: 500; cursor: pointer; }
+.custom-photo-viewer { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 24px; background: rgba(18, 25, 18, 0.9); cursor: zoom-out; animation: clover-sheet-backdrop-in 0.28s ease-out both; }
+.custom-photo-viewer > img { display: block; width: auto; height: auto; max-width: min(1200px, 94vw); max-height: 90vh; object-fit: contain; border-radius: 12px; background: #fff; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45); cursor: default; animation: clover-sheet-center-in 0.38s cubic-bezier(0.2, 0.9, 0.2, 1) both; }
+.custom-photo-viewer-close { position: fixed; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); z-index: 10001; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid rgba(255, 255, 255, 0.55); border-radius: 50%; background: rgba(255, 255, 255, 0.95); color: #345934; font-size: 30px; line-height: 1; font-weight: 500; cursor: pointer; animation: order-thankyou-text-in 0.45s ease-out 0.12s both; }
 
 .order-thankyou {
   position: fixed;
@@ -1884,6 +1986,18 @@ html.clover-thankyou-open .app-header {
   55% { opacity: 0.14; transform: translateY(-14px) scale(0.92); }
   80% { opacity: 0.05; transform: translateY(-18px) scale(0.8); }
 }
+@keyframes clover-sheet-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes clover-sheet-center-in {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 18px)) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes clover-sheet-up-in {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 @media (prefers-reduced-motion: reduce) {
   .order-thankyou,
   .order-thankyou-card,
@@ -1894,7 +2008,14 @@ html.clover-thankyou-open .app-header {
   .order-thankyou-text,
   .order-thankyou-button,
   .order-thankyou-glow,
-  .order-thankyou-spark {
+  .order-thankyou-spark,
+  .cart-sheet-backdrop,
+  .cart-sheet-panel,
+  .delivery-date-sheet-backdrop,
+  .delivery-date-sheet-panel,
+  .custom-photo-viewer,
+  .custom-photo-viewer > img,
+  .custom-photo-viewer-close {
     animation: none !important;
   }
 }
@@ -1908,8 +2029,38 @@ html.clover-thankyou-open .app-header {
 
 
 .manager-nav, .client-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 24px; padding: 0 0 2px; }
-.manager-nav button, .client-nav button { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 10px 15px; border: 1px solid #d7e1d4; border-radius: 12px; background: #fff; color: #5d695d; font-weight: 800; cursor: pointer; line-height: 1.2; box-sizing: border-box; }
-.manager-nav button.active, .client-nav button.active { border-color: #5b9d57; background: #5b9d57; color: #fff; }
+.manager-nav button, .client-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 42px;
+  padding: 10px 15px;
+  border: 1px solid #d7e1d4;
+  border-radius: 12px;
+  background: #fff;
+  color: #5d695d;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  line-height: 1.2;
+  box-sizing: border-box;
+}
+.manager-nav {
+  gap: 12px;
+}
+.manager-nav button {
+  min-height: 52px;
+  padding: 14px 24px;
+  font-size: 16px;
+  border-radius: 13px;
+}
+.manager-nav button.active, .client-nav button.active {
+  border-color: #458542;
+  background: #458542;
+  color: #fff;
+}
 .client-nav {
   position: sticky;
   top: 0;
@@ -1923,7 +2074,7 @@ html.clover-thankyou-open .app-header {
 .client-cabinet-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 4px; }
 .client-home-note { margin-bottom: 16px; }
 .manager-header-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.manager-search-input { min-width: 180px; max-width: 260px; padding: 9px 12px; border: 1px solid #d7e1d4; border-radius: 12px; font: inherit; }
+.manager-search-input { min-width: 180px; max-width: 260px; padding: 9px 12px; border: 1px solid #e6eee3; border-radius: 12px; background: #fbfdfb; font: inherit; }
 .manager-bell { position: relative; }
 .manager-bell-label-short { display: none; }
 .manager-bell-count { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #c45c26; color: #fff; font-size: 11px; font-weight: 800; display: grid; place-items: center; }
@@ -2037,7 +2188,7 @@ html.clover-thankyou-open .app-header {
 @media (max-width: 820px) {
   .client-nav {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
     margin-bottom: 12px;
     padding: 6px;
@@ -2048,7 +2199,7 @@ html.clover-thankyou-open .app-header {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
-  .client-cabinet-nav .category-button { width: 100%; text-align: center; }
+  .client-cabinet-nav .category-button { width: 100%; text-align: center; min-height: 42px; padding: 10px 12px; border-radius: 12px; font-size: 14px; }
   .page-content-client { padding-bottom: 24px; }
   .exchange-summary-strip { grid-template-columns: 1fr; }
   .order-thankyou {
@@ -2079,7 +2230,7 @@ html.clover-thankyou-open .app-header {
 button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 0; }
 .manager-grid { display: grid; gap: 16px; }
 .manager-textareas { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 12px; }
-.manager-textareas textarea { min-height: 90px; }
+.manager-textareas textarea { min-height: 90px; border: 1px solid #e6eee3; border-radius: 11px; background: #fbfdfb; }
 
 .client-list { display: grid; gap: 16px; }
 .client-card { padding: 21px; border: 1px solid #e1e9de; border-radius: 18px; background: #fff; }
@@ -2197,8 +2348,9 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   font-weight: 700;
 }
 
-.product-manager-list { display: grid; gap: 10px; }
-.product-manager-row { display: grid; grid-template-columns: 74px minmax(0,1fr) 110px 100px 180px; align-items: start; gap: 12px; padding: 14px; border: 1px solid #e1e9de; border-radius: 14px; background: #fff; box-sizing: border-box; min-height: 0; }
+.product-manager-list { display: grid; gap: 12px; align-content: start; }
+.product-manager-row { display: grid; grid-template-columns: 74px minmax(0,1fr) 110px 100px minmax(160px, 200px); align-items: start; gap: 12px; padding: 14px; border: 1px solid #e1e9de; border-radius: 14px; background: #fff; box-sizing: border-box; min-height: 0; position: relative; z-index: 0; overflow: visible; }
+.product-manager-row .image-actions { min-width: 0; }
 .product-manager-thumb { display: grid; place-items: center; width: 70px; height: 70px; overflow: hidden; border-radius: 12px; background: #f2f6ef; color: #9aaa98; font-size: 10px; text-align: center; }
 .product-manager-thumb img { width: 100%; height: 100%; object-fit: contain; }
 .image-actions { display: flex; flex-wrap: wrap; gap: 7px; }
@@ -2240,10 +2392,10 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 .setting-card { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 16px; border: 1px solid #e1e9de; border-radius: 14px; background: #f8fbf6; }
 .setting-card h3 { margin: 0 0 5px; color: #394639; font-size: 14px; }
 .setting-card p { margin: 0; color: #7a847a; font-size: 11px; line-height: 1.4; }
-.toggle { width: 48px; height: 28px; padding: 3px; border: none; border-radius: 999px; background: #cfd7cd; flex-shrink: 0; }
+.toggle { width: 52px; height: 28px; min-height: 28px; padding: 3px; border: none; border-radius: 999px; background: #cfd7cd; flex-shrink: 0; box-sizing: border-box; }
 .toggle span { display: block; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: .2s; }
 .toggle.active { background: #5b9d57; }
-.toggle.active span { transform: translateX(20px); }
+.toggle.active span { transform: translateX(24px); }
 
 .backup-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
 .backup-list, .audit-list { display: grid; gap: 9px; margin-top: 16px; }
@@ -2409,6 +2561,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     border: 0;
     background: rgba(30, 42, 30, 0.45);
     cursor: pointer;
+    animation: clover-sheet-backdrop-in 0.28s ease-out both;
   }
   .delivery-date-sheet-panel {
     position: absolute;
@@ -2423,6 +2576,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     border-radius: 18px 18px 0 0;
     background: #fff;
     box-shadow: 0 -12px 36px rgba(40, 64, 40, 0.18);
+    animation: clover-sheet-up-in 0.4s cubic-bezier(0.2, 0.9, 0.2, 1) both;
   }
   .delivery-date-sheet-head {
     display: flex;
@@ -2492,16 +2646,17 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     border-radius: 10px;
   }
   .embedded-catalog .catalog-filter-row .category-button {
-    min-height: 36px;
-    min-width: 36px;
-    padding: 6px 8px;
+    min-height: 42px;
+    min-width: 0;
+    padding: 10px 12px;
     font-size: 14px;
+    border-radius: 12px;
   }
   .fav-label-full { display: none; }
   .fav-label-short { display: inline; }
   .embedded-catalog .category-list {
     flex-wrap: nowrap;
-    gap: 6px;
+    gap: 8px;
     overflow-x: auto;
     max-width: 100%;
     -webkit-overflow-scrolling: touch;
@@ -2511,10 +2666,10 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   .embedded-catalog .category-list::-webkit-scrollbar { display: none; }
   .embedded-catalog .category-list .category-button {
     flex: 0 0 auto;
-    min-height: 30px;
-    padding: 5px 10px;
-    font-size: 12px;
-    border-radius: 8px;
+    min-height: 42px;
+    padding: 10px 14px;
+    font-size: 14px;
+    border-radius: 12px;
     white-space: nowrap;
   }
   .client-home-note {
@@ -2580,6 +2735,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     border: 0;
     background: rgba(30, 42, 30, 0.45);
     cursor: pointer;
+    animation: clover-sheet-backdrop-in 0.28s ease-out both;
   }
   .cart-sheet-panel {
     position: absolute;
@@ -2596,6 +2752,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     border-radius: 18px 18px 0 0;
     background: #fff;
     box-shadow: 0 -12px 40px rgba(30, 42, 30, 0.18);
+    animation: clover-sheet-up-in 0.4s cubic-bezier(0.2, 0.9, 0.2, 1) both;
   }
   .cart-sheet-head {
     display: flex;
@@ -2716,6 +2873,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   .order-meta { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .toolbar.four { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .product-manager-row { grid-template-columns: 70px minmax(0,1fr) 110px 90px; }
+  .product-manager-row .image-actions,
   .product-manager-row .row-actions { grid-column: 1 / -1; }
   .client-metrics { grid-template-columns: repeat(2,1fr); }
 }
@@ -2727,7 +2885,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   .catalog-content { padding-bottom: 88px; }
   .client-nav {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
     margin-bottom: 8px;
     padding: 6px;
@@ -2770,9 +2928,10 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   }
   .order-history-filters .category-button {
     width: 100%;
-    min-height: 34px;
-    padding: 6px 8px;
-    font-size: 12px;
+    min-height: 42px;
+    padding: 10px 12px;
+    font-size: 14px;
+    border-radius: 12px;
     text-align: center;
   }
   .client-order-actions {
@@ -2794,7 +2953,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 }
 @media (max-width: 700px) {
   .app-header { align-items: center; min-height: 0; padding: 8px 4%; gap: 10px; }
-  .app-header-logo { width: 72px; max-width: 72px; max-height: 40px; }
+  .app-header-logo { width: 96px; max-width: 96px; max-height: 52px; }
   .app-header-actions { align-items: center; flex-direction: row; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
   .manager-contact-popover { position: fixed; top: 64px; right: 4%; width: min(340px, 92vw); }
   .manager-contact-popover::before { display: none; }
@@ -2841,7 +3000,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .stat-card { padding: 15px; }
   .stat-card strong { font-size: 23px; }
-  .app-header-logo { width: 68px; max-width: 68px; max-height: 36px; }
+  .app-header-logo { width: 90px; max-width: 90px; max-height: 48px; }
   .product-image-wrap {
     height: 84px !important;
     margin: 0 !important;

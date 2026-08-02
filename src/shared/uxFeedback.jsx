@@ -1,4 +1,5 @@
 // Shared UX: empty states, soft banners, list skeletons.
+import cloverMark from "../assets/clover-mark.png";
 
 export function EmptyState({
   title,
@@ -9,7 +10,7 @@ export function EmptyState({
 }) {
   return (
     <div className={`ux-empty ux-empty-${tone}`} role="status">
-      <div className="ux-empty-mark" aria-hidden="true" />
+      <img className="ux-empty-mark" src={cloverMark} alt="" aria-hidden="true" />
       <strong className="ux-empty-title">{title}</strong>
       {message ? <p className="ux-empty-message">{message}</p> : null}
       {actionLabel && typeof onAction === "function" ? (
@@ -28,10 +29,14 @@ export function SoftBanner({
   onAction,
   onDismiss,
   tone = "info",
+  compact = false,
 }) {
   const safeTone = ["info", "warn", "danger", "success"].includes(tone) ? tone : "info";
   return (
-    <div className={`ux-banner ux-banner-${safeTone}`} role="status">
+    <div
+      className={`ux-banner ux-banner-${safeTone}${compact ? " ux-banner-compact" : ""}`}
+      role="status"
+    >
       <div className="ux-banner-body">
         {title ? <strong className="ux-banner-title">{title}</strong> : null}
         {message ? <p className="ux-banner-message">{message}</p> : null}

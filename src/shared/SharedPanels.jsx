@@ -5,6 +5,7 @@ import cloverLogo from "../assets/clover-logo.png";
 import { startPasskeyRegistration } from "../utils/webauthn";
 import { api, setApiToken } from "../serverApi";
 import { formatDateTime } from "./appHelpers";
+import { appConfirm } from "./AppModal";
 
 export class PanelErrorBoundary extends Component {
   constructor(props) {
@@ -99,7 +100,7 @@ export function Header({ title, subtitle, onLogout, onLogoClick, children }) {
   }, []);
 
   const logo = (
-    <img className="app-header-logo" src={cloverLogo} alt="Clover" width="120" height="52" />
+    <img className="app-header-logo" src={cloverLogo} alt="Clover" width="152" height="66" />
   );
 
   const handleLogoClick = () => {
@@ -279,7 +280,14 @@ export function PasswordSecurityPanel() {
   };
 
   const removePasskey = async (credentialId) => {
-    if (!window.confirm("Удалить этот ключ доступа? Вход по паролю останется доступен.")) return;
+    const ok = await appConfirm({
+      title: "Удалить ключ доступа?",
+      message: "Удалить этот ключ доступа? Вход по паролю останется доступен.",
+      confirmLabel: "Удалить",
+      cancelLabel: "Отмена",
+      tone: "danger",
+    });
+    if (!ok) return;
     setPasskeyBusy(true);
     setError("");
     try {
@@ -430,8 +438,14 @@ export function PushSettings() {
   );
 }
 
-/** Полноэкранная благодарность после оформления заказа (браузер и телефон). */
-export function OrderThankYouOverlay({ open, onDone }) {
+/** Полноэкранная благодарность / успех (заказ, акт сверки и т.п.). */
+export function OrderThankYouOverlay({
+  open,
+  onDone,
+  title = "Благодарим за Ваш заказ!",
+  message = "Мы уже начали его обрабатывать.",
+  confirmLabel = "К моим заказам",
+}) {
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
   const [isMobile, setIsMobile] = useState(() => {
@@ -573,13 +587,13 @@ export function OrderThankYouOverlay({ open, onDone }) {
           />
         </div>
         <h2 id="order-thankyou-title" className="order-thankyou-title">
-          Благодарим за Ваш заказ!
+          {title}
         </h2>
         <p className="order-thankyou-text">
-          Мы уже начали его обрабатывать.
+          {message}
         </p>
         <button className="primary-button order-thankyou-button" type="button" onClick={() => onDoneRef.current?.()}>
-          К моим заказам
+          {confirmLabel}
         </button>
       </div>
     </div>,

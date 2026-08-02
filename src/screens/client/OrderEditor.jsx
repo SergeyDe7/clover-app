@@ -778,7 +778,7 @@ export function OrderEditor({
     <main className="clover-app">
       <Header title={session.mode === "edit" ? "Редактирование заказа" : session.mode === "repeat" ? "Повтор заказа" : "Новый заказ"}>
         <ManagerContact settings={settings} />
-        <button className="header-button" type="button" onClick={onClose}>← В кабинет</button>
+        <button className="header-button" type="button" onClick={onClose}>← Назад</button>
       </Header>
       {catalogBody}
     </main>

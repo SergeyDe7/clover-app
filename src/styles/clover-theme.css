@@ -8,6 +8,30 @@
   --clover-green-soft: #eef7eb;
   --clover-green-mute: #4f8d4b;
 
+  /* Button levels: top darker, sub-window lighter */
+  --clover-l1-bg: #ffffff;
+  --clover-l1-border: #d7e1d4;
+  --clover-l1-text: #5d695d;
+  --clover-l1-active-bg: #458542;
+  --clover-l1-active-border: #458542;
+  --clover-l1-active-text: #ffffff;
+
+  --clover-l2-bg: #ffffff;
+  --clover-l2-border: #d7e1d4;
+  --clover-l2-text: #5d695d;
+  --clover-l2-active-bg: #5b9d57;
+  --clover-l2-active-border: #5b9d57;
+  --clover-l2-active-text: #ffffff;
+  --clover-l2-hover-bg: #f4faf2;
+
+  --clover-l3-bg: #ffffff;
+  --clover-l3-border: #d7e1d4;
+  --clover-l3-text: #5d695d;
+  --clover-l3-active-bg: #5b9d57;
+  --clover-l3-active-border: #5b9d57;
+  --clover-l3-active-text: #ffffff;
+  --clover-l3-hover-bg: #f4faf2;
+
   /* Surfaces */
   --clover-bg: #f4f8f2;
   --clover-surface: #ffffff;
@@ -96,11 +120,39 @@ body:has(.clover-app) {
 .clover-app a.header-button,
 .clover-app a.primary-button,
 .clover-app a.secondary-button,
-.clover-app .category-button,
 .clover-app input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
 .clover-app select,
 .clover-app .image-upload-label {
   min-height: 44px;
+}
+
+/* Категории / подкнопки: та же прямоугольная форма, что у верхнего блока */
+.clover-app .category-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 42px !important;
+  padding: 10px 15px !important;
+  border: 1px solid var(--clover-l2-border, #d7e1d4) !important;
+  border-radius: 12px !important;
+  background: var(--clover-l2-bg, #fff) !important;
+  color: var(--clover-l2-text, #5d695d) !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  box-sizing: border-box !important;
+}
+
+.clover-app .category-button.active {
+  background: var(--clover-l2-active-bg, #5b9d57) !important;
+  border-color: var(--clover-l2-active-border, #5b9d57) !important;
+  color: var(--clover-l2-active-text, #fff) !important;
+}
+
+.clover-app .category-button:hover:not(.active) {
+  background: var(--clover-l2-hover-bg, #f4faf2) !important;
+  border-color: #c5d8c1 !important;
+  color: var(--clover-green-deep, #386f37) !important;
 }
 
 .clover-app .quantity-control button,
@@ -108,8 +160,36 @@ body:has(.clover-app) {
 .clover-app .danger-text,
 .clover-app .cart-sheet-backdrop,
 .clover-app button.icon-only,
-.clover-app .ux-banner-dismiss {
+.clover-app .ux-banner-dismiss,
+.clover-app button.toggle {
   min-height: 0;
+}
+
+/* Переключатели-ползунки: вытянутая форма (не квадрат от a11y min-height) */
+.clover-app button.toggle {
+  width: 52px !important;
+  height: 28px !important;
+  min-width: 52px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  padding: 3px !important;
+  border: none !important;
+  border-radius: 999px !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.clover-app button.toggle span {
+  display: block !important;
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 50% !important;
+  background: #fff !important;
+  transition: transform 0.2s ease !important;
+}
+
+.clover-app button.toggle.active span {
+  transform: translateX(24px) !important;
 }
 
 .clover-app input[type="checkbox"],
@@ -121,13 +201,59 @@ body:has(.clover-app) {
 .clover-app button:focus-visible,
 .clover-app a:focus-visible,
 .clover-app .category-button:focus-visible,
-.clover-app input:focus-visible,
-.clover-app select:focus-visible,
-.clover-app textarea:focus-visible,
 .clover-app .image-upload-label:focus-visible {
   outline: 3px solid var(--clover-green-deep) !important;
   outline-offset: 2px !important;
   box-shadow: none !important;
+}
+
+/* Поиск и текстовые поля — тонкая светлая рамка, без жирного outline.
+   quantity-input внутри − / + без своей рамки (иначе две вертикальные линии). */
+.clover-app input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not(.quantity-input),
+.clover-app select,
+.clover-app textarea {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: var(--clover-border-soft) !important;
+  box-shadow: none !important;
+  outline: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.clover-app .quantity-input,
+.clover-app .quantity-input:focus,
+.clover-app .quantity-input:focus-visible {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+}
+
+.clover-app .manager-search-input,
+.clover-app .manager-search-block input[type="search"],
+.clover-app .catalog-search {
+  border-color: #e6eee3 !important;
+  background: #fbfdfb !important;
+}
+
+.clover-app .field textarea,
+.clover-app .manager-textareas textarea,
+.clover-app .order-summary textarea,
+.clover-app .client-reconciliation-comment input {
+  border-color: #e6eee3 !important;
+  background: #fbfdfb !important;
+}
+
+.clover-app input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not(.quantity-input):focus,
+.clover-app input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not(.quantity-input):focus-visible,
+.clover-app select:focus,
+.clover-app select:focus-visible,
+.clover-app textarea:focus,
+.clover-app textarea:focus-visible {
+  outline: none !important;
+  border-color: rgba(91, 157, 87, 0.55) !important;
+  box-shadow: 0 0 0 2px rgba(91, 157, 87, 0.1) !important;
+  background: #fff !important;
 }
 
 .muted {
@@ -164,12 +290,16 @@ body:has(.clover-app) {
 .passkey-login-button,
 .logout-button,
 .icon-button,
-.category-button,
 .manager-nav button,
 .client-nav button,
 .client-bottom-nav button {
   font-weight: var(--fw-semibold) !important;
   border-radius: var(--radius-sm) !important;
+}
+
+.category-button {
+  font-weight: var(--fw-semibold) !important;
+  border-radius: 12px !important;
 }
 
 .secondary-button,
@@ -222,7 +352,7 @@ body:has(.clover-app) {
 .login-form input,
 .manager-search-input {
   border-radius: var(--radius-sm) !important;
-  border-color: var(--clover-border) !important;
+  border-color: var(--clover-border-soft) !important;
 }
 
 .field input:focus,
@@ -231,8 +361,8 @@ body:has(.clover-app) {
 .toolbar input:focus,
 .toolbar select:focus,
 .login-form input:focus {
-  border-color: var(--clover-green) !important;
-  box-shadow: 0 0 0 3px rgba(91, 157, 87, 0.12) !important;
+  border-color: rgba(91, 157, 87, 0.55) !important;
+  box-shadow: 0 0 0 2px rgba(91, 157, 87, 0.1) !important;
 }
 
 /* —— Status badges (order FSM) —— */
@@ -332,6 +462,74 @@ body:has(.clover-app) {
   font-weight: var(--fw-semibold) !important;
 }
 
+/* Manager primary tabs — крупнее верхнего блока */
+.clover-app .manager-nav {
+  gap: 12px !important;
+  margin: 0 0 20px !important;
+}
+
+.clover-app .manager-nav button {
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+  min-height: 52px !important;
+  padding: 14px 24px !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  border-radius: 13px !important;
+  gap: 8px !important;
+}
+
+.manager-nav-count,
+.client-nav-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #c45a5a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.manager-nav button.active .manager-nav-count,
+.client-nav button.active .client-nav-count {
+  background: #fff;
+  color: var(--clover-l1-active-bg, #458542);
+}
+
+.manager-reconciliation-actions {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+}
+
+.manager-reconciliation-filechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(280px, 100%);
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid var(--clover-border, #cfe3ca);
+  border-radius: 11px;
+  background: var(--clover-green-soft, #eef7eb);
+  color: var(--clover-green-deep, #2f6b32);
+  box-sizing: border-box;
+}
+
+.manager-reconciliation-filename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /* —— Header: brand first, tools secondary —— */
 .app-header {
   align-items: center !important;
@@ -343,9 +541,9 @@ body:has(.clover-app) {
 }
 
 .app-header-logo {
-  width: 120px !important;
-  max-width: 120px !important;
-  max-height: 52px !important;
+  width: 152px !important;
+  max-width: 152px !important;
+  max-height: 66px !important;
   height: auto !important;
   object-fit: contain !important;
   flex-shrink: 0 !important;
@@ -431,14 +629,13 @@ body:has(.clover-app) {
   font-size: 13px !important;
 }
 
-/* —— Tabs: work vs service —— */
+/* —— Tabs: level 1 (top) = original green; nested levels lighter —— */
 .manager-nav button.active,
 .client-nav button.active,
-.client-bottom-nav button.active,
-.category-button.active {
-  background: var(--clover-green) !important;
-  border-color: var(--clover-green) !important;
-  color: #fff !important;
+.client-bottom-nav button.active {
+  background: var(--clover-l1-active-bg) !important;
+  border-color: var(--clover-l1-active-border) !important;
+  color: var(--clover-l1-active-text) !important;
 }
 
 .manager-nav button.nav-service.active,
@@ -461,9 +658,102 @@ body:has(.clover-app) {
   border-color: var(--clover-border) !important;
 }
 
+.clover-app .manager-nav button:not(.active) {
+  background: var(--clover-l1-bg) !important;
+  border-color: var(--clover-l1-border) !important;
+  color: var(--clover-l1-text) !important;
+}
+
+.clover-app .client-nav button:not(.active) {
+  background: var(--clover-l1-bg) !important;
+  border-color: var(--clover-l1-border) !important;
+  color: var(--clover-l1-text) !important;
+  border-style: solid !important;
+}
+
+.clover-app .client-nav button.active {
+  background: var(--clover-l1-active-bg) !important;
+  border-color: var(--clover-l1-active-border) !important;
+  color: var(--clover-l1-active-text) !important;
+}
+
+.clover-app .manager-nav button:not(.active):hover {
+  background: var(--clover-l2-hover-bg) !important;
+  border-color: #c5d8c1 !important;
+  color: var(--clover-green-deep) !important;
+}
+
+/* Подокно заказов: прямоугольные кнопки как у верхнего блока */
+.clover-app .manager-orders-topbar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin: 0 0 14px !important;
+}
+
+.clover-app .manager-orders-seg {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 46px !important;
+  padding: 11px 17px !important;
+  border: 1px solid var(--clover-l2-border) !important;
+  border-radius: 13px !important;
+  background: var(--clover-l2-bg) !important;
+  color: var(--clover-l2-text) !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+}
+
+.clover-app .manager-orders-seg.active {
+  background: var(--clover-l2-active-bg) !important;
+  border-color: var(--clover-l2-active-border) !important;
+  color: var(--clover-l2-active-text) !important;
+}
+
+.clover-app .manager-orders-seg:hover:not(.active) {
+  background: var(--clover-l2-hover-bg) !important;
+  border-color: #c5d8c1 !important;
+  color: var(--clover-green-deep) !important;
+}
+
+.clover-app .manager-orders-quick-chips {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin: 0 0 12px !important;
+  width: 100% !important;
+  overflow: visible !important;
+}
+
+.manager-more-nav .category-button {
+  background: var(--clover-l3-bg) !important;
+  border-color: var(--clover-l3-border) !important;
+  color: var(--clover-l3-text) !important;
+  border-radius: 13px !important;
+  min-height: 46px !important;
+  padding: 11px 17px !important;
+  font-size: 15px !important;
+}
+
 .manager-more-nav .category-button.active {
-  background: #6f8f6c !important;
-  border-color: #6f8f6c !important;
+  background: var(--clover-l3-active-bg) !important;
+  border-color: var(--clover-l3-active-border) !important;
+  color: var(--clover-l3-active-text) !important;
+}
+
+.category-button.active {
+  background: var(--clover-l2-active-bg) !important;
+  border-color: var(--clover-l2-active-border) !important;
+  color: var(--clover-l2-active-text) !important;
 }
 
 /* —— Manager density —— */
@@ -558,6 +848,14 @@ body:has(.clover-app) {
   min-width: 0 !important;
 }
 
+.clover-app .manager-order-checkbox {
+  width: 18px !important;
+  height: 18px !important;
+  margin: 4px 0 0 !important;
+  cursor: pointer !important;
+  accent-color: var(--clover-green) !important;
+}
+
 .clover-app .manager-order-card-item > .order-meta {
   margin: 12px 0 !important;
 }
@@ -592,6 +890,38 @@ body:has(.clover-app) {
 
 .clover-app .manager-send-onec-button.manager-send-onec-idle:hover:not(:disabled) {
   background: #345d89 !important;
+}
+
+/* Кнопка запроса акта сверки у клиента — тот же синий, что «Передать в 1С» */
+.clover-app .client-request-act-button {
+  min-height: 40px !important;
+  padding: 10px 16px !important;
+  border: none !important;
+  border-radius: var(--radius-sm) !important;
+  background: #3d6b9e !important;
+  color: #fff !important;
+  font-weight: var(--fw-bold) !important;
+  line-height: 1.2 !important;
+  cursor: pointer;
+  box-shadow: none !important;
+  white-space: nowrap;
+}
+
+.clover-app .client-request-act-button:hover:not(:disabled) {
+  background: #345d89 !important;
+}
+
+.clover-app .client-request-act-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.clover-app .client-reconciliation-form .field {
+  gap: 5px !important;
+}
+
+.clover-app .client-reconciliation-form .field input {
+  min-height: 40px !important;
 }
 
 /* Уже в очереди / принято 1С */
@@ -660,6 +990,7 @@ body:has(.clover-app) {
   min-height: 42px !important;
   line-height: 1.2 !important;
   box-sizing: border-box !important;
+  gap: 8px !important;
 }
 
 .clover-app .app-header {
@@ -769,9 +1100,9 @@ body:has(.clover-app) {
   }
 
   .clover-app .app-header-logo {
-    width: 72px !important;
-    max-width: 72px !important;
-    max-height: 40px !important;
+    width: 96px !important;
+    max-width: 96px !important;
+    max-height: 52px !important;
     object-fit: contain !important;
   }
 
@@ -918,14 +1249,17 @@ body:has(.clover-app) {
   }
 
   .clover-app .manager-nav {
-    gap: 6px !important;
-    margin: 0 0 10px !important;
+    gap: 10px !important;
+    margin: 0 0 14px !important;
   }
 
   .clover-app .manager-nav button {
-    padding: 7px 10px !important;
-    font-size: 12px !important;
-    border-radius: 10px !important;
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+    min-height: 50px !important;
+    padding: 13px 18px !important;
+    font-size: 15px !important;
+    border-radius: 13px !important;
   }
 
   .clover-app .manager-orders-filters {
@@ -934,16 +1268,16 @@ body:has(.clover-app) {
     margin-bottom: 8px !important;
   }
 
-  .clover-app .manager-orders-tools {
-    gap: 6px !important;
-    margin-bottom: 8px !important;
+  .clover-app .manager-orders-topbar {
+    gap: 8px !important;
+    margin-bottom: 10px !important;
   }
 
-  .clover-app .manager-filters-toggle,
-  .clover-app .manager-bulk-toggle {
-    min-height: 36px !important;
-    padding: 6px 10px !important;
-    font-size: 12px !important;
+  .clover-app .manager-orders-seg {
+    min-height: 44px !important;
+    padding: 10px 14px !important;
+    font-size: 14px !important;
+    border-radius: 13px !important;
   }
 
   .clover-app .manager-send-onec-button {
@@ -1041,7 +1375,9 @@ body:has(.clover-app) {
     max-width: 100% !important;
   }
 
-  .clover-app .category-list {
+  /* Горизонтальный скролл чипов — только в каталоге; в ЛК менеджера — перенос как раньше */
+  .clover-app .embedded-catalog .category-list,
+  .clover-app .catalog-section .category-list {
     display: flex !important;
     flex-wrap: nowrap !important;
     width: 100% !important;
@@ -1051,6 +1387,14 @@ body:has(.clover-app) {
     overflow-y: hidden !important;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .clover-app .manager-orders-topbar,
+  .clover-app .manager-orders-quick-chips {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    width: 100% !important;
+    overflow: visible !important;
   }
 
   .clover-app .product-card {
@@ -1210,73 +1554,10 @@ html.clover-thankyou-open .app-header {
   }
 }
 
-/* In-app confirm / alert — в атмосфере Clover (как thank-you) */
-.app-modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 12000;
-  display: grid;
-  place-items: center;
-  padding: max(20px, env(safe-area-inset-top, 0px)) 18px max(20px, env(safe-area-inset-bottom, 0px));
-  background:
-    radial-gradient(circle at 20% 18%, rgba(143, 208, 127, 0.28), transparent 42%),
-    radial-gradient(circle at 82% 78%, rgba(91, 157, 87, 0.22), transparent 46%),
-    rgba(24, 38, 26, 0.48);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  animation: app-modal-fade 0.22s ease-out;
-}
-
-.app-modal-glow {
-  position: absolute;
-  width: min(420px, 88vw);
-  height: min(280px, 50vh);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(143, 208, 127, 0.45), transparent 68%);
-  filter: blur(18px);
-  pointer-events: none;
-  animation: app-modal-pulse 2.6s ease-in-out infinite;
-}
-
-.app-modal-card {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  width: min(400px, 100%);
-  padding: 26px 22px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 18px 48px rgba(47, 90, 50, 0.18);
-  text-align: center;
-  animation: app-modal-rise 0.35s cubic-bezier(0.2, 0.9, 0.2, 1);
-}
-
-.app-modal-logo {
-  width: min(132px, 46vw);
-  height: auto;
-  margin-bottom: 2px;
-}
-
-.app-modal-title {
-  margin: 2px 0 0;
-  max-width: 22ch;
-  color: #2f3f2f;
-  font-size: clamp(1.15rem, 4.2vw, 1.45rem);
-  font-weight: 800;
-  line-height: 1.28;
-}
-
-.app-modal-message {
-  margin: 4px 0 0;
-  max-width: 34ch;
-  color: #5f6f5f;
-  font-size: 0.95rem;
-  font-weight: 600;
-  line-height: 1.45;
+/* In-app confirm / alert — тот же thank-you shell (логотип, sparks, rise) */
+.app-modal-shell .order-thankyou-text {
   white-space: pre-line;
+  max-width: 34ch;
 }
 
 .app-modal-expandable {
@@ -1338,49 +1619,46 @@ html.clover-thankyou-open .app-header {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  width: 100%;
+  width: min(100%, 340px);
   margin-top: 14px;
+  animation: order-thankyou-text-in 0.7s ease-out 0.52s both;
 }
 
 .app-modal-actions-single {
   grid-template-columns: 1fr;
 }
 
-.app-modal-btn {
+.app-modal-actions .order-thankyou-button,
+.app-modal-actions .secondary-button {
   width: 100%;
-  min-height: 44px;
+  min-height: 48px;
   justify-content: center;
+  animation: none;
 }
 
-.app-modal-btn-main {
-  min-height: 46px;
+.app-modal-shell .app-modal-expandable {
+  width: min(100%, 340px);
+  margin-top: 4px;
+  text-align: left;
+  animation: order-thankyou-text-in 0.7s ease-out 0.45s both;
 }
 
-.app-modal-tone-warn {
+.app-modal-tone-warn.order-thankyou-card {
   box-shadow:
-    0 18px 48px rgba(47, 90, 50, 0.14),
+    0 18px 48px rgba(122, 92, 30, 0.16),
     0 0 0 1px rgba(234, 217, 181, 0.9);
 }
 
-.app-modal-tone-danger {
+.app-modal-tone-danger.order-thankyou-card {
   box-shadow:
-    0 18px 48px rgba(47, 90, 50, 0.14),
+    0 18px 48px rgba(165, 79, 79, 0.16),
     0 0 0 1px rgba(230, 199, 199, 0.95);
 }
 
-@keyframes app-modal-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes app-modal-rise {
-  from { opacity: 0; transform: translateY(14px) scale(0.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes app-modal-pulse {
-  0%, 100% { opacity: 0.55; transform: scale(0.94); }
-  50% { opacity: 0.9; transform: scale(1.04); }
+.app-modal-tone-success.order-thankyou-card {
+  box-shadow:
+    0 18px 48px rgba(69, 133, 66, 0.18),
+    0 0 0 1px rgba(181, 214, 176, 0.65);
 }
 
 @media (max-width: 480px) {
@@ -1390,10 +1668,22 @@ html.clover-thankyou-open .app-header {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .app-modal-overlay,
-  .app-modal-card,
-  .app-modal-glow {
-    animation: none;
+  .app-modal-shell .order-thankyou-glow,
+  .app-modal-shell .order-thankyou-spark,
+  .app-modal-shell .order-thankyou-card,
+  .app-modal-shell .order-thankyou-logo,
+  .app-modal-shell .order-thankyou-title,
+  .app-modal-shell .order-thankyou-text,
+  .app-modal-shell .app-modal-actions,
+  .app-modal-shell .app-modal-expandable,
+  .cart-sheet-backdrop,
+  .cart-sheet-panel,
+  .delivery-date-sheet-backdrop,
+  .delivery-date-sheet-panel,
+  .custom-photo-viewer,
+  .custom-photo-viewer > img,
+  .ux-banner {
+    animation: none !important;
   }
 
   .ux-skeleton-block {
@@ -1416,14 +1706,12 @@ html.clover-thankyou-open .app-header {
 }
 
 .ux-empty-mark {
-  width: 44px;
-  height: 44px;
-  margin-bottom: 4px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 35% 30%, #fff 0 16%, transparent 17%),
-    linear-gradient(145deg, #7bb876, var(--clover-green-deep));
-  opacity: 0.9;
+  width: 96px;
+  height: 96px;
+  margin: 0 0 14px;
+  object-fit: contain;
+  object-position: center;
+  display: block;
 }
 
 .ux-empty-title {
@@ -1451,23 +1739,79 @@ html.clover-thankyou-open .app-header {
     var(--clover-surface);
 }
 
-.ux-banner {
+/* Compact system notice under the top safe-area — never fights checkout/FAB. */
+.ux-banner-stack {
   position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: max(6px, env(safe-area-inset-top, 0px)) 10px 0;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.ux-banner-stack > .ux-banner {
+  pointer-events: auto;
+  width: min(720px, 100%);
+  max-width: 720px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.ux-banner {
   display: flex;
   align-items: flex-start;
   gap: 12px;
   max-width: 560px;
-  margin: 0 auto;
+  margin: 0;
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--clover-border);
   background: var(--clover-surface);
   box-shadow: var(--shadow-lg);
   color: var(--clover-text);
+  animation: clover-banner-in 0.35s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+.ux-banner-stack > .ux-banner.ux-banner-compact {
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(40, 64, 40, 0.14);
+}
+
+.ux-banner-stack > .ux-banner.ux-banner-compact .ux-banner-title {
+  font-size: 0.88rem;
+  line-height: 1.3;
+}
+
+.ux-banner-stack > .ux-banner.ux-banner-compact .ux-banner-message {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ux-banner-stack > .ux-banner.ux-banner-compact .ux-banner-action {
+  min-height: 36px !important;
+  padding: 6px 10px !important;
+  font-size: 0.82rem !important;
+}
+
+.ux-banner-stack > .ux-banner.ux-banner-compact .ux-banner-dismiss {
+  min-width: 36px;
+  min-height: 36px;
 }
 
 .ux-banner-info {
@@ -1625,29 +1969,56 @@ html.clover-thankyou-open .app-header {
   100% { background-position: -100% 0; }
 }
 
+@keyframes clover-banner-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .loading-page-quiet .ux-skeleton {
   margin-top: 56px;
 }
 
-.manager-orders-quick-chips,
-.manager-orders-recent-clients {
+.manager-help-details {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--clover-border, #dce6d8);
+  border-radius: 12px;
+  background: var(--clover-surface, #fff);
+}
+
+.manager-help-details summary {
+  cursor: pointer;
+  color: var(--clover-green-deep, #386f37);
+  font-size: 0.95rem;
+  font-weight: 600;
+  list-style: none;
+}
+
+.manager-help-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.manager-help-details summary::before {
+  content: "▸ ";
+  color: var(--clover-muted, #5f6b5f);
+}
+
+.manager-help-details[open] summary::before {
+  content: "▾ ";
+}
+
+.manager-help-details p {
+  margin: 10px 0 0;
+  color: var(--clover-muted-strong, #5f6b5f);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.manager-orders-quick-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin: 0 0 12px;
-}
-
-.manager-orders-quick-chips .category-button,
-.manager-orders-recent-clients .category-button {
-  min-height: 40px;
-}
-
-.manager-orders-recent-label {
-  width: 100%;
-  margin: 0 0 2px;
-  color: var(--clover-muted);
-  font-size: 0.8rem;
-  font-weight: var(--fw-semibold);
 }
 
 .bulk-photo-panel {
@@ -1699,14 +2070,26 @@ html.clover-thankyou-open .app-header {
 }
 
 @media (max-width: 720px) {
-  .ux-banner {
-    left: 8px;
-    right: 8px;
-    bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  .ux-banner-stack {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .ux-banner-stack > .ux-banner.ux-banner-compact {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .ux-banner-stack > .ux-banner.ux-banner-compact .ux-banner-actions {
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  .ux-banner:not(.ux-banner-compact) {
     flex-direction: column;
   }
 
-  .ux-banner-actions {
+  .ux-banner:not(.ux-banner-compact) .ux-banner-actions {
     width: 100%;
     justify-content: flex-end;
   }

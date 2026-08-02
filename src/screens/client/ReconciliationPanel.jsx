@@ -7,6 +7,8 @@ import {
   reconciliationPeriodLabel,
   RECONCILIATION_STATUS_LABELS,
 } from "../../shared/appHelpers";
+import { appAlert } from "../../shared/AppModal";
+import { OrderThankYouOverlay } from "../../shared/SharedPanels";
 
 export function ReconciliationPanel({ requests = [], onReload }) {
   const nowDate = new Date();
@@ -16,18 +18,21 @@ export function ReconciliationPanel({ requests = [], onReload }) {
   const [dateTo, setDateTo] = useState("");
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [successOpen, setSuccessOpen] = useState(false);
 
   const submit = async () => {
     setBusy(true);
-    setMessage("");
     try {
       await api.createReconciliation({ periodType, year: Number(year), dateFrom, dateTo, comment });
       setComment("");
-      setMessage("Запрос отправлен менеджеру.");
       await onReload();
+      setSuccessOpen(true);
     } catch (error) {
-      setMessage(error.message);
+      await appAlert({
+        title: "Не удалось отправить",
+        message: error.message || "Ошибка запроса акта сверки.",
+        tone: "danger",
+      });
     } finally {
       setBusy(false);
     }
@@ -38,33 +43,126 @@ export function ReconciliationPanel({ requests = [], onReload }) {
       const blob = await api.downloadReconciliationFile(item.id);
       downloadBlobFile(blob, item.fileName || `Акт-сверки-${item.id}.pdf`);
     } catch (error) {
-      alert(error.message);
+      await appAlert({
+        title: "Не удалось скачать",
+        message: error.message || "Ошибка скачивания файла.",
+        tone: "danger",
+      });
     }
   };
 
+  const showYear = periodType !== "all" && periodType !== "custom";
+  const showDates = periodType === "custom";
+
   return (
-    <section className="panel" id="reconciliation">
-      <div className="panel-heading"><div><p className="eyebrow">Документы</p><h2>Запросить акт сверки</h2><p>Выберите готовый период или укажите собственный диапазон дат.</p></div></div>
-      <div className="period-buttons">
-        {[['q1','1 квартал'],['q2','2 квартал'],['q3','3 квартал'],['q4','4 квартал'],['all','За весь период'],['custom','Определённый период']].map(([value,label]) => (
-          <button className={periodType === value ? "category-button active" : "category-button"} type="button" key={value} onClick={() => setPeriodType(value)}>{label}</button>
-        ))}
-      </div>
-      <div className="form-grid" style={{ marginTop: 14 }}>
-        {periodType !== "all" && periodType !== "custom" && <label className="field">Год<input type="number" min="2000" max="2100" value={year} onChange={(event) => setYear(event.target.value)} /></label>}
-        {periodType === "custom" && <><label className="field">Дата с<input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label><label className="field">Дата по<input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label></>}
-        <label className="field field-wide">Комментарий — необязательно<textarea rows="2" value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Например: прошу отдельно проверить возвраты" /></label>
-      </div>
-      <div className="form-actions"><button className="primary-button" type="button" disabled={busy} onClick={submit}>{busy ? "Отправляем…" : "Отправить запрос"}</button></div>
-      {message && <div className="request-photo-status">{message}</div>}
-      <div className="reconciliation-list">
-        {requests.length ? requests.map((item) => (
-          <article className="reconciliation-row" key={item.id}>
-            <div><span className={`badge ${item.status === "ready" ? "green" : item.status === "rejected" ? "red" : "yellow"}`}>{RECONCILIATION_STATUS_LABELS[item.status] || item.status}</span><h3>{reconciliationPeriodLabel(item)}</h3><p>{formatDateTime(item.createdAt)}{item.managerComment ? ` · ${item.managerComment}` : ""}</p></div>
-            {item.hasFile && <button className="primary-button" type="button" onClick={() => download(item)}>Скачать PDF</button>}
-          </article>
-        )) : <div className="empty-box">Запросов актов сверки пока нет.</div>}
-      </div>
-    </section>
+    <>
+      <section className="panel client-reconciliation" id="reconciliation">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Документы</p>
+            <h2>Запросить акт сверки</h2>
+            <p>Выберите период и отправьте запрос менеджеру.</p>
+          </div>
+        </div>
+
+        <div className="period-buttons client-reconciliation-periods">
+          {[
+            ["q1", "1 кв."],
+            ["q2", "2 кв."],
+            ["q3", "3 кв."],
+            ["q4", "4 кв."],
+            ["all", "Весь период"],
+            ["custom", "Свои даты"],
+          ].map(([value, label]) => (
+            <button
+              className={periodType === value ? "category-button active" : "category-button"}
+              type="button"
+              key={value}
+              onClick={() => setPeriodType(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="client-reconciliation-form">
+          {showYear && (
+            <label className="field client-reconciliation-year">
+              Год
+              <input
+                type="number"
+                min="2000"
+                max="2100"
+                value={year}
+                onChange={(event) => setYear(event.target.value)}
+              />
+            </label>
+          )}
+          {showDates && (
+            <>
+              <label className="field client-reconciliation-date">
+                Дата с
+                <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+              </label>
+              <label className="field client-reconciliation-date">
+                Дата по
+                <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+              </label>
+            </>
+          )}
+          <label className="field client-reconciliation-comment">
+            Комментарий
+            <input
+              type="text"
+              value={comment}
+              onChange={(event) => setComment(event.target.value)}
+              placeholder="Необязательно"
+            />
+          </label>
+          <div className="client-reconciliation-submit">
+            <button
+              className="client-request-act-button"
+              type="button"
+              disabled={busy}
+              onClick={() => void submit()}
+            >
+              {busy ? "Отправляем…" : "Запросить акт сверки"}
+            </button>
+          </div>
+        </div>
+
+        <div className="reconciliation-list">
+          {requests.length ? requests.map((item) => (
+            <article className="reconciliation-row" key={item.id}>
+              <div>
+                <span className={`badge ${item.status === "ready" ? "green" : item.status === "rejected" ? "red" : "yellow"}`}>
+                  {RECONCILIATION_STATUS_LABELS[item.status] || item.status}
+                </span>
+                <h3>{reconciliationPeriodLabel(item)}</h3>
+                <p>
+                  {formatDateTime(item.createdAt)}
+                  {item.managerComment ? ` · ${item.managerComment}` : ""}
+                </p>
+              </div>
+              {item.hasFile && (
+                <button className="primary-button" type="button" onClick={() => void download(item)}>
+                  Скачать PDF
+                </button>
+              )}
+            </article>
+          )) : (
+            <div className="empty-box">Запросов актов сверки пока нет.</div>
+          )}
+        </div>
+      </section>
+
+      <OrderThankYouOverlay
+        open={successOpen}
+        onDone={() => setSuccessOpen(false)}
+        title="Запрос отправлен"
+        message="Менеджер подготовит акт сверки и пришлёт PDF в этот раздел."
+        confirmLabel="Понятно"
+      />
+    </>
   );
 }

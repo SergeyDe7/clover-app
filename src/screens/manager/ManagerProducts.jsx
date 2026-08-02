@@ -1,7 +1,6 @@
 // Раздел менеджера: каталог товаров и связь с 1С.
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../serverApi";
-import { VirtualList } from "../../components/VirtualList";
 import {
   UNIT_ORDER,
   UNIT_CONFIG,
@@ -12,7 +11,7 @@ import {
   normalizeProduct,
 } from "../../shared/appHelpers";
 import { SoftBanner } from "../../shared/uxFeedback";
-import { appAlert } from "../../shared/AppModal";
+import { appAlert, appConfirm } from "../../shared/AppModal";
 
 function normalizeMatchKey(value) {
   return String(value || "")
@@ -456,11 +455,13 @@ function OneCProductsPanel({ products, setProducts }) {
       setCatalog(refreshed);
       if (!silent) {
         const linked = result.report?.newlyLinked || 0;
-        alert(
-          linked
+        void appAlert({
+          title: linked ? "Связи обновлены" : "Совпадений нет",
+          message: linked
             ? `Автоматически связаны товары: ${linked}.`
-            : "Новых точных совпадений не найдено. Уже созданные связи сохранены."
-        );
+            : "Новых точных совпадений не найдено. Уже созданные связи сохранены.",
+          tone: linked ? "success" : "default",
+        });
       }
     } catch (linkError) {
       setError(linkError.message);
@@ -491,18 +492,9 @@ function OneCProductsPanel({ products, setProducts }) {
   const summary = catalog?.summary || {};
 
   return (
-    <section className="one-c-products-panel">
+    <section className="one-c-products-panel one-c-products-panel-compact">
       <div className="one-c-products-head">
-        <div>
-          <p className="eyebrow">Каталог 1С</p>
-          <h2>Автоматическое сопоставление номенклатуры</h2>
-          <p>
-            Clover сохраняет только точные совпадения и несколько наиболее похожих
-            вариантов для несвязанных товаров. Красивое название на сайте может быть
-            другим: в заказ передаётся ID 1С. Полная номенклатура и база клиентов в
-            Clover не сохраняются. Неоднозначные варианты выбирает менеджер.
-          </p>
-        </div>
+        <strong className="one-c-products-title">Каталог 1С</strong>
         <div className="one-c-products-actions">
           <button
             className="secondary-button"
@@ -518,7 +510,7 @@ function OneCProductsPanel({ products, setProducts }) {
             onClick={() => runAutoLink()}
             disabled={linking || !summary.oneCTotal}
           >
-            {linking ? "Сопоставление..." : "Сопоставить автоматически"}
+            {linking ? "Сопоставление..." : "Сопоставить"}
           </button>
         </div>
       </div>
@@ -526,22 +518,19 @@ function OneCProductsPanel({ products, setProducts }) {
       {error && <div className="sync-error">{error}</div>}
 
       <div className="one-c-products-stats">
-        <article><span>Подходящих из 1С</span><strong>{summary.oneCTotal || 0}</strong></article>
-        <article><span>Товаров Clover</span><strong>{summary.cloverTotal ?? products.length}</strong></article>
+        <article><span>Из 1С</span><strong>{summary.oneCTotal || 0}</strong></article>
         <article><span>Связано</span><strong>{summary.linked || 0}</strong></article>
-        <article><span>С закупочной ценой</span><strong>{summary.pricedProducts || 0}</strong></article>
         <article><span>Без связи</span><strong>{summary.unmatched ?? products.filter((item) => !item.oneCId).length}</strong></article>
-        {Number(summary.candidateProducts) > 0 && <article><span>Есть варианты</span><strong>{summary.candidateProducts}</strong></article>}
+        {Number(summary.candidateProducts) > 0 && (
+          <article><span>Есть варианты</span><strong>{summary.candidateProducts}</strong></article>
+        )}
       </div>
 
       <div className="one-c-products-meta">
         <span>
-          Последняя выгрузка: {summary.receivedAt ? formatDateTime(summary.receivedAt) : "ещё не выполнялась"}
+          Выгрузка: {summary.receivedAt ? formatDateTime(summary.receivedAt) : "ещё не было"}
         </span>
-        <span>
-          Автоматически: {summary.autoLinked || 0} · вручную: {summary.manualLinked || 0}
-        </span>
-        {summary.stale > 0 && <span className="warning-text">Не найдено в свежем каталоге: {summary.stale}</span>}
+        {summary.stale > 0 && <span className="warning-text">Не в свежем каталоге: {summary.stale}</span>}
       </div>
 
       <button
@@ -549,7 +538,7 @@ function OneCProductsPanel({ products, setProducts }) {
         type="button"
         onClick={() => setOpen((value) => !value)}
       >
-        {open ? "Скрыть сохранённые позиции 1С" : "Показать сохранённые позиции 1С"}
+        {open ? "Скрыть позиции 1С" : "Показать позиции 1С"}
       </button>
 
       {open && (
@@ -563,7 +552,7 @@ function OneCProductsPanel({ products, setProducts }) {
           >
             <input
               type="search"
-              placeholder="Поиск по выгрузке 1С TEST: название, код или ID"
+              placeholder="Поиск: название, код или ID"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -585,7 +574,7 @@ function OneCProductsPanel({ products, setProducts }) {
           </form>
 
           <p className="muted small">
-            Найдено: {catalog?.total || 0}. Показаны первые {catalog?.items?.length || 0} позиций.
+            Найдено: {catalog?.total || 0}. Показаны первые {catalog?.items?.length || 0}.
           </p>
 
           <div className="one-c-products-list">
@@ -600,7 +589,7 @@ function OneCProductsPanel({ products, setProducts }) {
                     Связан: {item.cloverLink.productName}
                   </span>
                 ) : (
-                  <span className="badge gray">Не используется в Clover</span>
+                  <span className="badge gray">Не в Clover</span>
                 )}
               </article>
             ))}
@@ -661,7 +650,11 @@ export function ManagerProducts({ products, setProducts }) {
       setProducts((result.products || nextProducts).map(normalizeProduct));
       setEditorProduct(undefined);
     } catch (error) {
-      alert(`Не удалось сохранить товар: ${error.message}`);
+      void appAlert({
+        title: "Не удалось сохранить",
+        message: `Не удалось сохранить товар: ${error.message}`,
+        tone: "danger",
+      });
     }
   };
 
@@ -669,7 +662,7 @@ export function ManagerProducts({ products, setProducts }) {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("Выберите фотографию товара.");
+      await appAlert({ title: "Неверный файл", message: "Выберите фотографию товара.", tone: "warn" });
       return;
     }
 
@@ -681,9 +674,13 @@ export function ManagerProducts({ products, setProducts }) {
           ? normalizeProduct({ ...item, ...result.product })
           : item
       ));
-      alert("Фотография товара сохранена на сервере.");
+      await appAlert({
+        title: "Фото сохранено",
+        message: "Фотография товара сохранена на сервере.",
+        tone: "success",
+      });
     } catch (error) {
-      alert(error.message);
+      await appAlert({ title: "Ошибка загрузки", message: error.message, tone: "danger" });
     } finally {
       setImageBusyId(null);
     }
@@ -761,7 +758,14 @@ export function ManagerProducts({ products, setProducts }) {
   };
 
   const deleteImage = async (product) => {
-    if (!window.confirm(`Удалить фотографию товара «${product.name}»?`)) {
+    const ok = await appConfirm({
+      title: "Удалить фото?",
+      message: `Удалить фотографию товара «${product.name}»?`,
+      confirmLabel: "Удалить",
+      cancelLabel: "Отмена",
+      tone: "danger",
+    });
+    if (!ok) {
       return;
     }
 
@@ -774,7 +778,7 @@ export function ManagerProducts({ products, setProducts }) {
           : item
       ));
     } catch (error) {
-      alert(error.message);
+      await appAlert({ title: "Ошибка удаления", message: error.message, tone: "danger" });
     } finally {
       setImageBusyId(null);
     }
@@ -868,12 +872,7 @@ export function ManagerProducts({ products, setProducts }) {
       )}
 
       <div className="product-manager-list" style={{ marginTop: 14 }}>
-        <VirtualList
-          items={visible}
-          itemHeight={200}
-          height={Math.min(640, typeof window !== "undefined" ? Math.floor(window.innerHeight * 0.65) : 640)}
-          getItemKey={(product) => product.id}
-          renderItem={(product) => (
+        {visible.map((product) => (
         <article className={product.active ? "product-manager-row" : "product-manager-row inactive"} key={product.id}>
           <div className="product-manager-thumb">
             {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <span>Нет фото</span>}
@@ -923,8 +922,7 @@ export function ManagerProducts({ products, setProducts }) {
             <button className="secondary-button" type="button" onClick={() => setProducts((current) => current.map((item) => item.id === product.id ? { ...item, active: !item.active } : item))}>{product.active ? "Скрыть" : "Показать"}</button>
           </div>
         </article>
-          )}
-        />
+        ))}
       </div>
       {editorProduct !== undefined && <ProductEditor product={editorProduct} onClose={() => setEditorProduct(undefined)} onSave={save} />}
     </section>

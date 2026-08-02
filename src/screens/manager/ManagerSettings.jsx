@@ -4,6 +4,7 @@ import { api } from "../../serverApi";
 import { AdminRolePanel } from "../../components/AdminRolePanel";
 import { PasswordSecurityPanel, PushSettings } from "../../shared/SharedPanels";
 import { getRussianPhoneLocalDigits, formatRussianPhone } from "../../shared/appHelpers";
+import { appAlert } from "../../shared/AppModal";
 
 function ManagerPromotionPanel() {
   const [title, setTitle] = useState("Новость Clover");
@@ -13,9 +14,19 @@ function ManagerPromotionPanel() {
     setBusy(true);
     try {
       const result = await api.sendPromotion(title, body);
-      alert(result.result?.enabled ? `Отправлено: ${result.result.sent}` : "Push пока не настроен на сервере.");
+      await appAlert({
+        title: result.result?.enabled ? "Отправлено" : "Push не настроен",
+        message: result.result?.enabled
+          ? `Отправлено: ${result.result.sent}`
+          : "Push пока не настроен на сервере.",
+        tone: result.result?.enabled ? "success" : "warn",
+      });
       setBody("");
-    } catch (error) { alert(error.message); } finally { setBusy(false); }
+    } catch (error) {
+      await appAlert({ title: "Ошибка отправки", message: error.message, tone: "danger" });
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <div className="manager-contact-settings">
@@ -118,6 +129,16 @@ export function ManagerSettings({ settings, setSettings, authUser }) {
           <p>Изменения сохраняются автоматически и применяются сразу.</p>
         </div>
       </div>
+
+      <details className="manager-help-details">
+        <summary>Автоматическое сопоставление номенклатуры</summary>
+        <p>
+          Clover сохраняет только точные совпадения и несколько наиболее похожих
+          вариантов для несвязанных товаров. Название на сайте может отличаться от 1С:
+          в заказ передаётся ID 1С. Полная номенклатура и база клиентов в Clover не
+          сохраняются. Неоднозначные варианты выбирает менеджер во вкладке «Товары».
+        </p>
+      </details>
 
       <div className="manager-contact-settings">
         <h3>Контакты менеджера для клиентов</h3>

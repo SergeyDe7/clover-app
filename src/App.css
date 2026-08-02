@@ -56,12 +56,25 @@ button{cursor:pointer}
   background: rgba(244, 249, 240, 0.92);
 }
 
+.one-c-products-panel-compact {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+}
+
 .one-c-products-head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 18px;
+  align-items: center;
+  gap: 12px;
   flex-wrap: wrap;
+}
+
+.one-c-products-title {
+  margin: 0;
+  color: #394639;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .one-c-products-head h2 {
@@ -76,16 +89,27 @@ button{cursor:pointer}
 .one-c-products-actions,
 .one-c-products-search {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   flex-wrap: wrap;
 }
 
+.one-c-products-panel-compact .one-c-products-actions .primary-button,
+.one-c-products-panel-compact .one-c-products-actions .secondary-button {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
 .one-c-products-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(130px, 1fr));
-  gap: 10px;
-  margin-top: 16px;
+  grid-template-columns: repeat(4, minmax(100px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.one-c-products-panel-compact .one-c-products-stats {
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
 }
 
 .one-c-products-stats article {
@@ -95,16 +119,30 @@ button{cursor:pointer}
   border: 1px solid rgba(64, 111, 45, 0.12);
 }
 
+.one-c-products-panel-compact .one-c-products-stats article {
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+
 .one-c-products-stats span {
   display: block;
   font-size: 12px;
   color: #687064;
 }
 
+.one-c-products-panel-compact .one-c-products-stats span {
+  font-size: 11px;
+}
+
 .one-c-products-stats strong {
   display: block;
   margin-top: 4px;
   font-size: 22px;
+}
+
+.one-c-products-panel-compact .one-c-products-stats strong {
+  margin-top: 2px;
+  font-size: 16px;
 }
 
 .one-c-products-meta {
@@ -114,6 +152,11 @@ button{cursor:pointer}
   margin-top: 12px;
   font-size: 13px;
   color: #5f675c;
+}
+
+.one-c-products-panel-compact .one-c-products-meta {
+  margin-top: 8px;
+  font-size: 12px;
 }
 
 .warning-text {
@@ -131,10 +174,21 @@ button{cursor:pointer}
   cursor: pointer;
 }
 
+.one-c-products-panel-compact .one-c-products-toggle {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .one-c-products-browser {
   margin-top: 14px;
   padding-top: 14px;
   border-top: 1px solid rgba(64, 111, 45, 0.14);
+}
+
+.one-c-products-panel-compact .one-c-products-browser {
+  margin-top: 10px;
+  padding-top: 10px;
 }
 
 .one-c-products-search input {
@@ -151,6 +205,12 @@ button{cursor:pointer}
   padding-right: 4px;
 }
 
+.one-c-products-panel-compact .one-c-products-list {
+  max-height: 220px;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 .one-c-products-list article {
   display: flex;
   justify-content: space-between;
@@ -160,6 +220,12 @@ button{cursor:pointer}
   border-radius: 12px;
   background: #fff;
   border: 1px solid rgba(64, 111, 45, 0.12);
+}
+
+.one-c-products-panel-compact .one-c-products-list article {
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
 }
 
 .one-c-products-list article > div {
@@ -451,6 +517,50 @@ button{cursor:pointer}
   gap: 8px;
 }
 
+.client-reconciliation-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px 12px;
+  margin-top: 12px;
+}
+
+.client-reconciliation-year {
+  width: 96px;
+  flex: 0 0 96px;
+  margin: 0;
+}
+
+.client-reconciliation-date {
+  width: 150px;
+  flex: 0 0 150px;
+  margin: 0;
+}
+
+.client-reconciliation-comment {
+  flex: 1 1 220px;
+  min-width: 180px;
+  margin: 0;
+}
+
+.client-reconciliation-year input,
+.client-reconciliation-date input,
+.client-reconciliation-comment input {
+  min-height: 40px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.client-reconciliation-submit {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: end;
+}
+
+.client-reconciliation-periods {
+  margin-top: 4px;
+}
+
 .reconciliation-list {
   display: grid;
   gap: 12px;
@@ -473,7 +583,77 @@ button{cursor:pointer}
 }
 
 .manager-reconciliation-row {
-  grid-template-columns: minmax(220px, 1fr) minmax(240px, .8fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.manager-reconciliation-info {
+  align-self: center;
+  min-width: 0;
+}
+
+.manager-reconciliation-info h3 {
+  margin: 6px 0 2px;
+  font-size: 16px;
+}
+
+.manager-reconciliation-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 40px;
+}
+
+.manager-reconciliation-attach {
+  margin: 0;
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.manager-reconciliation-actions .primary-button {
+  min-height: 40px;
+  min-width: 120px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.manager-reconciliation-filechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(240px, 55vw);
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 1px solid #cfe3ca;
+  border-radius: 11px;
+  background: #f3faf1;
+  color: #2f6b32;
+  box-sizing: border-box;
+}
+
+.manager-reconciliation-filename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.manager-reconciliation-filechip .danger-text {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #a54f4f;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .reconciliation-row h3,
