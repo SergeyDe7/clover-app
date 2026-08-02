@@ -34,6 +34,7 @@ import {
 import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
 import { appAlert, appConfirm } from "./shared/AppModal";
 import { canTrashOrder } from "./shared/orderTrash";
+import { SoftBanner, ListSkeleton } from "./shared/uxFeedback";
 
 function LoginView({ onAuth, authBusy, authError }) {
   const params = new URLSearchParams(window.location.search);
@@ -356,6 +357,11 @@ function App() {
   const [loading, setLoading] = useState(Boolean(getApiToken()));
   const [hydrated, setHydrated] = useState(false);
   const [syncError, setSyncError] = useState("");
+  const [isOffline, setIsOffline] = useState(
+    typeof navigator !== "undefined" ? !navigator.onLine : false
+  );
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [offlineBannerHidden, setOfflineBannerHidden] = useState(false);
 
   const [products, setProducts] = useState(
     DEFAULT_PRODUCTS.map(normalizeProduct)
@@ -517,6 +523,26 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const onOnline = () => {
+      setIsOffline(false);
+      setOfflineBannerHidden(false);
+    };
+    const onOffline = () => {
+      setIsOffline(true);
+      setOfflineBannerHidden(false);
+    };
+    const onUpdateAvailable = () => setUpdateAvailable(true);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    window.addEventListener("clover:update-available", onUpdateAvailable);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("clover:update-available", onUpdateAvailable);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isLoggedIn || !hydrated || !authUser) {
       return undefined;
     }
@@ -554,12 +580,14 @@ function App() {
           return next;
         });
 
+        // Онлайн как со статусами заказов: акты сверки подтягиваем и клиенту, и менеджеру.
+        if (Array.isArray(data.reconciliationRequests)) {
+          setReconciliationRequests(data.reconciliationRequests);
+        }
+
         if (data.user?.role === "manager" || data.user?.role === "admin") {
           applyManagerNotificationList(data.managerNotifications);
           setTrashedOrders(Array.isArray(data.trashedOrders) ? data.trashedOrders : []);
-          if (Array.isArray(data.reconciliationRequests)) {
-            setReconciliationRequests(data.reconciliationRequests);
-          }
           if (Array.isArray(data.clients)) {
             setServerClients(data.clients);
           }
@@ -919,12 +947,20 @@ function App() {
 
   const validateNewOrder = () => {
     if (settings.requireProfile && !profileComplete) {
-      alert("Сначала заполните профиль организации.");
+      void appAlert({
+        title: "Профиль не заполнен",
+        message: "Сначала заполните профиль организации.",
+        tone: "warn",
+      });
       return false;
     }
 
     if (settings.requireAddress && !addresses.length) {
-      alert("Сначала добавьте адрес доставки.");
+      void appAlert({
+        title: "Нет адреса",
+        message: "Сначала добавьте адрес доставки.",
+        tone: "warn",
+      });
       return false;
     }
 
@@ -961,7 +997,12 @@ function App() {
 
   const openEdit = (order) => {
     if (order.status !== "Новый") {
-      return alert("Редактировать можно только новый заказ.");
+      void appAlert({
+        title: "Редактирование недоступно",
+        message: "Редактировать можно только новый заказ.",
+        tone: "warn",
+      });
+      return;
     }
 
     setCatalogSession({ mode: "edit", order });
@@ -975,7 +1016,11 @@ function App() {
 
   const saveOrder = (payload) => {
     if (!hydrated || !authUser) {
-      alert("Данные с сервера ещё не загружены. Обновите страницу и повторите заказ.");
+      void appAlert({
+        title: "Данные не загружены",
+        message: "Данные с сервера ещё не загружены. Обновите страницу и повторите заказ.",
+        tone: "warn",
+      });
       return Promise.reject(new Error("not_hydrated"));
     }
 
@@ -1091,7 +1136,7 @@ function App() {
         }
         const message = `${error.message} Заказ не сохранён на сервере — менеджер его не увидит.`;
         setSyncError(message);
-        alert(message);
+        void appAlert({ title: "Заказ не сохранён", message, tone: "danger" });
         throw error;
       });
   };
@@ -1155,7 +1200,7 @@ function App() {
         pendingDeletedOrderIdsRef.current.delete(orderId);
         const message = `${error.message}. Заказ не удалён на сервере.`;
         setSyncError(message);
-        alert(message);
+        void appAlert({ title: "Удаление не выполнено", message, tone: "danger" });
         try {
           const data = await api.bootstrap();
           skipNextOrdersSyncRef.current = true;
@@ -1186,7 +1231,7 @@ function App() {
           setSyncError("");
         } catch (error) {
           setSyncError(error.message);
-          window.alert(error.message);
+          void appAlert({ title: "Ошибка обновления", message: error.message, tone: "danger" });
         }
       })();
       return;
@@ -1245,13 +1290,15 @@ function App() {
                 (item) => `${item.orderId}: ${item.error || item.code}`
               ),
             ];
-            window.alert(
-              `Обновлено: ${(result.updated || []).length}.\nНе изменено:\n${details.join("\n")}`
-            );
+            void appAlert({
+              title: "Частичное обновление",
+              message: `Обновлено: ${(result.updated || []).length}.\nНе изменено:\n${details.join("\n")}`,
+              tone: "warn",
+            });
           }
         } catch (error) {
           setSyncError(error.message);
-          window.alert(error.message);
+          void appAlert({ title: "Ошибка обновления", message: error.message, tone: "danger" });
         }
       })();
       return;
@@ -1323,7 +1370,7 @@ function App() {
       } catch (error) {
         const message = `${error.message}. Заказ не перемещён в корзину.`;
         setSyncError(message);
-        alert(message);
+        void appAlert({ title: "Корзина", message, tone: "danger" });
         try {
           await loadBootstrap({ silent: true });
         } catch {
@@ -1475,27 +1522,41 @@ function App() {
     }
   };
 
-  const clearOrders = () => {
-    if (window.confirm("Удалить все заказы?")) {
+  const clearOrders = async () => {
+    const ok = await appConfirm({
+      title: "Удалить все заказы?",
+      message: "Все заказы будут удалены. Это действие нельзя отменить из этого окна.",
+      confirmLabel: "Удалить",
+      cancelLabel: "Отмена",
+      tone: "danger",
+    });
+    if (ok) {
       setOrders([]);
     }
   };
 
   const resetAll = async () => {
-    if (
-      !window.confirm(
-        "Сбросить серверные данные Clover? Аккаунт менеджера сохранится."
-      )
-    ) {
+    const ok = await appConfirm({
+      title: "Сбросить серверные данные?",
+      message: "Сбросить серверные данные Clover? Аккаунт менеджера сохранится.",
+      confirmLabel: "Сбросить",
+      cancelLabel: "Отмена",
+      tone: "danger",
+    });
+    if (!ok) {
       return;
     }
 
     try {
       await api.resetAll();
       await loadBootstrap();
-      alert("Серверные данные сброшены.");
+      await appAlert({
+        title: "Готово",
+        message: "Серверные данные сброшены.",
+        tone: "success",
+      });
     } catch (error) {
-      alert(error.message);
+      await appAlert({ title: "Ошибка сброса", message: error.message, tone: "danger" });
     }
   };
 
@@ -1503,8 +1564,9 @@ function App() {
     return (
       <>
         <style>{APP_STYLES}</style>
-        <main className="loading-page loading-page-quiet" aria-busy="true" aria-label="Загрузка">
+        <main className="loading-page loading-page-quiet clover-app" aria-busy="true" aria-label="Загрузка">
           <div className="loading-quiet-bar" aria-hidden="true" />
+          {getApiToken() ? <ListSkeleton rows={5} variant="orders" /> : null}
         </main>
       </>
     );
@@ -1593,12 +1655,52 @@ function App() {
     );
   }
 
+  // Один компактный баннер сверху: offline > syncError > update (без стопки снизу).
+  const systemBanner = isOffline && !offlineBannerHidden
+    ? {
+        tone: "warn",
+        title: "Нет связи",
+        message: "Можно смотреть уже загруженные данные.",
+        actionLabel: null,
+        onAction: null,
+        onDismiss: () => setOfflineBannerHidden(true),
+      }
+    : !isOffline && syncError
+      ? {
+          tone: "danger",
+          title: "Проблема связи",
+          message: syncError,
+          actionLabel: "Повторить",
+          onAction: () => loadBootstrap(),
+          onDismiss: () => setSyncError(""),
+        }
+      : !isOffline && updateAvailable
+        ? {
+            tone: "info",
+            title: "Доступна новая версия",
+            message: "Обновите страницу, чтобы получить изменения.",
+            actionLabel: "Обновить",
+            onAction: () => window.location.reload(),
+            onDismiss: null,
+          }
+        : null;
+
   return (
     <>
       <style>{APP_STYLES}</style>
       {content}
-      {syncError && (
-        <div className="server-banner">{syncError}</div>
+      {systemBanner && (
+        <div className="ux-banner-stack" aria-live="polite">
+          <SoftBanner
+            compact
+            tone={systemBanner.tone}
+            title={systemBanner.title}
+            message={systemBanner.message}
+            actionLabel={systemBanner.actionLabel}
+            onAction={systemBanner.onAction || undefined}
+            onDismiss={systemBanner.onDismiss || undefined}
+          />
+        </div>
       )}
     </>
   );

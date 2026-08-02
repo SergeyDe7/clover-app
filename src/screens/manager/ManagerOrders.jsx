@@ -21,6 +21,7 @@ import {
 } from "../../shared/appHelpers";
 import { canTrashOrder } from "../../shared/orderTrash";
 import { appAlert } from "../../shared/AppModal";
+import { EmptyState } from "../../shared/uxFeedback";
 
 const CUSTOM_STATUSES = [
   "Новый запрос",
@@ -75,9 +76,24 @@ export function ManagerOrders({
   const [bulkPanelOpen, setBulkPanelOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const effectiveSearch = headerSearch.trim();
-  const filtersActive = status !== "Все" || exchangeFilter !== "all" || sort !== "newest";
   const inTrash = ordersView === "trash";
   const sourceOrders = inTrash ? trashedOrders : orders;
+
+  const waitingOneCCount = useMemo(
+    () => orders.filter((order) => {
+      const exchange = normalizeOrderExchange(order.exchange);
+      return exchange.status === "not_sent" || exchange.status === "error";
+    }).length,
+    [orders]
+  );
+
+  const queuedOneCCount = useMemo(
+    () => orders.filter((order) => {
+      const exchange = normalizeOrderExchange(order.exchange);
+      return exchange.status === "ready" || exchange.status === "sending";
+    }).length,
+    [orders]
+  );
 
   const visible = useMemo(() => {
     const needle = effectiveSearch.trim();
@@ -87,7 +103,10 @@ export function ManagerOrders({
       const haystack = buildOrderSearchHaystack(order, link);
       return (!needle || matchesTextSearch(haystack, needle))
         && (inTrash || status === "Все" || order.status === status)
-        && (inTrash || exchangeFilter === "all" || exchange.status === exchangeFilter);
+        && (inTrash || exchangeFilter === "all"
+          || (exchangeFilter === "waiting" && (exchange.status === "not_sent" || exchange.status === "error"))
+          || (exchangeFilter === "queued" && (exchange.status === "ready" || exchange.status === "sending"))
+          || exchange.status === exchangeFilter);
     }).sort((a, b) => {
       if (sort === "delivery") return String(a.firstDeliveryDate).localeCompare(String(b.firstDeliveryDate));
       if (sort === "oldest") return String(a.createdAt).localeCompare(String(b.createdAt));
@@ -146,7 +165,7 @@ export function ManagerOrders({
     );
   };
 
-  const applyBulkStatus = () => {
+  const applyBulkStatus = async () => {
     if (!selectedIds.length) return;
     const selected = orders.filter((order) => selectedIds.includes(order.id));
     const allowedIds = selected
@@ -154,13 +173,21 @@ export function ManagerOrders({
       .map((order) => order.id);
     const skipped = selected.length - allowedIds.length;
     if (!allowedIds.length) {
-      alert(`Статус «${bulkStatus}» недоступен ни для одного выбранного заказа.`);
+      await appAlert({
+        title: "Статус не изменён",
+        message: `Статус «${bulkStatus}» недоступен ни для одного выбранного заказа.`,
+        tone: "warn",
+      });
       return;
     }
     onBulkUpdateOrders(allowedIds, { status: bulkStatus });
     setSelectedIds([]);
     if (skipped > 0) {
-      alert(`Статус обновлён у ${allowedIds.length}. Пропущено (запрещённый переход): ${skipped}.`);
+      await appAlert({
+        title: "Статус обновлён частично",
+        message: `Обновлено: ${allowedIds.length}. Пропущено (запрещённый переход): ${skipped}.`,
+        tone: "warn",
+      });
     }
   };
 
@@ -185,7 +212,11 @@ export function ManagerOrders({
       }
       await onReload();
       if (errors.length) {
-        alert(`Не все заказы обработаны:\n${errors.join("\n")}`);
+        await appAlert({
+          title: "Не все заказы обработаны",
+          message: errors.join("\n"),
+          tone: "danger",
+        });
       }
       setSelectedIds([]);
     } finally {
@@ -194,51 +225,83 @@ export function ManagerOrders({
   };
 
   return (
-    <section>
-      <div className="manager-orders-view-switch category-list" style={{ marginBottom: 14 }}>
+    <section className="manager-orders-section">
+      <div className="manager-orders-topbar" role="toolbar" aria-label="Заказы и действия">
         <button
-          className={ordersView === "active" ? "category-button active" : "category-button"}
+          className={ordersView === "active" ? "manager-orders-seg active" : "manager-orders-seg"}
           type="button"
           onClick={() => onOrdersViewChange?.("active")}
         >
           Заказы ({orders.length})
         </button>
         <button
-          className={ordersView === "trash" ? "category-button active" : "category-button"}
+          className={ordersView === "trash" ? "manager-orders-seg active" : "manager-orders-seg"}
           type="button"
           onClick={() => onOrdersViewChange?.("trash")}
         >
           Корзина ({trashedOrders.length})
         </button>
+        {!inTrash && (
+          <>
+            <button
+              className={filtersOpen ? "manager-orders-seg manager-filters-toggle active" : "manager-orders-seg manager-filters-toggle"}
+              type="button"
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((open) => !open)}
+            >
+              {filtersOpen ? "Скрыть фильтры" : "Фильтры"}
+            </button>
+            <button
+              className={bulkPanelOpen ? "manager-orders-seg manager-bulk-toggle active" : "manager-orders-seg manager-bulk-toggle"}
+              type="button"
+              aria-expanded={bulkPanelOpen}
+              onClick={() => setBulkPanelOpen((open) => !open)}
+            >
+              {bulkPanelOpen ? "Скрыть действия" : "Массовые действия"}
+              {selectedIds.length > 0 ? ` · ${selectedIds.length}` : ""}
+            </button>
+          </>
+        )}
       </div>
 
       {!inTrash && (
-      <div className="manager-orders-tools">
-        <button
-          className="secondary-button manager-filters-toggle"
-          type="button"
-          aria-expanded={filtersOpen}
-          onClick={() => setFiltersOpen((open) => !open)}
-        >
-          {filtersOpen ? "Скрыть фильтры" : "Фильтры"}
-          {!filtersOpen && filtersActive ? " · изменены" : ""}
-        </button>
-        <button
-          className="secondary-button manager-bulk-toggle"
-          type="button"
-          aria-expanded={bulkPanelOpen}
-          onClick={() => setBulkPanelOpen((open) => !open)}
-        >
-          {bulkPanelOpen ? "Скрыть действия" : "Массовые действия"}
-          {selectedIds.length > 0 ? ` · ${selectedIds.length}` : ""}
-        </button>
-      </div>
+        <div className="manager-orders-quick-chips" role="group" aria-label="Быстрые фильтры 1С">
+          <button
+            className={exchangeFilter === "waiting" ? "manager-orders-seg active" : "manager-orders-seg"}
+            type="button"
+            onClick={() => {
+              setFiltersOpen(false);
+              setExchangeFilter((current) => (current === "waiting" ? "all" : "waiting"));
+            }}
+          >
+            Ждут передачи в 1С ({waitingOneCCount})
+          </button>
+          <button
+            className={exchangeFilter === "queued" ? "manager-orders-seg active" : "manager-orders-seg"}
+            type="button"
+            onClick={() => {
+              setFiltersOpen(false);
+              setExchangeFilter((current) => (current === "queued" ? "all" : "queued"));
+            }}
+          >
+            В очереди ({queuedOneCCount})
+          </button>
+        </div>
       )}
 
       {!inTrash && filtersOpen && (
         <div className="toolbar three manager-orders-filters">
           <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Фильтр статуса заказа"><option>Все</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
-          <select value={exchangeFilter} onChange={(e) => setExchangeFilter(e.target.value)} aria-label="Фильтр статуса 1С"><option value="all">Все статусы 1С</option>{Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select>
+          <select
+            value={exchangeFilter}
+            onChange={(e) => setExchangeFilter(e.target.value)}
+            aria-label="Фильтр статуса 1С"
+          >
+            <option value="all">Все статусы 1С</option>
+            <option value="waiting">Ждут передачи в 1С</option>
+            <option value="queued">В очереди</option>
+            {Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}
+          </select>
           <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Сортировка заказов"><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="delivery">По дате доставки</option></select>
         </div>
       )}
@@ -247,14 +310,14 @@ export function ManagerOrders({
         <div className="panel manager-bulk-panel">
           <div className="toolbar four">
             <button className="secondary-button" type="button" onClick={selectVisible}>
-              {visible.length > 0 && visible.every((order) => selectedIds.includes(order.id))
-                ? "Снять выбор с видимых"
-                : "Выбрать все видимые"}
+                  {visible.length > 0 && visible.every((order) => selectedIds.includes(order.id))
+                    ? "Снять выбор"
+                    : "Выбрать все"}
             </button>
             <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} aria-label="Статус для массового изменения">
               {ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}
             </select>
-            <button className="primary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={applyBulkStatus}>
+            <button className="primary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => void applyBulkStatus()}>
               Изменить статус ({selectedIds.length})
             </button>
             <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => runBulkExchange("check")}>
@@ -279,14 +342,16 @@ export function ManagerOrders({
         return (
         <article className="order-card manager-order-card-item" key={order.id}>
           <div className="order-card-header manager-order-card-header">
-            <label className="manager-order-select">
+            <div className="manager-order-select">
               <input
+                className="manager-order-checkbox"
                 type="checkbox"
                 checked={selectedIds.includes(order.id)}
                 onChange={() => toggleSelected(order.id)}
+                onClick={(event) => event.stopPropagation()}
                 aria-label={`Выбрать заказ ${order.number}`}
               />
-              <div>
+              <div className="manager-order-select-body">
                 <div className="exchange-status-line">
                   <span className={`badge ${statusClass(order.status)}`}>{order.status}</span>
                   <span className={`badge ${exchangeBadgeClass(exchange.status)}`}>1С: {EXCHANGE_STATUS_LABELS[exchange.status]}</span>
@@ -302,7 +367,7 @@ export function ManagerOrders({
                   </p>
                 )}
               </div>
-            </label>
+            </div>
             <div className="nowrap">
               <strong className="manager-order-sum success-text">
                 {settings.showPrices && getOrderTotal(order) > 0
@@ -514,9 +579,16 @@ export function ManagerOrders({
           })}
         </div>
       ) : (
-        <div className="empty-box">
-          {inTrash ? "Корзина пуста." : "Заказы не найдены."}
-        </div>
+        <EmptyState
+          title={inTrash ? "Удалённых заказов нет" : "Заказы не найдены"}
+          message={
+            inTrash
+              ? "Здесь появятся заказы, которые вы удалите."
+              : exchangeFilter !== "all" || status !== "Все"
+                ? "По текущим фильтрам ничего нет. Сбросьте фильтр или выберите другой."
+                : "Когда клиенты оформят заказы, они появятся в этом списке."
+          }
+        />
       )}
     </section>
   );

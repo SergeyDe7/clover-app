@@ -1,5 +1,5 @@
 // Экран клиента: заказ, история, кабинет.
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   OrderTimeline,
   Header,
@@ -17,6 +17,8 @@ import {
   writeClientCabinetSection,
   clientTabFromSection,
   clientCabinetSectionFromQuery,
+  countUnseenReadyActs,
+  markReadyActsSeen,
   UNIT_CONFIG,
   formatDate,
   formatDateTime,
@@ -26,6 +28,7 @@ import {
   statusClass,
 } from "../../shared/appHelpers";
 import { canTrashOrder } from "../../shared/orderTrash";
+import { EmptyState } from "../../shared/uxFeedback";
 import { ManagerContact } from "./ManagerContact";
 import { ProfilePanel } from "./ProfilePanel";
 import { AddressesPanel } from "./AddressesPanel";
@@ -86,6 +89,7 @@ function ClientDashboard({
   const [cabinetSection, setCabinetSection] = useState(readClientCabinetSection);
   const [filter, setFilter] = useState("Активные");
   const [thankYouOpen, setThankYouOpen] = useState(false);
+  const [seenActsTick, setSeenActsTick] = useState(0);
   const active = orders.filter(
     (order) => !["Выполнен", "Отменён"].includes(order.status)
   );
@@ -104,12 +108,6 @@ function ClientDashboard({
   };
 
   const openOrders = () => {
-    if (isNarrow) {
-      setTab("cabinet");
-      writeClientActiveTab("cabinet");
-      selectCabinetSection("history");
-      return;
-    }
     setTab("orders");
     writeClientActiveTab("orders");
   };
@@ -120,17 +118,17 @@ function ClientDashboard({
   };
 
   const selectTab = (id) => {
-    if (isNarrow && id === "orders") {
-      openOrders();
-      return;
-    }
     setTab(id);
     writeClientActiveTab(id);
     if (id === "home") {
       onNew?.({ silent: true });
     }
-    if (id === "cabinet" && isNarrow && !cabinetSection) {
-      selectCabinetSection("history");
+    if (id === "reconciliation") {
+      markReadyActsSeen(reconciliationRequests);
+      setSeenActsTick((value) => value + 1);
+    }
+    if (id === "cabinet" && isNarrow && !CLIENT_CABINET_SECTIONS.some(([sectionId]) => sectionId === cabinetSection)) {
+      selectCabinetSection("settings");
     }
   };
 
@@ -153,30 +151,25 @@ function ClientDashboard({
       const mapped = orderId ? "orders" : clientTabFromSection(section);
       const cabinetMapped =
         orderId
-          ? "history"
+          ? ""
           : clientCabinetSectionFromQuery(section) || readClientCabinetSection();
 
-      if (mapped === "orders" || mapped === "cabinet") {
-        if (window.matchMedia?.(NARROW_MQ).matches && (mapped === "orders" || orderId)) {
-          setTab("cabinet");
-          writeClientActiveTab("cabinet");
-          selectCabinetSection("history");
-        } else if (mapped === "cabinet") {
-          setTab("cabinet");
-          writeClientActiveTab("cabinet");
-          if (cabinetMapped) selectCabinetSection(cabinetMapped);
-        } else if (mapped) {
-          setTab(mapped);
-          writeClientActiveTab(mapped);
-        }
+      if (mapped === "cabinet") {
+        setTab("cabinet");
+        writeClientActiveTab("cabinet");
+        if (cabinetMapped) selectCabinetSection(cabinetMapped);
       } else if (mapped) {
         setTab(mapped);
         writeClientActiveTab(mapped);
+        if (mapped === "reconciliation") {
+          markReadyActsSeen(reconciliationRequests);
+          setSeenActsTick((value) => value + 1);
+        }
       }
 
       const targetId = orderId
         ? `order-${orderId}`
-        : section === "reconciliation"
+        : section === "reconciliation" || section === "acts"
           ? "reconciliation"
           : "";
       if (!targetId) return undefined;
@@ -194,41 +187,28 @@ function ClientDashboard({
     return undefined;
   }, []);
 
-  useEffect(() => {
-    if (!isNarrow && tab === "cabinet" && cabinetSection === "history") {
-      setTab("orders");
-      writeClientActiveTab("orders");
-    }
-    if (isNarrow && tab === "orders") {
-      setTab("cabinet");
-      writeClientActiveTab("cabinet");
-      selectCabinetSection("history");
-    }
-  }, [isNarrow]);
-
-  const primaryTabs = isNarrow
-    ? [
-        ["home", "Заказ"],
-        ["cabinet", "Кабинет"],
-      ]
-    : CLIENT_TABS;
+  const primaryTabs = CLIENT_TABS;
+  const readyActsBadge = useMemo(
+    () => countUnseenReadyActs(reconciliationRequests),
+    [reconciliationRequests, seenActsTick]
+  );
 
   const navButtons = (
     <>
       {primaryTabs.map(([id, label]) => (
         <button
-          className={[
-            tab === id ? "active" : "",
-            id === "cabinet" ? "nav-service" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
+          className={tab === id ? "active" : ""}
           type="button"
           key={id}
           onClick={() => selectTab(id)}
         >
           {label}
           {id === "orders" && active.length > 0 ? ` (${active.length})` : ""}
+          {id === "reconciliation" && readyActsBadge > 0 ? (
+            <span className="client-nav-count" aria-label={`Готовых актов: ${readyActsBadge}`}>
+              {readyActsBadge}
+            </span>
+          ) : null}
         </button>
       ))}
     </>
@@ -432,11 +412,16 @@ function ClientDashboard({
           })}
         </div>
       ) : (
-        <div className="empty-box">
-          {filter === "Активные"
-            ? "Активных заказов нет."
-            : "Заказов с таким статусом пока нет."}
-        </div>
+        <EmptyState
+          title={filter === "Активные" ? "Пока нет заказов" : "Заказы не найдены"}
+          message={
+            filter === "Активные"
+              ? "Создайте первый заказ — он появится здесь."
+              : "По этому фильтру заказов нет. Попробуйте другой статус."
+          }
+          actionLabel="Новый заказ"
+          onAction={openNewOrder}
+        />
       )}
 
       <button
@@ -449,32 +434,33 @@ function ClientDashboard({
     </section>
   );
 
+  const matrixPanel = (
+    <div className="panel" style={{ padding: 16 }}>
+      <div className="panel-heading" style={{ marginBottom: 14 }}>
+        <div>
+          <p className="eyebrow">Каталог</p>
+          <h2>Моя Матрица</h2>
+          <p className="muted small">Ваши постоянные товары и цены</p>
+        </div>
+      </div>
+      <ClientMatrixPanel
+        products={matrixProducts}
+        settings={settings}
+        catalogPolicy={catalogPolicy}
+        favorites={favorites}
+        setFavorites={setFavorites}
+        onCreateOrder={() => {
+          onNew({ forceNew: true });
+          selectTab("home");
+        }}
+      />
+    </div>
+  );
+
   const cabinetDesktop = (
     <div className="client-cabinet-stack">
       <ProfilePanel profile={profile} onChange={setProfile} />
       <AddressesPanel addresses={addresses} onChange={setAddresses} />
-      <ReconciliationPanel
-        requests={reconciliationRequests}
-        onReload={onReload}
-      />
-      <details className="panel" style={{ padding: 16 }}>
-        <summary style={{ cursor: "pointer", fontWeight: 800 }}>
-          Мои товары (справочно)
-        </summary>
-        <div style={{ marginTop: 14 }}>
-          <ClientMatrixPanel
-            products={matrixProducts}
-            settings={settings}
-            catalogPolicy={catalogPolicy}
-            favorites={favorites}
-            setFavorites={setFavorites}
-            onCreateOrder={() => {
-              onNew({ forceNew: true });
-              selectTab("home");
-            }}
-          />
-        </div>
-      </details>
       <PushSettings />
       <PasswordSecurityPanel />
     </div>
@@ -482,7 +468,7 @@ function ClientDashboard({
 
   const cabinetMobile = (
     <div className="client-cabinet-stack">
-      <nav className="client-cabinet-nav" aria-label="Разделы кабинета">
+      <nav className="client-cabinet-nav" aria-label="Разделы настроек">
         {CLIENT_CABINET_SECTIONS.map(([id, label]) => (
           <button
             key={id}
@@ -495,42 +481,12 @@ function ClientDashboard({
             onClick={() => selectCabinetSection(id)}
           >
             {label}
-            {id === "history" && active.length > 0 ? ` (${active.length})` : ""}
           </button>
         ))}
       </nav>
 
-      {cabinetSection === "history" && ordersPanel}
-      {cabinetSection === "matrix" && (
-        <div className="panel" style={{ padding: 16 }}>
-          <div className="panel-heading" style={{ marginBottom: 14 }}>
-            <div>
-              <p className="eyebrow">Каталог</p>
-              <h2>Товарная матрица</h2>
-              <p className="muted small">Ваши постоянные товары и цены</p>
-            </div>
-          </div>
-          <ClientMatrixPanel
-            products={matrixProducts}
-            settings={settings}
-            catalogPolicy={catalogPolicy}
-            favorites={favorites}
-            setFavorites={setFavorites}
-            onCreateOrder={() => {
-              onNew({ forceNew: true });
-              selectTab("home");
-            }}
-          />
-        </div>
-      )}
       {cabinetSection === "addresses" && (
         <AddressesPanel addresses={addresses} onChange={setAddresses} />
-      )}
-      {cabinetSection === "reconciliation" && (
-        <ReconciliationPanel
-          requests={reconciliationRequests}
-          onReload={onReload}
-        />
       )}
       {cabinetSection === "settings" && (
         <div className="client-settings-stack">
@@ -575,7 +531,7 @@ function ClientDashboard({
                         if (isNarrow) selectCabinetSection("settings");
                       }}
                     >
-                      Кабинете
+                      Настройках
                     </button>
                     .
                   </p>
@@ -591,7 +547,7 @@ function ClientDashboard({
                         if (isNarrow) selectCabinetSection("addresses");
                       }}
                     >
-                      Кабинете
+                      Настройках
                     </button>
                     .
                   </p>
@@ -638,7 +594,7 @@ function ClientDashboard({
                       if (isNarrow) selectCabinetSection("settings");
                     }}
                   >
-                    Открыть кабинет
+                    Открыть настройки
                   </button>
                 </div>
               </div>
@@ -646,7 +602,16 @@ function ClientDashboard({
           </>
         )}
 
-        {tab === "orders" && !isNarrow && ordersPanel}
+        {tab === "orders" && ordersPanel}
+
+        {tab === "matrix" && matrixPanel}
+
+        {tab === "reconciliation" && (
+          <ReconciliationPanel
+            requests={reconciliationRequests}
+            onReload={onReload}
+          />
+        )}
 
         {tab === "cabinet" && (isNarrow ? cabinetMobile : cabinetDesktop)}
       </section>

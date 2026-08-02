@@ -21,6 +21,7 @@ import { ManagerContact } from "./ManagerContact";
 import { CustomItemForm } from "./CustomItemForm";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
 import { appAlert } from "../../shared/AppModal";
+import { EmptyState } from "../../shared/uxFeedback";
 
 function capitalizeRu(value) {
   if (!value) return "";
@@ -305,7 +306,16 @@ export function OrderEditor({
         <div className="catalog-layout">
           <form className="order-summary" id="order-summary" onSubmit={submit}>
             <h2>Ваш заказ</h2>
-            {!selectedItems.length && !customItems.length ? <p className="summary-empty">Добавьте товар из каталога или запросите отсутствующую позицию.</p> : (
+            {!selectedItems.length && !customItems.length ? (
+              <EmptyState
+                title="Корзина пуста"
+                message="Добавьте товар из каталога или запросите отсутствующую позицию."
+                actionLabel="К каталогу"
+                onAction={() => {
+                  document.querySelector(".product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+              />
+            ) : (
               <div className="summary-list">
                 {selectedItems.map((item) => (
                   <div className="summary-item" key={item.productId}>
@@ -558,7 +568,17 @@ export function OrderEditor({
               </div>
 
               {!cartCount ? (
-                <p className="summary-empty">Добавьте товары из каталога — они появятся здесь для быстрой правки.</p>
+                <EmptyState
+                  title="Корзина пуста"
+                  message="Добавьте товары из каталога — они появятся здесь для быстрой правки."
+                  actionLabel="К каталогу"
+                  onAction={() => {
+                    setCartSheetOpen(false);
+                    window.setTimeout(() => {
+                      document.querySelector(".product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }, 50);
+                  }}
+                />
               ) : (
                 <div className="cart-sheet-list">
                   {selectedItems.map((item) => (
@@ -758,7 +778,7 @@ export function OrderEditor({
     <main className="clover-app">
       <Header title={session.mode === "edit" ? "Редактирование заказа" : session.mode === "repeat" ? "Повтор заказа" : "Новый заказ"}>
         <ManagerContact settings={settings} />
-        <button className="header-button" type="button" onClick={onClose}>← В кабинет</button>
+        <button className="header-button" type="button" onClick={onClose}>← Назад</button>
       </Header>
       {catalogBody}
     </main>

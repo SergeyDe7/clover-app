@@ -39,7 +39,7 @@ async function request(path, options = {}) {
     });
   } catch {
     const error = new Error(
-      "Сервер Clover недоступен. Проверьте, что сервер запущен на порту 4100."
+      "Не удалось связаться с сервером. Проверьте интернет и попробуйте снова."
     );
     error.status = 0;
     throw error;
@@ -52,19 +52,19 @@ async function request(path, options = {}) {
       payload = JSON.parse(rawText);
     } catch {
       payload = {
-        error: `Сервер вернул не JSON (HTTP ${response.status}). Обновите страницу (Ctrl+F5) или войдите снова.`,
+        error: "Не удалось прочитать ответ сервера. Обновите страницу или войдите снова.",
         raw: rawText.slice(0, 120),
       };
     }
   } else if (!response.ok) {
     payload = {
-      error: `Пустой ответ сервера (HTTP ${response.status}). Войдите снова или перезапустите backend.`,
+      error: "Сервер не ответил. Войдите снова или попробуйте позже.",
     };
   }
 
   if (!response.ok) {
     const error = new Error(
-      payload.error || `Ошибка сервера: ${response.status}`
+      payload.error || "Не удалось выполнить запрос. Попробуйте позже."
     );
     error.status = response.status;
     error.code = payload.code || "";
@@ -93,13 +93,13 @@ async function requestBlob(path, options = {}) {
     });
   } catch {
     throw new Error(
-      "Сервер Clover недоступен. Проверьте, что сервер запущен на порту 4100."
+      "Не удалось связаться с сервером. Проверьте интернет и попробуйте снова."
     );
   }
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.error || `Ошибка сервера: ${response.status}`);
+    throw new Error(payload.error || "Не удалось выполнить запрос. Попробуйте позже.");
   }
 
   return response.blob();

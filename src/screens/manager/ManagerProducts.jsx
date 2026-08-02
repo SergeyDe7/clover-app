@@ -1,7 +1,6 @@
 // Раздел менеджера: каталог товаров и связь с 1С.
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../serverApi";
-import { VirtualList } from "../../components/VirtualList";
 import {
   UNIT_ORDER,
   UNIT_CONFIG,
@@ -11,6 +10,30 @@ import {
   formatDateTime,
   normalizeProduct,
 } from "../../shared/appHelpers";
+import { SoftBanner } from "../../shared/uxFeedback";
+import { appAlert, appConfirm } from "../../shared/AppModal";
+
+function normalizeMatchKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function fileBaseName(fileName) {
+  return String(fileName || "").replace(/\.[^.]+$/, "");
+}
+
+function matchProductForPhoto(products, fileName) {
+  const key = normalizeMatchKey(fileBaseName(fileName));
+  if (!key) return null;
+  return products.find((product) => {
+    const candidates = [product.code, product.oneCCode, product.name]
+      .map(normalizeMatchKey)
+      .filter(Boolean);
+    return candidates.includes(key);
+  }) || null;
+}
 
 function ProductEditor({ product, onClose, onSave }) {
   const isNew = !product;
@@ -432,11 +455,13 @@ function OneCProductsPanel({ products, setProducts }) {
       setCatalog(refreshed);
       if (!silent) {
         const linked = result.report?.newlyLinked || 0;
-        alert(
-          linked
+        void appAlert({
+          title: linked ? "Связи обновлены" : "Совпадений нет",
+          message: linked
             ? `Автоматически связаны товары: ${linked}.`
-            : "Новых точных совпадений не найдено. Уже созданные связи сохранены."
-        );
+            : "Новых точных совпадений не найдено. Уже созданные связи сохранены.",
+          tone: linked ? "success" : "default",
+        });
       }
     } catch (linkError) {
       setError(linkError.message);
@@ -467,18 +492,9 @@ function OneCProductsPanel({ products, setProducts }) {
   const summary = catalog?.summary || {};
 
   return (
-    <section className="one-c-products-panel">
+    <section className="one-c-products-panel one-c-products-panel-compact">
       <div className="one-c-products-head">
-        <div>
-          <p className="eyebrow">Каталог 1С</p>
-          <h2>Автоматическое сопоставление номенклатуры</h2>
-          <p>
-            Clover сохраняет только точные совпадения и несколько наиболее похожих
-            вариантов для несвязанных товаров. Красивое название на сайте может быть
-            другим: в заказ передаётся ID 1С. Полная номенклатура и база клиентов в
-            Clover не сохраняются. Неоднозначные варианты выбирает менеджер.
-          </p>
-        </div>
+        <strong className="one-c-products-title">Каталог 1С</strong>
         <div className="one-c-products-actions">
           <button
             className="secondary-button"
@@ -494,7 +510,7 @@ function OneCProductsPanel({ products, setProducts }) {
             onClick={() => runAutoLink()}
             disabled={linking || !summary.oneCTotal}
           >
-            {linking ? "Сопоставление..." : "Сопоставить автоматически"}
+            {linking ? "Сопоставление..." : "Сопоставить"}
           </button>
         </div>
       </div>
@@ -502,22 +518,19 @@ function OneCProductsPanel({ products, setProducts }) {
       {error && <div className="sync-error">{error}</div>}
 
       <div className="one-c-products-stats">
-        <article><span>Подходящих из 1С</span><strong>{summary.oneCTotal || 0}</strong></article>
-        <article><span>Товаров Clover</span><strong>{summary.cloverTotal ?? products.length}</strong></article>
+        <article><span>Из 1С</span><strong>{summary.oneCTotal || 0}</strong></article>
         <article><span>Связано</span><strong>{summary.linked || 0}</strong></article>
-        <article><span>С закупочной ценой</span><strong>{summary.pricedProducts || 0}</strong></article>
         <article><span>Без связи</span><strong>{summary.unmatched ?? products.filter((item) => !item.oneCId).length}</strong></article>
-        {Number(summary.candidateProducts) > 0 && <article><span>Есть варианты</span><strong>{summary.candidateProducts}</strong></article>}
+        {Number(summary.candidateProducts) > 0 && (
+          <article><span>Есть варианты</span><strong>{summary.candidateProducts}</strong></article>
+        )}
       </div>
 
       <div className="one-c-products-meta">
         <span>
-          Последняя выгрузка: {summary.receivedAt ? formatDateTime(summary.receivedAt) : "ещё не выполнялась"}
+          Выгрузка: {summary.receivedAt ? formatDateTime(summary.receivedAt) : "ещё не было"}
         </span>
-        <span>
-          Автоматически: {summary.autoLinked || 0} · вручную: {summary.manualLinked || 0}
-        </span>
-        {summary.stale > 0 && <span className="warning-text">Не найдено в свежем каталоге: {summary.stale}</span>}
+        {summary.stale > 0 && <span className="warning-text">Не в свежем каталоге: {summary.stale}</span>}
       </div>
 
       <button
@@ -525,7 +538,7 @@ function OneCProductsPanel({ products, setProducts }) {
         type="button"
         onClick={() => setOpen((value) => !value)}
       >
-        {open ? "Скрыть сохранённые позиции 1С" : "Показать сохранённые позиции 1С"}
+        {open ? "Скрыть позиции 1С" : "Показать позиции 1С"}
       </button>
 
       {open && (
@@ -539,7 +552,7 @@ function OneCProductsPanel({ products, setProducts }) {
           >
             <input
               type="search"
-              placeholder="Поиск по выгрузке 1С TEST: название, код или ID"
+              placeholder="Поиск: название, код или ID"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -561,7 +574,7 @@ function OneCProductsPanel({ products, setProducts }) {
           </form>
 
           <p className="muted small">
-            Найдено: {catalog?.total || 0}. Показаны первые {catalog?.items?.length || 0} позиций.
+            Найдено: {catalog?.total || 0}. Показаны первые {catalog?.items?.length || 0}.
           </p>
 
           <div className="one-c-products-list">
@@ -576,7 +589,7 @@ function OneCProductsPanel({ products, setProducts }) {
                     Связан: {item.cloverLink.productName}
                   </span>
                 ) : (
-                  <span className="badge gray">Не используется в Clover</span>
+                  <span className="badge gray">Не в Clover</span>
                 )}
               </article>
             ))}
@@ -596,6 +609,11 @@ export function ManagerProducts({ products, setProducts }) {
   const [visibility, setVisibility] = useState("Все");
   const [editorProduct, setEditorProduct] = useState(undefined);
   const [imageBusyId, setImageBusyId] = useState(null);
+  const [bulkMatches, setBulkMatches] = useState(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState("");
+  const [bulkBanner, setBulkBanner] = useState(null);
+  const bulkInputRef = useRef(null);
   const categories = ["Все", ...new Set(products.map((item) => item.category))];
   const visible = products.filter((product) => {
     const bySearch = !search || `${product.name} ${product.code} ${product.oneCId} ${product.oneCCode} ${product.oneCName} ${product.oneCMatchCode} ${product.oneCMatchName} ${product.oneCSearchQuery}`.toLowerCase().includes(search.toLowerCase());
@@ -632,7 +650,11 @@ export function ManagerProducts({ products, setProducts }) {
       setProducts((result.products || nextProducts).map(normalizeProduct));
       setEditorProduct(undefined);
     } catch (error) {
-      alert(`Не удалось сохранить товар: ${error.message}`);
+      void appAlert({
+        title: "Не удалось сохранить",
+        message: `Не удалось сохранить товар: ${error.message}`,
+        tone: "danger",
+      });
     }
   };
 
@@ -640,7 +662,7 @@ export function ManagerProducts({ products, setProducts }) {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("Выберите фотографию товара.");
+      await appAlert({ title: "Неверный файл", message: "Выберите фотографию товара.", tone: "warn" });
       return;
     }
 
@@ -652,16 +674,98 @@ export function ManagerProducts({ products, setProducts }) {
           ? normalizeProduct({ ...item, ...result.product })
           : item
       ));
-      alert("Фотография товара сохранена на сервере.");
+      await appAlert({
+        title: "Фото сохранено",
+        message: "Фотография товара сохранена на сервере.",
+        tone: "success",
+      });
     } catch (error) {
-      alert(error.message);
+      await appAlert({ title: "Ошибка загрузки", message: error.message, tone: "danger" });
     } finally {
       setImageBusyId(null);
     }
   };
 
+  const prepareBulkPhotos = (fileList) => {
+    const files = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
+    if (!files.length) {
+      void appAlert({ title: "Нет фото", message: "Выберите файлы JPG, PNG или WEBP." });
+      return;
+    }
+    const usedProductIds = new Set();
+    const rows = files.map((file) => {
+      let product = matchProductForPhoto(products, file.name);
+      if (product && usedProductIds.has(product.id)) {
+        product = null;
+      }
+      if (product) usedProductIds.add(product.id);
+      return {
+        file,
+        fileName: file.name,
+        product,
+      };
+    });
+    setBulkMatches(rows);
+    setBulkBanner(null);
+    setBulkProgress("");
+  };
+
+  const cancelBulkPhotos = () => {
+    setBulkMatches(null);
+    setBulkProgress("");
+    if (bulkInputRef.current) bulkInputRef.current.value = "";
+  };
+
+  const uploadBulkMatches = async () => {
+    const matched = (bulkMatches || []).filter((row) => row.product);
+    if (!matched.length) {
+      void appAlert({ title: "Нет совпадений", message: "Не удалось сопоставить файлы с товарами по имени." });
+      return;
+    }
+
+    setBulkBusy(true);
+    let done = 0;
+    let failed = 0;
+    const total = matched.length;
+    try {
+      for (const row of matched) {
+        setBulkProgress(`${done + 1} из ${total}`);
+        try {
+          const result = await api.uploadProductImage(row.product.id, row.file);
+          setProducts((current) => current.map((item) =>
+            item.id === row.product.id
+              ? normalizeProduct({ ...item, ...result.product })
+              : item
+          ));
+          done += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+      setBulkMatches(null);
+      setBulkBanner({
+        tone: failed ? "warn" : "success",
+        title: failed ? "Загрузка завершена с ошибками" : "Фото загружены",
+        message: failed
+          ? `Успешно: ${done} из ${total}. Не удалось: ${failed}.`
+          : `Загружено фото: ${done} из ${total}.`,
+      });
+    } finally {
+      setBulkBusy(false);
+      setBulkProgress("");
+      if (bulkInputRef.current) bulkInputRef.current.value = "";
+    }
+  };
+
   const deleteImage = async (product) => {
-    if (!window.confirm(`Удалить фотографию товара «${product.name}»?`)) {
+    const ok = await appConfirm({
+      title: "Удалить фото?",
+      message: `Удалить фотографию товара «${product.name}»?`,
+      confirmLabel: "Удалить",
+      cancelLabel: "Отмена",
+      tone: "danger",
+    });
+    if (!ok) {
       return;
     }
 
@@ -674,7 +778,7 @@ export function ManagerProducts({ products, setProducts }) {
           : item
       ));
     } catch (error) {
-      alert(error.message);
+      await appAlert({ title: "Ошибка удаления", message: error.message, tone: "danger" });
     } finally {
       setImageBusyId(null);
     }
@@ -699,13 +803,76 @@ export function ManagerProducts({ products, setProducts }) {
       <div className="server-safe-note">
         Фото загружается на сервер и автоматически появляется в личном кабинете клиента. Поддерживаются JPG, PNG и WEBP до 5 МБ.
       </div>
+      <div className="bulk-photo-actions" style={{ marginTop: 12 }}>
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={bulkBusy}
+          onClick={() => bulkInputRef.current?.click()}
+        >
+          Загрузить фото пакетом
+        </button>
+        <input
+          ref={bulkInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          hidden
+          onChange={(event) => {
+            prepareBulkPhotos(event.target.files);
+          }}
+        />
+        {bulkProgress ? <span className="bulk-photo-progress">{bulkProgress}</span> : null}
+      </div>
+
+      {bulkMatches && (
+        <div className="bulk-photo-panel">
+          <strong>Сопоставление файлов с товарами</strong>
+          <p className="muted small" style={{ marginTop: 6 }}>
+            Имя файла (без расширения) сравнивается с кодом, кодом 1С и названием товара.
+          </p>
+          <div className="bulk-photo-list">
+            {bulkMatches.map((row) => (
+              <div
+                className={row.product ? "bulk-photo-row" : "bulk-photo-row miss"}
+                key={`${row.fileName}-${row.product?.id || "miss"}`}
+              >
+                <strong>{row.fileName}</strong>
+                <span>
+                  {row.product
+                    ? `→ ${row.product.name}${row.product.code ? ` (${row.product.code})` : ""}`
+                    : "→ не найден"}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="bulk-photo-actions">
+            <button
+              className="primary-button"
+              type="button"
+              disabled={bulkBusy || !bulkMatches.some((row) => row.product)}
+              onClick={() => void uploadBulkMatches()}
+            >
+              {bulkBusy ? (bulkProgress || "Загрузка…") : "Загрузить совпадения"}
+            </button>
+            <button className="secondary-button" type="button" disabled={bulkBusy} onClick={cancelBulkPhotos}>
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+
+      {bulkBanner && (
+        <SoftBanner
+          tone={bulkBanner.tone}
+          title={bulkBanner.title}
+          message={bulkBanner.message}
+          onDismiss={() => setBulkBanner(null)}
+        />
+      )}
+
       <div className="product-manager-list" style={{ marginTop: 14 }}>
-        <VirtualList
-          items={visible}
-          itemHeight={200}
-          height={Math.min(640, typeof window !== "undefined" ? Math.floor(window.innerHeight * 0.65) : 640)}
-          getItemKey={(product) => product.id}
-          renderItem={(product) => (
+        {visible.map((product) => (
         <article className={product.active ? "product-manager-row" : "product-manager-row inactive"} key={product.id}>
           <div className="product-manager-thumb">
             {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <span>Нет фото</span>}
@@ -742,7 +909,7 @@ export function ManagerProducts({ products, setProducts }) {
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
-                disabled={imageBusyId === product.id}
+                disabled={imageBusyId === product.id || bulkBusy}
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   uploadImage(product, file);
@@ -755,8 +922,7 @@ export function ManagerProducts({ products, setProducts }) {
             <button className="secondary-button" type="button" onClick={() => setProducts((current) => current.map((item) => item.id === product.id ? { ...item, active: !item.active } : item))}>{product.active ? "Скрыть" : "Показать"}</button>
           </div>
         </article>
-          )}
-        />
+        ))}
       </div>
       {editorProduct !== undefined && <ProductEditor product={editorProduct} onClose={() => setEditorProduct(undefined)} onSave={save} />}
     </section>

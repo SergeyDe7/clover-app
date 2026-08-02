@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#5b9d57" />
+    <title>Clover — нет связи</title>
+    <link rel="icon" type="image/png" href="/icon-192.png" />
+    <style>
+      :root {
+        --clover-green: #5b9d57;
+        --clover-green-hover: #4d8b49;
+        --clover-green-deep: #386f37;
+        --clover-bg: #f4f8f2;
+        --clover-text: #293329;
+        --clover-muted: #5f6b5f;
+        --clover-border: #dce6d8;
+        --radius-sm: 12px;
+        --font-ui: "Segoe UI", system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        font-family: var(--font-ui);
+        color: var(--clover-text);
+        background:
+          radial-gradient(circle at top left, #eef8eb 0, transparent 42%),
+          linear-gradient(135deg, #f9fcf7, #e5f2df);
+      }
+      .card {
+        width: min(420px, 100%);
+        padding: 28px 24px;
+        border-radius: 16px;
+        border: 1px solid var(--clover-border);
+        background: #fff;
+        box-shadow: 0 14px 36px rgba(48, 82, 45, 0.1);
+        text-align: center;
+      }
+      .mark {
+        width: 56px;
+        height: 56px;
+        margin: 0 auto 16px;
+        border-radius: 50%;
+        background:
+          radial-gradient(circle at 35% 30%, #fff 0 18%, transparent 19%),
+          linear-gradient(145deg, #7bb876, var(--clover-green-deep));
+        box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.35);
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.35rem;
+        font-weight: 800;
+      }
+      p {
+        margin: 0 0 20px;
+        color: var(--clover-muted);
+        line-height: 1.5;
+        font-size: 0.95rem;
+      }
+      button {
+        min-height: 44px;
+        min-width: 140px;
+        padding: 10px 18px;
+        border: 0;
+        border-radius: var(--radius-sm);
+        background: var(--clover-green);
+        color: #fff;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:hover { background: var(--clover-green-hover); }
+      button:focus-visible {
+        outline: 3px solid var(--clover-green-deep);
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <div class="mark" aria-hidden="true"></div>
+      <h1>Нет связи</h1>
+      <p>Проверьте интернет и попробуйте снова. Clover откроется, как только сеть вернётся.</p>
+      <button type="button" onclick="location.reload()">Повторить</button>
+    </main>
+  </body>
+</html>

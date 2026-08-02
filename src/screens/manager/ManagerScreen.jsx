@@ -41,11 +41,15 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
 
   const openFromNotification = (item) => {
     selectTab(managerNotificationTab(item));
-    // managerNotificationTab уже пишет moreTab в localStorage при acts/settings
     setMoreTab(readManagerMoreTab());
     setBellOpen(false);
     onReadNotification(item);
   };
+
+  const newActsCount = useMemo(
+    () => (reconciliationRequests || []).filter((item) => item.status === "new").length,
+    [reconciliationRequests]
+  );
   const clients = useMemo(() => {
     const map = new Map(
       (serverClients || []).map((client) => [
@@ -102,7 +106,6 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
   return <main className="clover-app">
     <Header
       title="Кабинет менеджера"
-      subtitle="Заказы · клиенты · товары · 1С"
       onLogout={onLogout}
     >
       <div className="manager-header-tools">
@@ -175,7 +178,23 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
         <article className="stat-card"><span>Ошибки 1С</span><strong>{exchangeErrors}</strong></article>
         <article className="stat-card"><span>Непрочитано</span><strong>{unreadCount}</strong></article>
       </div>
-      <nav className="manager-nav" aria-label="Разделы менеджера">{MANAGER_TABS.map(([id,label]) => <button className={[tab === id ? "active" : "", id === "more" ? "nav-service" : ""].filter(Boolean).join(" ")} type="button" key={id} onClick={() => selectTab(id)}>{label}</button>)}</nav>
+      <nav className="manager-nav" aria-label="Разделы менеджера">
+        {MANAGER_TABS.map(([id, label]) => (
+          <button
+            className={tab === id ? "active" : ""}
+            type="button"
+            key={id}
+            onClick={() => selectTab(id)}
+          >
+            {label}
+            {id === "acts" && newActsCount > 0 ? (
+              <span className="manager-nav-count" aria-label={`Новых запросов: ${newActsCount}`}>
+                {newActsCount}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </nav>
       {tab === "orders" && (
         <ManagerOrders
           orders={orders}
@@ -198,6 +217,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
       {tab === "exchange" && <ManagerExchange onReload={onReload} onApplyManagerNotifications={onApplyManagerNotifications} onNavigate={selectTab} />}
       {tab === "clients" && <ManagerClients clients={clients} orders={orders} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} onReload={onReload} />}
       {tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}
+      {tab === "acts" && <ManagerReconciliation requests={reconciliationRequests} onReload={onReload} />}
       {tab === "more" && (
         <section>
           <nav className="manager-more-nav" aria-label="Дополнительно">
@@ -212,7 +232,6 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
               </button>
             ))}
           </nav>
-          {moreTab === "acts" && <ManagerReconciliation requests={reconciliationRequests} onReload={onReload} />}
           {moreTab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} authUser={authUser} />}
           {moreTab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} onReload={onReload} />}
           {moreTab === "audit" && <ManagerAudit />}

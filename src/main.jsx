@@ -14,7 +14,7 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-const CLOVER_UI_BUILD = "ui-20260802-v54";
+const CLOVER_UI_BUILD = "ui-20260802-v88";
 const BOOT_SPLASH_MS = 1000;
 
 function hideBootSplash() {
@@ -66,9 +66,9 @@ async function refreshServiceWorkerIfNeeded() {
     console.error("Не удалось зарегистрировать PWA Clover", error);
   });
 
-  // Один принудительный reload, чтобы телефон точно взял новый JS/CSS.
+  // Не silent reload: App показывает SoftBanner «Обновить».
   if (previous) {
-    window.location.reload();
+    window.dispatchEvent(new CustomEvent("clover:update-available"));
   }
 }
 

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "./AddressManager.css";
+import { appConfirm } from "../shared/AppModal";
 
 const EMPTY_FORM = {
   label: "",
@@ -87,7 +88,7 @@ function AddressManager({ addresses, onChange }) {
     );
   };
 
-  const deleteAddress = (addressId) => {
+  const deleteAddress = async (addressId) => {
     const addressToDelete = addresses.find(
       (item) => item.id === addressId
     );
@@ -96,9 +97,13 @@ function AddressManager({ addresses, onChange }) {
       return;
     }
 
-    const shouldDelete = window.confirm(
-      `Удалить адрес «${addressToDelete.label}»?`
-    );
+    const shouldDelete = await appConfirm({
+      title: "Удалить адрес?",
+      message: `Удалить адрес «${addressToDelete.label}»?`,
+      confirmLabel: "Удалить",
+      cancelLabel: "Отмена",
+      tone: "danger",
+    });
 
     if (!shouldDelete) {
       return;

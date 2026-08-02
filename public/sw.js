@@ -1,5 +1,12 @@
-const CACHE_NAME = "clover-v18-shell-v54";
-const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/clover-logo.png"];
+const CACHE_NAME = "clover-v18-shell-v88";
+const SHELL = [
+  "/",
+  "/offline.html",
+  "/manifest.webmanifest",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/clover-logo.png",
+];
 
 async function applyPushBadge(data) {
   if (!self.registration?.setAppBadge) return;
@@ -56,7 +63,11 @@ self.addEventListener("fetch", (event) => {
         if (cached) return cached;
         // Нельзя отдавать HTML вместо JS/CSS — это даёт пустой экран.
         if (request.mode === "navigate") {
-          return (await caches.match("/")) || Response.error();
+          return (
+            (await caches.match("/offline.html"))
+            || (await caches.match("/"))
+            || Response.error()
+          );
         }
         return Response.error();
       })

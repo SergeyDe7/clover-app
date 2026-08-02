@@ -5,10 +5,10 @@ const MANAGER_NOTIFICATION_META = {
   new_order: { label: "Новый заказ", tab: "orders" },
   order_changed: { label: "Заказ изменён", tab: "orders" },
   order_deleted: { label: "Заказ удалён", tab: "orders" },
-  custom_item: { label: "Товар вне матрицы", tab: "orders" },
-  reconciliation_request: { label: "Акт сверки", tab: "more", moreTab: "acts" },
+  custom_item: { label: "Нужен новый товар", tab: "orders" },
+  reconciliation_request: { label: "Акт сверки", tab: "acts" },
   client_registration: { label: "Новый клиент", tab: "clients" },
-  onec_error: { label: "Ошибка 1С", tab: "exchange" },
+  onec_error: { label: "Не удалось передать в 1С", tab: "exchange" },
   test: { label: "Тест", tab: "more", moreTab: "settings" },
 };
 
