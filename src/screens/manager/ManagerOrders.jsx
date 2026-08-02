@@ -20,6 +20,7 @@ import {
   buildOrderSearchHaystack,
 } from "../../shared/appHelpers";
 import { canTrashOrder } from "../../shared/orderTrash";
+import { appAlert } from "../../shared/AppModal";
 
 const CUSTOM_STATUSES = [
   "Новый запрос",
@@ -30,10 +31,22 @@ const CUSTOM_STATUSES = [
 ];
 
 function exchangeSendLabel(exchange) {
-  if (exchange.status === "sending") return "Ожидает ACK 1С";
-  if (exchange.status === "ready") return "Обновить очередь";
-  if (exchange.status === "sent" || exchange.status === "error") return "Передать повторно";
-  return "Передать в 1С TEST";
+  if (exchange.status === "sending") return "Ожидает ответ 1С…";
+  if (exchange.status === "ready" || exchange.status === "sent" || exchange.status === "draft") {
+    return "Передано в 1С";
+  }
+  if (exchange.status === "error") return "Передать повторно";
+  return "Передать в 1С";
+}
+
+function exchangeSendButtonClass(exchange) {
+  if (exchange.status === "ready" || exchange.status === "sending" || exchange.status === "sent" || exchange.status === "draft") {
+    return "manager-send-onec-button manager-send-onec-done";
+  }
+  if (exchange.status === "error") {
+    return "manager-send-onec-button manager-send-onec-retry";
+  }
+  return "manager-send-onec-button manager-send-onec-idle";
 }
 export function ManagerOrders({
   orders,
@@ -83,6 +96,17 @@ export function ManagerOrders({
   }, [sourceOrders, effectiveSearch, status, exchangeFilter, sort, clientLinks, inTrash]);
 
   const runExchangeAction = async (order, action) => {
+    const exchange = normalizeOrderExchange(order.exchange);
+    // Уже в очереди / принято: повторный клик в обычной работе не нужен.
+    if (
+      action === "send"
+      && (exchange.status === "ready"
+        || exchange.status === "sending"
+        || exchange.status === "draft"
+        || exchange.status === "sent")
+    ) {
+      return;
+    }
     setBusyOrderId(order.id);
     try {
       if (action === "send") {
@@ -90,11 +114,14 @@ export function ManagerOrders({
         if (Array.isArray(result.managerNotifications)) {
           onApplyManagerNotifications?.(result.managerNotifications);
         }
-        alert(result.exchange?.message || "Тестовая передача выполнена.");
       }
       await onReload();
     } catch (error) {
-      alert(error.message);
+      await appAlert({
+        title: "Не удалось передать в 1С",
+        message: error.message,
+        tone: "danger",
+      });
       await onReload();
     } finally {
       setBusyOrderId("");
@@ -317,12 +344,33 @@ export function ManagerOrders({
               ) : (
                 <>
                   <button
-                    className="primary-button manager-send-onec-button"
-                    disabled={busy || exchange.status === "sending"}
+                    className={
+                      busy && (exchange.status === "not_sent" || exchange.status === "error")
+                        ? "manager-send-onec-button manager-send-onec-done"
+                        : exchangeSendButtonClass(exchange)
+                    }
+                    disabled={
+                      busy
+                      || exchange.status === "sending"
+                      || exchange.status === "ready"
+                      || exchange.status === "draft"
+                      || exchange.status === "sent"
+                    }
                     type="button"
+                    title={
+                      exchange.status === "ready"
+                        ? "Заказ уже в очереди 1С. 1С сама заберёт его при следующем обмене."
+                        : exchange.status === "sent" || exchange.status === "draft"
+                          ? "Заказ уже передан в 1С."
+                          : exchange.status === "sending"
+                            ? "Ждём подтверждение от 1С"
+                            : exchange.status === "error"
+                              ? "Произошла ошибка — нажмите, чтобы передать снова"
+                              : "Поставить заказ в очередь обмена с 1С"
+                    }
                     onClick={() => runExchangeAction(order, "send")}
                   >
-                    {exchangeSendLabel(exchange)}
+                    {busy ? "Передача…" : exchangeSendLabel(exchange)}
                   </button>
                   <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
                   {settings.managerCanDeleteOrders && canTrashOrder(order, "manager").ok && (
@@ -345,7 +393,83 @@ export function ManagerOrders({
               {exchange.message}{exchange.receipt ? ` · квитанция ${exchange.receipt}` : ""}
             </div>
           )}
-          {!inTrash && (
+          {inTrash ? (
+            <details className="order-details" open={false}>
+              <summary>Состав удалённого заказа</summary>
+              <div className="order-products">
+                {(order.items || []).map((item) => (
+                  <div className="order-product" key={`${order.id}-${item.productId ?? item.id}`}>
+                    <span>
+                      {item.name}
+                      <small>{item.code || item.category} · ID 1С: {item.oneCId || "—"}</small>
+                    </span>
+                    <strong>
+                      {item.quantity} {UNIT_CONFIG[item.unit]?.shortLabel || item.unit}
+                      <small>
+                        {settings.showPrices && item.lineTotal > 0
+                          ? formatMoney(item.lineTotal)
+                          : item.multiplier > 1
+                            ? `${item.quantity * item.multiplier} шт. всего`
+                            : ""}
+                      </small>
+                    </strong>
+                  </div>
+                ))}
+                {(order.customItems || []).map((item) => (
+                  <div className="custom-line" key={`${order.id}-${item.id}`}>
+                    <div className="order-product" style={{ border: 0, paddingTop: 0 }}>
+                      <span>
+                        <span className="badge yellow">Товар вне матрицы</span>
+                        {item.name}
+                        <small>{item.details}</small>
+                        {item.managerComment ? <small>Менеджер: {item.managerComment}</small> : null}
+                      </span>
+                      <strong>
+                        {item.quantity} {item.unit}
+                        <small>
+                          {Number(item.unitPrice) > 0
+                            ? formatMoney(item.unitPrice * item.quantity)
+                            : "Цена уточняется"}
+                        </small>
+                      </strong>
+                    </div>
+                    {item.photo?.dataUrl && (
+                      <div className="manager-request-photo-block">
+                        <strong>Фотография клиента</strong>
+                        <CustomRequestPhoto photo={item.photo} className="custom-request-photo-manager" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {!(order.items || []).length && !(order.customItems || []).length && (
+                  <p className="muted small">Позиции в заказе не сохранены.</p>
+                )}
+              </div>
+              {(order.clientComment || order.managerComment || order.internalNote) && (
+                <div className="manager-textareas" style={{ marginTop: 12 }}>
+                  {order.clientComment ? (
+                    <div className="comment-box">
+                      <strong>Комментарий клиента</strong>
+                      <p>{order.clientComment}</p>
+                    </div>
+                  ) : null}
+                  {order.managerComment ? (
+                    <div className="comment-box">
+                      <strong>Комментарий клиенту</strong>
+                      <p>{order.managerComment}</p>
+                    </div>
+                  ) : null}
+                  {order.internalNote ? (
+                    <div className="comment-box">
+                      <strong>Внутренняя заметка</strong>
+                      <p>{order.internalNote}</p>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+              <OrderTimeline order={order} />
+            </details>
+          ) : (
           <details className="order-details" open={false}>
             <summary>Состав и обработка заказа</summary>
             <div className="order-products">

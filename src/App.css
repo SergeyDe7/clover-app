@@ -4,8 +4,8 @@ body{margin:0;min-height:100vh;font-family:"Manrope","Segoe UI",system-ui,sans-s
 button,input{font:inherit}
 button{cursor:pointer}
 .page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:30px 16px;background:radial-gradient(circle at top left,#eef8eb 0,transparent 42%),linear-gradient(135deg,#f9fcf7,#e5f2df)}
-.login-card{width:100%;max-width:440px;padding:42px 38px;background:rgba(255,255,255,.96);border:1px solid rgba(86,156,80,.15);border-radius:16px;box-shadow:0 14px 36px rgba(48,82,45,.1);text-align:center}
-.logo{width:230px;max-width:85%;height:auto;margin-bottom:22px}
+.login-card{width:100%;max-width:460px;padding:40px 36px 38px;background:rgba(255,255,255,.96);border:1px solid rgba(86,156,80,.15);border-radius:16px;box-shadow:0 14px 36px rgba(48,82,45,.1);text-align:center}
+.logo{width:min(280px,78%);max-width:280px;height:auto;margin:0 auto 18px}
 .login-card h1{margin:0 0 10px;font-size:30px;color:#386f37}
 .subtitle{margin:0 0 30px;color:#6d786d;line-height:1.5}
 .login-form{display:flex;flex-direction:column;text-align:left}

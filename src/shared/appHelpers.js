@@ -706,10 +706,10 @@ textarea { resize: vertical; }
 
 .login-card .logo {
   display: block;
-  width: 230px;
-  max-width: 85%;
+  width: min(280px, 78%);
+  max-width: 280px;
   height: auto;
-  margin: 0 auto 22px;
+  margin: 0 auto 18px;
   object-fit: contain;
 }
 
@@ -720,6 +720,25 @@ textarea { resize: vertical; }
   padding: 24px;
   background: var(--clover-bg, #f4f8f2);
   font-family: "Manrope", "Segoe UI", system-ui, sans-serif;
+}
+.loading-page-quiet {
+  padding: 0;
+  place-items: stretch;
+}
+.loading-quiet-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 3px;
+  border-radius: 0 2px 2px 0;
+  background: #5b9d57;
+  animation: loading-quiet-slide 1.1s ease-in-out infinite;
+}
+@keyframes loading-quiet-slide {
+  0% { transform: translateX(-120%); width: 30%; }
+  50% { width: 55%; }
+  100% { transform: translateX(340%); width: 30%; }
 }
 .loading-card {
   width: min(420px, 100%);
@@ -1382,6 +1401,16 @@ textarea { resize: vertical; }
   margin-bottom: 14px;
 }
 .delivery-date-sheet-head strong { color: #394639; font-size: 16px; }
+.delivery-date-sheet-submit {
+  width: 100%;
+  margin-top: 16px;
+  min-height: 48px;
+}
+.delivery-date-sheet-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.15);
+}
 .delivery-date-preview {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
@@ -1671,17 +1700,78 @@ html.clover-thankyou-open .app-header {
 }
 .order-thankyou-spark {
   position: absolute;
-  width: 10px;
-  height: 10px;
   border-radius: 50%;
-  background: #6fba63;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.55), rgba(111, 186, 99, 0.35) 55%, rgba(74, 148, 78, 0));
   opacity: 0;
   pointer-events: none;
-  animation: order-thankyou-spark 2.8s ease-in-out infinite;
+  animation: order-thankyou-spark 4.6s ease-in-out infinite;
+  filter: blur(0.2px);
 }
-.order-thankyou-spark-a { top: 18%; left: 18%; animation-delay: 0.15s; }
-.order-thankyou-spark-b { top: 28%; right: 16%; width: 14px; height: 14px; background: #4a944e; animation-delay: 0.55s; }
-.order-thankyou-spark-c { bottom: 22%; left: 28%; width: 8px; height: 8px; background: #8fd07f; animation-delay: 0.95s; }
+/* Точки вокруг центра поздравления — разный диаметр, мягкая прозрачность */
+.order-thankyou-spark-1 {
+  top: 22%;
+  left: 18%;
+  width: 7px;
+  height: 7px;
+  animation-delay: 0.1s;
+  animation-duration: 4.8s;
+}
+.order-thankyou-spark-2 {
+  top: 16%;
+  right: 22%;
+  width: 12px;
+  height: 12px;
+  animation-delay: 0.55s;
+  animation-duration: 5.2s;
+}
+.order-thankyou-spark-3 {
+  top: 38%;
+  left: 10%;
+  width: 5px;
+  height: 5px;
+  animation-delay: 1.1s;
+  animation-duration: 4.4s;
+}
+.order-thankyou-spark-4 {
+  top: 34%;
+  right: 12%;
+  width: 9px;
+  height: 9px;
+  animation-delay: 0.8s;
+  animation-duration: 5s;
+}
+.order-thankyou-spark-5 {
+  bottom: 34%;
+  left: 16%;
+  width: 6px;
+  height: 6px;
+  animation-delay: 1.6s;
+  animation-duration: 4.7s;
+}
+.order-thankyou-spark-6 {
+  bottom: 30%;
+  right: 18%;
+  width: 14px;
+  height: 14px;
+  animation-delay: 0.35s;
+  animation-duration: 5.4s;
+}
+.order-thankyou-spark-7 {
+  bottom: 18%;
+  left: 38%;
+  width: 4px;
+  height: 4px;
+  animation-delay: 2s;
+  animation-duration: 4.2s;
+}
+.order-thankyou-spark-8 {
+  top: 48%;
+  right: 8%;
+  width: 8px;
+  height: 8px;
+  animation-delay: 1.35s;
+  animation-duration: 4.9s;
+}
 .order-thankyou-card {
   position: relative;
   z-index: 1;
@@ -1690,19 +1780,23 @@ html.clover-thankyou-open .app-header {
   gap: 10px;
   width: min(420px, 100%);
   padding: 28px 22px 24px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 18px 48px rgba(47, 90, 50, 0.18);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   text-align: center;
   cursor: default;
+  overflow: visible;
   animation: order-thankyou-card-in 0.7s cubic-bezier(0.2, 0.9, 0.2, 1) both;
 }
 .order-thankyou-mobile .order-thankyou-card {
   animation: order-thankyou-fade-in 0.45s ease-out both;
 }
+.order-thankyou-mobile .order-thankyou-logo-wrap {
+  width: min(280px, 78vw);
+}
 .order-thankyou-mobile .order-thankyou-logo {
-  width: min(200px, 55vw);
+  width: 100%;
 }
 .order-thankyou-mobile .order-thankyou-title {
   font-size: clamp(24px, 7vw, 32px);
@@ -1711,10 +1805,30 @@ html.clover-thankyou-open .app-header {
   width: min(280px, 100%);
   min-height: 52px;
 }
+.order-thankyou-logo-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(240px, 72vw);
+  overflow: visible;
+  padding: 18px;
+  box-sizing: content-box;
+}
 .order-thankyou-logo {
-  width: min(168px, 58vw);
+  display: block;
+  width: 100%;
   height: auto;
-  animation: order-thankyou-logo-in 0.85s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  transform-origin: center center;
+  animation: thankyou-logo-tilt 5s ease-in-out forwards;
+}
+@keyframes thankyou-logo-tilt {
+  0% { opacity: 0; transform: scale(0.94) rotate(-8deg); }
+  14% { opacity: 1; transform: scale(1.04) rotate(5deg); }
+  32% { transform: scale(0.99) rotate(-4deg); }
+  50% { transform: scale(1.03) rotate(3deg); }
+  68% { transform: scale(0.99) rotate(-1.5deg); }
+  86% { transform: scale(1.01) rotate(0.6deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
 }
 .order-thankyou-brand {
   margin: 4px 0 0;
@@ -1756,11 +1870,6 @@ html.clover-thankyou-open .app-header {
   from { opacity: 0; transform: translateY(18px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-@keyframes order-thankyou-logo-in {
-  0% { opacity: 0; transform: scale(0.7) rotate(-6deg); }
-  60% { opacity: 1; transform: scale(1.06) rotate(2deg); }
-  100% { opacity: 1; transform: scale(1) rotate(0deg); }
-}
 @keyframes order-thankyou-text-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -1770,14 +1879,16 @@ html.clover-thankyou-open .app-header {
   50% { transform: scale(1.08); opacity: 0.9; }
 }
 @keyframes order-thankyou-spark {
-  0%, 100% { opacity: 0; transform: translateY(0) scale(0.6); }
-  35% { opacity: 0.85; transform: translateY(-14px) scale(1); }
-  70% { opacity: 0.2; transform: translateY(-28px) scale(0.8); }
+  0%, 100% { opacity: 0; transform: translateY(0) scale(0.7); }
+  30% { opacity: 0.28; transform: translateY(-8px) scale(1); }
+  55% { opacity: 0.14; transform: translateY(-14px) scale(0.92); }
+  80% { opacity: 0.05; transform: translateY(-18px) scale(0.8); }
 }
 @media (prefers-reduced-motion: reduce) {
   .order-thankyou,
   .order-thankyou-card,
   .order-thankyou-logo,
+  .order-thankyou-logo-wrap,
   .order-thankyou-brand,
   .order-thankyou-title,
   .order-thankyou-text,
@@ -2321,6 +2432,11 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     margin-bottom: 14px;
   }
   .delivery-date-sheet-head strong { color: #394639; font-size: 16px; }
+  .delivery-date-sheet-submit {
+    width: 100%;
+    margin-top: 14px;
+    min-height: 50px;
+  }
   .catalog-lead { display: none; }
   .embedded-catalog .page-title-row {
     display: none;

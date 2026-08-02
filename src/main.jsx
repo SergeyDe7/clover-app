@@ -3,14 +3,42 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import './styles/clover-theme.css'
 import App from './App.jsx'
+import { AppModalHost } from './shared/AppModal.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <>
+      <AppModalHost />
+      <App />
+    </>
   </StrictMode>,
 )
 
-const CLOVER_UI_BUILD = "ui-20260802-v30";
+const CLOVER_UI_BUILD = "ui-20260802-v54";
+const BOOT_SPLASH_MS = 1000;
+
+function hideBootSplash() {
+  const splash = document.getElementById("clover-boot-splash");
+  if (!splash || splash.dataset.done === "1") return;
+  splash.dataset.done = "1";
+  splash.classList.add("is-done");
+  window.setTimeout(() => {
+    splash.remove();
+  }, 420);
+}
+
+function scheduleBootSplashHide(startedAt) {
+  const elapsed = Date.now() - startedAt;
+  const wait = Math.max(0, BOOT_SPLASH_MS - elapsed);
+  window.setTimeout(hideBootSplash, wait);
+}
+
+const bootStartedAt = Date.now();
+if (document.readyState === "complete") {
+  scheduleBootSplashHide(bootStartedAt);
+} else {
+  window.addEventListener("load", () => scheduleBootSplashHide(bootStartedAt), { once: true });
+}
 
 async function refreshServiceWorkerIfNeeded() {
   if (!("serviceWorker" in navigator)) return;

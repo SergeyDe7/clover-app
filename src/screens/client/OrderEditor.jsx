@@ -20,6 +20,7 @@ import {
 import { ManagerContact } from "./ManagerContact";
 import { CustomItemForm } from "./CustomItemForm";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
+import { appAlert } from "../../shared/AppModal";
 
 function capitalizeRu(value) {
   if (!value) return "";
@@ -105,27 +106,34 @@ export function OrderEditor({
   const cartAddressFieldRef = useRef(null);
   const earliestDeliveryDate = getEarliestDeliveryDateIso();
 
-  const updateDeliveryDate = (value) => {
+  const updateDeliveryDate = async (value) => {
     if (!value) {
       setDeliveryDate("");
       return;
     }
     const check = validateDeliveryDate(value);
     if (!check.ok) {
-      alert(check.message);
+      await appAlert({
+        title: "Дата недоступна",
+        message: check.message,
+        tone: "warn",
+      });
       return;
     }
     setDeliveryDate(value);
     setMissingFields((current) => ({ ...current, date: false }));
   };
 
-  const handleCalendarPick = (result) => {
+  const handleCalendarPick = async (result) => {
     if (!result.ok) {
-      alert(result.message);
+      await appAlert({
+        title: "Дата недоступна",
+        message: result.message,
+        tone: "warn",
+      });
       return;
     }
-    updateDeliveryDate(result.value);
-    setDatePickerOpen(false);
+    await updateDeliveryDate(result.value);
   };
 
   const updateAddressId = (value) => {
@@ -236,25 +244,36 @@ export function OrderEditor({
     );
   };
 
-  const submitOrder = () => {
+  const submitOrder = async () => {
     if (!selectedItems.length && !customItems.length) {
-      return alert("Добавьте хотя бы один товар.");
+      await appAlert({
+        title: "Корзина пуста",
+        message: "Добавьте хотя бы один товар.",
+        tone: "warn",
+      });
+      return;
     }
     const dateMissing = !deliveryDate;
     const addressMissing = !selectedAddress;
     if (dateMissing || addressMissing) {
       focusMissingFields(dateMissing, addressMissing);
-      if (dateMissing && addressMissing) {
-        return alert("Укажите дату и адрес доставки.");
+      if (dateMissing) {
+        setDatePickerOpen(true);
+        return;
       }
-      if (dateMissing) return alert("Укажите дату доставки.");
-      return alert("Укажите адрес доставки.");
+      await appAlert({
+        title: "Укажите адрес доставки",
+        message: "Выберите адрес из списка или добавьте новый.",
+        tone: "warn",
+      });
+      return;
     }
     const dateCheck = validateDeliveryDate(deliveryDate);
     if (!dateCheck.ok) {
       focusMissingFields(true, false);
       setDeliveryDate("");
-      return alert(dateCheck.message);
+      setDatePickerOpen(true);
+      return;
     }
     setMissingFields({ date: false, address: false });
     onSave({
@@ -268,6 +287,12 @@ export function OrderEditor({
     });
     localStorage.removeItem(STORAGE.draft);
     setCartSheetOpen(false);
+  };
+
+  const confirmDeliveryDateAndSubmit = () => {
+    if (!deliveryDate || !validateDeliveryDate(deliveryDate).ok) return;
+    setDatePickerOpen(false);
+    void submitOrder();
   };
 
   const submit = (event) => {
@@ -711,6 +736,14 @@ export function OrderEditor({
                 earliestIso={earliestDeliveryDate}
                 onPick={handleCalendarPick}
               />
+              <button
+                className="primary-button save-order-button delivery-date-sheet-submit"
+                type="button"
+                disabled={!deliveryDate || !validateDeliveryDate(deliveryDate).ok}
+                onClick={confirmDeliveryDateAndSubmit}
+              >
+                {session.mode === "edit" ? "Сохранить изменения" : "Оформить заказ"}
+              </button>
             </div>
           </div>
         )}
