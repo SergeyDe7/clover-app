@@ -13,10 +13,11 @@
     "test:onec": "node scripts/verify-onec-products.mjs && node scripts/verify-onec-clients.mjs && node scripts/verify-create-product-from-onec.mjs && node scripts/verify-order-payload.mjs && node scripts/verify-db-preservation.mjs && node scripts/verify-client-management.mjs && node scripts/verify-product-editor-selection.mjs && node scripts/verify-client-pricing.mjs && node scripts/verify-client-pricing-ui.mjs && node scripts/verify-onec-price-sync.mjs && node scripts/verify-v17-ui.mjs && node scripts/verify-orders-hardening.mjs && node scripts/verify-onec-claim-auth.mjs && node scripts/verify-onec-claim-requeue-db.mjs && node scripts/verify-order-status-roles.mjs && node scripts/verify-onec-accepted-status.mjs && node scripts/verify-bootstrap-search-opt.mjs",
     "apply:onec-links": "node scripts/apply-onec-links.mjs",
     "test:v18": "node scripts/verify-v18.mjs",
-    "test:all": "npm run check && npm run test:onec && npm run test:v18 && npm run test:runtime && npm run test:manager-notifications && npm run test:manager-tabs",
+    "test:all": "npm run check && npm run test:onec && npm run test:v18 && npm run test:runtime && npm run test:manager-notifications && npm run test:manager-tabs && npm run test:order-trash",
     "test:runtime": "node scripts/verify-runtime-integrations.mjs",
     "test:manager-notifications": "node scripts/verify-manager-notifications.mjs",
-    "test:manager-tabs": "node scripts/verify-manager-tabs-smoke.mjs"
+    "test:manager-tabs": "node scripts/verify-manager-tabs-smoke.mjs",
+    "test:order-trash": "node scripts/verify-order-trash.mjs"
   },
   "dependencies": {
     "@simplewebauthn/server": "13.0.0",

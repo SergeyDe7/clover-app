@@ -277,48 +277,6 @@ export function OrderEditor({
 
   const catalogBody = (
       <section className={embedded ? "catalog-content embedded-catalog" : "catalog-content"}>
-        <div className="page-title-row">
-          <div>
-            <p className="eyebrow">Каталог</p>
-            <h1>
-              {session.mode === "edit"
-                ? "Редактирование заказа"
-                : session.mode === "repeat"
-                  ? "Повтор заказа"
-                  : "Новый заказ"}
-            </h1>
-            <p className="catalog-lead">Сверху — заказ и оформление, ниже — каталог товаров.</p>
-          </div>
-          <div className="mini-card"><span className="mini-label">Позиций</span><strong>{cartCount}</strong></div>
-        </div>
-
-        {catalogPolicy.matrixMode === "pending" && (
-          <div className="matrix-catalog-note pending">
-            Менеджер ещё подготавливает ваш постоянный список
-            товаров и персональные цены. Пока можно добавить товар
-            через форму «Не нашли нужный товар?».
-          </div>
-        )}
-
-        {catalogPolicy.allowFullCatalog && (
-          <div className="catalog-scope-switch">
-            <button
-              className={!showFullCatalog ? "active" : ""}
-              type="button"
-              onClick={() => setShowFullCatalog(false)}
-            >
-              Мои постоянные позиции
-            </button>
-            <button
-              className={showFullCatalog ? "active" : ""}
-              type="button"
-              onClick={() => setShowFullCatalog(true)}
-            >
-              Весь каталог
-            </button>
-          </div>
-        )}
-
         <div className="catalog-layout">
           <form className="order-summary" id="order-summary" onSubmit={submit}>
             <h2>Ваш заказ</h2>
@@ -413,7 +371,47 @@ export function OrderEditor({
             <button className="save-order-button" type="submit">{session.mode === "edit" ? "Сохранить изменения" : "Оформить заказ"}</button>
           </form>
 
-          <div>
+          <div className="catalog-main">
+            <div className="page-title-row">
+              <div>
+                <h1>
+                  {session.mode === "edit"
+                    ? "Редактирование заказа"
+                    : session.mode === "repeat"
+                      ? "Повтор заказа"
+                      : "Новый заказ"}
+                </h1>
+              </div>
+              <div className="mini-card"><span className="mini-label">Позиций</span><strong>{cartCount}</strong></div>
+            </div>
+
+            {catalogPolicy.matrixMode === "pending" && (
+              <div className="matrix-catalog-note pending">
+                Менеджер ещё подготавливает ваш постоянный список
+                товаров и персональные цены. Пока можно добавить товар
+                через форму «Не нашли нужный товар?».
+              </div>
+            )}
+
+            {catalogPolicy.allowFullCatalog && (
+              <div className="catalog-scope-switch">
+                <button
+                  className={!showFullCatalog ? "active" : ""}
+                  type="button"
+                  onClick={() => setShowFullCatalog(false)}
+                >
+                  Мои постоянные позиции
+                </button>
+                <button
+                  className={showFullCatalog ? "active" : ""}
+                  type="button"
+                  onClick={() => setShowFullCatalog(true)}
+                >
+                  Весь каталог
+                </button>
+              </div>
+            )}
+
             <div className="catalog-toolbar">
               <div className="catalog-filter-row">
                 <input className="catalog-search" type="search" placeholder="Поиск по названию или коду" value={search} onChange={(e) => setSearch(e.target.value)} />

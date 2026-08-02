@@ -48,6 +48,43 @@ export function findClientOrderMatrixViolations(orders, rawLink = {}, products =
   return violations;
 }
 
+function itemsFingerprint(order) {
+  return JSON.stringify(
+    (Array.isArray(order?.items) ? order.items : [])
+      .map((item) => ({
+        productId: cleanId(item?.productId ?? item?.id),
+        quantity: Number(item?.quantity) || 0,
+        unit: String(item?.unit || ""),
+      }))
+      .sort((a, b) => a.productId.localeCompare(b.productId))
+  );
+}
+
+/**
+ * Матрицу проверяем только у новых заказов и у тех, где изменился состав items.
+ * Старые неизменённые заказы не должны блокировать сохранение нового.
+ */
+export function ordersRequiringMatrixCheck(orders, previousById) {
+  const map =
+    previousById instanceof Map
+      ? previousById
+      : new Map(
+          (Array.isArray(previousById) ? previousById : []).map((order) => [
+            String(order?.id || ""),
+            order,
+          ])
+        );
+
+  return (Array.isArray(orders) ? orders : []).filter((order) => {
+    const id = cleanId(order?.id);
+    if (!id) return true;
+    if (String(order?.deletedAt || "").trim()) return false;
+    const previous = map.get(id);
+    if (!previous) return true;
+    return itemsFingerprint(order) !== itemsFingerprint(previous);
+  });
+}
+
 export function isMatrixProductForLink(rawLink = {}, productId) {
   const matrixMode = String(rawLink?.matrixMode || "pending");
   if (matrixMode === "all") return true;

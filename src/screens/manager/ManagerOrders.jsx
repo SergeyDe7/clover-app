@@ -2,7 +2,6 @@
 import { useMemo, useState } from "react";
 import { api } from "../../serverApi";
 import { ORDER_STATUSES, allowedNextOrderStatuses } from "../../config/orderConfig";
-import { VirtualList } from "../../components/VirtualList";
 import { CustomRequestPhoto, OrderTimeline } from "../../shared/SharedPanels";
 import {
   UNIT_CONFIG,
@@ -10,7 +9,6 @@ import {
   EXCHANGE_STATUS_LABELS,
   normalizeOrderExchange,
   exchangeBadgeClass,
-  downloadBlobFile,
   printOrderDocument,
   formatDate,
   formatDateTime,
@@ -21,6 +19,7 @@ import {
   matchesTextSearch,
   buildOrderSearchHaystack,
 } from "../../shared/appHelpers";
+import { canTrashOrder } from "../../shared/orderTrash";
 
 const CUSTOM_STATUSES = [
   "Новый запрос",
@@ -30,8 +29,29 @@ const CUSTOM_STATUSES = [
   "Отклонён",
 ];
 
-export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onCreateProductFromCustom, onReload, onApplyManagerNotifications, headerSearch = "", clientLinks = {} }) {
-  const [search, setSearch] = useState("");
+function exchangeSendLabel(exchange) {
+  if (exchange.status === "sending") return "Ожидает ACK 1С";
+  if (exchange.status === "ready") return "Обновить очередь";
+  if (exchange.status === "sent" || exchange.status === "error") return "Передать повторно";
+  return "Передать в 1С TEST";
+}
+export function ManagerOrders({
+  orders,
+  trashedOrders = [],
+  ordersView = "active",
+  onOrdersViewChange,
+  settings,
+  onUpdateOrder,
+  onBulkUpdateOrders,
+  onDeleteOrder,
+  onRestoreOrder,
+  onPurgeOrder,
+  onCreateProductFromCustom,
+  onReload,
+  onApplyManagerNotifications,
+  headerSearch = "",
+  clientLinks = {},
+}) {
   const [status, setStatus] = useState("Все");
   const [exchangeFilter, setExchangeFilter] = useState("all");
   const [sort, setSort] = useState("newest");
@@ -39,57 +59,43 @@ export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrd
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkStatus, setBulkStatus] = useState("Принят");
   const [bulkBusy, setBulkBusy] = useState(false);
-  const effectiveSearch = headerSearch.trim() || search;
+  const [bulkPanelOpen, setBulkPanelOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const effectiveSearch = headerSearch.trim();
+  const filtersActive = status !== "Все" || exchangeFilter !== "all" || sort !== "newest";
+  const inTrash = ordersView === "trash";
+  const sourceOrders = inTrash ? trashedOrders : orders;
 
   const visible = useMemo(() => {
     const needle = effectiveSearch.trim();
-    return [...orders].filter((order) => {
+    return [...sourceOrders].filter((order) => {
       const exchange = normalizeOrderExchange(order.exchange);
       const link = clientLinks[order.clientId] || {};
       const haystack = buildOrderSearchHaystack(order, link);
       return (!needle || matchesTextSearch(haystack, needle))
-        && (status === "Все" || order.status === status)
-        && (exchangeFilter === "all" || exchange.status === exchangeFilter);
+        && (inTrash || status === "Все" || order.status === status)
+        && (inTrash || exchangeFilter === "all" || exchange.status === exchangeFilter);
     }).sort((a, b) => {
       if (sort === "delivery") return String(a.firstDeliveryDate).localeCompare(String(b.firstDeliveryDate));
       if (sort === "oldest") return String(a.createdAt).localeCompare(String(b.createdAt));
-      return String(b.createdAt).localeCompare(String(a.createdAt));
+      return String(b.createdAt || b.deletedAt || "").localeCompare(String(a.createdAt || a.deletedAt || ""));
     });
-  }, [orders, effectiveSearch, status, exchangeFilter, sort, clientLinks]);
+  }, [sourceOrders, effectiveSearch, status, exchangeFilter, sort, clientLinks, inTrash]);
 
   const runExchangeAction = async (order, action) => {
     setBusyOrderId(order.id);
     try {
-      if (action === "check") {
-        const result = await api.checkExchangeOrder(order.id);
-        alert(result.validation?.ready
-          ? "Проверка пройдена. Для отправки нажмите «Передать в 1С TEST»."
-          : (result.validation?.issues || []).join("\n"));
-      } else if (action === "send") {
+      if (action === "send") {
         const result = await api.sendExchangeOrder(order.id);
         if (Array.isArray(result.managerNotifications)) {
           onApplyManagerNotifications?.(result.managerNotifications);
         }
         alert(result.exchange?.message || "Тестовая передача выполнена.");
-      } else if (action === "reset") {
-        await api.resetExchangeOrder(order.id);
       }
       await onReload();
     } catch (error) {
       alert(error.message);
       await onReload();
-    } finally {
-      setBusyOrderId("");
-    }
-  };
-
-  const downloadOrder = async (order, format) => {
-    setBusyOrderId(order.id);
-    try {
-      const blob = await api.downloadExchangeOrder(order.id, format);
-      downloadBlobFile(blob, `clover-order-${order.number || order.id}-1c.${format}`);
-    } catch (error) {
-      alert(error.message);
     } finally {
       setBusyOrderId("");
     }
@@ -162,96 +168,184 @@ export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrd
 
   return (
     <section>
-      <div className="toolbar four">
-        {!headerSearch.trim() && (
-          <div className="manager-search-block">
-            <input
-              type="search"
-              placeholder="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              aria-label="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
-            />
-          </div>
-        )}
-        <select value={status} onChange={(e) => setStatus(e.target.value)}><option>Все</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
-        <select value={exchangeFilter} onChange={(e) => setExchangeFilter(e.target.value)}><option value="all">Все статусы 1С</option>{Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select>
-        <select value={sort} onChange={(e) => setSort(e.target.value)}><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="delivery">По дате доставки</option></select>
-      </div>
-      <div className="panel" style={{ marginTop: 14, marginBottom: 18, padding: 16 }}>
-        <div className="toolbar four">
-          <button className="secondary-button" type="button" onClick={selectVisible}>
-            {visible.length > 0 && visible.every((order) => selectedIds.includes(order.id))
-              ? "Снять выбор с видимых"
-              : "Выбрать все видимые"}
-          </button>
-          <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
-            {ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}
-          </select>
-          <button className="primary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={applyBulkStatus}>
-            Изменить статус ({selectedIds.length})
-          </button>
-          <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => runBulkExchange("check")}>
-            Проверить выбранные в 1С
-          </button>
-        </div>
-        <div className="exchange-actions" style={{ marginTop: 10 }}>
-          <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => runBulkExchange("send")}>
-            Тестово передать выбранные
-          </button>
-          {selectedIds.length > 0 && <button className="secondary-button" type="button" onClick={() => setSelectedIds([])}>Очистить выбор</button>}
-          <span className="muted small">Выбрано заказов: {selectedIds.length}</span>
-        </div>
+      <div className="manager-orders-view-switch category-list" style={{ marginBottom: 14 }}>
+        <button
+          className={ordersView === "active" ? "category-button active" : "category-button"}
+          type="button"
+          onClick={() => onOrdersViewChange?.("active")}
+        >
+          Заказы ({orders.length})
+        </button>
+        <button
+          className={ordersView === "trash" ? "category-button active" : "category-button"}
+          type="button"
+          onClick={() => onOrdersViewChange?.("trash")}
+        >
+          Корзина ({trashedOrders.length})
+        </button>
       </div>
 
-      {visible.length ? <VirtualList className="manager-grid" items={visible} itemHeight={400} height={Math.min(720, typeof window !== "undefined" ? Math.floor(window.innerHeight * 0.72) : 720)} getItemKey={(order) => order.id} renderItem={(order) => {
+      {!inTrash && (
+      <div className="manager-orders-tools">
+        <button
+          className="secondary-button manager-filters-toggle"
+          type="button"
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((open) => !open)}
+        >
+          {filtersOpen ? "Скрыть фильтры" : "Фильтры"}
+          {!filtersOpen && filtersActive ? " · изменены" : ""}
+        </button>
+        <button
+          className="secondary-button manager-bulk-toggle"
+          type="button"
+          aria-expanded={bulkPanelOpen}
+          onClick={() => setBulkPanelOpen((open) => !open)}
+        >
+          {bulkPanelOpen ? "Скрыть действия" : "Массовые действия"}
+          {selectedIds.length > 0 ? ` · ${selectedIds.length}` : ""}
+        </button>
+      </div>
+      )}
+
+      {!inTrash && filtersOpen && (
+        <div className="toolbar three manager-orders-filters">
+          <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Фильтр статуса заказа"><option>Все</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
+          <select value={exchangeFilter} onChange={(e) => setExchangeFilter(e.target.value)} aria-label="Фильтр статуса 1С"><option value="all">Все статусы 1С</option>{Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select>
+          <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Сортировка заказов"><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="delivery">По дате доставки</option></select>
+        </div>
+      )}
+
+      {!inTrash && bulkPanelOpen && (
+        <div className="panel manager-bulk-panel">
+          <div className="toolbar four">
+            <button className="secondary-button" type="button" onClick={selectVisible}>
+              {visible.length > 0 && visible.every((order) => selectedIds.includes(order.id))
+                ? "Снять выбор с видимых"
+                : "Выбрать все видимые"}
+            </button>
+            <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} aria-label="Статус для массового изменения">
+              {ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}
+            </select>
+            <button className="primary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={applyBulkStatus}>
+              Изменить статус ({selectedIds.length})
+            </button>
+            <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => runBulkExchange("check")}>
+              Проверить выбранные в 1С
+            </button>
+          </div>
+          <div className="exchange-actions" style={{ marginTop: 10 }}>
+            <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => runBulkExchange("send")}>
+              Тестово передать выбранные
+            </button>
+            {selectedIds.length > 0 && <button className="secondary-button" type="button" onClick={() => setSelectedIds([])}>Очистить выбор</button>}
+            <span className="muted small">Выбрано заказов: {selectedIds.length}</span>
+          </div>
+        </div>
+      )}
+
+      {visible.length ? (
+        <div className="manager-grid">
+          {visible.map((order) => {
         const exchange = normalizeOrderExchange(order.exchange);
         const busy = busyOrderId === order.id;
         return (
-        <article className="order-card" key={order.id}>
-          <div className="order-card-header">
-            <label style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <article className="order-card manager-order-card-item" key={order.id}>
+          <div className="order-card-header manager-order-card-header">
+            <label className="manager-order-select">
               <input
                 type="checkbox"
                 checked={selectedIds.includes(order.id)}
                 onChange={() => toggleSelected(order.id)}
                 aria-label={`Выбрать заказ ${order.number}`}
               />
+              <div>
+                <div className="exchange-status-line">
+                  <span className={`badge ${statusClass(order.status)}`}>{order.status}</span>
+                  <span className={`badge ${exchangeBadgeClass(exchange.status)}`}>1С: {EXCHANGE_STATUS_LABELS[exchange.status]}</span>
+                </div>
+                <h3 className="manager-order-client">{order.customerName || "Клиент"}</h3>
+                <p>
+                  № {order.number || "—"}
+                  {order.createdAt ? ` · создан ${formatDateTime(order.createdAt)}` : ""}
+                </p>
+                {(order.customerContact || order.customerPhone || order.customerEmail) && (
+                  <p className="manager-order-contacts muted small">
+                    {[order.customerContact, order.customerPhone, order.customerEmail].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+              </div>
             </label>
-            <div>
-              <div className="exchange-status-line"><span className={`badge ${statusClass(order.status)}`}>{order.status}</span><span className={`badge ${exchangeBadgeClass(exchange.status)}`}>1С: {EXCHANGE_STATUS_LABELS[exchange.status]}</span></div>
-              <h3>Заказ № {order.number} · {order.customerName || "Клиент"}</h3>
-              <p>{order.customerContact} · {order.customerPhone} · {order.customerEmail}</p>
-              <p className="small">Внешний ID: {order.externalId || order.id}</p>
+            <div className="nowrap">
+              <strong className="manager-order-sum success-text">
+                {settings.showPrices && getOrderTotal(order) > 0
+                  ? formatMoney(getOrderTotal(order))
+                  : "уточняется"}
+              </strong>
             </div>
-            <strong className="success-text">{settings.showPrices && getOrderTotal(order) > 0 ? formatMoney(getOrderTotal(order)) : `${getPositionCount(order)} поз.`}</strong>
           </div>
           <div className="order-meta">
-            <div><span>Доставка</span><strong>{formatDate(order.firstDeliveryDate)}</strong></div>
-            <div><span>Адрес</span><strong>{order.address}</strong></div>
-            <div><span>Позиций</span><strong>{getPositionCount(order)}</strong></div>
-            <div><span>Создан</span><strong>{formatDateTime(order.createdAt)}</strong></div>
+            <div>
+              <span>Дата доставки</span>
+              <strong>{order.firstDeliveryDate ? formatDate(order.firstDeliveryDate) : "не указана"}</strong>
+            </div>
+            <div>
+              <span>Адрес</span>
+              <strong>{order.address || "—"}</strong>
+            </div>
+            <div>
+              <span>Позиций</span>
+              <strong>{getPositionCount(order)}</strong>
+            </div>
+            <div>
+              <span>Дата заказа</span>
+              <strong>{order.createdAt ? formatDate(String(order.createdAt).slice(0, 10)) : "—"}</strong>
+            </div>
           </div>
           <div className="manager-order-controls">
-            <label className="field">Статус заказа
-              <select value={order.status} onChange={(e) => onUpdateOrder(order.id, { status: e.target.value, updatedAt: new Date().toISOString() })}>{allowedNextOrderStatuses(order.status).map((item) => <option key={item}>{item}</option>)}</select>
-            </label>
-            <div className="exchange-actions" style={{ alignSelf: "end" }}>
-              <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
-              {settings.managerCanDeleteOrders && <button className="danger-button" type="button" onClick={() => onDeleteOrder(order)}>Удалить</button>}
-            </div>
-          </div>
-          <div className="order-onec-box">
-            <strong className="order-onec-title">Обмен с 1С · {EXCHANGE_STATUS_LABELS[exchange.status]} · попыток {exchange.attempts}</strong>
-            {exchange.message && <div className="exchange-message">{exchange.message}{exchange.receipt ? ` · квитанция ${exchange.receipt}` : ""}</div>}
             <div className="exchange-actions">
-              <button className="secondary-button" disabled={busy} type="button" onClick={() => runExchangeAction(order, "check")}>Проверить</button>
-              <button className="primary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => runExchangeAction(order, "send")}>{exchange.status === "sending" ? "Ожидает ACK 1С" : exchange.status === "ready" ? "Обновить очередь" : exchange.status === "sent" || exchange.status === "error" ? "Передать повторно" : "Передать в 1С TEST"}</button>
-              <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOrder(order, "json")}>JSON</button>
-              <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOrder(order, "csv")}>CSV</button>
-              {exchange.status !== "not_sent" && <button className="secondary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => runExchangeAction(order, "reset")}>Сбросить</button>}
+              {inTrash ? (
+                <>
+                  <button className="primary-button" type="button" onClick={() => onRestoreOrder?.(order)}>
+                    Восстановить
+                  </button>
+                  <button className="danger-button" type="button" onClick={() => onPurgeOrder?.(order)}>
+                    Удалить навсегда
+                  </button>
+                  <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="primary-button manager-send-onec-button"
+                    disabled={busy || exchange.status === "sending"}
+                    type="button"
+                    onClick={() => runExchangeAction(order, "send")}
+                  >
+                    {exchangeSendLabel(exchange)}
+                  </button>
+                  <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
+                  {settings.managerCanDeleteOrders && canTrashOrder(order, "manager").ok && (
+                    <button className="danger-button" type="button" onClick={() => onDeleteOrder(order)}>
+                      В корзину
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           </div>
+          {inTrash && order.deletedAt && (
+            <div className="exchange-message manager-order-exchange-note">
+              В корзине с {formatDateTime(order.deletedAt)}
+              {order.deletedBy?.role ? ` · удалил: ${order.deletedBy.role}` : ""}
+            </div>
+          )}
+          {!inTrash && exchange.message && (
+            <div className="exchange-message manager-order-exchange-note">
+              {exchange.message}{exchange.receipt ? ` · квитанция ${exchange.receipt}` : ""}
+            </div>
+          )}
+          {!inTrash && (
           <details className="order-details" open={false}>
             <summary>Состав и обработка заказа</summary>
             <div className="order-products">
@@ -290,8 +384,16 @@ export function ManagerOrders({ orders, settings, onUpdateOrder, onBulkUpdateOrd
             </div>
             <OrderTimeline order={order} />
           </details>
+          )}
         </article>
-      );}} /> : <div className="empty-box">Заказы не найдены.</div>}
+        );
+          })}
+        </div>
+      ) : (
+        <div className="empty-box">
+          {inTrash ? "Корзина пуста." : "Заказы не найдены."}
+        </div>
+      )}
     </section>
   );
 }

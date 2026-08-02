@@ -11,6 +11,7 @@ import {
   clientMayOrderCatalogProduct,
   findClientOrderMatrixViolations,
   isMatrixProductForLink,
+  ordersRequiringMatrixCheck,
 } from "../src/matrixGuard.js";
 
 import { readFrontendUiSource } from "./readFrontendUiSource.mjs";
@@ -156,6 +157,44 @@ const customOnly = findClientOrderMatrixViolations(
   products
 );
 assert.equal(customOnly.length, 0, "Только customItems не нарушают матрицу.");
+
+const previousById = new Map([
+  [
+    "old-1",
+    {
+      id: "old-1",
+      items: [{ productId: "2", name: "Вне", quantity: 1, unit: "piece" }],
+    },
+  ],
+]);
+const unchangedOutside = ordersRequiringMatrixCheck(
+  [
+    {
+      id: "old-1",
+      items: [{ productId: "2", name: "Вне", quantity: 1, unit: "piece" }],
+    },
+    {
+      id: "new-1",
+      items: [{ productId: "1", name: "Ок", quantity: 1, unit: "piece" }],
+    },
+  ],
+  previousById
+);
+assert.deepEqual(
+  unchangedOutside.map((order) => order.id),
+  ["new-1"],
+  "Неизменённый старый заказ вне матрицы не должен попадать в matrix check."
+);
+const changedOutside = ordersRequiringMatrixCheck(
+  [
+    {
+      id: "old-1",
+      items: [{ productId: "2", name: "Вне", quantity: 2, unit: "piece" }],
+    },
+  ],
+  previousById
+);
+assert.equal(changedOutside.length, 1, "Изменение состава включает заказ в matrix check.");
 
 assert.equal(isMatrixProductForLink({ matrixMode: "all" }, "9"), true);
 assert.equal(
