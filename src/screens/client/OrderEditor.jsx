@@ -11,6 +11,10 @@ import {
   formatMoney,
   getUnitMultiplier,
   getUnitPrice,
+  toQuantityInputValue,
+  fromQuantityInputValue,
+  quantityInputStep,
+  quantityInputUnitLabel,
   CATALOG_NARROW_MQ,
 } from "../../shared/appHelpers";
 import {
@@ -85,6 +89,8 @@ export function OrderEditor({
     (initialSource.items || []).forEach((item) => { result[item.productId ?? item.id] = item.quantity; });
     return result;
   });
+  /** Черновик ввода в поле шт (чтобы «100» не сбрасывалось на «1» при наборе). */
+  const [qtyDrafts, setQtyDrafts] = useState({});
   const [units, setUnits] = useState(() => {
     const result = {};
     (initialSource.items || []).forEach((item) => { result[item.productId ?? item.id] = item.unit; });
@@ -238,7 +244,17 @@ export function OrderEditor({
     });
   }, [session.mode, settings.enableDrafts, selectedItems, customItems, deliveryDate, addressId, selectedAddress, clientComment]);
 
+  const clearQtyDraft = (id) => {
+    setQtyDrafts((current) => {
+      if (current[id] === undefined) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  };
+
   const changeQuantity = (id, delta) => {
+    clearQtyDraft(id);
     setCart((current) => {
       const nextValue = Math.max(0, (Number(current[id]) || 0) + delta);
       const next = { ...current };
@@ -247,13 +263,29 @@ export function OrderEditor({
     });
   };
 
-  const setItemQuantity = (id, value) => {
-    const nextValue = Math.max(0, Number.parseInt(value, 10) || 0);
+  const setItemQuantity = (id, value, multiplier = 1) => {
+    const nextValue = fromQuantityInputValue(value, multiplier);
     setCart((current) => {
       const next = { ...current };
       if (nextValue) next[id] = nextValue; else delete next[id];
       return next;
     });
+  };
+
+  const commitQtyDraft = (id, multiplier = 1) => {
+    if (qtyDrafts[id] === undefined) return;
+    setItemQuantity(id, qtyDrafts[id], multiplier);
+    clearQtyDraft(id);
+  };
+
+  const quantityFieldValue = (id, quantity, multiplier) => {
+    if (qtyDrafts[id] !== undefined) return qtyDrafts[id];
+    return quantity ? String(toQuantityInputValue(quantity, multiplier)) : "";
+  };
+
+  const setProductUnit = (productId, nextUnit) => {
+    clearQtyDraft(productId);
+    setUnits((current) => ({ ...current, [productId]: nextUnit }));
   };
 
   const changeCustomQuantity = (id, delta) => {
@@ -357,8 +389,8 @@ export function OrderEditor({
               <div className="summary-list">
                 {selectedItems.map((item) => (
                   <div className="summary-item" key={item.productId}>
-                    <span>{item.name}<small>{item.multiplier > 1 ? `${item.quantity * item.multiplier} шт. всего` : item.category}</small></span>
-                    <strong>{item.quantity} {UNIT_CONFIG[item.unit].shortLabel}<small>{settings.showPrices && item.lineTotal > 0 ? formatMoney(item.lineTotal) : ""}</small></strong>
+                    <span>{item.name}<small>{item.multiplier > 1 ? `${UNIT_CONFIG[item.unit].label}: ${item.quantity}` : item.category}</small></span>
+                    <strong>{toQuantityInputValue(item.quantity, item.multiplier)} {quantityInputUnitLabel(item.unit, item.multiplier)}<small>{settings.showPrices && item.lineTotal > 0 ? formatMoney(item.lineTotal) : ""}</small></strong>
                   </div>
                 ))}
                 {customItems.map((item) => (
@@ -534,10 +566,16 @@ export function OrderEditor({
                     <div className="product-card-controls">
                       <div className="unit-choice">
                         {UNIT_ORDER.filter((item) => product.saleUnits.includes(item)).map((item) => (
-                          <button className={unit === item ? "active" : ""} type="button" key={item} onClick={() => setUnits((current) => ({ ...current, [product.id]: item }))}>{UNIT_CONFIG[item].label}</button>
+                          <button className={unit === item ? "active" : ""} type="button" key={item} onClick={() => setProductUnit(product.id, item)}>{UNIT_CONFIG[item].label}</button>
                         ))}
                       </div>
-                      <p className="unit-hint">{multiplier > 1 ? `1 ${UNIT_CONFIG[unit].label.toLowerCase()} = ${multiplier} шт.` : "Количество считается поштучно"}</p>
+                      <p className="unit-hint">
+                        {unit === "piece"
+                          ? "Продажа в штуках: 1, 2, 3… → в 1С столько же шт."
+                          : multiplier > 1
+                            ? `1 ${UNIT_CONFIG[unit].label.toLowerCase()} = ${multiplier} шт. · в поле ${multiplier}, ${multiplier * 2}… · в 1С уйдёт в шт.`
+                            : `Для «${UNIT_CONFIG[unit].label}» не задан размер в шт. У менеджера укажите «Внутри, шт.»`}
+                      </p>
                       <div className="quantity-control">
                         <button type="button" onClick={() => changeQuantity(product.id, -1)} aria-label="Уменьшить">−</button>
                         <div className="quantity-input-wrap">
@@ -545,12 +583,14 @@ export function OrderEditor({
                             className="quantity-input"
                             type="number"
                             min="0"
+                            step={quantityInputStep(multiplier)}
                             inputMode="numeric"
-                            value={quantity || ""}
+                            value={quantityFieldValue(product.id, quantity, multiplier)}
                             placeholder="0"
-                            onChange={(e) => setItemQuantity(product.id, e.target.value)}
+                            onChange={(e) => setQtyDrafts((current) => ({ ...current, [product.id]: e.target.value }))}
+                            onBlur={() => commitQtyDraft(product.id, multiplier)}
                           />
-                          <small>{UNIT_CONFIG[unit].shortLabel}</small>
+                          <small>{quantityInputUnitLabel(unit, multiplier)}</small>
                         </div>
                         <button type="button" onClick={() => changeQuantity(product.id, 1)} aria-label="Увеличить">+</button>
                       </div>
@@ -636,7 +676,7 @@ export function OrderEditor({
                               className={item.unit === unitId ? "active" : ""}
                               type="button"
                               key={unitId}
-                              onClick={() => setUnits((current) => ({ ...current, [item.productId]: unitId }))}
+                              onClick={() => setProductUnit(item.productId, unitId)}
                             >
                               {UNIT_CONFIG[unitId].label}
                             </button>
@@ -650,11 +690,13 @@ export function OrderEditor({
                             className="quantity-input"
                             type="number"
                             min="0"
+                            step={quantityInputStep(item.multiplier)}
                             inputMode="numeric"
-                            value={item.quantity || ""}
-                            onChange={(e) => setItemQuantity(item.productId, e.target.value)}
+                            value={quantityFieldValue(item.productId, item.quantity, item.multiplier)}
+                            onChange={(e) => setQtyDrafts((current) => ({ ...current, [item.productId]: e.target.value }))}
+                            onBlur={() => commitQtyDraft(item.productId, item.multiplier)}
                           />
-                          <small>{UNIT_CONFIG[item.unit].shortLabel}</small>
+                          <small>{quantityInputUnitLabel(item.unit, item.multiplier)}</small>
                         </div>
                         <button type="button" onClick={() => changeQuantity(item.productId, 1)} aria-label="Увеличить">+</button>
                       </div>

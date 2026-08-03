@@ -10,12 +10,13 @@ export function formatOrderDate(dateString) {
 
 export function getUnitMultiplier(product, unit) {
   if (unit === "pack") {
-    return product.packSize || 1;
+    return Math.max(1, Number(product.packSize) || 1);
   }
 
   if (unit === "bundle") {
-    return product.bundleSize || 1;
+    return Math.max(1, Number(product.bundleSize) || 1);
   }
 
-  return product.pieceSize || 1;
+  // Штука: всегда 1 шт на единицу продажи (1,2,3 → в 1С 1,2,3 шт).
+  return 1;
 }

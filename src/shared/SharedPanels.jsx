@@ -80,7 +80,8 @@ export function OrderTimeline({ order }) {
   );
 }
 
-export function Header({ title, subtitle, onLogout, onLogoClick, children }) {
+export function Header({ title, subtitle, onLogout, onLogoClick, nav, children }) {
+  const headerRef = useRef(null);
   const [compactHeader, setCompactHeader] = useState(() => {
     if (typeof window === "undefined" || !window.matchMedia) return false;
     return window.matchMedia("(max-width: 900px)").matches;
@@ -99,6 +100,25 @@ export function Header({ title, subtitle, onLogout, onLogoClick, children }) {
     return () => media.removeListener(sync);
   }, []);
 
+  // Высота шапки → spacer под фиксированным верхом
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const apply = () => {
+      const height = Math.ceil(el.getBoundingClientRect().height);
+      const host = el.closest(".clover-app") || document.documentElement;
+      host.style.setProperty("--clover-header-offset", `${height}px`);
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(el);
+    window.addEventListener("resize", apply);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", apply);
+    };
+  }, [compactHeader, children, title, subtitle, nav]);
+
   const logo = (
     <img className="app-header-logo" src={cloverLogo} alt="Clover" width="152" height="66" />
   );
@@ -112,7 +132,10 @@ export function Header({ title, subtitle, onLogout, onLogoClick, children }) {
   };
 
   return (
-    <header className={`app-header${compactHeader ? " app-header-compact" : ""}`}>
+    <header
+      ref={headerRef}
+      className={`app-header${compactHeader ? " app-header-compact" : ""}${nav ? " app-header-with-nav" : ""}`}
+    >
       <button
         type="button"
         className="app-header-logo-button"
@@ -122,6 +145,7 @@ export function Header({ title, subtitle, onLogout, onLogoClick, children }) {
       >
         {logo}
       </button>
+      {nav ? <div className="app-header-nav">{nav}</div> : null}
       <div className="app-header-actions">
         {!compactHeader && (
           <div className="app-header-titles">
@@ -137,6 +161,17 @@ export function Header({ title, subtitle, onLogout, onLogoClick, children }) {
         </button>
       )}
     </header>
+  );
+}
+
+/** Вкладки кабинета: едут вверх и фиксируются у нижней границы шапки (логотип).
+ *  Устарело: используйте StickyCabinetChrome (фиксированный непрозрачный верх).
+ */
+export function StickyCabinetNav({ children, className = "" }) {
+  return (
+    <div className={`app-nav-bar${className ? ` ${className}` : ""}`}>
+      {children}
+    </div>
   );
 }
 

@@ -810,17 +810,121 @@ textarea { resize: vertical; }
 .loading-card p { margin: 0; color: #6d786d; line-height: 1.5; }
 
 .app-header {
-  min-height: 56px;
-  padding: 10px 5%;
+  min-height: 48px;
+  padding: 6px 4%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  background: #fff;
-  border-bottom: 1px solid #e1e9de;
-  position: sticky;
+  gap: 12px;
+  background-color: #ffffff;
+  background-image: none;
+  border-bottom: none;
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+}
+.app-header-with-nav {
+  gap: 10px;
+}
+.app-header-nav {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.app-header-nav::-webkit-scrollbar { display: none; }
+.app-header-nav .manager-nav,
+.app-header-nav .client-nav {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+.app-header-nav .manager-nav button,
+.app-header-nav .client-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-height: 42px;
+  height: 42px;
+  padding: 0 16px;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 11px;
+  box-sizing: border-box;
+}
+.app-header-nav .manager-nav button {
+  min-height: 42px;
+  height: 42px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+/* Единый непрозрачный верх: логотип + вкладки в один ряд. Без линии. */
+.app-top-chrome {
+  position: fixed;
   top: 0;
-  z-index: 40;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 100;
+  background-color: #ffffff;
+  background-image: none;
+  opacity: 1;
+  border-bottom: none;
+  box-shadow: 0 4px 14px rgba(40, 64, 40, 0.06);
+  box-sizing: border-box;
+}
+.app-top-chrome-spacer {
+  height: var(--clover-chrome-offset, 56px);
+  width: 100%;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.app-top-chrome .app-header {
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  width: 100%;
+  background-color: #ffffff;
+  background-image: none;
+  border-bottom: none;
+  box-shadow: none;
+  min-height: 48px;
+  padding: 6px 4%;
+}
+.app-top-chrome .app-header-logo {
+  width: 110px;
+  max-width: 110px;
+  max-height: 44px;
+}
+.app-nav-bar {
+  display: none;
+}
+.app-nav-bar .manager-nav,
+.app-nav-bar .client-nav {
+  width: min(1240px, 92%);
+  max-width: 100%;
+  margin: 0 auto;
+  background-color: transparent;
+}
+.app-nav-bar-client .client-nav,
+.app-top-chrome-client .app-nav-bar-client .client-nav {
+  width: min(1440px, 90%);
+}
+.clover-app > .page-content {
+  position: relative;
+  z-index: 1;
 }
 .app-header-logo { display: block; width: 152px; max-width: 152px; max-height: 66px; height: auto; object-fit: contain; flex: 0 0 auto; }
 .app-header-logo-button {
@@ -1231,6 +1335,32 @@ textarea { resize: vertical; }
 }
 .manager-order-card-header .exchange-status-line {
   margin: 0 0 4px;
+}
+.manager-order-status-select {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 0;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 0;
+  height: auto;
+  margin: 0;
+  padding: 5px 9px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  vertical-align: middle;
+  background-image: none;
+}
+.manager-order-status-select:focus-visible {
+  outline: 2px solid #5b9d57;
+  outline-offset: 2px;
 }
 .manager-order-card-header h3.manager-order-client,
 .manager-order-client {
@@ -1710,7 +1840,7 @@ textarea { resize: vertical; }
   font-size: 10px;
 }
 .cart-sheet { display: none; }
-.order-summary { position: sticky; top: 105px; z-index: 15; padding: 21px; border: 1px solid #e1e9de; border-radius: 19px; background: #fff; box-shadow: 0 10px 26px rgba(56,97,52,.07); }
+.order-summary { position: sticky; top: calc(var(--clover-chrome-offset, 140px) + 12px); z-index: 15; padding: 21px; border: 1px solid #e1e9de; border-radius: 19px; background: #fff; box-shadow: 0 10px 26px rgba(56,97,52,.07); }
 .order-summary h2 { margin: 0 0 14px; color: #394639; }
 .summary-list { display: grid; max-height: 320px; overflow: auto; gap: 8px; margin-bottom: 14px; }
 .summary-item { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; padding: 10px; border-radius: 10px; background: #f7faf5; }
@@ -1787,7 +1917,9 @@ html.clover-thankyou-open .order-thankyou {
 html.clover-thankyou-open .mobile-checkout-bar,
 html.clover-thankyou-open .cart-sheet,
 html.clover-thankyou-open .client-bottom-nav,
-html.clover-thankyou-open .app-header {
+html.clover-thankyou-open .app-header,
+html.clover-thankyou-open .app-nav-bar,
+html.clover-thankyou-open .app-top-chrome {
   display: none !important;
   visibility: hidden !important;
 }
@@ -2062,9 +2194,7 @@ html.clover-thankyou-open .app-header {
   color: #fff;
 }
 .client-nav {
-  position: sticky;
-  top: 0;
-  z-index: 20;
+  position: static;
   width: fit-content;
   max-width: 100%;
   margin: 0 0 20px;
@@ -2501,7 +2631,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 .import-label input { display: none; }
 
 @media print {
-  .app-header, .manager-nav, .client-nav, .client-bottom-nav, .client-order-actions, .mobile-checkout-bar, .cart-sheet, .toolbar, button, .order-thankyou { display: none !important; }
+  .app-header, .app-nav-bar, .app-top-chrome, .manager-nav, .client-nav, .client-bottom-nav, .client-order-actions, .mobile-checkout-bar, .cart-sheet, .toolbar, button, .order-thankyou { display: none !important; }
   .page-content { width: 100%; padding: 0; }
   .order-card { box-shadow: none; page-break-inside: avoid; }
 }
@@ -3035,6 +3165,21 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     min-width: 0;
     overflow-x: hidden;
   }
+  .app-nav-bar {
+    width: 100%;
+    max-width: 100%;
+    padding-left: 12px;
+    padding-right: 12px;
+    box-sizing: border-box;
+  }
+  .app-top-chrome .app-header {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .app-nav-bar .manager-nav,
+  .app-nav-bar .client-nav {
+    width: 100%;
+  }
   .catalog-content { padding-bottom: 88px; }
   .page-content-client .embedded-catalog.catalog-content {
     width: 100%;
@@ -3254,10 +3399,44 @@ export function formatMoney(value) {
   }).format(Number(value) || 0);
 }
 
+/**
+ * Сколько базовых штук в одной выбранной единице продажи.
+ * «Штука» всегда 1 (в поле 1,2,3 → в 1С 1,2,3 шт).
+ * Упаковка/пачка — packSize/bundleSize (в поле 100,200… → в 1С totalPieces).
+ */
 export function getUnitMultiplier(product, unit) {
-  if (unit === "pack") return Number(product.packSize) || 1;
-  if (unit === "bundle") return Number(product.bundleSize) || 1;
-  return Number(product.pieceSize) || 1;
+  if (unit === "pack") return Math.max(1, Number(product?.packSize) || 1);
+  if (unit === "bundle") return Math.max(1, Number(product?.bundleSize) || 1);
+  return 1;
+}
+
+/**
+ * Поле количества: для упаковки/пачки с размером >1 показываем штуки (100, 200…),
+ * в заказе храним число единиц продажи (1, 2 уп.).
+ */
+export function toQuantityInputValue(unitQuantity, multiplier) {
+  const qty = Math.max(0, Number(unitQuantity) || 0);
+  const mult = Math.max(1, Number(multiplier) || 1);
+  return mult > 1 ? qty * mult : qty;
+}
+
+/** Ввод из поля (штуки при mult>1) → количество единиц продажи. */
+export function fromQuantityInputValue(inputValue, multiplier) {
+  const raw = Math.max(0, Number.parseInt(String(inputValue), 10) || 0);
+  const mult = Math.max(1, Number(multiplier) || 1);
+  if (mult <= 1) return raw;
+  if (raw <= 0) return 0;
+  return Math.max(1, Math.round(raw / mult));
+}
+
+export function quantityInputStep(multiplier) {
+  const mult = Math.max(1, Number(multiplier) || 1);
+  return mult > 1 ? mult : 1;
+}
+
+export function quantityInputUnitLabel(unit, multiplier) {
+  if (Math.max(1, Number(multiplier) || 1) > 1) return "шт.";
+  return UNIT_CONFIG[unit]?.shortLabel || "шт.";
 }
 
 export function getUnitPrice(product, unit) {

@@ -14,7 +14,7 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-const CLOVER_UI_BUILD = "ui-20260803-v90";
+const CLOVER_UI_BUILD = "ui-20260803-v103";
 const BOOT_SPLASH_MS = 1000;
 
 function hideBootSplash() {

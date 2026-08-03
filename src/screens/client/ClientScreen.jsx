@@ -8,6 +8,7 @@ import {
   PushSettings,
   OrderThankYouOverlay,
 } from "../../shared/SharedPanels";
+import { StickyCabinetChrome } from "../../shared/StickyCabinetChrome";
 import {
   CLIENT_TABS,
   CLIENT_CABINET_SECTIONS,
@@ -500,22 +501,25 @@ function ClientDashboard({
 
   return (
     <main className="clover-app">
-      <Header
-        title={
-          profile.contactName
-            ? `Здравствуйте, ${profile.contactName}!`
-            : "Личный кабинет клиента"
-        }
-        subtitle={profile.companyName}
-        onLogout={onLogout}
-      >
-        <ManagerContact settings={settings} />
-      </Header>
+      <StickyCabinetChrome className="app-top-chrome-client">
+        <Header
+          title={
+            profile.contactName
+              ? `Здравствуйте, ${profile.contactName}!`
+              : "Личный кабинет клиента"
+          }
+          subtitle={profile.companyName}
+          onLogout={onLogout}
+          nav={
+            <nav className="client-nav" aria-label="Разделы кабинета">
+              {navButtons}
+            </nav>
+          }
+        >
+          <ManagerContact settings={settings} />
+        </Header>
+      </StickyCabinetChrome>
       <section className="page-content page-content-client">
-        <nav className="client-nav" aria-label="Разделы кабинета">
-          {navButtons}
-        </nav>
-
         {tab === "home" && (
           <>
             {!canCreateOrder && (

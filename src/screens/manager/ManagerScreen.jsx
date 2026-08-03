@@ -1,6 +1,7 @@
 // Экран менеджера/администратора: заказы, клиенты, товары, обмен с 1С, настройки.
 import { useMemo, useState } from "react";
 import { Header } from "../../shared/SharedPanels";
+import { StickyCabinetChrome } from "../../shared/StickyCabinetChrome";
 import {
   MANAGER_TABS,
   MANAGER_MORE_TABS,
@@ -104,32 +105,53 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
   const unreadCount = (managerNotifications || []).filter((item) => !item.readAt).length;
 
   return <main className="clover-app">
-    <Header
-      title="Кабинет менеджера"
-      onLogout={onLogout}
-    >
-      <div className="manager-header-tools">
-        <input
-          className="manager-search-input"
-          type="search"
-          placeholder="Поиск заказа"
-          value={headerSearch}
-          onChange={(e) => {
-            setHeaderSearch(e.target.value);
-            if (tab !== "orders") selectTab("orders");
-          }}
-          aria-label="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
-        />
-        <ManagerNotificationBell
-          notifications={managerNotifications}
-          open={bellOpen}
-          onToggle={() => setBellOpen((current) => !current)}
-          onOpen={openFromNotification}
-          onRead={(item) => { onReadNotification(item); }}
-          onReadAll={() => { onReadAllNotifications(); setBellOpen(false); }}
-        />
-      </div>
-    </Header>
+    <StickyCabinetChrome>
+      <Header
+        title="Кабинет менеджера"
+        onLogout={onLogout}
+        nav={
+          <nav className="manager-nav" aria-label="Разделы менеджера">
+            {MANAGER_TABS.map(([id, label]) => (
+              <button
+                className={tab === id ? "active" : ""}
+                type="button"
+                key={id}
+                onClick={() => selectTab(id)}
+              >
+                {label}
+                {id === "acts" && newActsCount > 0 ? (
+                  <span className="manager-nav-count" aria-label={`Новых запросов: ${newActsCount}`}>
+                    {newActsCount}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </nav>
+        }
+      >
+        <div className="manager-header-tools">
+          <input
+            className="manager-search-input"
+            type="search"
+            placeholder="Поиск заказа"
+            value={headerSearch}
+            onChange={(e) => {
+              setHeaderSearch(e.target.value);
+              if (tab !== "orders") selectTab("orders");
+            }}
+            aria-label="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
+          />
+          <ManagerNotificationBell
+            notifications={managerNotifications}
+            open={bellOpen}
+            onToggle={() => setBellOpen((current) => !current)}
+            onOpen={openFromNotification}
+            onRead={(item) => { onReadNotification(item); }}
+            onReadAll={() => { onReadAllNotifications(); setBellOpen(false); }}
+          />
+        </div>
+      </Header>
+    </StickyCabinetChrome>
     <section className="page-content">
       {managerNotice && (() => {
         const parsed = parseManagerNotification(managerNotice);
@@ -178,23 +200,6 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
         <article className="stat-card"><span>Ошибки 1С</span><strong>{exchangeErrors}</strong></article>
         <article className="stat-card"><span>Непрочитано</span><strong>{unreadCount}</strong></article>
       </div>
-      <nav className="manager-nav" aria-label="Разделы менеджера">
-        {MANAGER_TABS.map(([id, label]) => (
-          <button
-            className={tab === id ? "active" : ""}
-            type="button"
-            key={id}
-            onClick={() => selectTab(id)}
-          >
-            {label}
-            {id === "acts" && newActsCount > 0 ? (
-              <span className="manager-nav-count" aria-label={`Новых запросов: ${newActsCount}`}>
-                {newActsCount}
-              </span>
-            ) : null}
-          </button>
-        ))}
-      </nav>
       {tab === "orders" && (
         <ManagerOrders
           orders={orders}

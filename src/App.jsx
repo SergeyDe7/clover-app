@@ -315,21 +315,26 @@ function mergeOrdersFromServer(previous, incoming, { clientMode = false } = {}) 
       JSON.stringify(normalizeOrderExchange(local.exchange)) ===
       JSON.stringify(normalizeOrderExchange(remote.exchange));
 
-    // Статус/обмен с сервера всегда побеждают.
+    const localTime = Date.parse(local.updatedAt || "") || 0;
+    const remoteTime = Date.parse(remote.updatedAt || "") || 0;
+    // Обмен всегда с сервера. Статус — по более свежему updatedAt,
+    // иначе устаревший bootstrap откатывает только что сохранённый PATCH.
     if (!sameStatus || !sameExchange) {
+      const preferLocalStatus = !sameStatus && localTime > remoteTime;
       return {
         ...remote,
         managerComment: local.managerComment,
         internalNote: local.internalNote,
         customItems: Array.isArray(local.customItems) ? local.customItems : remote.customItems,
-        status: remote.status,
+        status: preferLocalStatus ? local.status : remote.status,
+        history: preferLocalStatus && Array.isArray(local.history) ? local.history : remote.history,
         exchange: remote.exchange,
-        updatedAt: remote.updatedAt || local.updatedAt,
+        updatedAt: preferLocalStatus
+          ? local.updatedAt
+          : remote.updatedAt || local.updatedAt,
       };
     }
 
-    const localTime = Date.parse(local.updatedAt || "") || 0;
-    const remoteTime = Date.parse(remote.updatedAt || "") || 0;
     if (localTime <= remoteTime) return remote;
 
     return {
@@ -1217,6 +1222,18 @@ function App() {
     const patchKeys = Object.keys(patch || {}).filter((key) => key !== "updatedAt");
     const isStatusOnly = patchKeys.length === 1 && patchKeys[0] === "status";
     if (isStatusOnly && (role === "manager" || role === "admin")) {
+      const previous = orders.find((order) => String(order.id) === String(id));
+      const optimisticUpdatedAt = new Date().toISOString();
+      if (previous) {
+        skipNextOrdersSyncRef.current = true;
+        setOrders((current) =>
+          current.map((order) =>
+            String(order.id) === String(id)
+              ? { ...order, status: patch.status, updatedAt: optimisticUpdatedAt }
+              : order
+          )
+        );
+      }
       void (async () => {
         try {
           const result = await api.patchOrderStatus(id, patch.status);
@@ -1230,6 +1247,14 @@ function App() {
           );
           setSyncError("");
         } catch (error) {
+          if (previous) {
+            skipNextOrdersSyncRef.current = true;
+            setOrders((current) =>
+              current.map((order) =>
+                String(order.id) === String(id) ? previous : order
+              )
+            );
+          }
           setSyncError(error.message);
           void appAlert({ title: "Ошибка обновления", message: error.message, tone: "danger" });
         }
