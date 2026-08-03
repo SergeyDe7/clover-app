@@ -746,6 +746,7 @@ button{cursor:pointer}
   right: 0;
   z-index: 30;
   min-width: 220px;
+  max-width: min(280px, 82vw);
   padding: 6px;
   border: 1px solid #d7e1d4;
   border-radius: 12px;

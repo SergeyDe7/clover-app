@@ -18,8 +18,23 @@ import {
   matchesTextSearch,
   buildClientSearchHaystack,
   buildOrderSearchHaystack,
+  RUSSIAN_PHONE_PREFIX,
+  formatRussianPhone,
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
+
+function generateAccessPassword(length = 10) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const bytes =
+    typeof crypto !== "undefined" && crypto.getRandomValues
+      ? crypto.getRandomValues(new Uint8Array(length))
+      : Array.from({ length }, (_, index) => (Date.now() + index * 17) % 256);
+  let out = "";
+  for (let i = 0; i < length; i += 1) {
+    out += alphabet[bytes[i] % alphabet.length];
+  }
+  return out;
+}
 
 function OneCClientPicker({ client, link, onChange }) {
   const [open, setOpen] = useState(false);
@@ -679,6 +694,18 @@ export function ManagerClients({
   const [approvalBusyId, setApprovalBusyId] = useState("");
   const [openMenuId, setOpenMenuId] = useState("");
   const [profileOpenId, setProfileOpenId] = useState("");
+  const [provisionOpen, setProvisionOpen] = useState(false);
+  const [provisionBusy, setProvisionBusy] = useState(false);
+  const [provisionForm, setProvisionForm] = useState({
+    companyName: "",
+    contactName: "",
+    phone: RUSSIAN_PHONE_PREFIX,
+    email: "",
+    password: "",
+  });
+  const [passwordClientId, setPasswordClientId] = useState("");
+  const [passwordDraft, setPasswordDraft] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
   const restoredOpenClient = useRef(false);
 
   const ordersByClientId = useMemo(() => {
@@ -693,28 +720,149 @@ export function ManagerClients({
   }, [orders]);
 
   useEffect(() => {
+    const onOpenClient = (event) => {
+      const nextId = String(event?.detail || readOpenManagerClientId() || "");
+      if (!nextId) return;
+      restoredOpenClient.current = false;
+      setOpenClientId(nextId);
+    };
+    window.addEventListener("clover:open-manager-client", onOpenClient);
+    return () => window.removeEventListener("clover:open-manager-client", onOpenClient);
+  }, []);
+
+  useEffect(() => {
     if (restoredOpenClient.current || !openClientId) return;
-    const target = document.getElementById(`client-matrix-${openClientId}`);
+    const card = document.getElementById(`client-card-${openClientId}`);
+    const target =
+      card || document.getElementById(`client-matrix-${openClientId}`);
     if (!target) return;
 
     restoredOpenClient.current = true;
-    if (target instanceof HTMLDetailsElement) {
-      target.open = true;
+    const matrix = document.getElementById(`client-matrix-${openClientId}`);
+    if (matrix instanceof HTMLDetailsElement) {
+      matrix.open = true;
     }
     window.requestAnimationFrame(() => {
-      target.scrollIntoView({ block: "start" });
+      target.scrollIntoView({ block: "start", behavior: "smooth" });
     });
   }, [openClientId, clients]);
 
-  const setApproval = async (client, status) => {
+  const requestApproval = async (client, status) => {
+    if (status === "approved" && !client.emailVerified) {
+      const ok = await appConfirm({
+        title: "Почта ещё не подтверждена",
+        message:
+          "Клиент ещё не подтвердил электронную почту. Разрешить всё равно?",
+        confirmLabel: "Разрешить",
+        cancelLabel: "Отмена",
+      });
+      if (!ok) return;
+    }
     setApprovalBusyId(client.id);
     try {
       await api.setClientApproval(client.id, status);
       await onReload();
+      if (status === "approved") {
+        await appAlert({
+          title: "Готово",
+          message: "Вход для клиента разрешён.",
+          tone: "success",
+        });
+      } else if (status === "rejected") {
+        await appAlert({
+          title: "Готово",
+          message: "Регистрация отклонена.",
+          tone: "warn",
+        });
+      }
     } catch (error) {
       await appAlert({ title: "Ошибка доступа", message: error.message, tone: "danger" });
     } finally {
       setApprovalBusyId("");
+    }
+  };
+
+  const createClientAccess = async (event) => {
+    event.preventDefault();
+    const companyName = provisionForm.companyName.trim();
+    const contactName = provisionForm.contactName.trim();
+    const phone = provisionForm.phone.trim();
+    const email = provisionForm.email.trim().toLowerCase();
+    const password = provisionForm.password.trim();
+    if (!companyName || !contactName || !phone || !email || password.length < 8) {
+      await appAlert({
+        title: "Проверьте поля",
+        message: "Заполните все поля. Пароль — не короче 8 символов.",
+        tone: "warn",
+      });
+      return;
+    }
+    setProvisionBusy(true);
+    try {
+      const result = await api.createClientAccess({
+        companyName,
+        contactName,
+        phone,
+        email,
+        password,
+      });
+      await onReload();
+      setProvisionOpen(false);
+      setProvisionForm({
+        companyName: "",
+        contactName: "",
+        phone: RUSSIAN_PHONE_PREFIX,
+        email: "",
+        password: "",
+      });
+      if (result.client?.id) {
+        writeOpenManagerClientId(String(result.client.id));
+      }
+      await appAlert({
+        title: "Доступ выдан",
+        message: `Логин: ${result.login || email}\nПароль: ${password}\n\nСохраните и передайте клиенту. Матрицу можно настроить в карточке клиента.`,
+        tone: "success",
+      });
+    } catch (error) {
+      await appAlert({
+        title: "Не удалось создать клиента",
+        message: error.message,
+        tone: "danger",
+      });
+    } finally {
+      setProvisionBusy(false);
+    }
+  };
+
+  const saveClientPassword = async (client) => {
+    const password = passwordDraft.trim();
+    if (password.length < 8) {
+      await appAlert({
+        title: "Короткий пароль",
+        message: "Пароль должен быть не короче 8 символов.",
+        tone: "warn",
+      });
+      return;
+    }
+    setPasswordBusy(true);
+    try {
+      const result = await api.setClientPassword(client.id, password);
+      await onReload();
+      setPasswordClientId("");
+      setPasswordDraft("");
+      await appAlert({
+        title: "Пароль обновлён",
+        message: `Логин: ${result.login || client.email}\nПароль: ${password}\n\nПередайте клиенту. Матрица и заказы сохранены.`,
+        tone: "success",
+      });
+    } catch (error) {
+      await appAlert({
+        title: "Не удалось сменить пароль",
+        message: error.message,
+        tone: "danger",
+      });
+    } finally {
+      setPasswordBusy(false);
     }
   };
 
@@ -909,6 +1057,134 @@ export function ManagerClients({
         </div>
       </div>
 
+      <div className="approval-box" style={{ marginTop: 12 }}>
+        <div>
+          <strong>Создать доступ для клиента</strong>
+          <p>
+            Создайте логин и пароль сами — без письма и подтверждения почты.
+            Матрицу настраиваете в карточке; при смене менеджера достаточно
+            сменить пароль у того же клиента.
+          </p>
+        </div>
+        <div className="inline-actions">
+          <button
+            className="primary-button"
+            type="button"
+            onClick={() => {
+              setProvisionOpen((current) => !current);
+              if (!provisionForm.password) {
+                setProvisionForm((current) => ({
+                  ...current,
+                  password: generateAccessPassword(),
+                }));
+              }
+            }}
+          >
+            {provisionOpen ? "Скрыть форму" : "Создать доступ для клиента"}
+          </button>
+        </div>
+      </div>
+
+      {provisionOpen ? (
+        <form className="client-profile-panel" onSubmit={createClientAccess} style={{ marginTop: 12 }}>
+          <div className="form-grid">
+            <label className="field">
+              Компания
+              <input
+                value={provisionForm.companyName}
+                onChange={(event) =>
+                  setProvisionForm((current) => ({
+                    ...current,
+                    companyName: event.target.value,
+                  }))
+                }
+                required
+                disabled={provisionBusy}
+              />
+            </label>
+            <label className="field">
+              Контактное лицо
+              <input
+                value={provisionForm.contactName}
+                onChange={(event) =>
+                  setProvisionForm((current) => ({
+                    ...current,
+                    contactName: event.target.value,
+                  }))
+                }
+                required
+                disabled={provisionBusy}
+              />
+            </label>
+            <label className="field">
+              Телефон
+              <input
+                type="tel"
+                value={provisionForm.phone}
+                onChange={(event) =>
+                  setProvisionForm((current) => ({
+                    ...current,
+                    phone: formatRussianPhone(event.target.value),
+                  }))
+                }
+                required
+                disabled={provisionBusy}
+              />
+            </label>
+            <label className="field">
+              Логин (email)
+              <input
+                type="email"
+                value={provisionForm.email}
+                onChange={(event) =>
+                  setProvisionForm((current) => ({
+                    ...current,
+                    email: event.target.value,
+                  }))
+                }
+                required
+                disabled={provisionBusy}
+              />
+            </label>
+            <label className="field">
+              Пароль
+              <input
+                type="text"
+                autoComplete="new-password"
+                value={provisionForm.password}
+                onChange={(event) =>
+                  setProvisionForm((current) => ({
+                    ...current,
+                    password: event.target.value,
+                  }))
+                }
+                required
+                minLength={8}
+                disabled={provisionBusy}
+              />
+            </label>
+          </div>
+          <div className="form-actions" style={{ marginTop: 14 }}>
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={provisionBusy}
+              onClick={() =>
+                setProvisionForm((current) => ({
+                  ...current,
+                  password: generateAccessPassword(),
+                }))
+              }
+            >
+              Сгенерировать пароль
+            </button>
+            <button className="primary-button" type="submit" disabled={provisionBusy}>
+              {provisionBusy ? "Создаём..." : "Создать и выдать доступ"}
+            </button>
+          </div>
+        </form>
+      ) : null}
+
       {visible.length ? (
         <div className="client-list">
           {visible.map((client) => {
@@ -953,7 +1229,7 @@ export function ManagerClients({
             const matrixOpen = String(openClientId) === String(client.id);
 
             return (
-              <article className="client-card" key={client.id}>
+              <article className="client-card" key={client.id} id={`client-card-${client.id}`}>
                 <div className="client-card-header">
                   <div>
                     <span
@@ -1000,6 +1276,20 @@ export function ManagerClients({
                                   }, 50);
                                 },
                               },
+                              {
+                                id: "password",
+                                label: "Сменить пароль",
+                                onSelect: () => {
+                                  setPasswordClientId(client.id);
+                                  setPasswordDraft(generateAccessPassword());
+                                  setProfileOpenId("");
+                                  window.setTimeout(() => {
+                                    document
+                                      .getElementById(`client-password-${client.id}`)
+                                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                  }, 50);
+                                },
+                              },
                             ]
                           : []),
                         {
@@ -1040,7 +1330,7 @@ export function ManagerClients({
                                     tone: "danger",
                                   });
                                   if (ok) {
-                                    setApproval(client, "rejected");
+                                    requestApproval(client, "rejected");
                                   }
                                 },
                               },
@@ -1051,11 +1341,9 @@ export function ManagerClients({
                           ? [
                               {
                                 id: "allow",
-                                label: "Разрешить вход",
-                                disabled:
-                                  approvalBusyId === client.id ||
-                                  !client.emailVerified,
-                                onSelect: () => setApproval(client, "approved"),
+                                label: "Разрешить",
+                                disabled: approvalBusyId === client.id,
+                                onSelect: () => requestApproval(client, "approved"),
                               },
                             ]
                           : []),
@@ -1064,11 +1352,9 @@ export function ManagerClients({
                           ? [
                               {
                                 id: "approve",
-                                label: "Разрешить вход",
-                                disabled:
-                                  approvalBusyId === client.id ||
-                                  !client.emailVerified,
-                                onSelect: () => setApproval(client, "approved"),
+                                label: "Разрешить",
+                                disabled: approvalBusyId === client.id,
+                                onSelect: () => requestApproval(client, "approved"),
                               },
                               {
                                 id: "reject",
@@ -1085,7 +1371,7 @@ export function ManagerClients({
                                     tone: "danger",
                                   });
                                   if (ok) {
-                                    setApproval(client, "rejected");
+                                    requestApproval(client, "rejected");
                                   }
                                 },
                               },
@@ -1135,17 +1421,17 @@ export function ManagerClients({
                       <p>
                         {client.emailVerified
                           ? "Почта подтверждена — можно разрешить вход в Clover."
-                          : "Сначала клиент должен подтвердить электронную почту."}
+                          : "Почта ещё не подтверждена. Можно разрешить вход вручную."}
                       </p>
                     </div>
                     <div className="inline-actions">
                       <button
                         className="primary-button"
                         type="button"
-                        disabled={approvalBusyId === client.id || !client.emailVerified}
-                        onClick={() => setApproval(client, "approved")}
+                        disabled={approvalBusyId === client.id}
+                        onClick={() => requestApproval(client, "approved")}
                       >
-                        Разрешить вход
+                        Разрешить
                       </button>
                       <button
                         className="danger-button"
@@ -1161,7 +1447,7 @@ export function ManagerClients({
                             tone: "danger",
                           });
                           if (ok) {
-                            setApproval(client, "rejected");
+                            requestApproval(client, "rejected");
                           }
                         }}
                       >
@@ -1181,14 +1467,74 @@ export function ManagerClients({
                       <button
                         className="primary-button"
                         type="button"
-                        disabled={approvalBusyId === client.id || !client.emailVerified}
-                        onClick={() => setApproval(client, "approved")}
+                        disabled={approvalBusyId === client.id}
+                        onClick={() => requestApproval(client, "approved")}
                       >
-                        Разрешить вход
+                        Разрешить
                       </button>
                     </div>
                   </div>
                 )}
+
+                {client.isRegistered !== false &&
+                String(passwordClientId) === String(client.id) ? (
+                  <section
+                    className="client-profile-panel"
+                    id={`client-password-${client.id}`}
+                    style={{ marginTop: 15 }}
+                  >
+                    <div className="client-profile-panel-head">
+                      <div>
+                        <p className="eyebrow">Доступ</p>
+                        <h3>Сменить пароль</h3>
+                        <p className="muted small">
+                          Логин остаётся {client.email}. Матрица и заказы не меняются.
+                        </p>
+                      </div>
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => {
+                          setPasswordClientId("");
+                          setPasswordDraft("");
+                        }}
+                      >
+                        Закрыть
+                      </button>
+                    </div>
+                    <div className="form-grid" style={{ marginTop: 14 }}>
+                      <label className="field">
+                        Новый пароль
+                        <input
+                          type="text"
+                          autoComplete="new-password"
+                          value={passwordDraft}
+                          onChange={(event) => setPasswordDraft(event.target.value)}
+                          minLength={8}
+                          disabled={passwordBusy}
+                        />
+                      </label>
+                    </div>
+                    <div className="form-actions" style={{ marginTop: 14 }}>
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        disabled={passwordBusy}
+                        onClick={() => setPasswordDraft(generateAccessPassword())}
+                      >
+                        Сгенерировать пароль
+                      </button>
+                      <button
+                        className="primary-button"
+                        type="button"
+                        disabled={passwordBusy}
+                        onClick={() => saveClientPassword(client)}
+                      >
+                        {passwordBusy ? "Сохраняем..." : "Сохранить пароль"}
+                      </button>
+                    </div>
+                  </section>
+                ) : null}
 
                 {client.isRegistered !== false &&
                 String(profileOpenId) === String(client.id) ? (

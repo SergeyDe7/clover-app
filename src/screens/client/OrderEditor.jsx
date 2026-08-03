@@ -18,7 +18,6 @@ import {
   validateDeliveryDate,
 } from "../../shared/deliveryDateRules";
 import { ManagerContact } from "./ManagerContact";
-import { CustomItemForm } from "./CustomItemForm";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
 import { appAlert } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
@@ -215,6 +214,40 @@ export function OrderEditor({
     });
   }, [session.mode, settings.enableDrafts, selectedItems, customItems, deliveryDate, addressId, selectedAddress, clientComment]);
 
+  // Пока открыта корзина/календарь — фон страницы не листается (iOS/Android).
+  useEffect(() => {
+    if (!cartSheetOpen && !datePickerOpen) return undefined;
+    const html = document.documentElement;
+    const body = document.body;
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const previous = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyWidth: body.style.width,
+      bodyLeft: body.style.left,
+      bodyRight: body.style.right,
+    };
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    return () => {
+      html.style.overflow = previous.htmlOverflow;
+      body.style.overflow = previous.bodyOverflow;
+      body.style.position = previous.bodyPosition;
+      body.style.top = previous.bodyTop;
+      body.style.width = previous.bodyWidth;
+      body.style.left = previous.bodyLeft;
+      body.style.right = previous.bodyRight;
+      window.scrollTo(0, scrollY);
+    };
+  }, [cartSheetOpen, datePickerOpen]);
+
   const changeQuantity = (id, delta) => {
     setCart((current) => {
       const nextValue = Math.max(0, (Number(current[id]) || 0) + delta);
@@ -399,7 +432,12 @@ export function OrderEditor({
               )}
             </label>
             <label className="field" style={{ marginTop: 10 }}>Комментарий к заказу
-              <textarea rows="3" placeholder="Например: позвонить перед доставкой" value={clientComment} onChange={(e) => setClientComment(e.target.value)} />
+              <textarea
+                rows="3"
+                placeholder="Например: позвонить перед доставкой, запросить интересующий товар"
+                value={clientComment}
+                onChange={(e) => setClientComment(e.target.value)}
+              />
             </label>
             <div className="summary-total"><span>Итого</span><strong>{settings.showPrices && total > 0 ? formatMoney(total) : `${selectedItems.length + customItems.length} поз.`}</strong></div>
             {settings.enableDrafts && session.mode === "new" && <p className="summary-note">Черновик автоматически сохраняется в этом браузере.</p>}
@@ -423,8 +461,8 @@ export function OrderEditor({
             {catalogPolicy.matrixMode === "pending" && (
               <div className="matrix-catalog-note pending">
                 Менеджер ещё подготавливает ваш постоянный список
-                товаров и персональные цены. Пока можно добавить товар
-                через форму «Не нашли нужный товар?».
+                товаров и персональные цены. Нужный товар можно указать
+                в комментарии к заказу.
               </div>
             )}
 
@@ -522,7 +560,6 @@ export function OrderEditor({
                 );
               })}
               {!filtered.length && <div className="empty-box">Товары не найдены.</div>}
-              {settings.allowCustomItems && <CustomItemForm onAdd={(item) => setCustomItems((current) => [...current, item])} />}
             </section>
           </div>
         </div>
@@ -712,6 +749,16 @@ export function OrderEditor({
                 {missingFields.address && (
                   <span className="field-error-hint">Укажите адрес доставки</span>
                 )}
+              </label>
+
+              <label className="field cart-sheet-comment">
+                Комментарий к заказу
+                <textarea
+                  rows="3"
+                  placeholder="Например: позвонить перед доставкой, запросить интересующий товар"
+                  value={clientComment}
+                  onChange={(e) => setClientComment(e.target.value)}
+                />
               </label>
 
               <div className="cart-sheet-footer">

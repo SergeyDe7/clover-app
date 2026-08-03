@@ -4,9 +4,10 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#5b9d57" />
+    <!-- Тот же hex, что splash/thank-you — иначе на iOS видна «линия» под status bar -->
+    <meta name="theme-color" content="#d2e8cb" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Clover" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -15,24 +16,41 @@
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
     <title>Clover</title>
     <style>
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        min-height: 100dvh;
+        min-height: -webkit-fill-available;
+        background: #d2e8cb;
+        background-color: #d2e8cb;
+      }
       #clover-boot-splash {
         display: none;
         position: fixed;
-        inset: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        min-height: 100dvh;
+        min-height: 100lvh;
+        min-height: -webkit-fill-available;
         z-index: 2147483646;
         margin: 0;
+        padding: 0;
         place-items: center;
-        padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
-        background:
-          radial-gradient(circle at 28% 22%, rgba(182, 232, 122, 0.42), transparent 42%),
-          radial-gradient(circle at 78% 78%, rgba(91, 157, 87, 0.28), transparent 46%),
-          linear-gradient(165deg, #eef7ea 0%, #dcefd6 48%, #cfe6c8 100%);
+        box-sizing: border-box;
+        /* Только сплошной цвет — градиент даёт шов под status bar на iPhone */
+        background: #d2e8cb;
+        background-color: #d2e8cb;
         transition: opacity 0.38s ease, visibility 0.38s ease;
       }
       #clover-boot-splash img {
         display: block;
         width: min(220px, 58vw);
         height: auto;
+        margin-top: env(safe-area-inset-top, 0px);
         animation: clover-boot-logo-in 0.55s ease-out both;
       }
       #clover-boot-splash.is-done {

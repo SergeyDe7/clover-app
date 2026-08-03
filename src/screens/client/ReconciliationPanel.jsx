@@ -116,7 +116,7 @@ export function ReconciliationPanel({ requests = [], onReload }) {
               type="text"
               value={comment}
               onChange={(event) => setComment(event.target.value)}
-              placeholder="Необязательно"
+              placeholder="Если необходимо, продублируем на электронную почту. Напишите Ваш email"
             />
           </label>
           <div className="client-reconciliation-submit">

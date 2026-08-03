@@ -221,6 +221,11 @@ export function writeOpenManagerClientId(value) {
   } catch (error) {
     console.error("Не удалось сохранить открытую карточку клиента", error);
   }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("clover:open-manager-client", { detail: value ? String(value) : "" })
+    );
+  }
 }
 
 export const DEFAULT_PRODUCTS = [
@@ -675,7 +680,7 @@ export function printOrderDocument(order, settings) {
     </div>
     <table><thead><tr><th>№</th><th>Товар</th><th>Единица</th><th>Количество</th><th>Цена</th><th>Сумма</th></tr></thead><tbody>${itemRows}${customRows}</tbody></table>
     ${settings.showPrices ? `<div class="total">Итого: ${escapeHtml(formatMoney(getOrderTotal(order)))}</div>` : ""}
-    ${order.clientComment ? `<div class="note"><strong>Комментарий клиента:</strong><br>${escapeHtml(order.clientComment)}</div>` : ""}
+    ${order.clientComment ? `<div class="note"><strong>Комментарий</strong><br>${escapeHtml(order.clientComment)}</div>` : ""}
     ${order.managerComment ? `<div class="note"><strong>Комментарий менеджера:</strong><br>${escapeHtml(order.managerComment)}</div>` : ""}
     <div class="footer">Внешний ID: ${escapeHtml(order.externalId || order.id || "")}</div>
     <script>window.onload=()=>window.print();<\/script>
@@ -694,11 +699,15 @@ export const APP_STYLES = `
 html {
   width: 100%;
   max-width: 100%;
+  background: var(--clover-bg, #f4f8f2);
+  background-color: var(--clover-bg, #f4f8f2);
 }
 body {
   width: 100%;
   max-width: 100%;
   margin: 0;
+  background: var(--clover-bg, #f4f8f2);
+  background-color: var(--clover-bg, #f4f8f2);
 }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
@@ -812,15 +821,21 @@ textarea { resize: vertical; }
 .app-header {
   min-height: 56px;
   padding: 10px 5%;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background: #fff;
-  border-bottom: 1px solid #e1e9de;
+  background: transparent;
+  border-bottom: none;
   position: sticky;
   top: 0;
   z-index: 40;
+}
+@media (max-width: 900px) {
+  .app-header {
+    border-bottom: none;
+  }
 }
 .app-header-logo { display: block; width: 152px; max-width: 152px; max-height: 66px; height: auto; object-fit: contain; flex: 0 0 auto; }
 .app-header-logo-button {
@@ -1308,6 +1323,26 @@ textarea { resize: vertical; }
 .order-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .order-card-header h3 { margin: 7px 0 5px; color: #394639; font-size: 21px; }
 .order-card-header p { margin: 4px 0 0; color: #7b857b; font-size: 13px; }
+.order-header-comment {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f3f7f1;
+  color: #4c5a4c;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.order-header-comment-label {
+  margin: 0 0 2px;
+  color: #394639;
+  font-size: 12px;
+  font-weight: 800;
+}
+.order-header-comment-text {
+  margin: 0;
+  color: #5f6b5f;
+}
 .order-meta { display: grid; grid-template-columns: 170px minmax(0,1fr) 110px 130px; gap: 12px; margin: 18px 0; padding: 15px; border-radius: 14px; background: #f5f9f3; }
 .order-meta span { display: block; margin-bottom: 5px; color: #7a847a; font-size: 10px; text-transform: uppercase; }
 .order-meta strong { color: #465146; font-size: 13px; line-height: 1.45; }
@@ -1465,6 +1500,7 @@ textarea { resize: vertical; }
   position: fixed;
   inset: 0;
   z-index: 80;
+  overscroll-behavior: none;
 }
 .delivery-date-sheet-backdrop {
   position: absolute;
@@ -1473,6 +1509,7 @@ textarea { resize: vertical; }
   background: rgba(30, 42, 30, 0.45);
   cursor: pointer;
   animation: clover-sheet-backdrop-in 0.28s ease-out both;
+  touch-action: none;
 }
 .delivery-date-sheet-panel {
   position: absolute;
@@ -1482,6 +1519,8 @@ textarea { resize: vertical; }
   width: min(420px, calc(100% - 32px));
   max-height: min(90vh, 640px);
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 18px 16px;
   border-radius: 18px;
   background: #fff;
@@ -1748,22 +1787,19 @@ textarea { resize: vertical; }
   bottom: 0;
   left: 0;
   inset: 0;
-  width: 100vw;
-  width: 100dvw;
-  height: 100vh;
-  height: 100dvh;
-  min-height: 100vh;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
   min-height: 100dvh;
+  min-height: 100svh;
   min-height: -webkit-fill-available;
   z-index: 2147483000;
   display: grid;
   place-items: center;
   padding: max(20px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
-  background:
-    radial-gradient(circle at 20% 18%, rgba(126, 196, 108, 0.45), transparent 42%),
-    radial-gradient(circle at 82% 78%, rgba(74, 148, 78, 0.38), transparent 48%),
-    linear-gradient(160deg, #eef7ea 0%, #d9ecd4 45%, #c7e0c2 100%);
+  background: #d2e8cb;
+  background-color: #d2e8cb;
   animation: order-thankyou-fade-in 0.45s ease-out both;
   cursor: pointer;
   overscroll-behavior: none;
@@ -1775,6 +1811,8 @@ body.clover-thankyou-open {
   overflow: hidden !important;
   overscroll-behavior: none !important;
   height: 100% !important;
+  background: #d2e8cb !important;
+  background-color: #d2e8cb !important;
 }
 html.clover-thankyou-open #root {
   visibility: hidden !important;
@@ -1903,9 +1941,12 @@ html.clover-thankyou-open .app-header {
 .order-thankyou-mobile .order-thankyou-title {
   font-size: clamp(24px, 7vw, 32px);
 }
-.order-thankyou-mobile .order-thankyou-button {
+.order-thankyou-mobile > .order-thankyou-card > .order-thankyou-button,
+.order-thankyou-mobile .app-modal-actions-single .order-thankyou-button {
   width: min(280px, 100%);
   min-height: 52px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .order-thankyou-logo-wrap {
   position: relative;
@@ -2200,20 +2241,38 @@ html.clover-thankyou-open .app-header {
     gap: 8px;
   }
   .client-cabinet-nav .category-button { width: 100%; text-align: center; min-height: 42px; padding: 10px 12px; border-radius: 12px; font-size: 14px; }
-  .page-content-client { padding-bottom: 24px; }
+  .page-content-client { padding-bottom: 0; }
   .exchange-summary-strip { grid-template-columns: 1fr; }
   .order-thankyou {
-    width: 100vw;
-    width: 100dvw;
-    height: 100vh;
-    height: 100dvh;
-    min-height: 100vh;
+    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
     min-height: 100dvh;
+    min-height: 100svh;
     min-height: -webkit-fill-available;
+    padding: 0;
+    margin: 0;
+  }
+  .order-thankyou-mobile {
+    padding: 0 !important;
   }
   .order-thankyou-card {
     padding: 24px 18px 20px;
-    border-radius: 18px;
+  }
+  .order-thankyou-mobile .order-thankyou-card {
+    border-radius: 0;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    min-height: 100%;
+    box-shadow: none;
+    background: transparent;
+    border: none;
   }
   .order-thankyou-title {
     font-size: clamp(20px, 6.2vw, 26px);
@@ -2667,7 +2726,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     width: 100%;
     max-width: 100%;
     margin: 0;
-    padding: 0 0 88px;
+    padding: 0 0 calc(58px + env(safe-area-inset-bottom, 0px));
     min-width: 0;
     overflow-x: hidden;
   }
@@ -2796,6 +2855,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     position: fixed;
     inset: 0;
     z-index: 70;
+    overscroll-behavior: none;
   }
   .cart-sheet-backdrop {
     position: absolute;
@@ -2804,6 +2864,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     background: rgba(30, 42, 30, 0.45);
     cursor: pointer;
     animation: clover-sheet-backdrop-in 0.28s ease-out both;
+    touch-action: none;
   }
   .cart-sheet-panel {
     position: absolute;
@@ -2816,6 +2877,9 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     gap: 12px;
     max-height: 88vh;
     overflow: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
     padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
     border-radius: 18px 18px 0 0;
     background: #fff;
@@ -2876,7 +2940,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     background: #eef6eb;
   }
   .cart-sheet-total strong { color: #386f37; font-size: 18px; }
-  .catalog-content { padding-bottom: 88px; }
+  .catalog-content { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
   .product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
@@ -2950,7 +3014,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     bottom: 0;
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   }
-  .catalog-content { padding-bottom: 88px; }
+  .catalog-content { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
   .client-nav {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3020,7 +3084,15 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   }
 }
 @media (max-width: 700px) {
-  .app-header { align-items: center; min-height: 0; padding: 8px 4%; gap: 10px; }
+  .app-header {
+    align-items: center;
+    min-height: 0;
+    padding: 8px 4%;
+    padding-top: calc(8px + env(safe-area-inset-top, 0px));
+    gap: 10px;
+    background: transparent;
+    border-bottom: none;
+  }
   .app-header-logo { width: 96px; max-width: 96px; max-height: 52px; }
   .app-header-actions { align-items: center; flex-direction: row; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
   .manager-contact-popover { position: fixed; top: 64px; right: 4%; width: min(340px, 92vw); }
@@ -3035,12 +3107,12 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     min-width: 0;
     overflow-x: hidden;
   }
-  .catalog-content { padding-bottom: 88px; }
+  .catalog-content { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
   .page-content-client .embedded-catalog.catalog-content {
     width: 100%;
     max-width: 100%;
     margin: 0;
-    padding: 0 0 88px;
+    padding: 0 0 calc(58px + env(safe-area-inset-bottom, 0px));
     min-width: 0;
     overflow-x: hidden;
   }

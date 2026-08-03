@@ -1,11 +1,12 @@
 // Компоненты, общие для экрана клиента и экрана менеджера.
-import { Component, useEffect, useRef, useState } from "react";
+import { Component, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import cloverLogo from "../assets/clover-logo.png";
 import { startPasskeyRegistration } from "../utils/webauthn";
 import { api, setApiToken } from "../serverApi";
 import { formatDateTime } from "./appHelpers";
 import { appConfirm } from "./AppModal";
+import { lockThankYouScreen, THANKYOU_SCREEN_BG } from "./thankYouScreen";
 
 export class PanelErrorBoundary extends Component {
   constructor(props) {
@@ -439,6 +440,8 @@ export function PushSettings() {
 }
 
 /** Полноэкранная благодарность / успех (заказ, акт сверки и т.п.). */
+const THANKYOU_MOBILE_MQ = "(max-width: 900px), (pointer: coarse)";
+
 export function OrderThankYouOverlay({
   open,
   onDone,
@@ -448,14 +451,15 @@ export function OrderThankYouOverlay({
 }) {
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
+  const overlayRef = useRef(null);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined" || !window.matchMedia) return false;
-    return window.matchMedia("(max-width: 900px)").matches;
+    return window.matchMedia(THANKYOU_MOBILE_MQ).matches;
   });
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return undefined;
-    const media = window.matchMedia("(max-width: 900px)");
+    const media = window.matchMedia(THANKYOU_MOBILE_MQ);
     const sync = () => setIsMobile(media.matches);
     sync();
     if (media.addEventListener) {
@@ -465,6 +469,8 @@ export function OrderThankYouOverlay({
     media.addListener(sync);
     return () => media.removeListener(sync);
   }, []);
+
+  useLayoutEffect(() => lockThankYouScreen(Boolean(open), overlayRef), [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -525,8 +531,7 @@ export function OrderThankYouOverlay({
     boxSizing: "border-box",
     display: "grid",
     placeItems: "center",
-    background:
-      "radial-gradient(circle at 20% 18%, rgba(126, 196, 108, 0.45), transparent 42%), radial-gradient(circle at 82% 78%, rgba(74, 148, 78, 0.38), transparent 48%), linear-gradient(160deg, #eef7ea 0%, #d9ecd4 45%, #c7e0c2 100%)",
+    background: THANKYOU_SCREEN_BG,
     cursor: "pointer",
     overflow: "hidden",
     touchAction: "none",
@@ -556,6 +561,7 @@ export function OrderThankYouOverlay({
 
   return createPortal(
     <div
+      ref={overlayRef}
       className={`order-thankyou${isMobile ? " order-thankyou-mobile" : ""}`}
       role="dialog"
       aria-modal="true"

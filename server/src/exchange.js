@@ -218,11 +218,23 @@ export function validateOrderFor1C({ order, products, clientLinks }) {
   };
 }
 
+export function build1COrderComment(order) {
+  const number = String(order?.number || order?.displayId || "").trim();
+  const lines = [`Заказ Clover № ${number}`.trim()].filter(Boolean);
+  const clientComment = String(order?.clientComment || "").trim();
+  if (clientComment) {
+    lines.push("Комментарий");
+    lines.push(clientComment);
+  }
+  return lines.join("\n");
+}
+
 export function build1CPayload({ order, products, clientLinks }) {
   const validation = validateOrderFor1C({ order, products, clientLinks });
   const link = clientLinks?.[order?.clientId] || {};
   const productsById = productMap(products);
   const exchange = normalizeExchangeState(order?.exchange);
+  const comment = build1COrderComment(order);
 
   return {
     schema: "clover.order.1c",
@@ -241,6 +253,7 @@ export function build1CPayload({ order, products, clientLinks }) {
       exchangeStatus: exchange.status,
       clientComment: order?.clientComment || "",
       managerComment: order?.managerComment || "",
+      comment,
     },
     client: {
       cloverId: String(order?.clientId || ""),

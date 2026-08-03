@@ -133,7 +133,7 @@ export function ManagerReconciliation({ requests = [], onReload }) {
       open={successOpen}
       onDone={() => setSuccessOpen(false)}
       title="Акт сверки отправлен"
-      message="Файл успешно отправлен клиенту. Клиент получит уведомление."
+      message="Файл доступен клиенту в разделе «Акт сверки»."
       confirmLabel="Отлично"
     />
     </>

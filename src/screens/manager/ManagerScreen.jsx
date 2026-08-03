@@ -8,6 +8,7 @@ import {
   writeManagerActiveTab,
   readManagerMoreTab,
   writeManagerMoreTab,
+  writeOpenManagerClientId,
   normalizeOrderExchange,
   formatDateTime,
 } from "../../shared/appHelpers";
@@ -43,6 +44,9 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
     selectTab(managerNotificationTab(item));
     setMoreTab(readManagerMoreTab());
     setBellOpen(false);
+    if (item?.type === "client_registration" && item?.sourceId) {
+      writeOpenManagerClientId(String(item.sourceId));
+    }
     onReadNotification(item);
   };
 

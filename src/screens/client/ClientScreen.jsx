@@ -268,6 +268,14 @@ function ClientDashboard({
                       {order.status}
                     </span>
                     <h3>Заказ № {order.number}</h3>
+                    {String(order.clientComment || "").trim() ? (
+                      <div className="order-header-comment">
+                        <div className="order-header-comment-label">Комментарий</div>
+                        <div className="order-header-comment-text">
+                          {String(order.clientComment).trim()}
+                        </div>
+                      </div>
+                    ) : null}
                     <p>Создан: {formatDateTime(order.createdAt)}</p>
                   </div>
                   <div className="nowrap">

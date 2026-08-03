@@ -384,9 +384,17 @@ export function ManagerOrders({
                 </div>
                 <h3 className="manager-order-client">{order.customerName || "Клиент"}</h3>
                 <p>
-                  № {order.number || "—"}
+                  Заказ № {order.number || "—"}
                   {order.createdAt ? ` · создан ${formatDateTime(order.createdAt)}` : ""}
                 </p>
+                {String(order.clientComment || "").trim() ? (
+                  <div className="order-header-comment">
+                    <div className="order-header-comment-label">Комментарий</div>
+                    <div className="order-header-comment-text">
+                      {String(order.clientComment).trim()}
+                    </div>
+                  </div>
+                ) : null}
                 {(order.customerContact || order.customerPhone || order.customerEmail) && (
                   <p className="manager-order-contacts muted small">
                     {[order.customerContact, order.customerPhone, order.customerEmail].filter(Boolean).join(" · ")}

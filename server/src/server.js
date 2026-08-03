@@ -76,6 +76,7 @@ import {
 } from "./backups.js";
 import {
   assertSafeManagerOrderReplace,
+  build1COrderComment,
   build1CPayload,
   isOneCClaimExpired,
   normalizeExchangeState,
@@ -147,7 +148,6 @@ import {
   resetPasswordEmail,
   sendCloverMail,
   verificationEmail,
-  reconciliationReadyEmail,
   approvalEmail,
 } from "./mailer.js";
 import {
@@ -320,8 +320,40 @@ function createPlainToken() {
   return randomBytes(32).toString("base64url");
 }
 
+function isLoopbackHostname(hostname) {
+  const host = String(hostname || "")
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .split("%")[0];
+  return ["localhost", "127.0.0.1", "::1"].includes(host);
+}
+
 function publicBaseUrl(req) {
   const configured = String(process.env.APP_PUBLIC_URL || "").trim().replace(/\/$/, "");
+  const forwardedHost = String(req.get("x-forwarded-host") || "")
+    .split(",")[0]
+    .trim();
+  const forwardedProto = String(req.get("x-forwarded-proto") || req.protocol || "http")
+    .split(",")[0]
+    .trim();
+
+  // Если клиент открыл Clover по LAN IP (телефон), а APP_PUBLIC_URL = localhost —
+  // в письмо кладём тот же хост, с которого шла регистрация.
+  if (forwardedHost) {
+    const forwardedHostname = forwardedHost.split(":")[0];
+    let configuredIsLoopback = !configured;
+    if (configured) {
+      try {
+        configuredIsLoopback = isLoopbackHostname(new URL(configured).hostname);
+      } catch {
+        configuredIsLoopback = /localhost|127\.0\.0\.1/i.test(configured);
+      }
+    }
+    if (configuredIsLoopback && !isLoopbackHostname(forwardedHostname)) {
+      return `${forwardedProto}://${forwardedHost}`.replace(/\/$/, "");
+    }
+  }
+
   if (configured) return configured;
   return `${req.protocol}://${req.get("host")}`.replace(/\/$/, "");
 }
@@ -657,6 +689,12 @@ const registerSchema = z.object({
   contactName: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(5).max(50),
   email: z.string().trim().email().max(200),
+  password: z.string().min(8).max(200),
+});
+
+const managerClientProvisionSchema = registerSchema;
+
+const managerClientPasswordSchema = z.object({
   password: z.string().min(8).max(200),
 });
 
@@ -1215,77 +1253,11 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-app.post("/api/auth/register", async (req, res, next) => {
-  try {
-    const input = registerSchema.parse(req.body);
-    const email = normalizeEmail(input.email);
-
-    if (findUserByEmail(email)) {
-      return res.status(409).json({
-        error: "Аккаунт с такой почтой уже существует.",
-      });
-    }
-
-    const passwordHash = await bcrypt.hash(input.password, 12);
-    const user = createUser({
-      email,
-      passwordHash,
-      role: "client",
-      emailVerified: false,
-      approvalStatus: "pending",
-      profile: {
-        companyName: input.companyName,
-        contactName: input.contactName,
-        phone: input.phone,
-        email,
-      },
-    });
-
-    const plainToken = createPlainToken();
-    createAuthToken({
-      userId: user.id,
-      type: "verify_email",
-      tokenHash: tokenHash(plainToken),
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    });
-    const verifyUrl = `${publicBaseUrl(req)}/?verify=${encodeURIComponent(plainToken)}`;
-    const message = verificationEmail({ companyName: input.companyName, verifyUrl });
-    let mail = { sent: false, reason: "unknown" };
-    try {
-      mail = await sendCloverMail({ to: email, ...message });
-    } catch (mailError) {
-      console.error("Не удалось отправить письмо подтверждения", mailError);
-      mail = { sent: false, reason: "send_failed" };
-    }
-
-    writeAudit({
-      userId: user.id,
-      userEmail: user.email,
-      userRole: user.role,
-      action: "auth.register",
-      details: { companyName: input.companyName, mailSent: Boolean(mail.sent) },
-    });
-
-    queueManagerNotification({
-      type: "client_registration",
-      title: "Новая регистрация клиента",
-      body: `${input.companyName} · ${input.contactName} · ${input.phone}`,
-      url: `/?managerTab=clients&client=${encodeURIComponent(user.id)}`,
-      sourceId: user.id,
-    });
-
-    res.status(201).json({
-      ok: true,
-      requiresEmailVerification: true,
-      message: mail.sent
-        ? "Регистрация создана. Подтвердите электронную почту по ссылке из письма."
-        : "Регистрация создана. Отправка писем пока не настроена — используйте тестовую ссылку на этом компьютере.",
-      mail: { sent: Boolean(mail.sent), status: publicMailStatus() },
-      developmentLink: allowDevelopmentAuthLinks(req) ? verifyUrl : undefined,
-    });
-  } catch (error) {
-    next(error);
-  }
+app.post("/api/auth/register", async (req, res) => {
+  return res.status(403).json({
+    error: "Самостоятельная регистрация отключена. Доступ выдаёт менеджер Clover.",
+    code: "SELF_REGISTER_DISABLED",
+  });
 });
 
 app.post("/api/auth/verify-email", (req, res, next) => {
@@ -2544,7 +2516,7 @@ async function handleOneCTestOrder(req, res, next) {
           (sum, item) => sum + item.quantity * item.price,
           0
         ),
-        comment: `Заказ Clover № ${realOrder.number || realOrder.displayId || ""}`.trim(),
+        comment: build1COrderComment(realOrder),
       },
     });
   } catch (error) {
@@ -4695,35 +4667,8 @@ app.post(
         url: "/?section=reconciliation", tag: `reconciliation-${request.id}`,
       }).catch((error) => console.error(error));
 
-      const clientUser = findUserById(request.userId);
-      let mail = { sent: false, reason: "account_not_found" };
-      if (clientUser?.email) {
-        const clientState = getClientState(clientUser.id);
-        const period = request.periodType === "all"
-          ? "за весь период"
-          : request.dateFrom && request.dateTo
-            ? `${request.dateFrom} — ${request.dateTo}`
-            : "";
-        const message = reconciliationReadyEmail({
-          companyName: clientState.profile?.companyName || "",
-          period,
-        });
-        try {
-          mail = await sendCloverMail({
-            to: clientUser.email,
-            ...message,
-            attachments: [{
-              filename: request.fileName || "Акт-сверки.pdf",
-              path: req.file.path,
-              contentType: "application/pdf",
-            }],
-          });
-        } catch (mailError) {
-          console.error("Reconciliation email error", mailError);
-          mail = { sent: false, reason: "send_failed" };
-        }
-      }
-      res.json({ ok: true, request, mail: { sent: Boolean(mail.sent) } });
+      // PDF только в кабинете Clover — дублирование на email отключено.
+      res.json({ ok: true, request, mail: { sent: false, reason: "email_disabled" } });
     } catch (error) { next(error); }
   }
 );
@@ -4748,26 +4693,115 @@ app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("m
   }
   const user = setUserApprovalStatus(req.params.clientId, status);
   if (!user) return res.status(404).json({ error: "Клиент не найден." });
-  auditFromRequest(req, "client.approval", { clientId: user.id, status });
+  // Разрешение менеджером = доверенный доступ: почту тоже считаем подтверждённой,
+  // иначе вход блокируется EMAIL_NOT_VERIFIED даже после «Разрешить».
+  if (status === "approved" && !user.email_verified) {
+    setUserEmailVerified(user.id, true);
+  }
+  const refreshed = findUserById(user.id) || user;
+  auditFromRequest(req, "client.approval", {
+    clientId: refreshed.id,
+    status,
+    emailVerified: Boolean(refreshed.email_verified),
+  });
   if (["approved", "rejected"].includes(status)) {
-    markManagerNotificationsReadBySource("client_registration", user.id);
+    markManagerNotificationsReadBySource("client_registration", refreshed.id);
   }
   let mail = { sent: false };
-  if (["approved", "rejected"].includes(status) && user.email) {
+  if (["approved", "rejected"].includes(status) && refreshed.email) {
     try {
-      mail = await sendCloverMail({ to: user.email, ...approvalEmail({ approved: status === "approved" }) });
+      mail = await sendCloverMail({
+        to: refreshed.email,
+        ...approvalEmail({ approved: status === "approved" }),
+      });
     } catch (mailError) {
       console.error("Approval email error", mailError);
     }
   }
   res.json({
     ok: true,
-    user: publicUser(user),
+    user: publicUser(refreshed),
     clients: listClients(),
     mail: { sent: Boolean(mail.sent) },
     managerNotifications: listManagerNotifications({ limit: 100 }),
   });
 });
+
+app.post("/api/admin/clients", authRequired, roleRequired("manager"), async (req, res, next) => {
+  try {
+    const input = managerClientProvisionSchema.parse(req.body);
+    const email = normalizeEmail(input.email);
+    if (findUserByEmail(email)) {
+      return res.status(409).json({ error: "Аккаунт с такой почтой уже существует." });
+    }
+    const passwordHash = await bcrypt.hash(input.password, 12);
+    const user = createUser({
+      email,
+      passwordHash,
+      role: "client",
+      emailVerified: true,
+      approvalStatus: "approved",
+      profile: {
+        companyName: input.companyName,
+        contactName: input.contactName,
+        phone: input.phone,
+        email,
+      },
+    });
+    auditFromRequest(req, "client.provision", {
+      clientId: user.id,
+      email,
+      companyName: input.companyName,
+    });
+    res.status(201).json({
+      ok: true,
+      message: "Клиент создан. Можно выдать логин и пароль.",
+      client: listClients().find((item) => String(item.id) === String(user.id)) || null,
+      user: publicUser(user),
+      clients: listClients(),
+      login: email,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post(
+  "/api/admin/clients/:clientId/password",
+  authRequired,
+  roleRequired("manager"),
+  async (req, res, next) => {
+    try {
+      const input = managerClientPasswordSchema.parse(req.body);
+      const clientUser = findUserById(req.params.clientId);
+      if (!clientUser || clientUser.role !== "client") {
+        return res.status(404).json({ error: "Клиент Clover не найден." });
+      }
+      const passwordHash = await bcrypt.hash(input.password, 12);
+      const updated = updateUserPassword(clientUser.id, passwordHash);
+      // Чтобы клиент мог войти сразу после выдачи пароля менеджером.
+      if (!updated?.email_verified) {
+        setUserEmailVerified(clientUser.id, true);
+      }
+      if (updated?.approval_status !== "approved") {
+        setUserApprovalStatus(clientUser.id, "approved");
+      }
+      const refreshed = findUserById(clientUser.id) || updated;
+      auditFromRequest(req, "client.password.set_by_manager", {
+        clientId: clientUser.id,
+      });
+      res.json({
+        ok: true,
+        message: "Пароль обновлён. Можно выдать клиенту логин и новый пароль.",
+        user: publicUser(refreshed),
+        login: refreshed?.email || clientUser.email,
+        clients: listClients(),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 app.get("/api/admin/notifications", authRequired, roleRequired("manager"), (req, res) => {
   const unreadOnly = String(req.query?.unread || "") === "1";
@@ -4880,6 +4914,19 @@ app.post(
     res.json({ ok: true });
   }
 );
+
+// Ссылка из письма иногда попадает на порт API (4100) — перенаправляем на UI.
+app.get(["/", "/index.html"], (req, res) => {
+  const configured = String(process.env.APP_PUBLIC_URL || "").trim().replace(/\/$/, "");
+  if (!configured) {
+    return res
+      .status(404)
+      .type("text")
+      .send("Откройте интерфейс Clover (обычно порт 5273), а не API-сервер.");
+  }
+  const search = new URL(req.originalUrl || "/", "http://local").search || "";
+  return res.redirect(302, `${configured}${search}`);
+});
 
 app.use((error, req, res, next) => {
   console.error(error);

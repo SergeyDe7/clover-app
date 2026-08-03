@@ -287,6 +287,20 @@ export const api = {
     });
   },
 
+  createClientAccess(data) {
+    return request("/admin/clients", {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  setClientPassword(clientId, password) {
+    return request(`/admin/clients/${encodeURIComponent(clientId)}/password`, {
+      method: "POST",
+      body: { password },
+    });
+  },
+
   migrateClient(data) {
     return request("/migrate/client", {
       method: "POST",
