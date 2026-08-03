@@ -29,10 +29,26 @@ assert.deepEqual(ORDER_STATUSES, [
 ]);
 
 assert.equal(canTransitionOrderStatus("Новый", "Принят"), true);
-assert.equal(canTransitionOrderStatus("Новый", "Выполнен"), false);
+assert.equal(canTransitionOrderStatus("Новый", "Выполнен"), true);
+assert.equal(canTransitionOrderStatus("Принят", "Выполнен"), true);
+assert.equal(canTransitionOrderStatus("Принят", "Новый"), false);
 assert.equal(canTransitionOrderStatus("Принят", "Принят"), true);
 assert.equal(canTransitionOrderStatus("Выполнен", "Отменён"), false);
-assert.deepEqual(allowedNextOrderStatuses("Новый"), ["Новый", "Принят", "Отменён"]);
+assert.deepEqual(allowedNextOrderStatuses("Новый"), [
+  "Новый",
+  "Принят",
+  "Собирается",
+  "Готов к доставке",
+  "Выполнен",
+  "Отменён",
+]);
+assert.deepEqual(allowedNextOrderStatuses("Принят"), [
+  "Принят",
+  "Собирается",
+  "Готов к доставке",
+  "Выполнен",
+  "Отменён",
+]);
 
 const clientKeep = enforceOrderStatusChange({
   previous: { status: "Принят" },
@@ -65,6 +81,15 @@ assert.equal(
     previous: { status: "Новый" },
     incoming: { status: "Выполнен" },
     role: "manager",
+  }).ok,
+  true
+);
+
+assert.equal(
+  enforceOrderStatusChange({
+    previous: { status: "Принят" },
+    incoming: { status: "Новый" },
+    role: "manager",
   }).code,
   "ORDER_STATUS_TRANSITION_FORBIDDEN"
 );
@@ -93,9 +118,17 @@ assert.equal(policy.ok, true);
 assert.equal(policy.orders[0].status, "Принят");
 assert.equal(policy.orders[1].status, "Собирается");
 
-const badPolicy = applyOrderStatusPolicy({
+const forwardPolicy = applyOrderStatusPolicy({
   previousById: new Map([["a", { id: "a", status: "Новый" }]]),
   orders: [{ id: "a", status: "Выполнен" }],
+  role: "manager",
+});
+assert.equal(forwardPolicy.ok, true);
+assert.equal(forwardPolicy.orders[0].status, "Выполнен");
+
+const badPolicy = applyOrderStatusPolicy({
+  previousById: new Map([["a", { id: "a", status: "Принят" }]]),
+  orders: [{ id: "a", status: "Новый" }],
   role: "manager",
 });
 assert.equal(badPolicy.ok, false);
@@ -119,13 +152,21 @@ const unchanged = buildStatusUpdatedOrder(
 assert.equal(unchanged.ok, true);
 assert.equal(unchanged.unchanged, true);
 
-const forbiddenPatch = buildStatusUpdatedOrder(
+const completedPatch = buildStatusUpdatedOrder(
   { id: "o1", status: "Новый", history: [] },
   "Выполнен",
+  { role: "manager", historyId: "h-done" }
+);
+assert.equal(completedPatch.ok, true);
+assert.equal(completedPatch.order.status, "Выполнен");
+
+const reversePatch = buildStatusUpdatedOrder(
+  { id: "o1", status: "Выполнен", history: [] },
+  "Принят",
   { role: "manager" }
 );
-assert.equal(forbiddenPatch.ok, false);
-assert.equal(forbiddenPatch.code, "ORDER_STATUS_TRANSITION_FORBIDDEN");
+assert.equal(reversePatch.ok, false);
+assert.equal(reversePatch.code, "ORDER_STATUS_TRANSITION_FORBIDDEN");
 
 const fromOneC = applyOneCAcceptedStatus(
   { id: "o2", status: "Новый", history: [] },

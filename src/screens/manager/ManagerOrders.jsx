@@ -379,7 +379,25 @@ export function ManagerOrders({
               />
               <div className="manager-order-select-body">
                 <div className="exchange-status-line">
-                  <span className={`badge ${statusClass(order.status)}`}>{order.status}</span>
+                  {inTrash ? (
+                    <span className={`badge ${statusClass(order.status)}`}>{order.status}</span>
+                  ) : (
+                    <select
+                      className={`badge ${statusClass(order.status)} manager-order-status-select`}
+                      value={order.status || "Новый"}
+                      aria-label={`Статус заказа ${order.number || ""}`}
+                      onClick={(event) => event.stopPropagation()}
+                      onChange={(event) => {
+                        const nextStatus = event.target.value;
+                        if (nextStatus === order.status) return;
+                        onUpdateOrder(order.id, { status: nextStatus });
+                      }}
+                    >
+                      {allowedNextOrderStatuses(order.status).map((item) => (
+                        <option key={item} value={item}>{item}</option>
+                      ))}
+                    </select>
+                  )}
                   <span className={`badge ${exchangeBadgeClass(exchange.status)}`}>1С: {EXCHANGE_STATUS_LABELS[exchange.status]}</span>
                 </div>
                 <h3 className="manager-order-client">{order.customerName || "Клиент"}</h3>

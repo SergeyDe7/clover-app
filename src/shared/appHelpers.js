@@ -1232,6 +1232,21 @@ textarea { resize: vertical; }
 .manager-order-card-header .exchange-status-line {
   margin: 0 0 4px;
 }
+.manager-order-status-select {
+  appearance: auto;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  max-width: 100%;
+  padding: 4px 8px;
+}
+.manager-order-status-select:focus-visible {
+  outline: 2px solid #5b9d57;
+  outline-offset: 2px;
+}
 .manager-order-card-header h3.manager-order-client,
 .manager-order-client {
   margin: 4px 0 2px;
