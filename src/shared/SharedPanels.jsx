@@ -204,7 +204,7 @@ export function CustomRequestPhoto({ photo, className = "" }) {
   );
 }
 
-export function PasswordSecurityPanel() {
+export function PasswordSecurityPanel({ allowPasswordChange = true } = {}) {
   const [form, setForm] = useState({ currentPassword: "", newPassword: "", repeatPassword: "" });
   const [busy, setBusy] = useState(false);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
@@ -305,14 +305,24 @@ export function PasswordSecurityPanel() {
   return (
     <section className="panel compact-panel">
       <div className="panel-heading">
-        <div><p className="eyebrow">Безопасность</p><h2>Пароль и вход по устройству</h2><p>Можно входить по паролю либо через Face ID, отпечаток или код блокировки телефона.</p></div>
+        <div>
+          <p className="eyebrow">Безопасность</p>
+          <h2>{allowPasswordChange ? "Пароль и вход по устройству" : "Вход по устройству"}</h2>
+          <p>
+            {allowPasswordChange
+              ? "Можно входить по паролю либо через Face ID, отпечаток или код блокировки телефона."
+              : "Можно включить вход через Face ID, отпечаток или код блокировки телефона. Смену пароля выполняет менеджер."}
+          </p>
+        </div>
       </div>
-      <form className="form-grid security-form" onSubmit={submit}>
-        <label className="field">Текущий пароль<input type="password" autoComplete="current-password" value={form.currentPassword} onChange={(event) => setForm({ ...form, currentPassword: event.target.value })} required /></label>
-        <label className="field">Новый пароль<input type="password" autoComplete="new-password" minLength="8" value={form.newPassword} onChange={(event) => setForm({ ...form, newPassword: event.target.value })} required /></label>
-        <label className="field">Повторите новый пароль<input type="password" autoComplete="new-password" minLength="8" value={form.repeatPassword} onChange={(event) => setForm({ ...form, repeatPassword: event.target.value })} required /></label>
-        <div className="form-actions"><button className="primary-button" disabled={busy} type="submit">{busy ? "Сохраняем…" : "Изменить пароль"}</button></div>
-      </form>
+      {allowPasswordChange ? (
+        <form className="form-grid security-form" onSubmit={submit}>
+          <label className="field">Текущий пароль<input type="password" autoComplete="current-password" value={form.currentPassword} onChange={(event) => setForm({ ...form, currentPassword: event.target.value })} required /></label>
+          <label className="field">Новый пароль<input type="password" autoComplete="new-password" minLength="8" value={form.newPassword} onChange={(event) => setForm({ ...form, newPassword: event.target.value })} required /></label>
+          <label className="field">Повторите новый пароль<input type="password" autoComplete="new-password" minLength="8" value={form.repeatPassword} onChange={(event) => setForm({ ...form, repeatPassword: event.target.value })} required /></label>
+          <div className="form-actions"><button className="primary-button" disabled={busy} type="submit">{busy ? "Сохраняем…" : "Изменить пароль"}</button></div>
+        </form>
+      ) : null}
       <div className="form-actions session-actions">
         <button className="secondary-button" type="button" disabled={busy} onClick={endOtherSessions}>
           Завершить другие сессии

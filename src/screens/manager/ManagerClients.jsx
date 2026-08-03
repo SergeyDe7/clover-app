@@ -1230,6 +1230,132 @@ export function ManagerClients({
 
             return (
               <article className="client-card" key={client.id} id={`client-card-${client.id}`}>
+                <ClientCardMenu
+                  open={String(openMenuId) === String(client.id)}
+                  onToggle={() =>
+                    setOpenMenuId((current) =>
+                      String(current) === String(client.id) ? "" : client.id
+                    )
+                  }
+                  onClose={() => setOpenMenuId("")}
+                  items={[
+                    ...(client.isRegistered !== false
+                      ? [
+                          {
+                            id: "profile",
+                            label: "Данные клиента",
+                            onSelect: () => {
+                              setProfileOpenId(client.id);
+                              window.setTimeout(() => {
+                                document
+                                  .getElementById(`client-profile-${client.id}`)
+                                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                              }, 50);
+                            },
+                          },
+                          {
+                            id: "password",
+                            label: "Сменить пароль",
+                            onSelect: () => {
+                              setPasswordClientId(client.id);
+                              setPasswordDraft(generateAccessPassword());
+                              setProfileOpenId("");
+                              window.setTimeout(() => {
+                                document
+                                  .getElementById(`client-password-${client.id}`)
+                                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                              }, 50);
+                            },
+                          },
+                        ]
+                      : []),
+                    {
+                      id: "matrix",
+                      label: "Матрица и 1С",
+                      onSelect: () => {
+                        setOpenClientId(client.id);
+                        writeOpenManagerClientId(client.id);
+                        window.setTimeout(() => {
+                          const target = document.getElementById(
+                            `client-matrix-${client.id}`
+                          );
+                          if (target instanceof HTMLDetailsElement) {
+                            target.open = true;
+                          }
+                          target?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                          });
+                        }, 50);
+                      },
+                    },
+                    ...(client.isRegistered !== false &&
+                    client.approvalStatus === "approved"
+                      ? [
+                          {
+                            id: "block",
+                            label: "Заблокировать вход",
+                            danger: true,
+                            disabled: approvalBusyId === client.id,
+                            onSelect: async () => {
+                              const ok = await appConfirm({
+                                title: "Заблокировать вход?",
+                                message:
+                                  "Заблокировать вход этому клиенту? Он не сможет войти в Clover, пока вы снова не разрешите доступ.",
+                                confirmLabel: "Заблокировать",
+                                cancelLabel: "Отмена",
+                                tone: "danger",
+                              });
+                              if (ok) {
+                                requestApproval(client, "rejected");
+                              }
+                            },
+                          },
+                        ]
+                      : []),
+                    ...(client.isRegistered !== false &&
+                    client.approvalStatus === "rejected"
+                      ? [
+                          {
+                            id: "allow",
+                            label: "Разрешить",
+                            disabled: approvalBusyId === client.id,
+                            onSelect: () => requestApproval(client, "approved"),
+                          },
+                        ]
+                      : []),
+                    ...(client.isRegistered !== false &&
+                    client.approvalStatus === "pending"
+                      ? [
+                          {
+                            id: "approve",
+                            label: "Разрешить",
+                            disabled: approvalBusyId === client.id,
+                            onSelect: () => requestApproval(client, "approved"),
+                          },
+                          {
+                            id: "reject",
+                            label: "Отклонить регистрацию",
+                            danger: true,
+                            disabled: approvalBusyId === client.id,
+                            onSelect: async () => {
+                              const ok = await appConfirm({
+                                title: "Отклонить регистрацию?",
+                                message:
+                                  "Отклонить регистрацию? Клиент не сможет войти, пока доступ не разрешат снова.",
+                                confirmLabel: "Отклонить",
+                                cancelLabel: "Отмена",
+                                tone: "danger",
+                              });
+                              if (ok) {
+                                requestApproval(client, "rejected");
+                              }
+                            },
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
                 <div className="client-card-header">
                   <div>
                     <span
@@ -1253,132 +1379,6 @@ export function ManagerClients({
                   </div>
                   <div className="client-card-header-actions">
                     <strong>{client.orders.length} заказов</strong>
-                    <ClientCardMenu
-                      open={String(openMenuId) === String(client.id)}
-                      onToggle={() =>
-                        setOpenMenuId((current) =>
-                          String(current) === String(client.id) ? "" : client.id
-                        )
-                      }
-                      onClose={() => setOpenMenuId("")}
-                      items={[
-                        ...(client.isRegistered !== false
-                          ? [
-                              {
-                                id: "profile",
-                                label: "Данные клиента",
-                                onSelect: () => {
-                                  setProfileOpenId(client.id);
-                                  window.setTimeout(() => {
-                                    document
-                                      .getElementById(`client-profile-${client.id}`)
-                                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                                  }, 50);
-                                },
-                              },
-                              {
-                                id: "password",
-                                label: "Сменить пароль",
-                                onSelect: () => {
-                                  setPasswordClientId(client.id);
-                                  setPasswordDraft(generateAccessPassword());
-                                  setProfileOpenId("");
-                                  window.setTimeout(() => {
-                                    document
-                                      .getElementById(`client-password-${client.id}`)
-                                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                                  }, 50);
-                                },
-                              },
-                            ]
-                          : []),
-                        {
-                          id: "matrix",
-                          label: "Матрица и 1С",
-                          onSelect: () => {
-                            setOpenClientId(client.id);
-                            writeOpenManagerClientId(client.id);
-                            window.setTimeout(() => {
-                              const target = document.getElementById(
-                                `client-matrix-${client.id}`
-                              );
-                              if (target instanceof HTMLDetailsElement) {
-                                target.open = true;
-                              }
-                              target?.scrollIntoView({
-                                behavior: "smooth",
-                                block: "start",
-                              });
-                            }, 50);
-                          },
-                        },
-                        ...(client.isRegistered !== false &&
-                        client.approvalStatus === "approved"
-                          ? [
-                              {
-                                id: "block",
-                                label: "Заблокировать вход",
-                                danger: true,
-                                disabled: approvalBusyId === client.id,
-                                onSelect: async () => {
-                                  const ok = await appConfirm({
-                                    title: "Заблокировать вход?",
-                                    message:
-                                      "Заблокировать вход этому клиенту? Он не сможет войти в Clover, пока вы снова не разрешите доступ.",
-                                    confirmLabel: "Заблокировать",
-                                    cancelLabel: "Отмена",
-                                    tone: "danger",
-                                  });
-                                  if (ok) {
-                                    requestApproval(client, "rejected");
-                                  }
-                                },
-                              },
-                            ]
-                          : []),
-                        ...(client.isRegistered !== false &&
-                        client.approvalStatus === "rejected"
-                          ? [
-                              {
-                                id: "allow",
-                                label: "Разрешить",
-                                disabled: approvalBusyId === client.id,
-                                onSelect: () => requestApproval(client, "approved"),
-                              },
-                            ]
-                          : []),
-                        ...(client.isRegistered !== false &&
-                        client.approvalStatus === "pending"
-                          ? [
-                              {
-                                id: "approve",
-                                label: "Разрешить",
-                                disabled: approvalBusyId === client.id,
-                                onSelect: () => requestApproval(client, "approved"),
-                              },
-                              {
-                                id: "reject",
-                                label: "Отклонить регистрацию",
-                                danger: true,
-                                disabled: approvalBusyId === client.id,
-                                onSelect: async () => {
-                                  const ok = await appConfirm({
-                                    title: "Отклонить регистрацию?",
-                                    message:
-                                      "Отклонить регистрацию? Клиент не сможет войти, пока доступ не разрешат снова.",
-                                    confirmLabel: "Отклонить",
-                                    cancelLabel: "Отмена",
-                                    tone: "danger",
-                                  });
-                                  if (ok) {
-                                    requestApproval(client, "rejected");
-                                  }
-                                },
-                              },
-                            ]
-                          : []),
-                      ]}
-                    />
                   </div>
                 </div>
 

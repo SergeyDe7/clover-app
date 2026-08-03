@@ -709,6 +709,14 @@ button{cursor:pointer}
   line-height: 1.45;
 }
 
+.client-card {
+  position: relative;
+}
+
+.client-card-header {
+  padding-right: 48px;
+}
+
 .client-card-header-actions {
   display: flex;
   align-items: flex-start;
@@ -716,7 +724,10 @@ button{cursor:pointer}
 }
 
 .client-card-menu {
-  position: relative;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 20;
   flex-shrink: 0;
 }
 

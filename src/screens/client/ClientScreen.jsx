@@ -34,7 +34,6 @@ import { ProfilePanel } from "./ProfilePanel";
 import { AddressesPanel } from "./AddressesPanel";
 import { OrderEditor } from "./OrderEditor";
 import { ReconciliationPanel } from "./ReconciliationPanel";
-import { ClientMatrixPanel } from "./ClientMatrixPanel";
 
 const NARROW_MQ = CLIENT_NARROW_MQ;
 const ORDER_HISTORY_FILTERS = ["Активные", "Все", "Выполнен", "Отменён"];
@@ -74,7 +73,6 @@ function ClientDashboard({
   onLogout,
   catalogSession,
   products,
-  matrixProducts,
   favorites,
   setFavorites,
   showFullCatalog,
@@ -442,35 +440,12 @@ function ClientDashboard({
     </section>
   );
 
-  const matrixPanel = (
-    <div className="panel" style={{ padding: 16 }}>
-      <div className="panel-heading" style={{ marginBottom: 14 }}>
-        <div>
-          <p className="eyebrow">Каталог</p>
-          <h2>Моя Матрица</h2>
-          <p className="muted small">Ваши постоянные товары и цены</p>
-        </div>
-      </div>
-      <ClientMatrixPanel
-        products={matrixProducts}
-        settings={settings}
-        catalogPolicy={catalogPolicy}
-        favorites={favorites}
-        setFavorites={setFavorites}
-        onCreateOrder={() => {
-          onNew({ forceNew: true });
-          selectTab("home");
-        }}
-      />
-    </div>
-  );
-
   const cabinetDesktop = (
     <div className="client-cabinet-stack">
       <ProfilePanel profile={profile} onChange={setProfile} />
       <AddressesPanel addresses={addresses} onChange={setAddresses} />
       <PushSettings />
-      <PasswordSecurityPanel />
+      <PasswordSecurityPanel allowPasswordChange={false} />
     </div>
   );
 
@@ -500,7 +475,7 @@ function ClientDashboard({
         <div className="client-settings-stack">
           <ProfilePanel profile={profile} onChange={setProfile} />
           <PushSettings />
-          <PasswordSecurityPanel />
+          <PasswordSecurityPanel allowPasswordChange={false} />
         </div>
       )}
     </div>
@@ -611,8 +586,6 @@ function ClientDashboard({
         )}
 
         {tab === "orders" && ordersPanel}
-
-        {tab === "matrix" && matrixPanel}
 
         {tab === "reconciliation" && (
           <ReconciliationPanel
