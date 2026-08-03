@@ -45,6 +45,18 @@ function getDeliveryDateParts(value) {
   }
 }
 
+/** Один адрес — берём его; несколько — только явный выбор (заказ/черновик) или пусто. */
+function resolveCheckoutAddressId(addresses, preferredId) {
+  const list = Array.isArray(addresses) ? addresses : [];
+  if (preferredId && list.some((item) => item.id === preferredId)) {
+    return preferredId;
+  }
+  if (list.length === 1) {
+    return list[0].id;
+  }
+  return "";
+}
+
 export function OrderEditor({
   session,
   products,
@@ -62,7 +74,6 @@ export function OrderEditor({
   embedded = false,
 }) {
   const initialOrder = session.order || null;
-  const defaultAddress = addresses.find((item) => item.isDefault) || addresses[0];
   const savedDraft = session.mode === "new" && settings.enableDrafts ? safeRead(STORAGE.draft, null) : null;
   const initialSource = initialOrder || savedDraft || {};
 
@@ -98,7 +109,9 @@ export function OrderEditor({
   });
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [cartSheetOpen, setCartSheetOpen] = useState(false);
-  const [addressId, setAddressId] = useState(initialSource.addressId || defaultAddress?.id || "");
+  const [addressId, setAddressId] = useState(() =>
+    resolveCheckoutAddressId(addresses, initialSource.addressId || "")
+  );
   const [clientComment, setClientComment] = useState(initialSource.clientComment || "");
   const [missingFields, setMissingFields] = useState({ date: false, address: false });
   const summaryDateFieldRef = useRef(null);
@@ -106,6 +119,16 @@ export function OrderEditor({
   const cartDateFieldRef = useRef(null);
   const cartAddressFieldRef = useRef(null);
   const earliestDeliveryDate = getEarliestDeliveryDateIso();
+
+  // Один адрес в списке — всегда подставляем автоматически.
+  useEffect(() => {
+    if (addresses.length !== 1) return;
+    const soleId = addresses[0].id;
+    if (addressId !== soleId) {
+      setAddressId(soleId);
+      setMissingFields((current) => ({ ...current, address: false }));
+    }
+  }, [addresses, addressId]);
 
   const updateDeliveryDate = async (value) => {
     if (!value) {
@@ -254,19 +277,12 @@ export function OrderEditor({
       });
       return;
     }
+
+    // 1) Сначала дата.
     const dateMissing = !deliveryDate;
-    const addressMissing = !selectedAddress;
-    if (dateMissing || addressMissing) {
-      focusMissingFields(dateMissing, addressMissing);
-      if (dateMissing) {
-        setDatePickerOpen(true);
-        return;
-      }
-      await appAlert({
-        title: "Укажите адрес доставки",
-        message: "Выберите адрес из списка или добавьте новый.",
-        tone: "warn",
-      });
+    if (dateMissing) {
+      focusMissingFields(true, false);
+      setDatePickerOpen(true);
       return;
     }
     const dateCheck = validateDeliveryDate(deliveryDate);
@@ -276,14 +292,35 @@ export function OrderEditor({
       setDatePickerOpen(true);
       return;
     }
+
+    // 2) Адрес: один — автоматически; несколько — явным выбором.
+    let checkoutAddressId = addressId;
+    let checkoutAddress = addresses.find((item) => item.id === checkoutAddressId) || null;
+    if (!checkoutAddress && addresses.length === 1) {
+      checkoutAddressId = addresses[0].id;
+      checkoutAddress = addresses[0];
+      setAddressId(checkoutAddressId);
+    }
+    if (!checkoutAddress) {
+      focusMissingFields(false, true);
+      await appAlert({
+        title: "Укажите адрес доставки",
+        message: addresses.length > 1
+          ? "У вас несколько адресов. Выберите, куда доставить заказ."
+          : "Выберите адрес из списка или добавьте новый.",
+        tone: "warn",
+      });
+      return;
+    }
+
     setMissingFields({ date: false, address: false });
     onSave({
       items: selectedItems,
       customItems,
       firstDeliveryDate: deliveryDate,
-      addressId,
-      address: selectedAddress.address,
-      addressLabel: selectedAddress.label,
+      addressId: checkoutAddressId,
+      address: checkoutAddress.address,
+      addressLabel: checkoutAddress.label,
       clientComment: clientComment.trim(),
     });
     localStorage.removeItem(STORAGE.draft);
@@ -293,6 +330,7 @@ export function OrderEditor({
   const confirmDeliveryDateAndSubmit = () => {
     if (!deliveryDate || !validateDeliveryDate(deliveryDate).ok) return;
     setDatePickerOpen(false);
+    // После даты: один адрес подставится сам; при нескольких — спросим адрес.
     void submitOrder();
   };
 
