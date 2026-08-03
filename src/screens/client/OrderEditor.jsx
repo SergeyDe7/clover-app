@@ -426,7 +426,6 @@ export function OrderEditor({
               <select
                 value={addressId}
                 onChange={(e) => updateAddressId(e.target.value)}
-                required
                 aria-invalid={missingFields.address}
               >
                 <option value="">Выберите адрес</option>
