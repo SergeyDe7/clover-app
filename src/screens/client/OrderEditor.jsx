@@ -18,7 +18,6 @@ import {
   validateDeliveryDate,
 } from "../../shared/deliveryDateRules";
 import { ManagerContact } from "./ManagerContact";
-import { CustomItemForm } from "./CustomItemForm";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
 import { appAlert } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
@@ -69,6 +68,10 @@ export function OrderEditor({
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Все");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [catalogView, setCatalogView] = useState(() => {
+    const saved = safeRead(STORAGE.catalogView, "cards");
+    return saved === "list" ? "list" : "cards";
+  });
   const [cart, setCart] = useState(() => {
     const result = {};
     (initialSource.items || []).forEach((item) => { result[item.productId ?? item.id] = item.quantity; });
@@ -214,6 +217,40 @@ export function OrderEditor({
       clientComment,
     });
   }, [session.mode, settings.enableDrafts, selectedItems, customItems, deliveryDate, addressId, selectedAddress, clientComment]);
+
+  // Пока открыта корзина/календарь — фон страницы не листается (iOS/Android).
+  useEffect(() => {
+    if (!cartSheetOpen && !datePickerOpen) return undefined;
+    const html = document.documentElement;
+    const body = document.body;
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const previous = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyWidth: body.style.width,
+      bodyLeft: body.style.left,
+      bodyRight: body.style.right,
+    };
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    return () => {
+      html.style.overflow = previous.htmlOverflow;
+      body.style.overflow = previous.bodyOverflow;
+      body.style.position = previous.bodyPosition;
+      body.style.top = previous.bodyTop;
+      body.style.width = previous.bodyWidth;
+      body.style.left = previous.bodyLeft;
+      body.style.right = previous.bodyRight;
+      window.scrollTo(0, scrollY);
+    };
+  }, [cartSheetOpen, datePickerOpen]);
 
   const changeQuantity = (id, delta) => {
     setCart((current) => {
@@ -399,7 +436,12 @@ export function OrderEditor({
               )}
             </label>
             <label className="field" style={{ marginTop: 10 }}>Комментарий к заказу
-              <textarea rows="3" placeholder="Например: позвонить перед доставкой" value={clientComment} onChange={(e) => setClientComment(e.target.value)} />
+              <textarea
+                rows="3"
+                placeholder="Например: позвонить перед доставкой, запросить интересующий товар"
+                value={clientComment}
+                onChange={(e) => setClientComment(e.target.value)}
+              />
             </label>
             <div className="summary-total"><span>Итого</span><strong>{settings.showPrices && total > 0 ? formatMoney(total) : `${selectedItems.length + customItems.length} поз.`}</strong></div>
             {settings.enableDrafts && session.mode === "new" && <p className="summary-note">Черновик автоматически сохраняется в этом браузере.</p>}
@@ -423,8 +465,8 @@ export function OrderEditor({
             {catalogPolicy.matrixMode === "pending" && (
               <div className="matrix-catalog-note pending">
                 Менеджер ещё подготавливает ваш постоянный список
-                товаров и персональные цены. Пока можно добавить товар
-                через форму «Не нашли нужный товар?».
+                товаров и персональные цены. Нужный товар можно указать
+                в комментарии к заказу.
               </div>
             )}
 
@@ -462,31 +504,58 @@ export function OrderEditor({
                     <span className="fav-label-short">★</span>
                   </button>
                 )}
+                <div className="catalog-view-toggle" role="group" aria-label="Вид каталога">
+                  <button
+                    type="button"
+                    className={catalogView === "cards" ? "active" : ""}
+                    aria-pressed={catalogView === "cards"}
+                    onClick={() => {
+                      setCatalogView("cards");
+                      safeWrite(STORAGE.catalogView, "cards");
+                    }}
+                  >
+                    С фото
+                  </button>
+                  <button
+                    type="button"
+                    className={catalogView === "list" ? "active" : ""}
+                    aria-pressed={catalogView === "list"}
+                    onClick={() => {
+                      setCatalogView("list");
+                      safeWrite(STORAGE.catalogView, "list");
+                    }}
+                  >
+                    Список
+                  </button>
+                </div>
               </div>
               <div className="category-list">
                 {categories.map((item) => <button className={category === item ? "category-button active" : "category-button"} type="button" key={item} onClick={() => setCategory(item)}>{item}</button>)}
               </div>
             </div>
 
-            <section className="product-grid">
+            <section className={catalogView === "list" ? "product-grid product-grid-list" : "product-grid"}>
               {filtered.map((product) => {
                 const unit = units[product.id] || product.saleUnits[0];
                 const quantity = Number(cart[product.id]) || 0;
                 const multiplier = getUnitMultiplier(product, unit);
                 const price = getUnitPrice(product, unit);
+                const isList = catalogView === "list";
                 return (
-                  <article className="product-card" key={product.id}>
+                  <article className={isList ? "product-card product-card-list" : "product-card"} key={product.id}>
                     <div className="product-card-top">
                       <span className="product-category">{product.category}</span>
                       {settings.showFavorites && <button className={favorites.includes(product.id) ? "favorite-button active" : "favorite-button"} type="button" onClick={() => setFavorites((current) => current.includes(product.id) ? current.filter((id) => id !== product.id) : [...current, product.id])}>★</button>}
                     </div>
-                    <div className="product-image-wrap">
-                      {product.imageUrl ? (
-                        <img className="product-image" src={product.imageUrl} alt={product.name} />
-                      ) : (
-                        <span className="product-image-placeholder">Фото товара пока не загружено</span>
-                      )}
-                    </div>
+                    {!isList && (
+                      <div className="product-image-wrap">
+                        {product.imageUrl ? (
+                          <img className="product-image" src={product.imageUrl} alt={product.name} />
+                        ) : (
+                          <span className="product-image-placeholder">Фото товара пока не загружено</span>
+                        )}
+                      </div>
+                    )}
                     <h2>{product.name}</h2>
                     <p className="product-code">Код: {product.code}</p>
                     <p className="product-price">
@@ -522,7 +591,6 @@ export function OrderEditor({
                 );
               })}
               {!filtered.length && <div className="empty-box">Товары не найдены.</div>}
-              {settings.allowCustomItems && <CustomItemForm onAdd={(item) => setCustomItems((current) => [...current, item])} />}
             </section>
           </div>
         </div>
@@ -712,6 +780,16 @@ export function OrderEditor({
                 {missingFields.address && (
                   <span className="field-error-hint">Укажите адрес доставки</span>
                 )}
+              </label>
+
+              <label className="field cart-sheet-comment">
+                Комментарий к заказу
+                <textarea
+                  rows="3"
+                  placeholder="Например: позвонить перед доставкой, запросить интересующий товар"
+                  value={clientComment}
+                  onChange={(e) => setClientComment(e.target.value)}
+                />
               </label>
 
               <div className="cart-sheet-footer">

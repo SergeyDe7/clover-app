@@ -15,8 +15,6 @@ import {
   writeClientActiveTab,
   writeOpenManagerClientId,
   DEFAULT_PRODUCTS,
-  RUSSIAN_PHONE_PREFIX,
-  formatRussianPhone,
   STORAGE,
   DEFAULT_SETTINGS,
   EMPTY_PROFILE,
@@ -36,43 +34,27 @@ import { appAlert, appConfirm } from "./shared/AppModal";
 import { canTrashOrder } from "./shared/orderTrash";
 import { SoftBanner, ListSkeleton } from "./shared/uxFeedback";
 
-function LoginView({ onAuth, authBusy, authError }) {
+function LoginView({ onAuth, authBusy, authError, initialMessage = "", initialError = "" }) {
   const params = new URLSearchParams(window.location.search);
-  const verifyToken = params.get("verify") || "";
   const resetToken = params.get("reset") || "";
   const [mode, setMode] = useState(resetToken ? "reset" : "login");
   const [form, setForm] = useState({
-    companyName: "",
-    contactName: "",
-    phone: RUSSIAN_PHONE_PREFIX,
     email: "",
     password: "",
     confirmPassword: "",
   });
-  const [message, setMessage] = useState("");
-  const [localError, setLocalError] = useState("");
+  const [message, setMessage] = useState(initialMessage);
+  const [localError, setLocalError] = useState(initialError);
   const [developmentLink, setDevelopmentLink] = useState("");
-  const [verificationBusy, setVerificationBusy] = useState(Boolean(verifyToken));
   const [passkeyBusy, setPasskeyBusy] = useState(false);
 
   useEffect(() => {
-    if (!verifyToken) return;
-    let cancelled = false;
-    api.verifyEmail(verifyToken)
-      .then((result) => {
-        if (cancelled) return;
-        setMessage(result.message || "Электронная почта подтверждена.");
-        window.history.replaceState({}, "", window.location.pathname);
-        setMode("login");
-      })
-      .catch((error) => {
-        if (!cancelled) setLocalError(error.message);
-      })
-      .finally(() => {
-        if (!cancelled) setVerificationBusy(false);
-      });
-    return () => { cancelled = true; };
-  }, [verifyToken]);
+    if (initialMessage) setMessage(initialMessage);
+  }, [initialMessage]);
+
+  useEffect(() => {
+    if (initialError) setLocalError(initialError);
+  }, [initialError]);
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -108,30 +90,11 @@ function LoginView({ onAuth, authBusy, authError }) {
         setForm((current) => ({ ...current, password: "", confirmPassword: "" }));
         return;
       }
-      const result = await onAuth({
-        mode,
-        companyName: form.companyName,
-        contactName: form.contactName,
-        phone: form.phone,
+      await onAuth({
+        mode: "login",
         email: form.email,
         password: form.password,
       });
-      if (mode === "register" && result) {
-        setMessage(result.message || "Регистрация создана.");
-        setDevelopmentLink(result.developmentLink || "");
-        setMode("login");
-      }
-    } catch (error) {
-      setLocalError(error.message);
-    }
-  };
-
-  const resend = async () => {
-    setLocalError("");
-    try {
-      const result = await api.resendVerification(form.email);
-      setMessage(result.message);
-      setDevelopmentLink(result.developmentLink || "");
     } catch (error) {
       setLocalError(error.message);
     }
@@ -161,21 +124,8 @@ function LoginView({ onAuth, authBusy, authError }) {
     }
   };
 
-  if (verificationBusy) {
-    return (
-      <main className="page">
-        <section className="login-card">
-          <img className="logo" src={cloverLogo} alt="Логотип Clover" width="280" height="189" />
-          <h1>Подтверждаем почту</h1>
-          <p className="subtitle">Проверяем ссылку регистрации…</p>
-        </section>
-      </main>
-    );
-  }
-
-  const title = mode === "register"
-    ? "Создание аккаунта"
-    : mode === "forgot"
+  const title =
+    mode === "forgot"
       ? "Восстановление пароля"
       : mode === "reset"
         ? "Новый пароль"
@@ -188,26 +138,13 @@ function LoginView({ onAuth, authBusy, authError }) {
         <h1>{title}</h1>
         {mode !== "login" && (
           <p className="subtitle">
-            {mode === "register"
-              ? "Регистрация доступна только клиентам. Роль определится автоматически при входе."
-              : mode === "forgot"
-                ? "Укажите почту — мы отправим ссылку для установки нового пароля."
-                : "Придумайте новый пароль длиной не менее 8 символов."}
+            {mode === "forgot"
+              ? "Укажите почту — мы отправим ссылку для установки нового пароля."
+              : "Придумайте новый пароль длиной не менее 8 символов."}
           </p>
         )}
 
         <form className="login-form" onSubmit={submit}>
-          {mode === "register" && (
-            <>
-              <label htmlFor="companyName">Название организации</label>
-              <input id="companyName" value={form.companyName} onChange={(event) => updateField("companyName", event.target.value)} required disabled={authBusy} />
-              <label htmlFor="contactName">Контактное лицо</label>
-              <input id="contactName" value={form.contactName} onChange={(event) => updateField("contactName", event.target.value)} required disabled={authBusy} />
-              <label htmlFor="phone">Телефон</label>
-              <input id="phone" type="tel" inputMode="tel" autoComplete="tel" maxLength="18" value={form.phone} onChange={(event) => updateField("phone", formatRussianPhone(event.target.value))} required disabled={authBusy} />
-            </>
-          )}
-
           {mode !== "reset" && (
             <>
               <label htmlFor="email">Электронная почта</label>
@@ -230,7 +167,7 @@ function LoginView({ onAuth, authBusy, authError }) {
           )}
 
           <button type="submit" disabled={authBusy}>
-            {authBusy ? "Подождите…" : mode === "register" ? "Зарегистрироваться" : mode === "forgot" ? "Отправить ссылку" : mode === "reset" ? "Сохранить пароль" : "Войти"}
+            {authBusy ? "Подождите…" : mode === "forgot" ? "Отправить ссылку" : mode === "reset" ? "Сохранить пароль" : "Войти"}
           </button>
         </form>
 
@@ -250,11 +187,7 @@ function LoginView({ onAuth, authBusy, authError }) {
 
         <div className="registration auth-links">
           {mode === "login" && (
-            <>
-              <button type="button" onClick={() => switchMode("register")}>Зарегистрироваться</button>
-              <button type="button" onClick={() => switchMode("forgot")}>Забыли пароль?</button>
-              <button type="button" disabled={!form.email} onClick={resend}>Повторить письмо</button>
-            </>
+            <button type="button" onClick={() => switchMode("forgot")}>Забыли пароль?</button>
           )}
           {mode !== "login" && mode !== "reset" && (
             <button type="button" onClick={() => switchMode("login")}>Вернуться ко входу</button>
@@ -362,6 +295,21 @@ function App() {
   );
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [offlineBannerHidden, setOfflineBannerHidden] = useState(false);
+  const [emailVerifyBusy, setEmailVerifyBusy] = useState(() =>
+    typeof window !== "undefined"
+      ? Boolean(new URLSearchParams(window.location.search).get("verify"))
+      : false
+  );
+  const [emailVerifyMessage, setEmailVerifyMessage] = useState("");
+  const [emailVerifyError, setEmailVerifyError] = useState("");
+  const [forceLoginScreen, setForceLoginScreen] = useState(() =>
+    typeof window !== "undefined"
+      ? Boolean(
+          new URLSearchParams(window.location.search).get("verify") ||
+            new URLSearchParams(window.location.search).get("reset")
+        )
+      : false
+  );
 
   const [products, setProducts] = useState(
     DEFAULT_PRODUCTS.map(normalizeProduct)
@@ -520,6 +468,51 @@ function App() {
     }
 
     loadBootstrap();
+  }, []);
+
+  // Подтверждение почты из письма — всегда, даже если в браузере уже есть сессия менеджера/клиента.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const verifyToken = params.get("verify") || "";
+    if (!verifyToken) return undefined;
+    let cancelled = false;
+    const hadSession = Boolean(getApiToken());
+    setForceLoginScreen(!hadSession);
+    setEmailVerifyBusy(true);
+    api
+      .verifyEmail(verifyToken)
+      .then(async (result) => {
+        if (cancelled) return;
+        const text = result.message || "Электронная почта подтверждена.";
+        window.history.replaceState({}, "", window.location.pathname);
+        if (hadSession) {
+          setForceLoginScreen(false);
+          await appAlert({ title: "Почта подтверждена", message: text, tone: "success" });
+        } else {
+          setForceLoginScreen(true);
+          setEmailVerifyMessage(text);
+          setEmailVerifyError("");
+        }
+      })
+      .catch(async (error) => {
+        if (cancelled) return;
+        const text = error.message || "Не удалось подтвердить почту.";
+        window.history.replaceState({}, "", window.location.pathname);
+        if (hadSession) {
+          setForceLoginScreen(false);
+          await appAlert({ title: "Не удалось подтвердить почту", message: text, tone: "danger" });
+        } else {
+          setForceLoginScreen(true);
+          setEmailVerifyError(text);
+          setEmailVerifyMessage("");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setEmailVerifyBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -759,20 +752,12 @@ function App() {
       const result =
         form.mode === "passkey"
           ? form.result
-          : form.mode === "register"
-            ? await api.register({
-                companyName: form.companyName,
-                contactName: form.contactName,
-                phone: form.phone,
-                email: form.email,
-                password: form.password,
-              })
-            : await api.login({
-                email: form.email,
-                password: form.password,
-              });
+          : await api.login({
+              email: form.email,
+              password: form.password,
+            });
 
-      if (form.mode === "register" || !result.token) {
+      if (!result.token) {
         return result;
       }
 
@@ -1372,7 +1357,6 @@ function App() {
       message: "Клиент перестанет его видеть. Восстановить можно из корзины.",
       confirmLabel: "В корзину",
       cancelLabel: "Отмена",
-      tone: "danger",
     });
     if (!ok) return;
 
@@ -1420,22 +1404,14 @@ function App() {
   };
 
   const purgeManagerOrder = async (order) => {
-    const first = await appConfirm({
+    const ok = await appConfirm({
       title: `Удалить заказ № ${order.number} навсегда?`,
-      message: "Восстановить будет нельзя без резервной копии.",
-      confirmLabel: "Продолжить",
-      cancelLabel: "Отмена",
-      tone: "danger",
-    });
-    if (!first) return;
-    const second = await appConfirm({
-      title: "Окончательное удаление",
-      message: `Подтвердите удаление заказа № ${order.number}. Это действие необратимо.`,
+      message: "Это действие необратимо. Восстановить будет нельзя без резервной копии.",
       confirmLabel: "Удалить навсегда",
       cancelLabel: "Отмена",
       tone: "danger",
     });
-    if (!second) return;
+    if (!ok) return;
     try {
       const result = await api.purgeOrder(order.id);
       skipNextOrdersSyncRef.current = true;
@@ -1580,13 +1556,19 @@ function App() {
     }
   };
 
-  if (loading) {
+  if (loading || emailVerifyBusy) {
     return (
       <>
         <style>{APP_STYLES}</style>
         <main className="loading-page loading-page-quiet clover-app" aria-busy="true" aria-label="Загрузка">
           <div className="loading-quiet-bar" aria-hidden="true" />
-          {getApiToken() ? <ListSkeleton rows={5} variant="orders" /> : null}
+          {emailVerifyBusy ? (
+            <p className="subtitle" style={{ marginTop: 24, textAlign: "center" }}>
+              Подтверждаем электронную почту…
+            </p>
+          ) : getApiToken() ? (
+            <ListSkeleton rows={5} variant="orders" />
+          ) : null}
         </main>
       </>
     );
@@ -1594,12 +1576,14 @@ function App() {
 
   let content;
 
-  if (!isLoggedIn) {
+  if (!isLoggedIn || forceLoginScreen) {
     content = (
       <LoginView
         onAuth={handleAuth}
         authBusy={authBusy}
         authError={authError}
+        initialMessage={emailVerifyMessage}
+        initialError={emailVerifyError}
       />
     );
   } else if (authUser?.role === "manager" || authUser?.role === "admin") {

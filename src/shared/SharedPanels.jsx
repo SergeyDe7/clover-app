@@ -1,11 +1,12 @@
 // Компоненты, общие для экрана клиента и экрана менеджера.
-import { Component, useEffect, useRef, useState } from "react";
+import { Component, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import cloverLogo from "../assets/clover-logo.png";
 import { startPasskeyRegistration } from "../utils/webauthn";
 import { api, setApiToken } from "../serverApi";
 import { formatDateTime } from "./appHelpers";
 import { appConfirm } from "./AppModal";
+import { lockThankYouScreen, THANKYOU_SCREEN_BG } from "./thankYouScreen";
 
 export class PanelErrorBoundary extends Component {
   constructor(props) {
@@ -203,7 +204,7 @@ export function CustomRequestPhoto({ photo, className = "" }) {
   );
 }
 
-export function PasswordSecurityPanel() {
+export function PasswordSecurityPanel({ allowPasswordChange = true } = {}) {
   const [form, setForm] = useState({ currentPassword: "", newPassword: "", repeatPassword: "" });
   const [busy, setBusy] = useState(false);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
@@ -304,14 +305,24 @@ export function PasswordSecurityPanel() {
   return (
     <section className="panel compact-panel">
       <div className="panel-heading">
-        <div><p className="eyebrow">Безопасность</p><h2>Пароль и вход по устройству</h2><p>Можно входить по паролю либо через Face ID, отпечаток или код блокировки телефона.</p></div>
+        <div>
+          <p className="eyebrow">Безопасность</p>
+          <h2>{allowPasswordChange ? "Пароль и вход по устройству" : "Вход по устройству"}</h2>
+          <p>
+            {allowPasswordChange
+              ? "Можно входить по паролю либо через Face ID, отпечаток или код блокировки телефона."
+              : "Можно включить вход через Face ID, отпечаток или код блокировки телефона. Смену пароля выполняет менеджер."}
+          </p>
+        </div>
       </div>
-      <form className="form-grid security-form" onSubmit={submit}>
-        <label className="field">Текущий пароль<input type="password" autoComplete="current-password" value={form.currentPassword} onChange={(event) => setForm({ ...form, currentPassword: event.target.value })} required /></label>
-        <label className="field">Новый пароль<input type="password" autoComplete="new-password" minLength="8" value={form.newPassword} onChange={(event) => setForm({ ...form, newPassword: event.target.value })} required /></label>
-        <label className="field">Повторите новый пароль<input type="password" autoComplete="new-password" minLength="8" value={form.repeatPassword} onChange={(event) => setForm({ ...form, repeatPassword: event.target.value })} required /></label>
-        <div className="form-actions"><button className="primary-button" disabled={busy} type="submit">{busy ? "Сохраняем…" : "Изменить пароль"}</button></div>
-      </form>
+      {allowPasswordChange ? (
+        <form className="form-grid security-form" onSubmit={submit}>
+          <label className="field">Текущий пароль<input type="password" autoComplete="current-password" value={form.currentPassword} onChange={(event) => setForm({ ...form, currentPassword: event.target.value })} required /></label>
+          <label className="field">Новый пароль<input type="password" autoComplete="new-password" minLength="8" value={form.newPassword} onChange={(event) => setForm({ ...form, newPassword: event.target.value })} required /></label>
+          <label className="field">Повторите новый пароль<input type="password" autoComplete="new-password" minLength="8" value={form.repeatPassword} onChange={(event) => setForm({ ...form, repeatPassword: event.target.value })} required /></label>
+          <div className="form-actions"><button className="primary-button" disabled={busy} type="submit">{busy ? "Сохраняем…" : "Изменить пароль"}</button></div>
+        </form>
+      ) : null}
       <div className="form-actions session-actions">
         <button className="secondary-button" type="button" disabled={busy} onClick={endOtherSessions}>
           Завершить другие сессии
@@ -439,6 +450,8 @@ export function PushSettings() {
 }
 
 /** Полноэкранная благодарность / успех (заказ, акт сверки и т.п.). */
+const THANKYOU_MOBILE_MQ = "(max-width: 900px), (pointer: coarse)";
+
 export function OrderThankYouOverlay({
   open,
   onDone,
@@ -448,14 +461,15 @@ export function OrderThankYouOverlay({
 }) {
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
+  const overlayRef = useRef(null);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined" || !window.matchMedia) return false;
-    return window.matchMedia("(max-width: 900px)").matches;
+    return window.matchMedia(THANKYOU_MOBILE_MQ).matches;
   });
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return undefined;
-    const media = window.matchMedia("(max-width: 900px)");
+    const media = window.matchMedia(THANKYOU_MOBILE_MQ);
     const sync = () => setIsMobile(media.matches);
     sync();
     if (media.addEventListener) {
@@ -465,6 +479,8 @@ export function OrderThankYouOverlay({
     media.addListener(sync);
     return () => media.removeListener(sync);
   }, []);
+
+  useLayoutEffect(() => lockThankYouScreen(Boolean(open), overlayRef), [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -525,8 +541,7 @@ export function OrderThankYouOverlay({
     boxSizing: "border-box",
     display: "grid",
     placeItems: "center",
-    background:
-      "radial-gradient(circle at 20% 18%, rgba(126, 196, 108, 0.45), transparent 42%), radial-gradient(circle at 82% 78%, rgba(74, 148, 78, 0.38), transparent 48%), linear-gradient(160deg, #eef7ea 0%, #d9ecd4 45%, #c7e0c2 100%)",
+    background: THANKYOU_SCREEN_BG,
     cursor: "pointer",
     overflow: "hidden",
     touchAction: "none",
@@ -556,6 +571,7 @@ export function OrderThankYouOverlay({
 
   return createPortal(
     <div
+      ref={overlayRef}
       className={`order-thankyou${isMobile ? " order-thankyou-mobile" : ""}`}
       role="dialog"
       aria-modal="true"

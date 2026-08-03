@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import cloverLogo from "../assets/clover-logo.png";
+import { lockThankYouScreen, THANKYOU_SCREEN_BG } from "./thankYouScreen";
+
+const MOBILE_OVERLAY_MQ = "(max-width: 900px)";
 
 let pushDialog = null;
 let hostGeneration = 0;
@@ -91,18 +94,12 @@ export async function appAlert({
   });
 }
 
-function toneCardClass(tone) {
-  if (tone === "danger") return "app-modal-tone-danger";
-  if (tone === "warn") return "app-modal-tone-warn";
-  if (tone === "success") return "app-modal-tone-success";
-  return "";
-}
-
 export function AppModalHost() {
   const [dialog, setDialog] = useState(null);
+  const overlayRef = useRef(null);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined" || !window.matchMedia) return false;
-    return window.matchMedia("(max-width: 900px)").matches;
+    return window.matchMedia(MOBILE_OVERLAY_MQ).matches;
   });
 
   useEffect(() => {
@@ -122,7 +119,7 @@ export function AppModalHost() {
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return undefined;
-    const media = window.matchMedia("(max-width: 900px)");
+    const media = window.matchMedia(MOBILE_OVERLAY_MQ);
     const sync = () => setIsMobile(media.matches);
     sync();
     if (media.addEventListener) {
@@ -132,6 +129,8 @@ export function AppModalHost() {
     media.addListener(sync);
     return () => media.removeListener(sync);
   }, []);
+
+  useLayoutEffect(() => lockThankYouScreen(Boolean(dialog), overlayRef), [dialog]);
 
   useEffect(() => {
     if (!dialog) return undefined;
@@ -144,6 +143,7 @@ export function AppModalHost() {
     };
     const html = document.documentElement;
     const body = document.body;
+    const scrollY = window.scrollY || window.pageYOffset || 0;
     const previous = {
       htmlOverflow: html.style.overflow,
       bodyOverflow: body.style.overflow,
@@ -151,6 +151,8 @@ export function AppModalHost() {
       bodyWidth: body.style.width,
       bodyHeight: body.style.height,
       bodyTop: body.style.top,
+      bodyLeft: body.style.left,
+      bodyRight: body.style.right,
     };
     html.classList.add("clover-thankyou-open");
     body.classList.add("clover-thankyou-open");
@@ -158,8 +160,9 @@ export function AppModalHost() {
     body.style.overflow = "hidden";
     body.style.position = "fixed";
     body.style.width = "100%";
-    body.style.height = "100%";
-    body.style.top = "0";
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.top = `-${scrollY}px`;
     window.addEventListener("keydown", onKey);
     return () => {
       html.classList.remove("clover-thankyou-open");
@@ -170,6 +173,9 @@ export function AppModalHost() {
       body.style.width = previous.bodyWidth;
       body.style.height = previous.bodyHeight;
       body.style.top = previous.bodyTop;
+      body.style.left = previous.bodyLeft;
+      body.style.right = previous.bodyRight;
+      window.scrollTo(0, scrollY);
       window.removeEventListener("keydown", onKey);
     };
   }, [dialog]);
@@ -177,10 +183,8 @@ export function AppModalHost() {
   if (!dialog || typeof document === "undefined") return null;
 
   const isConfirm = dialog.mode === "confirm";
-  const confirmClass =
-    dialog.tone === "danger"
-      ? "danger-button order-thankyou-button"
-      : "primary-button order-thankyou-button";
+  // Как «Акт сверки отправлен»: зелёная primary, без danger-рамки у кнопки/карточки
+  const confirmClass = "primary-button order-thankyou-button";
 
   const close = (value) => {
     const { resolve } = dialog;
@@ -203,8 +207,7 @@ export function AppModalHost() {
     boxSizing: "border-box",
     display: "grid",
     placeItems: "center",
-    background:
-      "radial-gradient(circle at 20% 18%, rgba(126, 196, 108, 0.45), transparent 42%), radial-gradient(circle at 82% 78%, rgba(74, 148, 78, 0.38), transparent 48%), linear-gradient(160deg, #eef7ea 0%, #d9ecd4 45%, #c7e0c2 100%)",
+    background: THANKYOU_SCREEN_BG,
     cursor: "pointer",
     overflow: "hidden",
     touchAction: "none",
@@ -227,13 +230,11 @@ export function AppModalHost() {
         justifyItems: "center",
         gap: "14px",
       }
-    : {
-        width: "min(420px, calc(100% - 32px))",
-        maxWidth: "100%",
-      };
+    : undefined;
 
   return createPortal(
     <div
+      ref={overlayRef}
       className={`order-thankyou app-modal-shell${isMobile ? " order-thankyou-mobile" : ""}`}
       role="presentation"
       style={overlayStyle}
@@ -249,7 +250,7 @@ export function AppModalHost() {
       <span className="order-thankyou-spark order-thankyou-spark-7" aria-hidden="true" />
       <span className="order-thankyou-spark order-thankyou-spark-8" aria-hidden="true" />
       <div
-        className={`order-thankyou-card ${toneCardClass(dialog.tone)}`.trim()}
+        className="order-thankyou-card"
         role="dialog"
         aria-modal="true"
         aria-labelledby="app-modal-title"
