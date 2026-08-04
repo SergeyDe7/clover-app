@@ -24,6 +24,7 @@ import {
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { MatrixOneCProductAdd } from "./MatrixOneCProductAdd";
+import { ProductEditor } from "./ProductEditor";
 
 /** Цена из вида цен 1С (категория клиента), с масштабом от шт. */
 function typedSalePriceForUnit(product, priceTypeId, unit) {
@@ -596,6 +597,7 @@ export function ManagerClients({
   const [passwordClientId, setPasswordClientId] = useState("");
   const [passwordDraft, setPasswordDraft] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
+  const [editorProduct, setEditorProduct] = useState(undefined);
   const restoredOpenClient = useRef(false);
 
   const ordersByClientId = useMemo(() => {
@@ -833,6 +835,38 @@ export function ManagerClients({
           "Есть несохранённые изменения. Нажмите «Сохранить матрицу», иначе после F5 они пропадут.",
       },
     }));
+  };
+
+  const saveCatalogProduct = async (value) => {
+    let nextProducts;
+    if (value.id) {
+      nextProducts = products.map((item) =>
+        String(item.id) === String(value.id) ? normalizeProduct(value) : item
+      );
+    } else {
+      const id =
+        Math.max(0, ...products.map((item) => Number(item.id) || 0)) + 1;
+      nextProducts = [
+        normalizeProduct({
+          ...value,
+          id,
+          code: value.code || `CL-${String(id).padStart(4, "0")}`,
+        }),
+        ...products,
+      ];
+    }
+
+    try {
+      const result = await api.saveProducts(nextProducts);
+      setProducts((result.products || nextProducts).map(normalizeProduct));
+      setEditorProduct(undefined);
+    } catch (error) {
+      void appAlert({
+        title: "Не удалось сохранить",
+        message: `Не удалось сохранить товар: ${error.message}`,
+        tone: "danger",
+      });
+    }
   };
 
   const updatePersonalPrice = (
@@ -1792,18 +1826,19 @@ export function ManagerClients({
                         )}
                       </div>
 
-                      <label className="field" style={{ marginTop: 12 }}>
-                        Заметка по матрице и связи с 1С
+                      <label className="field matrix-manager-note">
+                        Заметка по матрице
                         <textarea
-                          rows="3"
+                          rows="2"
                           value={link.managerNote}
+                          placeholder="Кратко: особенности матрицы или связи с 1С"
                           onChange={(event) =>
                             updateLink(client.id, {
                               managerNote: event.target.value,
                             })
                           }
                         />
-                        <small>Видна только менеджерам.</small>
+                        <small>Только для менеджеров</small>
                       </label>
 
                       <div className="comment-box" style={{ marginTop: 14 }}>
@@ -1973,40 +2008,49 @@ export function ManagerClients({
                               className="matrix-editor-row"
                               key={product.id}
                             >
-                              <label className="matrix-editor-product">
-                                <input
-                                  type="checkbox"
-                                  checked={selected}
-                                  disabled={link.matrixMode === "all"}
-                                  onChange={(event) =>
-                                    updateLink(client.id, {
-                                      matrixMode: "selected",
-                                      matrixProductIds: event.target.checked
-                                        ? [
-                                            ...new Set([
-                                              ...matrixProductIds,
-                                              product.id,
-                                            ]),
-                                          ]
-                                        : matrixProductIds.filter(
-                                            (id) =>
-                                              String(id) !== String(product.id)
-                                          ),
-                                    })
-                                  }
-                                />
-                                <span>
-                                  <strong>{product.name}</strong>
-                                  <small
-                                    style={{
-                                      display: "block",
-                                      marginTop: 3,
-                                    }}
-                                  >
-                                    {product.code} · {product.category}
-                                  </small>
-                                </span>
-                              </label>
+                              <div className="matrix-editor-product">
+                                <label className="matrix-editor-product-check">
+                                  <input
+                                    type="checkbox"
+                                    checked={selected}
+                                    disabled={link.matrixMode === "all"}
+                                    onChange={(event) =>
+                                      updateLink(client.id, {
+                                        matrixMode: "selected",
+                                        matrixProductIds: event.target.checked
+                                          ? [
+                                              ...new Set([
+                                                ...matrixProductIds,
+                                                product.id,
+                                              ]),
+                                            ]
+                                          : matrixProductIds.filter(
+                                              (id) =>
+                                                String(id) !== String(product.id)
+                                            ),
+                                      })
+                                    }
+                                  />
+                                  <span>
+                                    <strong>{product.name}</strong>
+                                    <small
+                                      style={{
+                                        display: "block",
+                                        marginTop: 3,
+                                      }}
+                                    >
+                                      {product.code} · {product.category}
+                                    </small>
+                                  </span>
+                                </label>
+                                <button
+                                  className="secondary-button matrix-edit-product-btn"
+                                  type="button"
+                                  onClick={() => setEditorProduct(product)}
+                                >
+                                  Изменить товар
+                                </button>
+                              </div>
 
                               <div className="matrix-editor-units">
                                 {allowedUnits.map((unit) => {
@@ -2260,6 +2304,23 @@ export function ManagerClients({
         </div>
       ) : (
         <div className="empty-box">Клиенты не найдены.</div>
+      )}
+      {editorProduct !== undefined && (
+        <ProductEditor
+          product={editorProduct}
+          products={products}
+          onClose={() => setEditorProduct(undefined)}
+          onSave={saveCatalogProduct}
+          onProductLiveUpdate={(updated) => {
+            if (!updated?.id) return;
+            setProducts((current) =>
+              current.map((item) =>
+                String(item.id) === String(updated.id) ? updated : item
+              )
+            );
+            setEditorProduct(updated);
+          }}
+        />
       )}
     </section>
     </PanelErrorBoundary>

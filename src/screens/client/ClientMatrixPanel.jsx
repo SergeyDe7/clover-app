@@ -2,10 +2,10 @@
 import { useMemo, useState } from "react";
 import {
   UNIT_CONFIG,
-  UNIT_ORDER,
   formatMoney,
   getUnitMultiplier,
   getUnitPrice,
+  orderedSaleUnits,
 } from "../../shared/appHelpers";
 
 export function ClientMatrixPanel({
@@ -109,17 +109,28 @@ export function ClientMatrixPanel({
 
       <section className="product-grid client-matrix-grid">
         {filtered.map((product) => {
-          const allowedUnits = UNIT_ORDER.filter((item) =>
-            (product.saleUnits || []).includes(item)
-          );
+          const allowedUnits = orderedSaleUnits(product);
           const unit = units[product.id] || allowedUnits[0] || "piece";
           const unitMeta = UNIT_CONFIG[unit] || UNIT_CONFIG.piece;
           const price = getUnitPrice(product, unit);
           const multiplier = getUnitMultiplier(product, unit);
+          const soleUnit = allowedUnits.length === 1;
           return (
             <article className="product-card client-matrix-card" key={product.id}>
               <div className="product-card-top">
-                <span className="product-category">{product.category || "Без категории"}</span>
+                {product.certificateUrl ? (
+                  <a
+                    className="product-cert-link product-cert-link-top"
+                    href={product.certificateUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={product.certificateName || undefined}
+                  >
+                    Сертификат
+                  </a>
+                ) : (
+                  <span className="product-card-top-spacer" aria-hidden="true" />
+                )}
                 {settings?.showFavorites && (
                   <button
                     className={favorites.includes(product.id) ? "favorite-button active" : "favorite-button"}
@@ -155,10 +166,10 @@ export function ClientMatrixPanel({
                 )}
               </p>
               <div className="product-card-controls">
-                <div className="unit-choice">
+                <div className={`unit-choice${soleUnit ? " unit-choice-single" : ""}`}>
                   {allowedUnits.map((item) => (
                     <button
-                      className={unit === item ? "active" : ""}
+                      className={soleUnit || unit === item ? "active" : ""}
                       type="button"
                       key={item}
                       onClick={() =>

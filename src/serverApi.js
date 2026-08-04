@@ -106,6 +106,10 @@ async function requestBlob(path, options = {}) {
 }
 
 export const api = {
+  getPublicManagerContact() {
+    return request("/public/manager-contact");
+  },
+
   register(data) {
     return request("/auth/register", {
       method: "POST",
@@ -336,6 +340,21 @@ export const api = {
 
   deleteProductImage(productId) {
     return request(`/admin/products/${productId}/image`, {
+      method: "DELETE",
+    });
+  },
+
+  uploadProductCertificate(productId, file) {
+    const formData = new FormData();
+    formData.append("certificate", file);
+    return request(`/admin/products/${productId}/certificate`, {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  deleteProductCertificate(productId) {
+    return request(`/admin/products/${productId}/certificate`, {
       method: "DELETE",
     });
   },

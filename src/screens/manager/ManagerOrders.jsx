@@ -558,7 +558,7 @@ export function ManagerOrders({
                 <div className="manager-textareas" style={{ marginTop: 12 }}>
                   {order.clientComment ? (
                     <div className="comment-box">
-                      <strong>Комментарий клиента</strong>
+                      <strong>Комментарий клиента:</strong>
                       <p>{order.clientComment}</p>
                     </div>
                   ) : null}
@@ -608,6 +608,12 @@ export function ManagerOrders({
               ))}
             </div>
             <div className="manager-textareas">
+              {order.clientComment ? (
+                <div className="comment-box">
+                  <strong>Комментарий клиента:</strong>
+                  <p>{order.clientComment}</p>
+                </div>
+              ) : null}
               <label className="field">Комментарий клиенту
                 <textarea value={order.managerComment || ""} onChange={(e) => onUpdateOrder(order.id, { managerComment: e.target.value, updatedAt: new Date().toISOString() })} />
               </label>

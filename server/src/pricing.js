@@ -1,32 +1,35 @@
 import { salePriceForUnit } from "./oneCSalePrices.js";
 
-export const UNITS = ["piece", "bundle", "pack", "box", "pair", "roll"];
+export const UNITS = ["piece", "pair", "meter", "roll", "pack", "bundle", "box"];
 
 const UNIT_SIZE_FIELD = {
   piece: "pieceSize",
+  pair: "pairSize",
+  meter: "meterSize",
+  roll: "rollSize",
   pack: "packSize",
   bundle: "bundleSize",
   box: "boxSize",
-  pair: "pairSize",
-  roll: "rollSize",
 };
 
 const UNIT_PRICE_FIELD = {
   piece: "pricePiece",
+  pair: "pricePair",
+  meter: "priceMeter",
+  roll: "priceRoll",
   pack: "pricePack",
   bundle: "priceBundle",
   box: "priceBox",
-  pair: "pricePair",
-  roll: "priceRoll",
 };
 
 const UNIT_LABEL = {
   piece: "штука",
+  pair: "пара",
+  meter: "метр",
+  roll: "рулон",
   pack: "упаковка",
   bundle: "пачка",
   box: "коробка",
-  pair: "пара",
-  roll: "рулон",
 };
 
 function finiteNonNegative(value) {
@@ -77,8 +80,8 @@ export function roundPriceUp(value) {
 }
 
 export function unitSize(product = {}, unit = "piece") {
-  // В 1С пара/рулон/штука уходят 1:1 в шт — размер содержимого не масштабирует.
-  if (unit === "piece" || unit === "pair" || unit === "roll") return 1;
+  // В 1С штука/пара/метр/рулон уходят 1:1 в шт — размер содержимого не масштабирует.
+  if (unit === "piece" || unit === "pair" || unit === "meter" || unit === "roll") return 1;
   const field = UNIT_SIZE_FIELD[unit] || "pieceSize";
   return Math.max(1, Number(product[field]) || 1);
 }
@@ -89,6 +92,7 @@ export function normalizePurchaseUnit(value) {
   if (["bundle", "bundlepack", "пач", "пач.", "пачка"].includes(raw)) return "bundle";
   if (["box", "кор", "кор.", "коробка"].includes(raw)) return "box";
   if (["pair", "пар", "пар.", "пара"].includes(raw)) return "pair";
+  if (["meter", "м", "м.", "метр", "метры"].includes(raw)) return "meter";
   if (["roll", "рул", "рул.", "рулон"].includes(raw)) return "roll";
   return "piece";
 }
@@ -100,6 +104,7 @@ export function purchasePriceForUnit(product = {}, oneCItem = {}, unit = "piece"
     bundle: ["purchasePriceBundle", "costPriceBundle"],
     box: ["purchasePriceBox", "costPriceBox"],
     pair: ["purchasePricePair", "costPricePair"],
+    meter: ["purchasePriceMeter", "costPriceMeter"],
     roll: ["purchasePriceRoll", "costPriceRoll"],
   };
 

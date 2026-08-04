@@ -1,9 +1,8 @@
 // Редактор заказа клиента: каталог, корзина и оформление.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Header, CustomRequestPhoto } from "../../shared/SharedPanels";
+import { Header } from "../../shared/SharedPanels";
 import {
   UNIT_CONFIG,
-  UNIT_ORDER,
   STORAGE,
   safeRead,
   safeWrite,
@@ -16,7 +15,7 @@ import {
   fromQuantityInputValue,
   quantityInputStep,
   quantityInputUnitLabel,
-  CATALOG_NARROW_MQ,
+  orderedSaleUnits,
 } from "../../shared/appHelpers";
 import {
   getEarliestDeliveryDateIso,
@@ -24,7 +23,7 @@ import {
 } from "../../shared/deliveryDateRules";
 import { ManagerContact } from "./ManagerContact";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
-import { appAlert } from "../../shared/AppModal";
+import { appAlert, appConfirm } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
 
 function capitalizeRu(value) {
@@ -124,8 +123,6 @@ export function OrderEditor({
   );
   const [clientComment, setClientComment] = useState(initialSource.clientComment || "");
   const [missingFields, setMissingFields] = useState({ date: false, address: false });
-  const summaryDateFieldRef = useRef(null);
-  const summaryAddressFieldRef = useRef(null);
   const cartDateFieldRef = useRef(null);
   const cartAddressFieldRef = useRef(null);
   const earliestDeliveryDate = getEarliestDeliveryDateIso();
@@ -168,6 +165,13 @@ export function OrderEditor({
       return;
     }
     await updateDeliveryDate(result.value);
+    setDatePickerOpen(false);
+    setCartSheetOpen(true);
+  };
+
+  const closeDatePickerToCart = () => {
+    setDatePickerOpen(false);
+    setCartSheetOpen(true);
   };
 
   const updateAddressId = (value) => {
@@ -177,23 +181,16 @@ export function OrderEditor({
 
   const focusMissingFields = (dateMissing, addressMissing) => {
     setMissingFields({ date: dateMissing, address: addressMissing });
-    const isNarrow =
-      typeof window !== "undefined" &&
-      window.matchMedia &&
-      window.matchMedia(CATALOG_NARROW_MQ).matches;
-
-    if (isNarrow) {
-      setCartSheetOpen(true);
-    }
+    setCartSheetOpen(true);
 
     window.setTimeout(() => {
       const target = dateMissing
-        ? (isNarrow ? cartDateFieldRef.current : summaryDateFieldRef.current)
-        : (isNarrow ? cartAddressFieldRef.current : summaryAddressFieldRef.current);
+        ? cartDateFieldRef.current
+        : cartAddressFieldRef.current;
       if (target && typeof target.scrollIntoView === "function") {
         target.scrollIntoView({ behavior: "smooth", block: "center" });
       }
-    }, isNarrow ? 80 : 0);
+    }, 80);
   };
 
   const categories = useMemo(() => ["Все", ...new Set(products.map((item) => item.category))], [products]);
@@ -210,7 +207,7 @@ export function OrderEditor({
   const selectedItems = useMemo(() => products
     .filter((product) => Number(cart[product.id]) > 0)
     .map((product) => {
-      const unit = units[product.id] || product.saleUnits[0];
+      const unit = units[product.id] || orderedSaleUnits(product)[0];
       const quantity = Number(cart[product.id]) || 0;
       const unitPrice = getUnitPrice(product, unit);
       return {
@@ -311,6 +308,33 @@ export function OrderEditor({
     );
   };
 
+  const clearCart = async () => {
+    if (!selectedItems.length && !customItems.length) return;
+    const ok = await appConfirm({
+      title: "Очистить корзину?",
+      message: "Все выбранные позиции будут удалены.",
+      confirmLabel: "Очистить",
+      cancelLabel: "Отмена",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setCart({});
+    setCustomItems([]);
+    setQtyDrafts({});
+  };
+
+  const openCartForCheckout = () => {
+    if (!selectedItems.length && !customItems.length) {
+      void appAlert({
+        title: "Корзина пуста",
+        message: "Добавьте хотя бы один товар из каталога.",
+        tone: "warn",
+      });
+      return;
+    }
+    setCartSheetOpen(true);
+  };
+
   const submitOrder = async () => {
     if (!selectedItems.length && !customItems.length) {
       await appAlert({
@@ -370,13 +394,6 @@ export function OrderEditor({
     setCartSheetOpen(false);
   };
 
-  const confirmDeliveryDateAndSubmit = () => {
-    if (!deliveryDate || !validateDeliveryDate(deliveryDate).ok) return;
-    setDatePickerOpen(false);
-    // После даты: один адрес подставится сам; при нескольких — спросим адрес.
-    void submitOrder();
-  };
-
   const submit = (event) => {
     event.preventDefault();
     submitOrder();
@@ -385,106 +402,52 @@ export function OrderEditor({
   const catalogBody = (
       <section className={embedded ? "catalog-content embedded-catalog" : "catalog-content"}>
         <div className="catalog-layout">
-          <form className="order-summary" id="order-summary" onSubmit={submit}>
-            <h2>Ваш заказ</h2>
+          <aside className="order-summary" id="order-summary">
+            <h2>Корзина</h2>
             {!selectedItems.length && !customItems.length ? (
               <EmptyState
-                title="Корзина пуста"
-                message="Добавьте товар из каталога или запросите отсутствующую позицию."
-                actionLabel="К каталогу"
-                onAction={() => {
-                  document.querySelector(".product-grid")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
+                title="Пока пусто"
+                message="Выберите товары в каталоге, затем откройте корзину для оформления."
               />
             ) : (
-              <div className="summary-list">
-                {selectedItems.map((item) => (
-                  <div className="summary-item" key={item.productId}>
-                    <span>{item.name}<small>{item.multiplier > 1 ? `${UNIT_CONFIG[item.unit].label}: ${item.quantity}` : item.category}</small></span>
-                    <strong>{toQuantityInputValue(item.quantity, item.multiplier)} {quantityInputUnitLabel(item.unit, item.multiplier)}<small>{settings.showPrices && item.lineTotal > 0 ? formatMoney(item.lineTotal) : ""}</small></strong>
-                  </div>
-                ))}
-                {customItems.map((item) => (
-                  <div className="summary-item custom-line" key={item.id}>
-                    <span>
-                      {item.name}
-                      <small>Товар вне матрицы · {item.details || "без уточнений"}</small>
-                      <CustomRequestPhoto photo={item.photo} className="custom-request-photo-small" />
-                    </span>
-                    <strong>{item.quantity} {item.unit}<button className="danger-text" style={{ border: 0, background: "transparent", fontSize: 9 }} type="button" onClick={() => setCustomItems((current) => current.filter((value) => value.id !== item.id))}>Убрать</button></strong>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div
-              className={`field delivery-date-field${missingFields.date ? " is-invalid" : ""}`}
-              ref={summaryDateFieldRef}
-            >
-              <span>Дата доставки</span>
-              <button
-                className={`delivery-date-trigger delivery-date-trigger-desktop${deliveryDateParts ? " is-selected" : ""}${missingFields.date ? " is-invalid" : ""}`}
-                type="button"
-                onClick={() => setDatePickerOpen(true)}
-                aria-invalid={missingFields.date}
-              >
-                {deliveryDateParts ? (
-                  <>
-                    <span className="delivery-date-day" aria-hidden="true">{deliveryDateParts.day}</span>
-                    <span className="delivery-date-text">
-                      <strong>{deliveryDateParts.weekday}</strong>
-                      <small>{deliveryDateParts.monthYear}</small>
-                    </span>
-                    <span className="delivery-date-action">Изменить</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="delivery-date-day is-empty" aria-hidden="true">—</span>
-                    <span className="delivery-date-text">
-                      <strong>Выберите дату</strong>
-                      <small>Когда привезти заказ</small>
-                    </span>
-                    <span className="delivery-date-action">Календарь</span>
-                  </>
-                )}
-              </button>
-              {deliveryDateParts && (
-                <p className="delivery-date-desktop-hint muted small">
-                  Выбрано: {deliveryDateParts.weekday}, {deliveryDateParts.monthYear}
+              <>
+                <div className="summary-total" style={{ marginTop: 0 }}>
+                  <span>Позиций</span>
+                  <strong>{cartCount}</strong>
+                </div>
+                <div className="summary-total">
+                  <span>Итого</span>
+                  <strong>
+                    {settings.showPrices && total > 0
+                      ? formatMoney(total)
+                      : "уточняется"}
+                  </strong>
+                </div>
+                <p className="summary-note">
+                  Дата, адрес и комментарий — в корзине перед оформлением.
                 </p>
-              )}
-              <p className="muted small" style={{ marginTop: 6 }}>
-                Ближайшая доставка: с {earliestDeliveryDate.split("-").reverse().join(".")}. Воскресенье недоступно.
-              </p>
-              {missingFields.date && (
-                <p className="field-error-hint">Укажите дату доставки</p>
-              )}
-            </div>
-            <label
-              className={`field${missingFields.address ? " is-invalid" : ""}`}
-              style={{ marginTop: 10 }}
-              ref={summaryAddressFieldRef}
-            >
-              Адрес доставки
-              <select
-                value={addressId}
-                onChange={(e) => updateAddressId(e.target.value)}
-                aria-invalid={missingFields.address}
-              >
-                <option value="">Выберите адрес</option>
-                {addresses.map((item) => <option value={item.id} key={item.id}>{item.label}{item.isDefault ? " — основной" : ""} · {item.address}</option>)}
-              </select>
-              {missingFields.address && (
-                <span className="field-error-hint">Укажите адрес доставки</span>
-              )}
-            </label>
-            <label className="field" style={{ marginTop: 10 }}>Комментарий к заказу
-              <textarea rows="3" placeholder="Например: позвонить перед доставкой" value={clientComment} onChange={(e) => setClientComment(e.target.value)} />
-            </label>
-            <div className="summary-total"><span>Итого</span><strong>{settings.showPrices && total > 0 ? formatMoney(total) : `${selectedItems.length + customItems.length} поз.`}</strong></div>
-            {settings.enableDrafts && session.mode === "new" && <p className="summary-note">Черновик автоматически сохраняется в этом браузере.</p>}
-            <button className="save-order-button" type="submit">{session.mode === "edit" ? "Сохранить изменения" : "Оформить заказ"}</button>
-          </form>
+                <div className="order-summary-actions">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => void clearCart()}
+                  >
+                    Очистить корзину
+                  </button>
+                  <button
+                    className="primary-button open-cart-button"
+                    type="button"
+                    onClick={openCartForCheckout}
+                  >
+                    Перейти в корзину
+                  </button>
+                </div>
+              </>
+            )}
+            {settings.enableDrafts && session.mode === "new" && (
+              <p className="summary-note">Черновик автоматически сохраняется в этом браузере.</p>
+            )}
+          </aside>
 
           <div className="catalog-main">
             <div className="page-title-row">
@@ -582,7 +545,7 @@ export function OrderEditor({
 
             <section className={catalogView === "list" ? "product-grid product-grid-list" : "product-grid"}>
               {filtered.map((product) => {
-                const unit = units[product.id] || product.saleUnits[0];
+                const unit = units[product.id] || orderedSaleUnits(product)[0];
                 const quantity = Number(cart[product.id]) || 0;
                 const multiplier = getUnitMultiplier(product, unit);
                 const price = getUnitPrice(product, unit);
@@ -590,7 +553,19 @@ export function OrderEditor({
                 return (
                   <article className={isList ? "product-card product-card-list" : "product-card"} key={product.id}>
                     <div className="product-card-top">
-                      <span className="product-category">{product.category}</span>
+                      {product.certificateUrl ? (
+                        <a
+                          className="product-cert-link product-cert-link-top"
+                          href={product.certificateUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          download={product.certificateName || undefined}
+                        >
+                          Сертификат
+                        </a>
+                      ) : (
+                        <span className="product-card-top-spacer" aria-hidden="true" />
+                      )}
                       {settings.showFavorites && <button className={favorites.includes(product.id) ? "favorite-button active" : "favorite-button"} type="button" onClick={() => setFavorites((current) => current.includes(product.id) ? current.filter((id) => id !== product.id) : [...current, product.id])}>★</button>}
                     </div>
                     {!isList && (
@@ -610,10 +585,20 @@ export function OrderEditor({
                         : "Цена уточняется"}
                     </p>
                     <div className="product-card-controls">
-                      <div className="unit-choice">
-                        {UNIT_ORDER.filter((item) => product.saleUnits.includes(item)).map((item) => (
-                          <button className={unit === item ? "active" : ""} type="button" key={item} onClick={() => setProductUnit(product.id, item)}>{UNIT_CONFIG[item].label}</button>
-                        ))}
+                      <div className={`unit-choice${orderedSaleUnits(product).length === 1 ? " unit-choice-single" : ""}`}>
+                        {orderedSaleUnits(product).map((item) => {
+                          const sole = orderedSaleUnits(product).length === 1;
+                          return (
+                            <button
+                              className={sole || unit === item ? "active" : ""}
+                              type="button"
+                              key={item}
+                              onClick={() => setProductUnit(product.id, item)}
+                            >
+                              {UNIT_CONFIG[item].label}
+                            </button>
+                          );
+                        })}
                       </div>
                       <div className="quantity-control">
                         <button type="button" onClick={() => changeQuantity(product.id, -1)} aria-label="Уменьшить">−</button>
@@ -642,24 +627,17 @@ export function OrderEditor({
           </div>
         </div>
 
-        <div className="mobile-checkout-bar" aria-label="Быстрое оформление">
+        <div className="mobile-checkout-bar" aria-label="Корзина">
           <div className="mobile-checkout-bar-info">
             <strong>{cartCount} поз.</strong>
             <span>{settings.showPrices && total > 0 ? formatMoney(total) : "Сумма уточняется"}</span>
           </div>
           <button
-            className="mobile-checkout-bar-cart"
-            type="button"
-            onClick={() => setCartSheetOpen(true)}
-          >
-            Корзина
-          </button>
-          <button
             className="mobile-checkout-bar-button"
             type="button"
-            onClick={submitOrder}
+            onClick={openCartForCheckout}
           >
-            {session.mode === "edit" ? "Сохранить" : "Оформить"}
+            Корзина
           </button>
         </div>
 
@@ -705,20 +683,25 @@ export function OrderEditor({
                           {item.multiplier > 1 ? ` · ${item.quantity * item.multiplier} шт. всего` : ""}
                           {settings.showPrices && item.lineTotal > 0 ? ` · ${formatMoney(item.lineTotal)}` : ""}
                         </small>
-                        <div className="unit-choice cart-sheet-units">
-                          {UNIT_ORDER.filter((unitId) => {
+                        <div className={`unit-choice cart-sheet-units${(() => {
+                          const product = products.find((row) => String(row.id) === String(item.productId));
+                          return orderedSaleUnits(product).length === 1 ? " unit-choice-single" : "";
+                        })()}`}>
+                          {(() => {
                             const product = products.find((row) => String(row.id) === String(item.productId));
-                            return product?.saleUnits?.includes(unitId);
-                          }).map((unitId) => (
-                            <button
-                              className={item.unit === unitId ? "active" : ""}
-                              type="button"
-                              key={unitId}
-                              onClick={() => setProductUnit(item.productId, unitId)}
-                            >
-                              {UNIT_CONFIG[unitId].label}
-                            </button>
-                          ))}
+                            const unitsList = orderedSaleUnits(product);
+                            const sole = unitsList.length === 1;
+                            return unitsList.map((unitId) => (
+                              <button
+                                className={sole || item.unit === unitId ? "active" : ""}
+                                type="button"
+                                key={unitId}
+                                onClick={() => setProductUnit(item.productId, unitId)}
+                              >
+                                {UNIT_CONFIG[unitId].label}
+                              </button>
+                            ));
+                          })()}
                         </div>
                       </div>
                       <div className="quantity-control cart-sheet-qty">
@@ -831,11 +814,24 @@ export function OrderEditor({
                 )}
               </label>
 
+              <label className="field cart-sheet-comment" style={{ marginTop: 10 }}>
+                Комментарий к заказу
+                <textarea
+                  rows="3"
+                  placeholder="Например: позвонить перед доставкой"
+                  value={clientComment}
+                  onChange={(e) => setClientComment(e.target.value)}
+                />
+              </label>
+
               <div className="cart-sheet-footer">
                 <div className="cart-sheet-total">
                   <span>Итого</span>
                   <strong>{settings.showPrices && total > 0 ? formatMoney(total) : `${cartCount} поз.`}</strong>
                 </div>
+                <button className="secondary-button" type="button" onClick={() => void clearCart()}>
+                  Очистить корзину
+                </button>
                 <button className="save-order-button" type="button" onClick={submitOrder}>
                   {session.mode === "edit" ? "Сохранить изменения" : "Оформить заказ"}
                 </button>
@@ -850,12 +846,12 @@ export function OrderEditor({
               className="delivery-date-sheet-backdrop"
               type="button"
               aria-label="Закрыть выбор даты"
-              onClick={() => setDatePickerOpen(false)}
+              onClick={closeDatePickerToCart}
             />
             <div className="delivery-date-sheet-panel">
               <div className="delivery-date-sheet-head">
                 <strong>Дата доставки</strong>
-                <button className="header-button" type="button" onClick={() => setDatePickerOpen(false)}>
+                <button className="header-button" type="button" onClick={closeDatePickerToCart}>
                   Готово
                 </button>
               </div>
@@ -873,14 +869,6 @@ export function OrderEditor({
                 earliestIso={earliestDeliveryDate}
                 onPick={handleCalendarPick}
               />
-              <button
-                className="primary-button save-order-button delivery-date-sheet-submit"
-                type="button"
-                disabled={!deliveryDate || !validateDeliveryDate(deliveryDate).ok}
-                onClick={confirmDeliveryDateAndSubmit}
-              >
-                {session.mode === "edit" ? "Сохранить изменения" : "Оформить заказ"}
-              </button>
             </div>
           </div>
         )}

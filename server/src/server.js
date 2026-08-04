@@ -1272,6 +1272,20 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+/** Публичные контакты менеджера для экрана входа (без авторизации). */
+app.get("/api/public/manager-contact", (req, res) => {
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    ...getGlobalState("settings", DEFAULT_SETTINGS),
+  };
+  res.json({
+    managerFullName: String(settings.managerFullName || ""),
+    managerPhone: String(settings.managerPhone || ""),
+    managerMax: String(settings.managerMax || ""),
+    managerTelegram: String(settings.managerTelegram || ""),
+  });
+});
+
 app.post("/api/auth/register", async (req, res, next) => {
   try {
     const input = registerSchema.parse(req.body);
@@ -3564,6 +3578,130 @@ app.delete(
 
     setGlobalState("products", updatedProducts);
     auditFromRequest(req, "product.image.delete", {
+      productId: updatedProduct.id,
+      productName: updatedProduct.name,
+    });
+
+    res.json({ ok: true, product: updatedProduct });
+  }
+);
+
+const certificateUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadsDirectory,
+    filename(req, file, callback) {
+      const extensionMap = {
+        "application/pdf": ".pdf",
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+      };
+      const fromName = path.extname(String(file.originalname || "")).toLowerCase();
+      const extension =
+        extensionMap[file.mimetype] ||
+        (fromName === ".pdf" ? ".pdf" : ".bin");
+      callback(
+        null,
+        `product-cert-${String(req.params.productId || "item")}-${Date.now()}-${randomUUID()}${extension}`
+      );
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter(req, file, callback) {
+    const allowed = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+    if (!allowed.includes(file.mimetype)) {
+      return callback(
+        new Error("Разрешены PDF, JPG, PNG или WEBP.")
+      );
+    }
+    callback(null, true);
+  },
+});
+
+app.post(
+  "/api/admin/products/:productId/certificate",
+  authRequired,
+  roleRequired("manager"),
+  certificateUpload.single("certificate"),
+  (req, res) => {
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const productIndex = products.findIndex(
+      (product) => String(product.id) === String(req.params.productId)
+    );
+
+    if (productIndex < 0) {
+      if (req.file?.path && existsSync(req.file.path)) {
+        unlinkSync(req.file.path);
+      }
+      return res.status(404).json({ error: "Товар не найден." });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "Выберите файл сертификата." });
+    }
+
+    removeUploadedImage(products[productIndex].certificateUrl);
+
+    const certificateUrl = `/uploads/${req.file.filename}`;
+    const certificateName = String(req.file.originalname || "certificate").slice(0, 180);
+    const updatedProduct = {
+      ...products[productIndex],
+      certificateUrl,
+      certificateName,
+      certificateUpdatedAt: new Date().toISOString(),
+    };
+    const updatedProducts = products.map((product, index) =>
+      index === productIndex ? updatedProduct : product
+    );
+
+    setGlobalState("products", updatedProducts);
+    auditFromRequest(req, "product.certificate.upload", {
+      productId: updatedProduct.id,
+      productName: updatedProduct.name,
+      certificateUrl,
+    });
+
+    res.status(201).json({
+      ok: true,
+      certificateUrl,
+      product: updatedProduct,
+    });
+  }
+);
+
+app.delete(
+  "/api/admin/products/:productId/certificate",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const productIndex = products.findIndex(
+      (product) => String(product.id) === String(req.params.productId)
+    );
+
+    if (productIndex < 0) {
+      return res.status(404).json({ error: "Товар не найден." });
+    }
+
+    removeUploadedImage(products[productIndex].certificateUrl);
+
+    const updatedProduct = {
+      ...products[productIndex],
+      certificateUrl: "",
+      certificateName: "",
+      certificateUpdatedAt: new Date().toISOString(),
+    };
+    const updatedProducts = products.map((product, index) =>
+      index === productIndex ? updatedProduct : product
+    );
+
+    setGlobalState("products", updatedProducts);
+    auditFromRequest(req, "product.certificate.delete", {
       productId: updatedProduct.id,
       productName: updatedProduct.name,
     });

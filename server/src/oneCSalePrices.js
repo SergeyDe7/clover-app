@@ -10,7 +10,7 @@ function finiteNonNegative(value) {
   return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
 }
 
-const UNITS = ["piece", "bundle", "pack", "box", "pair", "roll"];
+const UNITS = ["piece", "pair", "meter", "roll", "pack", "bundle", "box"];
 
 export function normalizeOneCPriceType(item = {}) {
   const id = cleanText(item.id ?? item.oneCId ?? item.ref ?? item.code);

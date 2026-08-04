@@ -1,10 +1,11 @@
 const UNIT_LABELS = {
   piece: "штука",
+  pair: "пара",
+  meter: "метр",
+  roll: "рулон",
   pack: "упаковка",
   bundle: "пачка",
   box: "коробка",
-  pair: "пара",
-  roll: "рулон",
 };
 
 /** В документ 1С количество всегда в шт (см. totalPieces). */
