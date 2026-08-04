@@ -22,7 +22,6 @@ import {
   validateDeliveryDate,
 } from "../../shared/deliveryDateRules";
 import { ManagerContact } from "./ManagerContact";
-import { CustomItemForm } from "./CustomItemForm";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
 import { appAlert } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
@@ -84,6 +83,10 @@ export function OrderEditor({
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Все");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [catalogView, setCatalogView] = useState(() => {
+    const saved = safeRead(STORAGE.catalogView, "cards");
+    return saved === "list" ? "list" : "cards";
+  });
   const [cart, setCart] = useState(() => {
     const result = {};
     (initialSource.items || []).forEach((item) => { result[item.productId ?? item.id] = item.quantity; });
@@ -519,43 +522,78 @@ export function OrderEditor({
             <div className="catalog-toolbar">
               <div className="catalog-filter-row">
                 <input className="catalog-search" type="search" placeholder="Поиск по названию или коду" value={search} onChange={(e) => setSearch(e.target.value)} />
-                {settings.showFavorites && (
-                  <button
-                    className={favoritesOnly ? "category-button active" : "category-button"}
-                    type="button"
-                    onClick={() => setFavoritesOnly((value) => !value)}
-                    aria-label="Избранное"
-                    title="Избранное"
-                  >
-                    <span className="fav-label-full">★ Избранное</span>
-                    <span className="fav-label-short">★</span>
-                  </button>
-                )}
+                <div className="catalog-filter-actions">
+                  {settings.showFavorites && (
+                    <button
+                      className={favoritesOnly ? "category-button active" : "category-button"}
+                      type="button"
+                      onClick={() => setFavoritesOnly((value) => !value)}
+                      aria-label="Избранное"
+                      title="Избранное"
+                    >
+                      <span className="fav-label-full">★ Избранное</span>
+                      <span className="fav-label-short">★</span>
+                    </button>
+                  )}
+                  <div className="catalog-view-toggle" role="group" aria-label="Вид каталога">
+                    <button
+                      type="button"
+                      className={catalogView === "cards" ? "active" : ""}
+                      aria-pressed={catalogView === "cards"}
+                      title="С фото"
+                      aria-label="С фото"
+                      onClick={() => {
+                        setCatalogView("cards");
+                        safeWrite(STORAGE.catalogView, "cards");
+                      }}
+                    >
+                      <span className="view-toggle-icon" aria-hidden="true">▦</span>
+                      <span className="view-toggle-label">Фото</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={catalogView === "list" ? "active" : ""}
+                      aria-pressed={catalogView === "list"}
+                      title="Список"
+                      aria-label="Список"
+                      onClick={() => {
+                        setCatalogView("list");
+                        safeWrite(STORAGE.catalogView, "list");
+                      }}
+                    >
+                      <span className="view-toggle-icon" aria-hidden="true">☰</span>
+                      <span className="view-toggle-label">Список</span>
+                    </button>
+                  </div>
+                </div>
               </div>
               <div className="category-list">
                 {categories.map((item) => <button className={category === item ? "category-button active" : "category-button"} type="button" key={item} onClick={() => setCategory(item)}>{item}</button>)}
               </div>
             </div>
 
-            <section className="product-grid">
+            <section className={catalogView === "list" ? "product-grid product-grid-list" : "product-grid"}>
               {filtered.map((product) => {
                 const unit = units[product.id] || product.saleUnits[0];
                 const quantity = Number(cart[product.id]) || 0;
                 const multiplier = getUnitMultiplier(product, unit);
                 const price = getUnitPrice(product, unit);
+                const isList = catalogView === "list";
                 return (
-                  <article className="product-card" key={product.id}>
+                  <article className={isList ? "product-card product-card-list" : "product-card"} key={product.id}>
                     <div className="product-card-top">
                       <span className="product-category">{product.category}</span>
                       {settings.showFavorites && <button className={favorites.includes(product.id) ? "favorite-button active" : "favorite-button"} type="button" onClick={() => setFavorites((current) => current.includes(product.id) ? current.filter((id) => id !== product.id) : [...current, product.id])}>★</button>}
                     </div>
-                    <div className="product-image-wrap">
-                      {product.imageUrl ? (
-                        <img className="product-image" src={product.imageUrl} alt={product.name} />
-                      ) : (
-                        <span className="product-image-placeholder">Фото товара пока не загружено</span>
-                      )}
-                    </div>
+                    {!isList && (
+                      <div className="product-image-wrap">
+                        {product.imageUrl ? (
+                          <img className="product-image" src={product.imageUrl} alt={product.name} />
+                        ) : (
+                          <span className="product-image-placeholder">Фото товара пока не загружено</span>
+                        )}
+                      </div>
+                    )}
                     <h2>{product.name}</h2>
                     <p className="product-code">Код: {product.code}</p>
                     <p className="product-price">
@@ -569,13 +607,6 @@ export function OrderEditor({
                           <button className={unit === item ? "active" : ""} type="button" key={item} onClick={() => setProductUnit(product.id, item)}>{UNIT_CONFIG[item].label}</button>
                         ))}
                       </div>
-                      <p className="unit-hint">
-                        {unit === "piece"
-                          ? "Продажа в штуках: 1, 2, 3… → в 1С столько же шт."
-                          : multiplier > 1
-                            ? `1 ${UNIT_CONFIG[unit].label.toLowerCase()} = ${multiplier} шт. · в поле ${multiplier}, ${multiplier * 2}… · в 1С уйдёт в шт.`
-                            : `Для «${UNIT_CONFIG[unit].label}» не задан размер в шт. У менеджера укажите «Внутри, шт.»`}
-                      </p>
                       <div className="quantity-control">
                         <button type="button" onClick={() => changeQuantity(product.id, -1)} aria-label="Уменьшить">−</button>
                         <div className="quantity-input-wrap">
@@ -599,7 +630,6 @@ export function OrderEditor({
                 );
               })}
               {!filtered.length && <div className="empty-box">Товары не найдены.</div>}
-              {settings.allowCustomItems && <CustomItemForm onAdd={(item) => setCustomItems((current) => [...current, item])} />}
             </section>
           </div>
         </div>

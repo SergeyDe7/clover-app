@@ -412,6 +412,14 @@ export function ensureGlobalState() {
   if (!db.prepare("SELECT 1 FROM app_state WHERE key = ?").get("oneCClientCandidates")) {
     setGlobalState("oneCClientCandidates", {});
   }
+
+  if (!db.prepare("SELECT 1 FROM app_state WHERE key = ?").get("oneCPriceTypes")) {
+    setGlobalState("oneCPriceTypes", []);
+  }
+
+  if (!db.prepare("SELECT 1 FROM app_state WHERE key = ?").get("oneCPriceTypesMeta")) {
+    setGlobalState("oneCPriceTypesMeta", {});
+  }
 }
 
 export function findUserByEmail(email) {

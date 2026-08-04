@@ -113,6 +113,7 @@ import {
   mergeProductsPreservingOneCLinks,
   normalizeOneCProduct,
   normalizeOneCProducts,
+  preserveOneCProductPricingFields,
   selectRelevantOneCProducts,
 } from "./oneCProducts.js";
 import {
@@ -131,6 +132,9 @@ import {
   normalizeDefaultPricingConfig,
   normalizePersonalPriceConfig,
   resolveClientProductPricing,
+  UNITS as SALE_UNITS,
+  unitLabel,
+  unitPriceField,
 } from "./pricing.js";
 import {
   buildAllPriceRequirements,
@@ -142,6 +146,12 @@ import {
   priceMaxAgeMs,
   validatePriceRequirements,
 } from "./oneCPriceSync.js";
+import {
+  buildSalePriceRequirements,
+  mergeOneCPriceTypes,
+  mergeSalePricesByType,
+  normalizeOneCPriceTypes,
+} from "./oneCSalePrices.js";
 import {
   publicMailStatus,
   resetPasswordEmail,
@@ -775,6 +785,14 @@ function normalizeManagerClientAddresses(addresses) {
 function normalizeClientLink(value) {
   const link = value && typeof value === "object" ? value : {};
   const defaultPricing = normalizeDefaultPricingConfig(link);
+  const oneCPriceTypeId = String(link.oneCPriceTypeId || "").trim();
+  const oneCPriceTypeName = String(link.oneCPriceTypeName || "").trim();
+  // Выбранный вид цен 1С всегда даёт режим one_c_price_type.
+  const defaultPricingMode = oneCPriceTypeId
+    ? "one_c_price_type"
+    : defaultPricing.source === "one_c_price_type"
+      ? "base"
+      : defaultPricing.source;
 
   return {
     ...EMPTY_LINK,
@@ -784,8 +802,10 @@ function normalizeClientLink(value) {
       ? link.matrixProductIds
       : [],
     allowFullCatalog: Boolean(link.allowFullCatalog),
-    defaultPricingMode: defaultPricing.source,
+    defaultPricingMode,
     defaultMarkupPercent: defaultPricing.markupPercent,
+    oneCPriceTypeId,
+    oneCPriceTypeName,
     personalPrices:
       link.personalPrices &&
       typeof link.personalPrices === "object"
@@ -815,15 +835,9 @@ function applyClientPrices(product, link, isMatrixProduct, oneCById = new Map())
   const oneCItem = oneCById.get(String(product.oneCId || "")) || null;
   const pricing = resolveClientProductPricing(product, priceConfig, oneCItem, link);
 
-  return {
+  const priced = {
     ...enrichProductWithPurchasePrices(product, oneCItem),
     isMatrixProduct,
-    basePricePiece: Number(product.pricePiece) || 0,
-    basePricePack: Number(product.pricePack) || 0,
-    basePriceBundle: Number(product.priceBundle) || 0,
-    pricePiece: pricing.prices.piece,
-    pricePack: pricing.prices.pack,
-    priceBundle: pricing.prices.bundle,
     priceSources: pricing.priceSources,
     clientPriceMode: pricing.source,
     clientPriceOverrideMode: pricing.overrideSource,
@@ -833,6 +847,15 @@ function applyClientPrices(product, link, isMatrixProduct, oneCById = new Map())
     purchasePrices: pricing.purchasePrices,
     purchasePriceUpdatedAt: pricing.purchasePriceUpdatedAt,
   };
+
+  for (const unit of SALE_UNITS) {
+    const priceField = unitPriceField(unit);
+    const baseField = priceField.replace(/^price/, "basePrice");
+    priced[baseField] = Number(product[priceField]) || 0;
+    priced[priceField] = pricing.prices[unit];
+  }
+
+  return priced;
 }
 
 function resolveClientCatalog(products, rawLink, oneCProducts = []) {
@@ -904,6 +927,9 @@ function stripRuntimeProductPricing(product = {}) {
     basePricePiece,
     basePricePack,
     basePriceBundle,
+    basePriceBox,
+    basePricePair,
+    basePriceRoll,
     isMatrixProduct,
     ...stored
   } = product;
@@ -911,9 +937,7 @@ function stripRuntimeProductPricing(product = {}) {
 }
 
 function priceForOrderUnit(product, unit) {
-  if (unit === "pack") return Number(product.pricePack) || 0;
-  if (unit === "bundle") return Number(product.priceBundle) || 0;
-  return Number(product.pricePiece) || 0;
+  return Number(product[unitPriceField(unit)]) || 0;
 }
 
 function purchasePriceForOrderUnit(product, unit) {
@@ -938,7 +962,7 @@ function repriceOrderWithCurrentOneC(order, products, rawLink, oneCProducts = []
       isMatrixProductForLink(link, product.id),
       oneCById
     );
-    const unit = ["piece", "pack", "bundle"].includes(item.unit) ? item.unit : "piece";
+    const unit = SALE_UNITS.includes(item.unit) ? item.unit : "piece";
     const unitPrice = priceForOrderUnit(priced, unit);
     const source = priced.priceSources?.[unit] || "unspecified";
 
@@ -1450,6 +1474,12 @@ app.post("/api/auth/login", async (req, res, next) => {
 
 app.post("/api/auth/change-password", authRequired, async (req, res, next) => {
   try {
+    if (isClientRole(req.user.role)) {
+      return res.status(403).json({
+        error: "Смену пароля клиента выполняет менеджер.",
+        code: "CLIENT_PASSWORD_CHANGE_FORBIDDEN",
+      });
+    }
     const input = changePasswordSchema.parse(req.body);
     const user = findUserByEmail(req.user.email);
     if (!user || !(await bcrypt.compare(input.currentPassword, user.password_hash))) {
@@ -1812,6 +1842,9 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
       clients: listClients(),
       reconciliationRequests: listReconciliationRequests(),
       managerNotifications: listManagerNotifications({ limit: 100 }),
+      oneCPriceTypes: normalizeOneCPriceTypes(
+        getGlobalState("oneCPriceTypes", [])
+      ),
       services: {
         mail: publicMailStatus(),
         push: publicPushStatus(),
@@ -2480,20 +2513,24 @@ async function handleOneCTestOrder(req, res, next) {
         Number(item.unitPrice) ||
         (Number(item.lineTotal) || 0) / quantity;
 
-      const unit = ["piece", "pack", "bundle"].includes(item.unit)
+      const saleUnit = SALE_UNITS.includes(item.unit)
         ? item.unit
         : "piece";
       const multiplier = Math.max(1, Number(item.multiplier) || 1);
+      const totalPieces = quantity * multiplier;
 
       return {
         id: oneCId,
         code: item.oneCCode || product?.oneCCode || item.code || product?.code || "",
         name: item.oneCName || product?.oneCName || item.name || product?.name || "",
         displayName: item.name || product?.name || "",
-        unit,
-        unitName: unit === "pack" ? "Упаковка" : unit === "bundle" ? "Пачка" : "Штука",
+        saleUnit,
+        saleUnitName: unitLabel(saleUnit),
+        // 1С: всегда количество в шт (totalPieces), единица «шт»
+        unit: "piece",
+        unitName: "шт",
         multiplier,
-        totalPieces: quantity * multiplier,
+        totalPieces,
         quantity,
         price,
       };
@@ -2608,6 +2645,89 @@ app.post("/api/one-c/purchase-prices", (req, res, next) => {
     const merged = receivePurchasePrices({
       items: req.body?.items,
       database: extractOneCDatabase(req),
+    });
+    res.json({
+      ok: true,
+      database: "TEST",
+      receivedAt: merged.receivedAt,
+      accepted: merged.accepted.length,
+      rejected: merged.rejected,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Справочник видов цен (категорий цен) из 1С TEST. */
+app.get("/api/one-c/price-types", (req, res) => {
+  if (!requireOneCTestDatabase(req, res)) return;
+  const types = normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", []));
+  const meta = getGlobalState("oneCPriceTypesMeta", {});
+  res.json({
+    ok: true,
+    database: "TEST",
+    items: types,
+    updatedAt: meta.updatedAt || "",
+  });
+});
+
+app.post("/api/one-c/price-types", (req, res, next) => {
+  try {
+    if (!requireOneCTestDatabase(req, res)) return;
+    const receivedAt = new Date().toISOString();
+    const merged = mergeOneCPriceTypes(
+      getGlobalState("oneCPriceTypes", []),
+      req.body?.items ?? req.body?.priceTypes ?? [],
+      { receivedAt }
+    );
+    setGlobalState("oneCPriceTypes", merged.types);
+    setGlobalState("oneCPriceTypesMeta", {
+      updatedAt: receivedAt,
+      accepted: merged.accepted,
+    });
+    auditFromRequest(req, "one-c.price-types.receive", {
+      accepted: merged.accepted,
+    });
+    res.json({
+      ok: true,
+      database: "TEST",
+      receivedAt,
+      accepted: merged.accepted,
+      items: merged.types,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Запрос продажных цен по видам, назначенным клиентам. */
+app.get("/api/one-c/sale-price-request", (req, res) => {
+  if (!requireOneCTestDatabase(req, res)) return;
+  const products = getGlobalState("products", DEFAULT_PRODUCTS);
+  const clientLinks = getGlobalState("clientLinks", {});
+  const items = buildSalePriceRequirements(products, clientLinks);
+  res.json({
+    ok: true,
+    database: "TEST",
+    items,
+    priceTypes: normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", [])),
+  });
+});
+
+/** Приём продажных цен номенклатуры по виду цен из 1С TEST. */
+app.post("/api/one-c/sale-prices", (req, res, next) => {
+  try {
+    if (!requireOneCTestDatabase(req, res)) return;
+    const receivedAt = new Date().toISOString();
+    const merged = mergeSalePricesByType(
+      getGlobalState("oneCProducts", []),
+      req.body?.items ?? [],
+      { receivedAt }
+    );
+    setGlobalState("oneCProducts", merged.products);
+    auditFromRequest(req, "one-c.sale-prices.receive", {
+      accepted: merged.accepted.length,
+      rejected: merged.rejected.length,
     });
     res.json({
       ok: true,
@@ -3541,7 +3661,11 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
       )
     );
 
-    setGlobalState("oneCProducts", linked.oneCProducts);
+    const previousOneCProducts = getGlobalState("oneCProducts", []);
+    setGlobalState(
+      "oneCProducts",
+      preserveOneCProductPricingFields(previousOneCProducts, linked.oneCProducts)
+    );
     setGlobalState("oneCProductCandidates", cleanCandidateMap);
     if (linked.changed || reclassified.changed) {
       setGlobalState("products", reclassified.products);
@@ -3914,6 +4038,27 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
     setGlobalState("oneCClients", linked.oneCClients);
     setGlobalState("oneCClientCandidates", cleanCandidateMap);
     if (linked.changed) setGlobalState("clientLinks", linked.clientLinks);
+
+    // Справочник видов цен — из выгрузки контрагентов (поля договора).
+    const harvestedTypes = allOneCClients
+      .filter((item) => item.priceTypeId)
+      .map((item) => ({
+        id: item.priceTypeId,
+        code: item.priceTypeCode || "",
+        name: item.priceTypeName || item.priceTypeCode || item.priceTypeId,
+      }));
+    if (harvestedTypes.length) {
+      const union = normalizeOneCPriceTypes([
+        ...normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", [])),
+        ...harvestedTypes,
+      ]);
+      setGlobalState("oneCPriceTypes", union);
+      setGlobalState("oneCPriceTypesMeta", {
+        updatedAt: receivedAt,
+        source: "clients-preview",
+        accepted: union.length,
+      });
+    }
 
     const meta = {
       receivedAt,

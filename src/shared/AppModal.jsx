@@ -230,6 +230,10 @@ export function AppModalHost() {
     : {
         width: "min(420px, calc(100% - 32px))",
         maxWidth: "100%",
+        border: "none",
+        borderRadius: 0,
+        boxShadow: "none",
+        background: "transparent",
       };
 
   return createPortal(

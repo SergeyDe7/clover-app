@@ -10,12 +10,12 @@ const exchangeSource = await readFile(exchangePath, "utf8");
 
 const checks = [
   [
-    'const UNIT_ORDER = ["piece", "bundle", "pack"]',
-    "Единицы отображаются в порядке Штука → Пачка → Упаковка",
+    'const UNIT_ORDER = ["piece", "bundle", "pack", "box", "pair", "roll"]',
+    "Единицы отображаются в порядке штука → пачка → упаковка",
   ],
   [
-    'className="product-purchase-summary"',
-    "Закупочная цена видна в карточке товара менеджера",
+    'className="catalog-view-toggle"',
+    "Клиент может переключать вид каталога: с фото / список",
   ],
   [
     'className="purchase-price-card"',

@@ -28,7 +28,6 @@ export const MANAGER_MORE_TAB_KEY = "clover-manager-more-tab-v1";
 export const CLIENT_TABS = [
   ["home", "Заказ"],
   ["orders", "Мои заказы"],
-  ["matrix", "Матрица"],
   ["reconciliation", "Акт сверки"],
   ["cabinet", "Настройки"],
 ];
@@ -123,7 +122,8 @@ export function writeManagerMoreTab(value) {
 
 export function readClientActiveTab() {
   try {
-    const value = localStorage.getItem(CLIENT_ACTIVE_TAB_KEY) || "home";
+    let value = localStorage.getItem(CLIENT_ACTIVE_TAB_KEY) || "home";
+    if (value === "matrix") value = "home";
     return CLIENT_TABS.some(([id]) => id === value) ? value : "home";
   } catch {
     return "home";
@@ -163,7 +163,7 @@ export function clientTabFromSection(section) {
     return "reconciliation";
   }
   if (section === "matrix" || section === "products") {
-    return "matrix";
+    return "home";
   }
   if (
     section === "addresses" ||
@@ -269,10 +269,65 @@ export const DEFAULT_PRODUCTS = [
 ];
 
 export const UNIT_CONFIG = {
-  piece: { label: "Штука", shortLabel: "шт." },
-  pack: { label: "Упаковка", shortLabel: "уп." },
-  bundle: { label: "Пачка", shortLabel: "пач." },
+  piece: {
+    label: "штука",
+    shortLabel: "шт.",
+    sizeField: "pieceSize",
+    priceField: "pricePiece",
+    basePriceField: "basePricePiece",
+  },
+  bundle: {
+    label: "пачка",
+    shortLabel: "пач.",
+    sizeField: "bundleSize",
+    priceField: "priceBundle",
+    basePriceField: "basePriceBundle",
+  },
+  pack: {
+    label: "упаковка",
+    shortLabel: "уп.",
+    sizeField: "packSize",
+    priceField: "pricePack",
+    basePriceField: "basePricePack",
+  },
+  box: {
+    label: "коробка",
+    shortLabel: "кор.",
+    sizeField: "boxSize",
+    priceField: "priceBox",
+    basePriceField: "basePriceBox",
+  },
+  pair: {
+    label: "пара",
+    shortLabel: "пар.",
+    sizeField: "pairSize",
+    priceField: "pricePair",
+    basePriceField: "basePricePair",
+  },
+  roll: {
+    label: "рулон",
+    shortLabel: "рул.",
+    sizeField: "rollSize",
+    priceField: "priceRoll",
+    basePriceField: "basePriceRoll",
+  },
 };
+
+export function unitSizeField(unit) {
+  return UNIT_CONFIG[unit]?.sizeField || "pieceSize";
+}
+
+export function unitPriceField(unit) {
+  return UNIT_CONFIG[unit]?.priceField || "pricePiece";
+}
+
+export function unitBasePriceField(unit) {
+  return UNIT_CONFIG[unit]?.basePriceField || "basePricePiece";
+}
+
+export function emptyPurchasePrices() {
+  return Object.fromEntries(Object.keys(UNIT_CONFIG).map((unit) => [unit, null]));
+}
 
 export const RUSSIAN_PHONE_PREFIX = "+7 ";
 
@@ -502,7 +557,7 @@ export function selectDefaultNumber(event) {
   }
 }
 
-export const UNIT_ORDER = ["piece", "bundle", "pack"];
+export const UNIT_ORDER = ["piece", "bundle", "pack", "box", "pair", "roll"];
 
 export const DEMO_SESSION_KEY = "clover-demo-session";
 
@@ -516,11 +571,12 @@ export const STORAGE = {
   settings: "clover-manager-settings",
   clientLinks: "clover-client-links",
   draft: "clover-order-draft",
+  catalogView: "clover-catalog-view",
 };
 
 export const DEFAULT_SETTINGS = {
   showPrices: true,
-  allowCustomItems: true,
+  allowCustomItems: false,
   allowClientEdit: true,
   allowClientDelete: true,
   allowRepeatOrder: true,
@@ -574,6 +630,8 @@ export const EMPTY_LINK = {
   allowFullCatalog: false,
   defaultPricingMode: "base",
   defaultMarkupPercent: 0,
+  oneCPriceTypeId: "",
+  oneCPriceTypeName: "",
   personalPrices: {},
 };
 
@@ -1486,7 +1544,52 @@ textarea { resize: vertical; }
   margin-bottom: 18px;
 }
 .catalog-toolbar { margin-bottom: 20px; }
-.catalog-filter-row { display: grid; grid-template-columns: minmax(220px,1fr) auto; gap: 12px; margin-bottom: 12px; }
+.catalog-filter-row { display: grid; grid-template-columns: minmax(220px,1fr) auto; gap: 10px; margin-bottom: 12px; align-items: center; }
+.catalog-filter-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.catalog-view-toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: stretch;
+  gap: 0;
+  height: 34px;
+  border: 1px solid #d5dfd2;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.catalog-view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 34px;
+  min-width: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-right: 1px solid #d5dfd2;
+  background: transparent;
+  color: #5d695d;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.catalog-view-toggle button:last-child { border-right: 0; }
+.catalog-view-toggle button.active {
+  background: #5b9d57;
+  color: #fff;
+}
+.catalog-view-toggle .view-toggle-icon {
+  font-size: 13px;
+  line-height: 1;
+  opacity: .9;
+}
+.catalog-view-toggle .view-toggle-label { font-size: 11px; }
 .catalog-search { width: 100%; padding: 12px 14px; border: 1px solid #e6eee3; border-radius: 12px; background: #fbfdfb; outline: none; }
 .catalog-search:focus { border-color: rgba(91,157,87,.55); box-shadow: 0 0 0 2px rgba(91,157,87,.1); background: #fff; }
 .category-list { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1513,6 +1616,10 @@ textarea { resize: vertical; }
   gap: 16px;
   align-items: stretch;
 }
+.product-grid.product-grid-list {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
 .product-card {
   display: flex;
   flex-direction: column;
@@ -1525,6 +1632,97 @@ textarea { resize: vertical; }
   background: #fff;
   box-shadow: 0 8px 20px rgba(56,97,52,.04);
   box-sizing: border-box;
+}
+.product-card.product-card-list {
+  min-height: 0;
+  height: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 10px;
+  box-shadow: none;
+}
+.product-card-list .product-card-top {
+  grid-column: 1;
+  grid-row: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.product-card-list .product-category {
+  padding: 2px 6px;
+  font-size: 10px;
+  border-radius: 6px;
+}
+.product-card-list .favorite-button {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  font-size: 14px;
+}
+.product-card-list h2 {
+  grid-column: 1;
+  grid-row: 2;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.3;
+  display: block;
+  overflow: visible;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  -webkit-line-clamp: unset;
+}
+.product-card-list .product-code {
+  display: none;
+}
+.product-card-list .product-price {
+  grid-column: 1;
+  grid-row: 3;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+.product-card-list .product-card-controls {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+  gap: 4px;
+  min-width: 168px;
+}
+.product-card-list .unit-choice {
+  gap: 3px;
+  min-height: 0;
+}
+.product-card-list .unit-choice button {
+  min-height: 26px;
+  padding: 2px 4px;
+  font-size: 10px;
+  border-radius: 7px;
+}
+.product-card-list .quantity-control {
+  gap: 4px;
+}
+.product-card-list .quantity-control > button {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 8px;
+  font-size: 16px;
+}
+.product-card-list .quantity-input-wrap {
+  min-height: 30px;
+  padding: 0 4px;
+  border-radius: 8px;
+}
+.product-card-list .quantity-input {
+  width: 40px;
+  font-size: 13px;
+}
+.product-card-list .quantity-input-wrap small {
+  font-size: 10px;
 }
 .product-image-wrap { display: flex; align-items: center; justify-content: center; width: 100%; height: 145px; margin: 10px 0 2px; overflow: hidden; border-radius: 0; background: #fff; }
 .mobile-checkout-bar { display: none; }
@@ -2536,14 +2734,21 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
+  align-items: center;
 }
 .matrix-summary span {
-  padding: 6px 9px;
-  border-radius: 999px;
-  background: #eef5eb;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid #d5dfd2;
+  border-radius: 10px;
+  background: #fff;
   color: #587058;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
+  line-height: 1.2;
+  box-sizing: border-box;
 }
 
 .product-manager-list { display: grid; gap: 12px; align-content: start; }
@@ -2572,6 +2777,16 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 .product-editor { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgba(28,40,28,.48); }
 .product-editor-card { width: min(800px,100%); max-height: 92vh; overflow: auto; padding: 24px; border-radius: 20px; background: #fff; box-shadow: 0 25px 80px rgba(0,0,0,.2); }
 .unit-settings { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 12px; }
+.unit-onec-hint {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px dashed #d7e3d4;
+  border-radius: 10px;
+  background: #f7fbf5;
+  color: #5f735f;
+  font-size: 12px;
+  font-weight: 600;
+}
 .unit-setting { padding: 12px; border: 1px solid #e1e9de; border-radius: 12px; background: #f8fbf6; }
 .unit-setting label { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; color: #465146; font-weight: 800; }
 .unit-setting .field { margin-top: 8px; }
@@ -2835,6 +3050,41 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     gap: 6px;
     margin-bottom: 6px;
   }
+  .catalog-filter-actions { gap: 6px; }
+  .catalog-view-toggle {
+    grid-column: auto;
+    width: auto;
+    height: 32px;
+  }
+  .catalog-view-toggle button {
+    flex: 0 0 auto;
+    min-height: 32px;
+    min-width: 32px;
+    font-size: 11px;
+    padding: 0 8px;
+  }
+  .catalog-view-toggle .view-toggle-label {
+    display: none;
+  }
+  .product-card.product-card-list {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 8px;
+    padding: 5px 8px;
+  }
+  .product-card-list .product-card-controls {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    min-width: 148px;
+  }
+  .product-card-list h2 {
+    font-size: 12px;
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+  .product-card-list .product-category {
+    display: none;
+  }
   .embedded-catalog .catalog-search {
     min-width: 0;
     width: 100%;
@@ -3081,20 +3331,55 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   }
   .catalog-content { padding-bottom: 88px; }
+  .app-header.app-header-with-nav {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .app-header-with-nav .app-header-logo-button { order: 1; }
+  .app-header-with-nav .app-header-actions { order: 2; }
+  .app-header-with-nav .header-logout { order: 3; }
+  .app-header-with-nav .app-header-nav {
+    order: 4;
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: visible;
+  }
+  .app-header-nav .client-nav,
   .client-nav {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
-    margin-bottom: 8px;
-    padding: 6px;
+    margin-bottom: 0;
+    padding: 0;
+    width: 100%;
+    max-width: 100%;
   }
+  .app-header-nav .client-nav button,
   .client-nav button {
     width: 100%;
     min-height: 36px;
-    padding: 6px 8px;
+    height: auto;
+    padding: 8px 10px;
     font-size: 13px;
     border-radius: 10px;
     text-align: center;
+  }
+  .app-header-nav .manager-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+    max-width: 100%;
+  }
+  .app-header-nav .manager-nav button {
+    flex: 1 1 calc(33.333% - 6px);
+    min-width: calc(33.333% - 6px);
+    min-height: 36px;
+    height: auto;
+    padding: 8px 10px;
+    font-size: 12px;
   }
   .manager-contact-label-full { display: none; }
   .manager-contact-label-short { display: inline; }
@@ -3306,6 +3591,79 @@ export function getOrCreateClientId() {
   return id;
 }
 
+const PLACEHOLDER_PRODUCT_CATEGORIES = new Set(["Из 1С", "Новые товары", ""]);
+
+const CATEGORY_KEYWORD_RULES = [
+  { category: "Перчатки", patterns: [/перчатк/u, /нитрил/u, /латекс/u, /винилов/u] },
+  {
+    category: "Пакеты и пленка",
+    patterns: [/пакет/u, /мешк/u, /пленк/u, /плёнк/u, /пергамент/u, /вакуумн/u, /стрейч/u, /stretch/u],
+  },
+  {
+    category: "Уборка",
+    patterns: [
+      /салфетк/u, /швабр/u, /\bмоп\b/u, /щетк/u, /губк/u, /ведр/u, /пипидастр/u,
+      /совк/u, /распылител/u, /пульверизатор/u, /тряпк/u, /полотер/u, /диспенсер/u,
+    ],
+  },
+  {
+    category: "Упаковка",
+    patterns: [/банк[аиуы]/u, /крышк/u, /контейнер/u, /бутылк/u, /oneclick/u, /стаканчик/u, /лоток/u, /коробк/u],
+  },
+  {
+    category: "Одноразовая продукция",
+    patterns: [/трубочк/u, /вилк/u, /ложк/u, /тарелк/u, /зубочист/u, /шпател/u],
+  },
+  {
+    category: "Канцтовары",
+    patterns: [/кассов/u, /лент/u, /бумаг/u, /ручк/u, /степлер/u, /ножниц/u, /\bа4\b/u],
+  },
+  {
+    category: "Бытовая химия",
+    patterns: [/белизна/u, /санокс/u, /хелп/u, /моющ/u, /чистящ/u, /дезинф/u, /средство для/u, /химия/u],
+  },
+  {
+    category: "Текстиль",
+    patterns: [/полотн/u, /вафельн/u, /текстил/u, /полотенц/u, /тряпк[аи] для пола/u],
+  },
+];
+
+function categoryNameTokens(value) {
+  return String(value || "")
+    .toLocaleLowerCase("ru-RU")
+    .replaceAll("ё", "е")
+    .split(/[^a-zа-я0-9]+/u)
+    .filter((token) => token.length >= 3);
+}
+
+/** Категория по названию: похожий товар в каталоге → ключевые слова → «Новые товары». */
+export function inferProductCategory(name, products = [], fallback = "Новые товары") {
+  const query = String(name || "").trim();
+  if (!query) return fallback;
+
+  const queryTokens = categoryNameTokens(query);
+  let best = null;
+  for (const product of Array.isArray(products) ? products : []) {
+    const category = String(product?.category || "").trim();
+    if (!category || PLACEHOLDER_PRODUCT_CATEGORIES.has(category)) continue;
+    const productTokens = new Set(categoryNameTokens(product.name));
+    if (!queryTokens.length || !productTokens.size) continue;
+    const hit = queryTokens.filter((token) => productTokens.has(token)).length;
+    const score = hit / queryTokens.length;
+    if (score < 0.52) continue;
+    if (!best || score > best.score || (score === best.score && category.localeCompare(best.category, "ru") < 0)) {
+      best = { category, score };
+    }
+  }
+  if (best) return best.category;
+
+  const text = query.toLocaleLowerCase("ru-RU").replaceAll("ё", "е");
+  for (const rule of CATEGORY_KEYWORD_RULES) {
+    if (rule.patterns.some((pattern) => pattern.test(text))) return rule.category;
+  }
+  return fallback;
+}
+
 export function normalizeProduct(product) {
   const filteredSaleUnits = Array.isArray(product.saleUnits)
     ? product.saleUnits.filter((unit) => UNIT_ORDER.includes(unit))
@@ -3313,6 +3671,26 @@ export function normalizeProduct(product) {
   const saleUnits = filteredSaleUnits.length ? filteredSaleUnits : ["piece"];
   const numericId = Number(product.id);
   const hasNumericId = Number.isFinite(numericId) && numericId > 0;
+
+  const sizes = {};
+  const prices = {};
+  const basePrices = {};
+  for (const unit of UNIT_ORDER) {
+    const sizeField = unitSizeField(unit);
+    const priceField = unitPriceField(unit);
+    const baseField = unitBasePriceField(unit);
+    sizes[sizeField] = Math.max(1, Number(product[sizeField]) || 1);
+    prices[priceField] = Math.max(0, Number(product[priceField]) || 0);
+    basePrices[baseField] = Math.max(
+      0,
+      Number(product[baseField] ?? product[priceField]) || 0
+    );
+  }
+
+  const purchasePrices =
+    product.purchasePrices && typeof product.purchasePrices === "object"
+      ? { ...emptyPurchasePrices(), ...product.purchasePrices }
+      : emptyPurchasePrices();
 
   return {
     ...product,
@@ -3330,33 +3708,15 @@ export function normalizeProduct(product) {
     imageUrl: product.imageUrl || "",
     imageUpdatedAt: product.imageUpdatedAt || "",
     active: product.active !== false,
-    pieceSize: Math.max(1, Number(product.pieceSize) || 1),
-    packSize: Math.max(1, Number(product.packSize) || 1),
-    bundleSize: Math.max(1, Number(product.bundleSize) || 1),
-    pricePiece: Math.max(0, Number(product.pricePiece) || 0),
-    pricePack: Math.max(0, Number(product.pricePack) || 0),
-    priceBundle: Math.max(0, Number(product.priceBundle) || 0),
-    basePricePiece: Math.max(
-      0,
-      Number(product.basePricePiece ?? product.pricePiece) || 0
-    ),
-    basePricePack: Math.max(
-      0,
-      Number(product.basePricePack ?? product.pricePack) || 0
-    ),
-    basePriceBundle: Math.max(
-      0,
-      Number(product.basePriceBundle ?? product.priceBundle) || 0
-    ),
+    ...sizes,
+    ...prices,
+    ...basePrices,
     priceSources:
       product.priceSources &&
       typeof product.priceSources === "object"
         ? product.priceSources
         : {},
-    purchasePrices:
-      product.purchasePrices && typeof product.purchasePrices === "object"
-        ? product.purchasePrices
-        : { piece: null, pack: null, bundle: null },
+    purchasePrices,
     purchasePriceUpdatedAt: product.purchasePriceUpdatedAt || "",
     purchasePriceUnit: product.purchasePriceUnit || "piece",
     purchasePriceAvailable: Boolean(product.purchasePriceAvailable),
@@ -3400,14 +3760,17 @@ export function formatMoney(value) {
 }
 
 /**
- * Сколько базовых штук в одной выбранной единице продажи.
- * «Штука» всегда 1 (в поле 1,2,3 → в 1С 1,2,3 шт).
- * Упаковка/пачка — packSize/bundleSize (в поле 100,200… → в 1С totalPieces).
+ * Сколько базовых штук в одной выбранной единице продажи → в 1С всегда «шт».
+ * - piece / pair / roll → 1:1
+ * - pack / box / bundle → «Внутри, шт.» (кратно содержимому)
  */
+export function unitConvertsOneToOneToPieces(unit) {
+  return unit === "piece" || unit === "pair" || unit === "roll";
+}
+
 export function getUnitMultiplier(product, unit) {
-  if (unit === "pack") return Math.max(1, Number(product?.packSize) || 1);
-  if (unit === "bundle") return Math.max(1, Number(product?.bundleSize) || 1);
-  return 1;
+  if (unitConvertsOneToOneToPieces(unit) || !UNIT_CONFIG[unit]) return 1;
+  return Math.max(1, Number(product?.[unitSizeField(unit)]) || 1);
 }
 
 /**
@@ -3440,9 +3803,7 @@ export function quantityInputUnitLabel(unit, multiplier) {
 }
 
 export function getUnitPrice(product, unit) {
-  if (unit === "pack") return Number(product.pricePack) || 0;
-  if (unit === "bundle") return Number(product.priceBundle) || 0;
-  return Number(product.pricePiece) || 0;
+  return Number(product?.[unitPriceField(unit)]) || 0;
 }
 
 export function getPriceSource(product, unit) {
@@ -3452,7 +3813,7 @@ export function getPriceSource(product, unit) {
 export function hasPersonalPrices(link) {
   return Object.values(link.personalPrices || {}).some((price) =>
     price?.source === "purchase_markup" ||
-    ["piece", "pack", "bundle"].some(
+    UNIT_ORDER.some(
       (unit) =>
         price?.[unit] !== null &&
         price?.[unit] !== undefined &&
@@ -3492,31 +3853,20 @@ export function prefillManualPriceFromProduct(product, currentPrice = {}) {
   const next = {
     source: "manual",
     markupPercent: Math.max(0, Number(currentPrice.markupPercent) || 0),
-    piece:
-      currentPrice.piece !== null && currentPrice.piece !== undefined
-        ? Number(currentPrice.piece)
-        : null,
-    pack:
-      currentPrice.pack !== null && currentPrice.pack !== undefined
-        ? Number(currentPrice.pack)
-        : null,
-    bundle:
-      currentPrice.bundle !== null && currentPrice.bundle !== undefined
-        ? Number(currentPrice.bundle)
-        : null,
   };
+
+  for (const unit of UNIT_ORDER) {
+    next[unit] =
+      currentPrice[unit] !== null && currentPrice[unit] !== undefined
+        ? Number(currentPrice[unit])
+        : null;
+  }
 
   const saleUnits = Array.isArray(product?.saleUnits) ? product.saleUnits : [];
   for (const unit of UNIT_ORDER) {
     if (!saleUnits.includes(unit)) continue;
     if (next[unit] !== null) continue;
-    const priceField =
-      unit === "piece"
-        ? "pricePiece"
-        : unit === "pack"
-          ? "pricePack"
-          : "priceBundle";
-    const base = Math.max(0, Number(product?.[priceField]) || 0);
+    const base = Math.max(0, Number(product?.[unitPriceField(unit)]) || 0);
     if (base > 0) next[unit] = base;
   }
 

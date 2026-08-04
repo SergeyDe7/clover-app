@@ -30,6 +30,18 @@ function pushIndex(map, key, item) {
   map.set(key, bucket);
 }
 
+/** Поля вида цен для clientLink — 1С (договор) источник истины. */
+function priceTypeFieldsFromOneCClient(item = {}, current = {}) {
+  const priceTypeId = cleanText(item.priceTypeId);
+  // Пустой вид из 1С не затирает уже выбранный в Clover (пока расширение не догрузило поле).
+  if (!priceTypeId) return {};
+  return {
+    oneCPriceTypeId: priceTypeId,
+    oneCPriceTypeName: cleanText(item.priceTypeName) || cleanText(item.priceTypeCode),
+    defaultPricingMode: "one_c_price_type",
+  };
+}
+
 export function normalizeOneCClient(item = {}) {
   return {
     id: cleanText(item.id ?? item.oneCId ?? item.ref),
@@ -38,6 +50,29 @@ export function normalizeOneCClient(item = {}) {
     inn: cleanText(item.inn ?? item.INN ?? item.taxId),
     phone: cleanText(item.phone ?? item.telephone),
     email: cleanText(item.email ?? item.mail),
+    // Вид цен с договора контрагента в 1С (источник истины для Clover).
+    priceTypeId: cleanText(
+      item.priceTypeId ??
+        item.oneCPriceTypeId ??
+        item.видЦенId ??
+        item.ВидЦенId ??
+        (item.priceType && typeof item.priceType === "object"
+          ? item.priceType.id ?? item.priceType.ref
+          : item.priceType)
+    ),
+    priceTypeName: cleanText(
+      item.priceTypeName ??
+        item.oneCPriceTypeName ??
+        item.видЦен ??
+        item.ВидЦен ??
+        (item.priceType && typeof item.priceType === "object"
+          ? item.priceType.name ?? item.priceType.presentation
+          : "")
+    ),
+    priceTypeCode: cleanText(
+      item.priceTypeCode ??
+        (item.priceType && typeof item.priceType === "object" ? item.priceType.code : "")
+    ),
   };
 }
 
@@ -207,6 +242,7 @@ export function autoLinkCloverClients(clients, clientLinks, oneCClients, now = n
           oneCInn: item.inn,
           oneCLinkMode: current.oneCLinkMode || "manual",
           oneCLinkedAt: current.oneCLinkedAt || now,
+          ...priceTypeFieldsFromOneCClient(item, current),
         };
         if (JSON.stringify(enriched) !== JSON.stringify(current)) changed = true;
         nextLinks[client.id] = enriched;
@@ -245,6 +281,7 @@ export function autoLinkCloverClients(clients, clientLinks, oneCClients, now = n
         oneCMatchInn: current.oneCMatchInn || candidate.inn,
         oneCLinkMode: "auto",
         oneCLinkedAt: now,
+        ...priceTypeFieldsFromOneCClient(candidate, current),
       };
       changed = true;
       report.linked += 1;
@@ -282,6 +319,7 @@ export function linkCloverClient(clientLinks, clientId, rawOneCClient, now = new
       oneCMatchInn: item.inn,
       oneCLinkMode: "manual",
       oneCLinkedAt: now,
+      ...priceTypeFieldsFromOneCClient(item, links[clientId] || {}),
     },
   };
 }

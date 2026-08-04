@@ -4,11 +4,15 @@ import { api } from "../../serverApi";
 import {
   UNIT_ORDER,
   UNIT_CONFIG,
+  unitSizeField,
+  unitPriceField,
+  unitConvertsOneToOneToPieces,
   selectDefaultNumber,
   hasPurchasePrice,
   formatMoney,
   formatDateTime,
   normalizeProduct,
+  inferProductCategory,
 } from "../../shared/appHelpers";
 import { SoftBanner } from "../../shared/uxFeedback";
 import { appAlert, appConfirm } from "../../shared/AppModal";
@@ -35,13 +39,13 @@ function matchProductForPhoto(products, fileName) {
   }) || null;
 }
 
-function ProductEditor({ product, onClose, onSave }) {
+function ProductEditor({ product, products = [], onClose, onSave }) {
   const isNew = !product;
   const [form, setForm] = useState(product || {
     name: "", category: "Новые товары", code: "", oneCId: "",
     oneCCode: "", oneCName: "", oneCMatchCode: "", oneCMatchName: "", oneCSearchQuery: "", oneCSearchRequestedAt: "", oneCLinkMode: "", oneCLinkedAt: "", active: true,
-    pieceSize: 1, packSize: 1, bundleSize: 1,
-    pricePiece: 0, pricePack: 0, priceBundle: 0,
+    pieceSize: 1, packSize: 1, bundleSize: 1, boxSize: 1, pairSize: 1, rollSize: 1,
+    pricePiece: 0, pricePack: 0, priceBundle: 0, priceBox: 0, pricePair: 0, priceRoll: 0,
     saleUnits: ["piece"],
   });
   const [oneCOpen, setOneCOpen] = useState(false);
@@ -107,8 +111,17 @@ function ProductEditor({ product, onClose, onSave }) {
   };
 
   const selectOneCProduct = (item) => {
+    const nextName = item.name || form.name || "";
+    const keepCategory =
+      form.category &&
+      form.category !== "Новые товары" &&
+      form.category !== "Из 1С";
     const nextProduct = normalizeProduct({
       ...form,
+      name: nextName || form.name,
+      category: keepCategory
+        ? form.category
+        : inferProductCategory(nextName, products),
       oneCId: item.id,
       oneCCode: item.code || "",
       oneCName: item.name || "",
@@ -124,7 +137,7 @@ function ProductEditor({ product, onClose, onSave }) {
     setOneCOpen(false);
     setOneCError("");
     setOneCNotice(
-      "Позиция 1С выбрана, но ещё не сохранена. Проверьте название, категорию, единицы, коэффициенты и цены, затем нажмите «Сохранить товар»."
+      `Позиция 1С выбрана. Категория: «${nextProduct.category}». Проверьте единицы и цены, затем «Сохранить товар».`
     );
   };
 
@@ -347,10 +360,11 @@ function ProductEditor({ product, onClose, onSave }) {
 
         <div className="unit-settings">
           {UNIT_ORDER.map((unit) => {
-            const sizeField = unit === "piece" ? "pieceSize" : unit === "pack" ? "packSize" : "bundleSize";
-            const priceField = unit === "piece" ? "pricePiece" : unit === "pack" ? "pricePack" : "priceBundle";
+            const sizeField = unitSizeField(unit);
+            const priceField = unitPriceField(unit);
             return <div className="unit-setting" key={unit}>
               <label><input type="checkbox" checked={form.saleUnits.includes(unit)} onChange={(e) => toggleUnit(unit, e.target.checked)} />{UNIT_CONFIG[unit].label}</label>
+              {unitConvertsOneToOneToPieces(unit) ? null : (
               <label className="field">Внутри, шт.
                 <input
                   type="number"
@@ -377,6 +391,7 @@ function ProductEditor({ product, onClose, onSave }) {
                   }
                 />
               </label>
+              )}
               <label className="field">Цена за единицу продажи
                 <input
                   type="number"
@@ -636,12 +651,12 @@ export function ManagerProducts({ products, setProducts }) {
     } else {
       const id = Math.max(0, ...products.map((item) => Number(item.id) || 0)) + 1;
       nextProducts = [
-        ...products,
         normalizeProduct({
           ...value,
           id,
           code: value.code || `CL-${String(id).padStart(4, "0")}`,
         }),
+        ...products,
       ];
     }
 
@@ -886,20 +901,6 @@ export function ManagerProducts({ products, setProducts }) {
                 : "1С: не связан"}
               {product.oneCLinkMode === "auto" ? " · автоматически" : product.oneCId ? " · вручную" : ""}
             </p>
-            <div className="product-purchase-summary">
-              {UNIT_ORDER.map((unit) => {
-                const value = product.purchasePrices?.[unit];
-                return (
-                  <span key={unit}>
-                    <strong>{UNIT_CONFIG[unit].label}:</strong>{" "}
-                    {hasPurchasePrice(value) ? formatMoney(value) : "—"}
-                  </span>
-                );
-              })}
-              <span className="product-purchase-updated">
-                Закупка 1С обновлена: {formatDateTime(product.purchasePriceUpdatedAt)}
-              </span>
-            </div>
           </div>
           <span className={product.active ? "badge green" : "badge gray"}>{product.active ? "Активен" : "Скрыт"}</span>
           <strong>{settingsPriceLabel(product)}</strong>
@@ -924,12 +925,19 @@ export function ManagerProducts({ products, setProducts }) {
         </article>
         ))}
       </div>
-      {editorProduct !== undefined && <ProductEditor product={editorProduct} onClose={() => setEditorProduct(undefined)} onSave={save} />}
+      {editorProduct !== undefined && (
+        <ProductEditor
+          product={editorProduct}
+          products={products}
+          onClose={() => setEditorProduct(undefined)}
+          onSave={save}
+        />
+      )}
     </section>
   );
 }
 
 function settingsPriceLabel(product) {
-  const prices = [product.pricePiece, product.pricePack, product.priceBundle].filter((value) => Number(value) > 0);
+  const prices = UNIT_ORDER.map((unit) => product[unitPriceField(unit)]).filter((value) => Number(value) > 0);
   return prices.length ? `от ${formatMoney(Math.min(...prices))}` : "Без цены";
 }

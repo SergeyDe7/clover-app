@@ -27,6 +27,7 @@ import {
   makeId,
   makeOrderIdentifiers,
   normalizeProduct,
+  inferProductCategory,
   makeOrderHistoryEvent,
   appendOrderHistory,
   UNIT_CONFIG,
@@ -288,6 +289,28 @@ function ordersLiveSignature(orders) {
     .join(";");
 }
 
+/** Сигнатура цен каталога — чтобы онлайн-bootstrap обновлял витрину как статусы. */
+function productPriceLiveSignature(product) {
+  return [
+    String(product?.id || ""),
+    String(product?.pricePiece ?? ""),
+    String(product?.pricePack ?? ""),
+    String(product?.priceBundle ?? ""),
+    String(product?.priceBox ?? ""),
+    String(product?.pricePair ?? ""),
+    String(product?.priceRoll ?? ""),
+    String(product?.clientPriceMode || ""),
+    String(product?.oneCPriceTypeId || ""),
+    String(product?.active !== false),
+  ].join(":");
+}
+
+function productsPriceLiveSignature(products) {
+  return (Array.isArray(products) ? products : [])
+    .map((product) => productPriceLiveSignature(product))
+    .join("|");
+}
+
 /**
  * Сервер — источник правды по составу списка, статусу и exchange.
  * Локальные комментарии менеджера сохраняем только если статус/обмен не менялись.
@@ -388,6 +411,7 @@ function App() {
   const [favorites, setFavorites] = useState([]);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [clientLinks, setClientLinks] = useState({});
+  const [oneCPriceTypes, setOneCPriceTypes] = useState([]);
   const [serverClients, setServerClients] = useState([]);
   const [reconciliationRequests, setReconciliationRequests] = useState([]);
   const [managerNotifications, setManagerNotifications] = useState([]);
@@ -395,6 +419,8 @@ function App() {
   const [managerNotice, setManagerNotice] = useState(null);
   const skipNextOrdersSyncRef = useRef(false);
   const pendingDeletedOrderIdsRef = useRef(new Set());
+  // Несохранённые правки матрицы у менеджера — live-bootstrap их не затирает.
+  const dirtyClientLinkIdsRef = useRef(new Set());
 
   const applyManagerNotificationList = (items) => {
     const incomingNotifications = Array.isArray(items) ? items : [];
@@ -462,6 +488,9 @@ function App() {
       ...(data.settings || DEFAULT_SETTINGS),
     });
     setClientLinks(data.clientLinks || {});
+    setOneCPriceTypes(
+      Array.isArray(data.oneCPriceTypes) ? data.oneCPriceTypes : []
+    );
     setServerClients(
       Array.isArray(data.clients) ? data.clients : []
     );
@@ -590,11 +619,54 @@ function App() {
           setReconciliationRequests(data.reconciliationRequests);
         }
 
+        // Онлайн-цены каталога (вид цен 1С / матрица) — тот же тихий bootstrap, что и статусы.
+        if (Array.isArray(data.products)) {
+          setProducts((prev) => {
+            const next = data.products.map(normalizeProduct);
+            return productsPriceLiveSignature(prev) === productsPriceLiveSignature(next)
+              ? prev
+              : next;
+          });
+        }
+        if (Array.isArray(data.fullCatalogProducts)) {
+          setFullCatalogProducts((prev) => {
+            const next = data.fullCatalogProducts.map(normalizeProduct);
+            return productsPriceLiveSignature(prev) === productsPriceLiveSignature(next)
+              ? prev
+              : next;
+          });
+        } else if (data.user?.role === "client" && data.catalogPolicy) {
+          // Если полный каталог больше не отдаётся — не держим устаревшие цены.
+          if (!data.catalogPolicy.allowFullCatalog || data.catalogPolicy.matrixMode === "all") {
+            setFullCatalogProducts([]);
+          }
+        }
+        if (data.catalogPolicy) {
+          setCatalogPolicy((current) => ({
+            ...current,
+            ...data.catalogPolicy,
+          }));
+        }
+
         if (data.user?.role === "manager" || data.user?.role === "admin") {
           applyManagerNotificationList(data.managerNotifications);
           setTrashedOrders(Array.isArray(data.trashedOrders) ? data.trashedOrders : []);
           if (Array.isArray(data.clients)) {
             setServerClients(data.clients);
+          }
+          if (Array.isArray(data.oneCPriceTypes)) {
+            setOneCPriceTypes(data.oneCPriceTypes);
+          }
+          if (data.clientLinks && typeof data.clientLinks === "object") {
+            setClientLinks((prev) => {
+              const dirty = dirtyClientLinkIdsRef.current;
+              if (!dirty.size) return data.clientLinks;
+              const merged = { ...data.clientLinks };
+              for (const clientId of dirty) {
+                if (prev[clientId]) merged[clientId] = prev[clientId];
+              }
+              return merged;
+            });
           }
         }
 
@@ -1497,7 +1569,7 @@ function App() {
 
     const newProduct = normalizeProduct({
       id,
-      category: "Новые товары",
+      category: inferProductCategory(customItem.name, products),
       name: customItem.name,
       code: `CL-${String(id).padStart(4, "0")}`,
       oneCId: "",
@@ -1505,22 +1577,19 @@ function App() {
       pieceSize: 1,
       packSize: 1,
       bundleSize: 1,
-      pricePiece:
-        saleUnit === "piece"
-          ? Number(customItem.unitPrice) || 0
-          : 0,
-      pricePack:
-        saleUnit === "pack"
-          ? Number(customItem.unitPrice) || 0
-          : 0,
-      priceBundle:
-        saleUnit === "bundle"
-          ? Number(customItem.unitPrice) || 0
-          : 0,
+      boxSize: 1,
+      pairSize: 1,
+      rollSize: 1,
+      pricePiece: saleUnit === "piece" ? Number(customItem.unitPrice) || 0 : 0,
+      pricePack: saleUnit === "pack" ? Number(customItem.unitPrice) || 0 : 0,
+      priceBundle: saleUnit === "bundle" ? Number(customItem.unitPrice) || 0 : 0,
+      priceBox: saleUnit === "box" ? Number(customItem.unitPrice) || 0 : 0,
+      pricePair: saleUnit === "pair" ? Number(customItem.unitPrice) || 0 : 0,
+      priceRoll: saleUnit === "roll" ? Number(customItem.unitPrice) || 0 : 0,
       saleUnits: [saleUnit],
     });
 
-    setProducts((current) => [...current, newProduct]);
+    setProducts((current) => [newProduct, ...current]);
 
     updateOrder(order.id, {
       customItems: (order.customItems || []).map((item) =>
@@ -1644,6 +1713,8 @@ function App() {
         setSettings={setSettings}
         clientLinks={clientLinks}
         setClientLinks={setClientLinks}
+        dirtyClientLinkIdsRef={dirtyClientLinkIdsRef}
+        oneCPriceTypes={oneCPriceTypes}
         managerNotice={managerNotice}
         onDismissNotice={dismissManagerNotice}
         onReadNotification={readManagerNotification}
@@ -1687,7 +1758,6 @@ function App() {
         onLogout={logout}
         catalogSession={catalogSession}
         products={catalogProducts}
-        matrixProducts={products}
         favorites={favorites}
         setFavorites={setFavorites}
         showFullCatalog={showFullCatalog}

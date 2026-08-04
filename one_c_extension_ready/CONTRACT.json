@@ -75,6 +75,36 @@
       "method": "POST",
       "path": "/api/one-c/purchase-prices"
     },
+    "priceTypes": {
+      "method": "POST",
+      "path": "/api/one-c/price-types",
+      "body": {
+        "items": [
+          { "id": "uuid-or-code", "code": "Опт", "name": "Оптовая" }
+        ]
+      },
+      "note": "Справочник видов цен (категорий цен) из 1С TEST"
+    },
+    "salePriceRequest": {
+      "method": "GET",
+      "path": "/api/one-c/sale-price-request",
+      "note": "Список номенклатуры и видов цен, нужных клиентам Clover"
+    },
+    "salePrices": {
+      "method": "POST",
+      "path": "/api/one-c/sale-prices",
+      "body": {
+        "items": [
+          {
+            "id": "nomenclature-uuid",
+            "priceTypeId": "price-type-uuid",
+            "price": 120.5,
+            "prices": { "piece": 120.5, "pack": 2400 }
+          }
+        ]
+      },
+      "note": "Продажные цены по виду цен; клиент Clover видит их онлайн через bootstrap"
+    },
     "nextOrder": {
       "method": "GET",
       "path": "/api/one-c/test-order"
