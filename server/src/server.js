@@ -1450,6 +1450,12 @@ app.post("/api/auth/login", async (req, res, next) => {
 
 app.post("/api/auth/change-password", authRequired, async (req, res, next) => {
   try {
+    if (isClientRole(req.user.role)) {
+      return res.status(403).json({
+        error: "Смену пароля клиента выполняет менеджер.",
+        code: "CLIENT_PASSWORD_CHANGE_FORBIDDEN",
+      });
+    }
     const input = changePasswordSchema.parse(req.body);
     const user = findUserByEmail(req.user.email);
     if (!user || !(await bcrypt.compare(input.currentPassword, user.password_hash))) {

@@ -22,7 +22,6 @@ import {
   validateDeliveryDate,
 } from "../../shared/deliveryDateRules";
 import { ManagerContact } from "./ManagerContact";
-import { CustomItemForm } from "./CustomItemForm";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
 import { appAlert } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
@@ -599,7 +598,6 @@ export function OrderEditor({
                 );
               })}
               {!filtered.length && <div className="empty-box">Товары не найдены.</div>}
-              {settings.allowCustomItems && <CustomItemForm onAdd={(item) => setCustomItems((current) => [...current, item])} />}
             </section>
           </div>
         </div>

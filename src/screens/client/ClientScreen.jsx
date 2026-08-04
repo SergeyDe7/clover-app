@@ -463,7 +463,7 @@ function ClientDashboard({
       <ProfilePanel profile={profile} onChange={setProfile} />
       <AddressesPanel addresses={addresses} onChange={setAddresses} />
       <PushSettings />
-      <PasswordSecurityPanel />
+      <PasswordSecurityPanel allowPasswordChange={false} />
     </div>
   );
 
@@ -493,7 +493,7 @@ function ClientDashboard({
         <div className="client-settings-stack">
           <ProfilePanel profile={profile} onChange={setProfile} />
           <PushSettings />
-          <PasswordSecurityPanel />
+          <PasswordSecurityPanel allowPasswordChange={false} />
         </div>
       )}
     </div>

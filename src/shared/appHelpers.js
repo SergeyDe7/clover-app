@@ -520,7 +520,7 @@ export const STORAGE = {
 
 export const DEFAULT_SETTINGS = {
   showPrices: true,
-  allowCustomItems: true,
+  allowCustomItems: false,
   allowClientEdit: true,
   allowClientDelete: true,
   allowRepeatOrder: true,

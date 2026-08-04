@@ -1957,22 +1957,13 @@ html.clover-thankyou-open .app-top-chrome {
   animation: order-thankyou-text-in 0.7s ease-out 0.45s both;
 }
 
-.app-modal-tone-warn.order-thankyou-card {
-  box-shadow:
-    0 18px 48px rgba(122, 92, 30, 0.16),
-    0 0 0 1px rgba(234, 217, 181, 0.9);
-}
-
-.app-modal-tone-danger.order-thankyou-card {
-  box-shadow:
-    0 18px 48px rgba(165, 79, 79, 0.16),
-    0 0 0 1px rgba(230, 199, 199, 0.95);
-}
-
+.app-modal-tone-warn.order-thankyou-card,
+.app-modal-tone-danger.order-thankyou-card,
 .app-modal-tone-success.order-thankyou-card {
-  box-shadow:
-    0 18px 48px rgba(69, 133, 66, 0.18),
-    0 0 0 1px rgba(181, 214, 176, 0.65);
+  /* Без «карточной» рамки/кольца — только контент на градиенте thank-you */
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
 }
 
 @media (max-width: 480px) {
