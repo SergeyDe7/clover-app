@@ -113,6 +113,7 @@ import {
   mergeProductsPreservingOneCLinks,
   normalizeOneCProduct,
   normalizeOneCProducts,
+  preserveOneCProductPricingFields,
   selectRelevantOneCProducts,
 } from "./oneCProducts.js";
 import {
@@ -3660,7 +3661,11 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
       )
     );
 
-    setGlobalState("oneCProducts", linked.oneCProducts);
+    const previousOneCProducts = getGlobalState("oneCProducts", []);
+    setGlobalState(
+      "oneCProducts",
+      preserveOneCProductPricingFields(previousOneCProducts, linked.oneCProducts)
+    );
     setGlobalState("oneCProductCandidates", cleanCandidateMap);
     if (linked.changed || reclassified.changed) {
       setGlobalState("products", reclassified.products);

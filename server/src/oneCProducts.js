@@ -109,6 +109,64 @@ export function normalizeOneCProducts(items) {
   return [...unique.values()];
 }
 
+function hasSalePricesByType(item) {
+  const byType =
+    item?.salePricesByType && typeof item.salePricesByType === "object"
+      ? item.salePricesByType
+      : null;
+  return Boolean(byType && Object.keys(byType).length);
+}
+
+/**
+ * Выгрузка products-preview не содержит salePricesByType —
+ * не затираем уже принятые продажные цены по видам.
+ */
+export function preserveOneCProductPricingFields(previousItems, nextItems) {
+  const previousById = new Map(
+    (Array.isArray(previousItems) ? previousItems : [])
+      .filter((item) => cleanText(item?.id))
+      .map((item) => [String(item.id), item])
+  );
+
+  return (Array.isArray(nextItems) ? nextItems : []).map((item) => {
+    const previous = previousById.get(String(item?.id || ""));
+    if (!previous) return item;
+
+    const next = { ...item };
+    if (!hasSalePricesByType(next) && hasSalePricesByType(previous)) {
+      next.salePricesByType = previous.salePricesByType;
+      next.salePriceUpdatedAt =
+        cleanText(next.salePriceUpdatedAt) || cleanText(previous.salePriceUpdatedAt);
+      next.salePriceReceivedAt =
+        cleanText(next.salePriceReceivedAt) || cleanText(previous.salePriceReceivedAt);
+    }
+
+    // Закупка из preview может быть пустой — не обнуляем ранее принятую.
+    if (
+      (next.purchasePrice === null || next.purchasePrice === undefined) &&
+      previous.purchasePrice !== null &&
+      previous.purchasePrice !== undefined
+    ) {
+      next.purchasePrice = previous.purchasePrice;
+      next.purchasePricePiece = previous.purchasePricePiece ?? next.purchasePricePiece;
+      next.purchasePricePack = previous.purchasePricePack ?? next.purchasePricePack;
+      next.purchasePriceBundle = previous.purchasePriceBundle ?? next.purchasePriceBundle;
+      next.purchasePriceBox = previous.purchasePriceBox ?? next.purchasePriceBox;
+      next.purchasePricePair = previous.purchasePricePair ?? next.purchasePricePair;
+      next.purchasePriceRoll = previous.purchasePriceRoll ?? next.purchasePriceRoll;
+      next.purchasePriceUnit = previous.purchasePriceUnit || next.purchasePriceUnit;
+      next.purchasePriceUpdatedAt =
+        previous.purchasePriceUpdatedAt || next.purchasePriceUpdatedAt;
+      next.purchasePriceReceivedAt =
+        previous.purchasePriceReceivedAt || next.purchasePriceReceivedAt;
+      next.purchasePriceSourceDatabase =
+        previous.purchasePriceSourceDatabase || next.purchasePriceSourceDatabase;
+    }
+
+    return next;
+  });
+}
+
 export function normalizeProductNameForMatch(value) {
   return cleanText(value)
     .toLocaleLowerCase("ru-RU")

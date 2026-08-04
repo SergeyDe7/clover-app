@@ -392,6 +392,29 @@ body:has(.clover-app) {
   padding: 5px 9px !important;
 }
 
+.clover-app .matrix-summary {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin-top: 12px !important;
+  align-items: center !important;
+}
+
+.clover-app .matrix-summary span {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 34px !important;
+  padding: 7px 12px !important;
+  border: 1px solid var(--clover-border-soft, #d5dfd2) !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  color: #587058 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  box-sizing: border-box !important;
+}
+
 .badge.status-new,
 .status-new {
   background: var(--status-new-bg) !important;

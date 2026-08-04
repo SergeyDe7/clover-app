@@ -2734,14 +2734,21 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
+  align-items: center;
 }
 .matrix-summary span {
-  padding: 6px 9px;
-  border-radius: 999px;
-  background: #eef5eb;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid #d5dfd2;
+  border-radius: 10px;
+  background: #fff;
   color: #587058;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
+  line-height: 1.2;
+  box-sizing: border-box;
 }
 
 .product-manager-list { display: grid; gap: 12px; align-content: start; }

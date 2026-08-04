@@ -289,6 +289,28 @@ function ordersLiveSignature(orders) {
     .join(";");
 }
 
+/** Сигнатура цен каталога — чтобы онлайн-bootstrap обновлял витрину как статусы. */
+function productPriceLiveSignature(product) {
+  return [
+    String(product?.id || ""),
+    String(product?.pricePiece ?? ""),
+    String(product?.pricePack ?? ""),
+    String(product?.priceBundle ?? ""),
+    String(product?.priceBox ?? ""),
+    String(product?.pricePair ?? ""),
+    String(product?.priceRoll ?? ""),
+    String(product?.clientPriceMode || ""),
+    String(product?.oneCPriceTypeId || ""),
+    String(product?.active !== false),
+  ].join(":");
+}
+
+function productsPriceLiveSignature(products) {
+  return (Array.isArray(products) ? products : [])
+    .map((product) => productPriceLiveSignature(product))
+    .join("|");
+}
+
 /**
  * Сервер — источник правды по составу списка, статусу и exchange.
  * Локальные комментарии менеджера сохраняем только если статус/обмен не менялись.
@@ -597,12 +619,22 @@ function App() {
           setReconciliationRequests(data.reconciliationRequests);
         }
 
-        // Онлайн-цены каталога (вид цен 1С / матрица) — тот же тихий bootstrap.
+        // Онлайн-цены каталога (вид цен 1С / матрица) — тот же тихий bootstrap, что и статусы.
         if (Array.isArray(data.products)) {
-          setProducts(data.products.map(normalizeProduct));
+          setProducts((prev) => {
+            const next = data.products.map(normalizeProduct);
+            return productsPriceLiveSignature(prev) === productsPriceLiveSignature(next)
+              ? prev
+              : next;
+          });
         }
         if (Array.isArray(data.fullCatalogProducts)) {
-          setFullCatalogProducts(data.fullCatalogProducts.map(normalizeProduct));
+          setFullCatalogProducts((prev) => {
+            const next = data.fullCatalogProducts.map(normalizeProduct);
+            return productsPriceLiveSignature(prev) === productsPriceLiveSignature(next)
+              ? prev
+              : next;
+          });
         } else if (data.user?.role === "client" && data.catalogPolicy) {
           // Если полный каталог больше не отдаётся — не держим устаревшие цены.
           if (!data.catalogPolicy.allowFullCatalog || data.catalogPolicy.matrixMode === "all") {
