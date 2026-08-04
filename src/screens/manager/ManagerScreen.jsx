@@ -21,6 +21,7 @@ import { ManagerSettings } from "./ManagerSettings";
 import { ManagerBackup } from "./ManagerBackup";
 import { ManagerAudit } from "./ManagerAudit";
 import { managerNotificationTab, ManagerNotificationBell, parseManagerNotification, ManagerOrderSummaryLines } from "./ManagerNotifications";
+import { ManagerAccessVault } from "./ManagerAccessVault";
 
 function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, dirtyClientLinkIdsRef, oneCPriceTypes = [], managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onRestoreOrder, onPurgeOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onLogout }) {
   const [tab, setTab] = useState(readManagerActiveTab);
@@ -144,7 +145,9 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
           <ManagerNotificationBell
             notifications={managerNotifications}
             open={bellOpen}
-            onToggle={() => setBellOpen((current) => !current)}
+            onToggle={() => {
+              setBellOpen((current) => !current);
+            }}
             onOpen={openFromNotification}
             onRead={(item) => { onReadNotification(item); }}
             onReadAll={() => { onReadAllNotifications(); setBellOpen(false); }}
@@ -237,6 +240,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
               </button>
             ))}
           </nav>
+          {moreTab === "access" && <ManagerAccessVault />}
           {moreTab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} authUser={authUser} />}
           {moreTab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} onReload={onReload} />}
           {moreTab === "audit" && <ManagerAudit />}

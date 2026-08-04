@@ -106,6 +106,10 @@ async function requestBlob(path, options = {}) {
 }
 
 export const api = {
+  getPublicManagerContact() {
+    return request("/public/manager-contact");
+  },
+
   register(data) {
     return request("/auth/register", {
       method: "POST",
@@ -294,6 +298,16 @@ export const api = {
     });
   },
 
+  getClientAccessVault() {
+    return request("/admin/client-access");
+  },
+
+  removeClientAccessVaultEntry(clientId) {
+    return request(`/admin/client-access/${encodeURIComponent(clientId)}`, {
+      method: "DELETE",
+    });
+  },
+
   setClientPassword(clientId, password) {
     return request(`/admin/clients/${encodeURIComponent(clientId)}/password`, {
       method: "POST",
@@ -326,6 +340,21 @@ export const api = {
 
   deleteProductImage(productId) {
     return request(`/admin/products/${productId}/image`, {
+      method: "DELETE",
+    });
+  },
+
+  uploadProductCertificate(productId, file) {
+    const formData = new FormData();
+    formData.append("certificate", file);
+    return request(`/admin/products/${productId}/certificate`, {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  deleteProductCertificate(productId) {
+    return request(`/admin/products/${productId}/certificate`, {
       method: "DELETE",
     });
   },
@@ -400,6 +429,12 @@ export const api = {
     return request(`/admin/one-c/products?${params.toString()}`);
   },
 
+  getClientMatrixPrices(clientId) {
+    return request(
+      `/admin/clients/${encodeURIComponent(clientId)}/matrix-prices`
+    );
+  },
+
   getOneCProductCandidates(productId) {
     return request(`/admin/one-c/products/${encodeURIComponent(productId)}/candidates`);
   },
@@ -428,6 +463,13 @@ export const api = {
     return request("/admin/one-c/products/from-catalog", {
       method: "POST",
       body: { oneCId, item, clientId: clientId || undefined },
+    });
+  },
+
+  matchOneCImportRows(rows = []) {
+    return request("/admin/one-c/products/match-import", {
+      method: "POST",
+      body: { rows },
     });
   },
 

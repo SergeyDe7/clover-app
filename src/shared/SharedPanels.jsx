@@ -136,30 +136,32 @@ export function Header({ title, subtitle, onLogout, onLogoClick, nav, children }
       ref={headerRef}
       className={`app-header${compactHeader ? " app-header-compact" : ""}${nav ? " app-header-with-nav" : ""}`}
     >
-      <button
-        type="button"
-        className="app-header-logo-button"
-        onClick={handleLogoClick}
-        aria-label="Обновить страницу"
-        title="Обновить страницу"
-      >
-        {logo}
-      </button>
-      {nav ? <div className="app-header-nav">{nav}</div> : null}
-      <div className="app-header-actions">
-        {!compactHeader && (
-          <div className="app-header-titles">
-            <strong>{title}</strong>
-            {subtitle && <div className="small muted">{subtitle}</div>}
-          </div>
-        )}
-        {children}
-      </div>
-      {onLogout && (
-        <button className="header-button header-logout" type="button" onClick={onLogout}>
-          Выйти
+      <div className="app-header-top">
+        <button
+          type="button"
+          className="app-header-logo-button"
+          onClick={handleLogoClick}
+          aria-label="Обновить страницу"
+          title="Обновить страницу"
+        >
+          {logo}
         </button>
-      )}
+        <div className="app-header-actions">
+          {!compactHeader && (
+            <div className="app-header-titles">
+              <strong>{title}</strong>
+              {subtitle && <div className="small muted">{subtitle}</div>}
+            </div>
+          )}
+          {children}
+          {onLogout && (
+            <button className="header-button header-logout" type="button" onClick={onLogout}>
+              Выйти
+            </button>
+          )}
+        </div>
+      </div>
+      {nav ? <div className="app-header-nav">{nav}</div> : null}
     </header>
   );
 }

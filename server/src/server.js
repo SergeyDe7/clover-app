@@ -76,6 +76,7 @@ import {
 } from "./backups.js";
 import {
   assertSafeManagerOrderReplace,
+  alignLinePricesToCeilTotal,
   build1CPayload,
   isOneCClaimExpired,
   normalizeExchangeState,
@@ -93,6 +94,12 @@ import {
 } from "./orderStatus.js";
 import { hasRole, isClientRole, isStaffRole } from "./roles.js";
 import { publicClientSettings } from "./clientSettings.js";
+import {
+  listClientAccessEntries,
+  removeClientAccessEntry,
+  saveClientAccessCredentials,
+  upsertClientAccessEntry,
+} from "./clientAccessVault.js";
 import { searchOneCProductsIndexed } from "./oneCSearchIndex.js";
 import {
   DEFAULT_ONE_C_CONFIG,
@@ -115,6 +122,7 @@ import {
   normalizeOneCProducts,
   preserveOneCProductPricingFields,
   selectRelevantOneCProducts,
+  matchOneCImportRows,
 } from "./oneCProducts.js";
 import {
   autoLinkCloverClients,
@@ -132,6 +140,8 @@ import {
   normalizeDefaultPricingConfig,
   normalizePersonalPriceConfig,
   resolveClientProductPricing,
+  resolveTypedSalePrice,
+  roundPriceUp,
   UNITS as SALE_UNITS,
   unitLabel,
   unitPriceField,
@@ -595,7 +605,7 @@ function orderMoneyTotal(order) {
     (sum, item) => sum + (Number(item?.unitPrice) || 0) * (Number(item?.quantity) || 0),
     0
   );
-  return itemsTotal + customTotal;
+  return roundPriceUp(itemsTotal + customTotal);
 }
 
 function formatOrderMoney(value) {
@@ -630,18 +640,29 @@ function formatOrderRuDateTime(value) {
 
 function managerOrderNotificationCopy(order, customerName) {
   const orderNumber = String(order?.number || order?.id || "");
-  const total = orderMoneyTotal(order);
+  const clientComment = String(order?.clientComment || "").trim();
   const lines = [
-    `Сумма: ${total > 0 ? formatOrderMoney(total) : "уточняется"}`,
+    `Сумма: ${orderMoneyTotal(order) > 0 ? formatOrderMoney(orderMoneyTotal(order)) : "уточняется"}`,
     `Кол-во позиций: ${orderPositionCount(order)}`,
     `Дата доставки: ${formatOrderRuDate(order?.firstDeliveryDate)}`,
     `Дата заказа: ${formatOrderRuDateTime(order?.createdAt)}`,
     `№ ${orderNumber || "—"}`,
   ];
+  if (clientComment) {
+    lines.push(`Комментарий: ${clientComment}`);
+  }
   return {
     title: String(customerName || "Клиент").trim() || "Клиент",
     body: lines.join("\n"),
   };
+}
+
+/** Текст комментария для документа «Заказ покупателя» в 1С. */
+function buildOneCOrderComment(order) {
+  const number = String(order?.number || order?.displayId || "").trim();
+  const header = number ? `Заказ Clover № ${number}` : "Заказ Clover";
+  const clientComment = String(order?.clientComment || "").trim();
+  return clientComment ? `${header}\nКомментарий: ${clientComment}` : header;
 }
 
 function reconciliationPeriodText(request) {
@@ -787,12 +808,21 @@ function normalizeClientLink(value) {
   const defaultPricing = normalizeDefaultPricingConfig(link);
   const oneCPriceTypeId = String(link.oneCPriceTypeId || "").trim();
   const oneCPriceTypeName = String(link.oneCPriceTypeName || "").trim();
-  // Выбранный вид цен 1С всегда даёт режим one_c_price_type.
-  const defaultPricingMode = oneCPriceTypeId
-    ? "one_c_price_type"
-    : defaultPricing.source === "one_c_price_type"
-      ? "base"
-      : defaultPricing.source;
+  // Явный режим «закупка+%» / «базовая» важнее заполненного вида цен —
+  // иначе после сохранения наценка снова превращается в категорию 1С.
+  const requestedMode = defaultPricing.source;
+  const markupPercent = defaultPricing.markupPercent;
+  let defaultPricingMode = requestedMode;
+  if (requestedMode === "purchase_markup" || requestedMode === "base") {
+    defaultPricingMode = requestedMode;
+  } else if (markupPercent > 0 && oneCPriceTypeId) {
+    // Наценка задана менеджером — не превращаем обратно в «вид без %».
+    defaultPricingMode = "purchase_markup";
+  } else if (oneCPriceTypeId) {
+    defaultPricingMode = "one_c_price_type";
+  } else if (requestedMode === "one_c_price_type") {
+    defaultPricingMode = "base";
+  }
 
   return {
     ...EMPTY_LINK,
@@ -844,8 +874,13 @@ function applyClientPrices(product, link, isMatrixProduct, oneCById = new Map())
     markupPercent: pricing.markupPercent,
     defaultPricingMode: pricing.defaultPricingMode,
     defaultMarkupPercent: pricing.defaultMarkupPercent,
+    oneCPriceTypeId: pricing.oneCPriceTypeId,
     purchasePrices: pricing.purchasePrices,
     purchasePriceUpdatedAt: pricing.purchasePriceUpdatedAt,
+    salePriceReceivedAt:
+      oneCItem?.salePriceReceivedAt ||
+      oneCItem?.salePriceUpdatedAt ||
+      "",
   };
 
   for (const unit of SALE_UNITS) {
@@ -918,11 +953,14 @@ function stripRuntimeProductPricing(product = {}) {
     purchasePriceSourceDatabase,
     purchasePriceUnit,
     purchasePriceAvailable,
+    salePricesByType,
+    salePriceReceivedAt,
     clientPriceMode,
     clientPriceOverrideMode,
     markupPercent,
     defaultPricingMode,
     defaultMarkupPercent,
+    oneCPriceTypeId,
     priceSources,
     basePricePiece,
     basePricePack,
@@ -1242,6 +1280,20 @@ app.get("/api/health", (req, res) => {
     ok: true,
     service: "clover-server", version: "4.0.4",
     time: new Date().toISOString(),
+  });
+});
+
+/** Публичные контакты менеджера для экрана входа (без авторизации). */
+app.get("/api/public/manager-contact", (req, res) => {
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    ...getGlobalState("settings", DEFAULT_SETTINGS),
+  };
+  res.json({
+    managerFullName: String(settings.managerFullName || ""),
+    managerPhone: String(settings.managerPhone || ""),
+    managerMax: String(settings.managerMax || ""),
+    managerTelegram: String(settings.managerTelegram || ""),
   });
 });
 
@@ -1832,6 +1884,9 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
         matrixReady: true,
         matrixProductIds: [],
       },
+      catalogPricesVersion: String(
+        getGlobalState("catalogPricesVersion", "") || ""
+      ),
       orders: listOrders(),
       trashedOrders: listTrashedOrders(),
       profile: {},
@@ -1854,16 +1909,30 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
   }
 
   const state = getClientState(req.user.id);
+  const clientLink = allClientLinks[req.user.id] || {};
   const catalog = resolveClientCatalog(
     products,
-    allClientLinks[req.user.id],
+    clientLink,
     oneCProducts
   );
+  const pricesVersion = String(
+    getGlobalState("catalogPricesVersion", "") || ""
+  );
+  // Версия учитывает и выгрузку цен 1С, и настройки матрицы/вида цен клиента.
+  const clientPricesRevision = [
+    pricesVersion,
+    String(catalog.link?.defaultPricingMode || ""),
+    String(catalog.link?.defaultMarkupPercent ?? ""),
+    String(catalog.link?.oneCPriceTypeId || ""),
+    String(catalog.link?.matrixMode || ""),
+    String((catalog.link?.matrixProductIds || []).length),
+  ].join("::");
 
   const clientPayload = {
     user: publicUser(req.user),
     products: catalog.matrixProducts,
     catalogPolicy: catalog.policy,
+    catalogPricesVersion: clientPricesRevision,
     orders: listOrders(req.user.id),
     trashedOrders: [],
     profile: state.profile,
@@ -2500,12 +2569,7 @@ async function handleOneCTestOrder(req, res, next) {
     // Цена уже согласована клиентом в заказе и фиксируется при постановке
     // в очередь. Свежая закупочная цена из 1С обязательна для контроля и
     // расчёта следующих заказов, но не меняет сумму уже созданного заказа.
-    const lockedOrderTotal = (realOrder.items || []).reduce(
-      (sum, item) => sum + (Number(item.lineTotal) || 0),
-      0
-    );
-
-    const items = (realOrder.items || []).map((item) => {
+    const rawClaimItems = (realOrder.items || []).map((item) => {
       const product = productsById.get(String(item.productId ?? item.id));
       const oneCId = String(item.oneCId || product?.oneCId || "").trim();
       const quantity = Number(item.quantity) || 1;
@@ -2518,6 +2582,7 @@ async function handleOneCTestOrder(req, res, next) {
         : "piece";
       const multiplier = Math.max(1, Number(item.multiplier) || 1);
       const totalPieces = quantity * multiplier;
+      const lineTotal = Number(item.lineTotal) || quantity * price;
 
       return {
         id: oneCId,
@@ -2533,8 +2598,13 @@ async function handleOneCTestOrder(req, res, next) {
         totalPieces,
         quantity,
         price,
+        lineTotal,
       };
     });
+
+    const aligned = alignLinePricesToCeilTotal(rawClaimItems, "price");
+    const items = aligned.items.map(({ lineTotal, ...rest }) => rest);
+    const lockedOrderTotal = aligned.total;
 
     const clientLink = normalizeClientLink(clientLinks[realOrder.clientId]);
 
@@ -2583,11 +2653,8 @@ async function handleOneCTestOrder(req, res, next) {
           lookupRequired: !clientLink.oneCId,
         },
         items,
-        total: items.reduce(
-          (sum, item) => sum + item.quantity * item.price,
-          0
-        ),
-        comment: `Заказ Clover № ${realOrder.number || realOrder.displayId || ""}`.trim(),
+        total: lockedOrderTotal,
+        comment: buildOneCOrderComment(realOrder),
       },
     });
   } catch (error) {
@@ -2725,6 +2792,7 @@ app.post("/api/one-c/sale-prices", (req, res, next) => {
       { receivedAt }
     );
     setGlobalState("oneCProducts", merged.products);
+    setGlobalState("catalogPricesVersion", merged.receivedAt || receivedAt);
     auditFromRequest(req, "one-c.sale-prices.receive", {
       accepted: merged.accepted.length,
       rejected: merged.rejected.length,
@@ -3142,6 +3210,72 @@ app.put(
 );
 
 
+/** Превью цен матрицы клиента — те же цены, что увидит ЛК. */
+app.get(
+  "/api/admin/clients/:clientId/matrix-prices",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const clientId = String(req.params.clientId || "").trim();
+    const clientUser = findUserById(clientId);
+    if (!clientUser || clientUser.role !== "client") {
+      return res.status(404).json({ error: "Клиент Clover не найден." });
+    }
+
+    const storedProducts = getGlobalState("products", DEFAULT_PRODUCTS);
+    const oneCProducts = normalizeOneCProducts(
+      getGlobalState("oneCProducts", [])
+    );
+    const oneCById = oneCProductsById(oneCProducts);
+    const allLinks = getGlobalState("clientLinks", {});
+    const rawLink = allLinks[clientId] || {};
+    const catalog = resolveClientCatalog(storedProducts, rawLink, oneCProducts);
+    const link = catalog.link;
+    const priceTypeId = String(link.oneCPriceTypeId || "").trim();
+
+    const items = {};
+    for (const product of catalog.matrixProducts) {
+      const oneCItem = oneCById.get(String(product.oneCId || "")) || null;
+      const typed = {};
+      for (const unit of SALE_UNITS) {
+        const resolved = resolveTypedSalePrice(
+          product,
+          oneCItem,
+          priceTypeId,
+          unit
+        );
+        typed[unit] = resolved ? resolved.price : null;
+      }
+      items[String(product.id)] = {
+        clientPriceMode: product.clientPriceMode || "",
+        markupPercent: product.markupPercent ?? 0,
+        pricePiece: product.pricePiece ?? 0,
+        pricePack: product.pricePack ?? 0,
+        priceBundle: product.priceBundle ?? 0,
+        priceBox: product.priceBox ?? 0,
+        pricePair: product.pricePair ?? 0,
+        priceRoll: product.priceRoll ?? 0,
+        typed,
+        salePriceReceivedAt: product.salePriceReceivedAt || "",
+        priceSources: product.priceSources || {},
+      };
+    }
+
+    res.json({
+      ok: true,
+      clientId,
+      priceTypeId,
+      priceTypeName: link.oneCPriceTypeName || "",
+      defaultPricingMode: link.defaultPricingMode || "base",
+      defaultMarkupPercent: link.defaultMarkupPercent ?? 0,
+      catalogPricesVersion: String(
+        getGlobalState("catalogPricesVersion", "") || ""
+      ),
+      items,
+    });
+  }
+);
+
 app.put(
   "/api/admin/clients/:clientId",
   authRequired,
@@ -3178,6 +3312,17 @@ app.put(
         managerNote: parsed.managerNote,
       });
 
+      // Логин в журнале доступов держим в актуальном состоянии при смене email.
+      upsertClientAccessEntry(
+        clientUser.id,
+        {
+          login: client.email || parsed.profile.email,
+          companyName: client.companyName || parsed.profile.companyName,
+          contactName: client.contactName || parsed.profile.contactName,
+        },
+        req.user
+      );
+
       auditFromRequest(req, "client.profile.manager_update", {
         clientId: clientUser.id,
         changedEmail: normalizeEmail(clientUser.email) !== normalizeEmail(parsed.profile.email),
@@ -3207,7 +3352,31 @@ app.put(
       incomingLinks,
       storedLinks
     );
+    // Полный снимок матрицы с UI: personalPrices заменяем целиком,
+    // иначе нельзя сбросить «индивидуальный %» (merge оставлял старые ключи).
+    for (const clientId of Object.keys(incomingLinks || {})) {
+      const raw = incomingLinks[clientId];
+      if (
+        !raw ||
+        typeof raw !== "object" ||
+        !Object.prototype.hasOwnProperty.call(raw, "personalPrices")
+      ) {
+        continue;
+      }
+      const prices =
+        raw.personalPrices &&
+        typeof raw.personalPrices === "object" &&
+        !Array.isArray(raw.personalPrices)
+          ? raw.personalPrices
+          : {};
+      clientLinks[clientId] = {
+        ...(clientLinks[clientId] || {}),
+        personalPrices: { ...prices },
+      };
+    }
     setGlobalState("clientLinks", clientLinks);
+    // Смена матрицы/вида цен/наценки — клиентский ЛК должен перечитать каталог.
+    setGlobalState("catalogPricesVersion", new Date().toISOString());
     auditFromRequest(req, "client.matrix.save", {
       clients: Object.keys(clientLinks).length,
     });
@@ -3420,6 +3589,130 @@ app.delete(
 
     setGlobalState("products", updatedProducts);
     auditFromRequest(req, "product.image.delete", {
+      productId: updatedProduct.id,
+      productName: updatedProduct.name,
+    });
+
+    res.json({ ok: true, product: updatedProduct });
+  }
+);
+
+const certificateUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadsDirectory,
+    filename(req, file, callback) {
+      const extensionMap = {
+        "application/pdf": ".pdf",
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+      };
+      const fromName = path.extname(String(file.originalname || "")).toLowerCase();
+      const extension =
+        extensionMap[file.mimetype] ||
+        (fromName === ".pdf" ? ".pdf" : ".bin");
+      callback(
+        null,
+        `product-cert-${String(req.params.productId || "item")}-${Date.now()}-${randomUUID()}${extension}`
+      );
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter(req, file, callback) {
+    const allowed = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+    if (!allowed.includes(file.mimetype)) {
+      return callback(
+        new Error("Разрешены PDF, JPG, PNG или WEBP.")
+      );
+    }
+    callback(null, true);
+  },
+});
+
+app.post(
+  "/api/admin/products/:productId/certificate",
+  authRequired,
+  roleRequired("manager"),
+  certificateUpload.single("certificate"),
+  (req, res) => {
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const productIndex = products.findIndex(
+      (product) => String(product.id) === String(req.params.productId)
+    );
+
+    if (productIndex < 0) {
+      if (req.file?.path && existsSync(req.file.path)) {
+        unlinkSync(req.file.path);
+      }
+      return res.status(404).json({ error: "Товар не найден." });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "Выберите файл сертификата." });
+    }
+
+    removeUploadedImage(products[productIndex].certificateUrl);
+
+    const certificateUrl = `/uploads/${req.file.filename}`;
+    const certificateName = String(req.file.originalname || "certificate").slice(0, 180);
+    const updatedProduct = {
+      ...products[productIndex],
+      certificateUrl,
+      certificateName,
+      certificateUpdatedAt: new Date().toISOString(),
+    };
+    const updatedProducts = products.map((product, index) =>
+      index === productIndex ? updatedProduct : product
+    );
+
+    setGlobalState("products", updatedProducts);
+    auditFromRequest(req, "product.certificate.upload", {
+      productId: updatedProduct.id,
+      productName: updatedProduct.name,
+      certificateUrl,
+    });
+
+    res.status(201).json({
+      ok: true,
+      certificateUrl,
+      product: updatedProduct,
+    });
+  }
+);
+
+app.delete(
+  "/api/admin/products/:productId/certificate",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const productIndex = products.findIndex(
+      (product) => String(product.id) === String(req.params.productId)
+    );
+
+    if (productIndex < 0) {
+      return res.status(404).json({ error: "Товар не найден." });
+    }
+
+    removeUploadedImage(products[productIndex].certificateUrl);
+
+    const updatedProduct = {
+      ...products[productIndex],
+      certificateUrl: "",
+      certificateName: "",
+      certificateUpdatedAt: new Date().toISOString(),
+    };
+    const updatedProducts = products.map((product, index) =>
+      index === productIndex ? updatedProduct : product
+    );
+
+    setGlobalState("products", updatedProducts);
+    auditFromRequest(req, "product.certificate.delete", {
       productId: updatedProduct.id,
       productName: updatedProduct.name,
     });
@@ -3823,6 +4116,57 @@ app.post(
     } catch (error) {
       next(error);
     }
+  }
+);
+
+app.post(
+  "/api/admin/one-c/products/match-import",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (!rows.length) {
+      return res.status(400).json({ error: "Передайте rows: [{ name, code? }]." });
+    }
+    if (rows.length > 2000) {
+      return res.status(400).json({ error: "Слишком много строк (макс. 2000)." });
+    }
+
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const oneCProducts = normalizeOneCProducts(getGlobalState("oneCProducts", []));
+    const linksByOneCId = new Map();
+    products.forEach((product) => {
+      const oneCId = String(product.oneCId || "").trim();
+      if (!oneCId) return;
+      linksByOneCId.set(oneCId, {
+        productId: product.id,
+        productName: product.name,
+        linkMode: product.oneCLinkMode || "manual",
+      });
+    });
+
+    const catalog = oneCProducts.map((item) => ({
+      ...item,
+      cloverLink: linksByOneCId.get(item.id) || null,
+    }));
+
+    const matched = matchOneCImportRows(rows, catalog);
+    const summary = {
+      total: matched.length,
+      exact: matched.filter((row) => row.status === "exact").length,
+      code: matched.filter((row) => row.status === "code").length,
+      fuzzy: matched.filter((row) => row.status === "fuzzy").length,
+      miss: matched.filter((row) => row.status === "miss" || row.status === "empty").length,
+    };
+
+    auditFromRequest(req, "one-c.product.match-import", {
+      total: summary.total,
+      exact: summary.exact,
+      fuzzy: summary.fuzzy,
+      miss: summary.miss,
+    });
+
+    res.json({ ok: true, rows: matched, summary });
   }
 );
 
@@ -4933,7 +5277,41 @@ app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("m
   });
 });
 
+app.get(
+  "/api/admin/client-access",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const items = listClientAccessEntries(listClients());
+    res.json({
+      ok: true,
+      items,
+      savedCount: items.filter((item) => item.hasPassword).length,
+    });
+  }
+);
+
+app.delete(
+  "/api/admin/client-access/:clientId",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const removed = removeClientAccessEntry(req.params.clientId);
+    if (!removed) {
+      return res.status(404).json({ error: "Запись доступа не найдена." });
+    }
+    auditFromRequest(req, "client.access.vault_remove", {
+      clientId: req.params.clientId,
+    });
+    res.json({
+      ok: true,
+      items: listClientAccessEntries(listClients()),
+    });
+  }
+);
+
 app.post("/api/admin/clients", authRequired, roleRequired("manager"), async (req, res, next) => {
+
   try {
     const input = managerClientProvisionSchema.parse(req.body);
     const email = normalizeEmail(input.email);
@@ -4959,13 +5337,25 @@ app.post("/api/admin/clients", authRequired, roleRequired("manager"), async (req
       email,
       companyName: input.companyName,
     });
+    const access = saveClientAccessCredentials(
+      user.id,
+      {
+        login: email,
+        password: input.password,
+        companyName: input.companyName,
+        contactName: input.contactName,
+      },
+      req.user
+    );
     res.status(201).json({
       ok: true,
-      message: "Клиент создан. Можно выдать логин и пароль.",
+      message:
+        "Клиент создан. Логин и пароль сохранены в «Ещё → Доступы».",
       client: listClients().find((item) => String(item.id) === String(user.id)) || null,
       user: publicUser(user),
       clients: listClients(),
       login: email,
+      access,
     });
   } catch (error) {
     next(error);
@@ -4996,12 +5386,27 @@ app.post(
       auditFromRequest(req, "client.password.set_by_manager", {
         clientId: clientUser.id,
       });
+      const clientCard =
+        listClients().find((item) => String(item.id) === String(clientUser.id)) ||
+        {};
+      const access = saveClientAccessCredentials(
+        clientUser.id,
+        {
+          login: refreshed?.email || clientUser.email,
+          password: input.password,
+          companyName: clientCard.companyName || "",
+          contactName: clientCard.contactName || "",
+        },
+        req.user
+      );
       res.json({
         ok: true,
-        message: "Пароль обновлён. Можно выдать клиенту логин и новый пароль.",
+        message:
+          "Пароль обновлён и сохранён в «Ещё → Доступы».",
         user: publicUser(refreshed),
         login: refreshed?.email || clientUser.email,
         clients: listClients(),
+        access,
       });
     } catch (error) {
       next(error);

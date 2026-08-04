@@ -10,7 +10,7 @@ function finiteNonNegative(value) {
   return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
 }
 
-const UNITS = ["piece", "bundle", "pack", "box", "pair", "roll"];
+const UNITS = ["piece", "pair", "meter", "roll", "pack", "bundle", "box"];
 
 export function normalizeOneCPriceType(item = {}) {
   const id = cleanText(item.id ?? item.oneCId ?? item.ref ?? item.code);
@@ -194,22 +194,56 @@ export function mergeSalePricesByType(
   };
 }
 
-/** Товары, которым нужна цена выбранного вида для клиентов с one_c_price_type. */
+/** Товары, которым нужна цена выбранного вида для клиентов. */
 export function buildSalePriceRequirements(products = [], clientLinks = {}) {
   const typeIds = new Set();
   for (const link of Object.values(clientLinks || {})) {
     const typeId = cleanText(link?.oneCPriceTypeId);
-    if (typeId && (link?.defaultPricingMode === "one_c_price_type" || typeId)) {
+    if (!typeId) continue;
+    const mode = String(link?.defaultPricingMode || "").trim();
+    // Нужны и «вид цен», и «закупка/категория + %» (база — тот же вид цен).
+    if (
+      mode === "one_c_price_type" ||
+      mode === "purchase_markup" ||
+      !mode
+    ) {
       typeIds.add(typeId);
     }
   }
   if (!typeIds.size) return [];
 
+  // Только товары из матриц клиентов с этими видами цен (не весь каталог).
+  const neededOneCIds = new Set();
+  for (const link of Object.values(clientLinks || {})) {
+    const typeId = cleanText(link?.oneCPriceTypeId);
+    if (!typeId || !typeIds.has(typeId)) continue;
+    const mode = String(link?.defaultPricingMode || "").trim();
+    if (mode && mode !== "one_c_price_type" && mode !== "purchase_markup") {
+      continue;
+    }
+    if (link?.matrixMode === "all") {
+      for (const product of Array.isArray(products) ? products : []) {
+        if (product.active === false) continue;
+        const oneCId = cleanText(product.oneCId);
+        if (oneCId) neededOneCIds.add(oneCId);
+      }
+      continue;
+    }
+    const ids = Array.isArray(link?.matrixProductIds) ? link.matrixProductIds : [];
+    for (const productId of ids) {
+      const product = (Array.isArray(products) ? products : []).find(
+        (item) => String(item.id) === String(productId)
+      );
+      const oneCId = cleanText(product?.oneCId);
+      if (oneCId) neededOneCIds.add(oneCId);
+    }
+  }
+
   const required = [];
   for (const product of Array.isArray(products) ? products : []) {
     if (product.active === false) continue;
     const oneCId = cleanText(product.oneCId);
-    if (!oneCId) continue;
+    if (!oneCId || !neededOneCIds.has(oneCId)) continue;
     for (const priceTypeId of typeIds) {
       required.push({
         productId: product.id,

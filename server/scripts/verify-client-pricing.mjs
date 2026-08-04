@@ -35,8 +35,8 @@ const oneCItem = normalizeOneCProduct({
 assert.equal(oneCItem.purchasePrice, 83.4);
 assert.equal(purchasePriceForUnit(product, oneCItem, "piece"), 83.4);
 assert.equal(purchasePriceForUnit(product, oneCItem, "pack"), 8340);
-assert.equal(roundPriceUp(104.25), 105);
-assert.equal(calculateMarkupPrice(83.4, 25), 105);
+assert.equal(roundPriceUp(104.25), 104.25);
+assert.equal(calculateMarkupPrice(83.4, 25), 104.25);
 
 const defaults = normalizeDefaultPricingConfig({
   defaultPricingMode: "purchase_markup",
@@ -54,7 +54,7 @@ const inherited = resolveClientProductPricing(
 assert.equal(inherited.overrideSource, "inherit");
 assert.equal(inherited.source, "purchase_markup");
 assert.equal(inherited.markupPercent, 25);
-assert.equal(inherited.prices.piece, 105);
+assert.equal(inherited.prices.piece, 104.25);
 assert.equal(inherited.prices.pack, 10425);
 assert.equal(inherited.priceSources.piece, "purchase_markup");
 
@@ -78,7 +78,7 @@ const individualMarkup = resolveClientProductPricing(
 );
 assert.equal(individualMarkup.overrideSource, "purchase_markup");
 assert.equal(individualMarkup.markupPercent, 10);
-assert.equal(individualMarkup.prices.piece, 92);
+assert.equal(individualMarkup.prices.piece, 91.74);
 assert.equal(individualMarkup.prices.pack, 9174);
 
 const inheritedAgain = resolveClientProductPricing(
@@ -87,7 +87,7 @@ const inheritedAgain = resolveClientProductPricing(
   oneCItem,
   { defaultPricingMode: "purchase_markup", defaultMarkupPercent: 25 }
 );
-assert.equal(inheritedAgain.prices.piece, 105);
+assert.equal(inheritedAgain.prices.piece, 104.25);
 
 const baseDefault = resolveClientProductPricing(
   product,
@@ -119,18 +119,80 @@ const missingNoBase = resolveClientProductPricing(
 assert.equal(missingNoBase.prices.piece, 0);
 assert.equal(missingNoBase.priceSources.piece, "purchase_missing");
 
+// Наценка % от вида цен «Закупочная» (когда purchasePrice в номенклатуре пустой).
+const typedPurchaseBase = {
+  ...oneCItem,
+  purchasePrice: null,
+  salePricesByType: {
+    "type-zakup": { piece: 65.47, pack: null, bundle: null, box: null, pair: null, roll: null },
+  },
+};
+const markupFromType = resolveClientProductPricing(
+  { ...product, pricePiece: 0, pricePack: 0 },
+  {},
+  typedPurchaseBase,
+  {
+    defaultPricingMode: "purchase_markup",
+    defaultMarkupPercent: 5,
+    oneCPriceTypeId: "type-zakup",
+  }
+);
+assert.equal(markupFromType.prices.piece, 68.74);
+assert.equal(markupFromType.priceSources.piece, "purchase_markup_from_price_type");
+assert.equal(markupFromType.prices.pack, 6874.35);
+
 const directUnits = normalizeOneCProduct({
   id: "onec-direct",
   name: "Товар с отдельными ценами",
   prices: { piece: 10.1, pack: 95.5, bundle: 440.2 },
 });
 assert.equal(purchasePriceForUnit(product, directUnits, "pack"), 95.5);
-assert.equal(calculateMarkupPrice(95.5, 10), 106);
+assert.equal(calculateMarkupPrice(95.5, 10), 105.05);
 
 const enriched = enrichProductWithPurchasePrices(product, oneCItem);
 assert.equal(enriched.purchasePriceAvailable, true);
 assert.equal(enriched.purchasePrices.piece, 83.4);
 
+// Категория цен 1С: в карточке товара цену не задали — берём шт из вида цен,
+// упаковку = шт × packSize.
+const typedOneC = {
+  ...oneCItem,
+  salePricesByType: {
+    "type-opt": { piece: 50, pack: null, bundle: null, box: null, pair: null, roll: null },
+  },
+};
+const emptyCatalog = {
+  ...product,
+  pricePiece: 0,
+  pricePack: 0,
+  priceBundle: 0,
+  priceBox: 0,
+  pricePair: 0,
+  priceRoll: 0,
+};
+const fromType = resolveClientProductPricing(
+  emptyCatalog,
+  {},
+  typedOneC,
+  { defaultPricingMode: "one_c_price_type", oneCPriceTypeId: "type-opt" }
+);
+assert.equal(fromType.prices.piece, 50);
+assert.equal(fromType.priceSources.piece, "one_c_price_type");
+assert.equal(fromType.prices.pack, 5000);
+assert.equal(fromType.priceSources.pack, "one_c_price_type_from_piece");
+
+const baseEmptyWithType = resolveClientProductPricing(
+  emptyCatalog,
+  {},
+  typedOneC,
+  { defaultPricingMode: "base", oneCPriceTypeId: "type-opt" }
+);
+assert.equal(baseEmptyWithType.prices.piece, 50);
+assert.equal(baseEmptyWithType.priceSources.piece, "one_c_price_type");
+assert.equal(baseEmptyWithType.prices.pack, 5000);
+assert.equal(baseEmptyWithType.priceSources.pack, "one_c_price_type_from_piece");
+
 console.log("Проверка общей наценки клиента и индивидуальных исключений прошла успешно.");
 console.log("Приоритет проверен: фиксированная цена -> индивидуальный процент -> общий процент.");
-console.log("Округление копеек вверх до целого рубля проверено.");
+console.log("Цены с копейками (без округления вверх до рубля) проверены.");
+console.log("Пустая цена в карточке → цена за шт из категории цен 1С (упаковка = шт × внутри).");

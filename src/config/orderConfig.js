@@ -1,13 +1,15 @@
 export const UNIT_CONFIG = {
   piece: { label: "штука", shortLabel: "шт." },
-  bundle: { label: "пачка", shortLabel: "пач." },
-  pack: { label: "упаковка", shortLabel: "уп." },
-  box: { label: "коробка", shortLabel: "кор." },
   pair: { label: "пара", shortLabel: "пар." },
+  meter: { label: "метр", shortLabel: "м" },
   roll: { label: "рулон", shortLabel: "рул." },
+  pack: { label: "упаковка", shortLabel: "уп." },
+  bundle: { label: "пачка", shortLabel: "пач." },
+  box: { label: "коробка", shortLabel: "кор." },
 };
 
-export const UNIT_ORDER = ["piece", "bundle", "pack", "box", "pair", "roll"];
+/** Слева → справа: от меньшей ед. измерения к большей. */
+export const UNIT_ORDER = ["piece", "pair", "meter", "roll", "pack", "bundle", "box"];
 
 export const ORDER_STATUSES = [
   "Новый",

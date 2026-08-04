@@ -1,15 +1,59 @@
 const UNIT_LABELS = {
   piece: "штука",
+  pair: "пара",
+  meter: "метр",
+  roll: "рулон",
   pack: "упаковка",
   bundle: "пачка",
   box: "коробка",
-  pair: "пара",
-  roll: "рулон",
 };
 
 /** В документ 1С количество всегда в шт (см. totalPieces). */
 export const ONEC_PIECE_UNIT = "piece";
 export const ONEC_PIECE_UNIT_NAME = "шт";
+
+/** Округление денег до копеек (без ceil до рубля). */
+export function ceilMoney(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+  return Math.round((numeric + Number.EPSILON) * 100) / 100;
+}
+
+/**
+ * Нормализует строки заказа для 1С.
+ * Цены и итог — фактические (с копейками), без подгонки под ceil(рубль).
+ *
+ * @param {Array<{quantity?: number, price?: number, unitPrice?: number, lineTotal?: number}>} items
+ * @param {"price"|"unitPrice"} priceField
+ */
+export function alignLinePricesToCeilTotal(items, priceField = "price") {
+  const lines = (Array.isArray(items) ? items : []).map((item) => {
+    const quantity = Math.max(0, Number(item.quantity) || 0);
+    const explicitLine = Number(item.lineTotal);
+    const unit =
+      Number(
+        item[priceField] ??
+          item.price ??
+          item.unitPrice ??
+          (quantity > 0 && Number.isFinite(explicitLine) ? explicitLine / quantity : 0)
+      ) || 0;
+    const lineTotal =
+      Number.isFinite(explicitLine) && explicitLine > 0
+        ? explicitLine
+        : quantity * unit;
+    return {
+      ...item,
+      quantity,
+      [priceField]: unit,
+      lineTotal,
+    };
+  });
+
+  const rawTotal = lines.reduce((sum, item) => sum + (Number(item.lineTotal) || 0), 0);
+  const total = ceilMoney(rawTotal);
+
+  return { items: lines, rawTotal, total };
+}
 
 export const EXCHANGE_STATUSES = {
   not_sent: "Не отправлен",
@@ -248,6 +292,12 @@ export function build1CPayload({ order, products, clientLinks }) {
       exchangeStatus: exchange.status,
       clientComment: order?.clientComment || "",
       managerComment: order?.managerComment || "",
+      comment: (() => {
+        const number = String(order?.number || "").trim();
+        const header = number ? `Заказ Clover № ${number}` : "Заказ Clover";
+        const clientComment = String(order?.clientComment || "").trim();
+        return clientComment ? `${header}\nКомментарий: ${clientComment}` : header;
+      })(),
     },
     client: {
       cloverId: String(order?.clientId || ""),
@@ -262,32 +312,35 @@ export function build1CPayload({ order, products, clientLinks }) {
       email: link?.oneCMatchEmail || order?.customerEmail || "",
       address: order?.address || "",
     },
-    items: (order?.items || []).map((item, index) => {
-      const product = productsById.get(String(item.productId ?? item.id));
-      const saleUnit = item.unit || "piece";
-      const quantity = Number(item.quantity) || 0;
-      const multiplier = Number(item.multiplier) || 1;
-      const totalPieces = quantity * multiplier;
-      return {
-        line: index + 1,
-        cloverProductId: String(item.productId ?? item.id ?? ""),
-        oneCId: String(item.oneCId || product?.oneCId || ""),
-        code: item.oneCCode || product?.oneCCode || item.code || product?.code || "",
-        name: item.oneCName || product?.oneCName || item.name || product?.name || "",
-        displayName: item.name || product?.name || "",
-        // Продажа в Clover (для аудита)
-        saleUnit,
-        saleUnitName: UNIT_LABELS[saleUnit] || saleUnit || "",
-        // В 1С всегда шт
-        unit: ONEC_PIECE_UNIT,
-        unitName: ONEC_PIECE_UNIT_NAME,
-        quantity,
-        multiplier,
-        totalPieces,
-        unitPrice: Number(item.unitPrice) || 0,
-        lineTotal: Number(item.lineTotal) || 0,
-      };
-    }),
+    items: (() => {
+      const rawItems = (order?.items || []).map((item, index) => {
+        const product = productsById.get(String(item.productId ?? item.id));
+        const saleUnit = item.unit || "piece";
+        const quantity = Number(item.quantity) || 0;
+        const multiplier = Number(item.multiplier) || 1;
+        const totalPieces = quantity * multiplier;
+        const unitPrice = Number(item.unitPrice) || 0;
+        const lineTotal = Number(item.lineTotal) || quantity * unitPrice;
+        return {
+          line: index + 1,
+          cloverProductId: String(item.productId ?? item.id ?? ""),
+          oneCId: String(item.oneCId || product?.oneCId || ""),
+          code: item.oneCCode || product?.oneCCode || item.code || product?.code || "",
+          name: item.oneCName || product?.oneCName || item.name || product?.name || "",
+          displayName: item.name || product?.name || "",
+          saleUnit,
+          saleUnitName: UNIT_LABELS[saleUnit] || saleUnit || "",
+          unit: ONEC_PIECE_UNIT,
+          unitName: ONEC_PIECE_UNIT_NAME,
+          quantity,
+          multiplier,
+          totalPieces,
+          unitPrice,
+          lineTotal,
+        };
+      });
+      return alignLinePricesToCeilTotal(rawItems, "unitPrice").items;
+    })(),
     customItems: (order?.customItems || []).map((item, index) => ({
       line: index + 1,
       id: String(item.id || ""),
@@ -301,10 +354,22 @@ export function build1CPayload({ order, products, clientLinks }) {
     })),
     totals: {
       positions: (order?.items || []).length + (order?.customItems || []).length,
-      amount: [...(order?.items || []), ...(order?.customItems || [])].reduce(
-        (sum, item) => sum + (Number(item.lineTotal) || (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0)),
-        0
-      ),
+      amount: alignLinePricesToCeilTotal(
+        [
+          ...(order?.items || []).map((item) => ({
+            quantity: Number(item.quantity) || 0,
+            unitPrice: Number(item.unitPrice) || 0,
+            lineTotal: Number(item.lineTotal) || 0,
+          })),
+          ...(order?.customItems || []).map((item) => ({
+            quantity: Number(item.quantity) || 0,
+            unitPrice: Number(item.unitPrice) || 0,
+            lineTotal:
+              (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0),
+          })),
+        ],
+        "unitPrice"
+      ).total,
     },
   };
 }

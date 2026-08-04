@@ -23,6 +23,34 @@ import {
   formatRussianPhone,
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
+import { MatrixOneCProductAdd } from "./MatrixOneCProductAdd";
+import { ProductEditor } from "./ProductEditor";
+
+/** Цена из вида цен 1С (категория клиента), с масштабом от шт. */
+function typedSalePriceForUnit(product, priceTypeId, unit) {
+  const typeId = String(priceTypeId || "").trim();
+  if (!typeId) return null;
+  const byType =
+    product?.salePricesByType && typeof product.salePricesByType === "object"
+      ? product.salePricesByType
+      : null;
+  const entry = byType?.[typeId];
+  if (!entry || typeof entry !== "object") return null;
+  const direct = Number(entry[unit]);
+  if (Number.isFinite(direct) && direct >= 0) return direct;
+  if (unit === "piece" || unit === "pair" || unit === "roll") return null;
+  const piece = Number(entry.piece);
+  if (!Number.isFinite(piece) || piece < 0) return null;
+  const sizeField =
+    unit === "pack"
+      ? "packSize"
+      : unit === "bundle"
+        ? "bundleSize"
+        : unit === "box"
+          ? "boxSize"
+          : "pieceSize";
+  return piece * Math.max(1, Number(product?.[sizeField]) || 1);
+}
 
 function generateAccessPassword(length = 10) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -176,202 +204,6 @@ function OneCClientPicker({ client, link, onChange }) {
               <div className="empty-box">
                 Контрагент ещё не загружен. Заказ всё равно передаст данные клиента в 1С, а точная связь сохранится автоматически после подтверждения 1С.
               </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MatrixOneCProductAdd({ clientId, link, setProducts, setClientLinks, onAfterAdd }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [items, setItems] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
-
-  const runSearch = async (query = search) => {
-    setLoading(true);
-    setError("");
-    try {
-      const result = await api.getOneCProducts({
-        search: String(query || "").trim(),
-        limit: 50,
-        offset: 0,
-      });
-      setItems(result.items || []);
-      setTotal(Number(result.total) || 0);
-    } catch (searchError) {
-      setError(searchError.message);
-      setItems([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const openPicker = async () => {
-    setOpen(true);
-    setNotice("");
-    setSelectedIds(new Set());
-    await runSearch(search);
-  };
-
-  const toggleSelected = (itemId) => {
-    const key = String(itemId);
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  const addItems = async (toAdd) => {
-    const list = Array.isArray(toAdd) ? toAdd : [];
-    if (!list.length) return;
-
-    setLoading(true);
-    setError("");
-    setNotice("");
-    const addedNames = [];
-    try {
-      for (const item of list) {
-        const result = await api.createProductFromOneCCatalog({
-          oneCId: item.id,
-          item,
-          clientId,
-        });
-        if (Array.isArray(result.products)) {
-          setProducts(result.products.map(normalizeProduct));
-        }
-        if (result.clientLinks) {
-          setClientLinks(result.clientLinks);
-        } else if (result.clientLink) {
-          setClientLinks((current) => ({
-            ...current,
-            [clientId]: {
-              ...EMPTY_LINK,
-              ...(current[clientId] || {}),
-              ...result.clientLink,
-            },
-          }));
-        }
-        addedNames.push(result.product?.name || item.name);
-        onAfterAdd?.(result);
-      }
-      setSelectedIds(new Set());
-      setNotice(
-        addedNames.length === 1
-          ? `Добавлено в матрицу: «${addedNames[0]}».`
-          : `Добавлено в матрицу: ${addedNames.length} поз. (${addedNames.slice(0, 3).join(", ")}${addedNames.length > 3 ? "…" : ""}).`
-      );
-      // Окно не закрываем — можно выбрать ещё позиции.
-    } catch (selectError) {
-      setError(selectError.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const selectedItems = items.filter((item) => selectedIds.has(String(item.id)));
-
-  return (
-    <div className="matrix-onec-add" style={{ marginTop: 12 }}>
-      <div className="toolbar two">
-        <p className="muted small" style={{ margin: 0 }}>
-          Можно взять позиции из каталога 1С: товары появятся в разделе «Товары» и в матрице клиента.
-          Отметьте несколько строк галочками и нажмите «Добавить выбранные».
-          {link.matrixMode === "all" ? " В режиме «все товары» позиция сразу доступна клиенту." : ""}
-        </p>
-        <button className="secondary-button" type="button" onClick={openPicker} disabled={loading}>
-          Добавить из 1С
-        </button>
-      </div>
-      {notice && <div className="matrix-save-message saved" style={{ marginTop: 8 }}>{notice}</div>}
-      {open && (
-        <div className="one-c-picker" style={{ marginTop: 10 }}>
-          <div className="one-c-products-search">
-            <input
-              type="search"
-              value={search}
-              placeholder="Название или код номенклатуры 1С"
-              onChange={(event) => setSearch(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  runSearch();
-                }
-              }}
-            />
-            <button className="secondary-button" type="button" disabled={loading} onClick={() => runSearch()}>
-              {loading ? "Поиск..." : "Найти"}
-            </button>
-            <button className="secondary-button" type="button" onClick={() => setOpen(false)}>Закрыть</button>
-          </div>
-          {error && <div className="sync-error">{error}</div>}
-          <div className="toolbar two" style={{ marginTop: 8, marginBottom: 8 }}>
-            <p className="muted small" style={{ margin: 0 }}>
-              Найдено: {total}. Показаны первые {items.length || 0}. Выбрано: {selectedIds.size}.
-            </p>
-            <button
-              className="primary-button"
-              type="button"
-              disabled={loading || selectedIds.size === 0}
-              onClick={() => addItems(selectedItems)}
-            >
-              {loading ? "Добавляем..." : `Добавить выбранные (${selectedIds.size})`}
-            </button>
-          </div>
-          <div className="one-c-products-list one-c-picker-list">
-            {items.map((item) => {
-              const alreadyInClover = Boolean(item.cloverLink?.productId);
-              const checked = selectedIds.has(String(item.id));
-              return (
-                <article
-                  key={item.id}
-                  className={checked ? "one-c-picker-row selected" : "one-c-picker-row"}
-                  onClick={() => toggleSelected(item.id)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <label style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: 0, cursor: "pointer", flex: 1 }}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleSelected(item.id)}
-                      onClick={(event) => event.stopPropagation()}
-                      style={{ marginTop: 4 }}
-                    />
-                    <div>
-                      <strong>{item.name}</strong>
-                      <span>Код: {item.code || "—"}</span>
-                      {alreadyInClover && (
-                        <span className="muted small">
-                          Уже в Clover: {item.cloverLink.productName || `ID ${item.cloverLink.productId}`}
-                        </span>
-                      )}
-                    </div>
-                  </label>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    disabled={loading}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      addItems([item]);
-                    }}
-                  >
-                    {alreadyInClover ? "В матрицу" : "Добавить"}
-                  </button>
-                </article>
-              );
-            })}
-            {!loading && !items.length && (
-              <div className="empty-box">Номенклатура не найдена. Уточните запрос или обновите выгрузку из 1С.</div>
             )}
           </div>
         </div>
@@ -746,6 +578,9 @@ export function ManagerClients({
   const [defaultMarkupDrafts, setDefaultMarkupDrafts] = useState({});
   const [individualMarkupDrafts, setIndividualMarkupDrafts] = useState({});
   const [matrixSaveState, setMatrixSaveState] = useState({});
+  const [matrixSettingsOpen, setMatrixSettingsOpen] = useState({});
+  const [matrixPricePreview, setMatrixPricePreview] = useState({});
+  const [matrixPricesStatus, setMatrixPricesStatus] = useState({});
   const [openClientId, setOpenClientId] = useState(readOpenManagerClientId);
   const [approvalBusyId, setApprovalBusyId] = useState("");
   const [openMenuId, setOpenMenuId] = useState("");
@@ -762,6 +597,7 @@ export function ManagerClients({
   const [passwordClientId, setPasswordClientId] = useState("");
   const [passwordDraft, setPasswordDraft] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
+  const [editorProduct, setEditorProduct] = useState(undefined);
   const restoredOpenClient = useRef(false);
 
   const ordersByClientId = useMemo(() => {
@@ -788,6 +624,89 @@ export function ManagerClients({
       target.scrollIntoView({ block: "start" });
     });
   }, [openClientId, clients]);
+
+  const openLink = openClientId ? clientLinks[openClientId] : null;
+  const matrixPricesKey = openClientId
+    ? [
+        openClientId,
+        openLink?.defaultPricingMode || "",
+        openLink?.defaultMarkupPercent ?? "",
+        openLink?.oneCPriceTypeId || "",
+        openLink?.matrixMode || "",
+        (openLink?.matrixProductIds || []).length,
+        Object.keys(openLink?.personalPrices || {}).length,
+      ].join(":")
+    : "";
+
+  useEffect(() => {
+    if (!openClientId || !matrixPricesKey) return undefined;
+    let cancelled = false;
+    setMatrixPricesStatus((current) => ({
+      ...current,
+      [openClientId]: { status: "loading" },
+    }));
+    (async () => {
+      try {
+        const result = await api.getClientMatrixPrices(openClientId);
+        if (cancelled) return;
+        const items = result.items || {};
+        setMatrixPricePreview((current) => ({
+          ...current,
+          [openClientId]: items,
+        }));
+        // Подмешиваем виды цен в товары менеджера — чтобы цена была и без повторного fetch.
+        setProducts((prev) => {
+          let changed = false;
+          const next = (Array.isArray(prev) ? prev : []).map((product) => {
+            const row = items[String(product.id)];
+            if (!row?.typed) return product;
+            const typeId = String(result.priceTypeId || "").trim();
+            if (!typeId) return product;
+            const prevByType =
+              product.salePricesByType && typeof product.salePricesByType === "object"
+                ? product.salePricesByType
+                : {};
+            changed = true;
+            return {
+              ...product,
+              salePricesByType: {
+                ...prevByType,
+                [typeId]: {
+                  ...(prevByType[typeId] || {}),
+                  ...row.typed,
+                  priceTypeId: typeId,
+                  receivedAt: row.salePriceReceivedAt || "",
+                },
+              },
+              salePriceReceivedAt:
+                row.salePriceReceivedAt || product.salePriceReceivedAt || "",
+            };
+          });
+          return changed ? next : prev;
+        });
+        setMatrixPricesStatus((current) => ({
+          ...current,
+          [openClientId]: {
+            status: "ok",
+            count: Object.keys(items).length,
+            priceTypeName: result.priceTypeName || "",
+          },
+        }));
+      } catch (error) {
+        if (cancelled) return;
+        setMatrixPricesStatus((current) => ({
+          ...current,
+          [openClientId]: {
+            status: "error",
+            message: error.message || "Не удалось загрузить цены",
+          },
+        }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [openClientId, matrixPricesKey, setProducts]);
 
   const setApproval = async (client, status) => {
     setApprovalBusyId(client.id);
@@ -840,7 +759,7 @@ export function ManagerClients({
       }
       await appAlert({
         title: "Доступ выдан",
-        message: `Логин: ${result.login || email}\nПароль: ${password}\n\nСохраните и передайте клиенту. Матрицу можно настроить в карточке клиента.`,
+        message: `Логин: ${result.login || email}\nПароль: ${password}\n\nСохранено в «Ещё → Доступы». Передайте клиенту. Матрицу можно настроить в карточке.`,
         tone: "success",
       });
     } catch (error) {
@@ -872,7 +791,7 @@ export function ManagerClients({
       setPasswordDraft("");
       await appAlert({
         title: "Пароль обновлён",
-        message: `Логин: ${result.login || client.email}\nПароль: ${password}\n\nПередайте клиенту. Матрица и заказы сохранены.`,
+        message: `Логин: ${result.login || client.email}\nПароль: ${password}\n\nСохранено в «Ещё → Доступы». Передайте клиенту.`,
         tone: "success",
       });
     } catch (error) {
@@ -918,6 +837,38 @@ export function ManagerClients({
     }));
   };
 
+  const saveCatalogProduct = async (value) => {
+    let nextProducts;
+    if (value.id) {
+      nextProducts = products.map((item) =>
+        String(item.id) === String(value.id) ? normalizeProduct(value) : item
+      );
+    } else {
+      const id =
+        Math.max(0, ...products.map((item) => Number(item.id) || 0)) + 1;
+      nextProducts = [
+        normalizeProduct({
+          ...value,
+          id,
+          code: value.code || `CL-${String(id).padStart(4, "0")}`,
+        }),
+        ...products,
+      ];
+    }
+
+    try {
+      const result = await api.saveProducts(nextProducts);
+      setProducts((result.products || nextProducts).map(normalizeProduct));
+      setEditorProduct(undefined);
+    } catch (error) {
+      void appAlert({
+        title: "Не удалось сохранить",
+        message: `Не удалось сохранить товар: ${error.message}`,
+        tone: "danger",
+      });
+    }
+  };
+
   const updatePersonalPrice = (
     clientId,
     link,
@@ -946,6 +897,14 @@ export function ManagerClients({
 
     if (nextPrice.source === "inherit") {
       delete nextPrices[key];
+      setIndividualMarkupDrafts((current) => {
+        const clientDrafts = { ...(current[clientId] || {}) };
+        delete clientDrafts[key];
+        const next = { ...current };
+        if (Object.keys(clientDrafts).length) next[clientId] = clientDrafts;
+        else delete next[clientId];
+        return next;
+      });
     } else {
       nextPrices[key] = nextPrice;
     }
@@ -1049,6 +1008,15 @@ export function ManagerClients({
         ...current,
         [clientId]: { status: "saved", message: "Матрица сохранена." },
       }));
+      try {
+        const preview = await api.getClientMatrixPrices(clientId);
+        setMatrixPricePreview((current) => ({
+          ...current,
+          [clientId]: preview.items || {},
+        }));
+      } catch {
+        /* ignore */
+      }
     } catch (error) {
       setMatrixSaveState((current) => ({
         ...current,
@@ -1084,6 +1052,7 @@ export function ManagerClients({
           <strong>Создать доступ для клиента</strong>
           <p>
             Создайте логин и пароль сами — без письма и подтверждения почты.
+            Логин и пароль сразу сохраняются в «Ещё → Доступы».
             Матрицу настраиваете в карточке; при смене менеджера достаточно
             сменить пароль у того же клиента.
           </p>
@@ -1579,7 +1548,7 @@ export function ManagerClients({
 
                 <details
                   id={`client-matrix-${client.id}`}
-                  className="order-details"
+                  className="order-details client-matrix-details"
                   style={{ marginTop: 15 }}
                   open={matrixOpen}
                   onToggle={(event) => {
@@ -1593,244 +1562,364 @@ export function ManagerClients({
                       writeOpenManagerClientId(value);
                       return value;
                     });
+                    if (isOpen && link.matrixMode === "pending") {
+                      setMatrixSettingsOpen((current) => ({
+                        ...current,
+                        [client.id]: true,
+                      }));
+                    }
                   }}
                 >
-                  <summary>
-                    Товарная матрица, цены и связь с 1С
-                  </summary>
+                  <summary>Товарная матрица</summary>
 
                   {matrixOpen && (
                   <PanelErrorBoundary label="Ошибка блока матрицы клиента">
-                  <OneCClientPicker
-                    client={client}
-                    link={link}
-                    onChange={(patch) => updateLink(client.id, patch)}
-                  />
+                  {(() => {
+                    const settingsOpen = Boolean(
+                      matrixSettingsOpen[client.id] ||
+                        (matrixSettingsOpen[client.id] === undefined &&
+                          link.matrixMode === "pending")
+                    );
+                    const pricingLabel =
+                      link.defaultPricingMode === "purchase_markup"
+                        ? `Наценка ${normalizePercentInput(getDefaultMarkupDraft(client.id, link))}%` +
+                          (link.oneCPriceTypeName
+                            ? ` · ${link.oneCPriceTypeName}`
+                            : "")
+                        : link.defaultPricingMode === "one_c_price_type"
+                          ? link.oneCPriceTypeName || "Вид цен 1С"
+                          : "Базовая цена Clover";
+                    const modeLabel =
+                      link.matrixMode === "all"
+                        ? "Все товары"
+                        : link.matrixMode === "selected"
+                          ? "Выбранные товары"
+                          : "Матрица не готова";
 
-                  <div
-                    className="form-grid"
-                    style={{ marginTop: 14 }}
-                  >
-                    <label className="field">
-                      Точное название в 1С — необязательно
-                      <input
-                        value={link.oneCMatchName || ""}
-                        placeholder={client.companyName || "Название контрагента"}
-                        onChange={(event) => updateLink(client.id, { oneCMatchName: event.target.value })}
+                    return (
+                      <>
+                  <div className="client-matrix-toolbar">
+                    <div className="client-matrix-toolbar-meta">
+                      <span className="badge green">{modeLabel}</span>
+                      <span className="muted small">{pricingLabel}</span>
+                      {link.oneCId ? (
+                        <span className="muted small">
+                          1С: {link.oneCName || link.oneCCode || "связан"}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="client-matrix-toolbar-actions">
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        aria-expanded={settingsOpen}
+                        onClick={() =>
+                          setMatrixSettingsOpen((current) => ({
+                            ...current,
+                            [client.id]: !settingsOpen,
+                          }))
+                        }
+                      >
+                        {settingsOpen
+                          ? "Скрыть настройки клиента"
+                          : "Настройки клиента"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {matrixSaveState[client.id]?.message && (
+                    <span
+                      className={`matrix-save-message ${
+                        matrixSaveState[client.id]?.status || ""
+                      }`}
+                      style={{ display: "block", marginTop: 8 }}
+                    >
+                      {matrixSaveState[client.id].message}
+                    </span>
+                  )}
+
+                  {settingsOpen && (
+                    <div className="client-matrix-settings">
+                      <h4>Настройки клиента и 1С</h4>
+                      <p className="muted small" style={{ marginTop: 0 }}>
+                        Связь с контрагентом, режим матрицы, вид цен и наценка.
+                        После «Обновить цены» в 1С ЛК клиента подтягивает каталог автоматически.
+                      </p>
+
+                      <OneCClientPicker
+                        client={client}
+                        link={link}
+                        onChange={(patch) => updateLink(client.id, patch)}
                       />
-                    </label>
 
-                    <label className="field">
-                      ИНН для точного сопоставления
-                      <input
-                        value={link.oneCMatchInn || ""}
-                        inputMode="numeric"
-                        onChange={(event) => updateLink(client.id, { oneCMatchInn: event.target.value })}
-                      />
-                    </label>
+                      <div className="form-grid" style={{ marginTop: 14 }}>
+                        <label className="field">
+                          Точное название в 1С — необязательно
+                          <input
+                            value={link.oneCMatchName || ""}
+                            placeholder={client.companyName || "Название контрагента"}
+                            onChange={(event) =>
+                              updateLink(client.id, {
+                                oneCMatchName: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
 
-                    <label className="field">
-                      Код контрагента в 1С — необязательно
-                      <input
-                        value={link.oneCMatchCode || ""}
-                        onChange={(event) => updateLink(client.id, { oneCMatchCode: event.target.value })}
-                      />
-                    </label>
+                        <label className="field">
+                          ИНН для точного сопоставления
+                          <input
+                            value={link.oneCMatchInn || ""}
+                            inputMode="numeric"
+                            onChange={(event) =>
+                              updateLink(client.id, {
+                                oneCMatchInn: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
 
-                    <label className="field">
-                      Режим товарной матрицы
-                      <select
-                        value={link.matrixMode}
-                        onChange={(event) =>
-                          updateLink(client.id, {
-                            matrixMode: event.target.value,
-                          })
-                        }
-                      >
-                        <option value="pending">
-                          Матрица подготавливается
-                        </option>
-                        <option value="selected">
-                          Только выбранные товары
-                        </option>
-                        <option value="all">
-                          Все активные товары
-                        </option>
-                      </select>
-                    </label>
+                        <label className="field">
+                          Код контрагента в 1С — необязательно
+                          <input
+                            value={link.oneCMatchCode || ""}
+                            onChange={(event) =>
+                              updateLink(client.id, {
+                                oneCMatchCode: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
 
-                    <label className="field">
-                      Полный каталог для клиента
-                      <select
-                        value={
-                          link.allowFullCatalog ? "yes" : "no"
-                        }
-                        onChange={(event) =>
-                          updateLink(client.id, {
-                            allowFullCatalog:
-                              event.target.value === "yes",
-                          })
-                        }
-                      >
-                        <option value="no">
-                          Скрыт — только матрица
-                        </option>
-                        <option value="yes">
-                          Разрешить просмотр
-                        </option>
-                      </select>
-                    </label>
+                        <label className="field">
+                          Режим товарной матрицы
+                          <select
+                            value={link.matrixMode}
+                            onChange={(event) =>
+                              updateLink(client.id, {
+                                matrixMode: event.target.value,
+                              })
+                            }
+                          >
+                            <option value="pending">Матрица подготавливается</option>
+                            <option value="selected">Только выбранные товары</option>
+                            <option value="all">Все активные товары</option>
+                          </select>
+                        </label>
 
+                        <label className="field">
+                          Полный каталог для клиента
+                          <select
+                            value={link.allowFullCatalog ? "yes" : "no"}
+                            onChange={(event) =>
+                              updateLink(client.id, {
+                                allowFullCatalog: event.target.value === "yes",
+                              })
+                            }
+                          >
+                            <option value="no">Скрыт — только матрица</option>
+                            <option value="yes">Разрешить просмотр</option>
+                          </select>
+                        </label>
+                      </div>
 
-                    <label className="field">
-                      Категория цен 1С (вид цен)
-                      <select
-                        value={link.oneCPriceTypeId || ""}
-                        onChange={(event) => {
-                          const nextId = event.target.value;
-                          const selected = (oneCPriceTypes || []).find(
-                            (item) => String(item.id) === String(nextId)
-                          );
-                          updateLink(client.id, {
-                            oneCPriceTypeId: nextId,
-                            oneCPriceTypeName: selected?.name || "",
-                            defaultPricingMode: nextId
-                              ? "one_c_price_type"
-                              : link.defaultPricingMode === "one_c_price_type"
-                                ? "base"
-                                : link.defaultPricingMode || "base",
-                          });
-                        }}
-                      >
-                        <option value="">Не задана — базовая / наценка</option>
-                        {(oneCPriceTypes || []).map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                            {item.code ? ` (${item.code})` : ""}
-                          </option>
-                        ))}
-                      </select>
-                      <small>
-                        {(oneCPriceTypes || []).length
-                          ? "Источник — договор в 1С (вкладка «Договоры» → «Вид цен»). Подтягивается при выгрузке контрагентов; цены матрицы обновляются онлайн."
-                          : "Задайте вид цен в 1С: карточка контрагента → «Договоры» → «Вид цен», затем «Отправить контрагентов в Clover». Затем выгрузите продажные цены."}
-                      </small>
-                    </label>
+                      <div className="client-pricing-panel" style={{ marginTop: 14 }}>
+                        <label className="field">
+                          Категория цен 1С (вид цен)
+                          <select
+                            value={link.oneCPriceTypeId || ""}
+                            onChange={(event) => {
+                              const nextId = event.target.value;
+                              const selected = (oneCPriceTypes || []).find(
+                                (item) => String(item.id) === String(nextId)
+                              );
+                              const keepMarkup =
+                                link.defaultPricingMode === "purchase_markup" ||
+                                Number(link.defaultMarkupPercent) > 0;
+                              updateLink(client.id, {
+                                oneCPriceTypeId: nextId,
+                                oneCPriceTypeName: selected?.name || "",
+                                defaultPricingMode: nextId
+                                  ? keepMarkup
+                                    ? "purchase_markup"
+                                    : "one_c_price_type"
+                                  : keepMarkup
+                                    ? "purchase_markup"
+                                    : link.defaultPricingMode === "one_c_price_type"
+                                      ? "base"
+                                      : link.defaultPricingMode || "base",
+                              });
+                            }}
+                          >
+                            <option value="">Не задана</option>
+                            {(oneCPriceTypes || []).map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name}
+                                {item.code ? ` (${item.code})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                          <small>
+                            Для наценки обычно выбирают вид «Закупочная цена».
+                          </small>
+                        </label>
 
-                    <label className="field">
-                      Цена по умолчанию для матрицы
-                      <select
-                        value={
-                          link.oneCPriceTypeId
-                            ? "one_c_price_type"
-                            : link.defaultPricingMode || "base"
-                        }
-                        disabled={Boolean(link.oneCPriceTypeId)}
-                        onChange={(event) =>
-                          updateLink(client.id, {
-                            defaultPricingMode: event.target.value,
-                          })
-                        }
-                      >
-                        <option value="base">
-                          Базовая цена Clover
-                        </option>
-                        <option value="purchase_markup">
-                          Закупка 1С + общий процент
-                        </option>
-                        <option value="one_c_price_type">
-                          Категория цен 1С
-                        </option>
-                      </select>
-                    </label>
+                        <label className="field">
+                          Цена по умолчанию для матрицы
+                          <select
+                            value={link.defaultPricingMode || "base"}
+                            onChange={(event) => {
+                              const mode = event.target.value;
+                              updateLink(client.id, {
+                                defaultPricingMode: mode,
+                                ...(mode === "one_c_price_type"
+                                  ? { defaultMarkupPercent: 0 }
+                                  : {}),
+                              });
+                            }}
+                          >
+                            <option value="base">Базовая цена Clover</option>
+                            <option value="purchase_markup">
+                              Категория/закупка + наценка %
+                            </option>
+                            <option
+                              value="one_c_price_type"
+                              disabled={
+                                !link.oneCPriceTypeId &&
+                                !(oneCPriceTypes || []).length
+                              }
+                            >
+                              Категория цен 1С без наценки
+                            </option>
+                          </select>
+                          <small>
+                            «+ наценка %»: цена вида или закупка × (1 + %/100), с копейками.
+                          </small>
+                        </label>
 
-                    {!link.oneCPriceTypeId && link.defaultPricingMode === "purchase_markup" && (
-                      <label className="field">
-                        Общая наценка для клиента, %
-                        <input
-                          type="number"
-                          min="0"
-                          max="10000"
-                          step="0.1"
-                          value={getDefaultMarkupDraft(client.id, link)}
+                        {(link.defaultPricingMode === "purchase_markup" ||
+                          Number(link.defaultMarkupPercent) > 0) && (
+                          <label className="field client-markup-field">
+                            Наценка для клиента, %
+                            <input
+                              type="number"
+                              min="0"
+                              max="10000"
+                              step="0.1"
+                              value={getDefaultMarkupDraft(client.id, link)}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                setDefaultMarkupDrafts((current) => ({
+                                  ...current,
+                                  [client.id]: value,
+                                }));
+                                updateLink(client.id, {
+                                  defaultMarkupPercent: normalizePercentInput(value),
+                                  defaultPricingMode: "purchase_markup",
+                                });
+                              }}
+                            />
+                            <small>
+                              Пример: 65,47 ₽ + 5% → 68,74 ₽. Затем «Сохранить матрицу».
+                            </small>
+                          </label>
+                        )}
+                      </div>
+
+                      <label className="field matrix-manager-note">
+                        Заметка по матрице
+                        <textarea
+                          rows="2"
+                          value={link.managerNote}
+                          placeholder="Кратко: особенности матрицы или связи с 1С"
                           onChange={(event) =>
-                            setDefaultMarkupDrafts((current) => ({
-                              ...current,
-                              [client.id]: event.target.value,
-                            }))
-                          }
-                          onBlur={() =>
                             updateLink(client.id, {
-                              defaultMarkupPercent: normalizePercentInput(
-                                getDefaultMarkupDraft(client.id, link)
-                              ),
+                              managerNote: event.target.value,
                             })
                           }
                         />
-                        <small>
-                          Применяется ко всем товарам без индивидуального исключения.
-                        </small>
+                        <small>Только для менеджеров</small>
                       </label>
-                    )}
-                  </div>
 
-                  <label
-                    className="field"
-                    style={{ marginTop: 12 }}
-                  >
-                    Заметка по матрице и связи с 1С
-                    <textarea
-                      rows="3"
-                      value={link.managerNote}
-                      onChange={(event) =>
-                        updateLink(client.id, {
-                          managerNote: event.target.value,
-                        })
-                      }
-                    />
-                    <small>Видна только менеджерам и относится к настройкам матрицы/1С.</small>
-                  </label>
-
-                  {link.matrixMode === "pending" && (
-                    <div className="matrix-catalog-note pending" style={{ marginTop: 14 }}>
-                      Сначала выберите режим товарной матрицы. Настройки цен сохранятся вместе с матрицей.
+                      <div className="comment-box" style={{ marginTop: 14 }}>
+                        <strong>Адреса клиента</strong>
+                        <p>
+                          {(() => {
+                            const addresses = Array.isArray(client.addresses)
+                              ? client.addresses
+                              : [];
+                            const text = addresses
+                              .map((item) =>
+                                typeof item === "string" ? item : item?.address
+                              )
+                              .filter(Boolean)
+                              .join("; ");
+                            return text || "Нет адресов";
+                          })()}
+                        </p>
+                      </div>
                     </div>
                   )}
 
-                  {link.matrixMode !== "pending" && (
-                    <div style={{ marginTop: 14 }}>
+                  {link.matrixMode === "pending" ? (
+                    <div className="matrix-catalog-note pending" style={{ marginTop: 14 }}>
+                      Выберите режим матрицы в «Настройки клиента», затем сохраните матрицу.
+                    </div>
+                  ) : (
+                    <div className="client-matrix-products" style={{ marginTop: 14 }}>
                       <MatrixOneCProductAdd
                         clientId={client.id}
                         link={link}
                         setProducts={setProducts}
                         setClientLinks={setClientLinks}
                       />
-                      <div className="toolbar two">
+                      <div className="client-matrix-search-bar">
                         <input
                           type="search"
+                          className="client-matrix-search-input"
                           placeholder="Поиск товара в матрице"
                           value={matrixSearch}
                           onChange={(event) =>
                             setMatrixSearch(event.target.value)
                           }
                         />
-                        {link.matrixMode === "selected" ? (
-                          <button
-                            className="secondary-button"
-                            type="button"
-                            onClick={() =>
-                              updateLink(client.id, {
-                                matrixMode: "selected",
-                                matrixProductIds: orderedIds,
-                              })
-                            }
-                          >
-                            Заполнить по истории заказов
-                          </button>
+                        {link.oneCPriceTypeName || link.oneCPriceTypeId ? (
+                          <span className="client-matrix-price-chip">
+                            {link.oneCPriceTypeName || "Вид цен 1С"}
+                            {link.defaultPricingMode === "purchase_markup"
+                              ? ` · +${normalizePercentInput(getDefaultMarkupDraft(client.id, link))}%`
+                              : ""}
+                          </span>
                         ) : (
-                          <div className="matrix-catalog-note">
-                            Все активные товары используют общую схему цены, кроме индивидуальных исключений.
-                          </div>
+                          <span className="client-matrix-price-chip muted">
+                            Категория цен не задана
+                          </span>
+                        )}
+                        {matrixPricesStatus[client.id]?.status === "loading" && (
+                          <span className="client-matrix-price-chip muted">
+                            Загрузка цен…
+                          </span>
+                        )}
+                        {matrixPricesStatus[client.id]?.status === "error" && (
+                          <button
+                            type="button"
+                            className="client-matrix-price-chip danger-text"
+                            style={{ cursor: "pointer", border: "1px solid #e8c4c4", background: "#fff5f5" }}
+                            onClick={() => {
+                              // Триггерим refetch сменой ключа через touch openClientId.
+                              setMatrixPricePreview((current) => {
+                                const next = { ...current };
+                                delete next[client.id];
+                                return next;
+                              });
+                              setOpenClientId("");
+                              window.requestAnimationFrame(() => {
+                                setOpenClientId(String(client.id));
+                              });
+                            }}
+                          >
+                            {matrixPricesStatus[client.id]?.message || "Ошибка цен"} · повторить
+                          </button>
                         )}
                       </div>
 
@@ -1877,9 +1966,7 @@ export function ManagerClients({
                       <div className="matrix-editor-list">
                         {matrixProducts.map((product) => {
                           const price =
-                            link.personalPrices?.[
-                              String(product.id)
-                            ] || {};
+                            link.personalPrices?.[String(product.id)] || {};
                           const selected =
                             link.matrixMode === "all" ||
                             matrixProductIds.some(
@@ -1906,22 +1993,31 @@ export function ManagerClients({
                               : normalizePercentInput(
                                   getDefaultMarkupDraft(client.id, link)
                                 );
+                          const saleUnits = Array.isArray(product.saleUnits)
+                            ? product.saleUnits
+                            : ["piece"];
+                          const allowedUnits = UNIT_ORDER.filter((unit) =>
+                            saleUnits.includes(unit)
+                          );
+                          const preview =
+                            matrixPricePreview[client.id]?.[String(product.id)] ||
+                            null;
 
                           return (
                             <div
                               className="matrix-editor-row"
                               key={product.id}
                             >
-                              <label className="matrix-editor-product">
-                                <input
-                                  type="checkbox"
-                                  checked={selected}
-                                  disabled={link.matrixMode === "all"}
-                                  onChange={(event) =>
-                                    updateLink(client.id, {
-                                      matrixMode: "selected",
-                                      matrixProductIds:
-                                        event.target.checked
+                              <div className="matrix-editor-product">
+                                <label className="matrix-editor-product-check">
+                                  <input
+                                    type="checkbox"
+                                    checked={selected}
+                                    disabled={link.matrixMode === "all"}
+                                    onChange={(event) =>
+                                      updateLink(client.id, {
+                                        matrixMode: "selected",
+                                        matrixProductIds: event.target.checked
                                           ? [
                                               ...new Set([
                                                 ...matrixProductIds,
@@ -1929,37 +2025,60 @@ export function ManagerClients({
                                               ]),
                                             ]
                                           : matrixProductIds.filter(
-                                              (id) => String(id) !== String(product.id)
+                                              (id) =>
+                                                String(id) !== String(product.id)
                                             ),
-                                    })
-                                  }
-                                />
-                                <span>
-                                  <strong>{product.name}</strong>
-                                  <small
-                                    style={{
-                                      display: "block",
-                                      marginTop: 3,
-                                    }}
-                                  >
-                                    {product.code} · {product.category}
-                                  </small>
-                                </span>
-                              </label>
+                                      })
+                                    }
+                                  />
+                                  <span>
+                                    <strong>{product.name}</strong>
+                                    <small
+                                      style={{
+                                        display: "block",
+                                        marginTop: 3,
+                                      }}
+                                    >
+                                      {product.code} · {product.category}
+                                    </small>
+                                  </span>
+                                </label>
+                                <button
+                                  className="secondary-button matrix-edit-product-btn"
+                                  type="button"
+                                  onClick={() => setEditorProduct(product)}
+                                >
+                                  Изменить товар
+                                </button>
+                              </div>
 
-                              {UNIT_ORDER.map(
-                                (unit) => {
+                              <div className="matrix-editor-units">
+                                {allowedUnits.map((unit) => {
                                   const priceField = unitPriceField(unit);
-                                  const unitAllowed = Array.isArray(product.saleUnits)
-                                    ? product.saleUnits.includes(unit)
-                                    : false;
                                   const purchasePrice =
                                     product.purchasePrices?.[unit];
+                                  const typedFromProduct = typedSalePriceForUnit(
+                                    product,
+                                    link.oneCPriceTypeId,
+                                    unit
+                                  );
+                                  const typedPrice =
+                                    preview?.typed?.[unit] ?? typedFromProduct;
+                                  const clientUnitPrice = preview
+                                    ? Number(preview[priceField])
+                                    : null;
+                                  const costPrice = hasPurchasePrice(purchasePrice)
+                                    ? Number(purchasePrice)
+                                    : typedPrice;
                                   const calculatedPrice =
-                                    calculateMarkupPreview(
-                                      purchasePrice,
-                                      markupPercent
-                                    );
+                                    clientUnitPrice != null &&
+                                    Number.isFinite(clientUnitPrice) &&
+                                    clientUnitPrice > 0
+                                      ? clientUnitPrice
+                                      : calculateMarkupPreview(
+                                          costPrice,
+                                          markupPercent
+                                        );
 
                                   if (effectiveMode === "purchase_markup") {
                                     return (
@@ -1968,20 +2087,24 @@ export function ManagerClients({
                                         key={unit}
                                       >
                                         <span>{UNIT_CONFIG[unit].label}</span>
-                                        {!unitAllowed ? (
-                                          <strong>Не продаётся</strong>
-                                        ) : hasPurchasePrice(purchasePrice) ? (
+                                        {costPrice != null &&
+                                        Number.isFinite(Number(costPrice)) ? (
                                           <>
                                             <small>
-                                              Закупка: {formatMoney(purchasePrice)}
+                                              {hasPurchasePrice(purchasePrice)
+                                                ? "Закупка"
+                                                : link.oneCPriceTypeName ||
+                                                  "Категория 1С"}
+                                              : {formatMoney(costPrice)}
                                             </small>
                                             <strong>
-                                              Клиенту: {formatMoney(calculatedPrice)}
+                                              Клиенту:{" "}
+                                              {formatMoney(calculatedPrice)}
                                             </strong>
                                           </>
                                         ) : (
                                           <strong className="danger-text">
-                                            Нет цены из 1С
+                                            Нет цены категории
                                           </strong>
                                         )}
                                       </div>
@@ -1999,13 +2122,12 @@ export function ManagerClients({
                                           type="number"
                                           min="0"
                                           step="0.01"
-                                          disabled={!unitAllowed}
                                           placeholder={
-                                            unitAllowed
-                                              ? `Цена: ${
+                                            typedPrice != null
+                                              ? `Категория: ${typedPrice}`
+                                              : `Цена: ${
                                                   Number(product[priceField]) || 0
                                                 }`
-                                              : "Не продаётся"
                                           }
                                           value={price[unit] ?? ""}
                                           onChange={(event) =>
@@ -2025,26 +2147,40 @@ export function ManagerClients({
                                     );
                                   }
 
+                                  const displayPrice =
+                                    clientUnitPrice != null &&
+                                    Number.isFinite(clientUnitPrice) &&
+                                    clientUnitPrice > 0
+                                      ? clientUnitPrice
+                                      : typedPrice != null
+                                        ? typedPrice
+                                        : Number(product[priceField]) || 0;
+                                  const hasDisplay =
+                                    displayPrice != null &&
+                                    Number.isFinite(Number(displayPrice)) &&
+                                    Number(displayPrice) > 0;
+
                                   return (
                                     <div
                                       className="matrix-price-field matrix-price-calculated"
                                       key={unit}
                                     >
                                       <span>{UNIT_CONFIG[unit].label}</span>
-                                      {!unitAllowed ? (
-                                        <strong>Не продаётся</strong>
-                                      ) : (
-                                        <>
-                                          <small>Базовая цена Clover</small>
-                                          <strong>
-                                            {formatMoney(product[priceField])}
-                                          </strong>
-                                        </>
-                                      )}
+                                      <small>
+                                        {link.oneCPriceTypeId
+                                          ? link.oneCPriceTypeName ||
+                                            "Категория цен 1С"
+                                          : "Базовая цена Clover"}
+                                      </small>
+                                      <strong>
+                                        {hasDisplay
+                                          ? formatMoney(displayPrice)
+                                          : "Нет цены"}
+                                      </strong>
                                     </div>
                                   );
-                                }
-                              )}
+                                })}
+                              </div>
 
                               <div className="matrix-price-mode">
                                 <label className="matrix-price-field">
@@ -2063,9 +2199,7 @@ export function ManagerClients({
                                       )
                                     }
                                   >
-                                    <option value="inherit">
-                                      По матрице
-                                    </option>
+                                    <option value="inherit">По матрице</option>
                                     <option value="manual">
                                       Фиксированная цена вручную
                                     </option>
@@ -2092,7 +2226,8 @@ export function ManagerClients({
                                           ...current,
                                           [client.id]: {
                                             ...(current[client.id] || {}),
-                                            [String(product.id)]: event.target.value,
+                                            [String(product.id)]:
+                                              event.target.value,
                                           },
                                         }))
                                       }
@@ -2102,13 +2237,14 @@ export function ManagerClients({
                                           link,
                                           product.id,
                                           {
-                                            markupPercent: normalizePercentInput(
-                                              getIndividualMarkupDraft(
-                                                client.id,
-                                                product.id,
-                                                price
-                                              )
-                                            ),
+                                            markupPercent:
+                                              normalizePercentInput(
+                                                getIndividualMarkupDraft(
+                                                  client.id,
+                                                  product.id,
+                                                  price
+                                                )
+                                              ),
                                           }
                                         )
                                       }
@@ -2123,7 +2259,17 @@ export function ManagerClients({
                                   )}
                                 {effectiveMode === "purchase_markup" && (
                                   <small className="price-update-time">
-                                    Цена 1С обновлена: {formatDateTime(product.purchasePriceUpdatedAt)}
+                                    Цена 1С обновлена:{" "}
+                                    {formatDateTime(
+                                      product.salePriceReceivedAt ||
+                                        product.purchasePriceUpdatedAt
+                                    )}
+                                  </small>
+                                )}
+                                {effectiveMode === "one_c_price_type" && (
+                                  <small className="price-update-time">
+                                    Категория обновлена:{" "}
+                                    {formatDateTime(product.salePriceReceivedAt)}
                                   </small>
                                 )}
                               </div>
@@ -2134,23 +2280,7 @@ export function ManagerClients({
                     </div>
                   )}
 
-                  <div className="matrix-save-bar" style={{ marginTop: 14 }}>
-                    <div>
-                      <strong>Сохранение товарной матрицы</strong>
-                      <small>
-                        После изменения режима, цен или состава нажмите кнопку справа.
-                        Добавление из каталога 1С и выбор контрагента пишутся сразу.
-                      </small>
-                      {matrixSaveState[client.id]?.message && (
-                        <span
-                          className={`matrix-save-message ${
-                            matrixSaveState[client.id]?.status || ""
-                          }`}
-                        >
-                          {matrixSaveState[client.id].message}
-                        </span>
-                      )}
-                    </div>
+                  <div className="client-matrix-save-fab">
                     <button
                       className="primary-button"
                       type="button"
@@ -2162,27 +2292,9 @@ export function ManagerClients({
                         : "Сохранить матрицу"}
                     </button>
                   </div>
-
-                  <div
-                    className="comment-box"
-                    style={{ marginTop: 14 }}
-                  >
-                    <strong>Адреса клиента</strong>
-                    <p>
-                      {(() => {
-                        const addresses = Array.isArray(client.addresses)
-                          ? client.addresses
-                          : [];
-                        const text = addresses
-                          .map((item) =>
-                            typeof item === "string" ? item : item?.address
-                          )
-                          .filter(Boolean)
-                          .join("; ");
-                        return text || "Нет адресов";
-                      })()}
-                    </p>
-                  </div>
+                      </>
+                    );
+                  })()}
                   </PanelErrorBoundary>
                   )}
                 </details>
@@ -2192,6 +2304,23 @@ export function ManagerClients({
         </div>
       ) : (
         <div className="empty-box">Клиенты не найдены.</div>
+      )}
+      {editorProduct !== undefined && (
+        <ProductEditor
+          product={editorProduct}
+          products={products}
+          onClose={() => setEditorProduct(undefined)}
+          onSave={saveCatalogProduct}
+          onProductLiveUpdate={(updated) => {
+            if (!updated?.id) return;
+            setProducts((current) =>
+              current.map((item) =>
+                String(item.id) === String(updated.id) ? updated : item
+              )
+            );
+            setEditorProduct(updated);
+          }}
+        />
       )}
     </section>
     </PanelErrorBoundary>

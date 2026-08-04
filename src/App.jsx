@@ -36,6 +36,7 @@ import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
 import { appAlert, appConfirm } from "./shared/AppModal";
 import { canTrashOrder } from "./shared/orderTrash";
 import { SoftBanner, ListSkeleton } from "./shared/uxFeedback";
+import { ManagerContact } from "./screens/client/ManagerContact";
 
 function LoginView({ onAuth, authBusy, authError }) {
   const params = new URLSearchParams(window.location.search);
@@ -55,6 +56,49 @@ function LoginView({ onAuth, authBusy, authError }) {
   const [developmentLink, setDevelopmentLink] = useState("");
   const [verificationBusy, setVerificationBusy] = useState(Boolean(verifyToken));
   const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [managerContact, setManagerContact] = useState({
+    managerFullName: "",
+    managerPhone: "",
+    managerMax: "",
+    managerTelegram: "",
+  });
+
+  const passwordToggleIcon = showPassword ? (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M12 5c-5 0-9.3 3.1-11 7 1.7 3.9 6 7 11 7s9.3-3.1 11-7c-1.7-3.9-6-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"
+      />
+      <path fill="currentColor" d="M3.3 3.3 20.7 20.7l-1.4 1.4L1.9 4.7z" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M12 5c-5 0-9.3 3.1-11 7 1.7 3.9 6 7 11 7s9.3-3.1 11-7c-1.7-3.9-6-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"
+      />
+    </svg>
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getPublicManagerContact()
+      .then((data) => {
+        if (cancelled || !data || typeof data !== "object") return;
+        setManagerContact({
+          managerFullName: String(data.managerFullName || ""),
+          managerPhone: String(data.managerPhone || ""),
+          managerMax: String(data.managerMax || ""),
+          managerTelegram: String(data.managerTelegram || ""),
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!verifyToken) return;
@@ -219,14 +263,56 @@ function LoginView({ onAuth, authBusy, authError }) {
           {!["forgot"].includes(mode) && (
             <>
               <label htmlFor="password">{mode === "reset" ? "Новый пароль" : "Пароль"}</label>
-              <input id="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? 1 : 8} value={form.password} onChange={(event) => updateField("password", event.target.value)} required disabled={authBusy} />
+              <div className="password-field">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  minLength={mode === "login" ? 1 : 8}
+                  value={form.password}
+                  onChange={(event) => updateField("password", event.target.value)}
+                  required
+                  disabled={authBusy}
+                />
+                <button
+                  className="password-toggle"
+                  type="button"
+                  disabled={authBusy}
+                  aria-pressed={showPassword}
+                  aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+                  onClick={() => setShowPassword((value) => !value)}
+                >
+                  {passwordToggleIcon}
+                </button>
+              </div>
             </>
           )}
 
           {mode === "reset" && (
             <>
               <label htmlFor="confirmPassword">Повторите новый пароль</label>
-              <input id="confirmPassword" type="password" autoComplete="new-password" minLength="8" value={form.confirmPassword} onChange={(event) => updateField("confirmPassword", event.target.value)} required disabled={authBusy} />
+              <div className="password-field">
+                <input
+                  id="confirmPassword"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  minLength="8"
+                  value={form.confirmPassword}
+                  onChange={(event) => updateField("confirmPassword", event.target.value)}
+                  required
+                  disabled={authBusy}
+                />
+                <button
+                  className="password-toggle"
+                  type="button"
+                  disabled={authBusy}
+                  aria-pressed={showPassword}
+                  aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+                  onClick={() => setShowPassword((value) => !value)}
+                >
+                  {passwordToggleIcon}
+                </button>
+              </div>
             </>
           )}
 
@@ -251,11 +337,12 @@ function LoginView({ onAuth, authBusy, authError }) {
 
         <div className="registration auth-links">
           {mode === "login" && (
-            <>
-              <button type="button" onClick={() => switchMode("register")}>Зарегистрироваться</button>
-              <button type="button" onClick={() => switchMode("forgot")}>Забыли пароль?</button>
-              <button type="button" disabled={!form.email} onClick={resend}>Повторить письмо</button>
-            </>
+            <div className="login-manager-cta">
+              <p className="login-manager-cta-text">
+                Доступ в личный кабинет Вы можете получить у менеджера
+              </p>
+              <ManagerContact settings={managerContact} />
+            </div>
           )}
           {mode !== "login" && mode !== "reset" && (
             <button type="button" onClick={() => switchMode("login")}>Вернуться ко входу</button>
@@ -291,6 +378,12 @@ function ordersLiveSignature(orders) {
 
 /** Сигнатура цен каталога — чтобы онлайн-bootstrap обновлял витрину как статусы. */
 function productPriceLiveSignature(product) {
+  const typedKeys = product?.salePricesByType && typeof product.salePricesByType === "object"
+    ? Object.keys(product.salePricesByType).sort().join(",")
+    : "";
+  const typedSample = typedKeys
+    ? String(product.salePricesByType?.[typedKeys.split(",")[0]]?.piece ?? "")
+    : "";
   return [
     String(product?.id || ""),
     String(product?.pricePiece ?? ""),
@@ -300,7 +393,11 @@ function productPriceLiveSignature(product) {
     String(product?.pricePair ?? ""),
     String(product?.priceRoll ?? ""),
     String(product?.clientPriceMode || ""),
+    String(product?.markupPercent ?? ""),
     String(product?.oneCPriceTypeId || ""),
+    String(product?.salePriceReceivedAt || ""),
+    typedKeys,
+    typedSample,
     String(product?.active !== false),
   ].join(":");
 }
@@ -421,6 +518,7 @@ function App() {
   const pendingDeletedOrderIdsRef = useRef(new Set());
   // Несохранённые правки матрицы у менеджера — live-bootstrap их не затирает.
   const dirtyClientLinkIdsRef = useRef(new Set());
+  const catalogPricesVersionRef = useRef("");
 
   const applyManagerNotificationList = (items) => {
     const incomingNotifications = Array.isArray(items) ? items : [];
@@ -456,6 +554,9 @@ function App() {
       matrixProductIds: [],
       ...(data.catalogPolicy || {}),
     });
+    if (data.catalogPricesVersion != null) {
+      catalogPricesVersionRef.current = String(data.catalogPricesVersion || "");
+    }
     if (!data.catalogPolicy?.allowFullCatalog) {
       setShowFullCatalog(false);
     }
@@ -620,17 +721,30 @@ function App() {
         }
 
         // Онлайн-цены каталога (вид цен 1С / матрица) — тот же тихий bootstrap, что и статусы.
+        const nextPricesVersion = String(data.catalogPricesVersion || "");
+        const pricesVersionChanged =
+          nextPricesVersion !== "" &&
+          nextPricesVersion !== catalogPricesVersionRef.current;
+        if (pricesVersionChanged) {
+          catalogPricesVersionRef.current = nextPricesVersion;
+        }
         if (Array.isArray(data.products)) {
           setProducts((prev) => {
             const next = data.products.map(normalizeProduct);
+            // При новой версии цен всегда подменяем каталог (даже если сигнатура совпала по ошибке).
+            if (pricesVersionChanged) return next;
             return productsPriceLiveSignature(prev) === productsPriceLiveSignature(next)
               ? prev
               : next;
           });
+        } else if (pricesVersionChanged && data.user?.role === "client") {
+          // Пустой список тоже фиксируем — иначе остаются старые нулевые цены.
+          setProducts([]);
         }
         if (Array.isArray(data.fullCatalogProducts)) {
           setFullCatalogProducts((prev) => {
             const next = data.fullCatalogProducts.map(normalizeProduct);
+            if (pricesVersionChanged) return next;
             return productsPriceLiveSignature(prev) === productsPriceLiveSignature(next)
               ? prev
               : next;
@@ -1151,6 +1265,7 @@ function App() {
           customerEmail: profile.email,
           managerComment: "",
           internalNote: "",
+          clientComment: String(payload.clientComment || "").trim(),
           history: [
             {
               ...makeOrderHistoryEvent(
@@ -1162,6 +1277,7 @@ function App() {
             },
           ],
           ...payload,
+          clientComment: String(payload.clientComment || "").trim(),
         },
         ...orders,
       ];
