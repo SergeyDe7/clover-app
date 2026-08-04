@@ -1520,27 +1520,44 @@ body:has(.clover-app) {
     flex-wrap: nowrap !important;
   }
 
-  /* Логотип + действия сверху; вкладки — второй ряд на всю ширину */
+  /* Логотип + действия (вкл. «Выйти») сверху; вкладки — второй ряд */
   .clover-app .app-header.app-header-with-nav {
-    flex-wrap: wrap !important;
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    grid-template-areas:
+      "logo actions"
+      "nav nav" !important;
+    align-items: center !important;
+    column-gap: 8px !important;
     row-gap: 6px !important;
+    flex-wrap: unset !important;
   }
 
   .clover-app .app-header-with-nav .app-header-logo-button {
-    order: 1 !important;
+    grid-area: logo !important;
+    order: unset !important;
   }
 
   .clover-app .app-header-with-nav .app-header-actions {
-    order: 2 !important;
+    grid-area: actions !important;
+    order: unset !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: auto !important;
+    justify-content: flex-end !important;
   }
 
   .clover-app .app-header-with-nav .header-logout {
-    order: 3 !important;
+    order: unset !important;
+    flex: 0 0 auto !important;
+    margin-left: 0 !important;
+    white-space: nowrap !important;
   }
 
   .clover-app .app-header-with-nav .app-header-nav {
-    order: 4 !important;
-    flex: 1 1 100% !important;
+    grid-area: nav !important;
+    order: unset !important;
+    flex: unset !important;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
@@ -1584,7 +1601,6 @@ body:has(.clover-app) {
     min-width: 0 !important;
     flex-wrap: nowrap !important;
     gap: 4px !important;
-    order: 2 !important;
   }
 
   .clover-app .manager-search-input {
@@ -1670,8 +1686,8 @@ body:has(.clover-app) {
   }
 
   .clover-app .header-logout {
-    order: unset !important;
-    margin-left: 2px !important;
+    margin-left: 0 !important;
+    white-space: nowrap !important;
   }
 
   .clover-app .stats-grid.manager-stats-strip {
@@ -2580,6 +2596,460 @@ html.clover-thankyou-open .app-top-chrome {
 
 .bulk-photo-row strong {
   font-weight: var(--fw-semibold);
+}
+
+.clover-app .client-pricing-panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--clover-border-soft, #d5dfd2);
+  border-radius: 12px;
+  background: var(--clover-surface-soft, #f7faf5);
+  box-sizing: border-box;
+}
+
+.clover-app .client-matrix-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--clover-border-soft, #dce6d8);
+  border-radius: 12px;
+  background: var(--clover-surface-soft, #f3f8f1);
+  box-sizing: border-box;
+}
+
+.clover-app .client-matrix-toolbar-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.clover-app .client-matrix-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.clover-app .client-matrix-settings {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--clover-border-soft, #d5dfd2);
+  border-radius: 14px;
+  background: #fff;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.clover-app .client-matrix-settings > h4 {
+  margin: 0 0 4px;
+  color: var(--clover-text, #3f4f3f);
+  font-size: 15px;
+}
+
+.clover-app .client-matrix-search-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 10px 0 4px;
+}
+
+.clover-app .client-matrix-search-input {
+  flex: 1 1 220px;
+  max-width: 420px;
+  min-width: 0;
+  height: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
+  padding: 0 12px !important;
+  border: 1px solid var(--clover-border-soft, #d7e1d4) !important;
+  border-radius: 10px !important;
+  background: #fbfdfb !important;
+  box-sizing: border-box;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.clover-app .client-matrix-price-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--clover-border-soft, #d5dfd2);
+  border-radius: 999px;
+  background: #f3f8f1;
+  color: #4f684c;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.clover-app .client-matrix-save-fab {
+  position: sticky;
+  bottom: 14px;
+  z-index: 20;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+  pointer-events: none;
+}
+
+.clover-app .client-matrix-save-fab .primary-button {
+  pointer-events: auto;
+  min-height: 44px;
+  padding: 10px 18px;
+  box-shadow: 0 10px 28px rgba(38, 67, 31, 0.22);
+}
+
+.clover-app .matrix-editor-units {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.clover-app .matrix-editor-units .matrix-price-field {
+  flex: 1 1 112px;
+  max-width: 180px;
+  min-width: 104px;
+}
+
+.clover-app .manager-access-trigger {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.clover-app .manager-access-label-short {
+  display: none;
+}
+
+.clover-app .access-vault-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(28, 42, 28, 0.42);
+  box-sizing: border-box;
+}
+
+.clover-app .access-vault-panel {
+  width: min(860px, 100%);
+  max-height: min(88vh, 920px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--clover-border-soft, #d7e1d4);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(38, 67, 31, 0.22);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.clover-app .access-vault-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.clover-app .access-vault-head h2 {
+  margin: 0;
+  color: #314531;
+  font-size: 22px;
+}
+
+.clover-app .access-vault-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.clover-app .access-vault-search {
+  flex: 1 1 240px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #d7e1d4;
+  border-radius: 11px;
+  background: #fbfdfb;
+  box-sizing: border-box;
+}
+
+.clover-app .access-vault-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.clover-app .access-vault-stats span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f3f8f1;
+  border: 1px solid #d5dfd2;
+  color: #4f684c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.clover-app .access-vault-list {
+  display: grid;
+  gap: 12px;
+  overflow: auto;
+  padding-right: 2px;
+  min-height: 0;
+}
+
+.clover-app .access-vault-card {
+  padding: 14px;
+  border: 1px solid #e1e9de;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fbfdfb 0%, #f5f9f3 100%);
+}
+
+.clover-app .access-vault-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.clover-app .access-vault-identity {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.clover-app .access-vault-identity strong {
+  color: #314531;
+  font-size: 15px;
+}
+
+.clover-app .access-vault-identity span {
+  color: #6a776a;
+  font-size: 12px;
+}
+
+.clover-app .access-vault-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.clover-app .access-vault-field {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e5ebe3;
+}
+
+.clover-app .access-vault-field > span {
+  color: #7a847a;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.clover-app .access-vault-field code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #2f4a2f;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.clover-app .access-vault-field-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.clover-app .access-vault-field .secondary-button,
+.clover-app .access-vault-card-foot .secondary-button {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.clover-app .access-vault-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.clover-app .access-vault-card-foot small {
+  color: #8a9688;
+  font-size: 11px;
+}
+
+.clover-app .access-vault-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: #6a776a;
+  border: 1px dashed #d5dfd2;
+  border-radius: 14px;
+  background: #f8fbf6;
+}
+
+@media (max-width: 820px) {
+  .clover-app .manager-access-label-full {
+    display: none !important;
+  }
+
+  .clover-app .manager-access-label-short {
+    display: inline !important;
+  }
+
+  .clover-app .access-vault-overlay {
+    padding: 8px;
+    align-items: stretch;
+  }
+
+  .clover-app .access-vault-panel {
+    max-height: none;
+    height: 100%;
+    border-radius: 14px;
+    padding: 14px;
+  }
+
+  .clover-app .access-vault-field {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .clover-app .access-vault-field-actions,
+  .clover-app .access-vault-field .secondary-button {
+    width: 100%;
+  }
+}
+
+.clover-app .client-pricing-panel .field {
+  margin: 0;
+  min-width: 0;
+}
+
+.clover-app .client-card-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: start !important;
+  flex-direction: row !important;
+  gap: 12px 14px;
+}
+
+.clover-app .client-card-header-actions {
+  justify-self: end;
+  flex-shrink: 0;
+}
+
+.clover-app .client-card-menu-trigger {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 820px) {
+  .clover-app .client-card-header-actions > strong {
+    display: none;
+  }
+}
+
+.clover-app .client-pricing-panel .field small {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.clover-app .client-markup-field input {
+  max-width: 220px;
+}
+
+@media (min-width: 900px) {
+  .clover-app .client-pricing-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .clover-app .client-markup-field {
+    grid-column: 1 / -1;
+  }
+}
+
+.clover-app .matrix-excel-row {
+  display: grid;
+  grid-template-columns: auto minmax(140px, 1fr) minmax(180px, 1.4fr);
+  gap: 10px 12px;
+  align-items: start;
+}
+
+.clover-app .matrix-excel-check {
+  margin: 0;
+  padding-top: 4px;
+}
+
+.clover-app .matrix-excel-source,
+.clover-app .matrix-excel-match {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.clover-app .matrix-excel-match select,
+.clover-app .matrix-excel-search input {
+  width: 100%;
+}
+
+.clover-app .matrix-excel-search {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.clover-app .matrix-excel-search-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (max-width: 760px) {
+  .clover-app .matrix-excel-row {
+    grid-template-columns: auto 1fr;
+  }
+
+  .clover-app .matrix-excel-match {
+    grid-column: 1 / -1;
+  }
 }
 
 .bulk-photo-row.miss {

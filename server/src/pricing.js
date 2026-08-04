@@ -72,7 +72,8 @@ export function normalizeMarkupPercent(value) {
 export function roundPriceUp(value) {
   const numeric = finiteNonNegative(value);
   if (numeric === null) return null;
-  return Math.ceil(numeric - 1e-9);
+  // Фактическая цена с копейками (без округления вверх до рубля).
+  return Math.round((numeric + Number.EPSILON) * 100) / 100;
 }
 
 export function unitSize(product = {}, unit = "piece") {
@@ -196,10 +197,10 @@ export function resolveClientProductPricing(
     result.purchasePrices[unit] = purchase;
 
     if (source === "one_c_price_type") {
-      const typed = oneCItem ? salePriceForUnit(oneCItem, priceTypeId, unit) : null;
-      if (typed !== null) {
-        result.prices[unit] = typed;
-        result.priceSources[unit] = "one_c_price_type";
+      const typed = resolveTypedSalePrice(product, oneCItem, priceTypeId, unit);
+      if (typed) {
+        result.prices[unit] = typed.price;
+        result.priceSources[unit] = typed.source;
       } else {
         const fallback = Math.max(0, Number(product[baseField]) || 0);
         result.prices[unit] = fallback;
@@ -210,16 +211,34 @@ export function resolveClientProductPricing(
     }
 
     if (source === "purchase_markup") {
-      const calculated = calculateMarkupPrice(purchase, markupPercent);
+      // База для наценки: закупочная из регистра 1С, иначе цена выбранного вида цен
+      // (часто вид «Закупочная цена» в справочнике видов цен).
+      let cost = purchase;
+      let costKind = "purchase";
+      if (cost === null) {
+        const typedCost = resolveTypedSalePrice(product, oneCItem, priceTypeId, unit);
+        if (typedCost) {
+          cost = typedCost.price;
+          costKind = "one_c_price_type";
+        }
+      }
+
+      const calculated = calculateMarkupPrice(cost, markupPercent);
       if (calculated !== null) {
         result.prices[unit] = calculated;
-        result.priceSources[unit] = "purchase_markup";
-      } else {
-        // Нет закупочной из 1С — не обнуляем витрину: показываем базовую цену каталога.
-        const fallback = Math.max(0, Number(product[baseField]) || 0);
-        result.prices[unit] = fallback;
         result.priceSources[unit] =
-          fallback > 0 ? "base_fallback" : "purchase_missing";
+          costKind === "purchase"
+            ? "purchase_markup"
+            : "purchase_markup_from_price_type";
+      } else {
+        const fallback = Math.max(0, Number(product[baseField]) || 0);
+        if (fallback > 0) {
+          result.prices[unit] = fallback;
+          result.priceSources[unit] = "base_fallback";
+        } else {
+          result.prices[unit] = 0;
+          result.priceSources[unit] = "purchase_missing";
+        }
       }
       continue;
     }
@@ -231,11 +250,53 @@ export function resolveClientProductPricing(
     }
 
     const fallback = Math.max(0, Number(product[baseField]) || 0);
-    result.prices[unit] = fallback;
-    result.priceSources[unit] = fallback > 0 ? "base" : "unspecified";
+    if (fallback > 0) {
+      result.prices[unit] = fallback;
+      result.priceSources[unit] = "base";
+      continue;
+    }
+
+    // В карточке товара цену не задали — для клиента с категорией цен 1С
+    // берём цену за шт из вида цен (упаковка/пачка/коробка = шт × внутри).
+    const typed = resolveTypedSalePrice(product, oneCItem, priceTypeId, unit);
+    if (typed) {
+      result.prices[unit] = typed.price;
+      result.priceSources[unit] = typed.source;
+    } else {
+      result.prices[unit] = 0;
+      result.priceSources[unit] = "unspecified";
+    }
   }
 
   return result;
+}
+
+/**
+ * Цена продажи из вида цен 1С.
+ * Если цены именно за единицу нет — берём цену за шт и масштабируем размером единицы.
+ */
+export function resolveTypedSalePrice(
+  product = {},
+  oneCItem = null,
+  priceTypeId = "",
+  unit = "piece"
+) {
+  if (!oneCItem || !cleanTextPriceType(priceTypeId)) return null;
+
+  const direct = salePriceForUnit(oneCItem, priceTypeId, unit);
+  if (direct !== null) {
+    return { price: direct, source: "one_c_price_type" };
+  }
+
+  const piece = salePriceForUnit(oneCItem, priceTypeId, "piece");
+  if (piece === null) return null;
+
+  if (unit === "piece") {
+    return { price: piece, source: "one_c_price_type" };
+  }
+
+  const sized = piece * unitSize(product, unit);
+  return { price: sized, source: "one_c_price_type_from_piece" };
 }
 
 function cleanTextPriceType(value) {
@@ -261,6 +322,12 @@ export function enrichProductWithPurchasePrices(product = {}, oneCItem = null) {
     purchasePriceSourceDatabase: oneCItem?.purchasePriceSourceDatabase || "",
     purchasePriceUnit: normalizePurchaseUnit(oneCItem?.purchasePriceUnit),
     purchasePriceAvailable: UNITS.some((unit) => purchasePrices[unit] !== null),
+    salePricesByType:
+      oneCItem?.salePricesByType && typeof oneCItem.salePricesByType === "object"
+        ? oneCItem.salePricesByType
+        : {},
+    salePriceReceivedAt:
+      oneCItem?.salePriceReceivedAt || oneCItem?.salePriceUpdatedAt || "",
   };
 }
 

@@ -154,12 +154,12 @@ export function Header({ title, subtitle, onLogout, onLogoClick, nav, children }
           </div>
         )}
         {children}
+        {onLogout && (
+          <button className="header-button header-logout" type="button" onClick={onLogout}>
+            Выйти
+          </button>
+        )}
       </div>
-      {onLogout && (
-        <button className="header-button header-logout" type="button" onClick={onLogout}>
-          Выйти
-        </button>
-      )}
     </header>
   );
 }

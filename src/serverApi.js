@@ -294,6 +294,16 @@ export const api = {
     });
   },
 
+  getClientAccessVault() {
+    return request("/admin/client-access");
+  },
+
+  removeClientAccessVaultEntry(clientId) {
+    return request(`/admin/client-access/${encodeURIComponent(clientId)}`, {
+      method: "DELETE",
+    });
+  },
+
   setClientPassword(clientId, password) {
     return request(`/admin/clients/${encodeURIComponent(clientId)}/password`, {
       method: "POST",
@@ -400,6 +410,12 @@ export const api = {
     return request(`/admin/one-c/products?${params.toString()}`);
   },
 
+  getClientMatrixPrices(clientId) {
+    return request(
+      `/admin/clients/${encodeURIComponent(clientId)}/matrix-prices`
+    );
+  },
+
   getOneCProductCandidates(productId) {
     return request(`/admin/one-c/products/${encodeURIComponent(productId)}/candidates`);
   },
@@ -428,6 +444,13 @@ export const api = {
     return request("/admin/one-c/products/from-catalog", {
       method: "POST",
       body: { oneCId, item, clientId: clientId || undefined },
+    });
+  },
+
+  matchOneCImportRows(rows = []) {
+    return request("/admin/one-c/products/match-import", {
+      method: "POST",
+      body: { rows },
     });
   },
 

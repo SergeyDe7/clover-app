@@ -21,12 +21,14 @@ import { ManagerSettings } from "./ManagerSettings";
 import { ManagerBackup } from "./ManagerBackup";
 import { ManagerAudit } from "./ManagerAudit";
 import { managerNotificationTab, ManagerNotificationBell, parseManagerNotification, ManagerOrderSummaryLines } from "./ManagerNotifications";
+import { ManagerAccessVault } from "./ManagerAccessVault";
 
 function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, dirtyClientLinkIdsRef, oneCPriceTypes = [], managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onRestoreOrder, onPurgeOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onLogout }) {
   const [tab, setTab] = useState(readManagerActiveTab);
   const [moreTab, setMoreTab] = useState(readManagerMoreTab);
   const [headerSearch, setHeaderSearch] = useState("");
   const [bellOpen, setBellOpen] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
   const [ordersView, setOrdersView] = useState("active");
 
   const selectTab = (nextTab) => {
@@ -141,10 +143,27 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
             }}
             aria-label="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
           />
+          <button
+            className="secondary-button manager-access-trigger"
+            type="button"
+            aria-expanded={accessOpen}
+            onClick={() => {
+              setBellOpen(false);
+              setAccessOpen(true);
+            }}
+          >
+            <span className="manager-access-label-full">Доступы</span>
+            <span className="manager-access-label-short" aria-hidden="true">
+              Дост.
+            </span>
+          </button>
           <ManagerNotificationBell
             notifications={managerNotifications}
             open={bellOpen}
-            onToggle={() => setBellOpen((current) => !current)}
+            onToggle={() => {
+              setAccessOpen(false);
+              setBellOpen((current) => !current);
+            }}
             onOpen={openFromNotification}
             onRead={(item) => { onReadNotification(item); }}
             onReadAll={() => { onReadAllNotifications(); setBellOpen(false); }}
@@ -152,6 +171,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
         </div>
       </Header>
     </StickyCabinetChrome>
+    <ManagerAccessVault open={accessOpen} onClose={() => setAccessOpen(false)} />
     <section className="page-content">
       {managerNotice && (() => {
         const parsed = parseManagerNotification(managerNotice);

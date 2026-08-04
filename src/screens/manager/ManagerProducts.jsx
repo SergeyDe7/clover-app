@@ -418,6 +418,15 @@ function ProductEditor({ product, products = [], onClose, onSave }) {
                     }))
                   }
                 />
+                {Number(form[priceField]) <= 0 ? (
+                  <small className="hint">
+                    Пусто — для клиента с категорией цен 1С возьмётся цена за шт из вида цен
+                    {unit === "piece" || unit === "pair" || unit === "roll"
+                      ? ""
+                      : " × кол-во внутри"}
+                    .
+                  </small>
+                ) : null}
               </label>
             </div>;
           })}

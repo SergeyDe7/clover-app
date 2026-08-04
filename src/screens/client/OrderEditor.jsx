@@ -9,6 +9,7 @@ import {
   safeWrite,
   makeId,
   formatMoney,
+  roundPriceUp,
   getUnitMultiplier,
   getUnitPrice,
   toQuantityInputValue,
@@ -230,7 +231,14 @@ export function OrderEditor({
       };
     }), [products, cart, units]);
 
-  const total = selectedItems.reduce((sum, item) => sum + item.lineTotal, 0) + customItems.reduce((sum, item) => sum + (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0), 0);
+  const total = roundPriceUp(
+    selectedItems.reduce((sum, item) => sum + item.lineTotal, 0) +
+      customItems.reduce(
+        (sum, item) =>
+          sum + (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0),
+        0
+      )
+  );
   const cartCount = selectedItems.length + customItems.length;
   const selectedAddress = addresses.find((item) => item.id === addressId);
   const deliveryDateParts = getDeliveryDateParts(deliveryDate);

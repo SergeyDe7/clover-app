@@ -291,6 +291,12 @@ function ordersLiveSignature(orders) {
 
 /** Сигнатура цен каталога — чтобы онлайн-bootstrap обновлял витрину как статусы. */
 function productPriceLiveSignature(product) {
+  const typedKeys = product?.salePricesByType && typeof product.salePricesByType === "object"
+    ? Object.keys(product.salePricesByType).sort().join(",")
+    : "";
+  const typedSample = typedKeys
+    ? String(product.salePricesByType?.[typedKeys.split(",")[0]]?.piece ?? "")
+    : "";
   return [
     String(product?.id || ""),
     String(product?.pricePiece ?? ""),
@@ -300,7 +306,11 @@ function productPriceLiveSignature(product) {
     String(product?.pricePair ?? ""),
     String(product?.priceRoll ?? ""),
     String(product?.clientPriceMode || ""),
+    String(product?.markupPercent ?? ""),
     String(product?.oneCPriceTypeId || ""),
+    String(product?.salePriceReceivedAt || ""),
+    typedKeys,
+    typedSample,
     String(product?.active !== false),
   ].join(":");
 }
@@ -421,6 +431,7 @@ function App() {
   const pendingDeletedOrderIdsRef = useRef(new Set());
   // Несохранённые правки матрицы у менеджера — live-bootstrap их не затирает.
   const dirtyClientLinkIdsRef = useRef(new Set());
+  const catalogPricesVersionRef = useRef("");
 
   const applyManagerNotificationList = (items) => {
     const incomingNotifications = Array.isArray(items) ? items : [];
@@ -456,6 +467,9 @@ function App() {
       matrixProductIds: [],
       ...(data.catalogPolicy || {}),
     });
+    if (data.catalogPricesVersion != null) {
+      catalogPricesVersionRef.current = String(data.catalogPricesVersion || "");
+    }
     if (!data.catalogPolicy?.allowFullCatalog) {
       setShowFullCatalog(false);
     }
@@ -620,17 +634,30 @@ function App() {
         }
 
         // Онлайн-цены каталога (вид цен 1С / матрица) — тот же тихий bootstrap, что и статусы.
+        const nextPricesVersion = String(data.catalogPricesVersion || "");
+        const pricesVersionChanged =
+          nextPricesVersion !== "" &&
+          nextPricesVersion !== catalogPricesVersionRef.current;
+        if (pricesVersionChanged) {
+          catalogPricesVersionRef.current = nextPricesVersion;
+        }
         if (Array.isArray(data.products)) {
           setProducts((prev) => {
             const next = data.products.map(normalizeProduct);
+            // При новой версии цен всегда подменяем каталог (даже если сигнатура совпала по ошибке).
+            if (pricesVersionChanged) return next;
             return productsPriceLiveSignature(prev) === productsPriceLiveSignature(next)
               ? prev
               : next;
           });
+        } else if (pricesVersionChanged && data.user?.role === "client") {
+          // Пустой список тоже фиксируем — иначе остаются старые нулевые цены.
+          setProducts([]);
         }
         if (Array.isArray(data.fullCatalogProducts)) {
           setFullCatalogProducts((prev) => {
             const next = data.fullCatalogProducts.map(normalizeProduct);
+            if (pricesVersionChanged) return next;
             return productsPriceLiveSignature(prev) === productsPriceLiveSignature(next)
               ? prev
               : next;

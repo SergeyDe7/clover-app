@@ -30,15 +30,19 @@ function pushIndex(map, key, item) {
   map.set(key, bucket);
 }
 
-/** Поля вида цен для clientLink — 1С (договор) источник истины. */
+/** Поля вида цен для clientLink — 1С (договор) источник истины по виду, не по режиму наценки. */
 function priceTypeFieldsFromOneCClient(item = {}, current = {}) {
   const priceTypeId = cleanText(item.priceTypeId);
   // Пустой вид из 1С не затирает уже выбранный в Clover (пока расширение не догрузило поле).
   if (!priceTypeId) return {};
+  const keepMarkup =
+    String(current.defaultPricingMode || "").trim() === "purchase_markup" ||
+    Number(current.defaultMarkupPercent) > 0;
   return {
     oneCPriceTypeId: priceTypeId,
     oneCPriceTypeName: cleanText(item.priceTypeName) || cleanText(item.priceTypeCode),
-    defaultPricingMode: "one_c_price_type",
+    // Не сбрасываем «закупка/категория + %» при выгрузке контрагентов.
+    defaultPricingMode: keepMarkup ? "purchase_markup" : "one_c_price_type",
   };
 }
 

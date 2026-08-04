@@ -893,3 +893,119 @@ export function buildOneCProductsSummary(products, oneCProducts, meta = {}) {
     lastReport: meta.lastReport || null,
   };
 }
+
+/**
+ * Сопоставление строк импорта (Excel) с номенклатурой 1С.
+ * Приоритет: код → точное имя → нечёткое совпадение.
+ */
+export function matchOneCImportRows(
+  rows,
+  oneCProducts,
+  { maxCandidates = 8, minimumScore = 0.52 } = {}
+) {
+  const catalog = normalizeOneCProducts(oneCProducts);
+  const byCode = new Map();
+  const byExactName = new Map();
+
+  for (const item of catalog) {
+    const code = cleanText(item.code).toLocaleLowerCase("ru-RU");
+    if (code && !byCode.has(code)) byCode.set(code, item);
+    const nameKey = normalizeProductNameForMatch(item.name);
+    if (nameKey && !byExactName.has(nameKey)) byExactName.set(nameKey, item);
+  }
+
+  return (Array.isArray(rows) ? rows : []).map((row, index) => {
+    const name = cleanText(row?.name ?? row?.title ?? row?.product);
+    const rawCode = cleanText(row?.code ?? row?.article ?? row?.sku);
+    const codeKey = rawCode.toLocaleLowerCase("ru-RU");
+    const nameKey = normalizeProductNameForMatch(name);
+
+    if (!name && !rawCode) {
+      return {
+        rowIndex: index,
+        name: "",
+        code: "",
+        status: "empty",
+        score: 0,
+        match: null,
+        candidates: [],
+      };
+    }
+
+    const codeHit = codeKey ? byCode.get(codeKey) || null : null;
+    const exactHit = nameKey ? byExactName.get(nameKey) || null : null;
+
+    const scored = catalog
+      .map((item) => ({
+        item,
+        score: name ? productCandidateScore(name, item) : 0,
+      }))
+      .filter((entry) => entry.score >= minimumScore)
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          String(a.item.name || "").localeCompare(String(b.item.name || ""), "ru")
+      );
+
+    const candidateMap = new Map();
+    const pushCandidate = (item, score) => {
+      if (!item?.id) return;
+      const key = String(item.id);
+      const prev = candidateMap.get(key);
+      if (!prev || score > prev.score) {
+        candidateMap.set(key, {
+          id: item.id,
+          name: item.name,
+          code: item.code || "",
+          score,
+          cloverLink: item.cloverLink || null,
+        });
+      }
+    };
+
+    if (codeHit) pushCandidate(codeHit, 1);
+    if (exactHit) pushCandidate(exactHit, 1);
+    for (const entry of scored.slice(0, maxCandidates)) {
+      pushCandidate(entry.item, entry.score);
+    }
+
+    const candidates = [...candidateMap.values()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, maxCandidates);
+
+    let match = null;
+    let status = "miss";
+    let score = 0;
+
+    if (exactHit) {
+      match = exactHit;
+      status = "exact";
+      score = 1;
+    } else if (codeHit) {
+      match = codeHit;
+      status = "code";
+      score = 1;
+    } else if (candidates[0]) {
+      match = catalog.find((item) => String(item.id) === String(candidates[0].id)) || null;
+      score = candidates[0].score;
+      status = score >= 0.96 ? "exact" : "fuzzy";
+    }
+
+    return {
+      rowIndex: index,
+      name,
+      code: rawCode,
+      status,
+      score,
+      match: match
+        ? {
+            id: match.id,
+            name: match.name,
+            code: match.code || "",
+            cloverLink: match.cloverLink || null,
+          }
+        : null,
+      candidates,
+    };
+  });
+}

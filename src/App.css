@@ -731,16 +731,21 @@ button{cursor:pointer}
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .client-card-menu {
   position: relative;
   flex-shrink: 0;
+  align-self: flex-start;
 }
 
 .client-card-menu-trigger {
   width: 38px;
   height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 0;
   border: 1px solid #d7e1d4;
   border-radius: 12px;
   background: #fff;
@@ -750,6 +755,9 @@ button{cursor:pointer}
   line-height: 1;
   letter-spacing: 0;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .client-card-menu-trigger:hover,
