@@ -262,6 +262,27 @@ body:has(.clover-app) {
   background: #fbfdfb !important;
 }
 
+.clover-app .manager-client-comment {
+  margin-top: 10px !important;
+  max-width: min(320px, 100%) !important;
+}
+
+.clover-app .comment-box-compact {
+  padding: 8px 10px !important;
+  border-radius: 10px !important;
+}
+
+.clover-app .comment-box-compact strong {
+  margin-bottom: 3px !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+}
+
+.clover-app .comment-box-compact p {
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+}
+
 .clover-app input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not(.quantity-input):focus,
 .clover-app input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not(.quantity-input):focus-visible,
 .clover-app select:focus,
@@ -1441,11 +1462,14 @@ body:has(.clover-app) {
   display: inline-flex !important;
   flex-shrink: 0 !important;
   align-items: stretch !important;
-  height: 34px !important;
+  align-self: center !important;
+  height: 42px !important;
+  min-height: 42px !important;
   border: 1px solid var(--clover-border-soft, #d5dfd2) !important;
-  border-radius: 10px !important;
+  border-radius: 12px !important;
   overflow: hidden !important;
   background: #fff !important;
+  box-sizing: border-box !important;
 }
 
 .clover-app .catalog-view-toggle button {
@@ -1453,17 +1477,19 @@ body:has(.clover-app) {
   align-items: center !important;
   justify-content: center !important;
   gap: 5px !important;
-  min-height: 34px !important;
-  min-width: 34px !important;
-  padding: 0 10px !important;
+  height: 100% !important;
+  min-height: 42px !important;
+  min-width: 42px !important;
+  padding: 0 12px !important;
   border: 0 !important;
   border-right: 1px solid var(--clover-border-soft, #d5dfd2) !important;
   border-radius: 0 !important;
   background: transparent !important;
   color: #5d695d !important;
-  font-size: 11px !important;
+  font-size: 12px !important;
   font-weight: 700 !important;
   line-height: 1 !important;
+  box-sizing: border-box !important;
 }
 
 .clover-app .catalog-view-toggle button:last-child {
@@ -1476,12 +1502,30 @@ body:has(.clover-app) {
 }
 
 .clover-app .catalog-view-toggle .view-toggle-icon {
-  font-size: 13px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 15px !important;
   line-height: 1 !important;
 }
 
 .clover-app .catalog-view-toggle .view-toggle-label {
-  font-size: 11px !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+}
+
+.clover-app .catalog-filter-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  align-self: center !important;
+  gap: 8px !important;
+}
+
+.clover-app .catalog-filter-actions > .category-button {
+  min-height: 42px !important;
+  height: 42px !important;
+  padding: 0 14px !important;
+  align-self: center !important;
 }
 
 .clover-app .product-image-wrap {
@@ -1972,20 +2016,36 @@ body:has(.clover-app) {
 
   .clover-app .catalog-filter-actions {
     gap: 6px !important;
+    align-items: center !important;
+  }
+
+  .clover-app .catalog-filter-actions > .category-button {
+    min-height: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    padding: 0 12px !important;
   }
 
   .clover-app .catalog-view-toggle {
     grid-column: auto !important;
     width: auto !important;
-    height: 32px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    border-radius: 12px !important;
+    align-self: center !important;
   }
 
   .clover-app .catalog-view-toggle button {
     flex: 0 0 auto !important;
-    min-height: 32px !important;
-    min-width: 32px !important;
-    font-size: 11px !important;
-    padding: 0 8px !important;
+    height: 100% !important;
+    min-height: 42px !important;
+    min-width: 42px !important;
+    font-size: 13px !important;
+    padding: 0 !important;
+  }
+
+  .clover-app .catalog-view-toggle .view-toggle-icon {
+    font-size: 16px !important;
   }
 
   .clover-app .catalog-view-toggle .view-toggle-label {

@@ -292,6 +292,12 @@ export function build1CPayload({ order, products, clientLinks }) {
       exchangeStatus: exchange.status,
       clientComment: order?.clientComment || "",
       managerComment: order?.managerComment || "",
+      comment: (() => {
+        const number = String(order?.number || "").trim();
+        const header = number ? `Заказ Clover № ${number}` : "Заказ Clover";
+        const clientComment = String(order?.clientComment || "").trim();
+        return clientComment ? `${header}\nКомментарий: ${clientComment}` : header;
+      })(),
     },
     client: {
       cloverId: String(order?.clientId || ""),

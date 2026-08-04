@@ -438,6 +438,14 @@ export function ManagerOrders({
               <strong>{order.createdAt ? formatDate(String(order.createdAt).slice(0, 10)) : "—"}</strong>
             </div>
           </div>
+          {order.clientComment ? (
+            <div className="manager-client-comment" style={{ marginTop: 8 }}>
+              <div className="comment-box comment-box-compact">
+                <strong>Комментарий клиента:</strong>
+                <p>{order.clientComment}</p>
+              </div>
+            </div>
+          ) : null}
           <div className="manager-order-controls">
             <div className="exchange-actions">
               {inTrash ? (
@@ -554,28 +562,6 @@ export function ManagerOrders({
                   <p className="muted small">Позиции в заказе не сохранены.</p>
                 )}
               </div>
-              {(order.clientComment || order.managerComment || order.internalNote) && (
-                <div className="manager-textareas" style={{ marginTop: 12 }}>
-                  {order.clientComment ? (
-                    <div className="comment-box">
-                      <strong>Комментарий клиента:</strong>
-                      <p>{order.clientComment}</p>
-                    </div>
-                  ) : null}
-                  {order.managerComment ? (
-                    <div className="comment-box">
-                      <strong>Комментарий клиенту</strong>
-                      <p>{order.managerComment}</p>
-                    </div>
-                  ) : null}
-                  {order.internalNote ? (
-                    <div className="comment-box">
-                      <strong>Внутренняя заметка</strong>
-                      <p>{order.internalNote}</p>
-                    </div>
-                  ) : null}
-                </div>
-              )}
               <OrderTimeline order={order} />
             </details>
           ) : (
@@ -606,20 +592,6 @@ export function ManagerOrders({
                   </div>
                 </div>
               ))}
-            </div>
-            <div className="manager-textareas">
-              {order.clientComment ? (
-                <div className="comment-box">
-                  <strong>Комментарий клиента:</strong>
-                  <p>{order.clientComment}</p>
-                </div>
-              ) : null}
-              <label className="field">Комментарий клиенту
-                <textarea value={order.managerComment || ""} onChange={(e) => onUpdateOrder(order.id, { managerComment: e.target.value, updatedAt: new Date().toISOString() })} />
-              </label>
-              <label className="field">Внутренняя заметка менеджера
-                <textarea value={order.internalNote || ""} onChange={(e) => onUpdateOrder(order.id, { internalNote: e.target.value })} />
-              </label>
             </div>
             <OrderTimeline order={order} />
           </details>

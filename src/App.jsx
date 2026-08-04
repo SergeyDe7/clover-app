@@ -1265,6 +1265,7 @@ function App() {
           customerEmail: profile.email,
           managerComment: "",
           internalNote: "",
+          clientComment: String(payload.clientComment || "").trim(),
           history: [
             {
               ...makeOrderHistoryEvent(
@@ -1276,6 +1277,7 @@ function App() {
             },
           ],
           ...payload,
+          clientComment: String(payload.clientComment || "").trim(),
         },
         ...orders,
       ];

@@ -1595,6 +1595,23 @@ textarea { resize: vertical; }
 .comment-box { padding: 13px; border-radius: 12px; background: #f7faf5; }
 .comment-box strong { display: block; margin-bottom: 6px; color: #4c5a4c; font-size: 12px; }
 .comment-box p { margin: 0; color: #697469; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+.manager-client-comment {
+  margin-top: 10px;
+  max-width: 320px;
+}
+.comment-box-compact {
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+.comment-box-compact strong {
+  margin-bottom: 3px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+.comment-box-compact p {
+  font-size: 12px;
+  line-height: 1.35;
+}
 .custom-line { margin-top: 6px; padding: 13px; border: 1px solid #ead9b5; border-radius: 12px; background: #fffaf0; }
 
 .client-order-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
@@ -1640,29 +1657,34 @@ textarea { resize: vertical; }
   display: inline-flex;
   flex-shrink: 0;
   align-items: stretch;
+  align-self: center;
   gap: 0;
-  height: 34px;
+  height: 42px;
+  min-height: 42px;
   border: 1px solid #d5dfd2;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   background: #fff;
+  box-sizing: border-box;
 }
 .catalog-view-toggle button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  min-height: 34px;
-  min-width: 34px;
-  padding: 0 10px;
+  height: 100%;
+  min-height: 42px;
+  min-width: 42px;
+  padding: 0 12px;
   border: 0;
   border-right: 1px solid #d5dfd2;
   background: transparent;
   color: #5d695d;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
+  box-sizing: border-box;
 }
 .catalog-view-toggle button:last-child { border-right: 0; }
 .catalog-view-toggle button.active {
@@ -1670,11 +1692,14 @@ textarea { resize: vertical; }
   color: #fff;
 }
 .catalog-view-toggle .view-toggle-icon {
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
   line-height: 1;
   opacity: .9;
 }
-.catalog-view-toggle .view-toggle-label { font-size: 11px; }
+.catalog-view-toggle .view-toggle-label { font-size: 12px; line-height: 1; }
 .catalog-search { width: 100%; padding: 12px 14px; border: 1px solid #e6eee3; border-radius: 12px; background: #fbfdfb; outline: none; }
 .catalog-search:focus { border-color: rgba(91,157,87,.55); box-shadow: 0 0 0 2px rgba(91,157,87,.1); background: #fff; }
 .category-list { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -3607,21 +3632,33 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     gap: 6px;
     margin-bottom: 6px;
   }
-  .catalog-filter-actions { gap: 6px; }
+  .catalog-filter-actions { gap: 6px; align-items: center; }
   .catalog-view-toggle {
     grid-column: auto;
     width: auto;
-    height: 32px;
+    height: 42px;
+    min-height: 42px;
+    border-radius: 12px;
+    align-self: center;
   }
   .catalog-view-toggle button {
     flex: 0 0 auto;
-    min-height: 32px;
-    min-width: 32px;
-    font-size: 11px;
-    padding: 0 8px;
+    height: 100%;
+    min-height: 42px;
+    min-width: 42px;
+    font-size: 13px;
+    padding: 0;
   }
   .catalog-view-toggle .view-toggle-label {
     display: none;
+  }
+  .embedded-catalog .catalog-filter-row .category-button {
+    min-height: 42px;
+    height: 42px;
+    min-width: 42px;
+    padding: 0 12px;
+    font-size: 14px;
+    border-radius: 12px;
   }
   .product-card.product-card-list {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -3649,13 +3686,6 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     padding: 7px 10px;
     font-size: 14px;
     border-radius: 10px;
-  }
-  .embedded-catalog .catalog-filter-row .category-button {
-    min-height: 42px;
-    min-width: 0;
-    padding: 10px 12px;
-    font-size: 14px;
-    border-radius: 12px;
   }
   .fav-label-full { display: none; }
   .fav-label-short { display: inline; }

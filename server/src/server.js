@@ -640,18 +640,29 @@ function formatOrderRuDateTime(value) {
 
 function managerOrderNotificationCopy(order, customerName) {
   const orderNumber = String(order?.number || order?.id || "");
-  const total = orderMoneyTotal(order);
+  const clientComment = String(order?.clientComment || "").trim();
   const lines = [
-    `Сумма: ${total > 0 ? formatOrderMoney(total) : "уточняется"}`,
+    `Сумма: ${orderMoneyTotal(order) > 0 ? formatOrderMoney(orderMoneyTotal(order)) : "уточняется"}`,
     `Кол-во позиций: ${orderPositionCount(order)}`,
     `Дата доставки: ${formatOrderRuDate(order?.firstDeliveryDate)}`,
     `Дата заказа: ${formatOrderRuDateTime(order?.createdAt)}`,
     `№ ${orderNumber || "—"}`,
   ];
+  if (clientComment) {
+    lines.push(`Комментарий: ${clientComment}`);
+  }
   return {
     title: String(customerName || "Клиент").trim() || "Клиент",
     body: lines.join("\n"),
   };
+}
+
+/** Текст комментария для документа «Заказ покупателя» в 1С. */
+function buildOneCOrderComment(order) {
+  const number = String(order?.number || order?.displayId || "").trim();
+  const header = number ? `Заказ Clover № ${number}` : "Заказ Clover";
+  const clientComment = String(order?.clientComment || "").trim();
+  return clientComment ? `${header}\nКомментарий: ${clientComment}` : header;
 }
 
 function reconciliationPeriodText(request) {
@@ -2643,7 +2654,7 @@ async function handleOneCTestOrder(req, res, next) {
         },
         items,
         total: lockedOrderTotal,
-        comment: `Заказ Clover № ${realOrder.number || realOrder.displayId || ""}`.trim(),
+        comment: buildOneCOrderComment(realOrder),
       },
     });
   } catch (error) {
