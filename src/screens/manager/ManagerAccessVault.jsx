@@ -1,8 +1,19 @@
-// Журнал доступов клиентов: логины и пароли для выдачи менеджером.
+// Журнал доступов клиентов: логины и пароли для выдачи менеджером (раздел «Ещё» → «Доступы»).
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { formatDateTime } from "../../shared/appHelpers";
+
+function generateAccessPassword(length = 10) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const bytes = new Uint8Array(length);
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+}
 
 async function copyText(value) {
   const text = String(value || "");
@@ -31,13 +42,16 @@ async function copyText(value) {
   }
 }
 
-export function ManagerAccessVault({ open, onClose }) {
+export function ManagerAccessVault() {
   const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [revealed, setRevealed] = useState({});
   const [copiedKey, setCopiedKey] = useState("");
+  const [passwordClientId, setPasswordClientId] = useState("");
+  const [passwordDraft, setPasswordDraft] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -54,19 +68,19 @@ export function ManagerAccessVault({ open, onClose }) {
   };
 
   useEffect(() => {
-    if (!open) return undefined;
     load();
-    const onKey = (event) => {
-      if (event.key === "Escape") onClose?.();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, []);
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase("ru-RU");
-    if (!needle) return items;
-    return items.filter((item) =>
+    const list = [...items].sort((a, b) => {
+      if (a.hasPassword !== b.hasPassword) return a.hasPassword ? -1 : 1;
+      return String(a.companyName || "").localeCompare(String(b.companyName || ""), "ru", {
+        sensitivity: "base",
+      });
+    });
+    if (!needle) return list;
+    return list.filter((item) =>
       [item.companyName, item.contactName, item.login, item.email, item.phone]
         .filter(Boolean)
         .join(" ")
@@ -114,152 +128,239 @@ export function ManagerAccessVault({ open, onClose }) {
     }
   };
 
-  if (!open) return null;
+  const openPasswordEditor = (item) => {
+    setPasswordClientId(item.clientId);
+    setPasswordDraft(generateAccessPassword());
+  };
+
+  const cancelPasswordEditor = () => {
+    setPasswordClientId("");
+    setPasswordDraft("");
+  };
+
+  const savePassword = async (item) => {
+    const password = passwordDraft.trim();
+    if (password.length < 8) {
+      await appAlert({
+        title: "Короткий пароль",
+        message: "Пароль должен быть не короче 8 символов.",
+        tone: "warn",
+      });
+      return;
+    }
+    setPasswordBusy(true);
+    try {
+      const result = await api.setClientPassword(item.clientId, password);
+      await load();
+      setRevealed((current) => ({ ...current, [item.clientId]: true }));
+      cancelPasswordEditor();
+      await appAlert({
+        title: "Пароль сохранён",
+        message: `Логин: ${result.login || item.login || item.email}\nПароль: ${password}\n\nЗапись появилась в журнале доступов.`,
+        tone: "success",
+      });
+    } catch (saveError) {
+      await appAlert({
+        title: "Не удалось сохранить",
+        message: saveError.message || "Ошибка сохранения пароля.",
+        tone: "danger",
+      });
+    } finally {
+      setPasswordBusy(false);
+    }
+  };
 
   return (
-    <div className="access-vault-overlay" role="presentation" onClick={onClose}>
-      <section
-        className="access-vault-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="access-vault-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="access-vault-head">
-          <div>
-            <p className="eyebrow">Менеджер</p>
-            <h2 id="access-vault-title">Доступы клиентов</h2>
-            <p className="muted small" style={{ margin: "6px 0 0" }}>
-              Логины и пароли ЛК. Сохраняются при создании доступа и смене пароля.
-            </p>
-          </div>
-          <button className="secondary-button" type="button" onClick={onClose}>
-            Закрыть
-          </button>
-        </header>
-
-        <div className="access-vault-toolbar">
-          <input
-            type="search"
-            className="access-vault-search"
-            placeholder="Поиск по компании, логину, телефону"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            aria-label="Поиск доступов"
-          />
-          <div className="access-vault-stats">
-            <span>{savedCount} с паролем</span>
-            <span>{items.length} клиентов</span>
-          </div>
+    <section className="access-vault-page" aria-labelledby="access-vault-title">
+      <header className="access-vault-head">
+        <div>
+          <p className="eyebrow">Ещё</p>
+          <h2 id="access-vault-title">Доступы клиентов</h2>
+          <p className="muted small" style={{ margin: "6px 0 0" }}>
+            Логины и пароли ЛК. Пишутся в журнал при создании клиента и при смене пароля.
+            Старые пароли до появления журнала восстановить нельзя — задайте новый.
+          </p>
         </div>
+        <button className="secondary-button" type="button" onClick={load} disabled={loading}>
+          {loading ? "Обновляем…" : "Обновить"}
+        </button>
+      </header>
 
-        {error ? <div className="sync-error">{error}</div> : null}
-        {loading ? (
-          <div className="access-vault-empty">Загружаем доступы…</div>
-        ) : filtered.length ? (
-          <div className="access-vault-list">
-            {filtered.map((item) => {
-              const showPassword = Boolean(revealed[item.clientId]);
-              const loginKey = `${item.clientId}:login`;
-              const passKey = `${item.clientId}:password`;
-              return (
-                <article className="access-vault-card" key={item.clientId}>
-                  <div className="access-vault-card-top">
-                    <div className="access-vault-identity">
-                      <strong>{item.companyName}</strong>
-                      <span>
-                        {[item.contactName, item.phone].filter(Boolean).join(" · ") ||
-                          "Контакт не указан"}
-                      </span>
-                    </div>
-                    <span
-                      className={
-                        item.hasPassword ? "badge green" : "badge yellow"
-                      }
-                    >
-                      {item.hasPassword ? "Пароль сохранён" : "Нет пароля"}
+      <div className="access-vault-toolbar">
+        <input
+          type="search"
+          className="access-vault-search"
+          placeholder="Поиск по компании, логину, телефону"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          aria-label="Поиск доступов"
+        />
+        <div className="access-vault-stats">
+          <span>{savedCount} с паролем</span>
+          <span>{items.length} клиентов</span>
+        </div>
+      </div>
+
+      {error ? <div className="sync-error">{error}</div> : null}
+      {loading && !items.length ? (
+        <div className="access-vault-empty">Загружаем доступы…</div>
+      ) : filtered.length ? (
+        <div className="access-vault-list">
+          {filtered.map((item) => {
+            const showPassword = Boolean(revealed[item.clientId]);
+            const loginKey = `${item.clientId}:login`;
+            const passKey = `${item.clientId}:password`;
+            const editing = String(passwordClientId) === String(item.clientId);
+            return (
+              <article className="access-vault-card" key={item.clientId}>
+                <div className="access-vault-card-top">
+                  <div className="access-vault-identity">
+                    <strong>{item.companyName}</strong>
+                    <span>
+                      {[item.contactName, item.phone].filter(Boolean).join(" · ") ||
+                        "Контакт не указан"}
                     </span>
                   </div>
+                  <span className={item.hasPassword ? "badge green" : "badge yellow"}>
+                    {item.hasPassword ? "Пароль сохранён" : "Нет пароля"}
+                  </span>
+                </div>
 
-                  <div className="access-vault-fields">
-                    <div className="access-vault-field">
-                      <span>Логин</span>
-                      <code>{item.login || "—"}</code>
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        disabled={!item.login}
-                        onClick={() => handleCopy(loginKey, item.login)}
-                      >
-                        {copiedKey === loginKey ? "Скопировано" : "Копировать"}
-                      </button>
-                    </div>
-                    <div className="access-vault-field">
-                      <span>Пароль</span>
-                      <code>
-                        {item.hasPassword
-                          ? showPassword
-                            ? item.password
-                            : "••••••••••"
-                          : "не сохранён"}
-                      </code>
-                      <div className="access-vault-field-actions">
-                        {item.hasPassword ? (
-                          <>
-                            <button
-                              className="secondary-button"
-                              type="button"
-                              onClick={() =>
-                                setRevealed((current) => ({
-                                  ...current,
-                                  [item.clientId]: !current[item.clientId],
-                                }))
-                              }
-                            >
-                              {showPassword ? "Скрыть" : "Показать"}
-                            </button>
-                            <button
-                              className="secondary-button"
-                              type="button"
-                              onClick={() => handleCopy(passKey, item.password)}
-                            >
-                              {copiedKey === passKey ? "Скопировано" : "Копировать"}
-                            </button>
-                          </>
-                        ) : null}
-                      </div>
+                <div className="access-vault-fields">
+                  <div className="access-vault-field">
+                    <span>Логин</span>
+                    <code>{item.login || "—"}</code>
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      disabled={!item.login}
+                      onClick={() => handleCopy(loginKey, item.login)}
+                    >
+                      {copiedKey === loginKey ? "Скопировано" : "Копировать"}
+                    </button>
+                  </div>
+                  <div className="access-vault-field">
+                    <span>Пароль</span>
+                    <code>
+                      {item.hasPassword
+                        ? showPassword
+                          ? item.password
+                          : "••••••••••"
+                        : "не сохранён"}
+                    </code>
+                    <div className="access-vault-field-actions">
+                      {item.hasPassword ? (
+                        <>
+                          <button
+                            className="secondary-button"
+                            type="button"
+                            onClick={() =>
+                              setRevealed((current) => ({
+                                ...current,
+                                [item.clientId]: !current[item.clientId],
+                              }))
+                            }
+                          >
+                            {showPassword ? "Скрыть" : "Показать"}
+                          </button>
+                          <button
+                            className="secondary-button"
+                            type="button"
+                            onClick={() => handleCopy(passKey, item.password)}
+                          >
+                            {copiedKey === passKey ? "Скопировано" : "Копировать"}
+                          </button>
+                          <button
+                            className="secondary-button"
+                            type="button"
+                            onClick={() => openPasswordEditor(item)}
+                          >
+                            Сменить
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => openPasswordEditor(item)}
+                        >
+                          Задать пароль
+                        </button>
+                      )}
                     </div>
                   </div>
+                </div>
 
-                  <footer className="access-vault-card-foot">
-                    <small>
-                      {item.updatedAt
-                        ? `Обновлён ${formatDateTime(item.updatedAt)}`
-                        : "Пароль появится после выдачи в карточке клиента"}
-                      {item.updatedBy ? ` · ${item.updatedBy}` : ""}
-                    </small>
-                    {item.hasPassword ? (
+                {editing ? (
+                  <div className="access-vault-password-editor">
+                    <label className="field">
+                      Новый пароль
+                      <input
+                        type="text"
+                        autoComplete="off"
+                        minLength={8}
+                        value={passwordDraft}
+                        onChange={(event) => setPasswordDraft(event.target.value)}
+                        disabled={passwordBusy}
+                      />
+                    </label>
+                    <div className="access-vault-field-actions">
                       <button
                         className="secondary-button"
                         type="button"
-                        onClick={() => handleRemove(item)}
+                        disabled={passwordBusy}
+                        onClick={() => setPasswordDraft(generateAccessPassword())}
                       >
-                        Убрать из журнала
+                        Сгенерировать
                       </button>
-                    ) : null}
-                  </footer>
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="access-vault-empty">
-            {search
-              ? "Ничего не найдено по запросу."
-              : "Пока нет клиентов. Создайте доступ в разделе «Клиенты»."}
-          </div>
-        )}
-      </section>
-    </div>
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        disabled={passwordBusy}
+                        onClick={cancelPasswordEditor}
+                      >
+                        Отмена
+                      </button>
+                      <button
+                        className="primary-button"
+                        type="button"
+                        disabled={passwordBusy}
+                        onClick={() => savePassword(item)}
+                      >
+                        {passwordBusy ? "Сохраняем…" : "Сохранить пароль"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <footer className="access-vault-card-foot">
+                  <small>
+                    {item.updatedAt
+                      ? `Обновлён ${formatDateTime(item.updatedAt)}`
+                      : "Задайте пароль здесь или в карточке клиента"}
+                    {item.updatedBy ? ` · ${item.updatedBy}` : ""}
+                  </small>
+                  {item.hasPassword ? (
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      onClick={() => handleRemove(item)}
+                    >
+                      Убрать из журнала
+                    </button>
+                  ) : null}
+                </footer>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="access-vault-empty">
+          {search
+            ? "Ничего не найдено по запросу."
+            : "Пока нет клиентов. Создайте доступ в разделе «Клиенты»."}
+        </div>
+      )}
+    </section>
   );
 }

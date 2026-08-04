@@ -97,6 +97,7 @@ import { publicClientSettings } from "./clientSettings.js";
 import {
   listClientAccessEntries,
   removeClientAccessEntry,
+  saveClientAccessCredentials,
   upsertClientAccessEntry,
 } from "./clientAccessVault.js";
 import { searchOneCProductsIndexed } from "./oneCSearchIndex.js";
@@ -3286,6 +3287,17 @@ app.put(
         managerNote: parsed.managerNote,
       });
 
+      // Логин в журнале доступов держим в актуальном состоянии при смене email.
+      upsertClientAccessEntry(
+        clientUser.id,
+        {
+          login: client.email || parsed.profile.email,
+          companyName: client.companyName || parsed.profile.companyName,
+          contactName: client.contactName || parsed.profile.contactName,
+        },
+        req.user
+      );
+
       auditFromRequest(req, "client.profile.manager_update", {
         clientId: clientUser.id,
         changedEmail: normalizeEmail(clientUser.email) !== normalizeEmail(parsed.profile.email),
@@ -5176,7 +5188,7 @@ app.post("/api/admin/clients", authRequired, roleRequired("manager"), async (req
       email,
       companyName: input.companyName,
     });
-    upsertClientAccessEntry(
+    const access = saveClientAccessCredentials(
       user.id,
       {
         login: email,
@@ -5188,11 +5200,13 @@ app.post("/api/admin/clients", authRequired, roleRequired("manager"), async (req
     );
     res.status(201).json({
       ok: true,
-      message: "Клиент создан. Можно выдать логин и пароль.",
+      message:
+        "Клиент создан. Логин и пароль сохранены в «Ещё → Доступы».",
       client: listClients().find((item) => String(item.id) === String(user.id)) || null,
       user: publicUser(user),
       clients: listClients(),
       login: email,
+      access,
     });
   } catch (error) {
     next(error);
@@ -5226,7 +5240,7 @@ app.post(
       const clientCard =
         listClients().find((item) => String(item.id) === String(clientUser.id)) ||
         {};
-      upsertClientAccessEntry(
+      const access = saveClientAccessCredentials(
         clientUser.id,
         {
           login: refreshed?.email || clientUser.email,
@@ -5238,10 +5252,12 @@ app.post(
       );
       res.json({
         ok: true,
-        message: "Пароль обновлён. Можно выдать клиенту логин и новый пароль.",
+        message:
+          "Пароль обновлён и сохранён в «Ещё → Доступы».",
         user: publicUser(refreshed),
         login: refreshed?.email || clientUser.email,
         clients: listClients(),
+        access,
       });
     } catch (error) {
       next(error);

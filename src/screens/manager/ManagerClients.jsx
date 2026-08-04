@@ -757,7 +757,7 @@ export function ManagerClients({
       }
       await appAlert({
         title: "Доступ выдан",
-        message: `Логин: ${result.login || email}\nПароль: ${password}\n\nСохраните и передайте клиенту. Матрицу можно настроить в карточке клиента.`,
+        message: `Логин: ${result.login || email}\nПароль: ${password}\n\nСохранено в «Ещё → Доступы». Передайте клиенту. Матрицу можно настроить в карточке.`,
         tone: "success",
       });
     } catch (error) {
@@ -789,7 +789,7 @@ export function ManagerClients({
       setPasswordDraft("");
       await appAlert({
         title: "Пароль обновлён",
-        message: `Логин: ${result.login || client.email}\nПароль: ${password}\n\nПередайте клиенту. Матрица и заказы сохранены.`,
+        message: `Логин: ${result.login || client.email}\nПароль: ${password}\n\nСохранено в «Ещё → Доступы». Передайте клиенту.`,
         tone: "success",
       });
     } catch (error) {
@@ -1018,6 +1018,7 @@ export function ManagerClients({
           <strong>Создать доступ для клиента</strong>
           <p>
             Создайте логин и пароль сами — без письма и подтверждения почты.
+            Логин и пароль сразу сохраняются в «Ещё → Доступы».
             Матрицу настраиваете в карточке; при смене менеджера достаточно
             сменить пароль у того же клиента.
           </p>

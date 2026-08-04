@@ -18,6 +18,7 @@ export const MANAGER_TABS = [
 
 /** Вкладки внутри «Ещё» у менеджера. */
 export const MANAGER_MORE_TABS = [
+  ["access", "Доступы"],
   ["settings", "Настройки"],
   ["backup", "Резервные копии"],
   ["audit", "Журнал"],

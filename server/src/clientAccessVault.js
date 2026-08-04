@@ -40,6 +40,51 @@ export function upsertClientAccessEntry(clientId, patch = {}, actor = {}) {
   return next;
 }
 
+/**
+ * Обязательное сохранение логина и пароля в журнал доступов менеджера.
+ * Падает с ошибкой, если запись не подтвердилась чтением из БД.
+ */
+export function saveClientAccessCredentials(clientId, credentials = {}, actor = {}) {
+  const id = cleanText(clientId);
+  const login = cleanText(credentials.login);
+  const password = cleanText(credentials.password);
+  if (!id) {
+    throw new Error("Не удалось сохранить доступ: пустой id клиента.");
+  }
+  if (!login || !password) {
+    throw new Error("Не удалось сохранить доступ: нужны логин и пароль.");
+  }
+  const saved = upsertClientAccessEntry(
+    id,
+    {
+      login,
+      password,
+      companyName: credentials.companyName,
+      contactName: credentials.contactName,
+      note: credentials.note,
+    },
+    actor
+  );
+  const verified = readClientAccessVault()[id];
+  if (
+    !saved ||
+    !verified ||
+    cleanText(verified.login) !== login ||
+    cleanText(verified.password) !== password
+  ) {
+    throw new Error("Не удалось сохранить логин и пароль в журнал доступов.");
+  }
+  return {
+    clientId: id,
+    login: verified.login,
+    hasPassword: true,
+    companyName: verified.companyName || "",
+    contactName: verified.contactName || "",
+    updatedAt: verified.updatedAt || "",
+    updatedBy: verified.updatedBy || "",
+  };
+}
+
 export function removeClientAccessEntry(clientId) {
   const id = cleanText(clientId);
   if (!id) return false;

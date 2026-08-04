@@ -28,7 +28,6 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
   const [moreTab, setMoreTab] = useState(readManagerMoreTab);
   const [headerSearch, setHeaderSearch] = useState("");
   const [bellOpen, setBellOpen] = useState(false);
-  const [accessOpen, setAccessOpen] = useState(false);
   const [ordersView, setOrdersView] = useState("active");
 
   const selectTab = (nextTab) => {
@@ -143,25 +142,10 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
             }}
             aria-label="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
           />
-          <button
-            className="secondary-button manager-access-trigger"
-            type="button"
-            aria-expanded={accessOpen}
-            onClick={() => {
-              setBellOpen(false);
-              setAccessOpen(true);
-            }}
-          >
-            <span className="manager-access-label-full">Доступы</span>
-            <span className="manager-access-label-short" aria-hidden="true">
-              Дост.
-            </span>
-          </button>
           <ManagerNotificationBell
             notifications={managerNotifications}
             open={bellOpen}
             onToggle={() => {
-              setAccessOpen(false);
               setBellOpen((current) => !current);
             }}
             onOpen={openFromNotification}
@@ -171,7 +155,6 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
         </div>
       </Header>
     </StickyCabinetChrome>
-    <ManagerAccessVault open={accessOpen} onClose={() => setAccessOpen(false)} />
     <section className="page-content">
       {managerNotice && (() => {
         const parsed = parseManagerNotification(managerNotice);
@@ -257,6 +240,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
               </button>
             ))}
           </nav>
+          {moreTab === "access" && <ManagerAccessVault />}
           {moreTab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} authUser={authUser} />}
           {moreTab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} onReload={onReload} />}
           {moreTab === "audit" && <ManagerAudit />}
