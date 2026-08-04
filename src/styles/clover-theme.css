@@ -1386,6 +1386,34 @@ body:has(.clover-app) {
     flex-wrap: nowrap !important;
   }
 
+  /* Логотип + действия сверху; вкладки — второй ряд на всю ширину */
+  .clover-app .app-header.app-header-with-nav {
+    flex-wrap: wrap !important;
+    row-gap: 6px !important;
+  }
+
+  .clover-app .app-header-with-nav .app-header-logo-button {
+    order: 1 !important;
+  }
+
+  .clover-app .app-header-with-nav .app-header-actions {
+    order: 2 !important;
+  }
+
+  .clover-app .app-header-with-nav .header-logout {
+    order: 3 !important;
+  }
+
+  .clover-app .app-header-with-nav .app-header-nav {
+    order: 4 !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: visible !important;
+    align-self: stretch !important;
+  }
+
   .clover-app .app-header-logo-button {
     flex: 0 0 auto !important;
   }
@@ -1554,24 +1582,41 @@ body:has(.clover-app) {
   }
 
   .clover-app .app-header-nav .manager-nav {
+    display: flex !important;
+    flex-wrap: wrap !important;
     gap: 6px !important;
     margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
-  .clover-app .app-header-nav .manager-nav button,
-  .clover-app .app-header-nav .client-nav button {
-    min-height: 40px !important;
-    height: 40px !important;
-    padding: 0 14px !important;
-    font-size: 13px !important;
+  .clover-app .app-header-nav .client-nav {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    flex-wrap: unset !important;
+    gap: 6px !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .clover-app .app-header-nav .manager-nav button {
+    flex: 1 1 calc(33.333% - 6px) !important;
+    min-width: calc(33.333% - 6px) !important;
+    min-height: 36px !important;
+    height: auto !important;
+    padding: 8px 10px !important;
+    font-size: 12px !important;
     border-radius: 10px !important;
   }
 
-  .clover-app .app-header-nav .client-nav,
-  .clover-app .app-header-nav .manager-nav {
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    grid-template-columns: none !important;
+  .clover-app .app-header-nav .client-nav button {
+    width: 100% !important;
+    min-height: 36px !important;
+    height: auto !important;
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+    border-radius: 10px !important;
   }
 
   .clover-app .manager-orders-filters {

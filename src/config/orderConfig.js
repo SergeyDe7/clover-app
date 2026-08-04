@@ -1,19 +1,13 @@
 export const UNIT_CONFIG = {
-  piece: {
-    label: "Штука",
-    shortLabel: "шт.",
-  },
-  pack: {
-    label: "Упаковка",
-    shortLabel: "уп.",
-  },
-  bundle: {
-    label: "Пачка",
-    shortLabel: "пач.",
-  },
+  piece: { label: "Штука", shortLabel: "шт." },
+  bundle: { label: "Пачка", shortLabel: "пач." },
+  pack: { label: "Упаковка", shortLabel: "уп." },
+  box: { label: "Коробка", shortLabel: "кор." },
+  pair: { label: "Пара", shortLabel: "пар." },
+  roll: { label: "Рулон", shortLabel: "рул." },
 };
 
-export const UNIT_ORDER = ["piece", "bundle", "pack"];
+export const UNIT_ORDER = ["piece", "bundle", "pack", "box", "pair", "roll"];
 
 export const ORDER_STATUSES = [
   "Новый",

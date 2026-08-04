@@ -269,10 +269,65 @@ export const DEFAULT_PRODUCTS = [
 ];
 
 export const UNIT_CONFIG = {
-  piece: { label: "Штука", shortLabel: "шт." },
-  pack: { label: "Упаковка", shortLabel: "уп." },
-  bundle: { label: "Пачка", shortLabel: "пач." },
+  piece: {
+    label: "Штука",
+    shortLabel: "шт.",
+    sizeField: "pieceSize",
+    priceField: "pricePiece",
+    basePriceField: "basePricePiece",
+  },
+  bundle: {
+    label: "Пачка",
+    shortLabel: "пач.",
+    sizeField: "bundleSize",
+    priceField: "priceBundle",
+    basePriceField: "basePriceBundle",
+  },
+  pack: {
+    label: "Упаковка",
+    shortLabel: "уп.",
+    sizeField: "packSize",
+    priceField: "pricePack",
+    basePriceField: "basePricePack",
+  },
+  box: {
+    label: "Коробка",
+    shortLabel: "кор.",
+    sizeField: "boxSize",
+    priceField: "priceBox",
+    basePriceField: "basePriceBox",
+  },
+  pair: {
+    label: "Пара",
+    shortLabel: "пар.",
+    sizeField: "pairSize",
+    priceField: "pricePair",
+    basePriceField: "basePricePair",
+  },
+  roll: {
+    label: "Рулон",
+    shortLabel: "рул.",
+    sizeField: "rollSize",
+    priceField: "priceRoll",
+    basePriceField: "basePriceRoll",
+  },
 };
+
+export function unitSizeField(unit) {
+  return UNIT_CONFIG[unit]?.sizeField || "pieceSize";
+}
+
+export function unitPriceField(unit) {
+  return UNIT_CONFIG[unit]?.priceField || "pricePiece";
+}
+
+export function unitBasePriceField(unit) {
+  return UNIT_CONFIG[unit]?.basePriceField || "basePricePiece";
+}
+
+export function emptyPurchasePrices() {
+  return Object.fromEntries(Object.keys(UNIT_CONFIG).map((unit) => [unit, null]));
+}
 
 export const RUSSIAN_PHONE_PREFIX = "+7 ";
 
@@ -502,7 +557,7 @@ export function selectDefaultNumber(event) {
   }
 }
 
-export const UNIT_ORDER = ["piece", "bundle", "pack"];
+export const UNIT_ORDER = ["piece", "bundle", "pack", "box", "pair", "roll"];
 
 export const DEMO_SESSION_KEY = "clover-demo-session";
 
@@ -2572,6 +2627,16 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 .product-editor { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgba(28,40,28,.48); }
 .product-editor-card { width: min(800px,100%); max-height: 92vh; overflow: auto; padding: 24px; border-radius: 20px; background: #fff; box-shadow: 0 25px 80px rgba(0,0,0,.2); }
 .unit-settings { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 12px; }
+.unit-onec-hint {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px dashed #d7e3d4;
+  border-radius: 10px;
+  background: #f7fbf5;
+  color: #5f735f;
+  font-size: 12px;
+  font-weight: 600;
+}
 .unit-setting { padding: 12px; border: 1px solid #e1e9de; border-radius: 12px; background: #f8fbf6; }
 .unit-setting label { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; color: #465146; font-weight: 800; }
 .unit-setting .field { margin-top: 8px; }
@@ -3081,20 +3146,55 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   }
   .catalog-content { padding-bottom: 88px; }
+  .app-header.app-header-with-nav {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .app-header-with-nav .app-header-logo-button { order: 1; }
+  .app-header-with-nav .app-header-actions { order: 2; }
+  .app-header-with-nav .header-logout { order: 3; }
+  .app-header-with-nav .app-header-nav {
+    order: 4;
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: visible;
+  }
+  .app-header-nav .client-nav,
   .client-nav {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
-    margin-bottom: 8px;
-    padding: 6px;
+    margin-bottom: 0;
+    padding: 0;
+    width: 100%;
+    max-width: 100%;
   }
+  .app-header-nav .client-nav button,
   .client-nav button {
     width: 100%;
     min-height: 36px;
-    padding: 6px 8px;
+    height: auto;
+    padding: 8px 10px;
     font-size: 13px;
     border-radius: 10px;
     text-align: center;
+  }
+  .app-header-nav .manager-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+    max-width: 100%;
+  }
+  .app-header-nav .manager-nav button {
+    flex: 1 1 calc(33.333% - 6px);
+    min-width: calc(33.333% - 6px);
+    min-height: 36px;
+    height: auto;
+    padding: 8px 10px;
+    font-size: 12px;
   }
   .manager-contact-label-full { display: none; }
   .manager-contact-label-short { display: inline; }
@@ -3314,6 +3414,26 @@ export function normalizeProduct(product) {
   const numericId = Number(product.id);
   const hasNumericId = Number.isFinite(numericId) && numericId > 0;
 
+  const sizes = {};
+  const prices = {};
+  const basePrices = {};
+  for (const unit of UNIT_ORDER) {
+    const sizeField = unitSizeField(unit);
+    const priceField = unitPriceField(unit);
+    const baseField = unitBasePriceField(unit);
+    sizes[sizeField] = Math.max(1, Number(product[sizeField]) || 1);
+    prices[priceField] = Math.max(0, Number(product[priceField]) || 0);
+    basePrices[baseField] = Math.max(
+      0,
+      Number(product[baseField] ?? product[priceField]) || 0
+    );
+  }
+
+  const purchasePrices =
+    product.purchasePrices && typeof product.purchasePrices === "object"
+      ? { ...emptyPurchasePrices(), ...product.purchasePrices }
+      : emptyPurchasePrices();
+
   return {
     ...product,
     id: hasNumericId ? numericId : product.id,
@@ -3330,33 +3450,15 @@ export function normalizeProduct(product) {
     imageUrl: product.imageUrl || "",
     imageUpdatedAt: product.imageUpdatedAt || "",
     active: product.active !== false,
-    pieceSize: Math.max(1, Number(product.pieceSize) || 1),
-    packSize: Math.max(1, Number(product.packSize) || 1),
-    bundleSize: Math.max(1, Number(product.bundleSize) || 1),
-    pricePiece: Math.max(0, Number(product.pricePiece) || 0),
-    pricePack: Math.max(0, Number(product.pricePack) || 0),
-    priceBundle: Math.max(0, Number(product.priceBundle) || 0),
-    basePricePiece: Math.max(
-      0,
-      Number(product.basePricePiece ?? product.pricePiece) || 0
-    ),
-    basePricePack: Math.max(
-      0,
-      Number(product.basePricePack ?? product.pricePack) || 0
-    ),
-    basePriceBundle: Math.max(
-      0,
-      Number(product.basePriceBundle ?? product.priceBundle) || 0
-    ),
+    ...sizes,
+    ...prices,
+    ...basePrices,
     priceSources:
       product.priceSources &&
       typeof product.priceSources === "object"
         ? product.priceSources
         : {},
-    purchasePrices:
-      product.purchasePrices && typeof product.purchasePrices === "object"
-        ? product.purchasePrices
-        : { piece: null, pack: null, bundle: null },
+    purchasePrices,
     purchasePriceUpdatedAt: product.purchasePriceUpdatedAt || "",
     purchasePriceUnit: product.purchasePriceUnit || "piece",
     purchasePriceAvailable: Boolean(product.purchasePriceAvailable),
@@ -3400,14 +3502,17 @@ export function formatMoney(value) {
 }
 
 /**
- * Сколько базовых штук в одной выбранной единице продажи.
- * «Штука» всегда 1 (в поле 1,2,3 → в 1С 1,2,3 шт).
- * Упаковка/пачка — packSize/bundleSize (в поле 100,200… → в 1С totalPieces).
+ * Сколько базовых штук в одной выбранной единице продажи → в 1С всегда «шт».
+ * - piece / pair / roll → 1:1
+ * - pack / box / bundle → «Внутри, шт.» (кратно содержимому)
  */
+export function unitConvertsOneToOneToPieces(unit) {
+  return unit === "piece" || unit === "pair" || unit === "roll";
+}
+
 export function getUnitMultiplier(product, unit) {
-  if (unit === "pack") return Math.max(1, Number(product?.packSize) || 1);
-  if (unit === "bundle") return Math.max(1, Number(product?.bundleSize) || 1);
-  return 1;
+  if (unitConvertsOneToOneToPieces(unit) || !UNIT_CONFIG[unit]) return 1;
+  return Math.max(1, Number(product?.[unitSizeField(unit)]) || 1);
 }
 
 /**
@@ -3440,9 +3545,7 @@ export function quantityInputUnitLabel(unit, multiplier) {
 }
 
 export function getUnitPrice(product, unit) {
-  if (unit === "pack") return Number(product.pricePack) || 0;
-  if (unit === "bundle") return Number(product.priceBundle) || 0;
-  return Number(product.pricePiece) || 0;
+  return Number(product?.[unitPriceField(unit)]) || 0;
 }
 
 export function getPriceSource(product, unit) {
@@ -3452,7 +3555,7 @@ export function getPriceSource(product, unit) {
 export function hasPersonalPrices(link) {
   return Object.values(link.personalPrices || {}).some((price) =>
     price?.source === "purchase_markup" ||
-    ["piece", "pack", "bundle"].some(
+    UNIT_ORDER.some(
       (unit) =>
         price?.[unit] !== null &&
         price?.[unit] !== undefined &&
@@ -3492,31 +3595,20 @@ export function prefillManualPriceFromProduct(product, currentPrice = {}) {
   const next = {
     source: "manual",
     markupPercent: Math.max(0, Number(currentPrice.markupPercent) || 0),
-    piece:
-      currentPrice.piece !== null && currentPrice.piece !== undefined
-        ? Number(currentPrice.piece)
-        : null,
-    pack:
-      currentPrice.pack !== null && currentPrice.pack !== undefined
-        ? Number(currentPrice.pack)
-        : null,
-    bundle:
-      currentPrice.bundle !== null && currentPrice.bundle !== undefined
-        ? Number(currentPrice.bundle)
-        : null,
   };
+
+  for (const unit of UNIT_ORDER) {
+    next[unit] =
+      currentPrice[unit] !== null && currentPrice[unit] !== undefined
+        ? Number(currentPrice[unit])
+        : null;
+  }
 
   const saleUnits = Array.isArray(product?.saleUnits) ? product.saleUnits : [];
   for (const unit of UNIT_ORDER) {
     if (!saleUnits.includes(unit)) continue;
     if (next[unit] !== null) continue;
-    const priceField =
-      unit === "piece"
-        ? "pricePiece"
-        : unit === "pack"
-          ? "pricePack"
-          : "priceBundle";
-    const base = Math.max(0, Number(product?.[priceField]) || 0);
+    const base = Math.max(0, Number(product?.[unitPriceField(unit)]) || 0);
     if (base > 0) next[unit] = base;
   }
 

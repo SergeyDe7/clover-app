@@ -8,6 +8,7 @@ import {
   writeOpenManagerClientId,
   UNIT_ORDER,
   UNIT_CONFIG,
+  unitPriceField,
   hasPurchasePrice,
   hasManualUnitValue,
   prefillManualPriceFromProduct,
@@ -1848,12 +1849,7 @@ export function ManagerClients({
 
                               {UNIT_ORDER.map(
                                 (unit) => {
-                                  const priceField =
-                                    unit === "piece"
-                                      ? "pricePiece"
-                                      : unit === "pack"
-                                        ? "pricePack"
-                                        : "priceBundle";
+                                  const priceField = unitPriceField(unit);
                                   const unitAllowed = Array.isArray(product.saleUnits)
                                     ? product.saleUnits.includes(unit)
                                     : false;

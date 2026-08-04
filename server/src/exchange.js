@@ -2,7 +2,14 @@ const UNIT_LABELS = {
   piece: "Штука",
   pack: "Упаковка",
   bundle: "Пачка",
+  box: "Коробка",
+  pair: "Пара",
+  roll: "Рулон",
 };
+
+/** В документ 1С количество всегда в шт (см. totalPieces). */
+export const ONEC_PIECE_UNIT = "piece";
+export const ONEC_PIECE_UNIT_NAME = "шт";
 
 export const EXCHANGE_STATUSES = {
   not_sent: "Не отправлен",
@@ -257,6 +264,10 @@ export function build1CPayload({ order, products, clientLinks }) {
     },
     items: (order?.items || []).map((item, index) => {
       const product = productsById.get(String(item.productId ?? item.id));
+      const saleUnit = item.unit || "piece";
+      const quantity = Number(item.quantity) || 0;
+      const multiplier = Number(item.multiplier) || 1;
+      const totalPieces = quantity * multiplier;
       return {
         line: index + 1,
         cloverProductId: String(item.productId ?? item.id ?? ""),
@@ -264,11 +275,15 @@ export function build1CPayload({ order, products, clientLinks }) {
         code: item.oneCCode || product?.oneCCode || item.code || product?.code || "",
         name: item.oneCName || product?.oneCName || item.name || product?.name || "",
         displayName: item.name || product?.name || "",
-        unit: item.unit || "piece",
-        unitName: UNIT_LABELS[item.unit] || item.unit || "",
-        quantity: Number(item.quantity) || 0,
-        multiplier: Number(item.multiplier) || 1,
-        totalPieces: (Number(item.quantity) || 0) * (Number(item.multiplier) || 1),
+        // Продажа в Clover (для аудита)
+        saleUnit,
+        saleUnitName: UNIT_LABELS[saleUnit] || saleUnit || "",
+        // В 1С всегда шт
+        unit: ONEC_PIECE_UNIT,
+        unitName: ONEC_PIECE_UNIT_NAME,
+        quantity,
+        multiplier,
+        totalPieces,
         unitPrice: Number(item.unitPrice) || 0,
         lineTotal: Number(item.lineTotal) || 0,
       };

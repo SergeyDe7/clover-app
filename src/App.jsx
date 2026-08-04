@@ -1505,18 +1505,15 @@ function App() {
       pieceSize: 1,
       packSize: 1,
       bundleSize: 1,
-      pricePiece:
-        saleUnit === "piece"
-          ? Number(customItem.unitPrice) || 0
-          : 0,
-      pricePack:
-        saleUnit === "pack"
-          ? Number(customItem.unitPrice) || 0
-          : 0,
-      priceBundle:
-        saleUnit === "bundle"
-          ? Number(customItem.unitPrice) || 0
-          : 0,
+      boxSize: 1,
+      pairSize: 1,
+      rollSize: 1,
+      pricePiece: saleUnit === "piece" ? Number(customItem.unitPrice) || 0 : 0,
+      pricePack: saleUnit === "pack" ? Number(customItem.unitPrice) || 0 : 0,
+      priceBundle: saleUnit === "bundle" ? Number(customItem.unitPrice) || 0 : 0,
+      priceBox: saleUnit === "box" ? Number(customItem.unitPrice) || 0 : 0,
+      pricePair: saleUnit === "pair" ? Number(customItem.unitPrice) || 0 : 0,
+      priceRoll: saleUnit === "roll" ? Number(customItem.unitPrice) || 0 : 0,
       saleUnits: [saleUnit],
     });
 

@@ -43,4 +43,15 @@ assert.equal(3 * getUnitMultiplier(gloves, "piece"), 3);
 // Упаковка без размера — шаг 1 (нужно заполнить «Внутри, шт.»)
 assert.equal(getUnitMultiplier({ packSize: 1 }, "pack"), 1);
 
+const box = { boxSize: 24, pairSize: 2, rollSize: 50, packSize: 100, saleUnits: ["box", "pair", "roll", "pack"] };
+assert.equal(getUnitMultiplier(box, "box"), 24);
+assert.equal(getUnitMultiplier(box, "pack"), 100);
+// пара и рулон в 1С → шт 1:1 (без кратности)
+assert.equal(getUnitMultiplier(box, "pair"), 1);
+assert.equal(getUnitMultiplier(box, "roll"), 1);
+assert.equal(toQuantityInputValue(2, 24), 48);
+assert.equal(fromQuantityInputValue("48", 24), 2);
+assert.equal(quantityInputUnitLabel("box", 24), "шт.");
+assert.equal(quantityInputUnitLabel("pair", 1), "пар.");
+
 console.log("verify-pack-qty-pieces-step: ok");

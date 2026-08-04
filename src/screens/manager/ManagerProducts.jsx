@@ -4,6 +4,9 @@ import { api } from "../../serverApi";
 import {
   UNIT_ORDER,
   UNIT_CONFIG,
+  unitSizeField,
+  unitPriceField,
+  unitConvertsOneToOneToPieces,
   selectDefaultNumber,
   hasPurchasePrice,
   formatMoney,
@@ -40,8 +43,8 @@ function ProductEditor({ product, onClose, onSave }) {
   const [form, setForm] = useState(product || {
     name: "", category: "Новые товары", code: "", oneCId: "",
     oneCCode: "", oneCName: "", oneCMatchCode: "", oneCMatchName: "", oneCSearchQuery: "", oneCSearchRequestedAt: "", oneCLinkMode: "", oneCLinkedAt: "", active: true,
-    pieceSize: 1, packSize: 1, bundleSize: 1,
-    pricePiece: 0, pricePack: 0, priceBundle: 0,
+    pieceSize: 1, packSize: 1, bundleSize: 1, boxSize: 1, pairSize: 1, rollSize: 1,
+    pricePiece: 0, pricePack: 0, priceBundle: 0, priceBox: 0, pricePair: 0, priceRoll: 0,
     saleUnits: ["piece"],
   });
   const [oneCOpen, setOneCOpen] = useState(false);
@@ -347,10 +350,14 @@ function ProductEditor({ product, onClose, onSave }) {
 
         <div className="unit-settings">
           {UNIT_ORDER.map((unit) => {
-            const sizeField = unit === "piece" ? "pieceSize" : unit === "pack" ? "packSize" : "bundleSize";
-            const priceField = unit === "piece" ? "pricePiece" : unit === "pack" ? "pricePack" : "priceBundle";
+            const sizeField = unitSizeField(unit);
+            const priceField = unitPriceField(unit);
+            const oneToOne = unitConvertsOneToOneToPieces(unit);
             return <div className="unit-setting" key={unit}>
               <label><input type="checkbox" checked={form.saleUnits.includes(unit)} onChange={(e) => toggleUnit(unit, e.target.checked)} />{UNIT_CONFIG[unit].label}</label>
+              {oneToOne ? (
+                <p className="unit-onec-hint">В 1С → шт (1:1)</p>
+              ) : (
               <label className="field">Внутри, шт.
                 <input
                   type="number"
@@ -377,6 +384,7 @@ function ProductEditor({ product, onClose, onSave }) {
                   }
                 />
               </label>
+              )}
               <label className="field">Цена за единицу продажи
                 <input
                   type="number"
@@ -930,6 +938,6 @@ export function ManagerProducts({ products, setProducts }) {
 }
 
 function settingsPriceLabel(product) {
-  const prices = [product.pricePiece, product.pricePack, product.priceBundle].filter((value) => Number(value) > 0);
+  const prices = UNIT_ORDER.map((unit) => product[unitPriceField(unit)]).filter((value) => Number(value) > 0);
   return prices.length ? `от ${formatMoney(Math.min(...prices))}` : "Без цены";
 }

@@ -131,6 +131,9 @@ import {
   normalizeDefaultPricingConfig,
   normalizePersonalPriceConfig,
   resolveClientProductPricing,
+  UNITS as SALE_UNITS,
+  unitLabel,
+  unitPriceField,
 } from "./pricing.js";
 import {
   buildAllPriceRequirements,
@@ -815,15 +818,9 @@ function applyClientPrices(product, link, isMatrixProduct, oneCById = new Map())
   const oneCItem = oneCById.get(String(product.oneCId || "")) || null;
   const pricing = resolveClientProductPricing(product, priceConfig, oneCItem, link);
 
-  return {
+  const priced = {
     ...enrichProductWithPurchasePrices(product, oneCItem),
     isMatrixProduct,
-    basePricePiece: Number(product.pricePiece) || 0,
-    basePricePack: Number(product.pricePack) || 0,
-    basePriceBundle: Number(product.priceBundle) || 0,
-    pricePiece: pricing.prices.piece,
-    pricePack: pricing.prices.pack,
-    priceBundle: pricing.prices.bundle,
     priceSources: pricing.priceSources,
     clientPriceMode: pricing.source,
     clientPriceOverrideMode: pricing.overrideSource,
@@ -833,6 +830,15 @@ function applyClientPrices(product, link, isMatrixProduct, oneCById = new Map())
     purchasePrices: pricing.purchasePrices,
     purchasePriceUpdatedAt: pricing.purchasePriceUpdatedAt,
   };
+
+  for (const unit of SALE_UNITS) {
+    const priceField = unitPriceField(unit);
+    const baseField = priceField.replace(/^price/, "basePrice");
+    priced[baseField] = Number(product[priceField]) || 0;
+    priced[priceField] = pricing.prices[unit];
+  }
+
+  return priced;
 }
 
 function resolveClientCatalog(products, rawLink, oneCProducts = []) {
@@ -904,6 +910,9 @@ function stripRuntimeProductPricing(product = {}) {
     basePricePiece,
     basePricePack,
     basePriceBundle,
+    basePriceBox,
+    basePricePair,
+    basePriceRoll,
     isMatrixProduct,
     ...stored
   } = product;
@@ -911,9 +920,7 @@ function stripRuntimeProductPricing(product = {}) {
 }
 
 function priceForOrderUnit(product, unit) {
-  if (unit === "pack") return Number(product.pricePack) || 0;
-  if (unit === "bundle") return Number(product.priceBundle) || 0;
-  return Number(product.pricePiece) || 0;
+  return Number(product[unitPriceField(unit)]) || 0;
 }
 
 function purchasePriceForOrderUnit(product, unit) {
@@ -938,7 +945,7 @@ function repriceOrderWithCurrentOneC(order, products, rawLink, oneCProducts = []
       isMatrixProductForLink(link, product.id),
       oneCById
     );
-    const unit = ["piece", "pack", "bundle"].includes(item.unit) ? item.unit : "piece";
+    const unit = SALE_UNITS.includes(item.unit) ? item.unit : "piece";
     const unitPrice = priceForOrderUnit(priced, unit);
     const source = priced.priceSources?.[unit] || "unspecified";
 
@@ -2486,20 +2493,24 @@ async function handleOneCTestOrder(req, res, next) {
         Number(item.unitPrice) ||
         (Number(item.lineTotal) || 0) / quantity;
 
-      const unit = ["piece", "pack", "bundle"].includes(item.unit)
+      const saleUnit = SALE_UNITS.includes(item.unit)
         ? item.unit
         : "piece";
       const multiplier = Math.max(1, Number(item.multiplier) || 1);
+      const totalPieces = quantity * multiplier;
 
       return {
         id: oneCId,
         code: item.oneCCode || product?.oneCCode || item.code || product?.code || "",
         name: item.oneCName || product?.oneCName || item.name || product?.name || "",
         displayName: item.name || product?.name || "",
-        unit,
-        unitName: unit === "pack" ? "Упаковка" : unit === "bundle" ? "Пачка" : "Штука",
+        saleUnit,
+        saleUnitName: unitLabel(saleUnit),
+        // 1С: всегда количество в шт (totalPieces), единица «шт»
+        unit: "piece",
+        unitName: "шт",
         multiplier,
-        totalPieces: quantity * multiplier,
+        totalPieces,
         quantity,
         price,
       };

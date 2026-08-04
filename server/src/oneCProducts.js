@@ -70,6 +70,9 @@ export function normalizeOneCProduct(item = {}) {
     purchasePricePiece: firstNumeric(item.purchasePricePiece, item.costPricePiece, prices.piece),
     purchasePricePack: firstNumeric(item.purchasePricePack, item.costPricePack, prices.pack),
     purchasePriceBundle: firstNumeric(item.purchasePriceBundle, item.costPriceBundle, prices.bundle),
+    purchasePriceBox: firstNumeric(item.purchasePriceBox, item.costPriceBox, prices.box),
+    purchasePricePair: firstNumeric(item.purchasePricePair, item.costPricePair, prices.pair),
+    purchasePriceRoll: firstNumeric(item.purchasePriceRoll, item.costPriceRoll, prices.roll),
     purchasePriceUnit: cleanText(item.purchasePriceUnit ?? item.costUnit ?? item.unit ?? "piece"),
     purchasePriceUpdatedAt: cleanText(
       item.purchasePriceUpdatedAt ?? item.priceUpdatedAt ?? item.updatedAt
@@ -677,9 +680,15 @@ export function createOrReuseCloverProductFromOneC(
     pieceSize: 1,
     packSize: 1,
     bundleSize: 1,
+    boxSize: 1,
+    pairSize: 1,
+    rollSize: 1,
     pricePiece: 0,
     pricePack: 0,
     priceBundle: 0,
+    priceBox: 0,
+    pricePair: 0,
+    priceRoll: 0,
     saleUnits: ["piece"],
   };
 

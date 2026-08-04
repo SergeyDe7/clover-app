@@ -1,4 +1,31 @@
-const UNITS = ["piece", "pack", "bundle"];
+export const UNITS = ["piece", "bundle", "pack", "box", "pair", "roll"];
+
+const UNIT_SIZE_FIELD = {
+  piece: "pieceSize",
+  pack: "packSize",
+  bundle: "bundleSize",
+  box: "boxSize",
+  pair: "pairSize",
+  roll: "rollSize",
+};
+
+const UNIT_PRICE_FIELD = {
+  piece: "pricePiece",
+  pack: "pricePack",
+  bundle: "priceBundle",
+  box: "priceBox",
+  pair: "pricePair",
+  roll: "priceRoll",
+};
+
+const UNIT_LABEL = {
+  piece: "Штука",
+  pack: "Упаковка",
+  bundle: "Пачка",
+  box: "Коробка",
+  pair: "Пара",
+  roll: "Рулон",
+};
 
 function finiteNonNegative(value) {
   if (value === "" || value === null || value === undefined) return null;
@@ -8,6 +35,14 @@ function finiteNonNegative(value) {
 
 function hasManualUnitPrice(value = {}) {
   return UNITS.some((unit) => finiteNonNegative(value?.[unit]) !== null);
+}
+
+export function unitPriceField(unit) {
+  return UNIT_PRICE_FIELD[unit] || "pricePiece";
+}
+
+export function unitLabel(unit) {
+  return UNIT_LABEL[unit] || "Штука";
 }
 
 export function normalizePricingSource(value, rawConfig = {}) {
@@ -36,15 +71,19 @@ export function roundPriceUp(value) {
 }
 
 export function unitSize(product = {}, unit = "piece") {
-  if (unit === "pack") return Math.max(1, Number(product.packSize) || 1);
-  if (unit === "bundle") return Math.max(1, Number(product.bundleSize) || 1);
-  return Math.max(1, Number(product.pieceSize) || 1);
+  // В 1С пара/рулон/штука уходят 1:1 в шт — размер содержимого не масштабирует.
+  if (unit === "piece" || unit === "pair" || unit === "roll") return 1;
+  const field = UNIT_SIZE_FIELD[unit] || "pieceSize";
+  return Math.max(1, Number(product[field]) || 1);
 }
 
 export function normalizePurchaseUnit(value) {
   const raw = String(value || "").trim().toLocaleLowerCase("ru-RU");
   if (["pack", "package", "уп", "уп.", "упаковка"].includes(raw)) return "pack";
   if (["bundle", "bundlepack", "пач", "пач.", "пачка"].includes(raw)) return "bundle";
+  if (["box", "кор", "кор.", "коробка"].includes(raw)) return "box";
+  if (["pair", "пар", "пар.", "пара"].includes(raw)) return "pair";
+  if (["roll", "рул", "рул.", "рулон"].includes(raw)) return "roll";
   return "piece";
 }
 
@@ -53,6 +92,9 @@ export function purchasePriceForUnit(product = {}, oneCItem = {}, unit = "piece"
     piece: ["purchasePricePiece", "costPricePiece"],
     pack: ["purchasePricePack", "costPricePack"],
     bundle: ["purchasePriceBundle", "costPriceBundle"],
+    box: ["purchasePriceBox", "costPriceBox"],
+    pair: ["purchasePricePair", "costPricePair"],
+    roll: ["purchasePriceRoll", "costPriceRoll"],
   };
 
   for (const field of directFields[unit] || []) {
@@ -140,7 +182,7 @@ export function resolveClientProductPricing(
   };
 
   for (const unit of UNITS) {
-    const baseField = unit === "piece" ? "pricePiece" : unit === "pack" ? "pricePack" : "priceBundle";
+    const baseField = unitPriceField(unit);
     const manual = config[unit];
     const purchase = oneCItem ? purchasePriceForUnit(product, oneCItem, unit) : null;
     result.purchasePrices[unit] = purchase;
@@ -203,8 +245,14 @@ export function hasPurchasePrice(oneCItem = {}) {
     oneCItem.purchasePricePiece,
     oneCItem.purchasePricePack,
     oneCItem.purchasePriceBundle,
+    oneCItem.purchasePriceBox,
+    oneCItem.purchasePricePair,
+    oneCItem.purchasePriceRoll,
     oneCItem.costPricePiece,
     oneCItem.costPricePack,
     oneCItem.costPriceBundle,
+    oneCItem.costPriceBox,
+    oneCItem.costPricePair,
+    oneCItem.costPriceRoll,
   ].some((value) => finiteNonNegative(value) !== null);
 }
