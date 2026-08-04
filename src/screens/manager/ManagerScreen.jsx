@@ -22,7 +22,7 @@ import { ManagerBackup } from "./ManagerBackup";
 import { ManagerAudit } from "./ManagerAudit";
 import { managerNotificationTab, ManagerNotificationBell, parseManagerNotification, ManagerOrderSummaryLines } from "./ManagerNotifications";
 
-function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onRestoreOrder, onPurgeOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onLogout }) {
+function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, dirtyClientLinkIdsRef, oneCPriceTypes = [], managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onRestoreOrder, onPurgeOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onLogout }) {
   const [tab, setTab] = useState(readManagerActiveTab);
   const [moreTab, setMoreTab] = useState(readManagerMoreTab);
   const [headerSearch, setHeaderSearch] = useState("");
@@ -220,7 +220,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
         />
       )}
       {tab === "exchange" && <ManagerExchange onReload={onReload} onApplyManagerNotifications={onApplyManagerNotifications} onNavigate={selectTab} />}
-      {tab === "clients" && <ManagerClients clients={clients} orders={orders} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} onReload={onReload} />}
+      {tab === "clients" && <ManagerClients clients={clients} orders={orders} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} dirtyClientLinkIdsRef={dirtyClientLinkIdsRef} oneCPriceTypes={oneCPriceTypes} onReload={onReload} />}
       {tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}
       {tab === "acts" && <ManagerReconciliation requests={reconciliationRequests} onReload={onReload} />}
       {tab === "more" && (

@@ -62,6 +62,11 @@ export function normalizeOneCProduct(item = {}) {
     prices.cost
   );
 
+  const salePricesByType =
+    item.salePricesByType && typeof item.salePricesByType === "object"
+      ? item.salePricesByType
+      : {};
+
   return {
     id: cleanText(item.id ?? item.oneCId ?? item.ref),
     code: cleanText(item.code ?? item.oneCCode),
@@ -86,6 +91,9 @@ export function normalizeOneCProduct(item = {}) {
     purchasePriceSourceDatabase: cleanText(
       item.purchasePriceSourceDatabase ?? item.sourceDatabase ?? item.database
     ),
+    salePricesByType,
+    salePriceUpdatedAt: cleanText(item.salePriceUpdatedAt),
+    salePriceReceivedAt: cleanText(item.salePriceReceivedAt),
   };
 }
 
@@ -693,7 +701,7 @@ export function createOrReuseCloverProductFromOneC(
   };
 
   return {
-    products: [...source, product],
+    products: [product, ...source],
     product,
     created: true,
   };

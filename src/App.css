@@ -194,6 +194,21 @@ button{cursor:pointer}
 .one-c-products-search input {
   flex: 1 1 360px;
   min-width: 220px;
+  min-height: 42px;
+  padding: 11px 14px;
+  border: 1px solid #e6eee3;
+  border-radius: 12px;
+  background: #fbfdfb;
+  color: #394639;
+  font: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.one-c-products-search input:focus {
+  border-color: rgba(91, 157, 87, 0.55);
+  box-shadow: 0 0 0 2px rgba(91, 157, 87, 0.1);
+  background: #fff;
 }
 
 .one-c-products-list {
@@ -311,8 +326,11 @@ button{cursor:pointer}
 
 .one-c-picker {
   margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(64, 111, 45, 0.14);
+  padding: 14px;
+  border: 1px solid rgba(64, 111, 45, 0.14);
+  border-radius: 14px;
+  background: #fff;
+  box-sizing: border-box;
 }
 
 .one-c-picker-list {

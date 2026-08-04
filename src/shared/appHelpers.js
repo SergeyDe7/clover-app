@@ -28,7 +28,6 @@ export const MANAGER_MORE_TAB_KEY = "clover-manager-more-tab-v1";
 export const CLIENT_TABS = [
   ["home", "Заказ"],
   ["orders", "Мои заказы"],
-  ["matrix", "Матрица"],
   ["reconciliation", "Акт сверки"],
   ["cabinet", "Настройки"],
 ];
@@ -123,7 +122,8 @@ export function writeManagerMoreTab(value) {
 
 export function readClientActiveTab() {
   try {
-    const value = localStorage.getItem(CLIENT_ACTIVE_TAB_KEY) || "home";
+    let value = localStorage.getItem(CLIENT_ACTIVE_TAB_KEY) || "home";
+    if (value === "matrix") value = "home";
     return CLIENT_TABS.some(([id]) => id === value) ? value : "home";
   } catch {
     return "home";
@@ -163,7 +163,7 @@ export function clientTabFromSection(section) {
     return "reconciliation";
   }
   if (section === "matrix" || section === "products") {
-    return "matrix";
+    return "home";
   }
   if (
     section === "addresses" ||
@@ -270,42 +270,42 @@ export const DEFAULT_PRODUCTS = [
 
 export const UNIT_CONFIG = {
   piece: {
-    label: "Штука",
+    label: "штука",
     shortLabel: "шт.",
     sizeField: "pieceSize",
     priceField: "pricePiece",
     basePriceField: "basePricePiece",
   },
   bundle: {
-    label: "Пачка",
+    label: "пачка",
     shortLabel: "пач.",
     sizeField: "bundleSize",
     priceField: "priceBundle",
     basePriceField: "basePriceBundle",
   },
   pack: {
-    label: "Упаковка",
+    label: "упаковка",
     shortLabel: "уп.",
     sizeField: "packSize",
     priceField: "pricePack",
     basePriceField: "basePricePack",
   },
   box: {
-    label: "Коробка",
+    label: "коробка",
     shortLabel: "кор.",
     sizeField: "boxSize",
     priceField: "priceBox",
     basePriceField: "basePriceBox",
   },
   pair: {
-    label: "Пара",
+    label: "пара",
     shortLabel: "пар.",
     sizeField: "pairSize",
     priceField: "pricePair",
     basePriceField: "basePricePair",
   },
   roll: {
-    label: "Рулон",
+    label: "рулон",
     shortLabel: "рул.",
     sizeField: "rollSize",
     priceField: "priceRoll",
@@ -571,6 +571,7 @@ export const STORAGE = {
   settings: "clover-manager-settings",
   clientLinks: "clover-client-links",
   draft: "clover-order-draft",
+  catalogView: "clover-catalog-view",
 };
 
 export const DEFAULT_SETTINGS = {
@@ -629,6 +630,8 @@ export const EMPTY_LINK = {
   allowFullCatalog: false,
   defaultPricingMode: "base",
   defaultMarkupPercent: 0,
+  oneCPriceTypeId: "",
+  oneCPriceTypeName: "",
   personalPrices: {},
 };
 
@@ -1541,7 +1544,52 @@ textarea { resize: vertical; }
   margin-bottom: 18px;
 }
 .catalog-toolbar { margin-bottom: 20px; }
-.catalog-filter-row { display: grid; grid-template-columns: minmax(220px,1fr) auto; gap: 12px; margin-bottom: 12px; }
+.catalog-filter-row { display: grid; grid-template-columns: minmax(220px,1fr) auto; gap: 10px; margin-bottom: 12px; align-items: center; }
+.catalog-filter-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.catalog-view-toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: stretch;
+  gap: 0;
+  height: 34px;
+  border: 1px solid #d5dfd2;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.catalog-view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 34px;
+  min-width: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-right: 1px solid #d5dfd2;
+  background: transparent;
+  color: #5d695d;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.catalog-view-toggle button:last-child { border-right: 0; }
+.catalog-view-toggle button.active {
+  background: #5b9d57;
+  color: #fff;
+}
+.catalog-view-toggle .view-toggle-icon {
+  font-size: 13px;
+  line-height: 1;
+  opacity: .9;
+}
+.catalog-view-toggle .view-toggle-label { font-size: 11px; }
 .catalog-search { width: 100%; padding: 12px 14px; border: 1px solid #e6eee3; border-radius: 12px; background: #fbfdfb; outline: none; }
 .catalog-search:focus { border-color: rgba(91,157,87,.55); box-shadow: 0 0 0 2px rgba(91,157,87,.1); background: #fff; }
 .category-list { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1568,6 +1616,10 @@ textarea { resize: vertical; }
   gap: 16px;
   align-items: stretch;
 }
+.product-grid.product-grid-list {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
 .product-card {
   display: flex;
   flex-direction: column;
@@ -1580,6 +1632,97 @@ textarea { resize: vertical; }
   background: #fff;
   box-shadow: 0 8px 20px rgba(56,97,52,.04);
   box-sizing: border-box;
+}
+.product-card.product-card-list {
+  min-height: 0;
+  height: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 10px;
+  box-shadow: none;
+}
+.product-card-list .product-card-top {
+  grid-column: 1;
+  grid-row: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.product-card-list .product-category {
+  padding: 2px 6px;
+  font-size: 10px;
+  border-radius: 6px;
+}
+.product-card-list .favorite-button {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  font-size: 14px;
+}
+.product-card-list h2 {
+  grid-column: 1;
+  grid-row: 2;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.3;
+  display: block;
+  overflow: visible;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  -webkit-line-clamp: unset;
+}
+.product-card-list .product-code {
+  display: none;
+}
+.product-card-list .product-price {
+  grid-column: 1;
+  grid-row: 3;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+.product-card-list .product-card-controls {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+  gap: 4px;
+  min-width: 168px;
+}
+.product-card-list .unit-choice {
+  gap: 3px;
+  min-height: 0;
+}
+.product-card-list .unit-choice button {
+  min-height: 26px;
+  padding: 2px 4px;
+  font-size: 10px;
+  border-radius: 7px;
+}
+.product-card-list .quantity-control {
+  gap: 4px;
+}
+.product-card-list .quantity-control > button {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 8px;
+  font-size: 16px;
+}
+.product-card-list .quantity-input-wrap {
+  min-height: 30px;
+  padding: 0 4px;
+  border-radius: 8px;
+}
+.product-card-list .quantity-input {
+  width: 40px;
+  font-size: 13px;
+}
+.product-card-list .quantity-input-wrap small {
+  font-size: 10px;
 }
 .product-image-wrap { display: flex; align-items: center; justify-content: center; width: 100%; height: 145px; margin: 10px 0 2px; overflow: hidden; border-radius: 0; background: #fff; }
 .mobile-checkout-bar { display: none; }
@@ -2900,6 +3043,41 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     gap: 6px;
     margin-bottom: 6px;
   }
+  .catalog-filter-actions { gap: 6px; }
+  .catalog-view-toggle {
+    grid-column: auto;
+    width: auto;
+    height: 32px;
+  }
+  .catalog-view-toggle button {
+    flex: 0 0 auto;
+    min-height: 32px;
+    min-width: 32px;
+    font-size: 11px;
+    padding: 0 8px;
+  }
+  .catalog-view-toggle .view-toggle-label {
+    display: none;
+  }
+  .product-card.product-card-list {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 8px;
+    padding: 5px 8px;
+  }
+  .product-card-list .product-card-controls {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    min-width: 148px;
+  }
+  .product-card-list h2 {
+    font-size: 12px;
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+  .product-card-list .product-category {
+    display: none;
+  }
   .embedded-catalog .catalog-search {
     min-width: 0;
     width: 100%;
@@ -3404,6 +3582,79 @@ export function getOrCreateClientId() {
   const id = makeId("client");
   localStorage.setItem(STORAGE.clientId, id);
   return id;
+}
+
+const PLACEHOLDER_PRODUCT_CATEGORIES = new Set(["Из 1С", "Новые товары", ""]);
+
+const CATEGORY_KEYWORD_RULES = [
+  { category: "Перчатки", patterns: [/перчатк/u, /нитрил/u, /латекс/u, /винилов/u] },
+  {
+    category: "Пакеты и пленка",
+    patterns: [/пакет/u, /мешк/u, /пленк/u, /плёнк/u, /пергамент/u, /вакуумн/u, /стрейч/u, /stretch/u],
+  },
+  {
+    category: "Уборка",
+    patterns: [
+      /салфетк/u, /швабр/u, /\bмоп\b/u, /щетк/u, /губк/u, /ведр/u, /пипидастр/u,
+      /совк/u, /распылител/u, /пульверизатор/u, /тряпк/u, /полотер/u, /диспенсер/u,
+    ],
+  },
+  {
+    category: "Упаковка",
+    patterns: [/банк[аиуы]/u, /крышк/u, /контейнер/u, /бутылк/u, /oneclick/u, /стаканчик/u, /лоток/u, /коробк/u],
+  },
+  {
+    category: "Одноразовая продукция",
+    patterns: [/трубочк/u, /вилк/u, /ложк/u, /тарелк/u, /зубочист/u, /шпател/u],
+  },
+  {
+    category: "Канцтовары",
+    patterns: [/кассов/u, /лент/u, /бумаг/u, /ручк/u, /степлер/u, /ножниц/u, /\bа4\b/u],
+  },
+  {
+    category: "Бытовая химия",
+    patterns: [/белизна/u, /санокс/u, /хелп/u, /моющ/u, /чистящ/u, /дезинф/u, /средство для/u, /химия/u],
+  },
+  {
+    category: "Текстиль",
+    patterns: [/полотн/u, /вафельн/u, /текстил/u, /полотенц/u, /тряпк[аи] для пола/u],
+  },
+];
+
+function categoryNameTokens(value) {
+  return String(value || "")
+    .toLocaleLowerCase("ru-RU")
+    .replaceAll("ё", "е")
+    .split(/[^a-zа-я0-9]+/u)
+    .filter((token) => token.length >= 3);
+}
+
+/** Категория по названию: похожий товар в каталоге → ключевые слова → «Новые товары». */
+export function inferProductCategory(name, products = [], fallback = "Новые товары") {
+  const query = String(name || "").trim();
+  if (!query) return fallback;
+
+  const queryTokens = categoryNameTokens(query);
+  let best = null;
+  for (const product of Array.isArray(products) ? products : []) {
+    const category = String(product?.category || "").trim();
+    if (!category || PLACEHOLDER_PRODUCT_CATEGORIES.has(category)) continue;
+    const productTokens = new Set(categoryNameTokens(product.name));
+    if (!queryTokens.length || !productTokens.size) continue;
+    const hit = queryTokens.filter((token) => productTokens.has(token)).length;
+    const score = hit / queryTokens.length;
+    if (score < 0.52) continue;
+    if (!best || score > best.score || (score === best.score && category.localeCompare(best.category, "ru") < 0)) {
+      best = { category, score };
+    }
+  }
+  if (best) return best.category;
+
+  const text = query.toLocaleLowerCase("ru-RU").replaceAll("ё", "е");
+  for (const rule of CATEGORY_KEYWORD_RULES) {
+    if (rule.patterns.some((pattern) => pattern.test(text))) return rule.category;
+  }
+  return fallback;
 }
 
 export function normalizeProduct(product) {

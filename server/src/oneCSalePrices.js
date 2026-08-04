@@ -1,0 +1,225 @@
+/** Виды цен 1С (категории цен) и продажные цены номенклатуры по виду. */
+
+function cleanText(value) {
+  return String(value ?? "").trim();
+}
+
+function finiteNonNegative(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const numeric = Number(String(value).replace(",", "."));
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
+}
+
+const UNITS = ["piece", "bundle", "pack", "box", "pair", "roll"];
+
+export function normalizeOneCPriceType(item = {}) {
+  const id = cleanText(item.id ?? item.oneCId ?? item.ref ?? item.code);
+  const name = cleanText(item.name ?? item.presentation ?? item.description ?? id);
+  return {
+    id,
+    code: cleanText(item.code ?? item.oneCCode),
+    name,
+  };
+}
+
+export function normalizeOneCPriceTypes(items) {
+  const unique = new Map();
+  for (const raw of Array.isArray(items) ? items : []) {
+    const item = normalizeOneCPriceType(raw);
+    if (!item.id || !item.name) continue;
+    unique.set(item.id, item);
+  }
+  return [...unique.values()].sort((a, b) =>
+    a.name.localeCompare(b.name, "ru")
+  );
+}
+
+function unitPricesFromPayload(raw = {}) {
+  const prices =
+    raw.prices && typeof raw.prices === "object" && !Array.isArray(raw.prices)
+      ? raw.prices
+      : {};
+  const generic = finiteNonNegative(
+    raw.price ?? raw.salePrice ?? raw.Цена ?? prices.price ?? prices.sale
+  );
+  const result = {};
+  for (const unit of UNITS) {
+    result[unit] = finiteNonNegative(
+      raw[unit] ??
+        raw[`price${unit[0].toUpperCase()}${unit.slice(1)}`] ??
+        prices[unit]
+    );
+  }
+  // Если пришла одна цена без единиц — считаем её ценой за штуку.
+  if (result.piece === null && generic !== null) {
+    result.piece = generic;
+  }
+  return result;
+}
+
+export function hasSalePriceForType(oneCItem = {}, priceTypeId = "") {
+  const typeId = cleanText(priceTypeId);
+  if (!typeId) return false;
+  const byType =
+    oneCItem.salePricesByType && typeof oneCItem.salePricesByType === "object"
+      ? oneCItem.salePricesByType
+      : {};
+  const entry = byType[typeId];
+  if (!entry || typeof entry !== "object") return false;
+  return UNITS.some((unit) => finiteNonNegative(entry[unit]) !== null);
+}
+
+export function salePriceForUnit(oneCItem = {}, priceTypeId = "", unit = "piece") {
+  const typeId = cleanText(priceTypeId);
+  if (!typeId) return null;
+  const byType =
+    oneCItem.salePricesByType && typeof oneCItem.salePricesByType === "object"
+      ? oneCItem.salePricesByType
+      : {};
+  const entry = byType[typeId];
+  if (!entry || typeof entry !== "object") return null;
+  return finiteNonNegative(entry[unit]);
+}
+
+/**
+ * Объединяет виды цен из 1С.
+ * Полная замена списка, если items непустой массив.
+ */
+export function mergeOneCPriceTypes(existing, incomingItems, { receivedAt = new Date().toISOString() } = {}) {
+  const next = normalizeOneCPriceTypes(incomingItems);
+  if (!next.length && Array.isArray(incomingItems) && incomingItems.length === 0) {
+    return { types: [], receivedAt, accepted: 0 };
+  }
+  if (!next.length) {
+    return {
+      types: normalizeOneCPriceTypes(existing),
+      receivedAt,
+      accepted: 0,
+    };
+  }
+  return { types: next, receivedAt, accepted: next.length };
+}
+
+/**
+ * Пишет продажные цены по виду цен в карточки oneCProducts.
+ * items: [{ id, priceTypeId, price? | prices?: { piece, pack, ... } }]
+ */
+export function mergeSalePricesByType(
+  existingProducts,
+  incomingItems,
+  { receivedAt = new Date().toISOString() } = {}
+) {
+  const existing = Array.isArray(existingProducts) ? [...existingProducts] : [];
+  const byId = new Map(
+    existing
+      .filter((item) => cleanText(item?.id))
+      .map((item) => [String(item.id), { ...item }])
+  );
+  const accepted = [];
+  const rejected = [];
+
+  for (const raw of Array.isArray(incomingItems) ? incomingItems : []) {
+    const id = cleanText(raw?.id ?? raw?.oneCId ?? raw?.ref);
+    const priceTypeId = cleanText(
+      raw?.priceTypeId ?? raw?.priceType ?? raw?.видЦен ?? raw?.ВидЦен
+    );
+    if (!id) {
+      rejected.push({ id: "", reason: "id_missing" });
+      continue;
+    }
+    if (!priceTypeId) {
+      rejected.push({ id, reason: "price_type_missing" });
+      continue;
+    }
+
+    const unitPrices = unitPricesFromPayload(raw);
+    if (!UNITS.some((unit) => unitPrices[unit] !== null)) {
+      rejected.push({ id, priceTypeId, reason: "sale_price_missing" });
+      continue;
+    }
+
+    const previous = byId.get(id) || { id };
+    const salePricesByType = {
+      ...(previous.salePricesByType && typeof previous.salePricesByType === "object"
+        ? previous.salePricesByType
+        : {}),
+    };
+    const previousType =
+      salePricesByType[priceTypeId] && typeof salePricesByType[priceTypeId] === "object"
+        ? salePricesByType[priceTypeId]
+        : {};
+    const mergedUnits = { ...previousType };
+    for (const unit of UNITS) {
+      if (unitPrices[unit] !== null) mergedUnits[unit] = unitPrices[unit];
+      else if (finiteNonNegative(previousType[unit]) !== null) {
+        mergedUnits[unit] = previousType[unit];
+      } else {
+        mergedUnits[unit] = null;
+      }
+    }
+    salePricesByType[priceTypeId] = {
+      ...mergedUnits,
+      updatedAt: receivedAt,
+      receivedAt,
+      priceTypeId,
+      priceTypeName: cleanText(
+        raw?.priceTypeName ?? raw?.priceTypeTitle ?? previousType.priceTypeName
+      ),
+    };
+
+    const merged = {
+      ...previous,
+      id,
+      code: cleanText(raw?.code || raw?.oneCCode || previous.code),
+      name: cleanText(
+        raw?.name ||
+          raw?.presentation ||
+          raw?.description ||
+          previous.name ||
+          id
+      ),
+      salePricesByType,
+      salePriceUpdatedAt: receivedAt,
+      salePriceReceivedAt: receivedAt,
+    };
+    byId.set(id, merged);
+    accepted.push({ id, priceTypeId });
+  }
+
+  return {
+    products: [...byId.values()],
+    accepted,
+    rejected,
+    receivedAt,
+  };
+}
+
+/** Товары, которым нужна цена выбранного вида для клиентов с one_c_price_type. */
+export function buildSalePriceRequirements(products = [], clientLinks = {}) {
+  const typeIds = new Set();
+  for (const link of Object.values(clientLinks || {})) {
+    const typeId = cleanText(link?.oneCPriceTypeId);
+    if (typeId && (link?.defaultPricingMode === "one_c_price_type" || typeId)) {
+      typeIds.add(typeId);
+    }
+  }
+  if (!typeIds.size) return [];
+
+  const required = [];
+  for (const product of Array.isArray(products) ? products : []) {
+    if (product.active === false) continue;
+    const oneCId = cleanText(product.oneCId);
+    if (!oneCId) continue;
+    for (const priceTypeId of typeIds) {
+      required.push({
+        productId: product.id,
+        id: oneCId,
+        code: cleanText(product.oneCCode || product.code),
+        name: cleanText(product.oneCName || product.name),
+        displayName: cleanText(product.name),
+        priceTypeId,
+      });
+    }
+  }
+  return required;
+}

@@ -192,6 +192,7 @@ function MatrixOneCProductAdd({ clientId, link, setProducts, setClientLinks, onA
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   const runSearch = async (query = search) => {
     setLoading(true);
@@ -216,41 +217,60 @@ function MatrixOneCProductAdd({ clientId, link, setProducts, setClientLinks, onA
   const openPicker = async () => {
     setOpen(true);
     setNotice("");
+    setSelectedIds(new Set());
     await runSearch(search);
   };
 
-  const selectItem = async (item) => {
+  const toggleSelected = (itemId) => {
+    const key = String(itemId);
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const addItems = async (toAdd) => {
+    const list = Array.isArray(toAdd) ? toAdd : [];
+    if (!list.length) return;
+
     setLoading(true);
     setError("");
     setNotice("");
+    const addedNames = [];
     try {
-      const result = await api.createProductFromOneCCatalog({
-        oneCId: item.id,
-        item,
-        clientId,
-      });
-      if (Array.isArray(result.products)) {
-        setProducts(result.products.map(normalizeProduct));
+      for (const item of list) {
+        const result = await api.createProductFromOneCCatalog({
+          oneCId: item.id,
+          item,
+          clientId,
+        });
+        if (Array.isArray(result.products)) {
+          setProducts(result.products.map(normalizeProduct));
+        }
+        if (result.clientLinks) {
+          setClientLinks(result.clientLinks);
+        } else if (result.clientLink) {
+          setClientLinks((current) => ({
+            ...current,
+            [clientId]: {
+              ...EMPTY_LINK,
+              ...(current[clientId] || {}),
+              ...result.clientLink,
+            },
+          }));
+        }
+        addedNames.push(result.product?.name || item.name);
+        onAfterAdd?.(result);
       }
-      if (result.clientLinks) {
-        setClientLinks(result.clientLinks);
-      } else if (result.clientLink) {
-        setClientLinks((current) => ({
-          ...current,
-          [clientId]: {
-            ...EMPTY_LINK,
-            ...(current[clientId] || {}),
-            ...result.clientLink,
-          },
-        }));
-      }
+      setSelectedIds(new Set());
       setNotice(
-        result.created
-          ? `Товар «${result.product?.name || item.name}» добавлен в Clover и в матрицу.`
-          : `Товар уже был в Clover — добавлен в матрицу: «${result.product?.name || item.name}».`
+        addedNames.length === 1
+          ? `Добавлено в матрицу: «${addedNames[0]}».`
+          : `Добавлено в матрицу: ${addedNames.length} поз. (${addedNames.slice(0, 3).join(", ")}${addedNames.length > 3 ? "…" : ""}).`
       );
-      onAfterAdd?.(result);
-      setOpen(false);
+      // Окно не закрываем — можно выбрать ещё позиции.
     } catch (selectError) {
       setError(selectError.message);
     } finally {
@@ -258,11 +278,14 @@ function MatrixOneCProductAdd({ clientId, link, setProducts, setClientLinks, onA
     }
   };
 
+  const selectedItems = items.filter((item) => selectedIds.has(String(item.id)));
+
   return (
     <div className="matrix-onec-add" style={{ marginTop: 12 }}>
       <div className="toolbar two">
         <p className="muted small" style={{ margin: 0 }}>
-          Можно взять позицию прямо из каталога 1С: товар появится в разделе «Товары» и в матрице клиента.
+          Можно взять позиции из каталога 1С: товары появятся в разделе «Товары» и в матрице клиента.
+          Отметьте несколько строк галочками и нажмите «Добавить выбранные».
           {link.matrixMode === "all" ? " В режиме «все товары» позиция сразу доступна клиенту." : ""}
         </p>
         <button className="secondary-button" type="button" onClick={openPicker} disabled={loading}>
@@ -291,26 +314,56 @@ function MatrixOneCProductAdd({ clientId, link, setProducts, setClientLinks, onA
             <button className="secondary-button" type="button" onClick={() => setOpen(false)}>Закрыть</button>
           </div>
           {error && <div className="sync-error">{error}</div>}
-          <p className="muted small">Найдено: {total}. Показаны первые {items.length || 0}.</p>
+          <div className="toolbar two" style={{ marginTop: 8, marginBottom: 8 }}>
+            <p className="muted small" style={{ margin: 0 }}>
+              Найдено: {total}. Показаны первые {items.length || 0}. Выбрано: {selectedIds.size}.
+            </p>
+            <button
+              className="primary-button"
+              type="button"
+              disabled={loading || selectedIds.size === 0}
+              onClick={() => addItems(selectedItems)}
+            >
+              {loading ? "Добавляем..." : `Добавить выбранные (${selectedIds.size})`}
+            </button>
+          </div>
           <div className="one-c-products-list one-c-picker-list">
             {items.map((item) => {
               const alreadyInClover = Boolean(item.cloverLink?.productId);
+              const checked = selectedIds.has(String(item.id));
               return (
-                <article key={item.id}>
-                  <div>
-                    <strong>{item.name}</strong>
-                    <span>Код: {item.code || "—"}</span>
-                    {alreadyInClover && (
-                      <span className="muted small">
-                        Уже в Clover: {item.cloverLink.productName || `ID ${item.cloverLink.productId}`}
-                      </span>
-                    )}
-                  </div>
+                <article
+                  key={item.id}
+                  className={checked ? "one-c-picker-row selected" : "one-c-picker-row"}
+                  onClick={() => toggleSelected(item.id)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <label style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: 0, cursor: "pointer", flex: 1 }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleSelected(item.id)}
+                      onClick={(event) => event.stopPropagation()}
+                      style={{ marginTop: 4 }}
+                    />
+                    <div>
+                      <strong>{item.name}</strong>
+                      <span>Код: {item.code || "—"}</span>
+                      {alreadyInClover && (
+                        <span className="muted small">
+                          Уже в Clover: {item.cloverLink.productName || `ID ${item.cloverLink.productId}`}
+                        </span>
+                      )}
+                    </div>
+                  </label>
                   <button
-                    className="primary-button"
+                    className="secondary-button"
                     type="button"
                     disabled={loading}
-                    onClick={() => selectItem(item)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      addItems([item]);
+                    }}
                   >
                     {alreadyInClover ? "В матрицу" : "Добавить"}
                   </button>
@@ -684,6 +737,8 @@ export function ManagerClients({
   setProducts,
   clientLinks,
   setClientLinks,
+  dirtyClientLinkIdsRef,
+  oneCPriceTypes = [],
   onReload,
 }) {
   const [search, setSearch] = useState("");
@@ -852,6 +907,7 @@ export function ManagerClients({
         ...patch,
       },
     }));
+    dirtyClientLinkIdsRef?.current?.add(clientId);
     setMatrixSaveState((current) => ({
       ...current,
       [clientId]: {
@@ -962,7 +1018,7 @@ export function ManagerClients({
           [clientId]: {
             status: "error",
             message:
-              `Для «${product.name}» выбрана фиксированная цена, но сумма не указана. Введите цену или верните «По умолчанию клиента».`,
+              `Для «${product.name}» выбрана фиксированная цена, но сумма не указана. Введите цену или верните «По матрице».`,
           },
         }));
         return;
@@ -988,6 +1044,7 @@ export function ManagerClients({
         delete next[clientId];
         return next;
       });
+      dirtyClientLinkIdsRef?.current?.delete(clientId);
       setMatrixSaveState((current) => ({
         ...current,
         [clientId]: { status: "saved", message: "Матрица сохранена." },
@@ -1626,9 +1683,49 @@ export function ManagerClients({
 
 
                     <label className="field">
+                      Категория цен 1С (вид цен)
+                      <select
+                        value={link.oneCPriceTypeId || ""}
+                        onChange={(event) => {
+                          const nextId = event.target.value;
+                          const selected = (oneCPriceTypes || []).find(
+                            (item) => String(item.id) === String(nextId)
+                          );
+                          updateLink(client.id, {
+                            oneCPriceTypeId: nextId,
+                            oneCPriceTypeName: selected?.name || "",
+                            defaultPricingMode: nextId
+                              ? "one_c_price_type"
+                              : link.defaultPricingMode === "one_c_price_type"
+                                ? "base"
+                                : link.defaultPricingMode || "base",
+                          });
+                        }}
+                      >
+                        <option value="">Не задана — базовая / наценка</option>
+                        {(oneCPriceTypes || []).map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
+                            {item.code ? ` (${item.code})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <small>
+                        {(oneCPriceTypes || []).length
+                          ? "Источник — договор в 1С (вкладка «Договоры» → «Вид цен»). Подтягивается при выгрузке контрагентов; цены матрицы обновляются онлайн."
+                          : "Задайте вид цен в 1С: карточка контрагента → «Договоры» → «Вид цен», затем «Отправить контрагентов в Clover». Затем выгрузите продажные цены."}
+                      </small>
+                    </label>
+
+                    <label className="field">
                       Цена по умолчанию для матрицы
                       <select
-                        value={link.defaultPricingMode || "base"}
+                        value={
+                          link.oneCPriceTypeId
+                            ? "one_c_price_type"
+                            : link.defaultPricingMode || "base"
+                        }
+                        disabled={Boolean(link.oneCPriceTypeId)}
                         onChange={(event) =>
                           updateLink(client.id, {
                             defaultPricingMode: event.target.value,
@@ -1641,10 +1738,13 @@ export function ManagerClients({
                         <option value="purchase_markup">
                           Закупка 1С + общий процент
                         </option>
+                        <option value="one_c_price_type">
+                          Категория цен 1С
+                        </option>
                       </select>
                     </label>
 
-                    {link.defaultPricingMode === "purchase_markup" && (
+                    {!link.oneCPriceTypeId && link.defaultPricingMode === "purchase_markup" && (
                       <label className="field">
                         Общая наценка для клиента, %
                         <input
@@ -1964,7 +2064,7 @@ export function ManagerClients({
                                     }
                                   >
                                     <option value="inherit">
-                                      По умолчанию клиента
+                                      По матрице
                                     </option>
                                     <option value="manual">
                                       Фиксированная цена вручную

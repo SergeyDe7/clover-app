@@ -146,6 +146,12 @@ import {
   validatePriceRequirements,
 } from "./oneCPriceSync.js";
 import {
+  buildSalePriceRequirements,
+  mergeOneCPriceTypes,
+  mergeSalePricesByType,
+  normalizeOneCPriceTypes,
+} from "./oneCSalePrices.js";
+import {
   publicMailStatus,
   resetPasswordEmail,
   sendCloverMail,
@@ -778,6 +784,14 @@ function normalizeManagerClientAddresses(addresses) {
 function normalizeClientLink(value) {
   const link = value && typeof value === "object" ? value : {};
   const defaultPricing = normalizeDefaultPricingConfig(link);
+  const oneCPriceTypeId = String(link.oneCPriceTypeId || "").trim();
+  const oneCPriceTypeName = String(link.oneCPriceTypeName || "").trim();
+  // Выбранный вид цен 1С всегда даёт режим one_c_price_type.
+  const defaultPricingMode = oneCPriceTypeId
+    ? "one_c_price_type"
+    : defaultPricing.source === "one_c_price_type"
+      ? "base"
+      : defaultPricing.source;
 
   return {
     ...EMPTY_LINK,
@@ -787,8 +801,10 @@ function normalizeClientLink(value) {
       ? link.matrixProductIds
       : [],
     allowFullCatalog: Boolean(link.allowFullCatalog),
-    defaultPricingMode: defaultPricing.source,
+    defaultPricingMode,
     defaultMarkupPercent: defaultPricing.markupPercent,
+    oneCPriceTypeId,
+    oneCPriceTypeName,
     personalPrices:
       link.personalPrices &&
       typeof link.personalPrices === "object"
@@ -1825,6 +1841,9 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
       clients: listClients(),
       reconciliationRequests: listReconciliationRequests(),
       managerNotifications: listManagerNotifications({ limit: 100 }),
+      oneCPriceTypes: normalizeOneCPriceTypes(
+        getGlobalState("oneCPriceTypes", [])
+      ),
       services: {
         mail: publicMailStatus(),
         push: publicPushStatus(),
@@ -2625,6 +2644,89 @@ app.post("/api/one-c/purchase-prices", (req, res, next) => {
     const merged = receivePurchasePrices({
       items: req.body?.items,
       database: extractOneCDatabase(req),
+    });
+    res.json({
+      ok: true,
+      database: "TEST",
+      receivedAt: merged.receivedAt,
+      accepted: merged.accepted.length,
+      rejected: merged.rejected,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Справочник видов цен (категорий цен) из 1С TEST. */
+app.get("/api/one-c/price-types", (req, res) => {
+  if (!requireOneCTestDatabase(req, res)) return;
+  const types = normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", []));
+  const meta = getGlobalState("oneCPriceTypesMeta", {});
+  res.json({
+    ok: true,
+    database: "TEST",
+    items: types,
+    updatedAt: meta.updatedAt || "",
+  });
+});
+
+app.post("/api/one-c/price-types", (req, res, next) => {
+  try {
+    if (!requireOneCTestDatabase(req, res)) return;
+    const receivedAt = new Date().toISOString();
+    const merged = mergeOneCPriceTypes(
+      getGlobalState("oneCPriceTypes", []),
+      req.body?.items ?? req.body?.priceTypes ?? [],
+      { receivedAt }
+    );
+    setGlobalState("oneCPriceTypes", merged.types);
+    setGlobalState("oneCPriceTypesMeta", {
+      updatedAt: receivedAt,
+      accepted: merged.accepted,
+    });
+    auditFromRequest(req, "one-c.price-types.receive", {
+      accepted: merged.accepted,
+    });
+    res.json({
+      ok: true,
+      database: "TEST",
+      receivedAt,
+      accepted: merged.accepted,
+      items: merged.types,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Запрос продажных цен по видам, назначенным клиентам. */
+app.get("/api/one-c/sale-price-request", (req, res) => {
+  if (!requireOneCTestDatabase(req, res)) return;
+  const products = getGlobalState("products", DEFAULT_PRODUCTS);
+  const clientLinks = getGlobalState("clientLinks", {});
+  const items = buildSalePriceRequirements(products, clientLinks);
+  res.json({
+    ok: true,
+    database: "TEST",
+    items,
+    priceTypes: normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", [])),
+  });
+});
+
+/** Приём продажных цен номенклатуры по виду цен из 1С TEST. */
+app.post("/api/one-c/sale-prices", (req, res, next) => {
+  try {
+    if (!requireOneCTestDatabase(req, res)) return;
+    const receivedAt = new Date().toISOString();
+    const merged = mergeSalePricesByType(
+      getGlobalState("oneCProducts", []),
+      req.body?.items ?? [],
+      { receivedAt }
+    );
+    setGlobalState("oneCProducts", merged.products);
+    auditFromRequest(req, "one-c.sale-prices.receive", {
+      accepted: merged.accepted.length,
+      rejected: merged.rejected.length,
     });
     res.json({
       ok: true,
@@ -3931,6 +4033,27 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
     setGlobalState("oneCClients", linked.oneCClients);
     setGlobalState("oneCClientCandidates", cleanCandidateMap);
     if (linked.changed) setGlobalState("clientLinks", linked.clientLinks);
+
+    // Справочник видов цен — из выгрузки контрагентов (поля договора).
+    const harvestedTypes = allOneCClients
+      .filter((item) => item.priceTypeId)
+      .map((item) => ({
+        id: item.priceTypeId,
+        code: item.priceTypeCode || "",
+        name: item.priceTypeName || item.priceTypeCode || item.priceTypeId,
+      }));
+    if (harvestedTypes.length) {
+      const union = normalizeOneCPriceTypes([
+        ...normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", [])),
+        ...harvestedTypes,
+      ]);
+      setGlobalState("oneCPriceTypes", union);
+      setGlobalState("oneCPriceTypesMeta", {
+        updatedAt: receivedAt,
+        source: "clients-preview",
+        accepted: union.length,
+      });
+    }
 
     const meta = {
       receivedAt,

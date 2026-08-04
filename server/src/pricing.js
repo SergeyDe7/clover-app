@@ -1,3 +1,5 @@
+import { salePriceForUnit } from "./oneCSalePrices.js";
+
 export const UNITS = ["piece", "bundle", "pack", "box", "pair", "roll"];
 
 const UNIT_SIZE_FIELD = {
@@ -19,12 +21,12 @@ const UNIT_PRICE_FIELD = {
 };
 
 const UNIT_LABEL = {
-  piece: "Штука",
-  pack: "Упаковка",
-  bundle: "Пачка",
-  box: "Коробка",
-  pair: "Пара",
-  roll: "Рулон",
+  piece: "штука",
+  pack: "упаковка",
+  bundle: "пачка",
+  box: "коробка",
+  pair: "пара",
+  roll: "рулон",
 };
 
 function finiteNonNegative(value) {
@@ -42,11 +44,12 @@ export function unitPriceField(unit) {
 }
 
 export function unitLabel(unit) {
-  return UNIT_LABEL[unit] || "Штука";
+  return UNIT_LABEL[unit] || "штука";
 }
 
 export function normalizePricingSource(value, rawConfig = {}) {
   if (value === "purchase_markup") return "purchase_markup";
+  if (value === "one_c_price_type") return "one_c_price_type";
   if (value === "manual") return "manual";
   if (value === "inherit") return "inherit";
 
@@ -56,7 +59,9 @@ export function normalizePricingSource(value, rawConfig = {}) {
 }
 
 export function normalizeDefaultPricingSource(value) {
-  return value === "purchase_markup" ? "purchase_markup" : "base";
+  if (value === "purchase_markup") return "purchase_markup";
+  if (value === "one_c_price_type") return "one_c_price_type";
+  return "base";
 }
 
 export function normalizeMarkupPercent(value) {
@@ -167,6 +172,7 @@ export function resolveClientProductPricing(
     markupPercent,
     defaultPricingMode: defaults.source,
     defaultMarkupPercent: defaults.markupPercent,
+    oneCPriceTypeId: cleanTextPriceType(rawDefaultConfig?.oneCPriceTypeId),
     purchasePriceUpdatedAt:
       oneCItem?.purchasePriceReceivedAt ||
       oneCItem?.purchasePriceUpdatedAt ||
@@ -181,11 +187,27 @@ export function resolveClientProductPricing(
     priceSources: {},
   };
 
+  const priceTypeId = result.oneCPriceTypeId;
+
   for (const unit of UNITS) {
     const baseField = unitPriceField(unit);
     const manual = config[unit];
     const purchase = oneCItem ? purchasePriceForUnit(product, oneCItem, unit) : null;
     result.purchasePrices[unit] = purchase;
+
+    if (source === "one_c_price_type") {
+      const typed = oneCItem ? salePriceForUnit(oneCItem, priceTypeId, unit) : null;
+      if (typed !== null) {
+        result.prices[unit] = typed;
+        result.priceSources[unit] = "one_c_price_type";
+      } else {
+        const fallback = Math.max(0, Number(product[baseField]) || 0);
+        result.prices[unit] = fallback;
+        result.priceSources[unit] =
+          fallback > 0 ? "base_fallback" : "one_c_price_missing";
+      }
+      continue;
+    }
 
     if (source === "purchase_markup") {
       const calculated = calculateMarkupPrice(purchase, markupPercent);
@@ -214,6 +236,10 @@ export function resolveClientProductPricing(
   }
 
   return result;
+}
+
+function cleanTextPriceType(value) {
+  return String(value ?? "").trim();
 }
 
 export function enrichProductWithPurchasePrices(product = {}, oneCItem = null) {

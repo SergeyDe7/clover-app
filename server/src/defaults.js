@@ -88,5 +88,7 @@ export const EMPTY_LINK = {
   allowFullCatalog: false,
   defaultPricingMode: "base",
   defaultMarkupPercent: 0,
+  oneCPriceTypeId: "",
+  oneCPriceTypeName: "",
   personalPrices: {},
 };

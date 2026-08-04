@@ -14,14 +14,57 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-const CLOVER_UI_BUILD = "ui-20260804-v105";
+const CLOVER_UI_BUILD = "ui-20260804-v106";
 const BOOT_SPLASH_MS = 1000;
+const APP_THEME_COLOR = "#f4f8f2";
+const VIEWPORT_BASE = "width=device-width, initial-scale=1.0, viewport-fit=cover";
+
+function setThemeColor(color) {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", color);
+}
+
+/** После правки текста на iPhone сбрасывает «залипший» зум страницы. */
+function resetMobileViewportZoom() {
+  if (typeof window === "undefined") return;
+  const vv = window.visualViewport;
+  const scaled = vv && Math.abs((vv.scale || 1) - 1) > 0.02;
+  if (!scaled) return;
+  const meta = document.querySelector('meta[name="viewport"]');
+  if (!meta) return;
+  meta.setAttribute("content", `${VIEWPORT_BASE}, maximum-scale=1.0`);
+  window.setTimeout(() => {
+    meta.setAttribute("content", VIEWPORT_BASE);
+  }, 80);
+}
+
+function installMobileInputZoomReset() {
+  document.addEventListener(
+    "focusout",
+    (event) => {
+      const target = event.target;
+      if (!target || !/^(INPUT|TEXTAREA|SELECT)$/i.test(target.tagName || "")) return;
+      window.setTimeout(() => {
+        const active = document.activeElement;
+        if (active && /^(INPUT|TEXTAREA|SELECT)$/i.test(active.tagName || "")) return;
+        resetMobileViewportZoom();
+      }, 120);
+    },
+    true
+  );
+}
+
+installMobileInputZoomReset();
 
 function hideBootSplash() {
   const splash = document.getElementById("clover-boot-splash");
   if (!splash || splash.dataset.done === "1") return;
   splash.dataset.done = "1";
   splash.classList.add("is-done");
+  // После splash — цвет кабинета, не цвет анимации
+  setThemeColor(APP_THEME_COLOR);
+  document.documentElement.style.backgroundColor = APP_THEME_COLOR;
+  document.body.style.backgroundColor = APP_THEME_COLOR;
   window.setTimeout(() => {
     splash.remove();
   }, 420);

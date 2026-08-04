@@ -1,4 +1,4 @@
-const CACHE_NAME = "clover-v18-shell-v105";
+const CACHE_NAME = "clover-v18-shell-v106";
 const SHELL = [
   "/",
   "/offline.html",

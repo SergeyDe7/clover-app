@@ -12,6 +12,7 @@ import {
   formatMoney,
   formatDateTime,
   normalizeProduct,
+  inferProductCategory,
 } from "../../shared/appHelpers";
 import { SoftBanner } from "../../shared/uxFeedback";
 import { appAlert, appConfirm } from "../../shared/AppModal";
@@ -38,7 +39,7 @@ function matchProductForPhoto(products, fileName) {
   }) || null;
 }
 
-function ProductEditor({ product, onClose, onSave }) {
+function ProductEditor({ product, products = [], onClose, onSave }) {
   const isNew = !product;
   const [form, setForm] = useState(product || {
     name: "", category: "Новые товары", code: "", oneCId: "",
@@ -110,8 +111,17 @@ function ProductEditor({ product, onClose, onSave }) {
   };
 
   const selectOneCProduct = (item) => {
+    const nextName = item.name || form.name || "";
+    const keepCategory =
+      form.category &&
+      form.category !== "Новые товары" &&
+      form.category !== "Из 1С";
     const nextProduct = normalizeProduct({
       ...form,
+      name: nextName || form.name,
+      category: keepCategory
+        ? form.category
+        : inferProductCategory(nextName, products),
       oneCId: item.id,
       oneCCode: item.code || "",
       oneCName: item.name || "",
@@ -127,7 +137,7 @@ function ProductEditor({ product, onClose, onSave }) {
     setOneCOpen(false);
     setOneCError("");
     setOneCNotice(
-      "Позиция 1С выбрана, но ещё не сохранена. Проверьте название, категорию, единицы, коэффициенты и цены, затем нажмите «Сохранить товар»."
+      `Позиция 1С выбрана. Категория: «${nextProduct.category}». Проверьте единицы и цены, затем «Сохранить товар».`
     );
   };
 
@@ -352,12 +362,9 @@ function ProductEditor({ product, onClose, onSave }) {
           {UNIT_ORDER.map((unit) => {
             const sizeField = unitSizeField(unit);
             const priceField = unitPriceField(unit);
-            const oneToOne = unitConvertsOneToOneToPieces(unit);
             return <div className="unit-setting" key={unit}>
               <label><input type="checkbox" checked={form.saleUnits.includes(unit)} onChange={(e) => toggleUnit(unit, e.target.checked)} />{UNIT_CONFIG[unit].label}</label>
-              {oneToOne ? (
-                <p className="unit-onec-hint">В 1С → шт (1:1)</p>
-              ) : (
+              {unitConvertsOneToOneToPieces(unit) ? null : (
               <label className="field">Внутри, шт.
                 <input
                   type="number"
@@ -644,12 +651,12 @@ export function ManagerProducts({ products, setProducts }) {
     } else {
       const id = Math.max(0, ...products.map((item) => Number(item.id) || 0)) + 1;
       nextProducts = [
-        ...products,
         normalizeProduct({
           ...value,
           id,
           code: value.code || `CL-${String(id).padStart(4, "0")}`,
         }),
+        ...products,
       ];
     }
 
@@ -894,20 +901,6 @@ export function ManagerProducts({ products, setProducts }) {
                 : "1С: не связан"}
               {product.oneCLinkMode === "auto" ? " · автоматически" : product.oneCId ? " · вручную" : ""}
             </p>
-            <div className="product-purchase-summary">
-              {UNIT_ORDER.map((unit) => {
-                const value = product.purchasePrices?.[unit];
-                return (
-                  <span key={unit}>
-                    <strong>{UNIT_CONFIG[unit].label}:</strong>{" "}
-                    {hasPurchasePrice(value) ? formatMoney(value) : "—"}
-                  </span>
-                );
-              })}
-              <span className="product-purchase-updated">
-                Закупка 1С обновлена: {formatDateTime(product.purchasePriceUpdatedAt)}
-              </span>
-            </div>
           </div>
           <span className={product.active ? "badge green" : "badge gray"}>{product.active ? "Активен" : "Скрыт"}</span>
           <strong>{settingsPriceLabel(product)}</strong>
@@ -932,7 +925,14 @@ export function ManagerProducts({ products, setProducts }) {
         </article>
         ))}
       </div>
-      {editorProduct !== undefined && <ProductEditor product={editorProduct} onClose={() => setEditorProduct(undefined)} onSave={save} />}
+      {editorProduct !== undefined && (
+        <ProductEditor
+          product={editorProduct}
+          products={products}
+          onClose={() => setEditorProduct(undefined)}
+          onSave={save}
+        />
+      )}
     </section>
   );
 }
