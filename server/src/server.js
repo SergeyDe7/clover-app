@@ -660,6 +660,12 @@ const registerSchema = z.object({
   password: z.string().min(8).max(200),
 });
 
+const managerClientProvisionSchema = registerSchema;
+
+const managerClientPasswordSchema = z.object({
+  password: z.string().min(8).max(200),
+});
+
 const managerCreateSchema = z.object({
   email: z.string().trim().email().max(200),
   password: z.string().min(12).max(200),
@@ -4748,26 +4754,115 @@ app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("m
   }
   const user = setUserApprovalStatus(req.params.clientId, status);
   if (!user) return res.status(404).json({ error: "Клиент не найден." });
-  auditFromRequest(req, "client.approval", { clientId: user.id, status });
+  // Разрешение менеджером = доверенный доступ: почту тоже считаем подтверждённой,
+  // иначе вход блокируется EMAIL_NOT_VERIFIED даже после «Разрешить».
+  if (status === "approved" && !user.email_verified) {
+    setUserEmailVerified(user.id, true);
+  }
+  const refreshed = findUserById(user.id) || user;
+  auditFromRequest(req, "client.approval", {
+    clientId: refreshed.id,
+    status,
+    emailVerified: Boolean(refreshed.email_verified),
+  });
   if (["approved", "rejected"].includes(status)) {
-    markManagerNotificationsReadBySource("client_registration", user.id);
+    markManagerNotificationsReadBySource("client_registration", refreshed.id);
   }
   let mail = { sent: false };
-  if (["approved", "rejected"].includes(status) && user.email) {
+  if (["approved", "rejected"].includes(status) && refreshed.email) {
     try {
-      mail = await sendCloverMail({ to: user.email, ...approvalEmail({ approved: status === "approved" }) });
+      mail = await sendCloverMail({
+        to: refreshed.email,
+        ...approvalEmail({ approved: status === "approved" }),
+      });
     } catch (mailError) {
       console.error("Approval email error", mailError);
     }
   }
   res.json({
     ok: true,
-    user: publicUser(user),
+    user: publicUser(refreshed),
     clients: listClients(),
     mail: { sent: Boolean(mail.sent) },
     managerNotifications: listManagerNotifications({ limit: 100 }),
   });
 });
+
+app.post("/api/admin/clients", authRequired, roleRequired("manager"), async (req, res, next) => {
+  try {
+    const input = managerClientProvisionSchema.parse(req.body);
+    const email = normalizeEmail(input.email);
+    if (findUserByEmail(email)) {
+      return res.status(409).json({ error: "Аккаунт с такой почтой уже существует." });
+    }
+    const passwordHash = await bcrypt.hash(input.password, 12);
+    const user = createUser({
+      email,
+      passwordHash,
+      role: "client",
+      emailVerified: true,
+      approvalStatus: "approved",
+      profile: {
+        companyName: input.companyName,
+        contactName: input.contactName,
+        phone: input.phone,
+        email,
+      },
+    });
+    auditFromRequest(req, "client.provision", {
+      clientId: user.id,
+      email,
+      companyName: input.companyName,
+    });
+    res.status(201).json({
+      ok: true,
+      message: "Клиент создан. Можно выдать логин и пароль.",
+      client: listClients().find((item) => String(item.id) === String(user.id)) || null,
+      user: publicUser(user),
+      clients: listClients(),
+      login: email,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post(
+  "/api/admin/clients/:clientId/password",
+  authRequired,
+  roleRequired("manager"),
+  async (req, res, next) => {
+    try {
+      const input = managerClientPasswordSchema.parse(req.body);
+      const clientUser = findUserById(req.params.clientId);
+      if (!clientUser || clientUser.role !== "client") {
+        return res.status(404).json({ error: "Клиент Clover не найден." });
+      }
+      const passwordHash = await bcrypt.hash(input.password, 12);
+      const updated = updateUserPassword(clientUser.id, passwordHash);
+      // Чтобы клиент мог войти сразу после выдачи пароля менеджером.
+      if (!updated?.email_verified) {
+        setUserEmailVerified(clientUser.id, true);
+      }
+      if (updated?.approval_status !== "approved") {
+        setUserApprovalStatus(clientUser.id, "approved");
+      }
+      const refreshed = findUserById(clientUser.id) || updated;
+      auditFromRequest(req, "client.password.set_by_manager", {
+        clientId: clientUser.id,
+      });
+      res.json({
+        ok: true,
+        message: "Пароль обновлён. Можно выдать клиенту логин и новый пароль.",
+        user: publicUser(refreshed),
+        login: refreshed?.email || clientUser.email,
+        clients: listClients(),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 app.get("/api/admin/notifications", authRequired, roleRequired("manager"), (req, res) => {
   const unreadOnly = String(req.query?.unread || "") === "1";
