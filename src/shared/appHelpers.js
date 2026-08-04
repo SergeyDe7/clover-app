@@ -3503,7 +3503,9 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     justify-content: flex-end;
   }
   .app-header-with-nav .header-logout {
+    order: 30;
     flex: 0 0 auto;
+    margin-left: auto;
     white-space: nowrap;
   }
   .app-header-with-nav .app-header-nav {

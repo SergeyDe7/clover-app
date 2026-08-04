@@ -1547,10 +1547,11 @@ body:has(.clover-app) {
     justify-content: flex-end !important;
   }
 
+  /* Правый верхний угол: после поиска/колокольчика (у tools order: 2) */
   .clover-app .app-header-with-nav .header-logout {
-    order: unset !important;
+    order: 30 !important;
     flex: 0 0 auto !important;
-    margin-left: 0 !important;
+    margin-left: auto !important;
     white-space: nowrap !important;
   }
 
@@ -1686,7 +1687,7 @@ body:has(.clover-app) {
   }
 
   .clover-app .header-logout {
-    margin-left: 0 !important;
+    margin-left: auto !important;
     white-space: nowrap !important;
   }
 
