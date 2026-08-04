@@ -2085,6 +2085,8 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
           body: copy.body,
           url: `/?managerTab=orders&order=${encodeURIComponent(order.id)}`,
           sourceId: String(order.id),
+          order,
+          customerName,
         });
       } else if (clientOrderSignature(previous) !== clientOrderSignature(order)) {
         const changeHash = createHash("sha256")
@@ -4040,7 +4042,7 @@ app.get(
     res.json({
       items: found.items.map((item) => ({
         ...item,
-        cloverLink: linksByOneCId.get(item.id) || null,
+        cloverLink: linksByOneCId.get(String(item.id)) || null,
       })),
       total: found.total,
       offset,
@@ -4939,36 +4941,54 @@ app.post(
     if (!stored) return res.status(404).json({ error: "Заказ не найден." });
 
     const previous = normalizeExchangeState(stored.payload.exchange);
-    if (previous.status === "sending" && !isOneCClaimExpired(previous)) {
+
+    // После ACK / документа 1С отозвать нельзя.
+    if (previous.status === "sent") {
       return res.status(409).json({
         error:
-          "Заказ уже выдан 1С TEST и ожидает ACK. Сброс заблокирован, пока активен claim. Дождитесь подтверждения или истечения lease.",
-        code: "ONEC_CLAIM_ACTIVE",
+          "Заказ уже принят в 1С (есть подтверждение документа). Отменить передачу нельзя.",
+        code: "ONEC_SENT_LOCKED",
+      });
+    }
+    if (
+      previous.status === "draft" &&
+      (String(previous.receipt || "").trim() ||
+        String(previous.remoteDocument?.id || previous.remoteDocument?.number || "").trim())
+    ) {
+      return res.status(409).json({
+        error:
+          "У заказа уже есть черновик в 1С. Отменить передачу нельзя.",
+        code: "ONEC_DRAFT_LOCKED",
       });
     }
 
-    if (!canReturnOrderToOneCQueue(stored.payload)) {
+    if (
+      previous.status !== "ready" &&
+      previous.status !== "sending" &&
+      previous.status !== "error"
+    ) {
       return res.status(409).json({
         error:
-          previous.status === "draft"
-            ? "У заказа уже есть черновик в 1С. Сброс заблокирован для защиты от дубля."
-            : "Заказ уже подтверждён уникальным документом 1С. Сброс заблокирован для защиты от дубля.",
-        code:
-          previous.status === "draft"
-            ? "ONEC_DRAFT_LOCKED"
-            : "ONEC_SENT_LOCKED",
+          "Сброс доступен для заказов в очереди, с ошибкой или ожидающих ACK (до принятия в 1С).",
+        code: "ONEC_RESET_NOT_ALLOWED",
       });
     }
+
     const exchange = {
       ...previous,
       status: "not_sent",
       checkedAt: "",
       lastAttemptAt: "",
       sentAt: "",
+      claimedAt: "",
+      claimedBy: "",
       receipt: "",
       remoteDocument: null,
       channel: "",
-      message: "Статус передачи сброшен менеджером.",
+      message:
+        previous.status === "error"
+          ? "Статус передачи сброшен менеджером."
+          : "Передача в 1С отменена менеджером. Можно передать снова.",
     };
     const order = updateOrderPayload(stored.id, {
       ...stored.payload,
@@ -4979,6 +4999,7 @@ app.post(
     auditFromRequest(req, "exchange.reset", {
       orderId: order.id,
       orderNumber: order.number,
+      from: previous.status,
     });
 
     res.json({ ok: true, order, exchange });

@@ -1,7 +1,7 @@
 // Раздел менеджера: заказы клиентов.
 import { useMemo, useState } from "react";
 import { api } from "../../serverApi";
-import { ORDER_STATUSES, allowedNextOrderStatuses } from "../../config/orderConfig";
+import { ORDER_STATUSES, MANAGER_BULK_ORDER_STATUSES, allowedNextOrderStatuses, canCancelOneCTransfer } from "../../config/orderConfig";
 import { CustomRequestPhoto, OrderTimeline } from "../../shared/SharedPanels";
 import {
   UNIT_CONFIG,
@@ -20,7 +20,7 @@ import {
   buildOrderSearchHaystack,
 } from "../../shared/appHelpers";
 import { canTrashOrder } from "../../shared/orderTrash";
-import { appAlert } from "../../shared/AppModal";
+import { appAlert, appConfirm } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
 
 const CUSTOM_STATUSES = [
@@ -116,7 +116,7 @@ export function ManagerOrders({
 
   const runExchangeAction = async (order, action) => {
     const exchange = normalizeOrderExchange(order.exchange);
-    // Уже в очереди / принято: повторный клик в обычной работе не нужен.
+    // Уже в очереди / принято: повторный клик «Передать» не нужен.
     if (
       action === "send"
       && (exchange.status === "ready"
@@ -124,6 +124,17 @@ export function ManagerOrders({
         || exchange.status === "draft"
         || exchange.status === "sent")
     ) {
+      return;
+    }
+    if (action === "cancel" && !canCancelOneCTransfer(exchange)) {
+      await appAlert({
+        title: "Отмена недоступна",
+        message:
+          exchange.status === "sent" || exchange.status === "draft"
+            ? "Заказ уже принят в 1С. Отозвать передачу нельзя."
+            : "Отменить можно только заказ в очереди до принятия в 1С.",
+        tone: "warn",
+      });
       return;
     }
     setBusyOrderId(order.id);
@@ -134,16 +145,68 @@ export function ManagerOrders({
           onApplyManagerNotifications?.(result.managerNotifications);
         }
       }
+      if (action === "cancel") {
+        await api.resetExchangeOrder(order.id);
+      }
       await onReload();
     } catch (error) {
       await appAlert({
-        title: "Не удалось передать в 1С",
+        title: action === "cancel" ? "Не удалось отменить передачу" : "Не удалось передать в 1С",
         message: error.message,
         tone: "danger",
       });
       await onReload();
     } finally {
       setBusyOrderId("");
+    }
+  };
+
+  const runBulkCancelOneC = async () => {
+    if (!selectedIds.length) return;
+    const cancellable = orders.filter(
+      (order) =>
+        selectedIds.includes(order.id) &&
+        canCancelOneCTransfer(normalizeOrderExchange(order.exchange))
+    );
+    if (!cancellable.length) {
+      await appAlert({
+        title: "Нечего отменять",
+        message:
+          "Среди выбранных нет заказов в очереди 1С (до принятия). Уже принятые в 1С отозвать нельзя.",
+        tone: "warn",
+      });
+      return;
+    }
+    const ok = await appConfirm({
+      title: "Отменить передачу в 1С?",
+      message: `Будет отменена передача для ${cancellable.length} заказ(ов). Кнопка снова станет «Передать в 1С».`,
+      confirmLabel: "Отменить передачу",
+      cancelLabel: "Не надо",
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    setBulkBusy(true);
+    const errors = [];
+    try {
+      for (const order of cancellable) {
+        try {
+          await api.resetExchangeOrder(order.id);
+        } catch (error) {
+          errors.push(`${order.number || order.id}: ${error.message}`);
+        }
+      }
+      await onReload();
+      if (errors.length) {
+        await appAlert({
+          title: "Не все передачи отменены",
+          message: errors.join("\n"),
+          tone: "danger",
+        });
+      }
+      setSelectedIds([]);
+    } finally {
+      setBulkBusy(false);
     }
   };
 
@@ -217,20 +280,17 @@ export function ManagerOrders({
     }
   };
 
-  const runBulkExchange = async (action) => {
+  const runBulkSendToOneC = async () => {
     if (!selectedIds.length) return;
     setBulkBusy(true);
     const errors = [];
     try {
       for (const orderId of selectedIds) {
         try {
-          if (action === "check") await api.checkExchangeOrder(orderId);
-          if (action === "send") {
-            await api.checkExchangeOrder(orderId);
-            const result = await api.sendExchangeOrder(orderId);
-            if (Array.isArray(result.managerNotifications)) {
-              onApplyManagerNotifications?.(result.managerNotifications);
-            }
+          await api.checkExchangeOrder(orderId);
+          const result = await api.sendExchangeOrder(orderId);
+          if (Array.isArray(result.managerNotifications)) {
+            onApplyManagerNotifications?.(result.managerNotifications);
           }
         } catch (error) {
           errors.push(error.message);
@@ -254,21 +314,47 @@ export function ManagerOrders({
     <section className="manager-orders-section">
       <div className="manager-orders-topbar" role="toolbar" aria-label="Заказы и действия">
         <button
-          className={ordersView === "active" ? "manager-orders-seg active" : "manager-orders-seg"}
+          className={ordersView === "active" && exchangeFilter === "all" ? "manager-orders-seg active" : "manager-orders-seg"}
           type="button"
-          onClick={() => onOrdersViewChange?.("active")}
+          onClick={() => {
+            onOrdersViewChange?.("active");
+            setExchangeFilter("all");
+          }}
         >
-          Заказы ({orders.length})
-        </button>
-        <button
-          className={ordersView === "trash" ? "manager-orders-seg active" : "manager-orders-seg"}
-          type="button"
-          onClick={() => onOrdersViewChange?.("trash")}
-        >
-          Корзина ({trashedOrders.length})
+          Заказы
         </button>
         {!inTrash && (
           <>
+            <button
+              className={exchangeFilter === "waiting" ? "manager-orders-seg active" : "manager-orders-seg"}
+              type="button"
+              onClick={() => {
+                setFiltersOpen(false);
+                setExchangeFilter((current) => (current === "waiting" ? "all" : "waiting"));
+              }}
+            >
+              Ждут передачи в 1С
+              {waitingOneCCount > 0 ? (
+                <span className="manager-nav-count" aria-label={`Ждут передачи в 1С: ${waitingOneCCount}`}>
+                  {waitingOneCCount}
+                </span>
+              ) : null}
+            </button>
+            <button
+              className={exchangeFilter === "queued" ? "manager-orders-seg active" : "manager-orders-seg"}
+              type="button"
+              onClick={() => {
+                setFiltersOpen(false);
+                setExchangeFilter((current) => (current === "queued" ? "all" : "queued"));
+              }}
+            >
+              В очереди
+              {queuedOneCCount > 0 ? (
+                <span className="manager-nav-count" aria-label={`В очереди: ${queuedOneCCount}`}>
+                  {queuedOneCCount}
+                </span>
+              ) : null}
+            </button>
             <button
               className={filtersOpen ? "manager-orders-seg manager-filters-toggle active" : "manager-orders-seg manager-filters-toggle"}
               type="button"
@@ -284,36 +370,27 @@ export function ManagerOrders({
               onClick={() => setBulkPanelOpen((open) => !open)}
             >
               {bulkPanelOpen ? "Скрыть действия" : "Массовые действия"}
-              {selectedIds.length > 0 ? ` · ${selectedIds.length}` : ""}
+              {selectedIds.length > 0 ? (
+                <span className="manager-nav-count" aria-label={`Выбрано: ${selectedIds.length}`}>
+                  {selectedIds.length}
+                </span>
+              ) : null}
             </button>
           </>
         )}
+        <button
+          className={ordersView === "trash" ? "manager-orders-seg active" : "manager-orders-seg"}
+          type="button"
+          onClick={() => onOrdersViewChange?.("trash")}
+        >
+          Корзина
+          {trashedOrders.length > 0 ? (
+            <span className="manager-nav-count" aria-label={`В корзине: ${trashedOrders.length}`}>
+              {trashedOrders.length}
+            </span>
+          ) : null}
+        </button>
       </div>
-
-      {!inTrash && (
-        <div className="manager-orders-quick-chips" role="group" aria-label="Быстрые фильтры 1С">
-          <button
-            className={exchangeFilter === "waiting" ? "manager-orders-seg active" : "manager-orders-seg"}
-            type="button"
-            onClick={() => {
-              setFiltersOpen(false);
-              setExchangeFilter((current) => (current === "waiting" ? "all" : "waiting"));
-            }}
-          >
-            Ждут передачи в 1С ({waitingOneCCount})
-          </button>
-          <button
-            className={exchangeFilter === "queued" ? "manager-orders-seg active" : "manager-orders-seg"}
-            type="button"
-            onClick={() => {
-              setFiltersOpen(false);
-              setExchangeFilter((current) => (current === "queued" ? "all" : "queued"));
-            }}
-          >
-            В очереди ({queuedOneCCount})
-          </button>
-        </div>
-      )}
 
       {!inTrash && filtersOpen && (
         <div className="toolbar three manager-orders-filters">
@@ -334,25 +411,45 @@ export function ManagerOrders({
 
       {!inTrash && bulkPanelOpen && (
         <div className="panel manager-bulk-panel">
-          <div className="toolbar four">
-            <button className="secondary-button" type="button" onClick={selectVisible}>
-                  {visible.length > 0 && visible.every((order) => selectedIds.includes(order.id))
-                    ? "Снять выбор"
-                    : "Выбрать все"}
+          <div className="manager-bulk-status-row">
+            <button className="secondary-button manager-bulk-chip" type="button" onClick={selectVisible}>
+              {visible.length > 0 && visible.every((order) => selectedIds.includes(order.id))
+                ? "Снять выбор"
+                : "Выбрать все"}
             </button>
-            <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} aria-label="Статус для массового изменения">
-              {ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}
+            <select
+              className="manager-bulk-status-select"
+              value={bulkStatus}
+              onChange={(e) => setBulkStatus(e.target.value)}
+              aria-label="Статус для массового изменения"
+            >
+              {MANAGER_BULK_ORDER_STATUSES.map((item) => (
+                <option key={item}>{item}</option>
+              ))}
             </select>
-            <button className="primary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => void applyBulkStatus()}>
-              Изменить статус ({selectedIds.length})
-            </button>
-            <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => runBulkExchange("check")}>
-              Проверить выбранные в 1С
+            <button
+              className="primary-button manager-bulk-chip manager-bulk-apply"
+              type="button"
+              disabled={!selectedIds.length || bulkBusy}
+              onClick={() => void applyBulkStatus()}
+            >
+              Изменить статус
+              {selectedIds.length > 0 ? (
+                <span className="manager-bulk-apply-count">{selectedIds.length}</span>
+              ) : null}
             </button>
           </div>
-          <div className="exchange-actions" style={{ marginTop: 10 }}>
-            <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => runBulkExchange("send")}>
+          <div className="exchange-actions manager-bulk-exchange" style={{ marginTop: 10 }}>
+            <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => void runBulkSendToOneC()}>
               Тестово передать выбранные
+            </button>
+            <button
+              className="danger-button manager-cancel-onec-button"
+              type="button"
+              disabled={!selectedIds.length || bulkBusy}
+              onClick={() => void runBulkCancelOneC()}
+            >
+              Отменить передачу в 1С
             </button>
             {selectedIds.length > 0 && <button className="secondary-button" type="button" onClick={() => setSelectedIds([])}>Очистить выбор</button>}
             <span className="muted small">Выбрано заказов: {selectedIds.length}</span>
@@ -439,7 +536,7 @@ export function ManagerOrders({
             </div>
           </div>
           {order.clientComment ? (
-            <div className="manager-client-comment" style={{ marginTop: 8 }}>
+            <div className="manager-client-comment">
               <div className="comment-box comment-box-compact">
                 <strong>Комментарий клиента:</strong>
                 <p>{order.clientComment}</p>
@@ -460,35 +557,57 @@ export function ManagerOrders({
                 </>
               ) : (
                 <>
-                  <button
-                    className={
-                      busy && (exchange.status === "not_sent" || exchange.status === "error")
-                        ? "manager-send-onec-button manager-send-onec-done"
-                        : exchangeSendButtonClass(exchange)
-                    }
-                    disabled={
-                      busy
-                      || exchange.status === "sending"
-                      || exchange.status === "ready"
-                      || exchange.status === "draft"
-                      || exchange.status === "sent"
-                    }
-                    type="button"
-                    title={
-                      exchange.status === "ready"
-                        ? "Заказ уже в очереди 1С. 1С сама заберёт его при следующем обмене."
-                        : exchange.status === "sent" || exchange.status === "draft"
-                          ? "Заказ уже передан в 1С."
-                          : exchange.status === "sending"
-                            ? "Ждём подтверждение от 1С"
-                            : exchange.status === "error"
-                              ? "Произошла ошибка — нажмите, чтобы передать снова"
-                              : "Поставить заказ в очередь обмена с 1С"
-                    }
-                    onClick={() => runExchangeAction(order, "send")}
-                  >
-                    {busy ? "Передача…" : exchangeSendLabel(exchange)}
-                  </button>
+                  {order.status === "Обработан вручную" ? (
+                    <span
+                      className="badge status-work manager-manual-processed-badge"
+                      title="Заказ обработан вручную. Передача в 1С не требуется или отменена."
+                    >
+                      Обработан вручную
+                    </span>
+                  ) : (
+                    <>
+                      <button
+                        className={
+                          busy && (exchange.status === "not_sent" || exchange.status === "error")
+                            ? "manager-send-onec-button manager-send-onec-done"
+                            : exchangeSendButtonClass(exchange)
+                        }
+                        disabled={
+                          busy
+                          || exchange.status === "sending"
+                          || exchange.status === "ready"
+                          || exchange.status === "draft"
+                          || exchange.status === "sent"
+                        }
+                        type="button"
+                        title={
+                          exchange.status === "ready"
+                            ? "Заказ уже в очереди 1С. 1С сама заберёт его при следующем обмене."
+                            : exchange.status === "sent" || exchange.status === "draft"
+                              ? "Заказ уже передан в 1С."
+                              : exchange.status === "sending"
+                                ? "Ждём подтверждение от 1С"
+                                : exchange.status === "error"
+                                  ? "Произошла ошибка — нажмите, чтобы передать снова"
+                                  : "Поставить заказ в очередь обмена с 1С"
+                        }
+                        onClick={() => runExchangeAction(order, "send")}
+                      >
+                        {busy ? "Передача…" : exchangeSendLabel(exchange)}
+                      </button>
+                      {canCancelOneCTransfer(exchange) ? (
+                        <button
+                          className="danger-button manager-cancel-onec-button"
+                          type="button"
+                          disabled={busy}
+                          title="Вернуть заказ из очереди 1С. После принятия в 1С отменить нельзя."
+                          onClick={() => void runExchangeAction(order, "cancel")}
+                        >
+                          Отменить передачу в 1С
+                        </button>
+                      ) : null}
+                    </>
+                  )}
                   <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
                   {settings.managerCanDeleteOrders && canTrashOrder(order, "manager").ok && (
                     <button className="danger-button" type="button" onClick={() => onDeleteOrder(order)}>

@@ -61,7 +61,7 @@ export const DEFAULT_SETTINGS = {
   managerNotifyReconciliation: true,
   managerNotifyRegistrations: true,
   managerNotifyOneCErrors: true,
-  managerNotifyEmail: false,
+  managerNotifyEmail: true,
   managerNotificationEmail: "clover-order@mail.ru",
   managerNotifyTelegram: false,
   managerTelegramChatId: "",

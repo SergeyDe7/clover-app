@@ -21,6 +21,7 @@ import {
   getEarliestDeliveryDateIso,
   validateDeliveryDate,
 } from "../../shared/deliveryDateRules";
+import { productImageSrc } from "../../shared/productPhoto";
 import { ManagerContact } from "./ManagerContact";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
 import { appAlert, appConfirm } from "../../shared/AppModal";
@@ -571,7 +572,7 @@ export function OrderEditor({
                     {!isList && (
                       <div className="product-image-wrap">
                         {product.imageUrl ? (
-                          <img className="product-image" src={product.imageUrl} alt={product.name} />
+                          <img className="product-image" src={productImageSrc(product)} alt={product.name} />
                         ) : (
                           <span className="product-image-placeholder">Фото товара пока не загружено</span>
                         )}
@@ -660,6 +661,7 @@ export function OrderEditor({
                 </button>
               </div>
 
+              <div className="cart-sheet-scroll">
               {!cartCount ? (
                 <EmptyState
                   title="Корзина пуста"
@@ -823,6 +825,7 @@ export function OrderEditor({
                   onChange={(e) => setClientComment(e.target.value)}
                 />
               </label>
+              </div>
 
               <div className="cart-sheet-footer">
                 <div className="cart-sheet-total">

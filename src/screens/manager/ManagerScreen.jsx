@@ -200,6 +200,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
       })()}
       <div className="stats-grid manager-stats-strip" aria-label="Сводка">
         <article className="stat-card"><span>Новые заказы</span><strong>{newCount}</strong></article>
+        <article className="stat-card"><span>Всего заказов</span><strong>{orders.length}</strong></article>
         <article className="stat-card"><span>Ошибки 1С</span><strong>{exchangeErrors}</strong></article>
         <article className="stat-card"><span>Непрочитано</span><strong>{unreadCount}</strong></article>
       </div>

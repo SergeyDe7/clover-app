@@ -22,6 +22,7 @@ import {
 assert.deepEqual(ORDER_STATUSES, [
   "Новый",
   "Принят",
+  "Обработан вручную",
   "Собирается",
   "Готов к доставке",
   "Выполнен",
@@ -30,6 +31,7 @@ assert.deepEqual(ORDER_STATUSES, [
 
 assert.equal(canTransitionOrderStatus("Новый", "Принят"), true);
 assert.equal(canTransitionOrderStatus("Новый", "Выполнен"), true);
+assert.equal(canTransitionOrderStatus("Новый", "Обработан вручную"), true);
 assert.equal(canTransitionOrderStatus("Принят", "Выполнен"), true);
 assert.equal(canTransitionOrderStatus("Принят", "Новый"), false);
 assert.equal(canTransitionOrderStatus("Принят", "Принят"), true);
@@ -37,6 +39,7 @@ assert.equal(canTransitionOrderStatus("Выполнен", "Отменён"), fal
 assert.deepEqual(allowedNextOrderStatuses("Новый"), [
   "Новый",
   "Принят",
+  "Обработан вручную",
   "Собирается",
   "Готов к доставке",
   "Выполнен",
@@ -44,6 +47,7 @@ assert.deepEqual(allowedNextOrderStatuses("Новый"), [
 ]);
 assert.deepEqual(allowedNextOrderStatuses("Принят"), [
   "Принят",
+  "Обработан вручную",
   "Собирается",
   "Готов к доставке",
   "Выполнен",

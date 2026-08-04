@@ -8,30 +8,23 @@ import {
   formatDateTime,
   normalizeProduct,
 } from "../../shared/appHelpers";
-import { SoftBanner } from "../../shared/uxFeedback";
-import { appAlert, appConfirm } from "../../shared/AppModal";
+import { appAlert } from "../../shared/AppModal";
+import { productImageSrc } from "../../shared/productPhoto";
 import { ProductEditor } from "./ProductEditor";
 
-function normalizeMatchKey(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
-}
-
-function fileBaseName(fileName) {
-  return String(fileName || "").replace(/\.[^.]+$/, "");
-}
-
-function matchProductForPhoto(products, fileName) {
-  const key = normalizeMatchKey(fileBaseName(fileName));
-  if (!key) return null;
-  return products.find((product) => {
-    const candidates = [product.code, product.oneCCode, product.name]
-      .map(normalizeMatchKey)
-      .filter(Boolean);
-    return candidates.includes(key);
-  }) || null;
+function clearConflictingOneCLink(product) {
+  return normalizeProduct({
+    ...product,
+    oneCId: "",
+    oneCCode: "",
+    oneCName: "",
+    oneCMatchCode: "",
+    oneCMatchName: "",
+    oneCSearchQuery: "",
+    oneCSearchRequestedAt: "",
+    oneCLinkMode: "",
+    oneCLinkedAt: "",
+  });
 }
 
 function OneCProductsPanel({ products, setProducts }) {
@@ -229,12 +222,6 @@ export function ManagerProducts({ products, setProducts }) {
   const [category, setCategory] = useState("Все");
   const [visibility, setVisibility] = useState("Все");
   const [editorProduct, setEditorProduct] = useState(undefined);
-  const [imageBusyId, setImageBusyId] = useState(null);
-  const [bulkMatches, setBulkMatches] = useState(null);
-  const [bulkBusy, setBulkBusy] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState("");
-  const [bulkBanner, setBulkBanner] = useState(null);
-  const bulkInputRef = useRef(null);
   const categories = ["Все", ...new Set(products.map((item) => item.category))];
   const visible = products.filter((product) => {
     const bySearch = !search || `${product.name} ${product.code} ${product.oneCId} ${product.oneCCode} ${product.oneCName} ${product.oneCMatchCode} ${product.oneCMatchName} ${product.oneCSearchQuery}`.toLowerCase().includes(search.toLowerCase());
@@ -250,20 +237,35 @@ export function ManagerProducts({ products, setProducts }) {
   });
 
   const save = async (value) => {
+    const normalized = normalizeProduct(value);
     let nextProducts;
+    let targetId;
 
-    if (value.id) {
-      nextProducts = products.map((item) => item.id === value.id ? normalizeProduct(value) : item);
+    if (normalized.id) {
+      targetId = String(normalized.id);
+      nextProducts = products.map((item) =>
+        String(item.id) === targetId ? normalized : item
+      );
     } else {
       const id = Math.max(0, ...products.map((item) => Number(item.id) || 0)) + 1;
+      targetId = String(id);
       nextProducts = [
         normalizeProduct({
-          ...value,
+          ...normalized,
           id,
-          code: value.code || `CL-${String(id).padStart(4, "0")}`,
+          code: normalized.code || `CL-${String(id).padStart(4, "0")}`,
         }),
         ...products,
       ];
+    }
+
+    const oneCId = String(normalized.oneCId || "").trim();
+    if (oneCId) {
+      nextProducts = nextProducts.map((item) => {
+        if (String(item.id) === targetId) return item;
+        if (String(item.oneCId || "").trim() !== oneCId) return item;
+        return clearConflictingOneCLink(item);
+      });
     }
 
     try {
@@ -276,132 +278,6 @@ export function ManagerProducts({ products, setProducts }) {
         message: `Не удалось сохранить товар: ${error.message}`,
         tone: "danger",
       });
-    }
-  };
-
-  const uploadImage = async (product, file) => {
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      await appAlert({ title: "Неверный файл", message: "Выберите фотографию товара.", tone: "warn" });
-      return;
-    }
-
-    setImageBusyId(product.id);
-    try {
-      const result = await api.uploadProductImage(product.id, file);
-      setProducts((current) => current.map((item) =>
-        item.id === product.id
-          ? normalizeProduct({ ...item, ...result.product })
-          : item
-      ));
-      await appAlert({
-        title: "Фото сохранено",
-        message: "Фотография товара сохранена на сервере.",
-        tone: "success",
-      });
-    } catch (error) {
-      await appAlert({ title: "Ошибка загрузки", message: error.message, tone: "danger" });
-    } finally {
-      setImageBusyId(null);
-    }
-  };
-
-  const prepareBulkPhotos = (fileList) => {
-    const files = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
-    if (!files.length) {
-      void appAlert({ title: "Нет фото", message: "Выберите файлы JPG, PNG или WEBP." });
-      return;
-    }
-    const usedProductIds = new Set();
-    const rows = files.map((file) => {
-      let product = matchProductForPhoto(products, file.name);
-      if (product && usedProductIds.has(product.id)) {
-        product = null;
-      }
-      if (product) usedProductIds.add(product.id);
-      return {
-        file,
-        fileName: file.name,
-        product,
-      };
-    });
-    setBulkMatches(rows);
-    setBulkBanner(null);
-    setBulkProgress("");
-  };
-
-  const cancelBulkPhotos = () => {
-    setBulkMatches(null);
-    setBulkProgress("");
-    if (bulkInputRef.current) bulkInputRef.current.value = "";
-  };
-
-  const uploadBulkMatches = async () => {
-    const matched = (bulkMatches || []).filter((row) => row.product);
-    if (!matched.length) {
-      void appAlert({ title: "Нет совпадений", message: "Не удалось сопоставить файлы с товарами по имени." });
-      return;
-    }
-
-    setBulkBusy(true);
-    let done = 0;
-    let failed = 0;
-    const total = matched.length;
-    try {
-      for (const row of matched) {
-        setBulkProgress(`${done + 1} из ${total}`);
-        try {
-          const result = await api.uploadProductImage(row.product.id, row.file);
-          setProducts((current) => current.map((item) =>
-            item.id === row.product.id
-              ? normalizeProduct({ ...item, ...result.product })
-              : item
-          ));
-          done += 1;
-        } catch {
-          failed += 1;
-        }
-      }
-      setBulkMatches(null);
-      setBulkBanner({
-        tone: failed ? "warn" : "success",
-        title: failed ? "Загрузка завершена с ошибками" : "Фото загружены",
-        message: failed
-          ? `Успешно: ${done} из ${total}. Не удалось: ${failed}.`
-          : `Загружено фото: ${done} из ${total}.`,
-      });
-    } finally {
-      setBulkBusy(false);
-      setBulkProgress("");
-      if (bulkInputRef.current) bulkInputRef.current.value = "";
-    }
-  };
-
-  const deleteImage = async (product) => {
-    const ok = await appConfirm({
-      title: "Удалить фото?",
-      message: `Удалить фотографию товара «${product.name}»?`,
-      confirmLabel: "Удалить",
-      cancelLabel: "Отмена",
-      tone: "danger",
-    });
-    if (!ok) {
-      return;
-    }
-
-    setImageBusyId(product.id);
-    try {
-      const result = await api.deleteProductImage(product.id);
-      setProducts((current) => current.map((item) =>
-        item.id === product.id
-          ? normalizeProduct({ ...item, ...result.product })
-          : item
-      ));
-    } catch (error) {
-      await appAlert({ title: "Ошибка удаления", message: error.message, tone: "danger" });
-    } finally {
-      setImageBusyId(null);
     }
   };
 
@@ -422,81 +298,14 @@ export function ManagerProducts({ products, setProducts }) {
         <button className="primary-button" type="button" onClick={() => setEditorProduct(null)}>+ Добавить товар</button>
       </div>
       <div className="server-safe-note">
-        Фото загружается на сервер и автоматически появляется в личном кабинете клиента. Поддерживаются JPG, PNG и WEBP до 5 МБ.
+        Фото загружается на сервер и автоматически появляется в личном кабинете клиента. JPG, PNG и WEBP до 5 МБ — при загрузке приводятся к квадрату 800×800 на белом фоне (JPEG).
       </div>
-      <div className="bulk-photo-actions" style={{ marginTop: 12 }}>
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={bulkBusy}
-          onClick={() => bulkInputRef.current?.click()}
-        >
-          Загрузить фото пакетом
-        </button>
-        <input
-          ref={bulkInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          multiple
-          hidden
-          onChange={(event) => {
-            prepareBulkPhotos(event.target.files);
-          }}
-        />
-        {bulkProgress ? <span className="bulk-photo-progress">{bulkProgress}</span> : null}
-      </div>
-
-      {bulkMatches && (
-        <div className="bulk-photo-panel">
-          <strong>Сопоставление файлов с товарами</strong>
-          <p className="muted small" style={{ marginTop: 6 }}>
-            Имя файла (без расширения) сравнивается с кодом, кодом 1С и названием товара.
-          </p>
-          <div className="bulk-photo-list">
-            {bulkMatches.map((row) => (
-              <div
-                className={row.product ? "bulk-photo-row" : "bulk-photo-row miss"}
-                key={`${row.fileName}-${row.product?.id || "miss"}`}
-              >
-                <strong>{row.fileName}</strong>
-                <span>
-                  {row.product
-                    ? `→ ${row.product.name}${row.product.code ? ` (${row.product.code})` : ""}`
-                    : "→ не найден"}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="bulk-photo-actions">
-            <button
-              className="primary-button"
-              type="button"
-              disabled={bulkBusy || !bulkMatches.some((row) => row.product)}
-              onClick={() => void uploadBulkMatches()}
-            >
-              {bulkBusy ? (bulkProgress || "Загрузка…") : "Загрузить совпадения"}
-            </button>
-            <button className="secondary-button" type="button" disabled={bulkBusy} onClick={cancelBulkPhotos}>
-              Отмена
-            </button>
-          </div>
-        </div>
-      )}
-
-      {bulkBanner && (
-        <SoftBanner
-          tone={bulkBanner.tone}
-          title={bulkBanner.title}
-          message={bulkBanner.message}
-          onDismiss={() => setBulkBanner(null)}
-        />
-      )}
 
       <div className="product-manager-list" style={{ marginTop: 14 }}>
         {visible.map((product) => (
         <article className={product.active ? "product-manager-row" : "product-manager-row inactive"} key={product.id}>
           <div className="product-manager-thumb">
-            {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <span>Нет фото</span>}
+            {product.imageUrl ? <img src={productImageSrc(product)} alt={product.name} /> : <span>Нет фото</span>}
           </div>
           <div className="product-manager-info">
             <h3>{product.name}</h3>

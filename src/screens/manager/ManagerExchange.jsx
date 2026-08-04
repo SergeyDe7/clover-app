@@ -358,7 +358,18 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
                   <button className="primary-button" disabled={busy || !runtime.readyForWrite} title={!runtime.readyForWrite ? "Запись пока заблокирована настройками" : ""} type="button" onClick={() => action(row, "draft")}>{modeIsReal ? "Черновик в 1С" : "Черновик в симуляторе"}</button>
                   <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "json")}>JSON</button>
                   <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "csv")}>CSV</button>
-                  {exchange.status !== "not_sent" && <button className="secondary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => action(row, "reset")}>Сбросить</button>}
+                  {exchange.status !== "not_sent" && exchange.status !== "sent" && !(
+                    exchange.status === "draft" && (exchange.receipt || exchange.remoteDocument)
+                  ) && (
+                    <button
+                      className="secondary-button"
+                      disabled={busy}
+                      type="button"
+                      onClick={() => action(row, "reset")}
+                    >
+                      Сбросить
+                    </button>
+                  )}
                 </div>
               </article>
             );

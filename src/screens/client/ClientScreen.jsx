@@ -389,13 +389,6 @@ function ClientDashboard({
                       Повторить заказ
                     </button>
                   )}
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => window.print()}
-                  >
-                    Печать
-                  </button>
                   {canDelete && (
                     <button
                       className="danger-button"

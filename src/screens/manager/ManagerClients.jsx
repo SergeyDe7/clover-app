@@ -838,22 +838,47 @@ export function ManagerClients({
   };
 
   const saveCatalogProduct = async (value) => {
+    const normalized = normalizeProduct(value);
     let nextProducts;
-    if (value.id) {
+    let targetId;
+
+    if (normalized.id) {
+      targetId = String(normalized.id);
       nextProducts = products.map((item) =>
-        String(item.id) === String(value.id) ? normalizeProduct(value) : item
+        String(item.id) === targetId ? normalized : item
       );
     } else {
       const id =
         Math.max(0, ...products.map((item) => Number(item.id) || 0)) + 1;
+      targetId = String(id);
       nextProducts = [
         normalizeProduct({
-          ...value,
+          ...normalized,
           id,
-          code: value.code || `CL-${String(id).padStart(4, "0")}`,
+          code: normalized.code || `CL-${String(id).padStart(4, "0")}`,
         }),
         ...products,
       ];
+    }
+
+    const oneCId = String(normalized.oneCId || "").trim();
+    if (oneCId) {
+      nextProducts = nextProducts.map((item) => {
+        if (String(item.id) === targetId) return item;
+        if (String(item.oneCId || "").trim() !== oneCId) return item;
+        return normalizeProduct({
+          ...item,
+          oneCId: "",
+          oneCCode: "",
+          oneCName: "",
+          oneCMatchCode: "",
+          oneCMatchName: "",
+          oneCSearchQuery: "",
+          oneCSearchRequestedAt: "",
+          oneCLinkMode: "",
+          oneCLinkedAt: "",
+        });
+      });
     }
 
     try {

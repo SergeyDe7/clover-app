@@ -15,6 +15,22 @@ import {
   inferProductCategory,
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
+import { normalizeProductPhotoFile, productImageSrc } from "../../shared/productPhoto";
+
+function sortOneCPickerResults(items, currentProductId) {
+  return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
+    const aLinkedElsewhere =
+      a.cloverLink?.productId &&
+      String(a.cloverLink.productId) !== String(currentProductId || "");
+    const bLinkedElsewhere =
+      b.cloverLink?.productId &&
+      String(b.cloverLink.productId) !== String(currentProductId || "");
+    if (aLinkedElsewhere !== bLinkedElsewhere) {
+      return aLinkedElsewhere ? 1 : -1;
+    }
+    return String(a.name || "").localeCompare(String(b.name || ""), "ru");
+  });
+}
 
 export function ProductEditor({
   product,
@@ -90,7 +106,7 @@ export function ProductEditor({
         limit: 50,
         offset: 0,
       });
-      setOneCResults(result.items || []);
+      setOneCResults(sortOneCPickerResults(result.items || [], productId));
       setOneCTotal(Number(result.total) || 0);
     } catch (error) {
       setOneCError(error.message);
@@ -119,7 +135,7 @@ export function ProductEditor({
       if (productId) {
         const candidateResult = await api.getOneCProductCandidates(productId);
         if ((candidateResult.items || []).length) {
-          setOneCResults(candidateResult.items || []);
+          setOneCResults(sortOneCPickerResults(candidateResult.items || [], productId));
           setOneCTotal(Number(candidateResult.total) || 0);
           setOneCNotice(
             "Показаны наиболее подходящие варианты, найденные при последней выгрузке из 1С."
@@ -132,7 +148,7 @@ export function ProductEditor({
         limit: 50,
         offset: 0,
       });
-      setOneCResults(result.items || []);
+      setOneCResults(sortOneCPickerResults(result.items || [], productId));
       setOneCTotal(Number(result.total) || 0);
     } catch (error) {
       setOneCError(error.message);
@@ -143,7 +159,7 @@ export function ProductEditor({
     }
   };
 
-  const selectOneCProduct = (item) => {
+  const applyOneCProduct = (item) => {
     const nextName = item.name || form.name || "";
     const keepCategory =
       form.category &&
@@ -172,6 +188,30 @@ export function ProductEditor({
     setOneCNotice(
       `Позиция 1С выбрана. Категория: «${nextProduct.category}». Проверьте единицы и цены, затем «Сохранить товар».`
     );
+  };
+
+  const selectOneCProduct = async (item) => {
+    const linkedToCurrent =
+      item.cloverLink &&
+      String(item.cloverLink.productId) === String(productId);
+    if (linkedToCurrent) {
+      setOneCOpen(false);
+      return;
+    }
+
+    const linkedElsewhere = Boolean(item.cloverLink?.productId);
+    if (linkedElsewhere) {
+      const ok = await appConfirm({
+        title: "Позиция уже связана",
+        message: `«${item.name}» уже связана с товаром «${item.cloverLink.productName || item.cloverLink.productId}». Перепривязать к текущему товару?`,
+        confirmLabel: "Перепривязать",
+        cancelLabel: "Отмена",
+        tone: "warn",
+      });
+      if (!ok) return;
+    }
+
+    applyOneCProduct(item);
   };
 
   const requestOneCSearch = async () => {
@@ -223,22 +263,15 @@ export function ProductEditor({
 
   const uploadImage = async (file) => {
     if (!file || !productId) return;
-    if (!file.type.startsWith("image/")) {
-      await appAlert({
-        title: "Неверный файл",
-        message: "Выберите фотографию товара (JPG, PNG или WEBP).",
-        tone: "warn",
-      });
-      return;
-    }
 
     setImageBusy(true);
     try {
-      const result = await api.uploadProductImage(productId, file);
+      const normalized = await normalizeProductPhotoFile(file);
+      const result = await api.uploadProductImage(productId, normalized);
       applyLiveProduct({ ...form, ...result.product });
       await appAlert({
         title: "Фото сохранено",
-        message: "Фотография товара сохранена на сервере.",
+        message: "Фото приведено к единому формату каталога и сохранено.",
         tone: "success",
       });
     } catch (error) {
@@ -354,6 +387,7 @@ export function ProductEditor({
       }}
     >
       <form className="product-editor-card" onSubmit={submit}>
+        <div className="product-editor-scroll">
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Каталог</p>
@@ -367,7 +401,7 @@ export function ProductEditor({
         <section className="product-editor-photo">
           <div className="product-editor-photo-preview">
             {form.imageUrl ? (
-              <img src={form.imageUrl} alt={form.name || "Фото товара"} />
+              <img src={productImageSrc(form)} alt={form.name || "Фото товара"} />
             ) : (
               <span>Нет фото</span>
             )}
@@ -403,7 +437,7 @@ export function ProductEditor({
                     Удалить фото
                   </button>
                 ) : null}
-                <small className="muted">JPG, PNG или WEBP до 5 МБ.</small>
+                <small className="muted">JPG, PNG или WEBP до 5 МБ. Автоматически: квадрат 800×800, белый фон, JPEG.</small>
               </>
             ) : (
               <small className="muted">
@@ -463,6 +497,39 @@ export function ProductEditor({
               Сначала сохраните товар — затем можно загрузить сертификат.
             </small>
           )}
+        </section>
+
+        <section className="purchase-price-card">
+          <div className="purchase-price-card-head">
+            <div>
+              <p className="eyebrow">Цена из 1С TEST</p>
+              <h3>Закупочная цена товара</h3>
+            </div>
+            <small>
+              {form.purchasePriceUpdatedAt
+                ? `Обновлено: ${formatDateTime(form.purchasePriceUpdatedAt)}`
+                : "Закупочная цена ещё не получена"}
+            </small>
+          </div>
+          {(() => {
+            const preferredUnit = hasPurchasePrice(form.purchasePrices?.piece)
+              ? "piece"
+              : UNIT_ORDER.find((unit) =>
+                  hasPurchasePrice(form.purchasePrices?.[unit])
+                ) || "piece";
+            const value = form.purchasePrices?.[preferredUnit];
+            const available = hasPurchasePrice(value);
+            return (
+              <div className="purchase-price-single">
+                <strong>{available ? formatMoney(value) : "—"}</strong>
+                <small>
+                  {available
+                    ? `Получено из 1С · ${UNIT_CONFIG[preferredUnit]?.label || "шт"}`
+                    : "Нет цены из 1С"}
+                </small>
+              </div>
+            );
+          })()}
         </section>
 
         <div className="form-grid">
@@ -603,7 +670,8 @@ export function ProductEditor({
               {oneCNotice && <div className="sync-success">{oneCNotice}</div>}
               <p className="muted small">
                 Найдено: {oneCTotal}. Показаны первые {oneCResults.length}{" "}
-                позиций.
+                позиций. Свободные позиции сверху; уже связанные можно
+                перепривязать.
               </p>
 
               <div className="one-c-products-list one-c-picker-list">
@@ -640,13 +708,12 @@ export function ProductEditor({
                             : "primary-button"
                         }
                         type="button"
-                        disabled={Boolean(linkedElsewhere)}
-                        onClick={() => selectOneCProduct(item)}
+                        onClick={() => void selectOneCProduct(item)}
                       >
                         {selected || linkedToCurrent
                           ? "Выбрано"
                           : linkedElsewhere
-                            ? "Уже связан"
+                            ? "Перепривязать"
                             : "Выбрать"}
                       </button>
                     </article>
@@ -667,39 +734,6 @@ export function ProductEditor({
               </div>
             </div>
           )}
-        </section>
-
-        <section className="purchase-price-card">
-          <div className="purchase-price-card-head">
-            <div>
-              <p className="eyebrow">Цена из 1С TEST</p>
-              <h3>Закупочная цена товара</h3>
-            </div>
-            <small>
-              {form.purchasePriceUpdatedAt
-                ? `Обновлено: ${formatDateTime(form.purchasePriceUpdatedAt)}`
-                : "Закупочная цена ещё не получена"}
-            </small>
-          </div>
-          <div className="purchase-price-grid">
-            {UNIT_ORDER.map((unit) => {
-              const value = form.purchasePrices?.[unit];
-              const available = hasPurchasePrice(value);
-              return (
-                <article key={unit}>
-                  <span>{UNIT_CONFIG[unit].label}</span>
-                  <strong>{available ? formatMoney(value) : "—"}</strong>
-                  <small>
-                    {form.saleUnits.includes(unit)
-                      ? available
-                        ? "Получено из 1С"
-                        : "Нет цены из 1С"
-                      : "Единица не продаётся"}
-                  </small>
-                </article>
-              );
-            })}
-          </div>
         </section>
 
         <div className="unit-settings">
@@ -780,20 +814,11 @@ export function ProductEditor({
                       }))
                     }
                   />
-                  {Number(form[priceField]) <= 0 ? (
-                    <small className="hint">
-                      Пусто — для клиента с категорией цен 1С возьмётся цена за
-                      шт из вида цен
-                      {unit === "piece" || unit === "pair" || unit === "roll"
-                        ? ""
-                        : " × кол-во внутри"}
-                      .
-                    </small>
-                  ) : null}
                 </label>
               </div>
             );
           })}
+        </div>
         </div>
         <div className="form-actions">
           <button className="secondary-button" type="button" onClick={onClose}>

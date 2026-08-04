@@ -4,9 +4,12 @@
  * Менеджер/админ — только по разрешённым переходам.
  */
 
+import { normalizeExchangeState } from "./exchange.js";
+
 export const ORDER_STATUSES = Object.freeze([
   "Новый",
   "Принят",
+  "Обработан вручную",
   "Собирается",
   "Готов к доставке",
   "Выполнен",
@@ -25,19 +28,31 @@ const TERMINAL = new Set(["Выполнен", "Отменён"]);
 export const ORDER_STATUS_TRANSITIONS = Object.freeze({
   Новый: Object.freeze([
     "Принят",
+    "Обработан вручную",
     "Собирается",
     "Готов к доставке",
     "Выполнен",
     "Отменён",
   ]),
   Принят: Object.freeze([
+    "Обработан вручную",
     "Собирается",
     "Готов к доставке",
     "Выполнен",
     "Отменён",
   ]),
-  Собирается: Object.freeze(["Готов к доставке", "Выполнен", "Отменён"]),
-  "Готов к доставке": Object.freeze(["Выполнен", "Отменён"]),
+  "Обработан вручную": Object.freeze(["Принят", "Выполнен", "Отменён"]),
+  Собирается: Object.freeze([
+    "Готов к доставке",
+    "Выполнен",
+    "Отменён",
+    "Обработан вручную",
+  ]),
+  "Готов к доставке": Object.freeze([
+    "Выполнен",
+    "Отменён",
+    "Обработан вручную",
+  ]),
   Выполнен: Object.freeze([]),
   Отменён: Object.freeze([]),
 });
@@ -235,14 +250,74 @@ export function buildStatusUpdatedOrder(
     createdAt: new Date().toISOString(),
   });
 
+  let exchange = previous.exchange;
+  if (check.status === "Обработан вручную") {
+    const cancelled = cancelExchangeForManualProcessing(previous.exchange);
+    exchange = cancelled.exchange;
+    if (cancelled.cancelled) {
+      history.push({
+        id: String(historyId ? `${historyId}-exchange` : `history-exchange-${Date.now()}`),
+        type: "exchange.reset",
+        label: "Передача в 1С отменена: заказ обработан вручную",
+        actor,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+
   return {
     ok: true,
     unchanged: false,
     order: {
       ...previous,
       status: check.status,
+      exchange,
       history: history.slice(-100),
       updatedAt: new Date().toISOString(),
+    },
+  };
+}
+
+/**
+ * Снимает заказ с очереди 1С при ручной обработке (до ACK / документа).
+ */
+export function cancelExchangeForManualProcessing(previousExchange) {
+  const exchange = normalizeExchangeState(previousExchange || {});
+
+  if (exchange.status === "sent") {
+    return { exchange, cancelled: false };
+  }
+  if (
+    exchange.status === "draft" &&
+    (String(exchange.receipt || "").trim() ||
+      String(exchange.remoteDocument?.id || exchange.remoteDocument?.number || "").trim())
+  ) {
+    return { exchange, cancelled: false };
+  }
+
+  if (
+    exchange.status !== "ready" &&
+    exchange.status !== "sending" &&
+    exchange.status !== "error" &&
+    exchange.status !== "draft"
+  ) {
+    return { exchange, cancelled: false };
+  }
+
+  return {
+    cancelled: true,
+    exchange: {
+      ...exchange,
+      status: "not_sent",
+      checkedAt: "",
+      lastAttemptAt: "",
+      sentAt: "",
+      claimedAt: "",
+      claimedBy: "",
+      receipt: "",
+      remoteDocument: null,
+      channel: "",
+      message: "Передача в 1С отменена: заказ обработан вручную.",
     },
   };
 }

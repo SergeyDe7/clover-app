@@ -376,7 +376,7 @@ function ordersLiveSignature(orders) {
     .join(";");
 }
 
-/** Сигнатура цен каталога — чтобы онлайн-bootstrap обновлял витрину как статусы. */
+/** Сигнатура цен/медиа каталога — чтобы онлайн-bootstrap обновлял витрину как статусы. */
 function productPriceLiveSignature(product) {
   const typedKeys = product?.salePricesByType && typeof product.salePricesByType === "object"
     ? Object.keys(product.salePricesByType).sort().join(",")
@@ -396,6 +396,8 @@ function productPriceLiveSignature(product) {
     String(product?.markupPercent ?? ""),
     String(product?.oneCPriceTypeId || ""),
     String(product?.salePriceReceivedAt || ""),
+    String(product?.imageUrl || ""),
+    String(product?.imageUpdatedAt || ""),
     typedKeys,
     typedSample,
     String(product?.active !== false),
@@ -1633,22 +1635,14 @@ function App() {
   };
 
   const purgeManagerOrder = async (order) => {
-    const first = await appConfirm({
+    const ok = await appConfirm({
       title: `Удалить заказ № ${order.number} навсегда?`,
-      message: "Восстановить будет нельзя без резервной копии.",
-      confirmLabel: "Продолжить",
-      cancelLabel: "Отмена",
-      tone: "danger",
-    });
-    if (!first) return;
-    const second = await appConfirm({
-      title: "Окончательное удаление",
-      message: `Подтвердите удаление заказа № ${order.number}. Это действие необратимо.`,
+      message: "Восстановить будет нельзя без резервной копии. Это действие необратимо.",
       confirmLabel: "Удалить навсегда",
       cancelLabel: "Отмена",
       tone: "danger",
     });
-    if (!second) return;
+    if (!ok) return;
     try {
       const result = await api.purgeOrder(order.id);
       skipNextOrdersSyncRef.current = true;

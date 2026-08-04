@@ -9,6 +9,7 @@ import { DEFAULT_SETTINGS } from "./defaults.js";
 import {
   publicMailStatus,
   sendCloverMail,
+  newOrderManualEmail,
 } from "./mailer.js";
 import {
   publicPushStatus,
@@ -115,15 +116,31 @@ async function sendTelegram(notification, settings) {
     );
     const result = await response.json().catch(() => ({}));
     if (!response.ok || !result.ok) {
-      throw new Error(result.description || `Telegram HTTP ${response.status}`);
+      return {
+        channel: "telegram",
+        sent: false,
+        reason: "telegram_api_error",
+        error: String(result.description || `Telegram HTTP ${response.status}`),
+      };
     }
     return { channel: "telegram", sent: true, messageId: result.result?.message_id || "" };
+  } catch (error) {
+    const message = String(error?.message || error || "fetch failed");
+    const unreachable =
+      error?.name === "AbortError" ||
+      /fetch failed|ETIMEDOUT|ENETUNREACH|ECONNREFUSED|abort/i.test(message);
+    return {
+      channel: "telegram",
+      sent: false,
+      reason: unreachable ? "telegram_unreachable" : "telegram_send_failed",
+      error: message,
+    };
   } finally {
     clearTimeout(timeout);
   }
 }
 
-async function sendEmail(notification, settings) {
+async function sendEmail(notification, settings, event = {}) {
   const recipients = emailRecipients(settings);
   const mailStatus = publicMailStatus();
   if (!mailStatus.configured) {
@@ -134,20 +151,39 @@ async function sendEmail(notification, settings) {
   }
 
   const link = publicUrl(notification);
-  const text = [
-    notification.title,
-    notification.body,
-    link ? `Открыть Clover: ${link}` : "",
-  ].filter(Boolean).join("\n\n");
-  const html = [
-    `<h2>${escapeHtml(notification.title)}</h2>`,
-    notification.body ? `<p>${escapeHtml(notification.body)}</p>` : "",
-    link ? `<p><a href="${escapeHtml(link)}">Открыть Clover</a></p>` : "",
-  ].filter(Boolean).join("");
+  let subject = String(event.emailSubject || `Clover: ${notification.title}`);
+  let text = String(event.emailText || "");
+  let html = String(event.emailHtml || "");
+
+  if (!text || !html) {
+    if (notification.type === "new_order" && event.order) {
+      const mail = newOrderManualEmail({
+        order: event.order,
+        customerName: event.customerName || notification.title,
+        link,
+      });
+      subject = mail.subject;
+      text = mail.text;
+      html = mail.html;
+    } else {
+      text = [
+        notification.title,
+        notification.body,
+        link ? `Открыть Clover: ${link}` : "",
+      ].filter(Boolean).join("\n\n");
+      html = [
+        `<h2>${escapeHtml(notification.title)}</h2>`,
+        notification.body
+          ? `<p>${escapeHtml(notification.body).replaceAll("\n", "<br>")}</p>`
+          : "",
+        link ? `<p><a href="${escapeHtml(link)}">Открыть Clover</a></p>` : "",
+      ].filter(Boolean).join("");
+    }
+  }
 
   const result = await sendCloverMail({
     to: recipients.join(", "),
-    subject: `Clover: ${notification.title}`,
+    subject,
     text,
     html,
   });
@@ -174,6 +210,11 @@ async function sendManagerPush(notification, settings) {
     enabled: results.some((item) => item.enabled),
     sent: results.reduce((sum, item) => sum + Number(item.sent || 0), 0),
     failed: results.reduce((sum, item) => sum + Number(item.failed || 0), 0),
+    reason: results.every((item) => !item.enabled)
+      ? "push_not_configured"
+      : results.reduce((sum, item) => sum + Number(item.sent || 0), 0) > 0
+        ? ""
+        : "no_push_subscription",
   };
 }
 
@@ -229,7 +270,7 @@ export async function notifyManagers(event = {}) {
   const notification = created.notification;
   const tasks = [];
   if (settings.managerNotifyEmail) {
-    tasks.push(sendEmail(notification, settings));
+    tasks.push(sendEmail(notification, settings, event));
   }
   if (settings.managerNotifyTelegram) {
     tasks.push(sendTelegram(notification, settings));
@@ -241,7 +282,11 @@ export async function notifyManagers(event = {}) {
   const settled = await Promise.allSettled(tasks);
   const delivery = settled.map((item) => item.status === "fulfilled"
     ? item.value
-    : { sent: false, error: String(item.reason?.message || item.reason || "Ошибка отправки") }
+    : {
+      channel: "unknown",
+      sent: false,
+      error: String(item.reason?.message || item.reason || "Ошибка отправки"),
+    }
   );
 
   writeAudit({

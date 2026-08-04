@@ -236,7 +236,6 @@ export function MatrixOneCProductAdd({
                 <article
                   key={item.id}
                   className={checked ? "one-c-picker-row selected" : "one-c-picker-row"}
-                  onClick={() => toggleSelected(item.id)}
                   style={{ cursor: "pointer" }}
                 >
                   <label
@@ -253,7 +252,6 @@ export function MatrixOneCProductAdd({
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggleSelected(item.id)}
-                      onClick={(event) => event.stopPropagation()}
                       style={{ marginTop: 4 }}
                     />
                     <div>
@@ -271,10 +269,7 @@ export function MatrixOneCProductAdd({
                     className="secondary-button"
                     type="button"
                     disabled={loading}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      addItems([item]);
-                    }}
+                    onClick={() => addItems([item])}
                   >
                     {alreadyInClover ? "В матрицу" : "Добавить"}
                   </button>

@@ -101,3 +101,172 @@ export function approvalEmail({ approved = true } = {}) {
         html: "<p>Регистрация отклонена.</p><p>Для уточнения свяжитесь с менеджером.</p>",
       };
 }
+
+function escapeMailHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function formatMailMoney(value) {
+  const amount = Number(value) || 0;
+  return `${amount.toLocaleString("ru-RU", {
+    minimumFractionDigits: amount % 1 ? 2 : 0,
+    maximumFractionDigits: 2,
+  })} ₽`;
+}
+
+function formatMailDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString("ru-RU");
+}
+
+function formatMailDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("ru-RU");
+}
+
+function orderMailLines(order) {
+  const items = Array.isArray(order?.items) ? order.items : [];
+  const customItems = Array.isArray(order?.customItems) ? order.customItems : [];
+  const rows = [];
+
+  items.forEach((item, index) => {
+    rows.push({
+      index: index + 1,
+      name: String(item.name || "Товар"),
+      code: String(item.code || item.category || item.oneCId || ""),
+      unit: String(item.unit || "шт."),
+      quantity: Number(item.quantity) || 0,
+      unitPrice: Number(item.unitPrice) || 0,
+      lineTotal: Number(item.lineTotal) || (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0),
+      note: "",
+    });
+  });
+
+  customItems.forEach((item, index) => {
+    rows.push({
+      index: items.length + index + 1,
+      name: String(item.name || "Товар вне матрицы"),
+      code: "вне матрицы",
+      unit: String(item.unit || "шт."),
+      quantity: Number(item.quantity) || 0,
+      unitPrice: Number(item.unitPrice) || 0,
+      lineTotal: (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0),
+      note: String(item.details || "").trim(),
+    });
+  });
+
+  return rows;
+}
+
+function orderMailTotal(order) {
+  return orderMailLines(order).reduce((sum, row) => sum + (Number(row.lineTotal) || 0), 0);
+}
+
+/**
+ * Письмо о новом заказе: полный состав в удобном виде для ручного ввода в 1С.
+ */
+export function newOrderManualEmail({ order, customerName = "", link = "" } = {}) {
+  const number = String(order?.number || order?.id || "—");
+  const client = String(customerName || order?.customerName || "Клиент").trim() || "Клиент";
+  const contact = String(order?.customerContact || "").trim();
+  const phone = String(order?.customerPhone || "").trim();
+  const email = String(order?.customerEmail || "").trim();
+  const address = String(order?.address || "").trim();
+  const delivery = formatMailDate(order?.firstDeliveryDate);
+  const createdAt = formatMailDateTime(order?.createdAt);
+  const clientComment = String(order?.clientComment || "").trim();
+  const managerComment = String(order?.managerComment || "").trim();
+  const rows = orderMailLines(order);
+  const total = orderMailTotal(order);
+  const externalId = String(order?.externalId || order?.id || "").trim();
+
+  const textLines = [
+    `НОВЫЙ ЗАКАЗ CLOVER № ${number}`,
+    "Формат для ручного ввода в 1С",
+    "",
+    `Клиент: ${client}`,
+    contact ? `Контакт: ${contact}` : "",
+    phone ? `Телефон: ${phone}` : "",
+    email ? `Email: ${email}` : "",
+    address ? `Адрес: ${address}` : "",
+    `Доставка: ${delivery}`,
+    `Дата заказа: ${createdAt}`,
+    externalId ? `Внешний ID: ${externalId}` : "",
+    "",
+    "СОСТАВ ЗАКАЗА",
+    "№ | Товар | Код | Ед. | Кол-во | Цена | Сумма",
+    "-".repeat(72),
+    ...rows.map((row) => {
+      const base = `${row.index}. ${row.name} | ${row.code || "—"} | ${row.unit} | ${row.quantity} | ${formatMailMoney(row.unitPrice)} | ${formatMailMoney(row.lineTotal)}`;
+      return row.note ? `${base}\n   (${row.note})` : base;
+    }),
+    "-".repeat(72),
+    `ИТОГО: ${formatMailMoney(total)}`,
+    clientComment ? `\nКомментарий клиента:\n${clientComment}` : "",
+    managerComment ? `\nКомментарий менеджера:\n${managerComment}` : "",
+    link ? `\nОткрыть в Clover: ${link}` : "",
+  ].filter((line, index, all) => !(line === "" && all[index - 1] === ""));
+
+  const htmlRows = rows.map((row) => `
+    <tr>
+      <td style="padding:8px;border:1px solid #dce6d9;vertical-align:top;">${row.index}</td>
+      <td style="padding:8px;border:1px solid #dce6d9;vertical-align:top;">
+        <strong>${escapeMailHtml(row.name)}</strong>
+        ${row.note ? `<br><small style="color:#6a7167;">${escapeMailHtml(row.note)}</small>` : ""}
+      </td>
+      <td style="padding:8px;border:1px solid #dce6d9;vertical-align:top;">${escapeMailHtml(row.code || "—")}</td>
+      <td style="padding:8px;border:1px solid #dce6d9;vertical-align:top;">${escapeMailHtml(row.unit)}</td>
+      <td style="padding:8px;border:1px solid #dce6d9;vertical-align:top;text-align:right;">${escapeMailHtml(String(row.quantity))}</td>
+      <td style="padding:8px;border:1px solid #dce6d9;vertical-align:top;text-align:right;">${escapeMailHtml(formatMailMoney(row.unitPrice))}</td>
+      <td style="padding:8px;border:1px solid #dce6d9;vertical-align:top;text-align:right;">${escapeMailHtml(formatMailMoney(row.lineTotal))}</td>
+    </tr>`).join("");
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;color:#263226;line-height:1.45;">
+      <h2 style="margin:0 0 6px;color:#3f7c3d;">Новый заказ Clover № ${escapeMailHtml(number)}</h2>
+      <p style="margin:0 0 16px;color:#6a7167;">Формат для ручного ввода в 1С</p>
+      <table style="width:100%;border-collapse:collapse;margin:0 0 18px;">
+        <tr><td style="padding:6px 0;width:140px;color:#6a7167;">Клиент</td><td style="padding:6px 0;"><strong>${escapeMailHtml(client)}</strong></td></tr>
+        ${contact ? `<tr><td style="padding:6px 0;color:#6a7167;">Контакт</td><td style="padding:6px 0;">${escapeMailHtml(contact)}</td></tr>` : ""}
+        ${phone ? `<tr><td style="padding:6px 0;color:#6a7167;">Телефон</td><td style="padding:6px 0;">${escapeMailHtml(phone)}</td></tr>` : ""}
+        ${email ? `<tr><td style="padding:6px 0;color:#6a7167;">Email</td><td style="padding:6px 0;">${escapeMailHtml(email)}</td></tr>` : ""}
+        ${address ? `<tr><td style="padding:6px 0;color:#6a7167;">Адрес</td><td style="padding:6px 0;">${escapeMailHtml(address)}</td></tr>` : ""}
+        <tr><td style="padding:6px 0;color:#6a7167;">Доставка</td><td style="padding:6px 0;">${escapeMailHtml(delivery)}</td></tr>
+        <tr><td style="padding:6px 0;color:#6a7167;">Дата заказа</td><td style="padding:6px 0;">${escapeMailHtml(createdAt)}</td></tr>
+      </table>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#eef5eb;">
+            <th style="padding:8px;border:1px solid #dce6d9;text-align:left;">№</th>
+            <th style="padding:8px;border:1px solid #dce6d9;text-align:left;">Товар</th>
+            <th style="padding:8px;border:1px solid #dce6d9;text-align:left;">Код</th>
+            <th style="padding:8px;border:1px solid #dce6d9;text-align:left;">Ед.</th>
+            <th style="padding:8px;border:1px solid #dce6d9;text-align:right;">Кол-во</th>
+            <th style="padding:8px;border:1px solid #dce6d9;text-align:right;">Цена</th>
+            <th style="padding:8px;border:1px solid #dce6d9;text-align:right;">Сумма</th>
+          </tr>
+        </thead>
+        <tbody>${htmlRows || `<tr><td colspan="7" style="padding:12px;border:1px solid #dce6d9;">Позиции отсутствуют</td></tr>`}</tbody>
+      </table>
+      <p style="margin:16px 0 0;font-size:18px;font-weight:700;text-align:right;">Итого: ${escapeMailHtml(formatMailMoney(total))}</p>
+      ${clientComment ? `<div style="margin-top:16px;padding:12px;background:#fff8e8;border-radius:10px;"><strong>Комментарий клиента</strong><br>${escapeMailHtml(clientComment)}</div>` : ""}
+      ${managerComment ? `<div style="margin-top:12px;padding:12px;background:#f3f7f1;border-radius:10px;"><strong>Комментарий менеджера</strong><br>${escapeMailHtml(managerComment)}</div>` : ""}
+      ${link ? `<p style="margin-top:18px;"><a href="${escapeMailHtml(link)}">Открыть заказ в Clover</a></p>` : ""}
+    </div>
+  `;
+
+  return {
+    subject: `Clover: новый заказ № ${number} · ${client}`,
+    text: textLines.join("\n"),
+    html,
+  };
+}

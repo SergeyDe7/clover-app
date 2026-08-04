@@ -7,6 +7,7 @@ import {
   getUnitPrice,
   orderedSaleUnits,
 } from "../../shared/appHelpers";
+import { productImageSrc } from "../../shared/productPhoto";
 
 export function ClientMatrixPanel({
   products = [],
@@ -149,7 +150,7 @@ export function ClientMatrixPanel({
               </div>
               <div className="product-image-wrap">
                 {product.imageUrl ? (
-                  <img className="product-image" src={product.imageUrl} alt={product.name} />
+                  <img className="product-image" src={productImageSrc(product)} alt={product.name} />
                 ) : (
                   <span className="product-image-placeholder">Нет фото</span>
                 )}

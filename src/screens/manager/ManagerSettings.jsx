@@ -57,22 +57,50 @@ function ManagerNotificationSettings({ settings, set }) {
 
   useEffect(() => { loadStatus(); }, []);
 
+  const reasonRu = (channel, reason, error) => {
+    const code = String(reason || error || "").trim();
+    const map = {
+      smtp_not_configured: "SMTP не настроен в server/.env",
+      recipient_not_configured: "укажите email выше",
+      telegram_not_configured: "нет токена бота в .env или Chat ID",
+      telegram_unreachable: "нет доступа с DC до api.telegram.org (сеть/firewall)",
+      telegram_api_error: "ответ Telegram API с ошибкой",
+      telegram_send_failed: "ошибка отправки в Telegram",
+      push_not_configured: "нужны HTTPS и VAPID на сервере",
+      no_push_subscription: "установите PWA и разрешите уведомления",
+      disabled: "выключено тумблером",
+    };
+    if (map[code]) return map[code];
+    if (/fetch failed|ETIMEDOUT|ENETUNREACH|AbortError/i.test(code)) {
+      return "нет доступа с DC до api.telegram.org (сеть/firewall)";
+    }
+    if (code) return code;
+    if (channel === "push") return "не отправлено (PWA-подписка не нужна для email)";
+    return "не отправлено";
+  };
+
   const test = async () => {
     setBusy(true);
     setMessage("");
     try {
-      await api.saveSettings(settings);
+      // Настройки уже сохраняются автоматически — повторный PUT здесь
+      // мог затереть email=true устаревшим состоянием вкладки.
       const result = await api.testManagerNotifications();
       const delivery = result.result?.delivery || [];
       const parts = delivery.map((item) => {
         const channel = item.channel === "email" ? "email" : item.channel === "telegram" ? "Telegram" : item.channel === "push" ? "push" : "канал";
         if (item.sent === true || Number(item.sent) > 0) return `${channel}: отправлено`;
-        return `${channel}: ${item.reason || item.error || "не отправлено"}`;
+        return `${channel}: ${reasonRu(item.channel, item.reason, item.error)}`;
       });
-      setMessage(parts.length ? parts.join("; ") : "Внутреннее уведомление создано. Внешние каналы пока выключены.");
+      if (!settings.managerNotifyEmail && !delivery.some((item) => item.channel === "email")) {
+        parts.unshift("email: включите тумблер «Отправлять на email» и обновите страницу");
+      }
+      const emailOk = delivery.some((item) => item.channel === "email" && (item.sent === true || Number(item.sent) > 0));
+      const summary = parts.length ? parts.join("; ") : "Внутреннее уведомление создано. Внешние каналы пока выключены.";
+      setMessage(emailOk ? `Письмо ушло на ${status?.email?.recipient || settings.managerNotificationEmail || "указанный адрес"}. ${summary}` : summary);
       setStatus(result.status || null);
     } catch (error) {
-      setMessage(error.message);
+      setMessage(error.message || "Не удалось проверить каналы");
     } finally {
       setBusy(false);
     }
@@ -91,7 +119,7 @@ function ManagerNotificationSettings({ settings, set }) {
         <ToggleSetting title="Новые регистрации" description="Сообщать о клиентах, ожидающих подтверждения менеджера." value={settings.managerNotifyRegistrations !== false} onChange={(value) => set("managerNotifyRegistrations", value)} />
         <ToggleSetting title="Ошибки обмена с 1С" description="Сообщать о сбоях передачи и обработки заказов." value={settings.managerNotifyOneCErrors !== false} onChange={(value) => set("managerNotifyOneCErrors", value)} />
         <ToggleSetting title="Push на устройства менеджера" description="Отправлять уведомления в установленную PWA Clover." value={settings.managerNotifyPush !== false} onChange={(value) => set("managerNotifyPush", value)} />
-        <ToggleSetting title="Отправлять на email" description="Использовать SMTP и адрес, указанный ниже." value={Boolean(settings.managerNotifyEmail)} onChange={(value) => set("managerNotifyEmail", value)} />
+        <ToggleSetting title="Отправлять на email" description="Письмо о новом заказе с полным составом для ручного ввода в 1С. Нужны SMTP в server/.env и адрес ниже." value={Boolean(settings.managerNotifyEmail)} onChange={(value) => set("managerNotifyEmail", value)} />
         <ToggleSetting title="Отправлять в Telegram-бот" description="Токен хранится только в server/.env, Chat ID указывается ниже." value={Boolean(settings.managerNotifyTelegram)} onChange={(value) => set("managerNotifyTelegram", value)} />
       </div>
       <div className="form-grid" style={{ marginTop: 14 }}>
@@ -103,11 +131,15 @@ function ManagerNotificationSettings({ settings, set }) {
         </label>
       </div>
       <div className="notification-channel-status">
-        <span className={status?.email?.configured ? "badge green" : "badge yellow"}>Email: {status?.email?.configured ? "готов" : status?.email?.smtpConfigured ? "укажите адрес" : "SMTP не настроен"}</span>
+        <span className={status?.email?.configured && settings.managerNotifyEmail ? "badge green" : "badge yellow"}>
+          Email: {settings.managerNotifyEmail
+            ? (status?.email?.configured ? "включён и готов" : status?.email?.smtpConfigured ? "включён, укажите адрес" : "включён, SMTP не настроен")
+            : (status?.email?.configured ? "готов, но выключен" : "выключен")}
+        </span>
         <span className={status?.telegram?.configured ? "badge green" : "badge yellow"}>Telegram: {status?.telegram?.configured ? "готов" : status?.telegram?.tokenConfigured ? "укажите Chat ID" : "токен не настроен"}</span>
         <span className={status?.push?.configured ? "badge green" : "badge yellow"}>Push: {status?.push?.configured ? "готов" : "после HTTPS и VAPID"}</span>
       </div>
-      <p className="manager-contact-help">Токен Telegram-бота и SMTP-пароль не вводятся в браузере и не отправляются в чат. Для них в обновлении будет отдельный локальный настройщик.</p>
+      <p className="manager-contact-help">Токен Telegram-бота и SMTP-пароль не вводятся в браузере — они уже задаются в server/.env на этом ПК (позже будет отдельный локальный настройщик). Для письма достаточно тумблера «Отправлять на email» и адреса выше. Push для проверки не обязателен.</p>
       <div className="inline-actions">
         <button className="primary-button" type="button" disabled={busy} onClick={test}>{busy ? "Проверяем…" : "Отправить тестовое уведомление"}</button>
         <button className="secondary-button" type="button" disabled={busy} onClick={loadStatus}>Обновить статус</button>

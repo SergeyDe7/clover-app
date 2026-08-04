@@ -24,12 +24,54 @@ button{cursor:pointer}
 .registration button{padding:0;border:0;background:transparent;color:#4f8d4b;font-weight:700}
 .login-manager-cta{display:grid;gap:14px;justify-items:center;width:100%;text-align:center}
 .login-manager-cta-text{margin:0;max-width:34ch;color:#5f6b5f;font-size:14px;line-height:1.45;font-weight:600}
-.login-manager-cta .manager-contact{display:flex;justify-content:center}
+.login-manager-cta .manager-contact{display:flex;justify-content:center;position:relative;z-index:5}
 .login-manager-cta .manager-contact-label-full{display:inline!important}
 .login-manager-cta .manager-contact-label-short{display:none!important}
 .login-manager-cta .manager-contact-trigger{min-height:44px;padding:10px 18px;border:1px solid #5b9d57;border-radius:12px;background:#fff;color:#4f8d4b;font-weight:700}
-.login-manager-cta .manager-contact-popover{left:50%;right:auto;transform:translateX(-50%);width:min(310px,92vw)}
-.login-manager-cta .manager-contact-popover::before{left:50%;right:auto;transform:translateX(-50%) rotate(45deg)}
+/* На главной попап вверх — не уезжает за низ экрана и не требует скролла */
+.login-manager-cta .manager-contact-popover{
+  position:absolute!important;
+  top:auto!important;
+  bottom:calc(100% + 11px)!important;
+  left:50%!important;
+  right:auto!important;
+  transform:translateX(-50%)!important;
+  width:min(310px,92vw)!important;
+  z-index:90;
+}
+.login-manager-cta .manager-contact-popover::before{
+  display:block!important;
+  top:auto!important;
+  bottom:-7px!important;
+  left:50%!important;
+  right:auto!important;
+  border-top:0!important;
+  border-left:0!important;
+  border-right:1px solid #dbe6d8!important;
+  border-bottom:1px solid #dbe6d8!important;
+  transform:translateX(-50%) rotate(45deg)!important;
+}
+/* Короткие экраны: вся форма входа в один viewport */
+@media (max-height:820px){
+  .page{align-items:flex-start;padding:16px 14px}
+  .login-card{padding:28px 28px 24px}
+  .login-card .logo{width:min(200px,62%);max-width:200px;margin-bottom:10px}
+  .login-card h1{margin-bottom:6px;font-size:26px}
+  .login-form label{margin-bottom:6px}
+  .login-form input{height:48px;margin-bottom:12px}
+  .login-form .password-field{margin-bottom:12px}
+  .login-form button[type="submit"]{height:48px}
+  .passkey-login-button{margin-top:10px!important}
+  .registration{margin-top:16px;padding-top:14px}
+  .login-manager-cta{gap:10px}
+  .login-manager-cta-text{font-size:13px}
+}
+@media (max-height:700px){
+  .login-card .logo{width:min(160px,52%);max-width:160px;margin-bottom:6px}
+  .login-card h1{font-size:22px}
+  .login-form input{height:44px;margin-bottom:10px}
+  .login-form button[type="submit"]{height:44px}
+}
 .dashboard-page{min-height:100vh;background:#f4f8f2;color:#293329}
 .dashboard-header{min-height:86px;padding:14px 6%;display:flex;align-items:center;justify-content:space-between;gap:24px;background:#fff;border-bottom:1px solid #e1e9de}
 .dashboard-logo{width:145px;height:auto}
