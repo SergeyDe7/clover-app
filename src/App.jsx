@@ -1160,13 +1160,26 @@ function App() {
     return true;
   };
 
+  const createFreshNewOrderSession = () => {
+    try {
+      localStorage.removeItem(STORAGE.draft);
+    } catch {
+      // ignore storage errors
+    }
+    return {
+      mode: "new",
+      instanceId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    };
+  };
+
   const openNew = (options = {}) => {
     const silent = Boolean(options?.silent);
     const forceNew = Boolean(options?.forceNew);
 
     if (forceNew) {
       if (!validateNewOrder()) return;
-      setCatalogSession({ mode: "new" });
+      // Новый instanceId → remount OrderEditor с пустой корзиной (не из прошлого заказа).
+      setCatalogSession(createFreshNewOrderSession());
       return;
     }
 
@@ -1178,13 +1191,16 @@ function App() {
         return;
       }
       if (!catalogSession || catalogSession.mode === "new") {
-        setCatalogSession({ mode: "new" });
+        // Не трогаем instanceId: иначе сбросится корзина при каждом заходе на «Главная».
+        if (!catalogSession) {
+          setCatalogSession({ mode: "new" });
+        }
       }
       return;
     }
 
     if (validateNewOrder()) {
-      setCatalogSession({ mode: "new" });
+      setCatalogSession(createFreshNewOrderSession());
     }
   };
 
@@ -1286,7 +1302,7 @@ function App() {
     }
 
     setOrders(nextOrders);
-    setCatalogSession(null);
+    // Сессию не сбрасываем до успеха API — при ошибке корзина остаётся для повтора.
 
     return api
       .saveOrders(nextOrders)
@@ -1296,6 +1312,8 @@ function App() {
           setOrders(result.orders);
         }
         setSyncError("");
+        // Пустой новый заказ: иначе OrderEditor с ключом new-new сохраняет старую корзину в памяти.
+        setCatalogSession(createFreshNewOrderSession());
         return result;
       })
       .catch(async (error) => {

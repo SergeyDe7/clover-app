@@ -512,9 +512,10 @@ export const api = {
     });
   },
 
-  sendExchangeOrder(orderId) {
+  sendExchangeOrder(orderId, { database } = {}) {
     return request(`/admin/exchange/orders/${encodeURIComponent(orderId)}/send`, {
       method: "POST",
+      body: database ? { database } : {},
     });
   },
 

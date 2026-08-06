@@ -241,7 +241,10 @@ export function OrderEditor({
   const selectedAddress = addresses.find((item) => item.id === addressId);
   const deliveryDateParts = getDeliveryDateParts(deliveryDate);
 
+  const draftSaveLockedRef = useRef(false);
+
   useEffect(() => {
+    if (draftSaveLockedRef.current) return;
     if (session.mode !== "new" || !settings.enableDrafts) return;
     safeWrite(STORAGE.draft, {
       items: selectedItems,
@@ -382,17 +385,30 @@ export function OrderEditor({
     }
 
     setMissingFields({ date: false, address: false });
-    onSave({
-      items: selectedItems,
-      customItems,
-      firstDeliveryDate: deliveryDate,
-      addressId: checkoutAddressId,
-      address: checkoutAddress.address,
-      addressLabel: checkoutAddress.label,
-      clientComment: clientComment.trim(),
-    });
-    localStorage.removeItem(STORAGE.draft);
-    setCartSheetOpen(false);
+    draftSaveLockedRef.current = true;
+    try {
+      localStorage.removeItem(STORAGE.draft);
+    } catch {
+      // ignore
+    }
+    Promise.resolve(
+      onSave({
+        items: selectedItems,
+        customItems,
+        firstDeliveryDate: deliveryDate,
+        addressId: checkoutAddressId,
+        address: checkoutAddress.address,
+        addressLabel: checkoutAddress.label,
+        clientComment: clientComment.trim(),
+      })
+    )
+      .then(() => {
+        setCartSheetOpen(false);
+      })
+      .catch(() => {
+        // Заказ не создан — снова разрешаем черновик и оставляем корзину.
+        draftSaveLockedRef.current = false;
+      });
   };
 
   const submit = (event) => {

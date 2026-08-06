@@ -34,7 +34,15 @@ assert.ok(
 );
 assert.ok(
   serverSource.includes("function requireOneCTestDatabase"),
-  "Обмен должен требовать X-Clover-Database: TEST."
+  "Каталог (preview) должен требовать X-Clover-Database: TEST."
+);
+assert.ok(
+  serverSource.includes("function requireOneCAllowedDatabase"),
+  "Pull/ACK должны использовать allowlist баз (prod-контур)."
+);
+assert.ok(
+  serverSource.includes("ONEC_PROD_EXCHANGE_ENABLED"),
+  "Prod-контур должен читаться из ONEC_PROD_EXCHANGE_ENABLED."
 );
 assert.ok(
   serverSource.includes("previous.status !== \"ready\" && previous.status !== \"sending\""),
@@ -140,8 +148,9 @@ assert.ok(
   "Send не должен возвращать активный sending в ready."
 );
 assert.ok(
-  serverSource.includes("ONEC_CLAIM_ACTIVE"),
-  "Reset должен блокировать активный claim с явным кодом."
+  serverSource.includes("ONEC_RESET_NOT_ALLOWED") ||
+    serverSource.includes('previous.status === "sending"'),
+  "Reset должен явно обрабатывать очередь ready/sending (отмена передачи менеджером)."
 );
 assert.ok(
   serverSource.includes("ONEC_DRAFT_LOCKED") ||
@@ -164,10 +173,10 @@ assert.ok(
 
 const resetIdx = serverSource.indexOf('"/api/admin/exchange/orders/:orderId/reset"');
 assert.ok(resetIdx > 0, "reset endpoint должен существовать.");
-const resetSlice = serverSource.slice(resetIdx, resetIdx + 900);
+const resetSlice = serverSource.slice(resetIdx, resetIdx + 1200);
 assert.ok(
-  resetSlice.includes("isOneCClaimExpired"),
-  "Reset endpoint обязан проверять lease claim."
+  resetSlice.includes("ONEC_SENT_LOCKED") || resetSlice.includes('status === "sent"'),
+  "Reset endpoint обязан блокировать уже принятый в 1С заказ."
 );
 
 const { readFrontendUiSource } = await import("./readFrontendUiSource.mjs");

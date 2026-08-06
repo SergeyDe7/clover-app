@@ -9,7 +9,7 @@ import {
 } from "./pricing.js";
 
 const DEFAULT_PRICE_MAX_AGE_MS = 10 * 60 * 1000;
-const TEST_DATABASE_NAME = "TEST";
+export const TEST_DATABASE_NAME = "TEST";
 
 function cleanText(value) {
   return String(value ?? "").trim();
@@ -31,6 +31,57 @@ export function normalizeOneCDatabaseName(value) {
 
 export function isTestDatabase(value) {
   return normalizeOneCDatabaseName(value) === TEST_DATABASE_NAME;
+}
+
+/** Prod-контур: явный флаг. Без него в allowlist остаётся только TEST. */
+export function isProdExchangeEnabled(
+  value = process.env.ONEC_PROD_EXCHANGE_ENABLED
+) {
+  return String(value || "false").toLowerCase() === "true";
+}
+
+/**
+ * Список имён баз 1С для pull/ACK/цен.
+ * TEST всегда сохраняется. Другие — только при ONEC_PROD_EXCHANGE_ENABLED=true.
+ */
+export function parseAllowedOneCDatabases(
+  envValue = process.env.ONEC_ALLOWED_DATABASES
+) {
+  const parsed = String(envValue || TEST_DATABASE_NAME)
+    .split(/[,;\s]+/)
+    .map((item) => normalizeOneCDatabaseName(item))
+    .filter(Boolean);
+  const allowed = new Set(parsed.length ? parsed : [TEST_DATABASE_NAME]);
+  allowed.add(TEST_DATABASE_NAME);
+  if (!isProdExchangeEnabled()) {
+    return [TEST_DATABASE_NAME];
+  }
+  return [...allowed];
+}
+
+export function isAllowedOneCDatabase(value) {
+  const database = normalizeOneCDatabaseName(value);
+  if (!database) return false;
+  return parseAllowedOneCDatabases().includes(database);
+}
+
+export function defaultExchangeDatabase(
+  value = process.env.ONEC_DEFAULT_EXCHANGE_DATABASE
+) {
+  const preferred = normalizeOneCDatabaseName(value || TEST_DATABASE_NAME);
+  if (preferred && isAllowedOneCDatabase(preferred)) {
+    return preferred;
+  }
+  return TEST_DATABASE_NAME;
+}
+
+export function publicOneCExchangeStatus() {
+  return {
+    prodEnabled: isProdExchangeEnabled(),
+    allowedDatabases: parseAllowedOneCDatabases(),
+    defaultDatabase: defaultExchangeDatabase(),
+    testDatabase: TEST_DATABASE_NAME,
+  };
 }
 
 export function extractOneCDatabase(req = {}) {
@@ -117,7 +168,7 @@ function parsedTimestamp(value) {
 
 export function purchasePriceFreshness(
   oneCItem,
-  { now = Date.now(), maxAgeMs = priceMaxAgeMs() } = {}
+  { now = Date.now(), maxAgeMs = priceMaxAgeMs(), expectedDatabase = "" } = {}
 ) {
   if (!oneCItem || !hasPurchasePrice(oneCItem)) {
     return { fresh: false, reason: "missing", ageMs: null, timestamp: "" };
@@ -138,10 +189,15 @@ export function purchasePriceFreshness(
     return { fresh: false, reason: "stale", ageMs, timestamp };
   }
 
-  if (
-    oneCItem.purchasePriceSourceDatabase &&
-    !isTestDatabase(oneCItem.purchasePriceSourceDatabase)
-  ) {
+  const sourceDatabase = normalizeOneCDatabaseName(
+    oneCItem.purchasePriceSourceDatabase
+  );
+  const expected = normalizeOneCDatabaseName(expectedDatabase);
+  if (expected) {
+    if (sourceDatabase && sourceDatabase !== expected) {
+      return { fresh: false, reason: "wrong_database", ageMs, timestamp };
+    }
+  } else if (sourceDatabase && !isAllowedOneCDatabase(sourceDatabase)) {
     return { fresh: false, reason: "wrong_database", ageMs, timestamp };
   }
 
@@ -187,8 +243,12 @@ export function mergePurchasePrices(
     allowedIds = null,
   } = {}
 ) {
-  if (!isTestDatabase(database)) {
-    throw new Error("Закупочные цены разрешено принимать только из базы 1С TEST.");
+  if (!isAllowedOneCDatabase(database)) {
+    throw new Error(
+      isProdExchangeEnabled()
+        ? `Закупочные цены принимаются только из разрешённых баз 1С: ${parseAllowedOneCDatabases().join(", ")}.`
+        : "Закупочные цены разрешено принимать только из базы 1С TEST (prod-контур выключен)."
+    );
   }
 
   const allowed = allowedIds

@@ -170,6 +170,12 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
 
   const summary = data?.summary || {};
   const runtime = oneC?.runtime || {};
+  const exchangeContour = data?.exchangeContour || oneC?.exchangeContour || {
+    prodEnabled: false,
+    allowedDatabases: ["TEST"],
+    defaultDatabase: "TEST",
+  };
+  const allowedDatabases = (exchangeContour.allowedDatabases || ["TEST"]).join(", ");
   const modeIsReal = configForm.mode === "real";
   const connectionLabel = modeIsReal
     ? runtime.readyForRead
@@ -274,6 +280,11 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
             <div className="warning-box">Чтение: {runtime.readyForRead ? "доступно" : "не готово"}</div>
             <div className="warning-box">Запись: {runtime.readyForWrite ? "разрешена" : "заблокирована"}</div>
             <div className="warning-box">База: УНФ 1.6 · документ ЗаказПокупателя</div>
+            <div className={exchangeContour.prodEnabled ? "success-box" : "warning-box"}>
+              Контур заказов: {exchangeContour.prodEnabled
+                ? `prod включён · базы ${allowedDatabases}`
+                : "только 1С TEST (prod выключен)"}
+            </div>
           </div>
 
           {connectionResult && (

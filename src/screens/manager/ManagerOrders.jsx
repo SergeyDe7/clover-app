@@ -9,6 +9,8 @@ import {
   EXCHANGE_STATUS_LABELS,
   normalizeOrderExchange,
   exchangeBadgeClass,
+  exchangeContourLabel,
+  exchangeStatusLabel,
   printOrderDocument,
   formatDate,
   formatDateTime,
@@ -31,13 +33,19 @@ const CUSTOM_STATUSES = [
   "Отклонён",
 ];
 
-function exchangeSendLabel(exchange) {
-  if (exchange.status === "sending") return "Ожидает ответ 1С…";
+function exchangeSendLabel(exchange, oneCExchange = null) {
+  const contour = exchangeContourLabel(
+    exchange.database || oneCExchange?.defaultDatabase || "TEST"
+  );
+  if (exchange.status === "sending") return `Ожидает ответ ${contour}…`;
   if (exchange.status === "ready" || exchange.status === "sent" || exchange.status === "draft") {
-    return "Передано в 1С";
+    return `Передано в ${contour}`;
   }
   if (exchange.status === "error") return "Передать повторно";
-  return "Передать в 1С";
+  if (oneCExchange?.prodEnabled) {
+    return `Передать в ${contour}`;
+  }
+  return "Передать в 1С TEST";
 }
 
 function exchangeSendButtonClass(exchange) {
@@ -495,7 +503,9 @@ export function ManagerOrders({
                       ))}
                     </select>
                   )}
-                  <span className={`badge ${exchangeBadgeClass(exchange.status)}`}>1С: {EXCHANGE_STATUS_LABELS[exchange.status]}</span>
+                  <span className={`badge ${exchangeBadgeClass(exchange.status)}`}>
+                    1С: {exchangeStatusLabel(exchange)}
+                  </span>
                 </div>
                 <h3 className="manager-order-client">{order.customerName || "Клиент"}</h3>
                 <p>

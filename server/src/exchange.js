@@ -1,3 +1,9 @@
+import {
+  isTestDatabase,
+  normalizeOneCDatabaseName,
+  TEST_DATABASE_NAME,
+} from "./oneCPriceSync.js";
+
 const UNIT_LABELS = {
   piece: "штука",
   pair: "пара",
@@ -57,12 +63,27 @@ export function alignLinePricesToCeilTotal(items, priceField = "price") {
 
 export const EXCHANGE_STATUSES = {
   not_sent: "Не отправлен",
-  ready: "В очереди 1С TEST",
-  sending: "Передаётся в 1С TEST",
-  sent: "Создан в 1С TEST",
+  ready: "В очереди 1С",
+  sending: "Передаётся в 1С",
+  sent: "Создан в 1С",
   draft: "Черновик создан в 1С",
   error: "Ошибка",
 };
+
+export function exchangeDatabaseLabel(database) {
+  const name = normalizeOneCDatabaseName(database) || TEST_DATABASE_NAME;
+  return isTestDatabase(name) ? "1С TEST" : `1С ${name}`;
+}
+
+export function exchangeStatusLabel(exchange = {}) {
+  const state = normalizeExchangeState(exchange);
+  const base = EXCHANGE_STATUSES[state.status] || EXCHANGE_STATUSES.not_sent;
+  if (!["ready", "sending", "sent"].includes(state.status)) return base;
+  const contour = exchangeDatabaseLabel(state.database);
+  if (state.status === "ready") return `В очереди ${contour}`;
+  if (state.status === "sending") return `Передаётся в ${contour}`;
+  return `Создан в ${contour}`;
+}
 
 /** Пока 1С не прислала ACK, заказ удерживается в sending. После таймаута снова ready. */
 export const ONEC_CLAIM_LEASE_MS = 15 * 60 * 1000;
@@ -99,9 +120,17 @@ export function normalizeExchangeState(value = {}) {
   const status = Object.hasOwn(EXCHANGE_STATUSES, value?.status)
     ? value.status
     : "not_sent";
+  const explicitDatabase = normalizeOneCDatabaseName(value?.database);
+  // Старые заказы без поля database считаем контуром TEST.
+  const database =
+    explicitDatabase ||
+    (["ready", "sending", "sent", "draft", "error"].includes(status)
+      ? TEST_DATABASE_NAME
+      : "");
 
   return {
     status,
+    database,
     attempts: Math.max(0, Number(value?.attempts) || 0),
     checkedAt: value?.checkedAt || "",
     lastAttemptAt: value?.lastAttemptAt || "",
@@ -153,7 +182,7 @@ export function sanitizeOrderExchangeForSave(order, previousOrder, role) {
         status: "not_sent",
         message:
           incoming.message ||
-          "Статус обмена сброшен: очередь 1С только через «Передать в 1С TEST».",
+          "Статус обмена сброшен: очередь 1С только через кнопку передачи менеджера.",
       }),
     };
   }

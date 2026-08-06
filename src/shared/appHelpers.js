@@ -653,13 +653,32 @@ export const EXCHANGE_STATUS_LABELS = {
   error: "Не удалось передать",
 };
 
+export function exchangeContourLabel(database) {
+  const name = String(database || "TEST").trim().toLocaleUpperCase("ru-RU") || "TEST";
+  return name === "TEST" ? "1С TEST" : `1С ${name}`;
+}
+
+export function exchangeStatusLabel(exchange = {}) {
+  const state = normalizeOrderExchange(exchange);
+  const base = EXCHANGE_STATUS_LABELS[state.status] || EXCHANGE_STATUS_LABELS.not_sent;
+  if (!["ready", "sending", "sent"].includes(state.status)) return base;
+  const contour = exchangeContourLabel(state.database);
+  if (state.status === "ready") return `В очереди ${contour}`;
+  if (state.status === "sending") return `Передаётся в ${contour}`;
+  return `Принят в ${contour}`;
+}
+
 export function normalizeOrderExchange(value = {}) {
   const status = Object.hasOwn(EXCHANGE_STATUS_LABELS, value?.status)
     ? value.status
     : "not_sent";
+  const database = String(value?.database || "").trim().toLocaleUpperCase("ru-RU");
 
   return {
     status,
+    database:
+      database ||
+      (["ready", "sending", "sent", "draft", "error"].includes(status) ? "TEST" : ""),
     attempts: Math.max(0, Number(value?.attempts) || 0),
     checkedAt: value?.checkedAt || "",
     lastAttemptAt: value?.lastAttemptAt || "",
@@ -3417,13 +3436,13 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 .product-editor {
   position: fixed;
   inset: 0;
-  z-index: 220 !important;
+  z-index: 1100 !important;
   display: flex;
   align-items: flex-start;
   justify-content: center;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 40px 16px max(28px, env(safe-area-inset-bottom, 0px));
+  padding: calc(var(--clover-chrome-offset, 56px) + 16px) 16px max(28px, env(safe-area-inset-bottom, 0px));
   background: rgba(28,40,28,.48);
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
@@ -3434,8 +3453,8 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   flex-direction: column;
   flex: 0 0 auto;
   width: min(720px,100%);
-  max-height: calc(100vh - 80px);
-  max-height: calc(100dvh - 80px);
+  max-height: calc(100vh - var(--clover-chrome-offset, 56px) - 32px);
+  max-height: calc(100dvh - var(--clover-chrome-offset, 56px) - 32px);
   margin: 0 auto;
   overflow: hidden;
   padding: 16px 18px 0;

@@ -45,8 +45,9 @@ assert.ok(
   "Полный сброс должен быть ограничен kill-switch."
 );
 assert.ok(
-  serverSource.includes("ONEC_CLAIM_ACTIVE"),
-  "Reset обмена должен блокировать активный sending claim."
+  serverSource.includes("ONEC_RESET_NOT_ALLOWED") ||
+    serverSource.includes('previous.status === "sending"'),
+  "Reset обмена должен явно обрабатывать очередь ready/sending."
 );
 assert.ok(
   appSource.includes('disabled={busy || exchange.status === "sending"}'),

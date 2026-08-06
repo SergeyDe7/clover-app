@@ -99,7 +99,9 @@ function ClientDashboard({
         ? orders
         : orders.filter((order) => order.status === filter);
   const orderSession = catalogSession || { mode: "new" };
-  const orderEditorKey = `${orderSession.mode}-${orderSession.order?.id || "new"}`;
+  // instanceId меняется при «Новый» / после успешного оформления — иначе React
+  // переиспользует OrderEditor и показывает корзину прошлого заказа.
+  const orderEditorKey = `${orderSession.mode}-${orderSession.order?.id || "new"}-${orderSession.instanceId || "0"}`;
 
   const selectCabinetSection = (id) => {
     setCabinetSection(id);
@@ -543,15 +545,11 @@ function ClientDashboard({
                 showFullCatalog={showFullCatalog}
                 setShowFullCatalog={setShowFullCatalog}
                 onClose={onCloseCatalog}
-                onSave={(payload) => {
-                  Promise.resolve(onSaveOrder(payload))
-                    .then(() => {
-                      setThankYouOpen(true);
-                    })
-                    .catch(() => {
-                      // Ошибка уже показана в saveOrder (alert).
-                    });
-                }}
+                onSave={(payload) =>
+                  Promise.resolve(onSaveOrder(payload)).then(() => {
+                    setThankYouOpen(true);
+                  })
+                }
               />
             ) : (
               <div className="empty-box">
