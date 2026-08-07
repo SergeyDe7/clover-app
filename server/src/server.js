@@ -2577,6 +2577,7 @@ async function handleOneCTestOrder(req, res, next) {
               products,
               clientLinks,
               maxAgeMs: priceMaxAgeMs(),
+              database,
             }),
           },
         };
@@ -2754,6 +2755,7 @@ app.get("/api/one-c/purchase-price-request", (req, res) => {
     clientLinks,
     orders,
     maxAgeMs: priceMaxAgeMs(),
+    database,
   });
 
   const requirements = scope === "all"
@@ -3959,8 +3961,25 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
   try {
     const { mkdirSync, writeFileSync } = await import("node:fs");
     const receivedAt = new Date().toISOString();
-    const sourceDatabase = requireOneCTestDatabase(req, res);
+    // Allowlist (TEST / VLAVKA при prod). Каталог применяем только из TEST;
+    // иначе 1С «полная проверка» на VLAVKA падала бы 403 на шаге товаров.
+    const sourceDatabase = requireOneCAllowedDatabase(req, res);
     if (!sourceDatabase) return;
+    if (!isTestDatabase(sourceDatabase)) {
+      writeAudit({
+        action: "one-c.products.preview.skipped",
+        details: { database: sourceDatabase, reason: "catalog-only-from-TEST" },
+      });
+      return res.json({
+        ok: true,
+        skipped: true,
+        database: sourceDatabase,
+        scanned: 0,
+        received: 0,
+        reason:
+          "Выгрузка номенклатуры в каталог Clover принимается только из TEST. Шаг для этой базы пропущен.",
+      });
+    }
     const verifiedTestSource = true;
     const allOneCProducts = normalizeOneCProducts(req.body?.items).map((item) => ({
       ...item,
@@ -4436,7 +4455,23 @@ app.post(
 
 app.post("/api/one-c/clients-preview", async (req, res, next) => {
   try {
-    if (!requireOneCTestDatabase(req, res)) return;
+    const sourceDatabase = requireOneCAllowedDatabase(req, res);
+    if (!sourceDatabase) return;
+    if (!isTestDatabase(sourceDatabase)) {
+      writeAudit({
+        action: "one-c.clients.preview.skipped",
+        details: { database: sourceDatabase, reason: "clients-only-from-TEST" },
+      });
+      return res.json({
+        ok: true,
+        skipped: true,
+        database: sourceDatabase,
+        scanned: 0,
+        received: 0,
+        reason:
+          "Выгрузка контрагентов в Clover принимается только из TEST. Шаг для этой базы пропущен.",
+      });
+    }
     const { mkdirSync, writeFileSync } = await import("node:fs");
     const receivedAt = new Date().toISOString();
     const allOneCClients = normalizeOneCClients(req.body?.items);

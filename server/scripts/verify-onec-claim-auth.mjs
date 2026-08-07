@@ -51,17 +51,21 @@ assert.ok(
 
 const clientsPreviewIdx = serverSource.indexOf('app.post("/api/one-c/clients-preview"');
 assert.ok(clientsPreviewIdx > 0, "clients-preview должен существовать.");
-const clientsSlice = serverSource.slice(clientsPreviewIdx, clientsPreviewIdx + 400);
+const clientsSlice = serverSource.slice(clientsPreviewIdx, clientsPreviewIdx + 900);
 assert.ok(
-  clientsSlice.includes("requireOneCTestDatabase"),
-  "clients-preview обязан требовать TEST-header."
+  clientsSlice.includes("requireOneCAllowedDatabase") &&
+    clientsSlice.includes("clients.preview.skipped") &&
+    clientsSlice.includes("isTestDatabase"),
+  "clients-preview: allowlist + skip не-TEST (без 403 на VLAVKA)."
 );
 
 const productsPreviewIdx = serverSource.indexOf('app.post("/api/one-c/products-preview"');
-const productsSlice = serverSource.slice(productsPreviewIdx, productsPreviewIdx + 500);
+const productsSlice = serverSource.slice(productsPreviewIdx, productsPreviewIdx + 900);
 assert.ok(
-  productsSlice.includes("requireOneCTestDatabase"),
-  "products-preview обязан требовать TEST-header."
+  productsSlice.includes("requireOneCAllowedDatabase") &&
+    productsSlice.includes("products.preview.skipped") &&
+    productsSlice.includes("isTestDatabase"),
+  "products-preview: allowlist + skip не-TEST (без 403 на VLAVKA)."
 );
 
 assert.equal(normalizeExchangeState({ status: "sending" }).status, "sending");

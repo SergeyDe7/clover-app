@@ -294,18 +294,22 @@ export function mergePurchasePrices(
         "",
       purchasePriceUpdatedAt: receivedAt,
       purchasePriceReceivedAt: receivedAt,
-      purchasePriceSourceDatabase: TEST_DATABASE_NAME,
+      purchasePriceSourceDatabase:
+        normalizeOneCDatabaseName(database) || TEST_DATABASE_NAME,
     };
     byId.set(id, merged);
     accepted.push(merged);
   }
+
+  const sourceDatabase =
+    normalizeOneCDatabaseName(database) || TEST_DATABASE_NAME;
 
   return {
     products: [...byId.values()],
     accepted,
     rejected,
     receivedAt,
-    database: TEST_DATABASE_NAME,
+    database: sourceDatabase,
   };
 }
 
@@ -316,6 +320,7 @@ export function buildPriceRequest({
   clientLinks = {},
   orders = [],
   maxAgeMs = priceMaxAgeMs(),
+  database = TEST_DATABASE_NAME,
 } = {}) {
   const requirements =
     scope === "all"
@@ -330,7 +335,7 @@ export function buildPriceRequest({
 
   return {
     ok: true,
-    database: TEST_DATABASE_NAME,
+    database: normalizeOneCDatabaseName(database) || TEST_DATABASE_NAME,
     scope,
     maxAgeSeconds: Math.round(maxAgeMs / 1000),
     order: order
