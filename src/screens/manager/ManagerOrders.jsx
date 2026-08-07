@@ -1,5 +1,5 @@
 // Раздел менеджера: заказы клиентов.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../serverApi";
 import { ORDER_STATUSES, MANAGER_BULK_ORDER_STATUSES, allowedNextOrderStatuses, canCancelOneCTransfer } from "../../config/orderConfig";
 import { CustomRequestPhoto, OrderTimeline } from "../../shared/SharedPanels";
@@ -33,9 +33,9 @@ const CUSTOM_STATUSES = [
   "Отклонён",
 ];
 
-function exchangeSendLabel(exchange, oneCExchange = null) {
+function exchangeSendLabel(exchange, oneCExchange = null, sendDatabase = "") {
   const contour = exchangeContourLabel(
-    exchange.database || oneCExchange?.defaultDatabase || "TEST"
+    exchange.database || sendDatabase || oneCExchange?.defaultDatabase || "TEST"
   );
   if (exchange.status === "sending") return `Ожидает ответ ${contour}…`;
   if (exchange.status === "ready" || exchange.status === "sent" || exchange.status === "draft") {
@@ -78,6 +78,57 @@ export function ManagerOrders({
   const [exchangeFilter, setExchangeFilter] = useState("all");
   const [sort, setSort] = useState("newest");
   const [busyOrderId, setBusyOrderId] = useState("");
+  const [exchangeContour, setExchangeContour] = useState({
+    prodEnabled: false,
+    allowedDatabases: ["TEST"],
+    defaultDatabase: "TEST",
+  });
+  const [sendDatabase, setSendDatabase] = useState("TEST");
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getExchange(1)
+      .then((result) => {
+        if (cancelled) return;
+        const contour = result?.exchangeContour || {
+          prodEnabled: false,
+          allowedDatabases: ["TEST"],
+          defaultDatabase: "TEST",
+        };
+        const allowed =
+          Array.isArray(contour.allowedDatabases) && contour.allowedDatabases.length
+            ? contour.allowedDatabases
+            : ["TEST"];
+        const fallback = allowed.includes(contour.defaultDatabase)
+          ? contour.defaultDatabase
+          : allowed[0];
+        setExchangeContour({ ...contour, allowedDatabases: allowed });
+        setSendDatabase(fallback);
+      })
+      .catch(() => {
+        // Контур остаётся TEST — безопасный fallback.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const resolveSendDatabase = async () => {
+    const target = String(sendDatabase || exchangeContour.defaultDatabase || "TEST").toUpperCase();
+    if (target === "VLAVKA") {
+      const ok = await appConfirm({
+        title: "Пилот в рабочую 1С VLAVKA",
+        message:
+          "Заказ попадёт в очередь рабочей базы VLAVKA. Убедитесь, что расширение в VLAVKA шлёт X-Clover-Database: VLAVKA. Продолжить?",
+        confirmLabel: "В VLAVKA",
+        cancelLabel: "Отмена",
+        tone: "warn",
+      });
+      if (!ok) return null;
+    }
+    return target;
+  };
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkStatus, setBulkStatus] = useState("Принят");
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -145,10 +196,15 @@ export function ManagerOrders({
       });
       return;
     }
+    let database = "";
+    if (action === "send") {
+      database = await resolveSendDatabase();
+      if (!database) return;
+    }
     setBusyOrderId(order.id);
     try {
       if (action === "send") {
-        const result = await api.sendExchangeOrder(order.id);
+        const result = await api.sendExchangeOrder(order.id, { database });
         if (Array.isArray(result.managerNotifications)) {
           onApplyManagerNotifications?.(result.managerNotifications);
         }
@@ -290,13 +346,15 @@ export function ManagerOrders({
 
   const runBulkSendToOneC = async () => {
     if (!selectedIds.length) return;
+    const database = await resolveSendDatabase();
+    if (!database) return;
     setBulkBusy(true);
     const errors = [];
     try {
       for (const orderId of selectedIds) {
         try {
           await api.checkExchangeOrder(orderId);
-          const result = await api.sendExchangeOrder(orderId);
+          const result = await api.sendExchangeOrder(orderId, { database });
           if (Array.isArray(result.managerNotifications)) {
             onApplyManagerNotifications?.(result.managerNotifications);
           }
@@ -399,6 +457,22 @@ export function ManagerOrders({
           ) : null}
         </button>
       </div>
+
+      {!inTrash && exchangeContour.prodEnabled && (exchangeContour.allowedDatabases || []).length > 1 ? (
+        <label className="field manager-orders-contour" style={{ marginTop: 12, maxWidth: 320 }}>
+          Контур передачи в 1С
+          <select
+            value={sendDatabase}
+            onChange={(event) => setSendDatabase(event.target.value)}
+          >
+            {(exchangeContour.allowedDatabases || ["TEST"]).map((name) => (
+              <option key={name} value={name}>
+                {name === "VLAVKA" ? "VLAVKA (рабочая)" : `${name} (копия)`}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       {!inTrash && filtersOpen && (
         <div className="toolbar three manager-orders-filters">
@@ -603,7 +677,7 @@ export function ManagerOrders({
                         }
                         onClick={() => runExchangeAction(order, "send")}
                       >
-                        {busy ? "Передача…" : exchangeSendLabel(exchange)}
+                        {busy ? "Передача…" : exchangeSendLabel(exchange, exchangeContour, sendDatabase)}
                       </button>
                       {canCancelOneCTransfer(exchange) ? (
                         <button

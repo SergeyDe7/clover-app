@@ -7,6 +7,7 @@
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Стек, роли, модули, порты |
 | [INTEGRATION_1C.md](./INTEGRATION_1C.md) | Обмен Clover ↔ 1С УНФ TEST |
 | [PROD_CONTOUR.md](./PROD_CONTOUR.md) | Подготовка prod-контура (рабочая 1С / VLAVKA) |
+| [VLAVKA_EXTENSION_INSTALL.md](./VLAVKA_EXTENSION_INSTALL.md) | Установка расширения в VLAVKA + пилот |
 | [OPERATIONS.md](./OPERATIONS.md) | Запуск, backup, диагностика |
 | [READINESS.md](./READINESS.md) | Готовность и путь к реальным заказам |
 | [ONEC_EMPTY_QUEUE_MESSAGE.md](./ONEC_EMPTY_QUEUE_MESSAGE.md) | Короткое сообщение при пустой очереди |

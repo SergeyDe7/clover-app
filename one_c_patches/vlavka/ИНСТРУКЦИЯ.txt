@@ -1,0 +1,12 @@
+VLAVKA — рабочая 1С
+====================
+
+Полная инструкция: docs/technical/VLAVKA_EXTENSION_INSTALL.md
+
+Кратко:
+1. Backup VLAVKA.
+2. То же расширение, что в TEST.
+3. В ДобавитьЗаголовкиОбмена: X-Clover-Database = "VLAVKA" (см. ЗАГОЛОВКИ_VLAVKA.txt).
+4. URL/ключ как у TEST → DC :4100.
+5. Из VLAVKA не гонять products-preview / clients-preview.
+6. Пилот: в ЛК менеджера контур «VLAVKA» → один заказ → ACK.
