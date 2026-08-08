@@ -80,7 +80,7 @@ export function OrderTimeline({ order }) {
   );
 }
 
-export function Header({ title, subtitle, onLogout, onLogoClick, nav, children }) {
+export function Header({ title, subtitle, onLogout, onLogoClick, nav, between, children }) {
   const headerRef = useRef(null);
   const [compactHeader, setCompactHeader] = useState(() => {
     if (typeof window === "undefined" || !window.matchMedia) return false;
@@ -117,7 +117,7 @@ export function Header({ title, subtitle, onLogout, onLogoClick, nav, children }
       observer.disconnect();
       window.removeEventListener("resize", apply);
     };
-  }, [compactHeader, children, title, subtitle, nav]);
+  }, [compactHeader, children, title, subtitle, nav, between]);
 
   const logo = (
     <img className="app-header-logo" src={cloverLogo} alt="Clover" width="152" height="66" />
@@ -134,7 +134,7 @@ export function Header({ title, subtitle, onLogout, onLogoClick, nav, children }
   return (
     <header
       ref={headerRef}
-      className={`app-header${compactHeader ? " app-header-compact" : ""}${nav ? " app-header-with-nav" : ""}`}
+      className={`app-header${compactHeader ? " app-header-compact" : ""}${nav ? " app-header-with-nav" : ""}${between ? " app-header-with-between" : ""}`}
     >
       <div className="app-header-top">
         <button
@@ -146,6 +146,7 @@ export function Header({ title, subtitle, onLogout, onLogoClick, nav, children }
         >
           {logo}
         </button>
+        {between ? <div className="app-header-between">{between}</div> : null}
         <div className="app-header-actions">
           {!compactHeader && (
             <div className="app-header-titles">

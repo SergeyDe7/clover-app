@@ -156,15 +156,23 @@ export function ProductPage({ code }) {
             details.composition ||
             details.characteristics) && (
             <div className="sf-details">
-              <h2>Характеристики</h2>
-              {details.description ? <p>{details.description}</p> : null}
+              {details.description ? (
+                <>
+                  <h2>Описание</h2>
+                  <p>{details.description}</p>
+                </>
+              ) : null}
               {details.composition ? (
-                <p>
-                  <strong>Состав:</strong> {details.composition}
-                </p>
+                <>
+                  <h2>Состав</h2>
+                  <p>{details.composition}</p>
+                </>
               ) : null}
               {details.characteristics ? (
-                <p>{details.characteristics}</p>
+                <>
+                  <h2>Характеристики</h2>
+                  <p>{details.characteristics}</p>
+                </>
               ) : null}
             </div>
           )}

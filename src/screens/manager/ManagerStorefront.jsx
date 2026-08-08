@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
+import { normalizeProduct } from "../../shared/appHelpers";
 
 /**
  * Редактирование витрины clover-spb.ru — только admin.
@@ -15,6 +16,12 @@ export function ManagerStorefront({
   const [busy, setBusy] = useState(false);
   const [productBusy, setProductBusy] = useState(false);
   const [productQuery, setProductQuery] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState({
+    description: "",
+    composition: "",
+    characteristics: "",
+  });
   const [draft, setDraft] = useState({
     storefrontPriceTypeId: settings?.storefrontPriceTypeId || "",
     storefrontPriceTypeName: settings?.storefrontPriceTypeName || "",
@@ -109,12 +116,14 @@ export function ManagerStorefront({
         message,
         tone: "success",
       });
+      return saved;
     } catch (error) {
       await appAlert({
         title: "Не удалось сохранить товары",
         message: error.message || "Ошибка сохранения.",
         tone: "danger",
       });
+      return null;
     } finally {
       setProductBusy(false);
     }
@@ -145,6 +154,57 @@ export function ManagerStorefront({
         ? `На витрину добавлено: ${ids.size}.`
         : `С витрины снято: ${ids.size}.`
     );
+  };
+
+  const openEditor = (item) => {
+    const details =
+      item.storefrontDetails && typeof item.storefrontDetails === "object"
+        ? item.storefrontDetails
+        : {};
+    setEditingId(item.id);
+    setEditDraft({
+      description: String(details.description || ""),
+      composition: String(details.composition || ""),
+      characteristics: String(details.characteristics || ""),
+    });
+  };
+
+  const closeEditor = () => {
+    setEditingId(null);
+    setEditDraft({ description: "", composition: "", characteristics: "" });
+  };
+
+  const saveProductCard = async (productId) => {
+    const next = (Array.isArray(products) ? products : []).map((item) => {
+      if (String(item.id) !== String(productId)) return item;
+      return normalizeProduct({
+        ...item,
+        storefrontDetails: {
+          description: String(editDraft.description || "").trim(),
+          composition: String(editDraft.composition || "").trim(),
+          characteristics: String(editDraft.characteristics || "").trim(),
+        },
+      });
+    });
+    const saved = await persistProducts(
+      next,
+      "Карточка товара на витрине обновлена."
+    );
+    if (saved) closeEditor();
+  };
+
+  const detailsPreview = (item) => {
+    const details =
+      item.storefrontDetails && typeof item.storefrontDetails === "object"
+        ? item.storefrontDetails
+        : {};
+    const filled = [
+      details.description,
+      details.composition,
+      details.characteristics,
+    ].filter((value) => String(value || "").trim()).length;
+    if (!filled) return "Описание не заполнено";
+    return `Заполнено полей: ${filled} из 3`;
   };
 
   return (
@@ -240,8 +300,9 @@ export function ManagerStorefront({
       <div className="manager-contact-settings" style={{ marginTop: 28 }}>
         <h3>Товары на витрине</h3>
         <p className="storefront-settings-hint">
-          На сайте показываются только отмеченные активные товары. Сейчас на
-          витрине: <strong>{onStorefrontCount}</strong> из {activeProducts.length}.
+          Отметьте товары для сайта и прямо здесь заполните описание, состав и
+          характеристики. Сейчас на витрине:{" "}
+          <strong>{onStorefrontCount}</strong> из {activeProducts.length}.
         </p>
         <div className="form-grid" style={{ marginBottom: 12 }}>
           <label className="field field-wide">
@@ -275,24 +336,116 @@ export function ManagerStorefront({
           {filteredProducts.length === 0 ? (
             <p className="storefront-settings-hint">Нет товаров по фильтру.</p>
           ) : (
-            filteredProducts.map((item) => (
-              <label className="storefront-check storefront-product-row" key={item.id}>
-                <input
-                  type="checkbox"
-                  checked={item.showOnStorefront === true}
-                  disabled={productBusy}
-                  onChange={(event) =>
-                    toggleProduct(item.id, event.target.checked)
-                  }
-                />
-                <span>
-                  <strong>{item.name}</strong>
-                  <span className="storefront-product-meta">
-                    {[item.code, item.category].filter(Boolean).join(" · ") || "—"}
-                  </span>
-                </span>
-              </label>
-            ))
+            filteredProducts.map((item) => {
+              const open = String(editingId) === String(item.id);
+              return (
+                <div
+                  className={`storefront-product-card${open ? " is-open" : ""}${
+                    item.showOnStorefront ? " is-on" : ""
+                  }`}
+                  key={item.id}
+                >
+                  <div className="storefront-product-card-head">
+                    <label className="storefront-check storefront-product-row">
+                      <input
+                        type="checkbox"
+                        checked={item.showOnStorefront === true}
+                        disabled={productBusy}
+                        onChange={(event) =>
+                          toggleProduct(item.id, event.target.checked)
+                        }
+                      />
+                      <span>
+                        <strong>{item.name}</strong>
+                        <span className="storefront-product-meta">
+                          {[item.code, item.category].filter(Boolean).join(" · ") ||
+                            "—"}
+                          {" · "}
+                          {detailsPreview(item)}
+                        </span>
+                      </span>
+                    </label>
+                    <button
+                      className="secondary-button storefront-product-edit-btn"
+                      type="button"
+                      disabled={productBusy}
+                      onClick={() => (open ? closeEditor() : openEditor(item))}
+                    >
+                      {open ? "Свернуть" : "Карточка"}
+                    </button>
+                  </div>
+                  {open ? (
+                    <div className="storefront-product-card-editor">
+                      <div className="form-grid">
+                        <label className="field field-wide">
+                          Описание
+                          <textarea
+                            rows={3}
+                            value={editDraft.description}
+                            placeholder="Кратко о товаре для витрины"
+                            disabled={productBusy}
+                            onChange={(event) =>
+                              setEditDraft((prev) => ({
+                                ...prev,
+                                description: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="field field-wide">
+                          Состав
+                          <textarea
+                            rows={2}
+                            value={editDraft.composition}
+                            placeholder="Состав / материалы"
+                            disabled={productBusy}
+                            onChange={(event) =>
+                              setEditDraft((prev) => ({
+                                ...prev,
+                                composition: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="field field-wide">
+                          Характеристики
+                          <textarea
+                            rows={3}
+                            value={editDraft.characteristics}
+                            placeholder="Размеры, плотность, упаковка и т.п."
+                            disabled={productBusy}
+                            onChange={(event) =>
+                              setEditDraft((prev) => ({
+                                ...prev,
+                                characteristics: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="form-actions" style={{ marginTop: 10 }}>
+                        <button
+                          className="primary-button"
+                          type="button"
+                          disabled={productBusy}
+                          onClick={() => void saveProductCard(item.id)}
+                        >
+                          {productBusy ? "Сохранение…" : "Сохранить карточку"}
+                        </button>
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={productBusy}
+                          onClick={closeEditor}
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })
           )}
         </div>
       </div>

@@ -567,8 +567,18 @@ export function OrderEditor({
                 const multiplier = getUnitMultiplier(product, unit);
                 const price = getUnitPrice(product, unit);
                 const isList = catalogView === "list";
+                const selected = quantity > 0;
                 return (
-                  <article className={isList ? "product-card product-card-list" : "product-card"} key={product.id}>
+                  <article
+                    className={[
+                      "product-card",
+                      isList ? "product-card-list" : "",
+                      selected ? "product-card-selected" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    key={product.id}
+                  >
                     <div className="product-card-top">
                       {product.certificateUrl ? (
                         <a

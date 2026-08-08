@@ -48,10 +48,6 @@ export default function StorefrontApp() {
     <div className="sf-app">
       <StoreHeader current={current} />
       <main className="sf-main">{page}</main>
-      <footer className="sf-footer">
-        <p>Clover · clover-spb.ru</p>
-        <p className="sf-muted">Цены сайта · заказ без регистрации</p>
-      </footer>
     </div>
   );
 }

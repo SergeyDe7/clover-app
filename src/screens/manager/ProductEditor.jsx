@@ -71,6 +71,11 @@ export function ProductEditor({
       oneCLinkedAt: "",
       active: true,
       showOnStorefront: false,
+      storefrontDetails: {
+        description: "",
+        composition: "",
+        characteristics: "",
+      },
       pieceSize: 1,
       packSize: 1,
       bundleSize: 1,
@@ -635,6 +640,71 @@ export function ProductEditor({
             </select>
           </label>
         </div>
+
+        <section className="storefront-details-editor">
+          <div className="one-c-link-editor-head">
+            <div>
+              <p className="eyebrow">Витрина сайта</p>
+              <h3>Описание для покупателей</h3>
+            </div>
+          </div>
+          <p className="muted small" style={{ marginTop: 0 }}>
+            Эти тексты видны на публичной карточке товара (/vitrina, clover-spb.ru).
+          </p>
+          <div className="form-grid">
+            <label className="field field-wide">
+              Описание
+              <textarea
+                rows={3}
+                value={form.storefrontDetails?.description || ""}
+                placeholder="Кратко о товаре для витрины"
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    storefrontDetails: {
+                      ...(form.storefrontDetails || {}),
+                      description: event.target.value,
+                    },
+                  })
+                }
+              />
+            </label>
+            <label className="field field-wide">
+              Состав
+              <textarea
+                rows={2}
+                value={form.storefrontDetails?.composition || ""}
+                placeholder="Состав / материалы"
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    storefrontDetails: {
+                      ...(form.storefrontDetails || {}),
+                      composition: event.target.value,
+                    },
+                  })
+                }
+              />
+            </label>
+            <label className="field field-wide">
+              Характеристики
+              <textarea
+                rows={3}
+                value={form.storefrontDetails?.characteristics || ""}
+                placeholder="Размеры, плотность, упаковка и т.п."
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    storefrontDetails: {
+                      ...(form.storefrontDetails || {}),
+                      characteristics: event.target.value,
+                    },
+                  })
+                }
+              />
+            </label>
+          </div>
+        </section>
 
         <section className="one-c-link-editor">
           <div className="one-c-link-editor-head">

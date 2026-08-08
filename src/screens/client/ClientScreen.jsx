@@ -31,6 +31,7 @@ import {
 import { canTrashOrder } from "../../shared/orderTrash";
 import { EmptyState } from "../../shared/uxFeedback";
 import { ManagerContact } from "./ManagerContact";
+import { ClientSectionMenu } from "./ClientSectionMenu";
 import { ProfilePanel } from "./ProfilePanel";
 import { AddressesPanel } from "./AddressesPanel";
 import { OrderEditor } from "./OrderEditor";
@@ -192,27 +193,6 @@ function ClientDashboard({
   const readyActsBadge = useMemo(
     () => countUnseenReadyActs(reconciliationRequests),
     [reconciliationRequests, seenActsTick]
-  );
-
-  const navButtons = (
-    <>
-      {primaryTabs.map(([id, label]) => (
-        <button
-          className={tab === id ? "active" : ""}
-          type="button"
-          key={id}
-          onClick={() => selectTab(id)}
-        >
-          {label}
-          {id === "orders" && active.length > 0 ? ` (${active.length})` : ""}
-          {id === "reconciliation" && readyActsBadge > 0 ? (
-            <span className="client-nav-count" aria-label={`Готовых актов: ${readyActsBadge}`}>
-              {readyActsBadge}
-            </span>
-          ) : null}
-        </button>
-      ))}
-    </>
   );
 
   const openNewOrder = () => {
@@ -480,10 +460,14 @@ function ClientDashboard({
           }
           subtitle={profile.companyName}
           onLogout={onLogout}
-          nav={
-            <nav className="client-nav" aria-label="Разделы кабинета">
-              {navButtons}
-            </nav>
+          between={
+            <ClientSectionMenu
+              tabs={primaryTabs}
+              activeId={tab}
+              onSelect={selectTab}
+              ordersBadge={active.length}
+              actsBadge={readyActsBadge}
+            />
           }
         >
           <ManagerContact settings={settings} />
