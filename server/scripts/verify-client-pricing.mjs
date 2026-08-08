@@ -141,6 +141,70 @@ assert.equal(markupFromType.prices.piece, 68.74);
 assert.equal(markupFromType.priceSources.piece, "purchase_markup_from_price_type");
 assert.equal(markupFromType.prices.pack, 6874.35);
 
+// Свежий вид «Закупочная» побеждает более старый purchase (кнопка «Обновить цены»).
+const stalePurchaseFreshType = {
+  ...oneCItem,
+  purchasePrice: 65.47,
+  purchasePriceReceivedAt: "2026-08-07T19:04:41.608Z",
+  purchasePriceUpdatedAt: "2026-08-07T19:04:41.608Z",
+  salePricesByType: {
+    "type-zakup": {
+      piece: 100,
+      pack: null,
+      bundle: null,
+      box: null,
+      pair: null,
+      roll: null,
+      receivedAt: "2026-08-08T18:57:27.353Z",
+      updatedAt: "2026-08-08T18:57:27.353Z",
+    },
+  },
+};
+const fresherTyped = resolveClientProductPricing(
+  { ...product, pricePiece: 0, pricePack: 0 },
+  {},
+  stalePurchaseFreshType,
+  {
+    defaultPricingMode: "purchase_markup",
+    defaultMarkupPercent: 5,
+    oneCPriceTypeId: "type-zakup",
+  }
+);
+assert.equal(fresherTyped.prices.piece, 105);
+assert.equal(fresherTyped.priceSources.piece, "purchase_markup_from_price_type");
+
+// Более свежий purchase по-прежнему важнее устаревшего вида цен.
+const freshPurchaseStaleType = {
+  ...stalePurchaseFreshType,
+  purchasePrice: 70,
+  purchasePriceReceivedAt: "2026-08-08T20:00:00.000Z",
+  purchasePriceUpdatedAt: "2026-08-08T20:00:00.000Z",
+  salePricesByType: {
+    "type-zakup": {
+      piece: 100,
+      pack: null,
+      bundle: null,
+      box: null,
+      pair: null,
+      roll: null,
+      receivedAt: "2026-08-08T18:57:27.353Z",
+      updatedAt: "2026-08-08T18:57:27.353Z",
+    },
+  },
+};
+const fresherPurchase = resolveClientProductPricing(
+  { ...product, pricePiece: 0, pricePack: 0 },
+  {},
+  freshPurchaseStaleType,
+  {
+    defaultPricingMode: "purchase_markup",
+    defaultMarkupPercent: 5,
+    oneCPriceTypeId: "type-zakup",
+  }
+);
+assert.equal(fresherPurchase.prices.piece, 73.5);
+assert.equal(fresherPurchase.priceSources.piece, "purchase_markup");
+
 const directUnits = normalizeOneCProduct({
   id: "onec-direct",
   name: "Товар с отдельными ценами",

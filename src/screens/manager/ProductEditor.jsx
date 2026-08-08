@@ -13,6 +13,7 @@ import {
   formatDateTime,
   normalizeProduct,
   inferProductCategory,
+  pickProductCardOneCCost,
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { normalizeProductPhotoFile, productImageSrc } from "../../shared/productPhoto";
@@ -48,6 +49,7 @@ function mergeOneCPickerResults(candidates, catalogItems, currentProductId) {
 export function ProductEditor({
   product,
   products = [],
+  oneCPriceTypes = [],
   onClose,
   onSave,
   onProductLiveUpdate,
@@ -544,34 +546,38 @@ export function ProductEditor({
         </section>
 
         <section className="purchase-price-card">
-          <div className="purchase-price-card-head">
-            <div>
-              <p className="eyebrow">Цена из 1С</p>
-              <h3>Закупочная цена товара</h3>
-            </div>
-            <small>
-              {form.purchasePriceUpdatedAt
-                ? `Обновлено: ${formatDateTime(form.purchasePriceUpdatedAt)}`
-                : "Закупочная цена ещё не получена"}
-            </small>
-          </div>
           {(() => {
-            const preferredUnit = hasPurchasePrice(form.purchasePrices?.piece)
-              ? "piece"
-              : UNIT_ORDER.find((unit) =>
-                  hasPurchasePrice(form.purchasePrices?.[unit])
-                ) || "piece";
-            const value = form.purchasePrices?.[preferredUnit];
-            const available = hasPurchasePrice(value);
+            const card = pickProductCardOneCCost({
+              purchasePrices: form.purchasePrices,
+              purchaseUpdatedAt:
+                form.purchasePriceReceivedAt || form.purchasePriceUpdatedAt || "",
+              salePricesByType: form.salePricesByType,
+              salePriceReceivedAt: form.salePriceReceivedAt || "",
+              oneCPriceTypes,
+            });
+            const available = hasPurchasePrice(card.cost);
             return (
-              <div className="purchase-price-single">
-                <strong>{available ? formatMoney(value) : "—"}</strong>
-                <small>
-                  {available
-                    ? `Получено из 1С · ${UNIT_CONFIG[preferredUnit]?.label || "шт"}`
-                    : "Нет цены из 1С"}
-                </small>
-              </div>
+              <>
+                <div className="purchase-price-card-head">
+                  <div>
+                    <p className="eyebrow">Цена из 1С</p>
+                    <h3>{card.title}</h3>
+                  </div>
+                  <small>
+                    {card.updatedAt
+                      ? `Обновлено: ${formatDateTime(card.updatedAt)}`
+                      : "Цена из 1С ещё не получена"}
+                  </small>
+                </div>
+                <div className="purchase-price-single">
+                  <strong>{available ? formatMoney(card.cost) : "—"}</strong>
+                  <small>
+                    {available
+                      ? `${card.sourceLabel} · ${UNIT_CONFIG[card.unit]?.label || "шт"}`
+                      : "Нет цены из 1С"}
+                  </small>
+                </div>
+              </>
             );
           })()}
         </section>

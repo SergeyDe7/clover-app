@@ -216,17 +216,16 @@ export function resolveClientProductPricing(
     }
 
     if (source === "purchase_markup") {
-      // База для наценки: закупочная из регистра 1С, иначе цена выбранного вида цен
-      // (часто вид «Закупочная цена» в справочнике видов цен).
-      let cost = purchase;
-      let costKind = "purchase";
-      if (cost === null) {
-        const typedCost = resolveTypedSalePrice(product, oneCItem, priceTypeId, unit);
-        if (typedCost) {
-          cost = typedCost.price;
-          costKind = "one_c_price_type";
-        }
-      }
+      // База для наценки: закупочная (purchase-prices) или вид цен («Обновить цены»).
+      // Если есть оба — берём более свежий timestamp, чтобы старый purchase
+      // не перекрывал свежую выгрузку вида «Закупочная цена».
+      const { cost, costKind } = pickPurchaseMarkupCost(
+        product,
+        oneCItem,
+        priceTypeId,
+        unit,
+        purchase
+      );
 
       const calculated = calculateMarkupPrice(cost, markupPercent);
       if (calculated !== null) {
@@ -306,6 +305,58 @@ export function resolveTypedSalePrice(
 
 function cleanTextPriceType(value) {
   return String(value ?? "").trim();
+}
+
+function purchaseCostReceivedAt(oneCItem = {}) {
+  return cleanTextPriceType(
+    oneCItem?.purchasePriceReceivedAt || oneCItem?.purchasePriceUpdatedAt || ""
+  );
+}
+
+function typedSalePriceReceivedAt(oneCItem = {}, priceTypeId = "") {
+  const typeId = cleanTextPriceType(priceTypeId);
+  if (!typeId) return "";
+  const byType =
+    oneCItem?.salePricesByType && typeof oneCItem.salePricesByType === "object"
+      ? oneCItem.salePricesByType
+      : {};
+  const entry = byType[typeId];
+  if (!entry || typeof entry !== "object") return "";
+  return cleanTextPriceType(entry.receivedAt || entry.updatedAt || "");
+}
+
+/**
+ * База для purchase_markup: purchase и/или вид цен.
+ * Свежий вид цен («Обновить цены») побеждает более старый purchase.
+ * При равных/пустых датах — прежнее поведение (purchase первым).
+ */
+export function pickPurchaseMarkupCost(
+  product,
+  oneCItem,
+  priceTypeId,
+  unit,
+  purchase
+) {
+  const typedCost = oneCItem
+    ? resolveTypedSalePrice(product, oneCItem, priceTypeId, unit)
+    : null;
+
+  if (purchase === null && !typedCost) {
+    return { cost: null, costKind: "purchase" };
+  }
+  if (purchase === null) {
+    return { cost: typedCost.price, costKind: "one_c_price_type" };
+  }
+  if (!typedCost) {
+    return { cost: purchase, costKind: "purchase" };
+  }
+
+  const purchaseAt = purchaseCostReceivedAt(oneCItem);
+  const typedAt = typedSalePriceReceivedAt(oneCItem, priceTypeId);
+  if (typedAt && (!purchaseAt || typedAt > purchaseAt)) {
+    return { cost: typedCost.price, costKind: "one_c_price_type" };
+  }
+  return { cost: purchase, costKind: "purchase" };
 }
 
 export function enrichProductWithPurchasePrices(product = {}, oneCItem = null) {

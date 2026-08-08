@@ -4833,6 +4833,145 @@ export function calculateMarkupPreview(purchasePrice, markupPercent) {
   return roundPriceUp(purchase * (1 + markup / 100));
 }
 
+/**
+ * База для превью наценки в UI менеджера (как pickPurchaseMarkupCost на сервере).
+ * Свежий вид цен побеждает более старую закупку; priceSource из matrix-prices — приоритетнее.
+ */
+export function pickPurchaseMarkupCostForUi({
+  purchasePrice,
+  typedPrice,
+  purchaseUpdatedAt = "",
+  typedReceivedAt = "",
+  priceSource = "",
+} = {}) {
+  const purchase = hasPurchasePrice(purchasePrice) ? Number(purchasePrice) : null;
+  const typed =
+    typedPrice !== null &&
+    typedPrice !== undefined &&
+    typedPrice !== "" &&
+    Number.isFinite(Number(typedPrice))
+      ? Number(typedPrice)
+      : null;
+
+  if (priceSource === "purchase_markup_from_price_type") {
+    return {
+      cost: typed !== null ? typed : purchase,
+      kind: "one_c_price_type",
+    };
+  }
+  if (priceSource === "purchase_markup") {
+    return {
+      cost: purchase !== null ? purchase : typed,
+      kind: "purchase",
+    };
+  }
+
+  if (purchase === null && typed === null) {
+    return { cost: null, kind: "purchase" };
+  }
+  if (purchase === null) {
+    return { cost: typed, kind: "one_c_price_type" };
+  }
+  if (typed === null) {
+    return { cost: purchase, kind: "purchase" };
+  }
+
+  const purchaseAt = String(purchaseUpdatedAt || "").trim();
+  const typedAt = String(typedReceivedAt || "").trim();
+  if (typedAt && (!purchaseAt || typedAt > purchaseAt)) {
+    return { cost: typed, kind: "one_c_price_type" };
+  }
+  return { cost: purchase, kind: "purchase" };
+}
+
+/** Вид цен 1С с именем вроде «Закупочная цена» (не путать с каналом purchase-prices). */
+export function findZakupPriceType(oneCPriceTypes = [], salePricesByType = {}) {
+  const listed = (Array.isArray(oneCPriceTypes) ? oneCPriceTypes : []).find((item) =>
+    /закупочн/i.test(String(item?.name || ""))
+  );
+  if (listed?.id) {
+    return {
+      id: String(listed.id).trim(),
+      name: String(listed.name || "Закупочная цена").trim(),
+    };
+  }
+  const byType =
+    salePricesByType && typeof salePricesByType === "object" ? salePricesByType : {};
+  for (const [id, entry] of Object.entries(byType)) {
+    const name = String(entry?.priceTypeName || entry?.name || "").trim();
+    if (!/закупочн/i.test(name)) continue;
+    return { id: String(id).trim(), name: name || "Закупочная цена" };
+  }
+  return null;
+}
+
+/**
+ * Число и подпись для карточки товара в редакторе.
+ * Свежий вид «Закупочная» побеждает более старый канал purchase-prices.
+ */
+export function pickProductCardOneCCost({
+  purchasePrices = {},
+  purchaseUpdatedAt = "",
+  salePricesByType = {},
+  salePriceReceivedAt = "",
+  oneCPriceTypes = [],
+  preferredUnit = "piece",
+} = {}) {
+  const unit =
+    UNIT_ORDER.includes(preferredUnit) && hasPurchasePrice(purchasePrices?.[preferredUnit])
+      ? preferredUnit
+      : UNIT_ORDER.find((item) => hasPurchasePrice(purchasePrices?.[item])) ||
+        UNIT_ORDER.find((item) => {
+          const zakup = findZakupPriceType(oneCPriceTypes, salePricesByType);
+          if (!zakup) return false;
+          const entry = salePricesByType?.[zakup.id];
+          return entry && Number.isFinite(Number(entry[item]));
+        }) ||
+        "piece";
+
+  const purchase = hasPurchasePrice(purchasePrices?.[unit])
+    ? Number(purchasePrices[unit])
+    : null;
+
+  const zakup = findZakupPriceType(oneCPriceTypes, salePricesByType);
+  const entry =
+    zakup && salePricesByType && typeof salePricesByType === "object"
+      ? salePricesByType[zakup.id]
+      : null;
+  let typed = null;
+  if (entry && typeof entry === "object") {
+    const direct = Number(entry[unit]);
+    if (Number.isFinite(direct) && direct >= 0) typed = direct;
+    else if (unit === "piece" || unit === "pair" || unit === "roll" || unit === "meter") {
+      typed = null;
+    } else {
+      const piece = Number(entry.piece);
+      typed = Number.isFinite(piece) && piece >= 0 ? piece : null;
+    }
+  }
+  const typedAt = String(
+    entry?.receivedAt || entry?.updatedAt || salePriceReceivedAt || ""
+  ).trim();
+  const purchaseAt = String(purchaseUpdatedAt || "").trim();
+  const picked = pickPurchaseMarkupCostForUi({
+    purchasePrice: purchase,
+    typedPrice: typed,
+    purchaseUpdatedAt: purchaseAt,
+    typedReceivedAt: typedAt,
+  });
+  const fromType = picked.kind === "one_c_price_type";
+  return {
+    cost: picked.cost,
+    kind: picked.kind,
+    unit,
+    updatedAt: fromType ? typedAt : purchaseAt,
+    title: fromType ? `Вид цен «${zakup?.name || "Закупочная"}»` : "Закупочная цена товара",
+    sourceLabel: fromType
+      ? "Из «Обновить цены» (вид цен)"
+      : "Из выгрузки закупочных цен",
+  };
+}
+
 export function getOrderTotal(order) {
   const itemsTotal = (order.items || []).reduce(
     (sum, item) => sum + (Number(item.lineTotal) || 0),

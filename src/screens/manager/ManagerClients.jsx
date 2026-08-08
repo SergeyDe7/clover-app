@@ -13,6 +13,7 @@ import {
   hasManualUnitValue,
   prefillManualPriceFromProduct,
   calculateMarkupPreview,
+  pickPurchaseMarkupCostForUi,
   formatMoney,
   formatDateTime,
   normalizeProduct,
@@ -2092,9 +2093,27 @@ export function ManagerClients({
                                   const clientUnitPrice = preview
                                     ? Number(preview[priceField])
                                     : null;
-                                  const costPrice = hasPurchasePrice(purchasePrice)
-                                    ? Number(purchasePrice)
-                                    : typedPrice;
+                                  const typeId = String(
+                                    link.oneCPriceTypeId || ""
+                                  ).trim();
+                                  const typedReceivedAt =
+                                    product.salePricesByType?.[typeId]
+                                      ?.receivedAt ||
+                                    preview?.salePriceReceivedAt ||
+                                    product.salePriceReceivedAt ||
+                                    "";
+                                  const { cost: costPrice, kind: costKind } =
+                                    pickPurchaseMarkupCostForUi({
+                                      purchasePrice,
+                                      typedPrice,
+                                      purchaseUpdatedAt:
+                                        product.purchasePriceReceivedAt ||
+                                        product.purchasePriceUpdatedAt ||
+                                        "",
+                                      typedReceivedAt,
+                                      priceSource:
+                                        preview?.priceSources?.[unit] || "",
+                                    });
                                   const calculatedPrice =
                                     clientUnitPrice != null &&
                                     Number.isFinite(clientUnitPrice) &&
@@ -2116,10 +2135,10 @@ export function ManagerClients({
                                         Number.isFinite(Number(costPrice)) ? (
                                           <>
                                             <small>
-                                              {hasPurchasePrice(purchasePrice)
-                                                ? "Закупка"
-                                                : link.oneCPriceTypeName ||
-                                                  "Категория 1С"}
+                                              {costKind === "one_c_price_type"
+                                                ? link.oneCPriceTypeName ||
+                                                  "Категория 1С"
+                                                : "Закупка"}
                                               : {formatMoney(costPrice)}
                                             </small>
                                             <strong>
@@ -2334,6 +2353,7 @@ export function ManagerClients({
         <ProductEditor
           product={editorProduct}
           products={products}
+          oneCPriceTypes={oneCPriceTypes}
           onClose={() => setEditorProduct(undefined)}
           onSave={saveCatalogProduct}
           onProductLiveUpdate={(updated) => {
