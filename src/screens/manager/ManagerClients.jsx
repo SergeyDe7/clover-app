@@ -22,6 +22,7 @@ import {
   buildOrderSearchHaystack,
   RUSSIAN_PHONE_PREFIX,
   formatRussianPhone,
+  normalizeProfileContacts,
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { MatrixOneCProductAdd } from "./MatrixOneCProductAdd";
@@ -253,11 +254,19 @@ export function normalizeManagerClientAddresses(addresses = []) {
 }
 
 function createManagerClientForm(client) {
-  return {
+  const normalized = normalizeProfileContacts({
     companyName: client.companyName || "",
     contactName: client.contactName || "",
     phone: client.phone || "",
     email: client.email || "",
+    contacts: Array.isArray(client.contacts) ? client.contacts : [],
+  });
+  return {
+    companyName: normalized.companyName || "",
+    contactName: normalized.contactName || "",
+    phone: normalized.phone || "",
+    email: client.email || "",
+    contacts: normalized.contacts,
     managerNote: client.managerNote || "",
     addresses: normalizeManagerClientAddresses(client.addresses),
   };
@@ -274,6 +283,7 @@ function ManagerClientEditor({ client, onReload, onClose }) {
     contactName: client.contactName || "",
     phone: client.phone || "",
     email: client.email || "",
+    contacts: Array.isArray(client.contacts) ? client.contacts : [],
     managerNote: client.managerNote || "",
     addresses: normalizeManagerClientAddresses(client.addresses),
   });
@@ -368,15 +378,48 @@ function ManagerClientEditor({ client, onReload, onClose }) {
     setMessage("");
 
     try {
+      const existingContacts = Array.isArray(form.contacts) ? form.contacts : [];
+      const secondary = existingContacts
+        .filter((item) => !item.isPrimary)
+        .slice(0, 1)
+        .map((item) => ({
+          ...item,
+          isPrimary: false,
+          label:
+            !item.label ||
+            item.label === "Основной" ||
+            item.label === "Дополнительный"
+              ? "Дополнительный"
+              : item.label,
+        }));
+      const contacts = normalizeProfileContacts({
+        companyName,
+        email,
+        contacts: [
+          {
+            id: existingContacts.find((item) => item.isPrimary)?.id || "contact-primary",
+            name: contactName,
+            label:
+              existingContacts.find((item) => item.isPrimary)?.label &&
+              existingContacts.find((item) => item.isPrimary)?.label !== "Дополнительный"
+                ? existingContacts.find((item) => item.isPrimary).label
+                : "Основной",
+            phone,
+            isPrimary: true,
+          },
+          ...secondary,
+        ],
+      }).contacts;
       await api.updateClient(client.id, {
         profile: {
           companyName,
           contactName,
           phone,
           email,
-          managerNote,
+          contacts,
         },
         addresses,
+        managerNote,
       });
       setMessage("Данные клиента сохранены в Clover.");
       await onReload();
@@ -432,6 +475,35 @@ function ManagerClientEditor({ client, onReload, onClose }) {
           />
         </label>
       </div>
+
+      {Array.isArray(form.contacts) && form.contacts.length > 0 ? (
+        <div className="profile-contacts-block" style={{ marginTop: 14 }}>
+          <strong>Контакты и телефоны</strong>
+          <div className="profile-contacts-list" style={{ marginTop: 8 }}>
+            {form.contacts.map((item) => (
+              <div
+                className={
+                  item.isPrimary
+                    ? "profile-contact-card is-primary"
+                    : "profile-contact-card"
+                }
+                key={item.id || `${item.phone}-${item.name}`}
+              >
+                <div className="profile-contact-card-top">
+                  <span className={item.isPrimary ? "badge green" : "badge yellow"}>
+                    {item.isPrimary ? "Основной" : item.label || "Дополнительный"}
+                  </span>
+                </div>
+                <strong>{item.name || "Без подписи"}</strong>
+                <em style={{ fontStyle: "normal" }}>{item.phone || "—"}</em>
+              </div>
+            ))}
+          </div>
+          <p className="muted small" style={{ marginTop: 8 }}>
+            Поля «Контактное лицо» и «Телефон» выше — основной контакт. Доп. контакты клиент задаёт в своём профиле.
+          </p>
+        </div>
+      ) : null}
 
       <div className="manager-client-addresses">
         <div className="manager-client-addresses-heading">
@@ -1263,10 +1335,37 @@ export function ManagerClients({
                     <h3>
                       {client.companyName || "Клиент без названия"}
                     </h3>
-                    <p className="muted small">
-                      {client.contactName} · {client.phone} ·{" "}
-                      {client.email}
-                    </p>
+                    <p className="muted small">{client.email}</p>
+                    {(() => {
+                      const contacts = normalizeProfileContacts({
+                        companyName: client.companyName || "",
+                        contactName: client.contactName || "",
+                        phone: client.phone || "",
+                        email: client.email || "",
+                        contacts: Array.isArray(client.contacts) ? client.contacts : [],
+                      }).contacts;
+                      if (!contacts.length) {
+                        return client.contactName || client.phone ? (
+                          <p className="muted small">
+                            {client.contactName} · {client.phone}
+                          </p>
+                        ) : null;
+                      }
+                      return (
+                        <div className="client-card-contacts">
+                          {contacts.map((item) => (
+                            <p className="muted small client-card-contact-row" key={item.id}>
+                              <span className={item.isPrimary ? "badge green" : "badge yellow"}>
+                                {item.isPrimary ? "Основной" : item.label || "Дополнительный"}
+                              </span>
+                              <span>
+                                {[item.name, item.phone].filter(Boolean).join(" · ") || "—"}
+                              </span>
+                            </p>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="client-card-header-actions">
                     <strong>{client.orders.length} заказов</strong>
@@ -1393,6 +1492,57 @@ export function ManagerClients({
                                   });
                                   if (ok) {
                                     setApproval(client, "rejected");
+                                  }
+                                },
+                              },
+                            ]
+                          : []),
+                        ...(client.isRegistered !== false
+                          ? [
+                              {
+                                id: "delete",
+                                label: "Удалить клиента",
+                                danger: true,
+                                onSelect: async () => {
+                                  const ok = await appConfirm({
+                                    title: "Удалить клиента?",
+                                    message: `Удалить «${
+                                      client.companyName || client.email || "клиента"
+                                    }»?\n\nБудут удалены аккаунт, матрица, журнал доступов и связанные заказы. Это необратимо.`,
+                                    confirmLabel: "Удалить клиента",
+                                    cancelLabel: "Отмена",
+                                    tone: "danger",
+                                  });
+                                  if (!ok) return;
+                                  try {
+                                    const result = await api.deleteClient(client.id);
+                                    if (result.clientLinks) {
+                                      setClientLinks(result.clientLinks);
+                                    }
+                                    if (String(openClientId) === String(client.id)) {
+                                      setOpenClientId("");
+                                      writeOpenManagerClientId("");
+                                    }
+                                    if (String(profileOpenId) === String(client.id)) {
+                                      setProfileOpenId("");
+                                    }
+                                    if (String(passwordClientId) === String(client.id)) {
+                                      setPasswordClientId("");
+                                      setPasswordDraft("");
+                                    }
+                                    await onReload();
+                                    await appAlert({
+                                      title: "Клиент удалён",
+                                      message: result.message || "Аккаунт клиента удалён.",
+                                      tone: "success",
+                                    });
+                                  } catch (deleteError) {
+                                    await appAlert({
+                                      title: "Не удалось удалить",
+                                      message:
+                                        deleteError.message || "Ошибка удаления клиента.",
+                                      tone: "danger",
+                                    });
                                   }
                                 },
                               },

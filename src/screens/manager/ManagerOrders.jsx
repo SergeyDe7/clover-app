@@ -9,7 +9,6 @@ import {
   EXCHANGE_STATUS_LABELS,
   normalizeOrderExchange,
   exchangeBadgeClass,
-  exchangeContourLabel,
   exchangeStatusLabel,
   printOrderDocument,
   formatDate,
@@ -33,19 +32,13 @@ const CUSTOM_STATUSES = [
   "Отклонён",
 ];
 
-function exchangeSendLabel(exchange, oneCExchange = null, sendDatabase = "") {
-  const contour = exchangeContourLabel(
-    exchange.database || sendDatabase || oneCExchange?.defaultDatabase || "TEST"
-  );
-  if (exchange.status === "sending") return `Ожидает ответ ${contour}…`;
+function exchangeSendLabel(exchange) {
+  if (exchange.status === "sending") return "Ожидает ответ 1С…";
   if (exchange.status === "ready" || exchange.status === "sent" || exchange.status === "draft") {
-    return `Передано в ${contour}`;
+    return "Передано в 1С";
   }
   if (exchange.status === "error") return "Передать повторно";
-  if (oneCExchange?.prodEnabled) {
-    return `Передать в ${contour}`;
-  }
-  return "Передать в 1С TEST";
+  return "Передать в 1С";
 }
 
 function exchangeSendButtonClass(exchange) {
@@ -116,17 +109,6 @@ export function ManagerOrders({
 
   const resolveSendDatabase = async () => {
     const target = String(sendDatabase || exchangeContour.defaultDatabase || "TEST").toUpperCase();
-    if (target === "VLAVKA") {
-      const ok = await appConfirm({
-        title: "Пилот в рабочую 1С VLAVKA",
-        message:
-          "Заказ попадёт в очередь рабочей базы VLAVKA. Убедитесь, что расширение в VLAVKA шлёт X-Clover-Database: VLAVKA. Продолжить?",
-        confirmLabel: "В VLAVKA",
-        cancelLabel: "Отмена",
-        tone: "warn",
-      });
-      if (!ok) return null;
-    }
     return target;
   };
   const [selectedIds, setSelectedIds] = useState([]);
@@ -467,7 +449,7 @@ export function ManagerOrders({
           >
             {(exchangeContour.allowedDatabases || ["TEST"]).map((name) => (
               <option key={name} value={name}>
-                {name === "VLAVKA" ? "VLAVKA (рабочая)" : `${name} (копия)`}
+                {String(name).toUpperCase() === "TEST" ? "Тестовая 1С" : "Рабочая 1С"}
               </option>
             ))}
           </select>
@@ -523,7 +505,7 @@ export function ManagerOrders({
           </div>
           <div className="exchange-actions manager-bulk-exchange" style={{ marginTop: 10 }}>
             <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => void runBulkSendToOneC()}>
-              Тестово передать выбранные
+              Передать выбранные в 1С
             </button>
             <button
               className="danger-button manager-cancel-onec-button"
@@ -677,7 +659,7 @@ export function ManagerOrders({
                         }
                         onClick={() => runExchangeAction(order, "send")}
                       >
-                        {busy ? "Передача…" : exchangeSendLabel(exchange, exchangeContour, sendDatabase)}
+                        {busy ? "Передача…" : exchangeSendLabel(exchange)}
                       </button>
                       {canCancelOneCTransfer(exchange) ? (
                         <button

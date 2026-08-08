@@ -353,6 +353,12 @@ export const api = {
     });
   },
 
+  deleteClient(clientId) {
+    return request(`/admin/clients/${encodeURIComponent(clientId)}`, {
+      method: "DELETE",
+    });
+  },
+
   migrateClient(data) {
     return request("/migrate/client", {
       method: "POST",

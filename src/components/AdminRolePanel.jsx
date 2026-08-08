@@ -306,21 +306,27 @@ export function AdminRolePanel({ currentUser }) {
           const isSelf = String(user.id) === String(currentUser?.id);
           const isExpanded = String(expandedId) === String(user.id);
           return (
-            <div key={user.id} className="manager-contact-settings" style={{ marginTop: 0 }}>
-              <div className="toolbar" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                <div>
+            <div key={user.id} className="manager-contact-settings staff-user-card" style={{ marginTop: 0 }}>
+              <div className="staff-card-top">
+                <div className="staff-card-identity">
                   <strong>{user.email}</strong>
-                  <div className="muted small">
-                    роль: {user.role}
-                    {isSelf ? " · вы" : ""}
-                    {user.disabled ? " · доступ закрыт" : ""}
+                  <div className="staff-card-meta">
+                    <span
+                      className={
+                        user.role === "admin" ? "staff-role-badge is-admin" : "staff-role-badge is-manager"
+                      }
+                    >
+                      {user.role === "admin" ? "Админ" : "Менеджер"}
+                    </span>
+                    {isSelf ? <span className="staff-meta-chip">вы</span> : null}
+                    {user.disabled ? <span className="staff-meta-chip is-warn">доступ закрыт</span> : null}
                   </div>
                 </div>
-                <div className="exchange-actions">
+                <div className="staff-card-actions">
                   {canManageRoles && (
-                    <div className="exchange-actions staff-role-toggle" role="group" aria-label="Роль">
+                    <div className="staff-role-seg" role="group" aria-label="Роль">
                       <button
-                        className={user.role === "manager" ? "primary-button" : "secondary-button"}
+                        className={user.role === "manager" ? "is-active" : ""}
                         type="button"
                         aria-pressed={user.role === "manager"}
                         disabled={busyId === user.id || user.role === "manager"}
@@ -329,7 +335,7 @@ export function AdminRolePanel({ currentUser }) {
                         Менеджер
                       </button>
                       <button
-                        className={user.role === "admin" ? "primary-button" : "secondary-button"}
+                        className={user.role === "admin" ? "is-active" : ""}
                         type="button"
                         aria-pressed={user.role === "admin"}
                         disabled={busyId === user.id || user.role === "admin"}
@@ -341,9 +347,10 @@ export function AdminRolePanel({ currentUser }) {
                   )}
                   {canManageStaff && !isSelf && (
                     <button
-                      className="secondary-button"
+                      className={isExpanded ? "staff-manage-btn is-open" : "staff-manage-btn"}
                       type="button"
                       disabled={busyId === user.id}
+                      aria-expanded={isExpanded}
                       onClick={() => setExpandedId(isExpanded ? "" : user.id)}
                     >
                       {isExpanded ? "Свернуть" : "Управление"}

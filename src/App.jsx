@@ -21,6 +21,8 @@ import {
   DEFAULT_SETTINGS,
   EMPTY_PROFILE,
   EMPTY_LINK,
+  isClientProfileComplete,
+  normalizeProfileContacts,
   normalizeOrderExchange,
   APP_STYLES,
   safeRead,
@@ -576,10 +578,12 @@ function App() {
     }
 
     setOrders(incomingOrders);
-    setProfile({
-      ...EMPTY_PROFILE,
-      ...(data.profile || EMPTY_PROFILE),
-    });
+    setProfile(
+      normalizeProfileContacts({
+        ...EMPTY_PROFILE,
+        ...(data.profile || EMPTY_PROFILE),
+      })
+    );
     setAddresses(
       Array.isArray(data.addresses) ? data.addresses : []
     );
@@ -1046,9 +1050,7 @@ function App() {
   };
 
   const clientId = authUser?.id || "";
-  const profileComplete = Object.values(profile).every((value) =>
-    String(value || "").trim()
-  );
+  const profileComplete = isClientProfileComplete(profile);
 
   const link = {
     ...EMPTY_LINK,
@@ -1742,10 +1744,12 @@ function App() {
     }
 
     if (backup.profile) {
-      setProfile({
-        ...EMPTY_PROFILE,
-        ...backup.profile,
-      });
+      setProfile(
+        normalizeProfileContacts({
+          ...EMPTY_PROFILE,
+          ...backup.profile,
+        })
+      );
     }
 
     if (Array.isArray(backup.addresses)) {

@@ -407,6 +407,155 @@ body:has(.clover-app) {
   box-shadow: 0 0 0 2px rgba(91, 157, 87, 0.1) !important;
 }
 
+.field input[readonly] {
+  background: #f4f7f3 !important;
+  color: #314531 !important;
+  cursor: default !important;
+}
+
+.profile-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profile-summary article {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(40, 60, 40, 0.1);
+  background: #fff;
+}
+
+.profile-summary article span {
+  display: block;
+  color: #5b675c;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.profile-summary article strong {
+  display: block;
+  margin-top: 4px;
+  color: #243028;
+  font-size: 0.98rem;
+}
+
+@media (max-width: 640px) {
+  .profile-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+.profile-summary-contacts {
+  align-items: stretch;
+}
+
+.profile-summary-contacts article {
+  display: grid;
+  gap: 4px;
+}
+
+.profile-summary-contacts article em {
+  font-style: normal;
+  color: #5b675c;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.profile-summary-contacts article.is-primary {
+  box-shadow: inset 0 0 0 1px rgba(69, 133, 66, 0.22);
+}
+
+.profile-contacts-block {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.profile-contacts-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.profile-contacts-head p {
+  margin: 4px 0 0;
+}
+
+.profile-contacts-list {
+  display: grid;
+  gap: 12px;
+}
+
+.profile-contact-card {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(40, 60, 40, 0.12);
+  background: linear-gradient(180deg, #fbfdfb 0%, #f5f9f3 100%);
+  display: grid;
+  gap: 12px;
+}
+
+.profile-contact-card.is-primary {
+  border-color: rgba(69, 133, 66, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(69, 133, 66, 0.08);
+}
+
+.profile-contact-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.profile-contact-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(47, 107, 58, 0.08);
+  color: #2f6b3a;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.profile-contact-primary input {
+  margin: 0;
+  accent-color: #458542;
+}
+
+.profile-contact-card-top .secondary-button {
+  margin-left: auto;
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+}
+
+.client-card-contacts {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.client-card-contact-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 !important;
+}
+
+.client-card-contact-row .badge {
+  flex-shrink: 0;
+}
+
 /* —— Status badges (order FSM) —— */
 .badge {
   border-radius: 12px !important;
@@ -2676,7 +2825,23 @@ html.clover-thankyou-open .app-top-chrome {
   align-content: center !important;
 }
 
-/* In-app confirm / alert — тот же thank-you shell (логотип, sparks, rise) */
+/* In-app confirm / alert — спокойный shell без sparks/анимаций */
+.order-thankyou,
+.order-thankyou-card,
+.order-thankyou-logo,
+.order-thankyou-logo-wrap,
+.order-thankyou-brand,
+.order-thankyou-title,
+.order-thankyou-text,
+.order-thankyou-button {
+  animation: none !important;
+}
+
+.order-thankyou-glow,
+.order-thankyou-spark {
+  display: none !important;
+}
+
 .app-modal-shell .order-thankyou-text {
   white-space: pre-line;
   max-width: 34ch;
@@ -3718,6 +3883,200 @@ html.clover-thankyou-open .app-top-chrome {
 .storefront-product-meta {
   font-size: 0.85rem;
   color: var(--muted, #5b675c);
+}
+
+/* Управление менеджерами: карточка и переключатель роли */
+.staff-user-card {
+  padding: 14px !important;
+}
+
+.staff-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.staff-card-identity {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.staff-card-identity strong {
+  color: #314531;
+  font-size: 0.98rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.staff-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.staff-role-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 9px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.staff-role-badge.is-manager {
+  background: rgba(47, 107, 58, 0.1);
+  color: #2f6b3a;
+}
+
+.staff-role-badge.is-admin {
+  background: rgba(36, 72, 48, 0.14);
+  color: #243028;
+}
+
+.staff-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(40, 60, 40, 0.06);
+  color: #5b675c;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.staff-meta-chip.is-warn {
+  background: rgba(138, 47, 47, 0.1);
+  color: #8a2f2f;
+}
+
+.staff-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.staff-role-seg {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 12px;
+  border: 1px solid rgba(40, 60, 40, 0.14);
+  background: rgba(247, 250, 246, 0.95);
+}
+
+.staff-role-seg button {
+  appearance: none;
+  margin: 0;
+  border: 0;
+  border-radius: 9px;
+  min-height: 34px;
+  padding: 6px 13px;
+  background: transparent;
+  color: #5b675c;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.staff-role-seg button:hover:not(:disabled):not(.is-active) {
+  background: rgba(47, 107, 58, 0.08);
+  color: #2f6b3a;
+}
+
+.staff-role-seg button.is-active {
+  background: #458542;
+  color: #fff;
+}
+
+.staff-role-seg button:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.staff-role-seg button:focus-visible {
+  outline: 2px solid rgba(69, 133, 66, 0.45);
+  outline-offset: 2px;
+}
+
+.staff-manage-btn {
+  appearance: none;
+  margin: 0;
+  border: 1px solid rgba(40, 60, 40, 0.16);
+  border-radius: 11px;
+  min-height: 40px;
+  padding: 8px 14px;
+  background: #fff;
+  color: #314531;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.staff-manage-btn:hover:not(:disabled) {
+  background: rgba(47, 107, 58, 0.06);
+  border-color: rgba(47, 107, 58, 0.28);
+  color: #2f6b3a;
+}
+
+.staff-manage-btn.is-open {
+  background: rgba(47, 107, 58, 0.1);
+  border-color: rgba(47, 107, 58, 0.32);
+  color: #2f6b3a;
+}
+
+.staff-manage-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.staff-manage-btn:focus-visible {
+  outline: 2px solid rgba(69, 133, 66, 0.45);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .staff-card-top {
+    align-items: stretch;
+  }
+
+  .staff-card-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .staff-role-seg {
+    flex: 1 1 auto;
+  }
+
+  .staff-role-seg button {
+    flex: 1 1 0;
+  }
+
+  .staff-manage-btn {
+    flex: 1 1 auto;
+  }
 }
 
 /* Управление менеджерами: панель прав */

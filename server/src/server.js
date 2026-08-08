@@ -41,6 +41,8 @@ import {
   setStaffDisabled,
   setStaffPermissions,
   deleteStaffUser,
+  deleteClientUser,
+  deleteManagerNotificationsBySource,
   revokeOtherSessions,
   createAuthToken,
   consumeAuthToken,
@@ -883,6 +885,18 @@ const managerClientUpdateSchema = z.object({
     contactName: z.string().trim().max(120),
     phone: z.string().trim().max(50),
     email: z.string().trim().email().max(200),
+    contacts: z
+      .array(
+        z.object({
+          id: z.string().trim().min(1).max(80).optional(),
+          name: z.string().trim().max(120).optional().default(""),
+          label: z.string().trim().max(80).optional().default(""),
+          phone: z.string().trim().max(50).optional().default(""),
+          isPrimary: z.boolean().optional().default(false),
+        })
+      )
+      .max(2)
+      .optional(),
   }),
   addresses: z.array(managerClientAddressSchema).max(50),
   managerNote: z.string().trim().max(2000).optional().default(""),
@@ -905,6 +919,86 @@ function normalizeManagerClientAddresses(addresses) {
     ...item,
     isDefault: index === selectedIndex,
   }));
+}
+
+function normalizeClientProfileContacts(profile = {}, accountEmail = "") {
+  const source = profile && typeof profile === "object" ? profile : {};
+  const companyName = String(source.companyName || "").trim();
+  const email = String(accountEmail || source.email || "").trim();
+  const rawContacts = Array.isArray(source.contacts) ? source.contacts : [];
+  const ROLE_PRIMARY = "Основной";
+  const ROLE_SECONDARY = "Дополнительный";
+  const syncLabel = (label, isPrimary) => {
+    const trimmed = String(label || "").trim();
+    if (!trimmed || trimmed === ROLE_PRIMARY || trimmed === ROLE_SECONDARY) {
+      return isPrimary ? ROLE_PRIMARY : ROLE_SECONDARY;
+    }
+    return trimmed;
+  };
+
+  let contacts = rawContacts
+    .map((item, index) => {
+      if (!item || typeof item !== "object") return null;
+      const name = String(item.name || item.contactName || "").trim();
+      const phone = String(item.phone || item.number || "").trim();
+      const label = String(item.label || "").trim();
+      if (!name && !phone && !label) return null;
+      return {
+        id: String(item.id || `contact-${index + 1}`).slice(0, 80),
+        name: name.slice(0, 120),
+        label: label.slice(0, 80),
+        phone: phone.slice(0, 50),
+        isPrimary: Boolean(item.isPrimary),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (!contacts.length) {
+    const legacyName = String(source.contactName || "").trim();
+    const legacyPhone = String(source.phone || "").trim();
+    if (legacyName || legacyPhone) {
+      contacts = [
+        {
+          id: "contact-primary",
+          name: legacyName.slice(0, 120),
+          label: ROLE_PRIMARY,
+          phone: legacyPhone.slice(0, 50),
+          isPrimary: true,
+        },
+      ];
+    }
+  }
+
+  if (!contacts.length) {
+    return {
+      companyName: companyName.slice(0, 160),
+      contactName: "",
+      phone: "",
+      email,
+      contacts: [],
+    };
+  }
+
+  let primaryIndex = contacts.findIndex((item) => item.isPrimary);
+  if (primaryIndex < 0) primaryIndex = 0;
+  contacts = contacts.map((item, index) => {
+    const isPrimary = index === primaryIndex;
+    return {
+      ...item,
+      isPrimary,
+      label: syncLabel(item.label, isPrimary),
+    };
+  });
+
+  const primary = contacts[primaryIndex];
+  return {
+    companyName: companyName.slice(0, 160),
+    contactName: primary.name || "",
+    phone: primary.phone || "",
+    email,
+    contacts,
+  };
 }
 
 
@@ -3460,13 +3554,23 @@ app.put(
   authRequired,
   roleRequired("client"),
   (req, res) => {
-    setClientStateField(
-      req.user.id,
-      "profile",
-      req.body?.profile || {}
+    const incoming =
+      req.body?.profile && typeof req.body.profile === "object" && !Array.isArray(req.body.profile)
+        ? req.body.profile
+        : {};
+    const current = getClientState(req.user.id).profile || {};
+    const accountEmail = normalizeEmail(req.user.email);
+    // Клиент не может сменить email/логин через профиль.
+    const profile = normalizeClientProfileContacts(
+      {
+        ...current,
+        ...incoming,
+      },
+      accountEmail || current.email || ""
     );
+    setClientStateField(req.user.id, "profile", profile);
 
-    res.json({ ok: true });
+    res.json({ ok: true, profile });
   }
 );
 
@@ -3700,9 +3804,13 @@ app.put(
       }
 
       const addresses = normalizeManagerClientAddresses(parsed.addresses);
+      const profile = normalizeClientProfileContacts(
+        parsed.profile,
+        parsed.profile.email
+      );
       const client = updateClientByManager({
         clientId: clientUser.id,
-        profile: parsed.profile,
+        profile,
         addresses,
         managerNote: parsed.managerNote,
       });
@@ -3711,9 +3819,9 @@ app.put(
       upsertClientAccessEntry(
         clientUser.id,
         {
-          login: client.email || parsed.profile.email,
-          companyName: client.companyName || parsed.profile.companyName,
-          contactName: client.contactName || parsed.profile.contactName,
+          login: client.email || profile.email,
+          companyName: client.companyName || profile.companyName,
+          contactName: client.contactName || profile.contactName,
         },
         req.user
       );
@@ -3723,6 +3831,7 @@ app.put(
         changedEmail: normalizeEmail(clientUser.email) !== normalizeEmail(parsed.profile.email),
         addresses: addresses.length,
         managerNoteLength: parsed.managerNote.length,
+        contacts: profile.contacts.length,
       });
 
       res.json({
@@ -5847,6 +5956,58 @@ app.post(
         login: refreshed?.email || clientUser.email,
         clients: listClients(),
         access,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.delete(
+  "/api/admin/clients/:clientId",
+  authRequired,
+  roleRequired("manager"),
+  (req, res, next) => {
+    try {
+      const clientId = String(req.params.clientId || "").trim();
+      const clientUser = findUserById(clientId);
+      if (!clientUser || clientUser.role !== "client") {
+        return res.status(404).json({ error: "Клиент Clover не найден." });
+      }
+
+      const removed = deleteClientUser(clientUser.id);
+      if (!removed) {
+        return res.status(404).json({ error: "Клиент Clover не найден." });
+      }
+
+      removeClientAccessEntry(clientUser.id);
+      deleteManagerNotificationsBySource(clientUser.id);
+
+      const clientLinks = { ...(getGlobalState("clientLinks", {}) || {}) };
+      if (Object.prototype.hasOwnProperty.call(clientLinks, String(clientUser.id))) {
+        delete clientLinks[String(clientUser.id)];
+        setGlobalState("clientLinks", clientLinks);
+      }
+
+      const candidateMap = { ...(getGlobalState("oneCClientCandidates", {}) || {}) };
+      if (Object.prototype.hasOwnProperty.call(candidateMap, String(clientUser.id))) {
+        delete candidateMap[String(clientUser.id)];
+        setGlobalState("oneCClientCandidates", candidateMap);
+        const meta = getGlobalState("oneCClientsMeta", {}) || {};
+        setGlobalState("oneCClientsMeta", { ...meta, candidateMap });
+      }
+
+      auditFromRequest(req, "client.delete", {
+        clientId: clientUser.id,
+        email: clientUser.email,
+      });
+
+      res.json({
+        ok: true,
+        message: "Клиент удалён.",
+        clients: listClients(),
+        clientLinks,
+        items: listClientAccessEntries(listClients()),
       });
     } catch (error) {
       next(error);

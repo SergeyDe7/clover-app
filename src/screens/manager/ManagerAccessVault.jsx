@@ -129,6 +129,41 @@ function ClientAccessPanel() {
     }
   };
 
+  const handleDeleteClient = async (item) => {
+    const registered = item.isRegistered !== false;
+    if (!registered) {
+      await handleRemove(item);
+      return;
+    }
+    const ok = await appConfirm({
+      title: "Удалить клиента?",
+      message: `Удалить «${item.companyName}» (${item.login || item.email || "без логина"})?\n\nБудут удалены аккаунт, матрица, журнал доступов и связанные заказы. Это необратимо.`,
+      confirmLabel: "Удалить клиента",
+      cancelLabel: "Отмена",
+      tone: "danger",
+    });
+    if (!ok) return;
+    try {
+      const result = await api.deleteClient(item.clientId);
+      setItems(
+        Array.isArray(result.items)
+          ? result.items
+          : (await api.getClientAccessVault()).items || []
+      );
+      await appAlert({
+        title: "Клиент удалён",
+        message: result.message || "Аккаунт клиента удалён.",
+        tone: "success",
+      });
+    } catch (deleteError) {
+      await appAlert({
+        title: "Не удалось удалить",
+        message: deleteError.message || "Ошибка удаления клиента.",
+        tone: "danger",
+      });
+    }
+  };
+
   const openPasswordEditor = (item) => {
     setPasswordClientId(item.clientId);
     setPasswordDraft(generateAccessPassword());
@@ -335,15 +370,24 @@ function ClientAccessPanel() {
                       : "Задайте пароль здесь или в карточке клиента"}
                     {item.updatedBy ? ` · ${item.updatedBy}` : ""}
                   </small>
-                  {item.hasPassword ? (
+                  <div className="access-vault-field-actions">
+                    {item.hasPassword ? (
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => handleRemove(item)}
+                      >
+                        Убрать из журнала
+                      </button>
+                    ) : null}
                     <button
-                      className="secondary-button"
+                      className="secondary-button staff-edit-danger"
                       type="button"
-                      onClick={() => handleRemove(item)}
+                      onClick={() => handleDeleteClient(item)}
                     >
-                      Убрать из журнала
+                      Удалить клиента
                     </button>
-                  ) : null}
+                  </div>
                 </footer>
               </article>
             );
