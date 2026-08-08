@@ -502,7 +502,7 @@ export function ProductEditor({
         <section className="purchase-price-card">
           <div className="purchase-price-card-head">
             <div>
-              <p className="eyebrow">Цена из 1С TEST</p>
+              <p className="eyebrow">Цена из 1С</p>
               <h3>Закупочная цена товара</h3>
             </div>
             <small>
@@ -574,7 +574,7 @@ export function ProductEditor({
           <div className="one-c-link-editor-head">
             <div>
               <p className="eyebrow">Связь с 1С</p>
-              <h3>Точная номенклатура 1С TEST</h3>
+              <h3>Точная номенклатура 1С</h3>
             </div>
             <button className="secondary-button" type="button" onClick={openOneCSearch}>
               {form.oneCId ? "Изменить товар 1С" : "Выбрать из загруженных 1С"}
@@ -601,7 +601,7 @@ export function ProductEditor({
             <div className="one-c-link-empty one-c-match-hints">
               <p>
                 Название для сайта может отличаться от названия в 1С. Выберите
-                позицию из полной выгрузки 1С TEST или укажите код / точное
+                позицию из полной выгрузки 1С или укажите код / точное
                 название — после выгрузки Clover сможет связать автоматически.
               </p>
               <div className="form-grid one-c-match-fields">
@@ -638,7 +638,7 @@ export function ProductEditor({
               <div className="one-c-products-search">
                 <input
                   type="search"
-                  placeholder="Поиск по выгрузке 1С TEST: название, код или ID"
+                  placeholder="Поиск по выгрузке 1С: название, код или ID"
                   value={oneCSearch}
                   onChange={(event) => setOneCSearch(event.target.value)}
                   onKeyDown={(event) => {

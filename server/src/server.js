@@ -3961,34 +3961,15 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
   try {
     const { mkdirSync, writeFileSync } = await import("node:fs");
     const receivedAt = new Date().toISOString();
-    // Allowlist (TEST / VLAVKA при prod). Каталог применяем только из TEST;
-    // иначе 1С «полная проверка» на VLAVKA падала бы 403 на шаге товаров.
+    // Allowlist (TEST / VLAVKA при prod). Каталог принимаем из любой разрешённой базы.
     const sourceDatabase = requireOneCAllowedDatabase(req, res);
     if (!sourceDatabase) return;
-    if (!isTestDatabase(sourceDatabase)) {
-      writeAudit({
-        action: "one-c.products.preview.skipped",
-        details: { database: sourceDatabase, reason: "catalog-only-from-TEST" },
-      });
-      return res.json({
-        ok: true,
-        skipped: true,
-        database: sourceDatabase,
-        scanned: 0,
-        received: 0,
-        reason:
-          "Выгрузка номенклатуры в каталог Clover принимается только из TEST. Шаг для этой базы пропущен.",
-      });
-    }
-    const verifiedTestSource = true;
     const allOneCProducts = normalizeOneCProducts(req.body?.items).map((item) => ({
       ...item,
       purchasePriceUpdatedAt:
         item.purchasePriceUpdatedAt || (hasPurchasePrice(item) ? receivedAt : ""),
-      purchasePriceReceivedAt:
-        hasPurchasePrice(item) && verifiedTestSource ? receivedAt : "",
-      purchasePriceSourceDatabase:
-        hasPurchasePrice(item) && verifiedTestSource ? "TEST" : "",
+      purchasePriceReceivedAt: hasPurchasePrice(item) ? receivedAt : "",
+      purchasePriceSourceDatabase: hasPurchasePrice(item) ? sourceDatabase : "",
     }));
     const currentProducts = getGlobalState("products", DEFAULT_PRODUCTS);
     const candidateMap = buildOneCProductCandidates(
@@ -3996,7 +3977,7 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
       allOneCProducts
     );
     // Кандидаты для подсказок — по-прежнему «релевантные»;
-    // для поиска менеджера храним полную выгрузку TEST.
+    // для поиска менеджера храним полную выгрузку разрешённой базы.
     const relevantOneCProducts = selectRelevantOneCProducts(
       currentProducts,
       allOneCProducts,
@@ -4029,6 +4010,7 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
       JSON.stringify(
         {
           receivedAt,
+          database: sourceDatabase,
           data: {
             sourceCount: allOneCProducts.length,
             retainedCount: allOneCProducts.length,
@@ -4076,6 +4058,7 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
 
     const meta = {
       receivedAt,
+      sourceDatabase,
       lastAutoLinkAt: receivedAt,
       lastReport: linked.report,
       candidateMap: cleanCandidateMap,
@@ -4085,6 +4068,7 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
     writeAudit({
       action: "one-c.products.receive",
       details: {
+        database: sourceDatabase,
         scanned: allOneCProducts.length,
         received: linked.oneCProducts.length,
         relevant: relevantOneCProducts.length,
@@ -4101,6 +4085,7 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
 
     res.json({
       ok: true,
+      database: sourceDatabase,
       scanned: allOneCProducts.length,
       received: linked.oneCProducts.length,
       relevant: relevantOneCProducts.length,
@@ -4457,21 +4442,6 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
   try {
     const sourceDatabase = requireOneCAllowedDatabase(req, res);
     if (!sourceDatabase) return;
-    if (!isTestDatabase(sourceDatabase)) {
-      writeAudit({
-        action: "one-c.clients.preview.skipped",
-        details: { database: sourceDatabase, reason: "clients-only-from-TEST" },
-      });
-      return res.json({
-        ok: true,
-        skipped: true,
-        database: sourceDatabase,
-        scanned: 0,
-        received: 0,
-        reason:
-          "Выгрузка контрагентов в Clover принимается только из TEST. Шаг для этой базы пропущен.",
-      });
-    }
     const { mkdirSync, writeFileSync } = await import("node:fs");
     const receivedAt = new Date().toISOString();
     const allOneCClients = normalizeOneCClients(req.body?.items);
@@ -4532,6 +4502,7 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
 
     const meta = {
       receivedAt,
+      sourceDatabase,
       lastAutoLinkAt: receivedAt,
       lastReport: linked.report,
       candidateMap: cleanCandidateMap,
@@ -4544,6 +4515,7 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
       path.resolve(previewDirectory, "clients-preview.json"),
       JSON.stringify({
         receivedAt,
+        database: sourceDatabase,
         data: {
           sourceCount: allOneCClients.length,
           retainedCount: allOneCClients.length,
@@ -4558,6 +4530,7 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
     writeAudit({
       action: "one-c.clients.receive",
       details: {
+        database: sourceDatabase,
         scanned: allOneCClients.length,
         received: linked.oneCClients.length,
         relevant: relevantOneCClients.length,
@@ -4571,6 +4544,7 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
 
     res.json({
       ok: true,
+      database: sourceDatabase,
       scanned: allOneCClients.length,
       received: linked.oneCClients.length,
       relevant: relevantOneCClients.length,
