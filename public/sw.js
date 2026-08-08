@@ -1,6 +1,5 @@
-const CACHE_NAME = "clover-v18-shell-v106";
+const CACHE_NAME = "clover-v18-shell-v142";
 const SHELL = [
-  "/",
   "/offline.html",
   "/manifest.webmanifest",
   "/icon-192.png",
@@ -43,16 +42,26 @@ self.addEventListener("fetch", (event) => {
   const path = new URL(request.url).pathname;
   if (path.startsWith("/api/") || path.startsWith("/uploads/")) return;
 
-  // JS/CSS с хэшем не кэшируем — иначе после обновления остаётся старый кабинет.
-  if (path.startsWith("/assets/")) {
-    event.respondWith(fetch(request));
+  // HTML навигация и hashed assets — только сеть (иначе stale HTML → чужие css/js → голый текст).
+  if (request.mode === "navigate" || path === "/" || path.startsWith("/assets/")) {
+    event.respondWith(
+      fetch(request).catch(async () => {
+        if (request.mode === "navigate") {
+          return (
+            (await caches.match("/offline.html"))
+            || Response.error()
+          );
+        }
+        return Response.error();
+      })
+    );
     return;
   }
 
   event.respondWith(
     fetch(request)
       .then((response) => {
-        if (response.ok && (path === "/" || SHELL.includes(path))) {
+        if (response.ok && SHELL.includes(path)) {
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => undefined);
         }
@@ -61,14 +70,6 @@ self.addEventListener("fetch", (event) => {
       .catch(async () => {
         const cached = await caches.match(request);
         if (cached) return cached;
-        // Нельзя отдавать HTML вместо JS/CSS — это даёт пустой экран.
-        if (request.mode === "navigate") {
-          return (
-            (await caches.match("/offline.html"))
-            || (await caches.match("/"))
-            || Response.error()
-          );
-        }
         return Response.error();
       })
   );

@@ -952,7 +952,7 @@ function normalizeClientProfileContacts(profile = {}, accountEmail = "") {
       };
     })
     .filter(Boolean)
-    .slice(0, 2);
+    .slice(0, 5);
 
   if (!contacts.length) {
     const legacyName = String(source.contactName || "").trim();
@@ -3579,15 +3579,20 @@ app.put(
   authRequired,
   roleRequired("client"),
   (req, res) => {
-    setClientStateField(
-      req.user.id,
-      "addresses",
-      Array.isArray(req.body?.addresses)
-        ? req.body.addresses
-        : []
-    );
+    const incoming = Array.isArray(req.body?.addresses)
+      ? req.body.addresses
+      : [];
+    const current = getClientState(req.user.id).addresses || [];
+    // Защита: пустой PUT после смены пароля/перелогина не должен стирать адреса.
+    if (incoming.length === 0 && current.length > 0) {
+      auditFromRequest(req, "addresses.save_rejected_empty", {
+        kept: current.length,
+      });
+      return res.json({ ok: true, addresses: current, rejectedEmpty: true });
+    }
 
-    res.json({ ok: true });
+    setClientStateField(req.user.id, "addresses", incoming);
+    res.json({ ok: true, addresses: incoming });
   }
 );
 
@@ -3904,7 +3909,7 @@ app.post(
         )
       ),
     };
-    const addresses = Array.isArray(req.body?.addresses)
+    const addressesIncoming = Array.isArray(req.body?.addresses)
       ? req.body.addresses
       : [];
     const favorites = Array.isArray(req.body?.favorites)
@@ -3918,6 +3923,13 @@ app.post(
       ...profile,
       email: profile.email || req.user.email,
     });
+    // Не затираем серверные адреса пустым localStorage при migrate после смены пароля.
+    const addresses =
+      addressesIncoming.length > 0
+        ? addressesIncoming
+        : Array.isArray(currentState.addresses) && currentState.addresses.length
+          ? currentState.addresses
+          : addressesIncoming;
     setClientStateField(
       req.user.id,
       "addresses",

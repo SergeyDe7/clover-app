@@ -10,6 +10,8 @@ import {
   syncContactRoleLabel,
 } from "../../shared/appHelpers";
 
+const MAX_PROFILE_CONTACTS = 5;
+
 function ensureEditableContacts(profile) {
   const normalized = normalizeProfileContacts(profile);
   if (normalized.contacts.length) return normalized.contacts;
@@ -52,7 +54,7 @@ export function ProfilePanel({ profile, onChange }) {
 
   const addContact = () => {
     setContacts((current) => {
-      if (current.length >= 2) return current;
+      if (current.length >= MAX_PROFILE_CONTACTS) return current;
       return [
         ...current,
         createEmptyProfileContact({ isPrimary: false }),
@@ -119,21 +121,16 @@ export function ProfilePanel({ profile, onChange }) {
             <article key={contact.id} className={contact.isPrimary ? "is-primary" : ""}>
               <span>
                 {contact.label || (contact.isPrimary ? "Основной контакт" : "Доп. контакт")}
-                {contact.isPrimary ? " · основной" : ""}
               </span>
-              <strong>{contact.name || "Без подписи"}</strong>
+              <strong>{contact.name || "—"}</strong>
               <em>{contact.phone || "—"}</em>
             </article>
           ))}
         </div>
       )}
 
-      {!editing && !complete && (
-        <div className="warning-box">Заполните профиль перед созданием первого заказа.</div>
-      )}
-
       {editing && (
-        <form onSubmit={save}>
+        <form className="profile-form" onSubmit={save}>
           <div className="form-grid">
             <label className="field">
               Название организации
@@ -145,13 +142,7 @@ export function ProfilePanel({ profile, onChange }) {
             </label>
             <label className="field">
               Электронная почта
-              <input
-                type="email"
-                value={profile.email || ""}
-                readOnly
-                title="Логин аккаунта — изменить нельзя"
-                aria-readonly="true"
-              />
+              <input value={String(profile.email || "")} readOnly disabled />
             </label>
           </div>
           <p className="muted small" style={{ margin: "8px 0 0" }}>
@@ -163,10 +154,11 @@ export function ProfilePanel({ profile, onChange }) {
               <div>
                 <strong>Контакты</strong>
                 <p className="muted small">
-                  Подпишите контакт, укажите номер и отметьте основной. Можно добавить ещё один.
+                  Укажите ФИО, роль в компании и телефон. Основной контакт — для связи по заказам.
+                  Можно добавить до {MAX_PROFILE_CONTACTS} контактов.
                 </p>
               </div>
-              {contacts.length < 2 ? (
+              {contacts.length < MAX_PROFILE_CONTACTS ? (
                 <button className="secondary-button" type="button" onClick={addContact}>
                   + Доп. контакт
                 </button>
@@ -193,9 +185,7 @@ export function ProfilePanel({ profile, onChange }) {
                       />
                       Основной
                     </label>
-                    <span className="muted small">
-                      {index === 0 ? "Контакт 1" : "Контакт 2"}
-                    </span>
+                    <span className="muted small">Контакт {index + 1}</span>
                     {contacts.length > 1 ? (
                       <button
                         className="secondary-button staff-edit-danger"
@@ -209,7 +199,7 @@ export function ProfilePanel({ profile, onChange }) {
 
                   <div className="form-grid">
                     <label className="field">
-                      Подпись контакта
+                      ФИО контакта
                       <input
                         value={contact.name}
                         placeholder="Например: Иван Иванов"
@@ -220,10 +210,10 @@ export function ProfilePanel({ profile, onChange }) {
                       />
                     </label>
                     <label className="field">
-                      Метка
+                      Роль в компании
                       <input
                         value={contact.label}
-                        placeholder={contact.isPrimary ? "Основной" : "Дополнительный"}
+                        placeholder="Например: директор, склад, закупки"
                         onChange={(event) =>
                           updateContact(contact.id, { label: event.target.value })
                         }
@@ -257,12 +247,12 @@ export function ProfilePanel({ profile, onChange }) {
               ))}
             </div>
             <datalist id="profile-contact-labels">
-              <option value="Основной" />
-              <option value="Дополнительный" />
               <option value="Директор" />
               <option value="Бухгалтер" />
               <option value="Склад" />
               <option value="Закупки" />
+              <option value="Приём товара" />
+              <option value="Менеджер" />
             </datalist>
           </div>
 

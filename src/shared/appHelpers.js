@@ -713,8 +713,8 @@ export function normalizeProfileContacts(profile = {}) {
     }
   }
 
-  // Не больше двух контактов: основной + дополнительный.
-  contacts = contacts.slice(0, 2);
+  // До 5 контактов: основной + дополнительные номера.
+  contacts = contacts.slice(0, 5);
 
   if (!contacts.length) {
     return {
@@ -2987,9 +2987,9 @@ html.clover-thankyou-open .app-top-chrome {
 .client-home-note { margin-bottom: 16px; }
 .manager-header-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .manager-search-input { min-width: 180px; max-width: 260px; padding: 9px 12px; border: 1px solid #e6eee3; border-radius: 12px; background: #fbfdfb; font: inherit; }
-.manager-bell { position: relative; }
+.manager-bell { position: relative; overflow: visible; }
 .manager-bell-label-short { display: none; }
-.manager-bell-count { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #c45c26; color: #fff; font-size: 11px; font-weight: 800; display: grid; place-items: center; }
+.manager-bell-count { position: absolute; top: -4px; right: -4px; z-index: 2; min-width: 18px; min-height: 18px; height: auto; padding: 0 5px; border-radius: 999px; background: #c45c26; color: #fff; font-size: 11px; font-weight: 800; line-height: 1; display: grid; place-items: center; box-sizing: border-box; }
 .manager-bell-panel {
   position: absolute;
   right: 0;
@@ -4107,21 +4107,24 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   }
   .product-card-controls { gap: 6px; }
   .unit-choice { gap: 5px; }
-  .unit-choice button { min-height: 30px; padding: 4px 2px; font-size: 10px; border-radius: 8px; }
+  .unit-choice button { min-height: 30px; height: 30px; padding: 4px 2px; font-size: 10px; border-radius: 8px; width: 100%; box-sizing: border-box; }
   .unit-choice.unit-choice-single {
-    display: flex;
-    justify-content: flex-start;
-    width: auto;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    width: 100%;
     max-width: 100%;
+    justify-content: stretch;
   }
   .unit-choice.unit-choice-single button {
-    width: auto;
+    width: 100%;
     max-width: 100%;
     min-width: 0;
-    min-height: 24px;
-    padding: 3px 8px;
-    font-size: 9px;
-    border-radius: 7px;
+    min-height: 30px;
+    height: 30px;
+    padding: 4px 2px;
+    font-size: 10px;
+    border-radius: 8px;
   }
   .unit-hint { display: none; }
   .quantity-control { grid-template-columns: 32px minmax(0, 1fr) 32px; border-radius: 10px; }

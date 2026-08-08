@@ -112,10 +112,10 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
   return <main className="clover-app">
     <StickyCabinetChrome>
       <Header
-        title="Кабинет менеджера"
+        title={authUser?.role === "admin" ? "Кабинет админа" : "Кабинет менеджера"}
         onLogout={onLogout}
         nav={
-          <nav className="manager-nav" aria-label="Разделы менеджера">
+          <nav className="manager-nav" aria-label={authUser?.role === "admin" ? "Разделы админа" : "Разделы менеджера"}>
             {MANAGER_TABS.map(([id, label]) => (
               <button
                 className={tab === id ? "active" : ""}

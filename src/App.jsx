@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import cloverLogo from "./assets/clover-logo.png";
 import { startPasskeyAuthentication } from "./utils/webauthn";
@@ -65,6 +65,47 @@ function LoginView({ onAuth, authBusy, authError }) {
     managerMax: "",
     managerTelegram: "",
   });
+  const pageRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const el = pageRef.current;
+    if (!el) return;
+    el.style.setProperty("flex-direction", "column", "important");
+    el.style.setProperty("align-items", "center", "important");
+    el.style.setProperty("box-sizing", "border-box", "important");
+
+    const LOGIN_BG = "#f4f8f2";
+    const html = document.documentElement;
+    const body = document.body;
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    const prevTheme = themeMeta?.getAttribute("content") || "";
+    html.classList.add("login-lock");
+    body.classList.add("login-lock");
+    html.style.backgroundColor = LOGIN_BG;
+    body.style.backgroundColor = LOGIN_BG;
+    if (themeMeta) themeMeta.setAttribute("content", LOGIN_BG);
+
+    // iOS rubber-band: блокируем свайп страницы (поля ввода не трогаем)
+    const blockPageSwipe = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        event.preventDefault();
+        return;
+      }
+      if (target.closest("input, textarea, select, button, a, [contenteditable='true']")) return;
+      event.preventDefault();
+    };
+    document.addEventListener("touchmove", blockPageSwipe, { passive: false });
+
+    return () => {
+      html.classList.remove("login-lock");
+      body.classList.remove("login-lock");
+      html.style.backgroundColor = "";
+      body.style.backgroundColor = "";
+      if (themeMeta) themeMeta.setAttribute("content", prevTheme || "#f4f8f2");
+      document.removeEventListener("touchmove", blockPageSwipe);
+    };
+  }, []);
 
   const passwordToggleIcon = showPassword ? (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -210,7 +251,7 @@ function LoginView({ onAuth, authBusy, authError }) {
 
   if (verificationBusy) {
     return (
-      <main className="page">
+      <main className="page login-page" ref={pageRef}>
         <section className="login-card">
           <img className="logo" src={cloverLogo} alt="Логотип Clover" width="280" height="189" />
           <h1>Подтверждаем почту</h1>
@@ -229,7 +270,7 @@ function LoginView({ onAuth, authBusy, authError }) {
         : "Личный кабинет";
 
   return (
-    <main className="page">
+    <main className="page login-page" ref={pageRef}>
       <section className="login-card">
         <img className="logo" src={cloverLogo} alt="Логотип Clover" width="280" height="189" />
         <h1>{title}</h1>
@@ -257,19 +298,33 @@ function LoginView({ onAuth, authBusy, authError }) {
 
           {mode !== "reset" && (
             <>
-              <label htmlFor="email">Электронная почта</label>
-              <input id="email" type="email" autoComplete={mode === "login" ? "username webauthn" : "email"} value={form.email} onChange={(event) => updateField("email", event.target.value)} required disabled={authBusy} />
+              {mode !== "login" && <label htmlFor="email">Электронная почта</label>}
+              <input
+                id="email"
+                type="email"
+                autoComplete={mode === "login" ? "username webauthn" : "email"}
+                placeholder={mode === "login" ? "Логин" : undefined}
+                aria-label={mode === "login" ? "Логин" : undefined}
+                value={form.email}
+                onChange={(event) => updateField("email", event.target.value)}
+                required
+                disabled={authBusy}
+              />
             </>
           )}
 
           {!["forgot"].includes(mode) && (
             <>
-              <label htmlFor="password">{mode === "reset" ? "Новый пароль" : "Пароль"}</label>
+              {mode !== "login" && (
+                <label htmlFor="password">{mode === "reset" ? "Новый пароль" : "Пароль"}</label>
+              )}
               <div className="password-field">
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  placeholder={mode === "login" ? "Пароль" : undefined}
+                  aria-label={mode === "login" ? "Пароль" : undefined}
                   minLength={mode === "login" ? 1 : 6}
                   value={form.password}
                   onChange={(event) => updateField("password", event.target.value)}
@@ -343,7 +398,7 @@ function LoginView({ onAuth, authBusy, authError }) {
               <p className="login-manager-cta-text">
                 Доступ в личный кабинет Вы можете получить у менеджера
               </p>
-              <ManagerContact settings={managerContact} />
+              <ManagerContact settings={managerContact} variant="inline" />
             </div>
           )}
           {mode !== "login" && mode !== "reset" && (
@@ -519,6 +574,7 @@ function App() {
   const [catalogSession, setCatalogSession] = useState(null);
   const [managerNotice, setManagerNotice] = useState(null);
   const skipNextOrdersSyncRef = useRef(false);
+  const skipNextAddressesSyncRef = useRef(false);
   const pendingDeletedOrderIdsRef = useRef(new Set());
   // Несохранённые правки матрицы у менеджера — live-bootstrap их не затирает.
   const dirtyClientLinkIdsRef = useRef(new Set());
@@ -587,6 +643,8 @@ function App() {
     setAddresses(
       Array.isArray(data.addresses) ? data.addresses : []
     );
+    // После bootstrap не пушим локальные адреса обратно (гонка после смены пароля).
+    skipNextAddressesSyncRef.current = true;
     setFavorites(
       Array.isArray(data.favorites) ? data.favorites : []
     );
@@ -637,6 +695,17 @@ function App() {
         setIsLoggedIn(false);
         setHydrated(false);
         setRole("client");
+        setAddresses([]);
+        setFavorites([]);
+        setProfile(EMPTY_PROFILE);
+        setOrders([]);
+        setClientLinks({});
+        setCatalogPolicy({
+          matrixMode: "pending",
+          allowFullCatalog: false,
+          matrixReady: false,
+          matrixProductIds: [],
+        });
       } else {
         setSyncError(error.message);
         // Без успешного bootstrap не показываем кабинет на локальных дефолтах:
@@ -798,6 +867,18 @@ function App() {
           setAuthUser(null);
           setIsLoggedIn(false);
           setHydrated(false);
+          // Как logout: иначе пустые дефолты после следующего входа могут уехать на сервер.
+          setAddresses([]);
+          setFavorites([]);
+          setProfile(EMPTY_PROFILE);
+          setOrders([]);
+          setClientLinks({});
+          setCatalogPolicy({
+            matrixMode: "pending",
+            allowFullCatalog: false,
+            matrixReady: false,
+            matrixProductIds: [],
+          });
         } else {
           setSyncError(error.message);
         }
@@ -920,6 +1001,10 @@ function App() {
     if (!hydrated || authUser?.role !== "client") {
       return undefined;
     }
+    if (skipNextAddressesSyncRef.current) {
+      skipNextAddressesSyncRef.current = false;
+      return undefined;
+    }
 
     return scheduleSync(() => api.saveAddresses(addresses));
   }, [addresses, hydrated, authUser?.role]);
@@ -1001,9 +1086,10 @@ function App() {
           oldOrders.length
         )
       ) {
+        // Пустые адреса из localStorage не отправляем — сервер сохранит свои.
         await api.migrateClient({
           profile: oldProfile,
-          addresses: oldAddresses,
+          addresses: oldAddresses.length ? oldAddresses : undefined,
           favorites: oldFavorites,
           orders: oldOrders,
         });

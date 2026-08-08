@@ -785,7 +785,7 @@ export function listClients() {
         };
       })
       .filter(Boolean)
-      .slice(0, 2);
+      .slice(0, 5);
 
     if (!contacts.length && (profile.contactName || profile.phone)) {
       contacts = [

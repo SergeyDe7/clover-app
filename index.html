@@ -5,24 +5,53 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <!-- Тот же hex, что splash/thank-you — иначе на iOS видна «линия» под status bar -->
-    <meta name="theme-color" content="#d2e8cb" />
+    <meta name="theme-color" content="#f4f8f2" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Clover" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- Шрифты не блокируют первый кадр: media=print + onload -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    </noscript>
     <title>Clover</title>
+    <script>
+      (function () {
+        var BUILD = "ui-20260809-v142-mgr-inline";
+        try {
+          if (localStorage.getItem("clover-ui-build") === BUILD) return;
+          if (navigator.serviceWorker) {
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              regs.forEach(function (reg) { reg.unregister(); });
+            });
+          }
+          if (window.caches && caches.keys) {
+            caches.keys().then(function (keys) {
+              keys.forEach(function (key) { caches.delete(key); });
+            });
+          }
+        } catch (e) {}
+      })();
+    </script>
     <style>
       html, body {
         margin: 0;
         min-height: 100%;
         min-height: 100dvh;
         min-height: -webkit-fill-available;
-        background: #d2e8cb;
-        background-color: #d2e8cb;
+        background: #f4f8f2;
+        background-color: #f4f8f2;
+        font-family: "Manrope", "Segoe UI", system-ui, sans-serif;
+        color: #293329;
       }
       #clover-boot-splash {
         display: none;
@@ -42,8 +71,8 @@
         place-items: center;
         box-sizing: border-box;
         /* Только сплошной цвет — градиент даёт шов под status bar на iPhone */
-        background: #d2e8cb;
-        background-color: #d2e8cb;
+        background: #f4f8f2;
+        background-color: #f4f8f2;
         transition: opacity 0.38s ease, visibility 0.38s ease;
       }
       #clover-boot-splash img {
@@ -68,6 +97,102 @@
       @media (prefers-reduced-motion: reduce) {
         #clover-boot-splash img { animation: none; }
         #clover-boot-splash { transition: none; }
+      }
+      /* Critical login shell — fluid + safe-area (без max()) */
+      html.login-lock, html.login-lock body, html.login-lock #root {
+        height: 100%;
+        height: 100dvh;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: #f4f8f2;
+        background-color: #f4f8f2;
+      }
+      .page,
+      .login-page {
+        position: fixed;
+        inset: 0;
+        min-height: 0;
+        height: 100%;
+        height: 100dvh;
+        max-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow: hidden;
+        overscroll-behavior: none;
+        padding: 24px 16px 24px;
+        padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
+        padding-right: calc(env(safe-area-inset-right, 0px) + 16px);
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+        padding-left: calc(env(safe-area-inset-left, 0px) + 16px);
+        background-color: #f4f8f2;
+        background-image: radial-gradient(ellipse 90% 55% at 50% 18%, rgba(91, 157, 87, 0.1), transparent 70%);
+      }
+      @media (min-width: 821px) and (min-height: 780px) {
+        .page,
+        .login-page {
+          justify-content: center;
+          padding-top: calc(env(safe-area-inset-top, 0px) + 32px);
+        }
+      }
+      .login-card {
+        width: min(100%, 460px);
+        max-width: 460px;
+        margin: 0 auto;
+        padding: clamp(20px, 4vw, 36px) clamp(14px, 4vw, 28px);
+        background: rgba(255, 255, 255, 0.96);
+        border: 1px solid rgba(86, 156, 80, 0.15);
+        border-radius: 16px;
+        box-shadow: 0 14px 36px rgba(48, 82, 45, 0.1);
+        text-align: center;
+        box-sizing: border-box;
+      }
+      .login-card .logo {
+        display: block;
+        width: clamp(120px, 42vw, 220px);
+        max-width: 78%;
+        height: auto;
+        margin: 0 auto clamp(8px, 2vh, 14px);
+      }
+      .login-card h1 {
+        margin: 0 0 10px;
+        font-size: clamp(22px, 5.5vw, 28px);
+        color: #386f37;
+      }
+      .login-form {
+        display: flex;
+        flex-direction: column;
+        text-align: left;
+      }
+      .login-form label {
+        margin: 0 0 6px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #3f4c3f;
+      }
+      .login-form input {
+        width: 100%;
+        height: 48px;
+        margin-bottom: 12px;
+        padding: 0 16px;
+        border: 1px solid #d5dfd2;
+        border-radius: 14px;
+        background: #fbfdfb;
+        font-size: 16px;
+        box-sizing: border-box;
+      }
+      .login-form button[type="submit"] {
+        height: 48px;
+        margin-top: 6px;
+        border: 0;
+        border-radius: 14px;
+        background: #5b9d57;
+        color: #fff;
+        font-weight: 700;
       }
     </style>
   </head>

@@ -19,8 +19,8 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-const CLOVER_UI_BUILD = "ui-20260808-v122";
-const BOOT_SPLASH_MS = 1000;
+const CLOVER_UI_BUILD = "ui-20260809-v142-mgr-inline";
+const BOOT_SPLASH_MS = 450;
 const APP_THEME_COLOR = "#f4f8f2";
 const VIEWPORT_BASE = "width=device-width, initial-scale=1.0, viewport-fit=cover";
 
@@ -72,7 +72,7 @@ function hideBootSplash() {
   document.body.style.backgroundColor = APP_THEME_COLOR;
   window.setTimeout(() => {
     splash.remove();
-  }, 420);
+  }, 280);
 }
 
 function scheduleBootSplashHide(startedAt) {
@@ -86,6 +86,23 @@ if (document.readyState === "complete") {
   scheduleBootSplashHide(bootStartedAt);
 } else {
   window.addEventListener("load", () => scheduleBootSplashHide(bootStartedAt), { once: true });
+}
+
+// Как только React нарисовал вход — убираем splash (иначе 2 логотипа на медленной сети)
+const rootEl = document.getElementById("root");
+if (rootEl) {
+  const splashObserver = new MutationObserver(() => {
+    if (rootEl.childElementCount > 0) {
+      hideBootSplash();
+      splashObserver.disconnect();
+    }
+  });
+  splashObserver.observe(rootEl, { childList: true, subtree: true });
+  // Страховка: не держать splash дольше 2.5с
+  window.setTimeout(() => {
+    hideBootSplash();
+    splashObserver.disconnect();
+  }, 2500);
 }
 
 async function refreshServiceWorkerIfNeeded() {
