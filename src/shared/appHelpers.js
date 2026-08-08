@@ -4833,6 +4833,57 @@ export function calculateMarkupPreview(purchasePrice, markupPercent) {
   return roundPriceUp(purchase * (1 + markup / 100));
 }
 
+/**
+ * База для превью наценки в UI менеджера (как pickPurchaseMarkupCost на сервере).
+ * Свежий вид цен побеждает более старую закупку; priceSource из matrix-prices — приоритетнее.
+ */
+export function pickPurchaseMarkupCostForUi({
+  purchasePrice,
+  typedPrice,
+  purchaseUpdatedAt = "",
+  typedReceivedAt = "",
+  priceSource = "",
+} = {}) {
+  const purchase = hasPurchasePrice(purchasePrice) ? Number(purchasePrice) : null;
+  const typed =
+    typedPrice !== null &&
+    typedPrice !== undefined &&
+    typedPrice !== "" &&
+    Number.isFinite(Number(typedPrice))
+      ? Number(typedPrice)
+      : null;
+
+  if (priceSource === "purchase_markup_from_price_type") {
+    return {
+      cost: typed !== null ? typed : purchase,
+      kind: "one_c_price_type",
+    };
+  }
+  if (priceSource === "purchase_markup") {
+    return {
+      cost: purchase !== null ? purchase : typed,
+      kind: "purchase",
+    };
+  }
+
+  if (purchase === null && typed === null) {
+    return { cost: null, kind: "purchase" };
+  }
+  if (purchase === null) {
+    return { cost: typed, kind: "one_c_price_type" };
+  }
+  if (typed === null) {
+    return { cost: purchase, kind: "purchase" };
+  }
+
+  const purchaseAt = String(purchaseUpdatedAt || "").trim();
+  const typedAt = String(typedReceivedAt || "").trim();
+  if (typedAt && (!purchaseAt || typedAt > purchaseAt)) {
+    return { cost: typed, kind: "one_c_price_type" };
+  }
+  return { cost: purchase, kind: "purchase" };
+}
+
 export function getOrderTotal(order) {
   const itemsTotal = (order.items || []).reduce(
     (sum, item) => sum + (Number(item.lineTotal) || 0),

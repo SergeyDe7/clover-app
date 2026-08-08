@@ -37,6 +37,13 @@ assert.ok(
 );
 
 assert.ok(
+  source.includes("pickPurchaseMarkupCostForUi") &&
+    source.includes("purchase_markup_from_price_type") &&
+    source.includes('costKind === "one_c_price_type"'),
+  "Превью наценки у менеджера должно брать свежий вид цен, как у клиента."
+);
+
+assert.ok(
   source.includes("prefillManualPriceFromProduct") &&
     source.includes("hasManualUnitValue") &&
     source.includes("выбрана фиксированная цена, но сумма не указана"),
