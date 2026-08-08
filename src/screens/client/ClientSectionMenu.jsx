@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * Одна кнопка разделов ЛК клиента: Заказ / Мои заказы / Акт сверки / Настройки.
+ * Телефон: одна кнопка разделов ЛК (Заказ / Мои заказы / …).
+ * На десктопе в ClientScreen остаётся ряд кнопок client-nav.
  */
 export function ClientSectionMenu({
   tabs,

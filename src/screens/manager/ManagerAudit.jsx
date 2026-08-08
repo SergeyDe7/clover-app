@@ -81,7 +81,7 @@ function formatAuditDetails(item) {
     case "exchange.check":
       return `Заказ № ${details.orderNumber || "—"} · ${details.ready ? "готов к передаче" : `ошибок: ${(details.issues || []).length}`}`;
     case "exchange.send.test":
-      return `Заказ № ${details.orderNumber || "—"} · квитанция: ${details.receipt || "—"}`;
+      return `Заказ № ${details.orderNumber || "—"} · Заказ покупателя: ${details.receipt || "—"}`;
     case "exchange.send.error":
       return `Заказ № ${details.orderNumber || "—"} · ошибок: ${(details.issues || []).length}`;
     case "exchange.reset":

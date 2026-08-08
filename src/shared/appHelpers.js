@@ -2053,15 +2053,44 @@ textarea { resize: vertical; }
   gap: 4px;
   min-width: 168px;
 }
-.product-card-list .unit-choice {
-  gap: 3px;
-  min-height: 0;
+.product-card-list .unit-choice,
+.product-card-list .unit-choice.unit-choice-single {
+  display: flex !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  gap: 0 !important;
+  border: 1px solid #dfe7dc !important;
+  border-radius: 10px !important;
+  overflow: hidden !important;
+  grid-template-columns: unset !important;
 }
-.product-card-list .unit-choice button {
-  min-height: 26px;
-  padding: 2px 4px;
-  font-size: 10px;
-  border-radius: 7px;
+.product-card-list .unit-choice button,
+.product-card-list .unit-choice.unit-choice-single button {
+  flex: 1 1 0 !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
+  padding: 0 4px !important;
+  border: 0 !important;
+  border-right: 1px solid #dfe7dc !important;
+  border-radius: 0 !important;
+  background: #fff !important;
+  color: #5f695f !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+}
+.product-card-list .unit-choice button:last-child,
+.product-card-list .unit-choice.unit-choice-single button:last-child {
+  border-right: 0 !important;
+}
+.product-card-list .unit-choice button.active,
+.product-card-list .unit-choice.unit-choice-single button.active {
+  background: #5b9d57 !important;
+  color: #fff !important;
 }
 .product-card-list .quantity-control {
   gap: 4px;
@@ -4077,7 +4106,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     width: 100%;
     min-height: 36px;
     padding: 7px 10px;
-    font-size: 14px;
+    font-size: 16px;
     border-radius: 10px;
   }
   .fav-label-full { display: none; }
@@ -4107,36 +4136,40 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     line-height: 1.3;
   }
   .product-card-controls { gap: 6px; }
-  .unit-choice,
-  .unit-choice.unit-choice-single {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 4px;
-    width: 100%;
-    max-width: 100%;
-    justify-content: stretch;
+  .product-card .unit-choice,
+  .product-card .unit-choice.unit-choice-single {
+    display: flex !important;
+    width: 100% !important;
+    gap: 0 !important;
+    border: 1px solid #dfe7dc !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
   }
-  .unit-choice button,
-  .unit-choice.unit-choice-single button {
-    flex: 1 1 0;
-    width: auto;
-    max-width: none;
-    min-width: 0;
-    min-height: 28px;
-    height: 28px;
-    padding: 0 6px;
-    font-size: 10px;
-    border-radius: 999px;
-    border: 1px solid #d8e3d4;
-    background: #fff;
-    color: #5f695f;
-    box-sizing: border-box;
+  .product-card .unit-choice button,
+  .product-card .unit-choice.unit-choice-single button {
+    flex: 1 1 0 !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    padding: 0 4px !important;
+    border: 0 !important;
+    border-right: 1px solid #dfe7dc !important;
+    border-radius: 0 !important;
+    font-size: 11px !important;
+    background: #fff !important;
+    color: #5f695f !important;
+    box-sizing: border-box !important;
   }
-  .unit-choice button.active,
-  .unit-choice.unit-choice-single button.active {
-    border-color: #5b9d57;
-    background: #5b9d57;
-    color: #fff;
+  .product-card .unit-choice button:last-child,
+  .product-card .unit-choice.unit-choice-single button:last-child {
+    border-right: 0 !important;
+  }
+  .product-card .unit-choice button.active,
+  .product-card .unit-choice.unit-choice-single button.active {
+    background: #5b9d57 !important;
+    color: #fff !important;
   }
   .unit-hint { display: none; }
   .quantity-control { grid-template-columns: 32px minmax(0, 1fr) 32px; border-radius: 10px; }
@@ -4326,31 +4359,28 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   .product-card-list .product-price {
     font-size: 11px;
   }
+  .product-card-list .product-card-controls {
+    width: 132px !important;
+    min-width: 132px !important;
+    max-width: 132px !important;
+  }
   .product-card-list .unit-choice,
   .product-card-list .unit-choice.unit-choice-single {
-    display: flex !important;
-    width: auto !important;
-    max-width: none !important;
-    gap: 2px;
+    width: 100% !important;
+    border-radius: 7px !important;
   }
   .product-card-list .unit-choice button,
   .product-card-list .unit-choice.unit-choice-single button {
-    flex: 0 1 auto !important;
-    width: auto !important;
-    min-height: 22px;
-    height: 22px;
-    padding: 0 6px;
-    font-size: 9px;
-    border-radius: 999px;
-    border: 1px solid #d8e3d4;
-    background: #fff;
-    color: #5f695f;
+    flex: 1 1 0 !important;
+    width: 0 !important;
+    height: 24px !important;
+    min-height: 24px !important;
+    max-height: 24px !important;
+    font-size: 10px !important;
   }
-  .product-card-list .unit-choice button.active,
-  .product-card-list .unit-choice.unit-choice-single button.active {
-    border-color: #5b9d57;
-    background: #5b9d57;
-    color: #fff;
+  .product-card-list .quantity-control {
+    width: 100% !important;
+    border-radius: 7px !important;
   }
   .product-card-list .quantity-control {
     grid-template-columns: 24px minmax(0, 1fr) 24px;
@@ -4925,7 +4955,13 @@ export function normalizeProduct(product) {
 export function formatDate(value) {
   if (!value) return "Дата не указана";
   try {
-    return new Intl.DateTimeFormat("ru-RU").format(new Date(`${value}T12:00:00`));
+    const raw = String(value).trim();
+    // YYYY-MM-DD (доставка и т.п.) — полдень локально, без сдвига суток
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return new Intl.DateTimeFormat("ru-RU").format(new Date(`${raw}T12:00:00`));
+    }
+    // ISO datetime — календарный день в локальной зоне (не UTC из slice)
+    return new Intl.DateTimeFormat("ru-RU").format(new Date(raw));
   } catch {
     return value;
   }
