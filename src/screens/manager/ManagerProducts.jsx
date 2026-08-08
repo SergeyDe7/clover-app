@@ -27,7 +27,7 @@ function clearConflictingOneCLink(product) {
   });
 }
 
-function OneCProductsPanel({ products, setProducts }) {
+function OneCProductsPanel({ products, setProducts, visibility, onVisibilityChange }) {
   const [catalog, setCatalog] = useState(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -35,6 +35,17 @@ function OneCProductsPanel({ products, setProducts }) {
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
   const initialLinkDone = useRef(false);
+
+  const selectLinkFilter = (nextVisibility) => {
+    if (typeof onVisibilityChange !== "function") return;
+    onVisibilityChange(visibility === nextVisibility ? "Все" : nextVisibility);
+    requestAnimationFrame(() => {
+      document.getElementById("manager-products-toolbar")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
 
   const loadCatalog = async (query = search) => {
     setLoading(true);
@@ -133,8 +144,36 @@ function OneCProductsPanel({ products, setProducts }) {
 
       <div className="one-c-products-stats">
         <article><span>Из 1С</span><strong>{summary.oneCTotal || 0}</strong></article>
-        <article><span>Связано</span><strong>{summary.linked || 0}</strong></article>
-        <article><span>Без связи</span><strong>{summary.unmatched ?? products.filter((item) => !item.oneCId).length}</strong></article>
+        <article
+          className={`one-c-products-stat-clickable${visibility === "Связанные с 1С" ? " is-active" : ""}`}
+          role="button"
+          tabIndex={0}
+          onClick={() => selectLinkFilter("Связанные с 1С")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              selectLinkFilter("Связанные с 1С");
+            }
+          }}
+        >
+          <span>Связано</span>
+          <strong>{summary.linked || 0}</strong>
+        </article>
+        <article
+          className={`one-c-products-stat-clickable${visibility === "Без связи с 1С" ? " is-active" : ""}`}
+          role="button"
+          tabIndex={0}
+          onClick={() => selectLinkFilter("Без связи с 1С")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              selectLinkFilter("Без связи с 1С");
+            }
+          }}
+        >
+          <span>Без связи</span>
+          <strong>{summary.unmatched ?? products.filter((item) => !item.oneCId).length}</strong>
+        </article>
         {Number(summary.candidateProducts) > 0 && (
           <article><span>Есть варианты</span><strong>{summary.candidateProducts}</strong></article>
         )}
@@ -283,9 +322,14 @@ export function ManagerProducts({ products, setProducts }) {
 
   return (
     <section>
-      <OneCProductsPanel products={products} setProducts={setProducts} />
+      <OneCProductsPanel
+        products={products}
+        setProducts={setProducts}
+        visibility={visibility}
+        onVisibilityChange={setVisibility}
+      />
 
-      <div className="toolbar four">
+      <div className="toolbar four" id="manager-products-toolbar">
         <input type="search" placeholder="Поиск товара, кода или ID 1С" value={search} onChange={(e) => setSearch(e.target.value)} />
         <select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select>
         <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>

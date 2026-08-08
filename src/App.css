@@ -200,6 +200,24 @@ button{cursor:pointer}
   font-size: 16px;
 }
 
+.one-c-products-stats article.one-c-products-stat-clickable {
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.one-c-products-stats article.one-c-products-stat-clickable:hover,
+.one-c-products-stats article.one-c-products-stat-clickable:focus-visible {
+  border-color: rgba(91, 157, 87, 0.45);
+  box-shadow: 0 0 0 2px rgba(91, 157, 87, 0.12);
+  outline: none;
+}
+
+.one-c-products-stats article.one-c-products-stat-clickable.is-active {
+  border-color: rgba(91, 157, 87, 0.65);
+  background: #eef7ec;
+  box-shadow: 0 0 0 2px rgba(91, 157, 87, 0.16);
+}
+
 .one-c-products-meta {
   display: flex;
   gap: 12px 24px;

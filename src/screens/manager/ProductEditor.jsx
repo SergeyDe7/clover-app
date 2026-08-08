@@ -32,6 +32,19 @@ function sortOneCPickerResults(items, currentProductId) {
   });
 }
 
+/** Кандидаты сверху, затем полный каталог; без дублей по id. */
+function mergeOneCPickerResults(candidates, catalogItems, currentProductId) {
+  const seen = new Set();
+  const merged = [];
+  for (const item of [...(candidates || []), ...(catalogItems || [])]) {
+    const id = String(item?.id || "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    merged.push(item);
+  }
+  return sortOneCPickerResults(merged, currentProductId);
+}
+
 export function ProductEditor({
   product,
   products = [],
@@ -100,14 +113,21 @@ export function ProductEditor({
   const searchOneCProducts = async (query = oneCSearch) => {
     setOneCLoading(true);
     setOneCError("");
+    setOneCNotice("");
     try {
+      const needle = String(query || "").trim();
       const result = await api.getOneCProducts({
-        search: String(query || "").trim(),
-        limit: 50,
+        search: needle,
+        limit: 100,
         offset: 0,
       });
       setOneCResults(sortOneCPickerResults(result.items || [], productId));
       setOneCTotal(Number(result.total) || 0);
+      if (!needle) {
+        setOneCNotice(
+          "Полная выгрузка 1С. Свободные позиции сверху. Введите название или код и нажмите «Найти»."
+        );
+      }
     } catch (error) {
       setOneCError(error.message);
       setOneCResults([]);
@@ -118,7 +138,7 @@ export function ProductEditor({
   };
 
   const openOneCSearch = async () => {
-    const query =
+    const hintQuery =
       form.oneCSearchQuery ||
       form.oneCCode ||
       form.oneCMatchCode ||
@@ -126,30 +146,54 @@ export function ProductEditor({
       form.oneCMatchName ||
       form.name ||
       "";
-    setOneCSearch(query);
+    setOneCSearch(hintQuery);
     setOneCOpen(true);
     setOneCLoading(true);
     setOneCError("");
     setOneCNotice("");
     try {
+      let candidates = [];
       if (productId) {
-        const candidateResult = await api.getOneCProductCandidates(productId);
-        if ((candidateResult.items || []).length) {
-          setOneCResults(sortOneCPickerResults(candidateResult.items || [], productId));
-          setOneCTotal(Number(candidateResult.total) || 0);
-          setOneCNotice(
-            "Показаны наиболее подходящие варианты, найденные при последней выгрузке из 1С."
-          );
-          return;
+        try {
+          const candidateResult = await api.getOneCProductCandidates(productId);
+          candidates = candidateResult.items || [];
+        } catch {
+          candidates = [];
         }
       }
+
+      // Ищем по названию товара Clover (токены на сервере: ×≈х и т.п.),
+      // а не по «первым 100 алфавитом» — иначе кажется, что каталога нет.
       const result = await api.getOneCProducts({
-        search: String(query || "").trim(),
-        limit: 50,
+        search: String(hintQuery || "").trim(),
+        limit: 100,
         offset: 0,
       });
-      setOneCResults(sortOneCPickerResults(result.items || [], productId));
-      setOneCTotal(Number(result.total) || 0);
+      let catalogItems = result.items || [];
+      let total = Number(result.total) || catalogItems.length;
+
+      // Если по полному названию пусто — всё равно показать срез каталога.
+      if (!catalogItems.length && hintQuery) {
+        const fallback = await api.getOneCProducts({
+          search: "",
+          limit: 100,
+          offset: 0,
+        });
+        catalogItems = fallback.items || [];
+        total = Number(fallback.total) || catalogItems.length;
+        setOneCNotice(
+          `По «${hintQuery}» точных совпадений нет. Показан каталог 1С (${total}). Уточните слова и нажмите «Найти».`
+        );
+      } else {
+        setOneCNotice(
+          total
+            ? `Найдено в выгрузке 1С: ${total}. Свободные сверху. Можно править строку поиска и жать «Найти» / «Весь каталог».`
+            : "В выгрузке 1С пока пусто — сначала «Отправить товары» из VLAVKA."
+        );
+      }
+
+      setOneCResults(mergeOneCPickerResults(candidates, catalogItems, productId));
+      setOneCTotal(total);
     } catch (error) {
       setOneCError(error.message);
       setOneCResults([]);
@@ -660,6 +704,17 @@ export function ProductEditor({
                 <button
                   className="secondary-button"
                   type="button"
+                  disabled={oneCLoading}
+                  onClick={() => {
+                    setOneCSearch("");
+                    void searchOneCProducts("");
+                  }}
+                >
+                  Весь каталог
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
                   onClick={() => setOneCOpen(false)}
                 >
                   Закрыть
@@ -669,9 +724,8 @@ export function ProductEditor({
               {oneCError && <div className="sync-error">{oneCError}</div>}
               {oneCNotice && <div className="sync-success">{oneCNotice}</div>}
               <p className="muted small">
-                Найдено: {oneCTotal}. Показаны первые {oneCResults.length}{" "}
-                позиций. Свободные позиции сверху; уже связанные можно
-                перепривязать.
+                В выгрузке 1С: {oneCTotal}. В списке сейчас: {oneCResults.length}.
+                Свободные сверху; уже связанные можно перепривязать.
               </p>
 
               <div className="one-c-products-list one-c-picker-list">
