@@ -38,6 +38,9 @@ import {
   updateUserRole,
   listStaffUsers,
   countUsersByRole,
+  setStaffDisabled,
+  setStaffPermissions,
+  deleteStaffUser,
   revokeOtherSessions,
   createAuthToken,
   consumeAuthToken,
@@ -93,7 +96,7 @@ import {
   applyOrderStatusPolicy,
   buildStatusUpdatedOrder,
 } from "./orderStatus.js";
-import { hasRole, isClientRole, isStaffRole } from "./roles.js";
+import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
 import { publicClientSettings } from "./clientSettings.js";
 import {
   listClientAccessEntries,
@@ -147,6 +150,14 @@ import {
   unitLabel,
   unitPriceField,
 } from "./pricing.js";
+import {
+  createStorefrontOrder,
+  getPublicCatalog,
+  getPublicProductByCode,
+  getStorefrontSettings,
+  mergeStorefrontSettings,
+  stripStorefrontSettings,
+} from "./storefrontPublic.js";
 import {
   buildAllPriceRequirements,
   buildOrderPriceRequirements,
@@ -303,13 +314,48 @@ function normalizeEmail(value) {
 }
 
 function publicUser(user) {
+  const permissions = parseStaffPermissions(user.permissions_json ?? user.permissions);
   return {
     id: user.id,
     email: user.email,
     role: user.role,
     emailVerified: Boolean(user.email_verified),
     approvalStatus: user.approval_status || "approved",
+    disabled: Boolean(user.disabled_at || user.disabled),
+    disabledAt: user.disabled_at || user.disabledAt || "",
+    permissions: isStaffRole(user.role)
+      ? {
+          tabs: permissions.fullAccess ? [...STAFF_FEATURE_IDS] : permissions.tabs,
+          manageStaff: permissions.manageStaff !== false,
+          fullAccess: permissions.fullAccess || user.role === "admin",
+        }
+      : undefined,
   };
+}
+
+function actorCanManageStaff(req) {
+  // Создание/правка/удаление менеджеров — только admin.
+  return req.user?.role === "admin" && staffCanManageStaff(req.user);
+}
+
+function assertCanManageTargetStaff(req, target) {
+  if (!actorCanManageStaff(req)) {
+    const error = new Error("Недостаточно прав для управления менеджерами.");
+    error.status = 403;
+    error.code = "STAFF_MANAGE_FORBIDDEN";
+    throw error;
+  }
+  if (!target || !isStaffRole(target.role)) {
+    const error = new Error("Менеджер не найден.");
+    error.status = 404;
+    throw error;
+  }
+  if (String(target.id) === String(req.user.id)) {
+    const error = new Error("Нельзя изменить собственный доступ этим действием.");
+    error.status = 409;
+    error.code = "STAFF_SELF_FORBIDDEN";
+    throw error;
+  }
 }
 
 function auditFromRequest(req, action, details = {}) {
@@ -447,6 +493,12 @@ function authRequired(req, res, next) {
     if (String(payload.sessionEpoch || "") !== String(user.password_changed_at || "")) {
       return res.status(401).json({
         error: "Сессия завершена. Войдите снова.",
+      });
+    }
+    if (user.disabled_at) {
+      return res.status(403).json({
+        error: "Доступ закрыт. Обратитесь к администратору.",
+        code: "ACCOUNT_DISABLED",
       });
     }
 
@@ -731,18 +783,28 @@ const registerSchema = z.object({
   contactName: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(5).max(50),
   email: z.string().trim().email().max(200),
-  password: z.string().min(8).max(200),
+  password: z.string().min(6).max(200),
 });
 
 const managerClientProvisionSchema = registerSchema;
 
 const managerClientPasswordSchema = z.object({
-  password: z.string().min(8).max(200),
+  password: z.string().min(6).max(200),
 });
 
 const managerCreateSchema = z.object({
   email: z.string().trim().email().max(200),
-  password: z.string().min(12).max(200),
+  password: z.string().min(6).max(200),
+});
+
+const staffPasswordSchema = z.object({
+  password: z.string().min(6).max(200),
+});
+
+const staffPermissionsSchema = z.object({
+  tabs: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+  manageStaff: z.boolean().optional(),
+  fullAccess: z.boolean().optional(),
 });
 
 const loginSchema = z.object({
@@ -759,12 +821,12 @@ const forgotPasswordSchema = z.object({
 });
 
 const resetPasswordSchema = tokenSchema.extend({
-  password: z.string().min(8).max(200),
+  password: z.string().min(6).max(200),
 });
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(200),
-  newPassword: z.string().min(8).max(200),
+  newPassword: z.string().min(6).max(200),
 });
 
 const passkeyAuthenticationOptionsSchema = z.object({
@@ -1355,6 +1417,64 @@ app.get("/api/public/manager-contact", (req, res) => {
   });
 });
 
+/** Публичный каталог витрины clover-spb.ru (цены сайта, без матрицы ЛК). */
+app.get("/api/public/catalog", (req, res) => {
+  try {
+    res.json(
+      getPublicCatalog({
+        category: String(req.query.category || ""),
+        q: String(req.query.q || ""),
+      })
+    );
+  } catch (error) {
+    console.error("public catalog failed", error);
+    res.status(500).json({ error: "Не удалось загрузить каталог." });
+  }
+});
+
+app.get("/api/public/catalog/:code", (req, res) => {
+  try {
+    const product = getPublicProductByCode(req.params.code);
+    if (!product) {
+      return res.status(404).json({ error: "Товар не найден." });
+    }
+    res.json({ product });
+  } catch (error) {
+    console.error("public product failed", error);
+    res.status(500).json({ error: "Не удалось загрузить товар." });
+  }
+});
+
+/** Гостевой заказ с витрины — только сайтовые цены. */
+app.post("/api/public/orders", async (req, res) => {
+  try {
+    const order = createStorefrontOrder(req.body, {
+      notify: (created) => {
+        queueManagerNotification({
+          type: "order_new",
+          title: `Заказ с сайта №${created.number}`,
+          body: `${created.customerName} · ${created.customerPhone} · ${created.items?.length || 0} поз.`,
+          url: "/?managerTab=orders",
+          sourceId: `${created.id}:storefront`,
+        });
+      },
+    });
+    res.status(201).json({ ok: true, order });
+  } catch (error) {
+    if (error?.name === "ZodError") {
+      return res.status(400).json({
+        error: "Проверьте данные формы заказа.",
+        details: error.issues,
+      });
+    }
+    const status = Number(error?.status) || 500;
+    res.status(status).json({
+      error: error?.message || "Не удалось оформить заказ.",
+      code: error?.code || "",
+    });
+  }
+});
+
 app.post("/api/auth/register", async (req, res, next) => {
   try {
     const input = registerSchema.parse(req.body);
@@ -1561,6 +1681,12 @@ app.post("/api/auth/login", async (req, res, next) => {
         error: "Подтвердите электронную почту по ссылке из письма.",
       });
     }
+    if (user.disabled_at) {
+      return res.status(403).json({
+        code: "ACCOUNT_DISABLED",
+        error: "Доступ закрыт. Обратитесь к администратору.",
+      });
+    }
   if (isClientRole(user.role) && user.approval_status !== "approved") {
       return res.status(403).json({
         code: user.approval_status === "rejected" ? "ACCOUNT_REJECTED" : "ACCOUNT_PENDING",
@@ -1624,43 +1750,29 @@ app.post("/api/auth/logout-other-sessions", authRequired, (req, res) => {
 
 app.post("/api/admin/managers", authRequired, roleRequired("manager"), async (req, res, next) => {
   try {
+    if (!actorCanManageStaff(req)) {
+      return res.status(403).json({ error: "Недостаточно прав для создания менеджера." });
+    }
     const input = managerCreateSchema.parse(req.body);
     const email = normalizeEmail(input.email);
     if (findUserByEmail(email)) {
       return res.status(409).json({ error: "Аккаунт с такой почтой уже существует." });
     }
     const passwordHash = await bcrypt.hash(input.password, 12);
+    // Сразу можно войти (без письма-подтверждения).
     const user = createUser({
       email,
       passwordHash,
       role: "manager",
-      emailVerified: false,
+      emailVerified: true,
       approvalStatus: "approved",
     });
-    const plainToken = createPlainToken();
-    createAuthToken({
-      userId: user.id,
-      type: "verify_email",
-      tokenHash: tokenHash(plainToken),
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    });
-    const verifyUrl = `${publicBaseUrl(req)}/?verify=${encodeURIComponent(plainToken)}`;
-    let mail = { sent: false };
-    try {
-      mail = await sendCloverMail({
-        to: email,
-        ...verificationEmail({ companyName: "Менеджер Clover", verifyUrl }),
-      });
-    } catch (mailError) {
-      console.error("Manager verification email error", mailError);
-    }
-    auditFromRequest(req, "manager.create", { managerId: user.id, mailSent: Boolean(mail.sent) });
+    auditFromRequest(req, "manager.create", { managerId: user.id });
     res.status(201).json({
       ok: true,
       manager: publicUser(user),
-      requiresEmailVerification: true,
-      mail: { sent: Boolean(mail.sent) },
-      developmentLink: allowDevelopmentAuthLinks(req) ? verifyUrl : undefined,
+      requiresEmailVerification: false,
+      message: "Менеджер создан. Можно сразу войти по email и паролю.",
     });
   } catch (error) {
     next(error);
@@ -1672,12 +1784,15 @@ app.get("/api/admin/staff", authRequired, roleRequired("manager"), (req, res) =>
   const canManageRoles =
     isStaffRole(req.user.role) &&
     (req.user.role === "admin" || adminCount === 0);
+  const canManageStaff = actorCanManageStaff(req);
   res.json({
     ok: true,
     staff: listStaffUsers(),
     adminCount,
     canManageRoles,
+    canManageStaff,
     adminRoleSupported: true,
+    featureOptions: STAFF_FEATURE_IDS,
   });
 });
 
@@ -1702,6 +1817,12 @@ app.post(
         return res.status(403).json({
           error: "Назначать роли может только администратор.",
           code: "ADMIN_REQUIRED",
+        });
+      }
+      if (!staffCanManageStaff(req.user)) {
+        return res.status(403).json({
+          error: "Недостаточно прав для управления менеджерами.",
+          code: "STAFF_MANAGE_FORBIDDEN",
         });
       }
 
@@ -1745,6 +1866,127 @@ app.post(
       });
 
       res.json({ ok: true, user: publicUser(updated) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  "/api/admin/staff/:userId/password",
+  authRequired,
+  roleRequired("manager"),
+  async (req, res, next) => {
+    try {
+      const target = findUserById(String(req.params.userId || "").trim());
+      assertCanManageTargetStaff(req, target);
+      const input = staffPasswordSchema.parse(req.body);
+      const passwordHash = await bcrypt.hash(input.password, 12);
+      const updated = updateUserPassword(target.id, passwordHash);
+      auditFromRequest(req, "manager.password.set", { managerId: target.id });
+      res.json({
+        ok: true,
+        message: "Пароль обновлён. Старые сессии менеджера завершены.",
+        user: publicUser(updated),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.patch(
+  "/api/admin/staff/:userId/access",
+  authRequired,
+  roleRequired("manager"),
+  (req, res, next) => {
+    try {
+      const target = findUserById(String(req.params.userId || "").trim());
+      assertCanManageTargetStaff(req, target);
+      const disabled = Boolean(req.body?.disabled);
+      if (disabled && target.role === "admin" && countUsersByRole("admin") <= 1) {
+        return res.status(409).json({
+          error: "Нельзя закрыть доступ единственному администратору.",
+          code: "LAST_ADMIN",
+        });
+      }
+      const updated = setStaffDisabled(target.id, disabled);
+      auditFromRequest(req, disabled ? "manager.access.disable" : "manager.access.enable", {
+        managerId: target.id,
+      });
+      res.json({
+        ok: true,
+        message: disabled ? "Доступ закрыт." : "Доступ открыт.",
+        user: publicUser(updated),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.patch(
+  "/api/admin/staff/:userId/permissions",
+  authRequired,
+  roleRequired("manager"),
+  (req, res, next) => {
+    try {
+      const target = findUserById(String(req.params.userId || "").trim());
+      assertCanManageTargetStaff(req, target);
+      const input = staffPermissionsSchema.parse(req.body || {});
+      let payload;
+      if (input.fullAccess || !Array.isArray(input.tabs)) {
+        payload = staffPermissionsPayload({
+          manageStaff: input.manageStaff,
+        });
+      } else {
+        payload = staffPermissionsPayload({
+          tabs: input.tabs,
+          manageStaff: input.manageStaff,
+        });
+      }
+      if (target.role === "admin") {
+        payload = { manageStaff: true };
+      }
+      const updated = setStaffPermissions(target.id, payload);
+      auditFromRequest(req, "manager.permissions.set", {
+        managerId: target.id,
+        permissions: payload,
+      });
+      res.json({
+        ok: true,
+        message: "Права обновлены.",
+        user: publicUser(updated),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.delete(
+  "/api/admin/staff/:userId",
+  authRequired,
+  roleRequired("manager"),
+  (req, res, next) => {
+    try {
+      const target = findUserById(String(req.params.userId || "").trim());
+      assertCanManageTargetStaff(req, target);
+      if (target.role === "admin" && countUsersByRole("admin") <= 1) {
+        return res.status(409).json({
+          error: "Нельзя удалить единственного администратора.",
+          code: "LAST_ADMIN",
+        });
+      }
+      const removed = deleteStaffUser(target.id);
+      if (!removed) {
+        return res.status(404).json({ error: "Менеджер не найден." });
+      }
+      auditFromRequest(req, "manager.delete", {
+        managerId: target.id,
+        email: target.email,
+      });
+      res.json({ ok: true, message: "Менеджер удалён." });
     } catch (error) {
       next(error);
     }
@@ -3288,13 +3530,77 @@ app.put(
   authRequired,
   roleRequired("manager"),
   (req, res) => {
-    setGlobalState(
-      "settings",
-      req.body?.settings || DEFAULT_SETTINGS
-    );
+    const current = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    const incoming = req.body?.settings || {};
+    // Поля витрины меняет только admin (через /api/admin/storefront).
+    const safeIncoming =
+      req.user.role === "admin"
+        ? incoming
+        : {
+            ...stripStorefrontSettings(incoming),
+            ...Object.fromEntries(
+              [
+                "storefrontPriceTypeId",
+                "storefrontPriceTypeName",
+                "storefrontShowOnlyLinked",
+                "storefrontHeroTitle",
+                "storefrontHeroLead",
+              ].map((key) => [key, current[key]])
+            ),
+          };
+
+    setGlobalState("settings", {
+      ...DEFAULT_SETTINGS,
+      ...safeIncoming,
+    });
     auditFromRequest(req, "settings.save", {});
 
     res.json({ ok: true });
+  }
+);
+
+/** Настройки витрины сайта — только admin. */
+app.get(
+  "/api/admin/storefront",
+  authRequired,
+  roleRequired("admin"),
+  (req, res) => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    res.json({
+      settings: getStorefrontSettings(settings),
+      priceTypes: normalizeOneCPriceTypes(
+        getGlobalState("oneCPriceTypes", [])
+      ),
+      previewPath: "/vitrina",
+    });
+  }
+);
+
+app.put(
+  "/api/admin/storefront",
+  authRequired,
+  roleRequired("admin"),
+  (req, res) => {
+    const current = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    const next = mergeStorefrontSettings(current, req.body?.settings || {});
+    setGlobalState("settings", next);
+    auditFromRequest(req, "storefront.settings.save", {
+      priceTypeId: next.storefrontPriceTypeId || "",
+    });
+    res.json({
+      ok: true,
+      settings: next,
+      storefront: getStorefrontSettings(next),
+    });
   }
 );
 

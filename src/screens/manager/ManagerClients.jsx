@@ -728,10 +728,10 @@ export function ManagerClients({
     const phone = provisionForm.phone.trim();
     const email = provisionForm.email.trim().toLowerCase();
     const password = provisionForm.password.trim();
-    if (!companyName || !contactName || !phone || !email || password.length < 8) {
+    if (!companyName || !contactName || !phone || !email || password.length < 6) {
       await appAlert({
         title: "Проверьте поля",
-        message: "Заполните все поля. Пароль — не короче 8 символов.",
+        message: "Заполните все поля. Пароль — не короче 6 символов.",
         tone: "warn",
       });
       return;
@@ -776,10 +776,10 @@ export function ManagerClients({
 
   const saveClientPassword = async (client) => {
     const password = passwordDraft.trim();
-    if (password.length < 8) {
+    if (password.length < 6) {
       await appAlert({
         title: "Короткий пароль",
-        message: "Пароль должен быть не короче 8 символов.",
+        message: "Пароль должен быть не короче 6 символов.",
         tone: "warn",
       });
       return;
@@ -1176,7 +1176,7 @@ export function ManagerClients({
                   }))
                 }
                 required
-                minLength={8}
+                minLength={6}
                 disabled={provisionBusy}
               />
             </label>
@@ -1531,7 +1531,7 @@ export function ManagerClients({
                           autoComplete="new-password"
                           value={passwordDraft}
                           onChange={(event) => setPasswordDraft(event.target.value)}
-                          minLength={8}
+                          minLength={6}
                           disabled={passwordBusy}
                         />
                       </label>

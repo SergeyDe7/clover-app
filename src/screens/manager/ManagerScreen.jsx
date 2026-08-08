@@ -18,6 +18,7 @@ import { ManagerClients, normalizeManagerClientAddresses } from "./ManagerClient
 import { ManagerReconciliation } from "./ManagerReconciliation";
 import { ManagerProducts } from "./ManagerProducts";
 import { ManagerSettings } from "./ManagerSettings";
+import { ManagerStorefront } from "./ManagerStorefront";
 import { ManagerBackup } from "./ManagerBackup";
 import { ManagerAudit } from "./ManagerAudit";
 import { managerNotificationTab, ManagerNotificationBell, parseManagerNotification, ManagerOrderSummaryLines } from "./ManagerNotifications";
@@ -25,7 +26,10 @@ import { ManagerAccessVault } from "./ManagerAccessVault";
 
 function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, dirtyClientLinkIdsRef, oneCPriceTypes = [], managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onRestoreOrder, onPurgeOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onLogout }) {
   const [tab, setTab] = useState(readManagerActiveTab);
-  const [moreTab, setMoreTab] = useState(readManagerMoreTab);
+  const [moreTab, setMoreTab] = useState(() => {
+    const saved = readManagerMoreTab();
+    return saved === "managers" ? "access" : saved;
+  });
   const [headerSearch, setHeaderSearch] = useState("");
   const [bellOpen, setBellOpen] = useState(false);
   const [ordersView, setOrdersView] = useState("active");
@@ -236,7 +240,10 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
       {tab === "more" && (
         <section>
           <nav className="manager-more-nav" aria-label="Дополнительно">
-            {MANAGER_MORE_TABS.map(([id, label]) => (
+            {MANAGER_MORE_TABS.filter(([id]) => {
+              if (id === "storefront") return authUser?.role === "admin";
+              return true;
+            }).map(([id, label]) => (
               <button
                 className={moreTab === id ? "category-button active" : "category-button"}
                 type="button"
@@ -247,7 +254,16 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
               </button>
             ))}
           </nav>
-          {moreTab === "access" && <ManagerAccessVault />}
+          {moreTab === "storefront" && authUser?.role === "admin" && (
+            <ManagerStorefront
+              settings={settings}
+              setSettings={setSettings}
+              oneCPriceTypes={oneCPriceTypes}
+              products={products}
+              setProducts={setProducts}
+            />
+          )}
+          {moreTab === "access" && <ManagerAccessVault authUser={authUser} />}
           {moreTab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} authUser={authUser} />}
           {moreTab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} onReload={onReload} />}
           {moreTab === "audit" && <ManagerAudit />}

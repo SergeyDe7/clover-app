@@ -4,17 +4,22 @@ import './index.css'
 import './styles/clover-theme.css'
 import App from './App.jsx'
 import { AppModalHost } from './shared/AppModal.jsx'
+import StorefrontApp from './screens/storefront/StorefrontApp.jsx'
+import { shouldRenderStorefront } from './screens/storefront/mode.js'
+
+// Витрина: clover-spb.ru или превью /vitrina. Иначе — ЛК (в т.ч. clover-order.ru/).
+const storefront = shouldRenderStorefront()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <>
-      <AppModalHost />
-      <App />
+      {!storefront ? <AppModalHost /> : null}
+      {storefront ? <StorefrontApp /> : <App />}
     </>
   </StrictMode>,
 )
 
-const CLOVER_UI_BUILD = "ui-20260808-v116";
+const CLOVER_UI_BUILD = "ui-20260808-v122";
 const BOOT_SPLASH_MS = 1000;
 const APP_THEME_COLOR = "#f4f8f2";
 const VIEWPORT_BASE = "width=device-width, initial-scale=1.0, viewport-fit=cover";

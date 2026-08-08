@@ -237,7 +237,7 @@ function LoginView({ onAuth, authBusy, authError }) {
               ? "Регистрация доступна только клиентам. Роль определится автоматически при входе."
               : mode === "forgot"
                 ? "Укажите почту — мы отправим ссылку для установки нового пароля."
-                : "Придумайте новый пароль длиной не менее 8 символов."}
+                : "Придумайте новый пароль длиной не менее 6 символов."}
           </p>
         )}
 
@@ -268,7 +268,7 @@ function LoginView({ onAuth, authBusy, authError }) {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  minLength={mode === "login" ? 1 : 8}
+                  minLength={mode === "login" ? 1 : 6}
                   value={form.password}
                   onChange={(event) => updateField("password", event.target.value)}
                   required
@@ -296,7 +296,7 @@ function LoginView({ onAuth, authBusy, authError }) {
                   id="confirmPassword"
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
-                  minLength="8"
+                  minLength="6"
                   value={form.confirmPassword}
                   onChange={(event) => updateField("confirmPassword", event.target.value)}
                   required

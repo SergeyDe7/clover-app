@@ -193,6 +193,8 @@ ensureColumn("users", "email_verified", "INTEGER NOT NULL DEFAULT 1");
 ensureColumn("users", "approval_status", "TEXT NOT NULL DEFAULT 'approved'");
 ensureColumn("users", "password_changed_at", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("users", "last_login_at", "TEXT NOT NULL DEFAULT ''");
+ensureColumn("users", "disabled_at", "TEXT NOT NULL DEFAULT ''");
+ensureColumn("users", "permissions_json", "TEXT NOT NULL DEFAULT '{}'");
 
 /**
  * Миграция admin-role переименовывала users → users_old_admin_mig.
@@ -425,7 +427,8 @@ export function ensureGlobalState() {
 export function findUserByEmail(email) {
   return db
     .prepare(`
-      SELECT id, email, password_hash, role, created_at, email_verified, approval_status, password_changed_at, last_login_at
+      SELECT id, email, password_hash, role, created_at, email_verified, approval_status,
+             password_changed_at, last_login_at, disabled_at, permissions_json
       FROM users
       WHERE email = ?
     `)
@@ -435,7 +438,8 @@ export function findUserByEmail(email) {
 export function findUserById(id) {
   return db
     .prepare(`
-      SELECT id, email, role, created_at, email_verified, approval_status, password_changed_at, last_login_at
+      SELECT id, email, role, created_at, email_verified, approval_status,
+             password_changed_at, last_login_at, disabled_at, permissions_json
       FROM users
       WHERE id = ?
     `)
@@ -711,6 +715,38 @@ export function replaceOrders({
   }
 }
 
+/** Добавить один заказ (витрина / внешние источники) без очистки остальных. */
+export function insertOrder(order, userId = null) {
+  if (!order?.id) {
+    throw new Error("insertOrder: нужен order.id");
+  }
+  const ownerId = resolveOrderUserId(order, userId);
+  if (!ownerId) {
+    throw new Error("insertOrder: не удалось определить user_id");
+  }
+  const payload = {
+    ...order,
+    clientId: ownerId,
+  };
+  db.prepare(`
+    INSERT INTO orders(
+      id,
+      user_id,
+      payload_json,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    String(payload.id),
+    ownerId,
+    JSON.stringify(payload),
+    payload.createdAt || now(),
+    payload.updatedAt || payload.createdAt || now()
+  );
+  return payload;
+}
+
 export function listClients() {
   const managerNotes = getGlobalState("clientManagerNotes", {});
   const rows = db.prepare(`
@@ -864,21 +900,74 @@ export function updateUserRole(userId, role) {
 export function listStaffUsers() {
   return db
     .prepare(`
-      SELECT id, email, role, email_verified, approval_status, created_at, last_login_at
+      SELECT id, email, role, email_verified, approval_status, created_at, last_login_at,
+             disabled_at, permissions_json
       FROM users
       WHERE role IN ('manager', 'admin')
       ORDER BY role DESC, email ASC
     `)
     .all()
-    .map((row) => ({
-      id: row.id,
-      email: row.email,
-      role: row.role,
-      emailVerified: Boolean(row.email_verified),
-      approvalStatus: row.approval_status || "approved",
-      createdAt: row.created_at,
-      lastLoginAt: row.last_login_at || "",
-    }));
+    .map((row) => mapStaffUser(row));
+}
+
+function parsePermissionsJson(raw) {
+  try {
+    const parsed = JSON.parse(String(raw || "{}"));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function mapStaffUser(row) {
+  return {
+    id: row.id,
+    email: row.email,
+    role: row.role,
+    emailVerified: Boolean(row.email_verified),
+    approvalStatus: row.approval_status || "approved",
+    createdAt: row.created_at,
+    lastLoginAt: row.last_login_at || "",
+    disabledAt: row.disabled_at || "",
+    disabled: Boolean(row.disabled_at),
+    permissions: parsePermissionsJson(row.permissions_json),
+  };
+}
+
+export function setStaffDisabled(userId, disabled) {
+  const value = disabled ? now() : "";
+  if (disabled) {
+    db.prepare(`
+      UPDATE users
+      SET disabled_at = ?, password_changed_at = ?
+      WHERE id = ? AND role IN ('manager', 'admin')
+    `).run(value, randomUUID(), String(userId));
+  } else {
+    db.prepare(`
+      UPDATE users
+      SET disabled_at = ?
+      WHERE id = ? AND role IN ('manager', 'admin')
+    `).run(value, String(userId));
+  }
+  return findUserById(String(userId));
+}
+
+export function setStaffPermissions(userId, permissions) {
+  const payload =
+    permissions && typeof permissions === "object" ? permissions : {};
+  db.prepare(`
+    UPDATE users
+    SET permissions_json = ?
+    WHERE id = ? AND role IN ('manager', 'admin')
+  `).run(JSON.stringify(payload), String(userId));
+  return findUserById(String(userId));
+}
+
+export function deleteStaffUser(userId) {
+  const result = db
+    .prepare(`DELETE FROM users WHERE id = ? AND role IN ('manager', 'admin')`)
+    .run(String(userId));
+  return Number(result.changes) > 0;
 }
 
 export function countUsersByRole(role) {

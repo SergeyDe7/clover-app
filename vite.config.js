@@ -19,13 +19,13 @@ export default defineConfig({
     port: 5273,
     strictPort: true,
     proxy,
-    allowedHosts: ["clover-order.ru"]
+    allowedHosts: ["clover-order.ru", "clover-spb.ru", "www.clover-spb.ru"],
   },
   preview: {
     host: "0.0.0.0",
     port: 5273,
     strictPort: true,
     proxy,
-    allowedHosts: ["clover-order.ru"],
+    allowedHosts: ["clover-order.ru", "clover-spb.ru", "www.clover-spb.ru"],
   },
 });

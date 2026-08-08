@@ -19,10 +19,40 @@ export const MANAGER_TABS = [
 /** Вкладки внутри «Ещё» у менеджера. */
 export const MANAGER_MORE_TABS = [
   ["access", "Доступы"],
+  ["storefront", "Витрина сайта"],
   ["settings", "Настройки"],
   ["backup", "Резервные копии"],
   ["audit", "Журнал"],
 ];
+
+/** Права разделов для ограничения менеджера. */
+export const STAFF_FEATURE_OPTIONS = [
+  ["orders", "Заказы"],
+  ["clients", "Клиенты"],
+  ["products", "Товары"],
+  ["exchange", "1С"],
+  ["acts", "Акты сверок"],
+  ["access", "Доступы"],
+  ["settings", "Настройки"],
+  ["backup", "Резервные копии"],
+  ["audit", "Журнал"],
+];
+
+export const STAFF_FEATURE_IDS = STAFF_FEATURE_OPTIONS.map(([id]) => id);
+
+export function staffHasFeature(authUser, featureId) {
+  if (!authUser) return false;
+  const id = String(featureId || "");
+  if (id === "storefront") return authUser.role === "admin";
+  if (authUser.role === "admin") return true;
+  const permissions = authUser.permissions;
+  if (!permissions || permissions.fullAccess) return true;
+  const tabs = Array.isArray(permissions.tabs) ? permissions.tabs : STAFF_FEATURE_IDS;
+  if (id === "more") {
+    return ["access", "settings", "backup", "audit"].some((item) => tabs.includes(item));
+  }
+  return tabs.includes(id);
+}
 
 export const MANAGER_MORE_TAB_KEY = "clover-manager-more-tab-v1";
 
@@ -4647,6 +4677,7 @@ export function normalizeProduct(product) {
     certificateName: product.certificateName || "",
     certificateUpdatedAt: product.certificateUpdatedAt || "",
     active: product.active !== false,
+    showOnStorefront: product.showOnStorefront === true,
     ...sizes,
     ...prices,
     ...basePrices,

@@ -66,6 +66,11 @@ export const DEFAULT_SETTINGS = {
   managerNotifyTelegram: false,
   managerTelegramChatId: "",
   managerNotifyPush: true,
+  storefrontPriceTypeId: "",
+  storefrontPriceTypeName: "",
+  storefrontShowOnlyLinked: true,
+  storefrontHeroTitle: "",
+  storefrontHeroLead: "",
 };
 
 export const EMPTY_LINK = {

@@ -155,6 +155,44 @@ export const api = {
     return request("/admin/managers", { method: "POST", body: { email, password } });
   },
 
+  getStaffUsers() {
+    return request("/admin/staff");
+  },
+
+  setUserRole(userId, role) {
+    return request(`/admin/users/${encodeURIComponent(userId)}/role`, {
+      method: "POST",
+      body: { role },
+    });
+  },
+
+  setStaffPassword(userId, password) {
+    return request(`/admin/staff/${encodeURIComponent(userId)}/password`, {
+      method: "POST",
+      body: { password },
+    });
+  },
+
+  setStaffAccess(userId, disabled) {
+    return request(`/admin/staff/${encodeURIComponent(userId)}/access`, {
+      method: "PATCH",
+      body: { disabled },
+    });
+  },
+
+  setStaffPermissions(userId, permissions) {
+    return request(`/admin/staff/${encodeURIComponent(userId)}/permissions`, {
+      method: "PATCH",
+      body: permissions,
+    });
+  },
+
+  deleteStaffUser(userId) {
+    return request(`/admin/staff/${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    });
+  },
+
   listPasskeys() {
     return request("/passkeys");
   },
@@ -231,17 +269,6 @@ export const api = {
     });
   },
 
-  getStaffUsers() {
-    return request("/admin/staff");
-  },
-
-  setUserRole(userId, role) {
-    return request(`/admin/users/${encodeURIComponent(userId)}/role`, {
-      method: "POST",
-      body: { role },
-    });
-  },
-
   saveProfile(profile) {
     return request("/state/profile", {
       method: "PUT",
@@ -272,6 +299,17 @@ export const api = {
 
   saveSettings(settings) {
     return request("/state/settings", {
+      method: "PUT",
+      body: { settings },
+    });
+  },
+
+  getStorefrontSettings() {
+    return request("/admin/storefront");
+  },
+
+  saveStorefrontSettings(settings) {
+    return request("/admin/storefront", {
       method: "PUT",
       body: { settings },
     });

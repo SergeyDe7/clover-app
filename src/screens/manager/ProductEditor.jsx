@@ -70,6 +70,7 @@ export function ProductEditor({
       oneCLinkMode: "",
       oneCLinkedAt: "",
       active: true,
+      showOnStorefront: false,
       pieceSize: 1,
       packSize: 1,
       bundleSize: 1,
@@ -616,6 +617,21 @@ export function ProductEditor({
             >
               <option value="yes">Да</option>
               <option value="no">Нет</option>
+            </select>
+          </label>
+          <label className="field">
+            На витрине сайта
+            <select
+              value={form.showOnStorefront ? "yes" : "no"}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  showOnStorefront: e.target.value === "yes",
+                })
+              }
+            >
+              <option value="no">Нет</option>
+              <option value="yes">Да</option>
             </select>
           </label>
         </div>
