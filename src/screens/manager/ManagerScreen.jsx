@@ -225,7 +225,13 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
       )}
       {tab === "exchange" && <ManagerExchange onReload={onReload} onApplyManagerNotifications={onApplyManagerNotifications} onNavigate={selectTab} />}
       {tab === "clients" && <ManagerClients clients={clients} orders={orders} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} dirtyClientLinkIdsRef={dirtyClientLinkIdsRef} oneCPriceTypes={oneCPriceTypes} onReload={onReload} />}
-      {tab === "products" && <ManagerProducts products={products} setProducts={setProducts} />}
+      {tab === "products" && (
+        <ManagerProducts
+          products={products}
+          setProducts={setProducts}
+          oneCPriceTypes={oneCPriceTypes}
+        />
+      )}
       {tab === "acts" && <ManagerReconciliation requests={reconciliationRequests} onReload={onReload} />}
       {tab === "more" && (
         <section>

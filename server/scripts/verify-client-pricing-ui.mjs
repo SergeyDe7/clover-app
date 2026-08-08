@@ -44,6 +44,13 @@ assert.ok(
 );
 
 assert.ok(
+  source.includes("pickProductCardOneCCost") &&
+    source.includes("Из «Обновить цены» (вид цен)") &&
+    source.includes("findZakupPriceType"),
+  "Карточка товара должна показывать свежий вид «Закупочная», а не устаревший purchase-prices."
+);
+
+assert.ok(
   source.includes("prefillManualPriceFromProduct") &&
     source.includes("hasManualUnitValue") &&
     source.includes("выбрана фиксированная цена, но сумма не указана"),

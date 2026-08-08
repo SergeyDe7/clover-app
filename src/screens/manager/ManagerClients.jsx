@@ -2353,6 +2353,7 @@ export function ManagerClients({
         <ProductEditor
           product={editorProduct}
           products={products}
+          oneCPriceTypes={oneCPriceTypes}
           onClose={() => setEditorProduct(undefined)}
           onSave={saveCatalogProduct}
           onProductLiveUpdate={(updated) => {

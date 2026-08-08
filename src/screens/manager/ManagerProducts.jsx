@@ -256,7 +256,7 @@ function OneCProductsPanel({ products, setProducts, visibility, onVisibilityChan
   );
 }
 
-export function ManagerProducts({ products, setProducts }) {
+export function ManagerProducts({ products, setProducts, oneCPriceTypes = [] }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Все");
   const [visibility, setVisibility] = useState("Все");
@@ -385,6 +385,7 @@ export function ManagerProducts({ products, setProducts }) {
         <ProductEditor
           product={editorProduct}
           products={products}
+          oneCPriceTypes={oneCPriceTypes}
           onClose={() => setEditorProduct(undefined)}
           onSave={save}
           onProductLiveUpdate={(updated) => {
