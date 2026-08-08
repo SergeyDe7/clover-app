@@ -10,13 +10,15 @@
   - `ONEC_DEFAULT_EXCHANGE_DATABASE=TEST`
 - Обычная кнопка менеджера по умолчанию ставит заказ в очередь **TEST**.
 - В ЛК «Заказы» при prod: селект **Контур передачи** (TEST / VLAVKA) + подтверждение для VLAVKA.
-- Расширение в **VLAVKA** — шаг на PC1 (см. [VLAVKA_EXTENSION_INSTALL.md](./VLAVKA_EXTENSION_INSTALL.md)).
+- Расширение в **VLAVKA** на PC1: `X-Clover-Database: VLAVKA`.
+- Пилотные заказы в VLAVKA — пройдены.
+- Выгрузки **номенклатуры / контрагентов / цен** принимаются из любой базы в allowlist (в т.ч. **VLAVKA**).
 
 ## Что уже сделано в коде
 
 1. Allowlist баз + флаг prod.
 2. Очередь / pull / ACK / цены scoped по `exchange.database` и заголовку 1С.
-3. Выгрузки номенклатуры/контрагентов (`products-preview`, `clients-preview`) пока **только TEST**.
+3. `products-preview` / `clients-preview` / sale-prices / purchase-prices — из TEST и VLAVKA.
 4. UI: контур в бейдже заказа, статус на вкладке 1С, выбор контура при передаче.
 
 ## Чеклист
@@ -26,8 +28,9 @@
 | A–B | Backup VLAVKA + Clover (+ `.env`) | сделано |
 | C | Код prod на DC + smoke TEST | сделано |
 | D | Флаг в `.env` | сделано |
-| E | Расширение в рабочей 1С (VLAVKA) | **сейчас — на PC1** |
-| F | Пилот: 1 заказ → ACK → сверка | после E |
+| E | Расширение в рабочей 1С (VLAVKA) | сделано |
+| F | Пилот: 1 заказ → ACK → сверка | сделано |
+| G | Каталог/цены из VLAVKA в Clover | **сейчас** — выкат кода + кнопки на PC1 |
 
 ## Включение (уже применено на DC)
 
@@ -42,4 +45,4 @@ ONEC_DEFAULT_EXCHANGE_DATABASE=TEST
 ## Не смешивать
 
 - TEST и VLAVKA не забирают чужие `ready`.
-- Каталог Clover (products-preview) пока только из TEST.
+- Последняя успешная выгрузка номенклатуры/контрагентов **перезаписывает** каталог поиска в Clover. Для рабочей витрины выгружайте из **VLAVKA**.

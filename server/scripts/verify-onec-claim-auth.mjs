@@ -33,12 +33,8 @@ assert.ok(
   "Claim должен писать exchange.status=sending."
 );
 assert.ok(
-  serverSource.includes("function requireOneCTestDatabase"),
-  "Каталог (preview) должен требовать X-Clover-Database: TEST."
-);
-assert.ok(
   serverSource.includes("function requireOneCAllowedDatabase"),
-  "Pull/ACK должны использовать allowlist баз (prod-контур)."
+  "Pull/ACK/каталог должны использовать allowlist баз (prod-контур)."
 );
 assert.ok(
   serverSource.includes("ONEC_PROD_EXCHANGE_ENABLED"),
@@ -51,21 +47,25 @@ assert.ok(
 
 const clientsPreviewIdx = serverSource.indexOf('app.post("/api/one-c/clients-preview"');
 assert.ok(clientsPreviewIdx > 0, "clients-preview должен существовать.");
-const clientsSlice = serverSource.slice(clientsPreviewIdx, clientsPreviewIdx + 900);
+const clientsSlice = serverSource.slice(clientsPreviewIdx, clientsPreviewIdx + 1200);
 assert.ok(
   clientsSlice.includes("requireOneCAllowedDatabase") &&
-    clientsSlice.includes("clients.preview.skipped") &&
-    clientsSlice.includes("isTestDatabase"),
-  "clients-preview: allowlist + skip не-TEST (без 403 на VLAVKA)."
+    !clientsSlice.includes("clients.preview.skipped") &&
+    !clientsSlice.includes("clients-only-from-TEST"),
+  "clients-preview: принимать каталог из любой allowlist-базы (в т.ч. VLAVKA)."
 );
 
 const productsPreviewIdx = serverSource.indexOf('app.post("/api/one-c/products-preview"');
-const productsSlice = serverSource.slice(productsPreviewIdx, productsPreviewIdx + 900);
+const productsSlice = serverSource.slice(productsPreviewIdx, productsPreviewIdx + 1200);
 assert.ok(
   productsSlice.includes("requireOneCAllowedDatabase") &&
-    productsSlice.includes("products.preview.skipped") &&
-    productsSlice.includes("isTestDatabase"),
-  "products-preview: allowlist + skip не-TEST (без 403 на VLAVKA)."
+    !productsSlice.includes("products.preview.skipped") &&
+    !productsSlice.includes("catalog-only-from-TEST"),
+  "products-preview: принимать каталог из любой allowlist-базы (в т.ч. VLAVKA)."
+);
+assert.ok(
+  productsSlice.includes("purchasePriceSourceDatabase: hasPurchasePrice(item) ? sourceDatabase : \"\""),
+  "products-preview должен помечать источник закупочной цены фактической базой."
 );
 
 assert.equal(normalizeExchangeState({ status: "sending" }).status, "sending");
