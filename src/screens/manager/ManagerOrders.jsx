@@ -598,7 +598,7 @@ export function ManagerOrders({
             </div>
             <div>
               <span>Дата заказа</span>
-              <strong>{order.createdAt ? formatDate(String(order.createdAt).slice(0, 10)) : "—"}</strong>
+              <strong>{order.createdAt ? formatDate(order.createdAt) : "—"}</strong>
             </div>
           </div>
           {order.clientComment ? (
@@ -692,7 +692,7 @@ export function ManagerOrders({
           )}
           {!inTrash && exchange.message && (
             <div className="exchange-message manager-order-exchange-note">
-              {exchange.message}{exchange.receipt ? ` · квитанция ${exchange.receipt}` : ""}
+              {exchange.message}{exchange.receipt ? ` · Заказ покупателя ${exchange.receipt}` : ""}
             </div>
           )}
           {inTrash ? (

@@ -195,6 +195,30 @@ function ClientDashboard({
     [reconciliationRequests, seenActsTick]
   );
 
+  const navButtons = (
+    <>
+      {primaryTabs.map(([id, label]) => (
+        <button
+          className={tab === id ? "active" : ""}
+          type="button"
+          key={id}
+          onClick={() => selectTab(id)}
+        >
+          {label}
+          {id === "orders" && active.length > 0 ? ` (${active.length})` : ""}
+          {id === "reconciliation" && readyActsBadge > 0 ? (
+            <span
+              className="client-nav-count"
+              aria-label={`Готовых актов: ${readyActsBadge}`}
+            >
+              {readyActsBadge}
+            </span>
+          ) : null}
+        </button>
+      ))}
+    </>
+  );
+
   const openNewOrder = () => {
     onNew({ forceNew: true });
     selectTab("home");
@@ -460,14 +484,23 @@ function ClientDashboard({
           }
           subtitle={profile.companyName}
           onLogout={onLogout}
+          nav={
+            !isNarrow ? (
+              <nav className="client-nav" aria-label="Разделы кабинета">
+                {navButtons}
+              </nav>
+            ) : null
+          }
           between={
-            <ClientSectionMenu
-              tabs={primaryTabs}
-              activeId={tab}
-              onSelect={selectTab}
-              ordersBadge={active.length}
-              actsBadge={readyActsBadge}
-            />
+            isNarrow ? (
+              <ClientSectionMenu
+                tabs={primaryTabs}
+                activeId={tab}
+                onSelect={selectTab}
+                ordersBadge={active.length}
+                actsBadge={readyActsBadge}
+              />
+            ) : null
           }
         >
           <ManagerContact settings={settings} />

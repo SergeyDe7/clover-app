@@ -8,6 +8,7 @@ import {
   orderedSaleUnits,
 } from "../../shared/appHelpers";
 import { productImageSrc } from "../../shared/productPhoto";
+import { CatalogSearchInput } from "./CatalogSearchInput";
 
 export function ClientMatrixPanel({
   products = [],
@@ -76,10 +77,7 @@ export function ClientMatrixPanel({
       {catalogPolicy?.matrixMode !== "pending" && (
       <div className="client-matrix-toolbar">
         <div className="catalog-filter-row">
-          <input
-            className="catalog-search"
-            type="search"
-            placeholder="Поиск по названию или коду"
+          <CatalogSearchInput
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -177,7 +175,8 @@ export function ClientMatrixPanel({
                         setUnits((current) => ({ ...current, [product.id]: item }))
                       }
                     >
-                      {(UNIT_CONFIG[item] || UNIT_CONFIG.piece).label}
+                      {(UNIT_CONFIG[item] || UNIT_CONFIG.piece).shortLabel ||
+                        (UNIT_CONFIG[item] || UNIT_CONFIG.piece).label}
                     </button>
                   ))}
                 </div>

@@ -24,6 +24,7 @@ import {
 import { productImageSrc } from "../../shared/productPhoto";
 import { ManagerContact } from "./ManagerContact";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
+import { CatalogSearchInput } from "./CatalogSearchInput";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
 
@@ -509,7 +510,10 @@ export function OrderEditor({
 
             <div className="catalog-toolbar">
               <div className="catalog-filter-row">
-                <input className="catalog-search" type="search" placeholder="Поиск по названию или коду" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <CatalogSearchInput
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
                 <div className="catalog-filter-actions">
                   {settings.showFavorites && (
                     <button
@@ -622,7 +626,7 @@ export function OrderEditor({
                               key={item}
                               onClick={() => setProductUnit(product.id, item)}
                             >
-                              {UNIT_CONFIG[item].label}
+                              {UNIT_CONFIG[item].shortLabel || UNIT_CONFIG[item].label}
                             </button>
                           );
                         })}
@@ -726,7 +730,7 @@ export function OrderEditor({
                                 key={unitId}
                                 onClick={() => setProductUnit(item.productId, unitId)}
                               >
-                                {UNIT_CONFIG[unitId].label}
+                                {UNIT_CONFIG[unitId].shortLabel || UNIT_CONFIG[unitId].label}
                               </button>
                             ));
                           })()}
