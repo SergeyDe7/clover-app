@@ -35,7 +35,7 @@ for (const table of ["auth_tokens", "reconciliation_requests", "push_subscriptio
   assert.ok(dbSource.includes(`CREATE TABLE IF NOT EXISTS ${table}`), `Missing DB table ${table}`);
 }
 for (const fragment of [
-  "Забыли пароль?",
+  "Доступ в личный кабинет Вы можете получить у менеджера",
   "Войти по Face ID / отпечатку",
   "Запросить акт сверки",
   "1 квартал",

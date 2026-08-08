@@ -22,6 +22,7 @@ const MAIN_TAB_TO_PANEL = {
 };
 
 const MORE_TAB_TO_PANEL = {
+  access: "ManagerAccessVault",
   settings: "ManagerSettings",
   backup: "ManagerBackup",
   audit: "ManagerAudit",
@@ -33,6 +34,7 @@ const PANEL_FILES = {
   ManagerProducts: "ManagerProducts.jsx",
   ManagerExchange: "ManagerExchange.jsx",
   ManagerReconciliation: "ManagerReconciliation.jsx",
+  ManagerAccessVault: "ManagerAccessVault.jsx",
   ManagerSettings: "ManagerSettings.jsx",
   ManagerBackup: "ManagerBackup.jsx",
   ManagerAudit: "ManagerAudit.jsx",
