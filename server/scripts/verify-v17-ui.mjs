@@ -10,8 +10,8 @@ const exchangeSource = await readFile(exchangePath, "utf8");
 
 const checks = [
   [
-    'const UNIT_ORDER = ["piece", "bundle", "pack", "box", "pair", "roll"]',
-    "Единицы отображаются в порядке штука → пачка → упаковка",
+    'const UNIT_ORDER = ["piece", "pair", "meter", "roll", "pack", "bundle", "box"]',
+    "Единицы отображаются в порядке штука → пара → метр → рулон → упаковка → пачка → коробка",
   ],
   [
     'className="catalog-view-toggle"',

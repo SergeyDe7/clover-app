@@ -2,9 +2,10 @@
 
 ## Режим
 
-Текущий боевой контур для проверки: **только база 1С с именем TEST** (копия, не VLAVKA / production).
+Прод-контур на DC включён: allowlist баз **`TEST,VLAVKA`** (`ONEC_ALLOWED_DATABASES`), флаг `ONEC_PROD_EXCHANGE_ENABLED=true`.  
+Очередь менеджера по умолчанию — **TEST** (`ONEC_DEFAULT_EXCHANGE_DATABASE=TEST`); в ЛК можно выбрать контур **VLAVKA** для конкретного заказа.
 
-Подготовка отдельного prod-контура (флаг выключен): [`PROD_CONTOUR.md`](./PROD_CONTOUR.md).
+Установка расширения и пилот: [`VLAVKA_EXTENSION_INSTALL.md`](./VLAVKA_EXTENSION_INSTALL.md), обзор: [`PROD_CONTOUR.md`](./PROD_CONTOUR.md).
 
 Очередь: 1С **сама забирает** заказ из Clover (pull), затем подтверждает ACK.
 
@@ -15,7 +16,7 @@
 - заголовок `X-Clover-Key` (или Bearer) = `ONEC_API_KEY` из `server/.env` (≥24 символов, не placeholder), **или**
 - локальный доступ **только** при явном `ONEC_ALLOW_LOCAL_WITHOUT_KEY=true` (по умолчанию в коде `false`).
 
-Обязательный заголовок среды: `X-Clover-Database: TEST` (пустой / другой — `403`).
+Обязательный заголовок среды: `X-Clover-Database` — имя базы из allowlist (`TEST` или `VLAVKA`). Пустой / не из списка — `403`.
 
 Ключ **не** публиковать в Git, чат и скриншоты.
 
@@ -29,20 +30,20 @@
 | GET/POST | `/api/one-c/test-order` | Claim следующего `ready` → `sending` |
 | POST | `/api/one-c/orders/:orderId/ack` | Подтверждение с номером документа 1С |
 | POST | `/api/one-c/orders/accepted` | Ручная смена состояния в 1С → бизнес-статус `Принят` |
-| POST | `/api/one-c/products-preview` | Выгрузка номенклатуры (только TEST) |
-| POST | `/api/one-c/clients-preview` | Выгрузка контрагентов (только TEST) |
+| POST | `/api/one-c/products-preview` | Выгрузка номенклатуры (TEST или VLAVKA) |
+| POST | `/api/one-c/clients-preview` | Выгрузка контрагентов (TEST или VLAVKA) |
 
 Менеджер (UI):
 
 - проверка / постановка / сброс — `/api/admin/exchange/...`
-- кнопка **«Передать в 1С TEST»**
+- кнопка **«Передать в 1С»** + при prod селект контура (TEST / VLAVKA)
 
 ## Статусы `exchange.status`
 
 | Статус | Смысл |
 |--------|--------|
 | `not_sent` | Не в очереди |
-| `ready` | В очереди 1С TEST |
+| `ready` | В очереди выбранного контура (TEST или VLAVKA) |
 | `sending` | Выдан 1С (claim), ждёт ACK |
 | `sent` | Создан в 1С, ACK принят |
 | `draft` | Черновик через отдельный draft-путь |
@@ -53,7 +54,7 @@ Lease claim: если ACK не пришёл за 15 минут, `sending` сно
 
 ## Правила ACK
 
-- Только база TEST (`X-Clover-Database: TEST`).
+- База из allowlist (`X-Clover-Database: TEST` или `VLAVKA`), совпадает с контуром заказа.
 - Обязателен номер документа 1С.
 - Сверка номера заказа Clover.
 - Повтор того же receipt — идемпотентен.
@@ -72,7 +73,7 @@ Lease claim: если ACK не пришёл за 15 минут, `sending` сно
 
 Правила:
 
-- Только TEST + ключ обмена.
+- База из allowlist + ключ обмена; контур должен совпадать с заказом.
 - `exchange.status` должен быть `sent` (иначе 409).
 - Бизнес-статус Clover: только `Новый` → `Принят`; уже продвинутые статусы не откатываются.
 - При создании документа из Clover состояние в 1С **не** заполняется (патч модуля + подписки: `one_c_patches/empty_queue_and_comment/ИНСТРУКЦИЯ_СТАТУС_ПРИНЯТ.txt`).
