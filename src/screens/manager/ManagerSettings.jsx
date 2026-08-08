@@ -1,7 +1,6 @@
 // Раздел менеджера: настройки кабинета, уведомления и роли.
 import { useEffect, useState } from "react";
 import { api } from "../../serverApi";
-import { AdminRolePanel } from "../../components/AdminRolePanel";
 import { PasswordSecurityPanel, PushSettings } from "../../shared/SharedPanels";
 import { getRussianPhoneLocalDigits, formatRussianPhone } from "../../shared/appHelpers";
 import { appAlert } from "../../shared/AppModal";
@@ -243,7 +242,6 @@ export function ManagerSettings({ settings, setSettings, authUser }) {
         <ToggleSetting title="Автосохранение черновика" description="Незавершённый новый заказ сохраняется в браузере." value={settings.enableDrafts} onChange={(value) => set("enableDrafts", value)} />
       </div>
       <ManagerPromotionPanel />
-      <AdminRolePanel currentUser={authUser} />
       <PasswordSecurityPanel />
     </section>
   );

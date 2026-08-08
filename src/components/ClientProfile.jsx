@@ -30,7 +30,8 @@ function ClientProfile({ profile, onChange }) {
       companyName: form.companyName.trim(),
       contactName: form.contactName.trim(),
       phone: form.phone.trim(),
-      email: form.email.trim(),
+      // Почта = логин аккаунта; клиент не может её менять.
+      email: String(profile.email || "").trim(),
     };
 
     if (
@@ -156,14 +157,16 @@ function ClientProfile({ profile, onChange }) {
               <input
                 type="email"
                 placeholder="company@mail.ru"
-                value={form.email}
-                onChange={(event) =>
-                  updateField("email", event.target.value)
-                }
-                required
+                value={profile.email || ""}
+                readOnly
+                title="Логин аккаунта — изменить нельзя"
+                aria-readonly="true"
               />
             </label>
           </div>
+          <p className="small-title" style={{ margin: "8px 0 0" }}>
+            Электронная почта — логин аккаунта, изменить нельзя.
+          </p>
 
           <div className="profile-form-actions">
             <button

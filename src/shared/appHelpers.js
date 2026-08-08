@@ -19,10 +19,40 @@ export const MANAGER_TABS = [
 /** Вкладки внутри «Ещё» у менеджера. */
 export const MANAGER_MORE_TABS = [
   ["access", "Доступы"],
+  ["storefront", "Витрина сайта"],
   ["settings", "Настройки"],
   ["backup", "Резервные копии"],
   ["audit", "Журнал"],
 ];
+
+/** Права разделов для ограничения менеджера. */
+export const STAFF_FEATURE_OPTIONS = [
+  ["orders", "Заказы"],
+  ["clients", "Клиенты"],
+  ["products", "Товары"],
+  ["exchange", "1С"],
+  ["acts", "Акты сверок"],
+  ["access", "Доступы"],
+  ["settings", "Настройки"],
+  ["backup", "Резервные копии"],
+  ["audit", "Журнал"],
+];
+
+export const STAFF_FEATURE_IDS = STAFF_FEATURE_OPTIONS.map(([id]) => id);
+
+export function staffHasFeature(authUser, featureId) {
+  if (!authUser) return false;
+  const id = String(featureId || "");
+  if (id === "storefront") return authUser.role === "admin";
+  if (authUser.role === "admin") return true;
+  const permissions = authUser.permissions;
+  if (!permissions || permissions.fullAccess) return true;
+  const tabs = Array.isArray(permissions.tabs) ? permissions.tabs : STAFF_FEATURE_IDS;
+  if (id === "more") {
+    return ["access", "settings", "backup", "audit"].some((item) => tabs.includes(item));
+  }
+  return tabs.includes(id);
+}
 
 export const MANAGER_MORE_TAB_KEY = "clover-manager-more-tab-v1";
 
@@ -617,7 +647,123 @@ export const EMPTY_PROFILE = {
   contactName: "",
   phone: "",
   email: "",
+  contacts: [],
 };
+
+function newContactId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `contact-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+const CONTACT_LABEL_PRIMARY = "Основной";
+const CONTACT_LABEL_SECONDARY = "Дополнительный";
+
+/** Служебные метки роли синхронизируем с isPrimary; кастомные («Директор») сохраняем. */
+export function syncContactRoleLabel(label, isPrimary) {
+  const trimmed = String(label || "").trim();
+  if (
+    !trimmed ||
+    trimmed === CONTACT_LABEL_PRIMARY ||
+    trimmed === CONTACT_LABEL_SECONDARY
+  ) {
+    return isPrimary ? CONTACT_LABEL_PRIMARY : CONTACT_LABEL_SECONDARY;
+  }
+  return trimmed;
+}
+
+/** Нормализует контакты профиля; держит legacy contactName/phone в синхроне с основным. */
+export function normalizeProfileContacts(profile = {}) {
+  const source = profile && typeof profile === "object" ? profile : {};
+  const companyName = String(source.companyName || "").trim();
+  const email = String(source.email || "").trim();
+  const rawContacts = Array.isArray(source.contacts) ? source.contacts : [];
+
+  let contacts = rawContacts
+    .map((item, index) => {
+      if (!item || typeof item !== "object") return null;
+      const name = String(item.name || item.contactName || "").trim();
+      const phone = String(item.phone || item.number || "").trim();
+      const label = String(item.label || "").trim();
+      if (!name && !phone && !label) return null;
+      return {
+        id: String(item.id || `contact-${index + 1}`),
+        name,
+        label,
+        phone,
+        isPrimary: Boolean(item.isPrimary),
+      };
+    })
+    .filter(Boolean);
+
+  if (!contacts.length) {
+    const legacyName = String(source.contactName || "").trim();
+    const legacyPhone = String(source.phone || "").trim();
+    if (legacyName || legacyPhone) {
+      contacts = [
+        {
+          id: "contact-primary",
+          name: legacyName,
+          label: CONTACT_LABEL_PRIMARY,
+          phone: legacyPhone,
+          isPrimary: true,
+        },
+      ];
+    }
+  }
+
+  // До 5 контактов: основной + дополнительные номера.
+  contacts = contacts.slice(0, 5);
+
+  if (!contacts.length) {
+    return {
+      companyName,
+      contactName: "",
+      phone: "",
+      email,
+      contacts: [],
+    };
+  }
+
+  let primaryIndex = contacts.findIndex((item) => item.isPrimary);
+  if (primaryIndex < 0) primaryIndex = 0;
+  contacts = contacts.map((item, index) => {
+    const isPrimary = index === primaryIndex;
+    return {
+      ...item,
+      isPrimary,
+      label: syncContactRoleLabel(item.label, isPrimary),
+    };
+  });
+
+  const primary = contacts[primaryIndex];
+  return {
+    companyName,
+    contactName: primary.name || "",
+    phone: primary.phone || "",
+    email,
+    contacts,
+  };
+}
+
+export function createEmptyProfileContact({ isPrimary = false } = {}) {
+  return {
+    id: newContactId(),
+    name: "",
+    label: isPrimary ? "Основной" : "Дополнительный",
+    phone: "",
+    isPrimary: Boolean(isPrimary),
+  };
+}
+
+export function isClientProfileComplete(profile = {}) {
+  const normalized = normalizeProfileContacts(profile);
+  if (!normalized.companyName || !normalized.email) return false;
+  const primary =
+    normalized.contacts.find((item) => item.isPrimary) || normalized.contacts[0];
+  return Boolean(primary?.name && primary?.phone);
+}
 
 export const EMPTY_LINK = {
   matched1C: false,
@@ -655,7 +801,8 @@ export const EXCHANGE_STATUS_LABELS = {
 
 export function exchangeContourLabel(database) {
   const name = String(database || "TEST").trim().toLocaleUpperCase("ru-RU") || "TEST";
-  return name === "TEST" ? "1С TEST" : `1С ${name}`;
+  // В UI не светим внутренние имена баз (VLAVKA и т.п.).
+  return name === "TEST" ? "1С TEST" : "1С";
 }
 
 export function exchangeStatusLabel(exchange = {}) {
@@ -2526,11 +2673,15 @@ textarea { resize: vertical; }
     radial-gradient(circle at 20% 18%, rgba(126, 196, 108, 0.45), transparent 42%),
     radial-gradient(circle at 82% 78%, rgba(74, 148, 78, 0.38), transparent 48%),
     linear-gradient(160deg, #eef7ea 0%, #d9ecd4 45%, #c7e0c2 100%);
-  animation: order-thankyou-fade-in 0.45s ease-out both;
+  animation: none;
   cursor: pointer;
   overscroll-behavior: none;
   -webkit-overflow-scrolling: auto;
   touch-action: none;
+}
+.order-thankyou-glow,
+.order-thankyou-spark {
+  display: none !important;
 }
 html.clover-thankyou-open,
 body.clover-thankyou-open {
@@ -2653,10 +2804,10 @@ html.clover-thankyou-open .app-top-chrome {
   text-align: center;
   cursor: default;
   overflow: visible;
-  animation: order-thankyou-card-in 0.7s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  animation: none;
 }
 .order-thankyou-mobile .order-thankyou-card {
-  animation: order-thankyou-fade-in 0.45s ease-out both;
+  animation: none;
 }
 .order-thankyou-mobile .order-thankyou-logo-wrap {
   width: min(280px, 78vw);
@@ -2693,16 +2844,7 @@ html.clover-thankyou-open .app-top-chrome {
   width: 100%;
   height: auto;
   transform-origin: center center;
-  animation: thankyou-logo-tilt 5s ease-in-out forwards;
-}
-@keyframes thankyou-logo-tilt {
-  0% { opacity: 0; transform: scale(0.94) rotate(-8deg); }
-  14% { opacity: 1; transform: scale(1.04) rotate(5deg); }
-  32% { transform: scale(0.99) rotate(-4deg); }
-  50% { transform: scale(1.03) rotate(3deg); }
-  68% { transform: scale(0.99) rotate(-1.5deg); }
-  86% { transform: scale(1.01) rotate(0.6deg); }
-  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+  animation: none;
 }
 .order-thankyou-brand {
   margin: 4px 0 0;
@@ -2711,7 +2853,7 @@ html.clover-thankyou-open .app-top-chrome {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  animation: order-thankyou-text-in 0.7s ease-out 0.15s both;
+  animation: none;
 }
 .order-thankyou-title {
   margin: 0;
@@ -2719,7 +2861,7 @@ html.clover-thankyou-open .app-top-chrome {
   font-size: clamp(22px, 5.5vw, 30px);
   font-weight: 800;
   line-height: 1.25;
-  animation: order-thankyou-text-in 0.7s ease-out 0.28s both;
+  animation: none;
 }
 .order-thankyou-text {
   margin: 0;
@@ -2728,13 +2870,13 @@ html.clover-thankyou-open .app-top-chrome {
   font-size: 14px;
   font-weight: 600;
   line-height: 1.45;
-  animation: order-thankyou-text-in 0.7s ease-out 0.4s both;
+  animation: none;
 }
 .order-thankyou-button {
   margin-top: 8px;
   min-width: min(220px, 100%);
   min-height: 46px;
-  animation: order-thankyou-text-in 0.7s ease-out 0.52s both;
+  animation: none;
 }
 @keyframes order-thankyou-fade-in {
   from { opacity: 0; }
@@ -2845,9 +2987,9 @@ html.clover-thankyou-open .app-top-chrome {
 .client-home-note { margin-bottom: 16px; }
 .manager-header-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .manager-search-input { min-width: 180px; max-width: 260px; padding: 9px 12px; border: 1px solid #e6eee3; border-radius: 12px; background: #fbfdfb; font: inherit; }
-.manager-bell { position: relative; }
+.manager-bell { position: relative; overflow: visible; }
 .manager-bell-label-short { display: none; }
-.manager-bell-count { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #c45c26; color: #fff; font-size: 11px; font-weight: 800; display: grid; place-items: center; }
+.manager-bell-count { position: absolute; top: -4px; right: -4px; z-index: 2; min-width: 18px; min-height: 18px; height: auto; padding: 0 5px; border-radius: 999px; background: #c45c26; color: #fff; font-size: 11px; font-weight: 800; line-height: 1; display: grid; place-items: center; box-sizing: border-box; }
 .manager-bell-panel {
   position: absolute;
   right: 0;
@@ -3965,21 +4107,24 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   }
   .product-card-controls { gap: 6px; }
   .unit-choice { gap: 5px; }
-  .unit-choice button { min-height: 30px; padding: 4px 2px; font-size: 10px; border-radius: 8px; }
+  .unit-choice button { min-height: 30px; height: 30px; padding: 4px 2px; font-size: 10px; border-radius: 8px; width: 100%; box-sizing: border-box; }
   .unit-choice.unit-choice-single {
-    display: flex;
-    justify-content: flex-start;
-    width: auto;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    width: 100%;
     max-width: 100%;
+    justify-content: stretch;
   }
   .unit-choice.unit-choice-single button {
-    width: auto;
+    width: 100%;
     max-width: 100%;
     min-width: 0;
-    min-height: 24px;
-    padding: 3px 8px;
-    font-size: 9px;
-    border-radius: 7px;
+    min-height: 30px;
+    height: 30px;
+    padding: 4px 2px;
+    font-size: 10px;
+    border-radius: 8px;
   }
   .unit-hint { display: none; }
   .quantity-control { grid-template-columns: 32px minmax(0, 1fr) 32px; border-radius: 10px; }
@@ -4647,6 +4792,7 @@ export function normalizeProduct(product) {
     certificateName: product.certificateName || "",
     certificateUpdatedAt: product.certificateUpdatedAt || "",
     active: product.active !== false,
+    showOnStorefront: product.showOnStorefront === true,
     ...sizes,
     ...prices,
     ...basePrices,

@@ -355,8 +355,8 @@ export function PasswordSecurityPanel({ allowPasswordChange = true } = {}) {
       {allowPasswordChange ? (
         <form className="form-grid security-form" onSubmit={submit}>
           <label className="field">Текущий пароль<input type="password" autoComplete="current-password" value={form.currentPassword} onChange={(event) => setForm({ ...form, currentPassword: event.target.value })} required /></label>
-          <label className="field">Новый пароль<input type="password" autoComplete="new-password" minLength="8" value={form.newPassword} onChange={(event) => setForm({ ...form, newPassword: event.target.value })} required /></label>
-          <label className="field">Повторите новый пароль<input type="password" autoComplete="new-password" minLength="8" value={form.repeatPassword} onChange={(event) => setForm({ ...form, repeatPassword: event.target.value })} required /></label>
+          <label className="field">Новый пароль<input type="password" autoComplete="new-password" minLength="6" value={form.newPassword} onChange={(event) => setForm({ ...form, newPassword: event.target.value })} required /></label>
+          <label className="field">Повторите новый пароль<input type="password" autoComplete="new-password" minLength="6" value={form.repeatPassword} onChange={(event) => setForm({ ...form, repeatPassword: event.target.value })} required /></label>
           <div className="form-actions"><button className="primary-button" disabled={busy} type="submit">{busy ? "Сохраняем…" : "Изменить пароль"}</button></div>
         </form>
       ) : null}
@@ -541,7 +541,7 @@ export function OrderThankYouOverlay({
     body.style.top = "0";
     window.addEventListener("keydown", onKey);
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-    const timer = window.setTimeout(finish, reduceMotion ? 1800 : 7000);
+    const timer = window.setTimeout(finish, reduceMotion ? 1200 : 2500);
     return () => {
       html.classList.remove("clover-thankyou-open");
       body.classList.remove("clover-thankyou-open");
@@ -611,15 +611,6 @@ export function OrderThankYouOverlay({
       style={overlayStyle}
       onClick={() => onDoneRef.current?.()}
     >
-      <div className="order-thankyou-glow" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-1" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-2" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-3" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-4" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-5" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-6" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-7" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-8" aria-hidden="true" />
       <div
         className="order-thankyou-card"
         style={cardStyle}

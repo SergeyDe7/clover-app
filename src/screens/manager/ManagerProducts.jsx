@@ -270,6 +270,7 @@ export function ManagerProducts({ products, setProducts, oneCPriceTypes = [] }) 
       visibility === "Все" ||
       (visibility === "Активные" && product.active) ||
       (visibility === "Скрытые" && !product.active) ||
+      (visibility === "На витрине сайта" && product.showOnStorefront === true) ||
       (visibility === "Связанные с 1С" && hasOneCLink) ||
       (visibility === "Без связи с 1С" && !hasOneCLink);
     return bySearch && byCategory && byVisibility;
@@ -336,6 +337,7 @@ export function ManagerProducts({ products, setProducts, oneCPriceTypes = [] }) 
           <option>Все</option>
           <option>Активные</option>
           <option>Скрытые</option>
+          <option>На витрине сайта</option>
           <option>Связанные с 1С</option>
           <option>Без связи с 1С</option>
         </select>
@@ -375,6 +377,9 @@ export function ManagerProducts({ products, setProducts, oneCPriceTypes = [] }) 
           </div>
           <div className="product-manager-meta">
             <span className={product.active ? "badge green" : "badge gray"}>{product.active ? "Активен" : "Скрыт"}</span>
+            {product.showOnStorefront ? (
+              <span className="badge green">Витрина</span>
+            ) : null}
             <strong>{settingsPriceLabel(product)}</strong>
             <button className="secondary-button" type="button" onClick={() => setEditorProduct(product)}>Изменить</button>
           </div>

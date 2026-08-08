@@ -1,6 +1,22 @@
-# Эксплуатация Clover (Windows)
+# Эксплуатация Clover
 
-## Запуск / остановка
+## Linux (DC)
+
+| Действие | Команда / файл |
+|----------|----------------|
+| Юниты | `clover-api.service`, `clover-ui.service` (`enabled`) |
+| Health | `curl -s http://127.0.0.1:4100/api/health` → `version: "4.0.4"` |
+| UI | http://127.0.0.1:5273/ и https://clover-order.ru/ |
+| Ежедневный backup | `scripts/linux/install-daily-backup-cron.sh` (user crontab 03:15) |
+| Backup сейчас | `scripts/linux/daily-backup.sh` → `server/backups/daily/` + zip в `server/backups/` |
+
+Состав daily tarball: `server/data` + `server/.env`. Полный zip (снимок + фото) — через `server/scripts/create-scheduled-backup.mjs`.
+
+Если после деплоя процессы запущены вручную, а systemd-юниты `inactive` из‑за занятых портов — остановить ручные PID и `sudo systemctl restart clover-api clover-ui`.
+
+Живые заказы: [MANAGER_WORKING_1C.md](./MANAGER_WORKING_1C.md). Приёмка VLAVKA: [ACCEPTANCE_ORDERS_VLAVKA.md](./ACCEPTANCE_ORDERS_VLAVKA.md).
+
+## Windows — запуск / остановка
 
 | Действие | Файл |
 |----------|------|

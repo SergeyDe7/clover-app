@@ -193,6 +193,8 @@ ensureColumn("users", "email_verified", "INTEGER NOT NULL DEFAULT 1");
 ensureColumn("users", "approval_status", "TEXT NOT NULL DEFAULT 'approved'");
 ensureColumn("users", "password_changed_at", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("users", "last_login_at", "TEXT NOT NULL DEFAULT ''");
+ensureColumn("users", "disabled_at", "TEXT NOT NULL DEFAULT ''");
+ensureColumn("users", "permissions_json", "TEXT NOT NULL DEFAULT '{}'");
 
 /**
  * Миграция admin-role переименовывала users → users_old_admin_mig.
@@ -425,7 +427,8 @@ export function ensureGlobalState() {
 export function findUserByEmail(email) {
   return db
     .prepare(`
-      SELECT id, email, password_hash, role, created_at, email_verified, approval_status, password_changed_at, last_login_at
+      SELECT id, email, password_hash, role, created_at, email_verified, approval_status,
+             password_changed_at, last_login_at, disabled_at, permissions_json
       FROM users
       WHERE email = ?
     `)
@@ -435,7 +438,8 @@ export function findUserByEmail(email) {
 export function findUserById(id) {
   return db
     .prepare(`
-      SELECT id, email, role, created_at, email_verified, approval_status, password_changed_at, last_login_at
+      SELECT id, email, role, created_at, email_verified, approval_status,
+             password_changed_at, last_login_at, disabled_at, permissions_json
       FROM users
       WHERE id = ?
     `)
@@ -711,6 +715,38 @@ export function replaceOrders({
   }
 }
 
+/** Добавить один заказ (витрина / внешние источники) без очистки остальных. */
+export function insertOrder(order, userId = null) {
+  if (!order?.id) {
+    throw new Error("insertOrder: нужен order.id");
+  }
+  const ownerId = resolveOrderUserId(order, userId);
+  if (!ownerId) {
+    throw new Error("insertOrder: не удалось определить user_id");
+  }
+  const payload = {
+    ...order,
+    clientId: ownerId,
+  };
+  db.prepare(`
+    INSERT INTO orders(
+      id,
+      user_id,
+      payload_json,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    String(payload.id),
+    ownerId,
+    JSON.stringify(payload),
+    payload.createdAt || now(),
+    payload.updatedAt || payload.createdAt || now()
+  );
+  return payload;
+}
+
 export function listClients() {
   const managerNotes = getGlobalState("clientManagerNotes", {});
   const rows = db.prepare(`
@@ -732,13 +768,60 @@ export function listClients() {
   return rows.map((row) => {
     const profile = parseJson(row.profile_json, {});
     const addresses = parseJson(row.addresses_json, []);
+    const rawContacts = Array.isArray(profile.contacts) ? profile.contacts : [];
+    let contacts = rawContacts
+      .map((item, index) => {
+        if (!item || typeof item !== "object") return null;
+        const name = String(item.name || "").trim();
+        const phone = String(item.phone || "").trim();
+        const label = String(item.label || "").trim();
+        if (!name && !phone && !label) return null;
+        return {
+          id: String(item.id || `contact-${index + 1}`),
+          name,
+          label,
+          phone,
+          isPrimary: Boolean(item.isPrimary),
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 5);
+
+    if (!contacts.length && (profile.contactName || profile.phone)) {
+      contacts = [
+        {
+          id: "contact-primary",
+          name: String(profile.contactName || "").trim(),
+          label: "Основной",
+          phone: String(profile.phone || "").trim(),
+          isPrimary: true,
+        },
+      ];
+    }
+
+    let primaryIndex = contacts.findIndex((item) => item.isPrimary);
+    if (primaryIndex < 0 && contacts.length) primaryIndex = 0;
+    contacts = contacts.map((item, index) => {
+      const isPrimary = contacts.length ? index === primaryIndex : false;
+      const trimmed = String(item.label || "").trim();
+      const label =
+        !trimmed || trimmed === "Основной" || trimmed === "Дополнительный"
+          ? isPrimary
+            ? "Основной"
+            : "Дополнительный"
+          : trimmed;
+      return { ...item, isPrimary, label };
+    });
+
+    const primary = contacts[primaryIndex] || null;
 
     return {
       id: row.id,
       email: profile.email || row.email,
       companyName: profile.companyName || "",
-      contactName: profile.contactName || "",
-      phone: profile.phone || "",
+      contactName: primary?.name || profile.contactName || "",
+      phone: primary?.phone || profile.phone || "",
+      contacts,
       managerNote: String(managerNotes[row.id] || ""),
       addresses,
       createdAt: row.created_at,
@@ -864,21 +947,102 @@ export function updateUserRole(userId, role) {
 export function listStaffUsers() {
   return db
     .prepare(`
-      SELECT id, email, role, email_verified, approval_status, created_at, last_login_at
+      SELECT id, email, role, email_verified, approval_status, created_at, last_login_at,
+             disabled_at, permissions_json
       FROM users
       WHERE role IN ('manager', 'admin')
       ORDER BY role DESC, email ASC
     `)
     .all()
-    .map((row) => ({
-      id: row.id,
-      email: row.email,
-      role: row.role,
-      emailVerified: Boolean(row.email_verified),
-      approvalStatus: row.approval_status || "approved",
-      createdAt: row.created_at,
-      lastLoginAt: row.last_login_at || "",
-    }));
+    .map((row) => mapStaffUser(row));
+}
+
+function parsePermissionsJson(raw) {
+  try {
+    const parsed = JSON.parse(String(raw || "{}"));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function mapStaffUser(row) {
+  return {
+    id: row.id,
+    email: row.email,
+    role: row.role,
+    emailVerified: Boolean(row.email_verified),
+    approvalStatus: row.approval_status || "approved",
+    createdAt: row.created_at,
+    lastLoginAt: row.last_login_at || "",
+    disabledAt: row.disabled_at || "",
+    disabled: Boolean(row.disabled_at),
+    permissions: parsePermissionsJson(row.permissions_json),
+  };
+}
+
+export function setStaffDisabled(userId, disabled) {
+  const value = disabled ? now() : "";
+  if (disabled) {
+    db.prepare(`
+      UPDATE users
+      SET disabled_at = ?, password_changed_at = ?
+      WHERE id = ? AND role IN ('manager', 'admin')
+    `).run(value, randomUUID(), String(userId));
+  } else {
+    db.prepare(`
+      UPDATE users
+      SET disabled_at = ?
+      WHERE id = ? AND role IN ('manager', 'admin')
+    `).run(value, String(userId));
+  }
+  return findUserById(String(userId));
+}
+
+export function setStaffPermissions(userId, permissions) {
+  const payload =
+    permissions && typeof permissions === "object" ? permissions : {};
+  db.prepare(`
+    UPDATE users
+    SET permissions_json = ?
+    WHERE id = ? AND role IN ('manager', 'admin')
+  `).run(JSON.stringify(payload), String(userId));
+  return findUserById(String(userId));
+}
+
+export function deleteStaffUser(userId) {
+  const result = db
+    .prepare(`DELETE FROM users WHERE id = ? AND role IN ('manager', 'admin')`)
+    .run(String(userId));
+  return Number(result.changes) > 0;
+}
+
+/** Удаляет клиента Clover. Связанные строки с ON DELETE CASCADE уходят вместе с users. */
+export function deleteClientUser(userId) {
+  const id = String(userId || "").trim();
+  if (!id) return null;
+  const user = findUserById(id);
+  if (!user || user.role !== "client") return null;
+  const result = db
+    .prepare(`DELETE FROM users WHERE id = ? AND role = 'client'`)
+    .run(id);
+  if (Number(result.changes) <= 0) return null;
+  return user;
+}
+
+/** Удаляет уведомления менеджера по source_id (точное и с суффиксом `:`). */
+export function deleteManagerNotificationsBySource(sourceId) {
+  const id = String(sourceId || "").trim();
+  if (!id) return 0;
+  const likeNeedle = `${id.replace(/([%_\\])/g, "\\$1")}:%`;
+  const result = db
+    .prepare(`
+      DELETE FROM manager_notifications
+      WHERE source_id = ?
+         OR source_id LIKE ? ESCAPE '\\'
+    `)
+    .run(id, likeNeedle);
+  return Number(result.changes) || 0;
 }
 
 export function countUsersByRole(role) {

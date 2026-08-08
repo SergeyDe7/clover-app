@@ -243,15 +243,6 @@ export function AppModalHost() {
       style={overlayStyle}
       onClick={() => close(isConfirm ? false : undefined)}
     >
-      <div className="order-thankyou-glow" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-1" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-2" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-3" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-4" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-5" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-6" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-7" aria-hidden="true" />
-      <span className="order-thankyou-spark order-thankyou-spark-8" aria-hidden="true" />
       <div
         className={`order-thankyou-card ${toneCardClass(dialog.tone)}`.trim()}
         role="dialog"

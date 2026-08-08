@@ -4,24 +4,90 @@ import {
   RUSSIAN_PHONE_PREFIX,
   getRussianPhoneLocalDigits,
   formatRussianPhone,
+  normalizeProfileContacts,
+  createEmptyProfileContact,
+  isClientProfileComplete,
+  syncContactRoleLabel,
 } from "../../shared/appHelpers";
+
+const MAX_PROFILE_CONTACTS = 5;
+
+function ensureEditableContacts(profile) {
+  const normalized = normalizeProfileContacts(profile);
+  if (normalized.contacts.length) return normalized.contacts;
+  return [createEmptyProfileContact({ isPrimary: true })];
+}
 
 export function ProfilePanel({ profile, onChange }) {
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState(profile);
-  const complete = Object.values(profile).every((value) => String(value || "").trim());
+  const [companyName, setCompanyName] = useState(profile.companyName || "");
+  const [contacts, setContacts] = useState(() => ensureEditableContacts(profile));
+  const complete = isClientProfileComplete(profile);
+  const viewProfile = normalizeProfileContacts(profile);
 
-  useEffect(() => setForm(profile), [profile]);
+  useEffect(() => {
+    if (editing) return;
+    setCompanyName(profile.companyName || "");
+    setContacts(ensureEditableContacts(profile));
+  }, [profile, editing]);
+
+  const updateContact = (contactId, patch) => {
+    setContacts((current) =>
+      current.map((item) =>
+        String(item.id) === String(contactId) ? { ...item, ...patch } : item
+      )
+    );
+  };
+
+  const setPrimaryContact = (contactId) => {
+    setContacts((current) =>
+      current.map((item) => {
+        const isPrimary = String(item.id) === String(contactId);
+        return {
+          ...item,
+          isPrimary,
+          label: syncContactRoleLabel(item.label, isPrimary),
+        };
+      })
+    );
+  };
+
+  const addContact = () => {
+    setContacts((current) => {
+      if (current.length >= MAX_PROFILE_CONTACTS) return current;
+      return [
+        ...current,
+        createEmptyProfileContact({ isPrimary: false }),
+      ];
+    });
+  };
+
+  const removeContact = (contactId) => {
+    setContacts((current) => {
+      if (current.length <= 1) return current;
+      const next = current.filter((item) => String(item.id) !== String(contactId));
+      if (!next.some((item) => item.isPrimary) && next[0]) {
+        next[0] = {
+          ...next[0],
+          isPrimary: true,
+          label: syncContactRoleLabel(next[0].label, true),
+        };
+      }
+      return next.map((item) => ({
+        ...item,
+        label: syncContactRoleLabel(item.label, Boolean(item.isPrimary)),
+      }));
+    });
+  };
 
   const save = (event) => {
     event.preventDefault();
-    const next = {
-      companyName: form.companyName.trim(),
-      contactName: form.contactName.trim(),
-      phone: form.phone.trim(),
-      email: form.email.trim(),
-    };
-    if (!Object.values(next).every(Boolean)) return;
+    const next = normalizeProfileContacts({
+      companyName: companyName.trim(),
+      email: String(profile.email || "").trim(),
+      contacts,
+    });
+    if (!isClientProfileComplete(next)) return;
     onChange(next);
     setEditing(false);
   };
@@ -42,54 +108,169 @@ export function ProfilePanel({ profile, onChange }) {
       </div>
 
       {!editing && complete && (
-        <div className="profile-summary">
-          <article><span>Организация</span><strong>{profile.companyName}</strong></article>
-          <article><span>Контактное лицо</span><strong>{profile.contactName}</strong></article>
-          <article><span>Телефон</span><strong>{profile.phone}</strong></article>
-          <article><span>Почта</span><strong>{profile.email}</strong></article>
+        <div className="profile-summary profile-summary-contacts">
+          <article>
+            <span>Организация</span>
+            <strong>{viewProfile.companyName}</strong>
+          </article>
+          <article>
+            <span>Почта</span>
+            <strong>{viewProfile.email}</strong>
+          </article>
+          {viewProfile.contacts.map((contact) => (
+            <article key={contact.id} className={contact.isPrimary ? "is-primary" : ""}>
+              <span>
+                {contact.label || (contact.isPrimary ? "Основной контакт" : "Доп. контакт")}
+              </span>
+              <strong>{contact.name || "—"}</strong>
+              <em>{contact.phone || "—"}</em>
+            </article>
+          ))}
         </div>
       )}
 
-      {!editing && !complete && <div className="warning-box">Заполните профиль перед созданием первого заказа.</div>}
-
       {editing && (
-        <form onSubmit={save}>
+        <form className="profile-form" onSubmit={save}>
           <div className="form-grid">
-            <label className="field">Название организации
-              <input value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} required />
-            </label>
-            <label className="field">Контактное лицо
-              <input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} required />
-            </label>
-            <label className="field">Телефон
+            <label className="field">
+              Название организации
               <input
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="+7 (999) 000-00-00"
-                maxLength="18"
-                value={form.phone || RUSSIAN_PHONE_PREFIX}
-                onFocus={(event) => {
-                  if (!getRussianPhoneLocalDigits(event.currentTarget.value)) {
-                    setForm((current) => ({ ...current, phone: RUSSIAN_PHONE_PREFIX }));
-                  }
-                }}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    phone: formatRussianPhone(event.target.value),
-                  }))
-                }
+                value={companyName}
+                onChange={(event) => setCompanyName(event.target.value)}
                 required
               />
             </label>
-            <label className="field">Электронная почта
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+            <label className="field">
+              Электронная почта
+              <input value={String(profile.email || "")} readOnly disabled />
             </label>
           </div>
+          <p className="muted small" style={{ margin: "8px 0 0" }}>
+            Электронная почта — логин аккаунта, изменить нельзя. Нужна смена? Обратитесь к менеджеру.
+          </p>
+
+          <div className="profile-contacts-block">
+            <div className="profile-contacts-head">
+              <div>
+                <strong>Контакты</strong>
+                <p className="muted small">
+                  Укажите ФИО, роль в компании и телефон. Основной контакт — для связи по заказам.
+                  Можно добавить до {MAX_PROFILE_CONTACTS} контактов.
+                </p>
+              </div>
+              {contacts.length < MAX_PROFILE_CONTACTS ? (
+                <button className="secondary-button" type="button" onClick={addContact}>
+                  + Доп. контакт
+                </button>
+              ) : null}
+            </div>
+
+            <div className="profile-contacts-list">
+              {contacts.map((contact, index) => (
+                <div
+                  key={contact.id}
+                  className={
+                    contact.isPrimary
+                      ? "profile-contact-card is-primary"
+                      : "profile-contact-card"
+                  }
+                >
+                  <div className="profile-contact-card-top">
+                    <label className="profile-contact-primary">
+                      <input
+                        type="radio"
+                        name="profile-primary-contact"
+                        checked={Boolean(contact.isPrimary)}
+                        onChange={() => setPrimaryContact(contact.id)}
+                      />
+                      Основной
+                    </label>
+                    <span className="muted small">Контакт {index + 1}</span>
+                    {contacts.length > 1 ? (
+                      <button
+                        className="secondary-button staff-edit-danger"
+                        type="button"
+                        onClick={() => removeContact(contact.id)}
+                      >
+                        Удалить
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="form-grid">
+                    <label className="field">
+                      ФИО контакта
+                      <input
+                        value={contact.name}
+                        placeholder="Например: Иван Иванов"
+                        onChange={(event) =>
+                          updateContact(contact.id, { name: event.target.value })
+                        }
+                        required={contact.isPrimary}
+                      />
+                    </label>
+                    <label className="field">
+                      Роль в компании
+                      <input
+                        value={contact.label}
+                        placeholder="Например: директор, склад, закупки"
+                        onChange={(event) =>
+                          updateContact(contact.id, { label: event.target.value })
+                        }
+                        list="profile-contact-labels"
+                      />
+                    </label>
+                    <label className="field field-wide">
+                      Телефон
+                      <input
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        placeholder="+7 (999) 000-00-00"
+                        maxLength="18"
+                        value={contact.phone || RUSSIAN_PHONE_PREFIX}
+                        onFocus={(event) => {
+                          if (!getRussianPhoneLocalDigits(event.currentTarget.value)) {
+                            updateContact(contact.id, { phone: RUSSIAN_PHONE_PREFIX });
+                          }
+                        }}
+                        onChange={(event) =>
+                          updateContact(contact.id, {
+                            phone: formatRussianPhone(event.target.value),
+                          })
+                        }
+                        required={contact.isPrimary}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <datalist id="profile-contact-labels">
+              <option value="Директор" />
+              <option value="Бухгалтер" />
+              <option value="Склад" />
+              <option value="Закупки" />
+              <option value="Приём товара" />
+              <option value="Менеджер" />
+            </datalist>
+          </div>
+
           <div className="form-actions">
-            <button className="secondary-button" type="button" onClick={() => { setForm(profile); setEditing(false); }}>Отмена</button>
-            <button className="primary-button" type="submit">Сохранить профиль</button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => {
+                setCompanyName(profile.companyName || "");
+                setContacts(ensureEditableContacts(profile));
+                setEditing(false);
+              }}
+            >
+              Отмена
+            </button>
+            <button className="primary-button" type="submit">
+              Сохранить профиль
+            </button>
           </div>
         </form>
       )}

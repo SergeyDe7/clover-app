@@ -3,74 +3,256 @@ html,body,#root{min-width:320px;min-height:100%}
 body{margin:0;min-height:100vh;font-family:"Manrope","Segoe UI",system-ui,sans-serif;color:#293329;background:#f4f8f2}
 button,input{font:inherit}
 button{cursor:pointer}
-.page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:30px 16px;background:radial-gradient(circle at top left,#eef8eb 0,transparent 42%),linear-gradient(135deg,#f9fcf7,#e5f2df)}
-.login-card{width:100%;max-width:460px;padding:40px 36px 38px;background:rgba(255,255,255,.96);border:1px solid rgba(86,156,80,.15);border-radius:16px;box-shadow:0 14px 36px rgba(48,82,45,.1);text-align:center}
-.logo{width:min(280px,78%);max-width:280px;height:auto;margin:0 auto 18px}
-.login-card h1{margin:0 0 10px;font-size:30px;color:#386f37}
-.subtitle{margin:0 0 30px;color:#6d786d;line-height:1.5}
+.page{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 16px;background:#f4f8f2;box-sizing:border-box;width:100%;max-width:100%;overflow-x:hidden}
+.login-card{width:min(100%,460px);padding:clamp(22px,4.5vw,40px) clamp(16px,4vw,36px) clamp(22px,4vw,38px);background:rgba(255,255,255,.96);border:1px solid rgba(86,156,80,.15);border-radius:clamp(14px,3vw,16px);box-shadow:0 14px 36px rgba(48,82,45,.1);text-align:center;box-sizing:border-box;margin:0 auto}
+.logo,.login-card .logo{display:block;width:clamp(140px,42vw,280px);max-width:min(280px,78%);height:auto;margin:0 auto clamp(8px,2vh,18px)}
+.login-card h1{margin:0 0 clamp(6px,1.2vh,10px);font-size:clamp(22px,5.5vw,30px);color:#386f37;line-height:1.2}
+.subtitle{margin:0 0 clamp(16px,3vh,30px);color:#6d786d;line-height:1.5;font-size:clamp(13px,3.4vw,15px)}
 .login-form{display:flex;flex-direction:column;text-align:left}
 .login-form label{margin:0 0 8px;font-size:14px;font-weight:600;color:#3f4c3f}
-.login-form input{width:100%;height:52px;margin-bottom:18px;padding:0 16px;border:1px solid #d5dfd2;border-radius:14px;background:#fbfdfb;outline:none;transition:.2s}
-.login-form .password-field{position:relative;margin-bottom:18px}
+.login-form input{width:100%;height:clamp(44px,6.5vh,52px);margin-bottom:clamp(10px,1.8vh,18px);padding:0 16px;border:1px solid #d5dfd2;border-radius:14px;background:#fbfdfb;outline:none;transition:.2s;font-size:16px;box-sizing:border-box}
+.login-form .password-field{position:relative;margin-bottom:clamp(10px,1.8vh,18px)}
 .login-form .password-field input{margin-bottom:0;padding-right:48px}
-.login-form input:focus{border-color:#5b9d57;box-shadow:0 0 0 4px rgba(91,157,87,.12)}
-.login-form button[type="submit"]{height:54px;margin-top:6px;border:0;border-radius:14px;background:#5b9d57;color:#fff;font-weight:700;transition:.2s}
+.login-form input::placeholder{color:#9aa69a;opacity:1}
+.login-page .login-form input{margin-bottom:14px!important}
+.login-page .login-form .password-field{margin-bottom:14px!important}
+.login-form button[type="submit"]{height:clamp(44px,6.5vh,54px);margin-top:6px;border:0;border-radius:14px;background:#5b9d57;color:#fff;font-weight:700;transition:.2s}
 .login-form button[type="submit"]:hover{background:#4d8b49;transform:translateY(-1px)}
 .login-form .password-toggle{position:absolute;top:50%;right:8px;transform:translateY(-50%);width:36px;height:36px;margin:0;padding:0;border:0;border-radius:10px;background:transparent;color:#5f7260}
 .login-form .password-toggle:hover{background:rgba(91,157,87,.12);color:#3f6f3d;transform:translateY(-50%)}
 .login-form .password-toggle svg{display:block}
-.forgot-button{margin-top:18px;padding:5px;border:0;background:transparent;color:#568e52}
-.registration{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:28px;padding-top:24px;border-top:1px solid #e6ece4;font-size:14px;color:#727c72}
+.forgot-button{margin-top:clamp(10px,1.5vh,18px);padding:5px;border:0;background:transparent;color:#568e52}
+.registration{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:clamp(14px,2.5vh,28px);padding-top:clamp(12px,2vh,24px);border-top:1px solid #e6ece4;font-size:14px;color:#727c72}
 .registration button{padding:0;border:0;background:transparent;color:#4f8d4b;font-weight:700}
-.login-manager-cta{display:grid;gap:14px;justify-items:center;width:100%;text-align:center}
-.login-manager-cta-text{margin:0;max-width:34ch;color:#5f6b5f;font-size:14px;line-height:1.45;font-weight:600}
-.login-manager-cta .manager-contact{display:flex;justify-content:center;position:relative;z-index:5}
+.login-manager-cta{display:grid;gap:clamp(10px,1.5vh,14px);justify-items:center;width:100%;text-align:center}
+.login-manager-cta-text{margin:0;max-width:34ch;color:#5f6b5f;font-size:clamp(13px,3.2vw,14px);line-height:1.45;font-weight:600}
+.login-manager-cta .manager-contact--inline{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  width:100%;
+  max-width:100%;
+  position:relative;
+  z-index:2;
+}
 .login-manager-cta .manager-contact-label-full{display:inline!important}
 .login-manager-cta .manager-contact-label-short{display:none!important}
-.login-manager-cta .manager-contact-trigger{min-height:44px;padding:10px 18px;border:1px solid #5b9d57;border-radius:12px;background:#fff;color:#4f8d4b;font-weight:700}
-/* На главной попап вверх — не уезжает за низ экрана и не требует скролла */
-.login-manager-cta .manager-contact-popover{
-  position:absolute!important;
-  top:auto!important;
-  bottom:calc(100% + 11px)!important;
-  left:50%!important;
-  right:auto!important;
-  transform:translateX(-50%)!important;
-  width:min(310px,92vw)!important;
-  z-index:90;
+.login-manager-cta .manager-contact-trigger{
+  width:100%;
+  min-height:44px;
+  padding:10px 18px;
+  border:1px solid #5b9d57;
+  border-radius:12px;
+  background:#fff;
+  color:#4f8d4b;
+  font-weight:700;
 }
-.login-manager-cta .manager-contact-popover::before{
-  display:block!important;
-  top:auto!important;
-  bottom:-7px!important;
-  left:50%!important;
-  right:auto!important;
-  border-top:0!important;
-  border-left:0!important;
-  border-right:1px solid #dbe6d8!important;
-  border-bottom:1px solid #dbe6d8!important;
-  transform:translateX(-50%) rotate(45deg)!important;
+.login-manager-cta .manager-contact--inline.open .manager-contact-trigger{
+  border-color:#4d8b49;
+  background:#eef7eb;
 }
-/* Короткие экраны: вся форма входа в один viewport */
-@media (max-height:820px){
-  .page{align-items:flex-start;padding:16px 14px}
-  .login-card{padding:28px 28px 24px}
-  .login-card .logo{width:min(200px,62%);max-width:200px;margin-bottom:10px}
-  .login-card h1{margin-bottom:6px;font-size:26px}
-  .login-form label{margin-bottom:6px}
-  .login-form input{height:48px;margin-bottom:12px}
-  .login-form .password-field{margin-bottom:12px}
-  .login-form button[type="submit"]{height:48px}
-  .passkey-login-button{margin-top:10px!important}
-  .registration{margin-top:16px;padding-top:14px}
-  .login-manager-cta{gap:10px}
-  .login-manager-cta-text{font-size:13px}
+.login-manager-cta .manager-contact-panel{
+  margin-top:10px;
+  padding:14px 14px 12px;
+  border:1px solid #d7e3d4;
+  border-radius:14px;
+  background:#f7fbf5;
+  box-shadow:none;
+  text-align:left;
+  animation:login-contact-in .18s ease-out;
 }
-@media (max-height:700px){
-  .login-card .logo{width:min(160px,52%);max-width:160px;margin-bottom:6px}
-  .login-card h1{font-size:22px}
-  .login-form input{height:44px;margin-bottom:10px}
-  .login-form button[type="submit"]{height:44px}
+.login-manager-cta .manager-contact-panel .eyebrow{
+  margin:0 0 4px;
+  color:#5b9d57;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.login-manager-cta .manager-contact-panel h3{
+  margin:0 0 8px;
+  color:#386f37;
+  font-size:16px;
+  line-height:1.25;
+}
+.login-manager-cta .manager-contact-panel .manager-contact-phone{
+  margin-bottom:10px;
+  color:#4f8d4b;
+}
+.login-manager-cta .manager-contact-panel .manager-contact-actions{
+  gap:8px;
+}
+.login-manager-cta .manager-contact-panel .manager-contact-actions a{
+  min-height:40px;
+  border-radius:11px;
+}
+@keyframes login-contact-in{
+  from{opacity:0;transform:translateY(-4px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@media (prefers-reduced-motion:reduce){
+  .login-manager-cta .manager-contact-panel{animation:none}
+}
+
+/* —— Login: один тон с кабинетом (#f4f8f2), без полосы status bar —— */
+html.login-lock,
+html.login-lock body,
+html.login-lock #root {
+  height: 100% !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  background: #f4f8f2 !important;
+  background-color: #f4f8f2 !important;
+  touch-action: none;
+}
+
+html.login-lock body {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+}
+
+.login-page {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  min-height: 0 !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  touch-action: none;
+  padding-top: 24px !important;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 20px) !important;
+  padding-right: 16px !important;
+  padding-right: calc(env(safe-area-inset-right, 0px) + 16px) !important;
+  padding-bottom: 24px !important;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px) !important;
+  padding-left: 16px !important;
+  padding-left: calc(env(safe-area-inset-left, 0px) + 16px) !important;
+  /* сплошной фон кабинета + лёгкое свечение бренда (без другого цвета сверху) */
+  background-color: #f4f8f2 !important;
+  background-image:
+    radial-gradient(ellipse 90% 55% at 50% 18%, rgba(91, 157, 87, 0.1), transparent 70%) !important;
+  background-repeat: no-repeat !important;
+}
+
+.login-page .login-card {
+  flex: 0 1 auto;
+  max-height: 100%;
+  overflow: visible;
+  border: 1px solid rgba(91, 157, 87, 0.14) !important;
+  box-shadow:
+    0 18px 40px rgba(56, 111, 55, 0.1),
+    0 2px 0 rgba(255, 255, 255, 0.8) inset !important;
+  background: rgba(255, 255, 255, 0.97) !important;
+}
+
+.login-page input,
+.login-page textarea,
+.login-page select,
+.login-page button,
+.login-page a {
+  touch-action: manipulation;
+}
+
+/* Широкий + высокий экран: карточка по центру */
+@media (min-width: 821px) and (min-height: 780px) {
+  .login-page {
+    justify-content: center !important;
+    padding-top: 24px !important;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 24px) !important;
+  }
+}
+
+/* Телефон / PWA — компактнее, чтобы влезло без скролла */
+@media (max-width: 820px), (display-mode: standalone), (display-mode: fullscreen) {
+  .login-page {
+    justify-content: center !important;
+    padding-top: 24px !important;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 20px) !important;
+  }
+  .login-page .login-card {
+    padding: 20px 18px 18px !important;
+  }
+  .login-page .logo,
+  .login-page .login-card .logo {
+    width: clamp(110px, 28vw, 160px) !important;
+    max-width: 160px !important;
+    margin-bottom: 8px !important;
+  }
+  .login-page .login-card h1 {
+    font-size: clamp(20px, 5vw, 24px) !important;
+    margin-bottom: 4px !important;
+  }
+  .login-page .login-form input,
+  .login-page .login-form button[type="submit"] {
+    height: 46px !important;
+  }
+  .login-page .login-form input {
+    margin-bottom: 10px !important;
+    font-size: 16px !important;
+  }
+  .login-page .login-form .password-field {
+    margin-bottom: 10px !important;
+  }
+  .login-page .registration {
+    margin-top: 12px !important;
+    padding-top: 12px !important;
+  }
+  .login-page .login-manager-cta {
+    gap: 8px !important;
+  }
+}
+
+@media (max-height: 700px) {
+  .login-page {
+    padding-top: 40px !important;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 28px) !important;
+    padding-bottom: 10px !important;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px) !important;
+  }
+  .login-page .logo,
+  .login-page .login-card .logo {
+    width: clamp(88px, 22vh, 130px) !important;
+    margin-bottom: 4px !important;
+  }
+  .login-page .login-card {
+    padding: 14px 14px 12px !important;
+  }
+  .login-page .login-card h1 {
+    font-size: 18px !important;
+  }
+  .login-page .login-form input,
+  .login-page .login-form button[type="submit"] {
+    height: 42px !important;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .login-page {
+    padding-top: 8px !important;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 8px) !important;
+  }
+  .login-page .logo,
+  .login-page .login-card .logo {
+    width: clamp(64px, 18vh, 100px) !important;
+    margin-bottom: 2px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .login-page .login-card {
+    padding: 16px 12px 14px !important;
+  }
+  .login-page .login-manager-cta-text {
+    font-size: 12px !important;
+  }
 }
 .dashboard-page{min-height:100vh;background:#f4f8f2;color:#293329}
 .dashboard-header{min-height:86px;padding:14px 6%;display:flex;align-items:center;justify-content:space-between;gap:24px;background:#fff;border-bottom:1px solid #e1e9de}
@@ -101,7 +283,7 @@ button{cursor:pointer}
 .empty-orders button{padding:14px 22px;border:0;border-radius:13px;background:#5b9d57;color:#fff;font-weight:700}
 .create-order-button:hover,.empty-orders button:hover{background:#4d8b49}
 @media(max-width:800px){.dashboard-header{padding:14px 20px}.header-actions span{display:none}.welcome-block{align-items:flex-start;flex-direction:column}.dashboard-grid{grid-template-columns:1fr}.create-order-button{width:100%}}
-@media(max-width:500px){.login-card{padding:34px 22px;border-radius:22px}.login-card h1{font-size:26px}.dashboard-logo{width:120px}.dashboard-content{width:92%;padding-top:30px}.welcome-block h1{font-size:29px}.orders-section{padding:22px 16px}}
+@media(max-width:500px){.dashboard-logo{width:120px}.dashboard-content{width:92%;padding-top:30px}.welcome-block h1{font-size:29px}.orders-section{padding:22px 16px}}
 /* Справочник номенклатуры 1С в кабинете менеджера */
 .one-c-products-panel {
   margin-bottom: 18px;
@@ -932,8 +1114,14 @@ button{cursor:pointer}
 
 .checkbox-line input { width: auto; }
 
-.clover-app,
-.page { padding-bottom: env(safe-area-inset-bottom); }
+.clover-app {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Login shell: единый fluid-layout в блоке .login-page выше; здесь без max() */
+.page {
+  box-sizing: border-box;
+}
 
 @media (max-width: 900px) {
   .manager-reconciliation-row { grid-template-columns: 1fr; }

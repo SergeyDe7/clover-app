@@ -7,6 +7,8 @@
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Стек, роли, модули, порты |
 | [INTEGRATION_1C.md](./INTEGRATION_1C.md) | Обмен Clover ↔ 1С УНФ TEST |
 | [PROD_CONTOUR.md](./PROD_CONTOUR.md) | Подготовка prod-контура (рабочая 1С / VLAVKA) |
+| [MANAGER_WORKING_1C.md](./MANAGER_WORKING_1C.md) | Менеджеру: селект «Рабочая 1С» для живых заказов |
+| [ACCEPTANCE_ORDERS_VLAVKA.md](./ACCEPTANCE_ORDERS_VLAVKA.md) | Протокол 2–3 приёмочных заказов в рабочую 1С |
 | [VLAVKA_EXTENSION_INSTALL.md](./VLAVKA_EXTENSION_INSTALL.md) | Установка расширения в VLAVKA + пилот |
 | [OPERATIONS.md](./OPERATIONS.md) | Запуск, backup, диагностика |
 | [READINESS.md](./READINESS.md) | Готовность и путь к реальным заказам |
