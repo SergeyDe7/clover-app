@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
-import { normalizeProduct } from "../../shared/appHelpers";
+import { normalizeProduct, productArticle } from "../../shared/appHelpers";
+
+function formatMarkupDraft(value) {
+  if (value === "" || value === null || value === undefined) return "";
+  const n = Number(value);
+  return Number.isFinite(n) ? String(n) : "";
+}
+
+function parseMarkupPercent(value) {
+  if (value === "" || value === null || value === undefined) return 0;
+  const n = Number(String(value).replace(",", "."));
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(1000, Math.max(0, n));
+}
 
 /**
  * Редактирование витрины clover-spb.ru — только admin.
@@ -14,6 +27,7 @@ export function ManagerStorefront({
   setProducts,
 }) {
   const [busy, setBusy] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
   const [productBusy, setProductBusy] = useState(false);
   const [productQuery, setProductQuery] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -23,6 +37,11 @@ export function ManagerStorefront({
     characteristics: "",
   });
   const [draft, setDraft] = useState({
+    storefrontPricingMode:
+      settings?.storefrontPricingMode === "purchase_markup"
+        ? "purchase_markup"
+        : "price_type",
+    storefrontMarkupPercent: formatMarkupDraft(settings?.storefrontMarkupPercent),
     storefrontPriceTypeId: settings?.storefrontPriceTypeId || "",
     storefrontPriceTypeName: settings?.storefrontPriceTypeName || "",
     storefrontShowOnlyLinked: settings?.storefrontShowOnlyLinked !== false,
@@ -31,14 +50,40 @@ export function ManagerStorefront({
   });
 
   useEffect(() => {
-    setDraft({
-      storefrontPriceTypeId: settings?.storefrontPriceTypeId || "",
-      storefrontPriceTypeName: settings?.storefrontPriceTypeName || "",
-      storefrontShowOnlyLinked: settings?.storefrontShowOnlyLinked !== false,
-      storefrontHeroTitle: settings?.storefrontHeroTitle || "",
-      storefrontHeroLead: settings?.storefrontHeroLead || "",
+    setDraft((prev) => {
+      const next = {
+        storefrontPricingMode:
+          settings?.storefrontPricingMode === "purchase_markup"
+            ? "purchase_markup"
+            : "price_type",
+        storefrontMarkupPercent: formatMarkupDraft(
+          settings?.storefrontMarkupPercent
+        ),
+        storefrontPriceTypeId: settings?.storefrontPriceTypeId || "",
+        storefrontPriceTypeName: settings?.storefrontPriceTypeName || "",
+        storefrontShowOnlyLinked: settings?.storefrontShowOnlyLinked !== false,
+        storefrontHeroTitle: settings?.storefrontHeroTitle || "",
+        storefrontHeroLead: settings?.storefrontHeroLead || "",
+      };
+      const same =
+        prev.storefrontPricingMode === next.storefrontPricingMode &&
+        prev.storefrontMarkupPercent === next.storefrontMarkupPercent &&
+        prev.storefrontPriceTypeId === next.storefrontPriceTypeId &&
+        prev.storefrontPriceTypeName === next.storefrontPriceTypeName &&
+        prev.storefrontShowOnlyLinked === next.storefrontShowOnlyLinked &&
+        prev.storefrontHeroTitle === next.storefrontHeroTitle &&
+        prev.storefrontHeroLead === next.storefrontHeroLead;
+      return same ? prev : next;
     });
-  }, [settings]);
+  }, [
+    settings?.storefrontPricingMode,
+    settings?.storefrontMarkupPercent,
+    settings?.storefrontPriceTypeId,
+    settings?.storefrontPriceTypeName,
+    settings?.storefrontShowOnlyLinked,
+    settings?.storefrontHeroTitle,
+    settings?.storefrontHeroLead,
+  ]);
 
   const types = Array.isArray(oneCPriceTypes) ? oneCPriceTypes : [];
 
@@ -57,7 +102,7 @@ export function ManagerStorefront({
     const q = productQuery.trim().toLocaleLowerCase("ru-RU");
     if (!q) return activeProducts;
     return activeProducts.filter((item) => {
-      const hay = `${item.name || ""} ${item.code || ""} ${item.category || ""}`
+      const hay = `${item.name || ""} ${productArticle(item)} ${item.code || ""} ${item.category || ""}`
         .toLocaleLowerCase("ru-RU")
         .replaceAll("ё", "е");
       return hay.includes(q.replaceAll("ё", "е"));
@@ -70,12 +115,14 @@ export function ManagerStorefront({
   );
 
   const setField = (key, value) => {
+    setSettingsSaved(false);
     setDraft((prev) => ({ ...prev, [key]: value }));
   };
 
   const onPriceTypeChange = (event) => {
     const id = event.target.value;
     const found = types.find((item) => String(item.id) === String(id));
+    setSettingsSaved(false);
     setDraft((prev) => ({
       ...prev,
       storefrontPriceTypeId: id,
@@ -85,15 +132,16 @@ export function ManagerStorefront({
 
   const save = async () => {
     setBusy(true);
+    setSettingsSaved(false);
     try {
-      const result = await api.saveStorefrontSettings(draft);
-      const next = result.settings || { ...settings, ...draft };
+      const payload = {
+        ...draft,
+        storefrontMarkupPercent: parseMarkupPercent(draft.storefrontMarkupPercent),
+      };
+      const result = await api.saveStorefrontSettings(payload);
+      const next = result.settings || { ...settings, ...payload };
       setSettings(next);
-      await appAlert({
-        title: "Сохранено",
-        message: "Настройки витрины обновлены.",
-        tone: "success",
-      });
+      setSettingsSaved(true);
     } catch (error) {
       await appAlert({
         title: "Не удалось сохранить",
@@ -222,23 +270,80 @@ export function ManagerStorefront({
       <div className="manager-contact-settings storefront-settings-card">
         <h3>Цены на сайте</h3>
         <p className="storefront-settings-hint">
-          Один вид цен из 1С для витрины. В ЛК у клиентов — персональные цены.
+          Как считать цену на витрине. В ЛК у клиентов — персональные цены матрицы.
         </p>
-        <label className="storefront-price-field">
-          <span>Вид цен витрины</span>
-          <select
-            value={draft.storefrontPriceTypeId || ""}
-            onChange={onPriceTypeChange}
-          >
-            <option value="">Не выбран</option>
-            {types.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-                {item.code ? ` · ${item.code}` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
+
+        <div className="storefront-pricing-modes" role="radiogroup" aria-label="Режим цен витрины">
+          <label className="storefront-check">
+            <input
+              type="radio"
+              name="storefront-pricing-mode"
+              checked={draft.storefrontPricingMode !== "purchase_markup"}
+              onChange={() => setField("storefrontPricingMode", "price_type")}
+            />
+            <span>Вид цен 1С</span>
+          </label>
+          <label className="storefront-check">
+            <input
+              type="radio"
+              name="storefront-pricing-mode"
+              checked={draft.storefrontPricingMode === "purchase_markup"}
+              onChange={() => setField("storefrontPricingMode", "purchase_markup")}
+            />
+            <span>Закупочная + %</span>
+          </label>
+        </div>
+
+        {draft.storefrontPricingMode === "purchase_markup" ? (
+          <>
+            <label className="storefront-price-field">
+              <span>Наценка, %</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="0"
+                value={draft.storefrontMarkupPercent}
+                onChange={(event) => {
+                  const raw = String(event.target.value).replace(",", ".");
+                  if (raw === "") {
+                    setField("storefrontMarkupPercent", "");
+                    return;
+                  }
+                  // Разрешаем промежуточный ввод: 0, 0., 12.5
+                  if (!/^\d{0,4}(\.\d{0,2})?$/.test(raw)) return;
+                  setField("storefrontMarkupPercent", raw);
+                }}
+                onBlur={() => {
+                  setField(
+                    "storefrontMarkupPercent",
+                    String(parseMarkupPercent(draft.storefrontMarkupPercent))
+                  );
+                }}
+              />
+            </label>
+            <p className="storefront-settings-hint">
+              База — закупочная цена из выгрузки 1С (и вид «Закупочная», если он
+              свежее). Итог: закупка × (1 + % / 100), округление вверх как в ЛК.
+            </p>
+          </>
+        ) : (
+          <label className="storefront-price-field">
+            <span>Вид цен витрины</span>
+            <select
+              value={draft.storefrontPriceTypeId || ""}
+              onChange={onPriceTypeChange}
+            >
+              <option value="">Не выбран</option>
+              {types.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <label className="storefront-check">
           <input
             type="checkbox"
@@ -280,12 +385,12 @@ export function ManagerStorefront({
 
       <div className="form-actions" style={{ marginTop: 16 }}>
         <button
-          className="primary-button"
+          className={`primary-button${settingsSaved && !busy ? " is-saved" : ""}`}
           type="button"
-          disabled={busy}
-          onClick={save}
+          disabled={busy || settingsSaved}
+          onClick={() => void save()}
         >
-          {busy ? "Сохранение…" : "Сохранить витрину"}
+          {busy ? "Сохранение…" : settingsSaved ? "Сохранено" : "Сохранить витрину"}
         </button>
         <a
           className="secondary-button"
@@ -358,7 +463,7 @@ export function ManagerStorefront({
                       <span>
                         <strong>{item.name}</strong>
                         <span className="storefront-product-meta">
-                          {[item.code, item.category].filter(Boolean).join(" · ") ||
+                          {[productArticle(item), item.category].filter(Boolean).join(" · ") ||
                             "—"}
                           {" · "}
                           {detailsPreview(item)}

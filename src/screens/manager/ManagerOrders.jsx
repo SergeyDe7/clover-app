@@ -504,7 +504,12 @@ export function ManagerOrders({
             </button>
           </div>
           <div className="exchange-actions manager-bulk-exchange" style={{ marginTop: 10 }}>
-            <button className="secondary-button" type="button" disabled={!selectedIds.length || bulkBusy} onClick={() => void runBulkSendToOneC()}>
+            <button
+              className="manager-send-onec-button manager-send-onec-idle"
+              type="button"
+              disabled={!selectedIds.length || bulkBusy}
+              onClick={() => void runBulkSendToOneC()}
+            >
               Передать выбранные в 1С
             </button>
             <button
@@ -564,18 +569,9 @@ export function ManagerOrders({
                   </span>
                 </div>
                 <h3 className="manager-order-client">{order.customerName || "Клиент"}</h3>
-                <p>
-                  № {order.number || "—"}
-                  {order.createdAt ? ` · создан ${formatDateTime(order.createdAt)}` : ""}
-                </p>
-                {(order.customerContact || order.customerPhone || order.customerEmail) && (
-                  <p className="manager-order-contacts muted small">
-                    {[order.customerContact, order.customerPhone, order.customerEmail].filter(Boolean).join(" · ")}
-                  </p>
-                )}
               </div>
             </div>
-            <div className="nowrap">
+            <div className="nowrap manager-order-sum-wrap">
               <strong className="manager-order-sum success-text">
                 {settings.showPrices && getOrderTotal(order) > 0
                   ? formatMoney(getOrderTotal(order))
@@ -583,22 +579,36 @@ export function ManagerOrders({
               </strong>
             </div>
           </div>
-          <div className="order-meta">
+          <div className="order-meta manager-order-meta">
+            <div>
+              <span>Номер</span>
+              <strong>{order.number || "—"}</strong>
+            </div>
+            <div>
+              <span>Создан</span>
+              <strong>{order.createdAt ? formatDateTime(order.createdAt) : "—"}</strong>
+            </div>
             <div>
               <span>Дата доставки</span>
               <strong>{order.firstDeliveryDate ? formatDate(order.firstDeliveryDate) : "не указана"}</strong>
             </div>
             <div>
-              <span>Адрес</span>
-              <strong>{order.address || "—"}</strong>
-            </div>
-            <div>
               <span>Позиций</span>
               <strong>{getPositionCount(order)}</strong>
             </div>
-            <div>
-              <span>Дата заказа</span>
-              <strong>{order.createdAt ? formatDate(order.createdAt) : "—"}</strong>
+            {(order.customerContact || order.customerPhone || order.customerEmail) ? (
+              <div className="order-meta-wide">
+                <span>Контакт</span>
+                <strong>
+                  {[order.customerContact, order.customerPhone, order.customerEmail]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </strong>
+              </div>
+            ) : null}
+            <div className="order-meta-wide">
+              <span>Адрес</span>
+              <strong>{order.address || "—"}</strong>
             </div>
           </div>
           {order.clientComment ? (

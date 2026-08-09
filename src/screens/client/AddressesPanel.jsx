@@ -69,13 +69,26 @@ export function AddressesPanel({ addresses, onChange }) {
       ) : <div className="empty-box">Адресов пока нет.</div>}
 
       {formOpen && (
-        <form style={{ marginTop: 18 }} onSubmit={save}>
+        <form className="address-edit-form" style={{ marginTop: 18 }} onSubmit={save}>
           <div className="form-grid">
-            <label className="field">Название точки
-              <input placeholder="Например: Магазин на Ленина" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} required />
+            <label className="field">
+              Название точки
+              <input
+                placeholder="Например: Магазин на Ленина"
+                value={form.label}
+                onChange={(e) => setForm({ ...form, label: e.target.value })}
+                required
+              />
             </label>
-            <label className="field">Полный адрес
-              <textarea rows="3" placeholder="Город, улица, дом, помещение" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} required />
+            <label className="field">
+              Полный адрес
+              <textarea
+                rows="3"
+                placeholder="Город, улица, дом, помещение"
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                required
+              />
             </label>
           </div>
           <div className="form-actions">

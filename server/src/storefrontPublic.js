@@ -16,6 +16,9 @@ import {
   unitLabel,
   unitPriceField,
   unitSize,
+  purchasePriceForUnit,
+  calculateMarkupPrice,
+  pickPurchaseMarkupCost,
 } from "./pricing.js";
 import { normalizeExchangeState } from "./exchange.js";
 import {
@@ -31,6 +34,12 @@ export function getStorefrontSettings(settingsInput) {
     ...(settingsInput && typeof settingsInput === "object" ? settingsInput : {}),
   };
   return {
+    storefrontPricingMode: normalizeStorefrontPricingMode(
+      settings.storefrontPricingMode
+    ),
+    storefrontMarkupPercent: normalizeStorefrontMarkupPercent(
+      settings.storefrontMarkupPercent
+    ),
     storefrontPriceTypeId: String(settings.storefrontPriceTypeId || "").trim(),
     storefrontPriceTypeName: String(settings.storefrontPriceTypeName || "").trim(),
     storefrontShowOnlyLinked: settings.storefrontShowOnlyLinked !== false,
@@ -39,7 +48,21 @@ export function getStorefrontSettings(settingsInput) {
   };
 }
 
+function normalizeStorefrontPricingMode(value) {
+  return String(value || "").trim() === "purchase_markup"
+    ? "purchase_markup"
+    : "price_type";
+}
+
+function normalizeStorefrontMarkupPercent(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) return 0;
+  return Math.min(1000, Math.round(num * 100) / 100);
+}
+
 const STOREFRONT_SETTING_KEYS = [
+  "storefrontPricingMode",
+  "storefrontMarkupPercent",
   "storefrontPriceTypeId",
   "storefrontPriceTypeName",
   "storefrontShowOnlyLinked",
@@ -64,6 +87,12 @@ export function mergeStorefrontSettings(baseSettings, patch = {}) {
   const incoming = patch && typeof patch === "object" ? patch : {};
   return {
     ...current,
+    storefrontPricingMode: normalizeStorefrontPricingMode(
+      incoming.storefrontPricingMode ?? current.storefrontPricingMode
+    ),
+    storefrontMarkupPercent: normalizeStorefrontMarkupPercent(
+      incoming.storefrontMarkupPercent ?? current.storefrontMarkupPercent
+    ),
     storefrontPriceTypeId: String(
       incoming.storefrontPriceTypeId ?? current.storefrontPriceTypeId ?? ""
     ).trim(),
@@ -89,17 +118,54 @@ function oneCByIdMap(items) {
   );
 }
 
+function findPurchasePriceTypeId(priceTypes = []) {
+  const list = normalizeOneCPriceTypes(priceTypes);
+  const found = list.find((item) => /закупочн/i.test(String(item?.name || "")));
+  return found ? String(found.id) : "";
+}
+
 function publicSaleUnits(product = {}) {
   const raw = Array.isArray(product.saleUnits) ? product.saleUnits : [];
   const units = raw.filter((unit) => SALE_UNITS.includes(unit));
   return units.length ? units : ["piece"];
 }
 
-function buildStorefrontPrices(product, oneCItem, priceTypeId) {
+function buildStorefrontPrices(product, oneCItem, storeSettings, costPriceTypeId = "") {
   const prices = {};
   const priceSources = {};
+  const mode = storeSettings.storefrontPricingMode;
+  const markupPercent = storeSettings.storefrontMarkupPercent;
+  const priceTypeId = storeSettings.storefrontPriceTypeId;
+
   for (const unit of SALE_UNITS) {
     const field = unitPriceField(unit);
+
+    if (mode === "purchase_markup") {
+      const purchase = oneCItem
+        ? purchasePriceForUnit(product, oneCItem, unit)
+        : null;
+      const { cost, costKind } = pickPurchaseMarkupCost(
+        product,
+        oneCItem,
+        costPriceTypeId,
+        unit,
+        purchase
+      );
+      const calculated = calculateMarkupPrice(cost, markupPercent);
+      if (calculated !== null) {
+        prices[unit] = calculated;
+        priceSources[unit] =
+          costKind === "purchase"
+            ? "purchase_markup"
+            : "purchase_markup_from_price_type";
+        continue;
+      }
+      const fallback = Math.max(0, Number(product[field]) || 0);
+      prices[unit] = fallback;
+      priceSources[unit] = fallback > 0 ? "base_fallback" : "purchase_missing";
+      continue;
+    }
+
     if (priceTypeId) {
       const typed = resolveTypedSalePrice(product, oneCItem, priceTypeId, unit);
       if (typed) {
@@ -115,26 +181,33 @@ function buildStorefrontPrices(product, oneCItem, priceTypeId) {
   return { prices, priceSources };
 }
 
-function toPublicProduct(product, oneCItem, storeSettings) {
+function toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId = "") {
   const { prices, priceSources } = buildStorefrontPrices(
     product,
     oneCItem,
-    storeSettings.storefrontPriceTypeId
+    storeSettings,
+    costPriceTypeId
   );
   const details =
     product.storefrontDetails && typeof product.storefrontDetails === "object"
       ? product.storefrontDetails
       : {};
 
+  const cloverCode = String(product.code || "").trim();
+  const oneCCode = String(product.oneCCode || oneCItem?.code || "").trim();
+  // На витрине артикул = код 1С; внутренний CL- оставляем как запасной ключ URL.
+  const code = oneCCode || cloverCode;
+
   return {
     id: product.id,
-    code: String(product.code || "").trim(),
+    code,
+    cloverCode,
     name: String(product.name || "").trim(),
     category: String(product.category || "Прочее").trim() || "Прочее",
     imageUrl: String(product.imageUrl || "").trim(),
     certificateUrl: String(product.certificateUrl || "").trim(),
     oneCId: String(product.oneCId || "").trim(),
-    oneCCode: String(product.oneCCode || oneCItem?.code || "").trim(),
+    oneCCode,
     saleUnits: publicSaleUnits(product),
     prices,
     priceSources,
@@ -153,7 +226,9 @@ function toPublicProduct(product, oneCItem, storeSettings) {
 function listStorefrontProducts(storeSettings) {
   const products = getGlobalState("products", DEFAULT_PRODUCTS);
   const oneCProducts = getGlobalState("oneCProducts", []);
+  const priceTypes = getGlobalState("oneCPriceTypes", []);
   const byId = oneCByIdMap(oneCProducts);
+  const costPriceTypeId = findPurchasePriceTypeId(priceTypes);
 
   return (Array.isArray(products) ? products : [])
     .filter((product) => product?.active !== false)
@@ -164,7 +239,7 @@ function listStorefrontProducts(storeSettings) {
     })
     .map((product) => {
       const oneCItem = byId.get(String(product.oneCId || "")) || null;
-      return toPublicProduct(product, oneCItem, storeSettings);
+      return toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId);
     })
     .filter((product) => product.code && product.name);
 }
@@ -232,7 +307,7 @@ export function getPublicCatalog({ category = "", q = "" } = {}) {
   const query = String(q || "").trim().toLocaleLowerCase("ru-RU");
   if (query) {
     products = products.filter((product) =>
-      `${product.name} ${product.code} ${product.category}`
+      `${product.name} ${product.code} ${product.cloverCode || ""} ${product.oneCCode || ""} ${product.category}`
         .toLocaleLowerCase("ru-RU")
         .includes(query)
     );
@@ -245,6 +320,8 @@ export function getPublicCatalog({ category = "", q = "" } = {}) {
   return {
     categories: buildCategories(listStorefrontProducts(settings)),
     products,
+    pricingMode: settings.storefrontPricingMode,
+    markupPercent: settings.storefrontMarkupPercent,
     priceType: selectedType
       ? { id: selectedType.id, name: selectedType.name }
       : settings.storefrontPriceTypeId
@@ -269,9 +346,12 @@ export function getPublicProductByCode(code) {
     getGlobalState("settings", DEFAULT_SETTINGS)
   );
   return (
-    listStorefrontProducts(settings).find(
-      (product) => product.code.toLocaleLowerCase("ru-RU") === needle
-    ) || null
+    listStorefrontProducts(settings).find((product) => {
+      const aliases = [product.code, product.oneCCode, product.cloverCode]
+        .map((value) => String(value || "").trim().toLocaleLowerCase("ru-RU"))
+        .filter(Boolean);
+      return aliases.includes(needle);
+    }) || null
   );
 }
 
@@ -344,9 +424,15 @@ export function createStorefrontOrder(input, { notify } = {}) {
     ])
   );
   const byId = new Map(catalog.map((product) => [String(product.id), product]));
-  const byCode = new Map(
-    catalog.map((product) => [product.code.toLocaleLowerCase("ru-RU"), product])
-  );
+  const byCode = new Map();
+  for (const product of catalog) {
+    for (const alias of [product.code, product.oneCCode, product.cloverCode]) {
+      const key = String(alias || "")
+        .trim()
+        .toLocaleLowerCase("ru-RU");
+      if (key && !byCode.has(key)) byCode.set(key, product);
+    }
+  }
 
   let firstDeliveryDate = String(parsed.firstDeliveryDate || "").trim();
   if (!firstDeliveryDate) {
@@ -401,6 +487,7 @@ export function createStorefrontOrder(input, { notify } = {}) {
       id: randomUUID(),
       productId: product.id,
       code: product.code,
+      oneCCode: String(product.oneCCode || "").trim(),
       name: product.name,
       category: product.category || stored.category || "",
       unit,

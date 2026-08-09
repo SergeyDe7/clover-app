@@ -91,9 +91,6 @@ export function ProductPage({ code }) {
           <p className="sf-product-cat">{product.category}</p>
           <h1>{product.name}</h1>
           <p className="sf-product-code">Артикул {product.code}</p>
-          {product.oneCCode ? (
-            <p className="sf-muted">Код 1С: {product.oneCCode}</p>
-          ) : null}
 
           <div className="sf-price-block">
             <strong>{price > 0 ? formatMoney(price) : "Цена по запросу"}</strong>

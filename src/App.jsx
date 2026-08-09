@@ -228,22 +228,27 @@ function LoginView({ onAuth, authBusy, authError }) {
   const loginWithPasskey = async () => {
     setLocalError("");
     setMessage("");
-    if (!form.email.trim()) {
-      setLocalError("Сначала укажите электронную почту.");
-      return;
-    }
     if (!("PublicKeyCredential" in window)) {
       setLocalError("Это устройство или браузер не поддерживает вход по Face ID или ключу доступа.");
       return;
     }
     setPasskeyBusy(true);
     try {
-      const ceremony = await api.getPasskeyAuthenticationOptions(form.email);
+      const email = form.email.trim();
+      const ceremony = await api.getPasskeyAuthenticationOptions(email);
       const response = await startPasskeyAuthentication(ceremony.options);
-      const result = await api.verifyPasskeyAuthentication(form.email, ceremony.ceremonyId, response);
+      const result = await api.verifyPasskeyAuthentication(email, ceremony.ceremonyId, response);
       await onAuth({ mode: "passkey", result });
     } catch (error) {
-      setLocalError(error.message || "Не удалось выполнить вход по ключу доступа.");
+      const name = String(error?.name || "");
+      if (name === "NotAllowedError") {
+        setLocalError("Вход по Face ID отменён.");
+      } else {
+        setLocalError(
+          error.message
+          || "Не удалось войти по Face ID. Если ключ добавляли раньше — укажите почту или добавьте Face ID заново в профиле."
+        );
+      }
     } finally {
       setPasskeyBusy(false);
     }

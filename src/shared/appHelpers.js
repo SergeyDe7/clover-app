@@ -1829,9 +1829,10 @@ textarea { resize: vertical; }
 .order-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .order-card-header h3 { margin: 7px 0 5px; color: #394639; font-size: 21px; }
 .order-card-header p { margin: 4px 0 0; color: #7b857b; font-size: 13px; }
-.order-meta { display: grid; grid-template-columns: 170px minmax(0,1fr) 110px 130px; gap: 12px; margin: 18px 0; padding: 15px; border-radius: 14px; background: #f5f9f3; }
-.order-meta span { display: block; margin-bottom: 5px; color: #7a847a; font-size: 10px; text-transform: uppercase; }
-.order-meta strong { color: #465146; font-size: 13px; line-height: 1.45; }
+.order-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 16px; margin: 18px 0; padding: 15px; border-radius: 14px; background: #f5f9f3; align-items: start; }
+.order-meta > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.order-meta span { display: block; margin: 0; color: #7a847a; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.3; min-height: 1.3em; }
+.order-meta strong { color: #465146; font-size: 13px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
 .order-details { border-top: 1px solid #edf1eb; padding-top: 14px; }
 .order-details summary { color: #4f8d4b; font-weight: 800; cursor: pointer; }
 .order-products { display: grid; gap: 0; margin-top: 12px; }
@@ -4863,6 +4864,13 @@ export function inferProductCategory(name, products = [], fallback = "Новые
     if (rule.patterns.some((pattern) => pattern.test(text))) return rule.category;
   }
   return fallback;
+}
+
+/** Артикул для UI: код 1С, иначе внутренний код Clover. */
+export function productArticle(product = {}) {
+  return String(
+    product.oneCCode || product.oneCMatchCode || product.code || ""
+  ).trim();
 }
 
 export function normalizeProduct(product) {

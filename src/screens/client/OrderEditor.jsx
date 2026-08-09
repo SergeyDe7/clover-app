@@ -16,6 +16,7 @@ import {
   quantityInputStep,
   quantityInputUnitLabel,
   orderedSaleUnits,
+  productArticle,
 } from "../../shared/appHelpers";
 import {
   getEarliestDeliveryDateIso,
@@ -215,7 +216,7 @@ export function OrderEditor({
       return {
         id: product.id,
         productId: product.id,
-        code: product.code,
+        code: productArticle(product),
         oneCId: product.oneCId || "",
         name: product.name,
         category: product.category,
@@ -609,7 +610,7 @@ export function OrderEditor({
                       </div>
                     )}
                     <h2>{product.name}</h2>
-                    <p className="product-code">Код: {product.code}</p>
+                    <p className="product-code">Код: {productArticle(product)}</p>
                     <p className="product-price">
                       {settings.showPrices && price > 0
                         ? <>{formatMoney(price)} <small>/ {UNIT_CONFIG[unit].shortLabel}</small></>

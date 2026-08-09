@@ -7,6 +7,7 @@ import {
   formatMoney,
   formatDateTime,
   normalizeProduct,
+  productArticle,
 } from "../../shared/appHelpers";
 import { appAlert } from "../../shared/AppModal";
 import { productImageSrc } from "../../shared/productPhoto";
@@ -355,7 +356,7 @@ export function ManagerProducts({ products, setProducts, oneCPriceTypes = [] }) 
           </div>
           <div className="product-manager-info">
             <h3>{product.name}</h3>
-            <p>{product.category} · {product.code}</p>
+            <p>{product.category} · {productArticle(product)}</p>
             <p className="product-one-c-line">
               {product.oneCId
                 ? `1С: ${product.oneCCode || "без кода"} · ${product.oneCId}`

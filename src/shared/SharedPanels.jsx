@@ -341,7 +341,7 @@ export function PasswordSecurityPanel({ allowPasswordChange = true } = {}) {
   };
 
   return (
-    <section className="panel compact-panel">
+    <section className="panel compact-panel security-panel">
       <div className="panel-heading">
         <div>
           <p className="eyebrow">Безопасность</p>
@@ -353,33 +353,89 @@ export function PasswordSecurityPanel({ allowPasswordChange = true } = {}) {
           </p>
         </div>
       </div>
+
       {allowPasswordChange ? (
-        <form className="form-grid security-form" onSubmit={submit}>
-          <label className="field">Текущий пароль<input type="password" autoComplete="current-password" value={form.currentPassword} onChange={(event) => setForm({ ...form, currentPassword: event.target.value })} required /></label>
-          <label className="field">Новый пароль<input type="password" autoComplete="new-password" minLength="6" value={form.newPassword} onChange={(event) => setForm({ ...form, newPassword: event.target.value })} required /></label>
-          <label className="field">Повторите новый пароль<input type="password" autoComplete="new-password" minLength="6" value={form.repeatPassword} onChange={(event) => setForm({ ...form, repeatPassword: event.target.value })} required /></label>
-          <div className="form-actions"><button className="primary-button" disabled={busy} type="submit">{busy ? "Сохраняем…" : "Изменить пароль"}</button></div>
-        </form>
+        <div className="security-block">
+          <div className="security-block-head">
+            <h3>Смена пароля</h3>
+            <p className="muted small">Минимум 6 символов. После смены другие сессии можно завершить отдельно.</p>
+          </div>
+          <form className="security-password-form" onSubmit={submit}>
+            <label className="field">
+              Текущий пароль
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={form.currentPassword}
+                onChange={(event) => setForm({ ...form, currentPassword: event.target.value })}
+                required
+              />
+            </label>
+            <label className="field">
+              Новый пароль
+              <input
+                type="password"
+                autoComplete="new-password"
+                minLength="6"
+                value={form.newPassword}
+                onChange={(event) => setForm({ ...form, newPassword: event.target.value })}
+                required
+              />
+            </label>
+            <label className="field">
+              Повторите новый пароль
+              <input
+                type="password"
+                autoComplete="new-password"
+                minLength="6"
+                value={form.repeatPassword}
+                onChange={(event) => setForm({ ...form, repeatPassword: event.target.value })}
+                required
+              />
+            </label>
+            <div className="form-actions">
+              <button className="primary-button" disabled={busy} type="submit">
+                {busy ? "Сохраняем…" : "Изменить пароль"}
+              </button>
+            </div>
+          </form>
+        </div>
       ) : null}
-      <div className="form-actions session-actions">
-        <button className="secondary-button" type="button" disabled={busy} onClick={endOtherSessions}>
-          Завершить другие сессии
-        </button>
+
+      <div className="security-block">
+        <div className="security-block-head">
+          <h3>Сессии</h3>
+          <p className="muted small">Завершает вход на других устройствах и в браузерах. Текущая сессия останется.</p>
+        </div>
+        <div className="security-block-actions">
+          <button className="secondary-button" type="button" disabled={busy} onClick={endOtherSessions}>
+            Завершить другие сессии
+          </button>
+        </div>
       </div>
 
-      <div className="passkey-settings">
-        <div>
-          <h3>Face ID / отпечаток</h3>
-          <p className="muted">Данные лица и отпечатка остаются только на устройстве. Clover получает лишь подтверждение входа.</p>
+      <div className="security-block">
+        <div className="security-block-head security-block-head-row">
+          <div>
+            <h3>Face ID / отпечаток</h3>
+            <p className="muted small">
+              Данные лица и отпечатка остаются только на устройстве. Clover получает лишь подтверждение входа.
+            </p>
+          </div>
+          <button className="secondary-button" type="button" disabled={passkeyBusy} onClick={addPasskey}>
+            {passkeyBusy ? "Подождите…" : passkeys.length ? "Добавить ещё устройство" : "Включить вход по устройству"}
+          </button>
         </div>
-        <button className="secondary-button" type="button" disabled={passkeyBusy} onClick={addPasskey}>
-          {passkeyBusy ? "Подождите…" : passkeys.length ? "Добавить ещё устройство" : "Включить вход по устройству"}
-        </button>
         <div className="passkey-list">
           {passkeys.map((item, index) => (
             <div className="passkey-row" key={item.id}>
-              <div><strong>Ключ доступа {index + 1}</strong><span>{item.backedUp ? "Синхронизируется с аккаунтом устройства" : "Сохранён на этом устройстве"}</span></div>
-              <button className="danger-button" type="button" disabled={passkeyBusy} onClick={() => removePasskey(item.id)}>Удалить</button>
+              <div>
+                <strong>Ключ доступа {index + 1}</strong>
+                <span>{item.backedUp ? "Синхронизируется с аккаунтом устройства" : "Сохранён на этом устройстве"}</span>
+              </div>
+              <button className="danger-button" type="button" disabled={passkeyBusy} onClick={() => removePasskey(item.id)}>
+                Удалить
+              </button>
             </div>
           ))}
           {!passkeys.length && <div className="empty-box">Ключи доступа пока не добавлены.</div>}

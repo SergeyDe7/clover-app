@@ -66,6 +66,8 @@ export const DEFAULT_SETTINGS = {
   managerNotifyTelegram: false,
   managerTelegramChatId: "",
   managerNotifyPush: true,
+  storefrontPricingMode: "price_type",
+  storefrontMarkupPercent: 0,
   storefrontPriceTypeId: "",
   storefrontPriceTypeName: "",
   storefrontShowOnlyLinked: true,

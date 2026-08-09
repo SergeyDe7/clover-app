@@ -23,6 +23,7 @@ import {
   RUSSIAN_PHONE_PREFIX,
   formatRussianPhone,
   normalizeProfileContacts,
+  productArticle,
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { MatrixOneCProductAdd } from "./MatrixOneCProductAdd";
@@ -2215,7 +2216,7 @@ export function ManagerClients({
                                         marginTop: 3,
                                       }}
                                     >
-                                      {product.code} · {product.category}
+                                      {productArticle(product)} · {product.category}
                                     </small>
                                   </span>
                                 </label>

@@ -19,7 +19,7 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-const CLOVER_UI_BUILD = "ui-20260809-v157-order-date-tz";
+const CLOVER_UI_BUILD = "ui-20260809-v171-article-from-1c";
 const BOOT_SPLASH_MS = 450;
 const APP_THEME_COLOR = "#f4f8f2";
 const VIEWPORT_BASE = "width=device-width, initial-scale=1.0, viewport-fit=cover";

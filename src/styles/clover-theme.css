@@ -565,6 +565,114 @@ body:has(.clover-app) {
   font-size: 0.78rem;
 }
 
+/* Профиль: организация + почта на одном уровне; подсказка только под почтой */
+.clover-app .form-grid {
+  align-items: start;
+}
+
+.clover-app .profile-org-email-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+  align-items: start;
+}
+
+.clover-app .profile-org-email-grid .field-hint-email {
+  grid-column: 2;
+  margin: 0;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .clover-app .profile-org-email-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .clover-app .profile-org-email-grid .field-hint-email {
+    grid-column: 1;
+  }
+}
+
+/* Адреса: поля друг под другом, без перекоса input/textarea */
+.clover-app .address-edit-form .form-grid {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+}
+
+/* Безопасность: блоки вместо хаотичной сетки */
+.clover-app .security-panel {
+  display: grid;
+  gap: 0;
+}
+
+.clover-app .security-block {
+  display: grid;
+  gap: 12px;
+  padding: 16px 0;
+  border-top: 1px solid #e0e8de;
+}
+
+.clover-app .security-block:first-of-type {
+  border-top: 0;
+  padding-top: 4px;
+}
+
+.clover-app .security-block-head h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.clover-app .security-block-head p {
+  margin: 0;
+}
+
+.clover-app .security-block-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.clover-app .security-password-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.clover-app .security-password-form .field:first-child {
+  grid-column: 1 / -1;
+  max-width: 100%;
+}
+
+.clover-app .security-password-form .form-actions {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  justify-content: flex-start;
+}
+
+.clover-app .security-block-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.clover-app .security-panel .passkey-list {
+  display: grid;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .clover-app .security-password-form {
+    grid-template-columns: 1fr;
+  }
+
+  .clover-app .security-block-head-row .secondary-button {
+    width: 100%;
+  }
+}
+
 .client-card-contacts {
   display: grid;
   gap: 6px;
@@ -1211,7 +1319,12 @@ body:has(.clover-app) {
 .clover-app .manager-order-client {
   font-size: 18px !important;
   font-weight: 800 !important;
-  margin: 4px 0 2px !important;
+  margin: 6px 0 0 !important;
+  line-height: 1.25 !important;
+}
+
+.clover-app .manager-order-sum-wrap {
+  padding-top: 2px !important;
 }
 
 .clover-app .manager-order-sum {
@@ -1227,6 +1340,7 @@ body:has(.clover-app) {
   justify-content: space-between !important;
   width: 100% !important;
   gap: 16px !important;
+  margin-bottom: 0 !important;
 }
 
 .clover-app .manager-order-select {
@@ -1245,8 +1359,53 @@ body:has(.clover-app) {
   accent-color: var(--clover-green) !important;
 }
 
-.clover-app .manager-order-card-item > .order-meta {
-  margin: 12px 0 !important;
+.clover-app .manager-order-card-item > .order-meta,
+.clover-app .manager-order-meta {
+  margin: 12px 0 10px !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 12px 14px !important;
+  align-items: start !important;
+}
+
+.clover-app .order-meta > div {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+}
+
+.clover-app .order-meta span {
+  margin: 0 !important;
+  min-height: 1.3em !important;
+  line-height: 1.3 !important;
+}
+
+.clover-app .order-meta strong {
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+.clover-app .order-meta .order-meta-wide {
+  grid-column: 1 / -1 !important;
+  padding-top: 2px !important;
+  border-top: 1px solid rgba(60, 90, 60, 0.08);
+  margin-top: 2px;
+}
+
+@media (max-width: 900px) {
+  .clover-app .manager-order-card-item > .order-meta,
+  .clover-app .manager-order-meta,
+  .clover-app .order-card > .order-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .clover-app .manager-order-card-item > .order-meta,
+  .clover-app .manager-order-meta,
+  .clover-app .order-card > .order-meta {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 .clover-app .manager-order-controls {
@@ -4388,6 +4547,32 @@ html.clover-thankyou-open .app-top-chrome {
   display: grid;
   gap: 6px;
   margin-bottom: 12px;
+}
+
+.storefront-price-field input[type="number"] {
+  max-width: 160px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid rgba(40, 60, 40, 0.16);
+  border-radius: 10px;
+}
+
+.storefront-pricing-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0 0 12px;
+}
+
+.clover-app .form-actions .primary-button.is-saved,
+.clover-app .form-actions .primary-button.is-saved:hover {
+  background: #5f7a5c !important;
+  border-color: #5f7a5c !important;
+  color: #fff !important;
+  cursor: default;
+  transform: none !important;
+  animation: none !important;
+  transition: none !important;
 }
 
 .storefront-check {

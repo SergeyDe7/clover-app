@@ -194,8 +194,12 @@ export function mergeSalePricesByType(
   };
 }
 
-/** Товары, которым нужна цена выбранного вида для клиентов. */
-export function buildSalePriceRequirements(products = [], clientLinks = {}) {
+/** Товары, которым нужна цена выбранного вида для клиентов и витрины. */
+export function buildSalePriceRequirements(
+  products = [],
+  clientLinks = {},
+  { storefrontPriceTypeId = "" } = {}
+) {
   const typeIds = new Set();
   for (const link of Object.values(clientLinks || {})) {
     const typeId = cleanText(link?.oneCPriceTypeId);
@@ -210,9 +214,15 @@ export function buildSalePriceRequirements(products = [], clientLinks = {}) {
       typeIds.add(typeId);
     }
   }
+
+  const storefrontTypeId = cleanText(storefrontPriceTypeId);
+  if (storefrontTypeId) {
+    typeIds.add(storefrontTypeId);
+  }
+
   if (!typeIds.size) return [];
 
-  // Только товары из матриц клиентов с этими видами цен (не весь каталог).
+  // Товары из матриц клиентов с этими видами цен + товары витрины.
   const neededOneCIds = new Set();
   for (const link of Object.values(clientLinks || {})) {
     const typeId = cleanText(link?.oneCPriceTypeId);
@@ -239,12 +249,42 @@ export function buildSalePriceRequirements(products = [], clientLinks = {}) {
     }
   }
 
+  if (storefrontTypeId) {
+    for (const product of Array.isArray(products) ? products : []) {
+      if (product.active === false) continue;
+      if (product.showOnStorefront !== true) continue;
+      const oneCId = cleanText(product.oneCId);
+      if (oneCId) neededOneCIds.add(oneCId);
+    }
+  }
+
   const required = [];
   for (const product of Array.isArray(products) ? products : []) {
     if (product.active === false) continue;
     const oneCId = cleanText(product.oneCId);
     if (!oneCId || !neededOneCIds.has(oneCId)) continue;
-    for (const priceTypeId of typeIds) {
+
+    const productTypeIds = new Set();
+    for (const link of Object.values(clientLinks || {})) {
+      const typeId = cleanText(link?.oneCPriceTypeId);
+      if (!typeId || !typeIds.has(typeId)) continue;
+      const mode = String(link?.defaultPricingMode || "").trim();
+      if (mode && mode !== "one_c_price_type" && mode !== "purchase_markup") {
+        continue;
+      }
+      const inMatrix =
+        link?.matrixMode === "all" ||
+        (Array.isArray(link?.matrixProductIds) &&
+          link.matrixProductIds.some(
+            (productId) => String(productId) === String(product.id)
+          ));
+      if (inMatrix) productTypeIds.add(typeId);
+    }
+    if (storefrontTypeId && product.showOnStorefront === true) {
+      productTypeIds.add(storefrontTypeId);
+    }
+
+    for (const priceTypeId of productTypeIds) {
       required.push({
         productId: product.id,
         id: oneCId,
