@@ -124,6 +124,8 @@ function findPurchasePriceTypeId(priceTypes = []) {
   return found ? String(found.id) : "";
 }
 
+export { findPurchasePriceTypeId };
+
 function publicSaleUnits(product = {}) {
   const raw = Array.isArray(product.saleUnits) ? product.saleUnits : [];
   const units = raw.filter((unit) => SALE_UNITS.includes(unit));
@@ -317,21 +319,25 @@ export function getPublicCatalog({ category = "", q = "" } = {}) {
     priceTypes.find((item) => item.id === settings.storefrontPriceTypeId) ||
     null;
 
+  // Не отдаём pricingMode/markupPercent наружу: по % можно восстановить закупку.
+  const priceType =
+    settings.storefrontPricingMode === "price_type"
+      ? selectedType
+        ? { id: selectedType.id, name: selectedType.name }
+        : settings.storefrontPriceTypeId
+          ? {
+              id: settings.storefrontPriceTypeId,
+              name:
+                settings.storefrontPriceTypeName ||
+                settings.storefrontPriceTypeId,
+            }
+          : null
+      : null;
+
   return {
     categories: buildCategories(listStorefrontProducts(settings)),
     products,
-    pricingMode: settings.storefrontPricingMode,
-    markupPercent: settings.storefrontMarkupPercent,
-    priceType: selectedType
-      ? { id: selectedType.id, name: selectedType.name }
-      : settings.storefrontPriceTypeId
-        ? {
-            id: settings.storefrontPriceTypeId,
-            name:
-              settings.storefrontPriceTypeName ||
-              settings.storefrontPriceTypeId,
-          }
-        : null,
+    priceType,
     site: {
       heroTitle: settings.storefrontHeroTitle || "",
       heroLead: settings.storefrontHeroLead || "",
@@ -487,7 +493,6 @@ export function createStorefrontOrder(input, { notify } = {}) {
       id: randomUUID(),
       productId: product.id,
       code: product.code,
-      oneCCode: String(product.oneCCode || "").trim(),
       name: product.name,
       category: product.category || stored.category || "",
       unit,
@@ -554,6 +559,8 @@ export function createStorefrontOrder(input, { notify } = {}) {
     amount: total,
     createdAt,
     updatedAt: createdAt,
+    storefrontPricingMode: settings.storefrontPricingMode,
+    storefrontMarkupPercent: settings.storefrontMarkupPercent,
     storefrontPriceTypeId: settings.storefrontPriceTypeId,
     storefrontPriceTypeName: settings.storefrontPriceTypeName,
   };

@@ -159,6 +159,7 @@ import {
   getStorefrontSettings,
   mergeStorefrontSettings,
   stripStorefrontSettings,
+  findPurchasePriceTypeId,
 } from "./storefrontPublic.js";
 import {
   buildAllPriceRequirements,
@@ -3106,6 +3107,9 @@ app.get("/api/one-c/purchase-price-request", (req, res) => {
   const products = getGlobalState("products", DEFAULT_PRODUCTS);
   const clientLinks = getGlobalState("clientLinks", {});
   const orders = listOrders();
+  const settings = getGlobalState("settings", DEFAULT_SETTINGS);
+  const includeStorefrontPurchaseMarkup =
+    String(settings?.storefrontPricingMode || "").trim() === "purchase_markup";
   const scope = String(req.query.scope || "next-order") === "all" ? "all" : "next-order";
   const order = scope === "next-order" ? nextOrderForOneC(database) : null;
   const request = buildPriceRequest({
@@ -3116,10 +3120,13 @@ app.get("/api/one-c/purchase-price-request", (req, res) => {
     orders,
     maxAgeMs: priceMaxAgeMs(),
     database,
+    includeStorefrontPurchaseMarkup,
   });
 
   const requirements = scope === "all"
-    ? buildAllPriceRequirements(products, clientLinks, orders)
+    ? buildAllPriceRequirements(products, clientLinks, orders, {
+        includeStorefrontPurchaseMarkup,
+      })
     : request.items;
   const issues = validatePriceRequirements(
     requirements,
@@ -3208,14 +3215,17 @@ app.get("/api/one-c/sale-price-request", (req, res) => {
   const products = getGlobalState("products", DEFAULT_PRODUCTS);
   const clientLinks = getGlobalState("clientLinks", {});
   const settings = getGlobalState("settings", DEFAULT_SETTINGS);
+  const priceTypes = normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", []));
   const items = buildSalePriceRequirements(products, clientLinks, {
     storefrontPriceTypeId: settings?.storefrontPriceTypeId || "",
+    storefrontPricingMode: settings?.storefrontPricingMode || "price_type",
+    storefrontCostPriceTypeId: findPurchasePriceTypeId(priceTypes),
   });
   res.json({
     ok: true,
     database,
     items,
-    priceTypes: normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", [])),
+    priceTypes,
   });
 });
 

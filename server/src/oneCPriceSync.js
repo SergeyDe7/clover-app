@@ -137,7 +137,12 @@ export function buildOrderPriceRequirements(order, products, rawLink = {}) {
     .map(productReference);
 }
 
-export function buildAllPriceRequirements(products, clientLinks = {}, orders = []) {
+export function buildAllPriceRequirements(
+  products,
+  clientLinks = {},
+  orders = [],
+  { includeStorefrontPurchaseMarkup = false } = {}
+) {
   const required = new Map();
   const sourceProducts = Array.isArray(products) ? products : [];
 
@@ -155,6 +160,16 @@ export function buildAllPriceRequirements(products, clientLinks = {}, orders = [
     const link = clientLinks?.[order.clientId] || {};
     for (const item of buildOrderPriceRequirements(order, sourceProducts, link)) {
       if (item.id) required.set(item.id, item);
+    }
+  }
+
+  if (includeStorefrontPurchaseMarkup) {
+    for (const product of sourceProducts) {
+      if (product.active === false) continue;
+      if (product.showOnStorefront !== true) continue;
+      const oneCId = cleanText(product.oneCId);
+      if (!oneCId) continue;
+      required.set(oneCId, productReference(product));
     }
   }
 
@@ -321,10 +336,13 @@ export function buildPriceRequest({
   orders = [],
   maxAgeMs = priceMaxAgeMs(),
   database = TEST_DATABASE_NAME,
+  includeStorefrontPurchaseMarkup = false,
 } = {}) {
   const requirements =
     scope === "all"
-      ? buildAllPriceRequirements(products, clientLinks, orders)
+      ? buildAllPriceRequirements(products, clientLinks, orders, {
+          includeStorefrontPurchaseMarkup,
+        })
       : order
         ? buildOrderPriceRequirements(
             order,

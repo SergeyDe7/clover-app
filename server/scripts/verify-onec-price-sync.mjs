@@ -146,5 +146,46 @@ assert.equal(request.database, "TEST");
 assert.equal(request.items.length, 1);
 assert.equal(request.maxAgeSeconds, 600);
 
+// Витрина в режиме Закупочная+% должна попадать в purchase-price-request (scope=all).
+const storefrontOnlyId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const selectedLinks = {
+  client1: {
+    matrixMode: "selected",
+    matrixProductIds: [1],
+    defaultPricingMode: "purchase_markup",
+    defaultMarkupPercent: 25,
+  },
+};
+const storefrontProducts = [
+  ...products,
+  {
+    id: 3,
+    name: "Только витрина",
+    active: true,
+    showOnStorefront: true,
+    oneCId: storefrontOnlyId,
+    oneCCode: "НФ-STORE",
+  },
+];
+const withoutStorefront = buildAllPriceRequirements(
+  storefrontProducts,
+  selectedLinks,
+  []
+);
+assert.equal(
+  withoutStorefront.some((item) => item.id === storefrontOnlyId),
+  false
+);
+const withStorefront = buildAllPriceRequirements(
+  storefrontProducts,
+  selectedLinks,
+  [],
+  { includeStorefrontPurchaseMarkup: true }
+);
+assert.equal(
+  withStorefront.some((item) => item.id === storefrontOnlyId),
+  true
+);
+
 console.log("Проверка запроса и приёма свежих закупочных цен из 1С TEST прошла успешно.");
 console.log("Проверено: только нужные товары, запрет VLAVKA, контроль давности и фиксированное исключение.");

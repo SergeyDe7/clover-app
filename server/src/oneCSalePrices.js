@@ -194,11 +194,20 @@ export function mergeSalePricesByType(
   };
 }
 
-/** Товары, которым нужна цена выбранного вида для клиентов и витрины. */
+/**
+ * Товары, которым нужна цена выбранного вида для клиентов и витрины.
+ * storefrontPricingMode:
+ * - price_type → storefrontPriceTypeId (напр. «Розничная»)
+ * - purchase_markup → storefrontCostPriceTypeId (напр. «Закупочная») для fresher typed cost
+ */
 export function buildSalePriceRequirements(
   products = [],
   clientLinks = {},
-  { storefrontPriceTypeId = "" } = {}
+  {
+    storefrontPriceTypeId = "",
+    storefrontPricingMode = "price_type",
+    storefrontCostPriceTypeId = "",
+  } = {}
 ) {
   const typeIds = new Set();
   for (const link of Object.values(clientLinks || {})) {
@@ -215,7 +224,14 @@ export function buildSalePriceRequirements(
     }
   }
 
-  const storefrontTypeId = cleanText(storefrontPriceTypeId);
+  const storefrontMode =
+    String(storefrontPricingMode || "").trim() === "purchase_markup"
+      ? "purchase_markup"
+      : "price_type";
+  const storefrontTypeId =
+    storefrontMode === "purchase_markup"
+      ? cleanText(storefrontCostPriceTypeId)
+      : cleanText(storefrontPriceTypeId);
   if (storefrontTypeId) {
     typeIds.add(storefrontTypeId);
   }
