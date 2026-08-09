@@ -131,7 +131,7 @@ export function ProfilePanel({ profile, onChange }) {
 
       {editing && (
         <form className="profile-form" onSubmit={save}>
-          <div className="form-grid">
+          <div className="form-grid profile-org-email-grid">
             <label className="field">
               Название организации
               <input
@@ -144,10 +144,10 @@ export function ProfilePanel({ profile, onChange }) {
               Электронная почта
               <input value={String(profile.email || "")} readOnly disabled />
             </label>
+            <p className="muted small field-hint field-hint-email">
+              Электронная почта — логин аккаунта, изменить нельзя.
+            </p>
           </div>
-          <p className="muted small" style={{ margin: "8px 0 0" }}>
-            Электронная почта — логин аккаунта, изменить нельзя. Нужна смена? Обратитесь к менеджеру.
-          </p>
 
           <div className="profile-contacts-block">
             <div className="profile-contacts-head">

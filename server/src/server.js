@@ -159,6 +159,7 @@ import {
   getStorefrontSettings,
   mergeStorefrontSettings,
   stripStorefrontSettings,
+  findPurchasePriceTypeId,
 } from "./storefrontPublic.js";
 import {
   buildAllPriceRequirements,
@@ -832,7 +833,7 @@ const changePasswordSchema = z.object({
 });
 
 const passkeyAuthenticationOptionsSchema = z.object({
-  email: z.string().trim().email().max(200),
+  email: z.string().trim().email().max(200).optional(),
 });
 
 const passkeyCeremonySchema = z.object({
@@ -841,7 +842,7 @@ const passkeyCeremonySchema = z.object({
 });
 
 const passkeyAuthenticationVerifySchema = passkeyCeremonySchema.extend({
-  email: z.string().trim().email().max(200),
+  email: z.string().trim().email().max(200).optional(),
 });
 
 const reconciliationSchema = z.object({
@@ -2173,21 +2174,34 @@ app.delete("/api/passkeys/:credentialId", authRequired, (req, res) => {
 
 app.post("/api/passkeys/authentication/options", async (req, res, next) => {
   try {
-    const input = passkeyAuthenticationOptionsSchema.parse(req.body);
-    const email = normalizeEmail(input.email);
-    const user = findUserByEmail(email);
-    const credentials = user ? listPasskeys(user.id) : [];
-    if (!user || !user.email_verified || (isClientRole(user.role) && user.approval_status !== "approved") || !credentials.length) {
-      return res.status(400).json({ error: "Для этого аккаунта вход по Face ID или ключу доступа пока не настроен." });
+    const input = passkeyAuthenticationOptionsSchema.parse(req.body || {});
+    const email = input.email ? normalizeEmail(input.email) : "";
+
+    // С почтой — узкий список ключей аккаунта. Без почты — discoverable (Face ID выбирает ключ сам).
+    if (email) {
+      const user = findUserByEmail(email);
+      const credentials = user ? listPasskeys(user.id) : [];
+      if (!user || !user.email_verified || (isClientRole(user.role) && user.approval_status !== "approved") || !credentials.length) {
+        return res.status(400).json({ error: "Для этого аккаунта вход по Face ID или ключу доступа пока не настроен." });
+      }
+      const options = await authenticationOptions({ req, credentials });
+      const ceremony = createWebAuthnChallenge({
+        userId: user.id,
+        type: "authentication",
+        challenge: options.challenge,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      });
+      return res.json({ ceremonyId: ceremony.id, options, mode: "account" });
     }
-    const options = await authenticationOptions({ req, credentials });
+
+    const options = await authenticationOptions({ req, credentials: [] });
     const ceremony = createWebAuthnChallenge({
-      userId: user.id,
+      userId: "",
       type: "authentication",
       challenge: options.challenge,
       expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     });
-    res.json({ ceremonyId: ceremony.id, options });
+    res.json({ ceremonyId: ceremony.id, options, mode: "discoverable" });
   } catch (error) {
     next(error);
   }
@@ -2195,12 +2209,23 @@ app.post("/api/passkeys/authentication/options", async (req, res, next) => {
 
 app.post("/api/passkeys/authentication/verify", async (req, res, next) => {
   try {
-    const input = passkeyAuthenticationVerifySchema.parse(req.body);
-    const email = normalizeEmail(input.email);
-    const user = findUserByEmail(email);
+    const input = passkeyAuthenticationVerifySchema.parse(req.body || {});
+    const email = input.email ? normalizeEmail(input.email) : "";
     const ceremony = consumeWebAuthnChallenge(input.ceremonyId, "authentication");
     const credential = getPasskey(input.response?.id || "");
-    if (!user || !ceremony || ceremony.userId !== String(user.id) || !credential || credential.userId !== String(user.id)) {
+    if (!ceremony || !credential) {
+      return res.status(400).json({ error: "Не удалось подтвердить вход. Повторите попытку." });
+    }
+
+    const user = email
+      ? findUserByEmail(email)
+      : findUserById(credential.userId);
+
+    if (
+      !user
+      || credential.userId !== String(user.id)
+      || (ceremony.userId && ceremony.userId !== String(user.id))
+    ) {
       return res.status(400).json({ error: "Не удалось подтвердить вход. Повторите попытку." });
     }
     if (!user.email_verified || (isClientRole(user.role) && user.approval_status !== "approved")) {
@@ -2216,14 +2241,14 @@ app.post("/api/passkeys/authentication/verify", async (req, res, next) => {
       return res.status(401).json({ error: "Ключ доступа не подтверждён." });
     }
     updatePasskeyCounter(credential.id, verification.authenticationInfo.newCounter);
-    clearLoginLimit(email);
+    clearLoginLimit(user.email);
     markUserLogin(user.id);
     writeAudit({
       userId: user.id,
       userEmail: user.email,
       userRole: user.role,
       action: "auth.login.passkey",
-      details: { credentialId: credential.id },
+      details: { credentialId: credential.id, mode: email ? "account" : "discoverable" },
     });
     res.json({ token: signToken(user), user: publicUser(user) });
   } catch (error) {
@@ -3082,6 +3107,9 @@ app.get("/api/one-c/purchase-price-request", (req, res) => {
   const products = getGlobalState("products", DEFAULT_PRODUCTS);
   const clientLinks = getGlobalState("clientLinks", {});
   const orders = listOrders();
+  const settings = getGlobalState("settings", DEFAULT_SETTINGS);
+  const includeStorefrontPurchaseMarkup =
+    String(settings?.storefrontPricingMode || "").trim() === "purchase_markup";
   const scope = String(req.query.scope || "next-order") === "all" ? "all" : "next-order";
   const order = scope === "next-order" ? nextOrderForOneC(database) : null;
   const request = buildPriceRequest({
@@ -3092,10 +3120,13 @@ app.get("/api/one-c/purchase-price-request", (req, res) => {
     orders,
     maxAgeMs: priceMaxAgeMs(),
     database,
+    includeStorefrontPurchaseMarkup,
   });
 
   const requirements = scope === "all"
-    ? buildAllPriceRequirements(products, clientLinks, orders)
+    ? buildAllPriceRequirements(products, clientLinks, orders, {
+        includeStorefrontPurchaseMarkup,
+      })
     : request.items;
   const issues = validatePriceRequirements(
     requirements,
@@ -3177,18 +3208,24 @@ app.post("/api/one-c/price-types", (req, res, next) => {
   }
 });
 
-/** Запрос продажных цен по видам, назначенным клиентам. */
+/** Запрос продажных цен по видам для клиентов и витрины. */
 app.get("/api/one-c/sale-price-request", (req, res) => {
   const database = requireOneCAllowedDatabase(req, res);
   if (!database) return;
   const products = getGlobalState("products", DEFAULT_PRODUCTS);
   const clientLinks = getGlobalState("clientLinks", {});
-  const items = buildSalePriceRequirements(products, clientLinks);
+  const settings = getGlobalState("settings", DEFAULT_SETTINGS);
+  const priceTypes = normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", []));
+  const items = buildSalePriceRequirements(products, clientLinks, {
+    storefrontPriceTypeId: settings?.storefrontPriceTypeId || "",
+    storefrontPricingMode: settings?.storefrontPricingMode || "price_type",
+    storefrontCostPriceTypeId: findPurchasePriceTypeId(priceTypes),
+  });
   res.json({
     ok: true,
     database,
     items,
-    priceTypes: normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", [])),
+    priceTypes,
   });
 });
 
@@ -3652,6 +3689,8 @@ app.put(
             ...stripStorefrontSettings(incoming),
             ...Object.fromEntries(
               [
+                "storefrontPricingMode",
+                "storefrontMarkupPercent",
                 "storefrontPriceTypeId",
                 "storefrontPriceTypeName",
                 "storefrontShowOnlyLinked",
@@ -3703,6 +3742,8 @@ app.put(
     const next = mergeStorefrontSettings(current, req.body?.settings || {});
     setGlobalState("settings", next);
     auditFromRequest(req, "storefront.settings.save", {
+      pricingMode: next.storefrontPricingMode || "price_type",
+      markupPercent: next.storefrontMarkupPercent || 0,
       priceTypeId: next.storefrontPriceTypeId || "",
     });
     res.json({

@@ -35,7 +35,8 @@ export async function registrationOptions({ req, user, credentials }) {
       transports: credential.transports || [],
     })),
     authenticatorSelection: {
-      residentKey: "preferred",
+      residentKey: "required",
+      requireResidentKey: true,
       userVerification: "required",
     },
     supportedAlgorithmIDs: [-7, -257],
@@ -57,12 +58,14 @@ export async function verifyPasskeyRegistration({ req, response, challenge }) {
 export async function authenticationOptions({ req, credentials }) {
   const { generateAuthenticationOptions } = await import("@simplewebauthn/server");
   const { rpID } = passkeyConfiguration(req);
+  const allowCredentials = (credentials || []).map((credential) => ({
+    id: credential.id,
+    transports: credential.transports || [],
+  }));
   return generateAuthenticationOptions({
     rpID,
-    allowCredentials: (credentials || []).map((credential) => ({
-      id: credential.id,
-      transports: credential.transports || [],
-    })),
+    // Пустой список = discoverable credentials (вход без email / Face ID выбирает аккаунт).
+    ...(allowCredentials.length ? { allowCredentials } : {}),
     userVerification: "required",
   });
 }

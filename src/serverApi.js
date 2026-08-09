@@ -51,8 +51,11 @@ async function request(path, options = {}) {
     try {
       payload = JSON.parse(rawText);
     } catch {
+      const gatewayDown = response.status === 502 || response.status === 503 || response.status === 504;
       payload = {
-        error: "Не удалось прочитать ответ сервера. Обновите страницу или войдите снова.",
+        error: gatewayDown
+          ? "Сервер API сейчас недоступен. Обновите страницу через минуту или обратитесь к менеджеру."
+          : "Не удалось прочитать ответ сервера. Обновите страницу или войдите снова.",
         raw: rawText.slice(0, 120),
       };
     }
@@ -213,16 +216,22 @@ export const api = {
   },
 
   getPasskeyAuthenticationOptions(email) {
+    const body = {};
+    const trimmed = String(email || "").trim();
+    if (trimmed) body.email = trimmed;
     return request("/passkeys/authentication/options", {
       method: "POST",
-      body: { email },
+      body,
     });
   },
 
   verifyPasskeyAuthentication(email, ceremonyId, response) {
+    const body = { ceremonyId, response };
+    const trimmed = String(email || "").trim();
+    if (trimmed) body.email = trimmed;
     return request("/passkeys/authentication/verify", {
       method: "POST",
-      body: { email, ceremonyId, response },
+      body,
     });
   },
 

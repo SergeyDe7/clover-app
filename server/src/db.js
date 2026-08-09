@@ -180,12 +180,11 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS webauthn_challenges (
     id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
+    user_id TEXT NOT NULL DEFAULT '',
     type TEXT NOT NULL,
     challenge TEXT NOT NULL,
     expires_at TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    created_at TEXT NOT NULL
   ) STRICT;
 `);
 
@@ -195,6 +194,38 @@ ensureColumn("users", "password_changed_at", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("users", "last_login_at", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("users", "disabled_at", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("users", "permissions_json", "TEXT NOT NULL DEFAULT '{}'");
+
+/** Discoverable Face ID: challenge может быть без user_id (пустая строка) — FK мешает. */
+function relaxWebAuthnChallengeUserFk() {
+  const fks = db.prepare(`PRAGMA foreign_key_list(webauthn_challenges)`).all();
+  if (!fks.length) return;
+  db.exec("PRAGMA foreign_keys = OFF");
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.exec(`
+      CREATE TABLE webauthn_challenges__nofk (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL DEFAULT '',
+        type TEXT NOT NULL,
+        challenge TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      ) STRICT;
+      INSERT INTO webauthn_challenges__nofk (id, user_id, type, challenge, expires_at, created_at)
+      SELECT id, user_id, type, challenge, expires_at, created_at FROM webauthn_challenges;
+      DROP TABLE webauthn_challenges;
+      ALTER TABLE webauthn_challenges__nofk RENAME TO webauthn_challenges;
+    `);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
+relaxWebAuthnChallengeUserFk();
 
 /**
  * Миграция admin-role переименовывала users → users_old_admin_mig.
@@ -282,12 +313,11 @@ function repairStaleUsersForeignKeys() {
     ) STRICT`,
     webauthn_challenges: `CREATE TABLE webauthn_challenges (
       id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
+      user_id TEXT NOT NULL DEFAULT '',
       type TEXT NOT NULL,
       challenge TEXT NOT NULL,
       expires_at TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+      created_at TEXT NOT NULL
     ) STRICT`,
   };
 

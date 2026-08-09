@@ -162,11 +162,11 @@ function ClientProfile({ profile, onChange }) {
                 title="Логин аккаунта — изменить нельзя"
                 aria-readonly="true"
               />
+              <span className="small-title" style={{ display: "block", marginTop: 6 }}>
+                Электронная почта — логин аккаунта, изменить нельзя.
+              </span>
             </label>
           </div>
-          <p className="small-title" style={{ margin: "8px 0 0" }}>
-            Электронная почта — логин аккаунта, изменить нельзя.
-          </p>
 
           <div className="profile-form-actions">
             <button

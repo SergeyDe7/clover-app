@@ -781,7 +781,6 @@ html.login-lock body {
 .auth-links button:disabled { opacity: .45; cursor: default; }
 
 .compact-panel { margin-top: 18px; }
-.security-form { align-items: end; }
 .field-wide { grid-column: 1 / -1; }
 
 .period-buttons {
