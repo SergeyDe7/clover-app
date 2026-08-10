@@ -584,6 +584,7 @@ function App() {
   // Несохранённые правки матрицы у менеджера — live-bootstrap их не затирает.
   const dirtyClientLinkIdsRef = useRef(new Set());
   const catalogPricesVersionRef = useRef("");
+  const [catalogPricesVersion, setCatalogPricesVersion] = useState("");
 
   const applyManagerNotificationList = (items) => {
     const incomingNotifications = Array.isArray(items) ? items : [];
@@ -620,7 +621,9 @@ function App() {
       ...(data.catalogPolicy || {}),
     });
     if (data.catalogPricesVersion != null) {
-      catalogPricesVersionRef.current = String(data.catalogPricesVersion || "");
+      const version = String(data.catalogPricesVersion || "");
+      catalogPricesVersionRef.current = version;
+      setCatalogPricesVersion(version);
     }
     if (!data.catalogPolicy?.allowFullCatalog) {
       setShowFullCatalog(false);
@@ -807,6 +810,7 @@ function App() {
           nextPricesVersion !== catalogPricesVersionRef.current;
         if (pricesVersionChanged) {
           catalogPricesVersionRef.current = nextPricesVersion;
+          setCatalogPricesVersion(nextPricesVersion);
         }
         if (Array.isArray(data.products)) {
           setProducts((prev) => {
@@ -1792,7 +1796,7 @@ function App() {
       id,
       category: inferProductCategory(customItem.name, products),
       name: customItem.name,
-      code: `CL-${String(id).padStart(4, "0")}`,
+      code: "",
       oneCId: "",
       active: true,
       pieceSize: 1,
@@ -1938,6 +1942,7 @@ function App() {
         setClientLinks={setClientLinks}
         dirtyClientLinkIdsRef={dirtyClientLinkIdsRef}
         oneCPriceTypes={oneCPriceTypes}
+        catalogPricesVersion={catalogPricesVersion}
         managerNotice={managerNotice}
         onDismissNotice={dismissManagerNotice}
         onReadNotification={readManagerNotification}

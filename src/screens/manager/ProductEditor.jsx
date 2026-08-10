@@ -1,5 +1,5 @@
 // Модалка редактирования товара каталога: поля, ед. измерения, фото, связь с 1С.
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "../../serverApi";
 import {
   UNIT_ORDER,
@@ -17,6 +17,13 @@ import {
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { normalizeProductPhotoFile, productImageSrc } from "../../shared/productPhoto";
+import {
+  CLOVER_PRODUCT_GROUPS,
+  getGroupChildren,
+  getSubgroupFacets,
+  groupRequiresSubgroup,
+  canonicalizeProductCategory,
+} from "../storefront/productGroups.js";
 
 function sortOneCPickerResults(items, currentProductId) {
   return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
@@ -46,6 +53,24 @@ function mergeOneCPickerResults(candidates, catalogItems, currentProductId) {
   return sortOneCPickerResults(merged, currentProductId);
 }
 
+/** Категории: канон витрины + уже используемые в каталоге + текущее значение. */
+function buildCategoryOptions(products, currentCategory) {
+  const fromCatalog = new Set();
+  for (const item of Array.isArray(products) ? products : []) {
+    const name = String(item?.category || "").trim();
+    if (name) fromCatalog.add(name);
+  }
+  const current = String(currentCategory || "").trim();
+  if (current) fromCatalog.add(current);
+
+  const options = [...CLOVER_PRODUCT_GROUPS];
+  const extras = [...fromCatalog]
+    .filter((name) => !options.includes(name))
+    .sort((a, b) => a.localeCompare(b, "ru"));
+  options.push(...extras);
+  return options;
+}
+
 export function ProductEditor({
   product,
   products = [],
@@ -71,12 +96,18 @@ export function ProductEditor({
       oneCLinkedAt: "",
       active: true,
       showOnStorefront: false,
+      subcategory: "",
+      facet: "",
       storefrontDetails: {
         description: "",
         composition: "",
         characteristics: "",
       },
+      storefrontPricing: {
+        source: "inherit",
+      },
       pieceSize: 1,
+      pieceOrderMultiple: 1,
       packSize: 1,
       bundleSize: 1,
       boxSize: 1,
@@ -102,8 +133,26 @@ export function ProductEditor({
   const [oneCNotice, setOneCNotice] = useState("");
   const [imageBusy, setImageBusy] = useState(false);
   const [certificateBusy, setCertificateBusy] = useState(false);
+  const [enrichBusy, setEnrichBusy] = useState(false);
 
   const productId = form.id || product?.id;
+  const categoryOptions = useMemo(
+    () => buildCategoryOptions(products, form.category),
+    [products, form.category]
+  );
+  const categoryKey = canonicalizeProductCategory(form.category || "");
+  const subcategoryOptions = useMemo(
+    () => getGroupChildren(categoryKey).map((item) => item.name),
+    [categoryKey]
+  );
+  const facetOptions = useMemo(
+    () =>
+      getSubgroupFacets(categoryKey, form.subcategory || "").map(
+        (item) => item.name
+      ),
+    [categoryKey, form.subcategory]
+  );
+  const needsSubcategory = groupRequiresSubgroup(categoryKey);
 
   const applyLiveProduct = (nextProduct) => {
     const normalized = normalizeProduct(nextProduct);
@@ -414,12 +463,21 @@ export function ProductEditor({
   const submit = (event) => {
     event.preventDefault();
     if (!form.name.trim() || !form.category.trim()) return;
+    if (needsSubcategory && !String(form.subcategory || "").trim()) {
+      void appAlert({
+        title: "Выберите подкатегорию",
+        message: `Для группы «${categoryKey}» нужно указать подкатегорию.`,
+      });
+      return;
+    }
 
     onSave(
       normalizeProduct({
         ...form,
         name: form.name.trim(),
         category: form.category.trim(),
+        subcategory: String(form.subcategory || "").trim(),
+        facet: String(form.facet || "").trim(),
         oneCId: String(form.oneCId || "").trim(),
         oneCCode: String(form.oneCCode || "").trim(),
         oneCName: String(form.oneCName || "").trim(),
@@ -599,12 +657,94 @@ export function ProductEditor({
           </label>
           <label className="field">
             Категория
-            <input
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
+            <select
+              value={form.category || ""}
+              onChange={(e) => {
+                const category = e.target.value;
+                const nextKey = canonicalizeProductCategory(category);
+                const children = getGroupChildren(nextKey).map((item) => item.name);
+                const keepSub = children.includes(String(form.subcategory || "").trim())
+                  ? form.subcategory
+                  : "";
+                const facets = getSubgroupFacets(nextKey, keepSub).map(
+                  (item) => item.name
+                );
+                const keepFacet = facets.includes(String(form.facet || "").trim())
+                  ? form.facet
+                  : "";
+                setForm({
+                  ...form,
+                  category,
+                  subcategory: keepSub,
+                  facet: keepFacet,
+                });
+              }}
               required
-            />
+            >
+              {!form.category ? (
+                <option value="" disabled>
+                  Выберите категорию
+                </option>
+              ) : null}
+              {categoryOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
           </label>
+          {subcategoryOptions.length > 0 ? (
+            <label className="field">
+              Подкатегория
+              <select
+                value={form.subcategory || ""}
+                onChange={(e) => {
+                  const subcategory = e.target.value;
+                  const facets = getSubgroupFacets(categoryKey, subcategory).map(
+                    (item) => item.name
+                  );
+                  const keepFacet = facets.includes(String(form.facet || "").trim())
+                    ? form.facet
+                    : "";
+                  setForm({
+                    ...form,
+                    subcategory,
+                    facet: keepFacet,
+                  });
+                }}
+                required={needsSubcategory}
+              >
+                <option value="">
+                  {needsSubcategory
+                    ? "Выберите подкатегорию"
+                    : "Без подкатегории"}
+                </option>
+                {subcategoryOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {facetOptions.length > 0 ? (
+            <label className="field">
+              Уточнение
+              <select
+                value={form.facet || ""}
+                onChange={(e) =>
+                  setForm({ ...form, facet: e.target.value })
+                }
+              >
+                <option value="">Без уточнения</option>
+                {facetOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <label className="field">
             Внутренний код
             <input
@@ -647,9 +787,46 @@ export function ProductEditor({
               <p className="eyebrow">Витрина сайта</p>
               <h3>Описание для покупателей</h3>
             </div>
+            {productId ? (
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={enrichBusy}
+                onClick={async () => {
+                  setEnrichBusy(true);
+                  try {
+                    const result = await api.enrichProductCard(productId, {
+                      force: false,
+                    });
+                    if (result.product) {
+                      applyLiveProduct(result.product);
+                      onProductLiveUpdate?.(result.product);
+                    }
+                    await appAlert({
+                      title: result.changed ? "Карточка дополнена" : "Без изменений",
+                      message:
+                        result.message ||
+                        "Пустые поля заполнены из открытых источников.",
+                      tone: result.changed ? "success" : "default",
+                    });
+                  } catch (error) {
+                    await appAlert({
+                      title: "Не удалось дополнить",
+                      message: error.message,
+                      tone: "danger",
+                    });
+                  } finally {
+                    setEnrichBusy(false);
+                  }
+                }}
+              >
+                {enrichBusy ? "Ищем…" : "Дополнить из интернета"}
+              </button>
+            ) : null}
           </div>
           <p className="muted small" style={{ marginTop: 0 }}>
             Эти тексты видны на публичной карточке товара (/vitrina, clover-spb.ru).
+            При добавлении из 1С пустые поля и фото подтягиваются автоматически.
           </p>
           <div className="form-grid">
             <label className="field field-wide">
@@ -704,6 +881,72 @@ export function ProductEditor({
               />
             </label>
           </div>
+          <div className="form-grid" style={{ marginTop: 12 }}>
+            <label className="field field-wide">
+              Цена на сайте
+              <select
+                value={form.storefrontPricing?.source === "manual" ? "manual" : "inherit"}
+                onChange={(event) => {
+                  const source = event.target.value === "manual" ? "manual" : "inherit";
+                  const next = {
+                    ...(form.storefrontPricing || {}),
+                    source,
+                  };
+                  if (source === "manual") {
+                    for (const unit of form.saleUnits || ["piece"]) {
+                      if (next[unit] == null) {
+                        const catalog = Number(form[unitPriceField(unit)]) || 0;
+                        next[unit] = catalog > 0 ? catalog : null;
+                      }
+                    }
+                  }
+                  setForm({ ...form, storefrontPricing: next });
+                }}
+              >
+                <option value="inherit">Как в настройках витрины (закупка+% или вид цен)</option>
+                <option value="manual">Своя цена для этого товара</option>
+              </select>
+            </label>
+            {form.storefrontPricing?.source === "manual"
+              ? (form.saleUnits || ["piece"]).map((unit) => (
+                  <label className="field" key={`sf-price-${unit}`}>
+                    Цена на сайте, {UNIT_CONFIG[unit]?.label || unit}
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={
+                        form.storefrontPricing?.[unit] == null
+                          ? ""
+                          : form.storefrontPricing[unit]
+                      }
+                      placeholder="0"
+                      onFocus={selectDefaultNumber}
+                      onChange={(event) => {
+                        const raw = event.target.value;
+                        setForm({
+                          ...form,
+                          storefrontPricing: {
+                            ...(form.storefrontPricing || {}),
+                            source: "manual",
+                            [unit]:
+                              raw === ""
+                                ? null
+                                : Math.max(0, Number(String(raw).replace(",", ".")) || 0),
+                          },
+                        });
+                      }}
+                    />
+                  </label>
+                ))
+              : null}
+          </div>
+          {form.storefrontPricing?.source === "manual" ? (
+            <p className="muted small">
+              Своя цена перекрывает расчёт «закупочная + %» (и вид цен 1С) только
+              на витрине сайта. В ЛК клиентов не влияет.
+            </p>
+          ) : null}
         </section>
 
         <section className="one-c-link-editor">
@@ -896,7 +1139,41 @@ export function ProductEditor({
                   />
                   {UNIT_CONFIG[unit].label}
                 </label>
-                {unitConvertsOneToOneToPieces(unit) ? null : (
+                {unit === "piece" ? (
+                  <label className="field">
+                    Кратность, шт.
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={form.pieceOrderMultiple ?? 1}
+                      onFocus={selectDefaultNumber}
+                      onMouseUp={(event) => {
+                        if (
+                          ["0", "1"].includes(String(event.currentTarget.value))
+                        ) {
+                          event.preventDefault();
+                          event.currentTarget.select();
+                        }
+                      }}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          pieceOrderMultiple: event.target.value,
+                        }))
+                      }
+                      onBlur={() =>
+                        setForm((current) => ({
+                          ...current,
+                          pieceOrderMultiple: Math.max(
+                            1,
+                            Math.floor(Number(current.pieceOrderMultiple) || 1)
+                          ),
+                        }))
+                      }
+                    />
+                  </label>
+                ) : unitConvertsOneToOneToPieces(unit) ? null : (
                   <label className="field">
                     Внутри, шт.
                     <input

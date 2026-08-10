@@ -24,7 +24,7 @@ import { ManagerAudit } from "./ManagerAudit";
 import { managerNotificationTab, ManagerNotificationBell, parseManagerNotification, ManagerOrderSummaryLines } from "./ManagerNotifications";
 import { ManagerAccessVault } from "./ManagerAccessVault";
 
-function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, dirtyClientLinkIdsRef, oneCPriceTypes = [], managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onRestoreOrder, onPurgeOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onLogout }) {
+function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, dirtyClientLinkIdsRef, oneCPriceTypes = [], catalogPricesVersion = "", managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onRestoreOrder, onPurgeOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onLogout }) {
   const [tab, setTab] = useState(readManagerActiveTab);
   const [moreTab, setMoreTab] = useState(() => {
     const saved = readManagerMoreTab();
@@ -228,7 +228,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
         />
       )}
       {tab === "exchange" && <ManagerExchange onReload={onReload} onApplyManagerNotifications={onApplyManagerNotifications} onNavigate={selectTab} />}
-      {tab === "clients" && <ManagerClients clients={clients} orders={orders} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} dirtyClientLinkIdsRef={dirtyClientLinkIdsRef} oneCPriceTypes={oneCPriceTypes} onReload={onReload} />}
+      {tab === "clients" && <ManagerClients clients={clients} orders={orders} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} dirtyClientLinkIdsRef={dirtyClientLinkIdsRef} oneCPriceTypes={oneCPriceTypes} catalogPricesVersion={catalogPricesVersion} onReload={onReload} />}
       {tab === "products" && (
         <ManagerProducts
           products={products}

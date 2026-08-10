@@ -19,12 +19,20 @@ import {
   purchasePriceForUnit,
   calculateMarkupPrice,
   pickPurchaseMarkupCost,
+  normalizeStorefrontPricing,
 } from "./pricing.js";
 import { normalizeExchangeState } from "./exchange.js";
 import {
   getEarliestDeliveryDateIso,
   validateDeliveryDate,
 } from "../../src/shared/deliveryDateRules.js";
+import {
+  CLOVER_PRODUCT_GROUPS as STOREFRONT_PRODUCT_GROUPS,
+  canonicalizeProductCategory,
+  categoryMatchesFilter,
+  subcategoryMatchesFilter,
+  facetMatchesFilter,
+} from "../../src/screens/storefront/productGroups.js";
 
 const STOREFRONT_GUEST_EMAIL = "storefront-guest@clover.local";
 
@@ -138,9 +146,19 @@ function buildStorefrontPrices(product, oneCItem, storeSettings, costPriceTypeId
   const mode = storeSettings.storefrontPricingMode;
   const markupPercent = storeSettings.storefrontMarkupPercent;
   const priceTypeId = storeSettings.storefrontPriceTypeId;
+  const storefrontPricing = normalizeStorefrontPricing(product.storefrontPricing);
 
   for (const unit of SALE_UNITS) {
     const field = unitPriceField(unit);
+
+    if (storefrontPricing.source === "manual") {
+      const manual = storefrontPricing[unit];
+      if (manual !== null) {
+        prices[unit] = manual;
+        priceSources[unit] = "storefront_manual";
+        continue;
+      }
+    }
 
     if (mode === "purchase_markup") {
       const purchase = oneCItem
@@ -176,6 +194,31 @@ function buildStorefrontPrices(product, oneCItem, storeSettings, costPriceTypeId
         continue;
       }
     }
+
+    // Выбранный вид цен пуст (часто «Розничная» не выгружена) —
+    // считаем от закупки / вида «Закупочная» + наценка витрины.
+    {
+      const purchase = oneCItem
+        ? purchasePriceForUnit(product, oneCItem, unit)
+        : null;
+      const { cost, costKind } = pickPurchaseMarkupCost(
+        product,
+        oneCItem,
+        costPriceTypeId,
+        unit,
+        purchase
+      );
+      const calculated = calculateMarkupPrice(cost, markupPercent);
+      if (calculated !== null) {
+        prices[unit] = calculated;
+        priceSources[unit] =
+          costKind === "purchase"
+            ? "purchase_markup_fallback"
+            : "purchase_markup_from_price_type_fallback";
+        continue;
+      }
+    }
+
     const fallback = Math.max(0, Number(product[field]) || 0);
     prices[unit] = fallback;
     priceSources[unit] = fallback > 0 ? "base" : "missing";
@@ -197,15 +240,26 @@ function toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId = "")
 
   const cloverCode = String(product.code || "").trim();
   const oneCCode = String(product.oneCCode || oneCItem?.code || "").trim();
-  // На витрине артикул = код 1С; внутренний CL- оставляем как запасной ключ URL.
-  const code = oneCCode || cloverCode;
+  // На витрине артикул = только код 1С (не внутренний CL-…).
+  const code =
+    oneCCode ||
+    (/^cl-\d+$/i.test(cloverCode) ? "" : cloverCode);
+
+  // На витрине имя = как в матрице/каталоге Clover (не сырое имя 1С).
+  const cloverName = String(product.name || "").trim();
+  const oneCName = String(oneCItem?.name || product.oneCName || "").trim();
 
   return {
     id: product.id,
     code,
     cloverCode,
-    name: String(product.name || "").trim(),
-    category: String(product.category || "Прочее").trim() || "Прочее",
+    name: cloverName || oneCName,
+    oneCName,
+    category: canonicalizeProductCategory(
+      String(product.category || "Прочее").trim() || "Прочее"
+    ),
+    subcategory: String(product.subcategory || "").trim(),
+    facet: String(product.facet || "").trim(),
     imageUrl: String(product.imageUrl || "").trim(),
     certificateUrl: String(product.certificateUrl || "").trim(),
     oneCId: String(product.oneCId || "").trim(),
@@ -219,6 +273,11 @@ function toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId = "")
       characteristics: String(details.characteristics || "").trim(),
     },
     pieceSize: Number(product.pieceSize) || 1,
+    pieceOrderMultiple: (() => {
+      const raw = Number(product.pieceOrderMultiple);
+      if (!Number.isFinite(raw) || raw < 1) return 1;
+      return Math.max(1, Math.floor(raw));
+    })(),
     packSize: Number(product.packSize) || 1,
     bundleSize: Number(product.bundleSize) || 1,
     boxSize: Number(product.boxSize) || 1,
@@ -246,49 +305,49 @@ function listStorefrontProducts(storeSettings) {
     .filter((product) => product.code && product.name);
 }
 
-/** Группы как в ЛК Clover (порядок CATEGORY_KEYWORD_RULES). */
-const CLOVER_PRODUCT_GROUPS = [
-  "Перчатки",
-  "Пакеты и пленка",
-  "Уборка",
-  "Упаковка",
-  "Одноразовая продукция",
-  "Канцтовары",
-  "Бытовая химия",
-  "Текстиль",
-];
+/** Группы витрины — как Opticom, канон из productGroups.js. */
+const CLOVER_PRODUCT_GROUPS = STOREFRONT_PRODUCT_GROUPS;
 
 function sortCloverProductGroups(names) {
   const order = new Map(CLOVER_PRODUCT_GROUPS.map((name, index) => [name, index]));
-  return [...new Set(names.map((name) => String(name || "").trim()).filter(Boolean))].sort(
-    (a, b) => {
-      if (a === "Прочее") return 1;
-      if (b === "Прочее") return -1;
-      const ai = order.has(a) ? order.get(a) : 1000;
-      const bi = order.has(b) ? order.get(b) : 1000;
-      if (ai !== bi) return ai - bi;
-      return a.localeCompare(b, "ru");
-    }
-  );
+  return [
+    ...new Set(
+      names
+        .map((name) => canonicalizeProductCategory(name))
+        .filter(Boolean)
+    ),
+  ].sort((a, b) => {
+    if (a === "Прочее") return 1;
+    if (b === "Прочее") return -1;
+    const ai = order.has(a) ? order.get(a) : 1000;
+    const bi = order.has(b) ? order.get(b) : 1000;
+    if (ai !== bi) return ai - bi;
+    return a.localeCompare(b, "ru");
+  });
 }
 
 function buildCategories(products) {
   const counts = new Map();
   for (const product of products) {
-    const name = product.category || "Прочее";
+    const name = canonicalizeProductCategory(product.category || "Прочее");
     counts.set(name, (counts.get(name) || 0) + 1);
   }
-  // Всегда отдаём канонические группы Clover (даже с 0), плюс фактические «лишние».
   for (const name of CLOVER_PRODUCT_GROUPS) {
     if (!counts.has(name)) counts.set(name, 0);
   }
-  return sortCloverProductGroups([...counts.keys()])
-    .filter((name) => (counts.get(name) || 0) > 0 || CLOVER_PRODUCT_GROUPS.includes(name))
-    .filter((name) => (counts.get(name) || 0) > 0)
-    .map((name) => ({ name, count: counts.get(name) || 0 }));
+  // На витрине показываем все канонические группы (в т.ч. пустые), как у Opticom.
+  return sortCloverProductGroups([
+    ...CLOVER_PRODUCT_GROUPS,
+    ...counts.keys(),
+  ]).map((name) => ({ name, count: counts.get(name) || 0 }));
 }
 
-export function getPublicCatalog({ category = "", q = "" } = {}) {
+export function getPublicCatalog({
+  category = "",
+  subcategory = "",
+  facet = "",
+  q = "",
+} = {}) {
   const settings = getStorefrontSettings(
     getGlobalState("settings", DEFAULT_SETTINGS)
   );
@@ -299,17 +358,29 @@ export function getPublicCatalog({ category = "", q = "" } = {}) {
 
   const categoryFilter = String(category || "").trim();
   if (categoryFilter) {
-    products = products.filter(
-      (product) =>
-        product.category.toLocaleLowerCase("ru-RU") ===
-        categoryFilter.toLocaleLowerCase("ru-RU")
+    products = products.filter((product) =>
+      categoryMatchesFilter(product.category, categoryFilter)
+    );
+  }
+
+  const subcategoryFilter = String(subcategory || "").trim();
+  if (subcategoryFilter) {
+    products = products.filter((product) =>
+      subcategoryMatchesFilter(product.subcategory, subcategoryFilter)
+    );
+  }
+
+  const facetFilter = String(facet || "").trim();
+  if (facetFilter) {
+    products = products.filter((product) =>
+      facetMatchesFilter(product.facet, facetFilter)
     );
   }
 
   const query = String(q || "").trim().toLocaleLowerCase("ru-RU");
   if (query) {
     products = products.filter((product) =>
-      `${product.name} ${product.code} ${product.cloverCode || ""} ${product.oneCCode || ""} ${product.category}`
+      `${product.name} ${product.code} ${product.cloverCode || ""} ${product.oneCCode || ""} ${product.category} ${product.subcategory || ""} ${product.facet || ""}`
         .toLocaleLowerCase("ru-RU")
         .includes(query)
     );

@@ -118,6 +118,7 @@ import {
 import {
   addProductIdToClientMatrix,
   applyInferredCategories,
+  applyOneCArticles,
   autoLinkCloverProducts,
   buildOneCProductCandidates,
   buildOneCProductsSummary,
@@ -130,6 +131,11 @@ import {
   selectRelevantOneCProducts,
   matchOneCImportRows,
 } from "./oneCProducts.js";
+import {
+  productNeedsWebEnrichment,
+  scheduleProductWebEnrichment,
+  enrichProductCardFromWeb,
+} from "./productEnrichment.js";
 import {
   autoLinkCloverClients,
   buildOneCClientCandidates,
@@ -1028,6 +1034,9 @@ function normalizeClientLink(value) {
     ...EMPTY_LINK,
     ...link,
     matched1C: Boolean(link.matched1C || String(link.oneCId || "").trim()),
+    matrixMode: ["pending", "selected", "all"].includes(String(link.matrixMode || ""))
+      ? String(link.matrixMode)
+      : "selected",
     matrixProductIds: Array.isArray(link.matrixProductIds)
       ? link.matrixProductIds
       : [],
@@ -1518,6 +1527,8 @@ app.get("/api/public/catalog", (req, res) => {
     res.json(
       getPublicCatalog({
         category: String(req.query.category || ""),
+        subcategory: String(req.query.subcategory || ""),
+        facet: String(req.query.facet || ""),
         q: String(req.query.q || ""),
       })
     );
@@ -2262,8 +2273,9 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     DEFAULT_PRODUCTS
   );
   const reclassified = applyInferredCategories(storedProducts);
-  const products = reclassified.products;
-  if (reclassified.changed) {
+  const articled = applyOneCArticles(reclassified.products);
+  const products = articled.products;
+  if (reclassified.changed || articled.changed) {
     setGlobalState("products", products);
   }
   const settings = getGlobalState(
@@ -3659,12 +3671,56 @@ app.put(
       ? req.body.products.map(stripRuntimeProductPricing)
       : DEFAULT_PRODUCTS;
     const storedProducts = getGlobalState("products", DEFAULT_PRODUCTS);
-    const products = mergeProductsPreservingOneCLinks(
+    const storedById = new Map(
+      (Array.isArray(storedProducts) ? storedProducts : []).map((item) => [
+        String(item.id),
+        item,
+      ])
+    );
+    let products = mergeProductsPreservingOneCLinks(
       incomingProducts,
       storedProducts
     );
 
+    // Дедуп по oneCId в каталоге: оставляем первый (предпочтительно уже на витрине).
+    const seenOneC = new Set();
+    products = products
+      .slice()
+      .sort((a, b) => {
+        const as = a.showOnStorefront === true ? 0 : 1;
+        const bs = b.showOnStorefront === true ? 0 : 1;
+        return as - bs;
+      })
+      .filter((product) => {
+        const oneCId = String(product.oneCId || "").trim();
+        if (!oneCId) return true;
+        if (seenOneC.has(oneCId)) return false;
+        seenOneC.add(oneCId);
+        return true;
+      });
+
     setGlobalState("products", products);
+
+    // Массовое «на витрину» тоже дополняет фото/описание (раньше только from-catalog).
+    for (const product of products) {
+      if (product.showOnStorefront !== true) continue;
+      if (!productNeedsWebEnrichment(product)) continue;
+      const prev = storedById.get(String(product.id));
+      const newlyOnStorefront = prev?.showOnStorefront !== true;
+      const stillMissing = productNeedsWebEnrichment(product);
+      if (newlyOnStorefront || stillMissing) {
+        scheduleProductWebEnrichment({
+          productId: product.id,
+          uploadsDirectory,
+          getProducts: () => getGlobalState("products", DEFAULT_PRODUCTS),
+          setProducts: (list) => {
+            setGlobalState("products", list);
+            setGlobalState("catalogPricesVersion", new Date().toISOString());
+          },
+        });
+      }
+    }
+
     auditFromRequest(req, "products.save", { count: products.length });
 
     res.json({ ok: true, products });
@@ -3902,27 +3958,42 @@ app.put(
       incomingLinks,
       storedLinks
     );
-    // Полный снимок матрицы с UI: personalPrices заменяем целиком,
-    // иначе нельзя сбросить «индивидуальный %» (merge оставлял старые ключи).
+    // Полный снимок матрицы с UI: personalPrices и matrixProductIds заменяем целиком,
+    // иначе нельзя сбросить состав матрицы / индивидуальные цены.
     for (const clientId of Object.keys(incomingLinks || {})) {
       const raw = incomingLinks[clientId];
-      if (
-        !raw ||
-        typeof raw !== "object" ||
-        !Object.prototype.hasOwnProperty.call(raw, "personalPrices")
-      ) {
-        continue;
+      if (!raw || typeof raw !== "object") continue;
+      const patch = { ...(clientLinks[clientId] || {}) };
+      let changed = false;
+      if (Object.prototype.hasOwnProperty.call(raw, "personalPrices")) {
+        const prices =
+          raw.personalPrices &&
+          typeof raw.personalPrices === "object" &&
+          !Array.isArray(raw.personalPrices)
+            ? raw.personalPrices
+            : {};
+        patch.personalPrices = { ...prices };
+        changed = true;
       }
-      const prices =
-        raw.personalPrices &&
-        typeof raw.personalPrices === "object" &&
-        !Array.isArray(raw.personalPrices)
-          ? raw.personalPrices
-          : {};
-      clientLinks[clientId] = {
-        ...(clientLinks[clientId] || {}),
-        personalPrices: { ...prices },
-      };
+      if (Object.prototype.hasOwnProperty.call(raw, "matrixProductIds")) {
+        const rawIds = Array.isArray(raw.matrixProductIds)
+          ? raw.matrixProductIds
+          : [];
+        // Уникальные id — защита от дублей в матрице клиента.
+        const seen = new Set();
+        const unique = [];
+        for (const id of rawIds) {
+          const key = String(id);
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          unique.push(id);
+        }
+        patch.matrixProductIds = unique;
+        changed = true;
+      }
+      if (changed) {
+        clientLinks[clientId] = patch;
+      }
     }
     setGlobalState("clientLinks", clientLinks);
     // Смена матрицы/вида цен/наценки — клиентский ЛК должен перечитать каталог.
@@ -4502,9 +4573,10 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
       receivedAt
     );
     const reclassified = applyInferredCategories(linked.products);
+    const articled = applyOneCArticles(reclassified.products);
 
     const unmatchedProductIds = new Set(
-      reclassified.products
+      articled.products
         .filter((product) => !String(product.oneCId || "").trim())
         .map((product) => String(product.id))
     );
@@ -4520,8 +4592,8 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
       preserveOneCProductPricingFields(previousOneCProducts, linked.oneCProducts)
     );
     setGlobalState("oneCProductCandidates", cleanCandidateMap);
-    if (linked.changed || reclassified.changed) {
-      setGlobalState("products", reclassified.products);
+    if (linked.changed || reclassified.changed || articled.changed) {
+      setGlobalState("products", articled.products);
     }
 
     const meta = {
@@ -4623,19 +4695,74 @@ app.post(
       const oneCProducts = normalizeOneCProducts(getGlobalState("oneCProducts", []));
       const requestedId = String(req.body?.oneCId || req.body?.id || "").trim();
       const item =
-        oneCProducts.find((entry) => entry.id === requestedId) ||
+        oneCProducts.find((entry) => String(entry.id) === requestedId) ||
         normalizeOneCProduct(req.body?.item || req.body || {});
+      const preferredName = String(req.body?.preferredName || req.body?.name || "").trim();
+      const showOnStorefront = req.body?.showOnStorefront === true;
       const linkedAt = new Date().toISOString();
-      const result = createOrReuseCloverProductFromOneC(products, item, linkedAt);
+      const result = createOrReuseCloverProductFromOneC(products, item, linkedAt, {
+        preferredName,
+        showOnStorefront,
+      });
       const reclassified = applyInferredCategories(result.products);
-      const nextProducts = reclassified.products;
+      const articled = applyOneCArticles(reclassified.products);
+      let nextProducts = articled.products;
+      // Если товар уже был — всё равно можно явно выставить витрину.
+      if (showOnStorefront) {
+        nextProducts = nextProducts.map((entry) =>
+          String(entry.id) === String(result.product.id)
+            ? { ...entry, showOnStorefront: true }
+            : entry
+        );
+      }
       const product =
         nextProducts.find((entry) => String(entry.id) === String(result.product.id)) ||
         result.product;
       setGlobalState("products", nextProducts);
 
+      // Фото + описание/состав/характеристики с открытых источников — в фоне.
+      const enrichTarget =
+        nextProducts.find((entry) => String(entry.id) === String(product.id)) ||
+        product;
+      let enrichmentQueued = false;
+      if (productNeedsWebEnrichment(enrichTarget)) {
+        enrichmentQueued = true;
+        scheduleProductWebEnrichment({
+          productId: enrichTarget.id,
+          uploadsDirectory,
+          getProducts: () => getGlobalState("products", DEFAULT_PRODUCTS),
+          setProducts: (list) => {
+            setGlobalState("products", list);
+            setGlobalState("catalogPricesVersion", new Date().toISOString());
+          },
+        });
+        nextProducts = nextProducts.map((entry) =>
+          String(entry.id) === String(enrichTarget.id)
+            ? { ...entry, enrichmentStatus: "pending" }
+            : entry
+        );
+        setGlobalState("products", nextProducts);
+      }
+
+      // В ответ — с ценами 1С (закупка / виды цен), иначе матрица менеджера пустая.
+      const oneCById = oneCProductsById(oneCProducts);
+      const fullOneCItem =
+        oneCById.get(String(product.oneCId || item.id || "")) ||
+        (item.id ? item : null);
+      const enrichedProducts = nextProducts.map((entry) =>
+        enrichProductWithPurchasePrices(
+          entry,
+          oneCById.get(String(entry.oneCId || "")) || null
+        )
+      );
+      const enrichedProduct =
+        enrichedProducts.find((entry) => String(entry.id) === String(product.id)) ||
+        enrichProductWithPurchasePrices(product, fullOneCItem);
+
       let clientLink = null;
       let clientLinks = getGlobalState("clientLinks", {});
+      let alreadyInMatrix = false;
+      let addedToMatrix = false;
       const clientId = String(req.body?.clientId || "").trim();
       if (clientId) {
         const clients = listClients();
@@ -4650,6 +4777,8 @@ app.post(
         );
         clientLinks = matrixUpdate.clientLinks;
         clientLink = normalizeClientLink(matrixUpdate.clientLink);
+        alreadyInMatrix = Boolean(matrixUpdate.alreadyInMatrix);
+        addedToMatrix = Boolean(matrixUpdate.addedToMatrix);
         setGlobalState("clientLinks", clientLinks);
       }
 
@@ -4659,28 +4788,155 @@ app.post(
         productCategory: product.category,
         oneCId: item.id,
         oneCName: item.name,
+        preferredName: preferredName || null,
+        showOnStorefront: product.showOnStorefront === true,
         created: result.created,
+        alreadyInMatrix,
+        addedToMatrix,
         categoriesReclassified: reclassified.changed,
         clientId: clientId || null,
       });
 
+      let message = result.created
+        ? "Товар создан в Clover и связан с 1С."
+        : "Товар уже был в Clover — использована существующая связь.";
+      if (showOnStorefront) {
+        message = result.created
+          ? "Товар создан в Clover и добавлен на витрину."
+          : "Товар добавлен на витрину сайта.";
+      }
+      if (alreadyInMatrix) {
+        message = "Товар уже есть в матрице клиента — дубликат не добавлен.";
+      } else if (addedToMatrix && !result.created) {
+        message = "Товар уже был в Clover — добавлен в матрицу клиента.";
+      }
+      if (enrichmentQueued) {
+        message = `${message} Карточка дополняется: фото и описание ищем в открытых источниках.`;
+      }
+
       res.json({
         ok: true,
         created: result.created,
-        product,
-        products: nextProducts,
+        alreadyInMatrix,
+        addedToMatrix,
+        enrichmentQueued,
+        product: enrichedProduct,
+        products: enrichedProducts,
         clientId: clientId || null,
         clientLink,
         clientLinks: clientId ? clientLinks : undefined,
-        message: result.created
-          ? "Товар создан в Clover и связан с 1С."
-          : "Товар уже был в Clover — использована существующая связь.",
+        message,
       });
     } catch (error) {
       next(error);
     }
   }
 );
+
+app.post(
+  "/api/admin/products/:productId/enrich",
+  authRequired,
+  roleRequired("manager"),
+  async (req, res, next) => {
+    try {
+      const products = getGlobalState("products", DEFAULT_PRODUCTS);
+      const product = products.find(
+        (entry) => String(entry.id) === String(req.params.productId)
+      );
+      if (!product) {
+        return res.status(404).json({ error: "Товар не найден." });
+      }
+
+      const force = req.body?.force === true;
+      const target = force
+        ? {
+            ...product,
+            imageUrl: "",
+            storefrontDetails: {
+              description: "",
+              composition: "",
+              characteristics: "",
+            },
+          }
+        : product;
+
+      const result = await enrichProductCardFromWeb(target, {
+        uploadsDirectory,
+      });
+      if (!result.changed && !force) {
+        return res.json({
+          ok: true,
+          changed: false,
+          product,
+          message: "Карточка уже заполнена — нечего дополнять.",
+        });
+      }
+
+      const nextProduct = {
+        ...product,
+        storefrontDetails: force
+          ? result.product.storefrontDetails
+          : {
+              description:
+                emptyDetailsSafe(product).description ||
+                result.product.storefrontDetails?.description ||
+                "",
+              composition:
+                emptyDetailsSafe(product).composition ||
+                result.product.storefrontDetails?.composition ||
+                "",
+              characteristics:
+                emptyDetailsSafe(product).characteristics ||
+                result.product.storefrontDetails?.characteristics ||
+                "",
+            },
+        imageUrl: force
+          ? result.product.imageUrl || product.imageUrl || ""
+          : product.imageUrl || result.product.imageUrl || "",
+        imageUpdatedAt: force
+          ? result.product.imageUpdatedAt || product.imageUpdatedAt || ""
+          : product.imageUrl
+            ? product.imageUpdatedAt
+            : result.product.imageUpdatedAt || "",
+        enrichmentStatus: "done",
+        enrichmentUpdatedAt: new Date().toISOString(),
+      };
+
+      const nextProducts = products.map((entry) =>
+        String(entry.id) === String(product.id) ? nextProduct : entry
+      );
+      setGlobalState("products", nextProducts);
+      setGlobalState("catalogPricesVersion", new Date().toISOString());
+      auditFromRequest(req, "product.enrich", {
+        productId: product.id,
+        productName: product.name,
+        force,
+      });
+
+      res.json({
+        ok: true,
+        changed: true,
+        product: nextProduct,
+        products: nextProducts,
+        message: "Карточка дополнена из открытых источников.",
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+function emptyDetailsSafe(product = {}) {
+  const details =
+    product.storefrontDetails && typeof product.storefrontDetails === "object"
+      ? product.storefrontDetails
+      : {};
+  return {
+    description: String(details.description || "").trim(),
+    composition: String(details.composition || "").trim(),
+    characteristics: String(details.characteristics || "").trim(),
+  };
+}
 
 app.post(
   "/api/admin/one-c/products/match-import",
@@ -5949,6 +6205,14 @@ app.post("/api/admin/clients", authRequired, roleRequired("manager"), async (req
       },
       req.user
     );
+    const clientLinks = { ...(getGlobalState("clientLinks", {}) || {}) };
+    clientLinks[String(user.id)] = normalizeClientLink({
+      ...(clientLinks[String(user.id)] || {}),
+      matrixMode: "selected",
+      allowFullCatalog: false,
+      matrixProductIds: [],
+    });
+    setGlobalState("clientLinks", clientLinks);
     res.status(201).json({
       ok: true,
       message:
@@ -5956,6 +6220,7 @@ app.post("/api/admin/clients", authRequired, roleRequired("manager"), async (req
       client: listClients().find((item) => String(item.id) === String(user.id)) || null,
       user: publicUser(user),
       clients: listClients(),
+      clientLinks,
       login: email,
       access,
     });

@@ -512,10 +512,29 @@ export const api = {
     });
   },
 
-  createProductFromOneCCatalog({ oneCId, item = null, clientId = "" } = {}) {
+  createProductFromOneCCatalog({
+    oneCId,
+    item = null,
+    clientId = "",
+    preferredName = "",
+    showOnStorefront = false,
+  } = {}) {
     return request("/admin/one-c/products/from-catalog", {
       method: "POST",
-      body: { oneCId, item, clientId: clientId || undefined },
+      body: {
+        oneCId,
+        item,
+        clientId: clientId || undefined,
+        preferredName: preferredName || undefined,
+        showOnStorefront: showOnStorefront || undefined,
+      },
+    });
+  },
+
+  enrichProductCard(productId, { force = false } = {}) {
+    return request(`/admin/products/${encodeURIComponent(productId)}/enrich`, {
+      method: "POST",
+      body: { force },
     });
   },
 

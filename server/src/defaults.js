@@ -90,7 +90,7 @@ export const EMPTY_LINK = {
   oneCLinkMode: "",
   oneCLinkedAt: "",
   managerNote: "",
-  matrixMode: "pending",
+  matrixMode: "selected",
   matrixProductIds: [],
   allowFullCatalog: false,
   defaultPricingMode: "base",

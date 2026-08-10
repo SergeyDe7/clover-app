@@ -780,7 +780,7 @@ export const EMPTY_LINK = {
   oneCLinkMode: "",
   oneCLinkedAt: "",
   managerNote: "",
-  matrixMode: "pending",
+  matrixMode: "selected",
   matrixProductIds: [],
   allowFullCatalog: false,
   defaultPricingMode: "base",
@@ -4796,37 +4796,68 @@ export function getOrCreateClientId() {
 const PLACEHOLDER_PRODUCT_CATEGORIES = new Set(["Из 1С", "Новые товары", ""]);
 
 const CATEGORY_KEYWORD_RULES = [
-  { category: "Перчатки", patterns: [/перчатк/u, /нитрил/u, /латекс/u, /винилов/u] },
   {
-    category: "Пакеты и пленка",
-    patterns: [/пакет/u, /мешк/u, /пленк/u, /плёнк/u, /пергамент/u, /вакуумн/u, /стрейч/u, /stretch/u],
+    category: "Спецодежда, обувь и средства защиты",
+    patterns: [/перчатк/u, /нитрил/u, /латекс/u, /винилов/u, /спецодежд/u, /\bсиз\b/u],
   },
   {
-    category: "Уборка",
+    category: "Пленка",
+    patterns: [/пленк/u, /плёнк/u, /стрейч/u, /stretch/u, /пергамент/u, /вакуумн/u],
+  },
+  {
+    category: "Пакеты и сумки",
+    patterns: [/пакет/u, /мешк/u, /сумк/u],
+  },
+  {
+    category: "Уборочный инвентарь и оборудование",
     patterns: [
       /салфетк/u, /швабр/u, /\bмоп\b/u, /щетк/u, /губк/u, /ведр/u, /пипидастр/u,
       /совк/u, /распылител/u, /пульверизатор/u, /тряпк/u, /полотер/u, /диспенсер/u,
     ],
   },
+  { category: "Контейнеры", patterns: [/контейнер/u] },
+  { category: "Лотки и подложки", patterns: [/лоток/u, /подложк/u] },
   {
-    category: "Упаковка",
-    patterns: [/банк[аиуы]/u, /крышк/u, /контейнер/u, /бутылк/u, /oneclick/u, /стаканчик/u, /лоток/u, /коробк/u],
+    category: "Упаковочные материалы",
+    patterns: [/банк[аиуы]/u, /крышк/u, /бутылк/u, /oneclick/u, /стаканчик/u, /коробк/u],
   },
   {
-    category: "Одноразовая продукция",
-    patterns: [/трубочк/u, /вилк/u, /ложк/u, /тарелк/u, /зубочист/u, /шпател/u],
+    category: "Одноразовая посуда",
+    patterns: [/трубочк/u, /вилк/u, /ложк/u, /тарелк/u, /зубочист/u, /шпател/u, /стакан/u],
   },
   {
-    category: "Канцтовары",
-    patterns: [/кассов/u, /лент/u, /бумаг/u, /ручк/u, /степлер/u, /ножниц/u, /\bа4\b/u],
+    category: "Принадлежности для касс и торговли",
+    patterns: [/кассов/u, /лент.*кас/u],
   },
   {
-    category: "Бытовая химия",
+    category: "Бумага офисная",
+    patterns: [/\bа4\b/u, /бумаг.*офис/u, /офисн.*бумаг/u],
+  },
+  {
+    category: "Канцелярские товары",
+    patterns: [/лент/u, /бумаг/u, /ручк/u, /степлер/u, /ножниц/u],
+  },
+  {
+    category: "Химия профессиональная",
+    patterns: [/профессионал.*хим/u, /хим.*профессион/u],
+  },
+  {
+    category: "Химия бытовая",
     patterns: [/белизна/u, /санокс/u, /хелп/u, /моющ/u, /чистящ/u, /дезинф/u, /средство для/u, /химия/u],
   },
   {
-    category: "Текстиль",
-    patterns: [/полотн/u, /вафельн/u, /текстил/u, /полотенц/u, /тряпк[аи] для пола/u],
+    category: "Гигиеническая продукция",
+    patterns: [/полотн/u, /вафельн/u, /текстил/u, /полотенц/u, /тряпк[аи] для пола/u, /гигиен/u],
+  },
+  {
+    category: "Оборудование для туалетных комнат",
+    patterns: [/туалетн/u, /диспенсер.*бумаг/u, /мыльниц/u],
+  },
+  { category: "Посуда и столовые приборы", patterns: [/столов.*прибор/u, /посуд/u] },
+  { category: "Кухонные принадлежности", patterns: [/кухон/u] },
+  {
+    category: "Барные аксессуары и товары для сервировки",
+    patterns: [/барн/u, /сервировк/u],
   },
 ];
 
@@ -4866,11 +4897,13 @@ export function inferProductCategory(name, products = [], fallback = "Новые
   return fallback;
 }
 
-/** Артикул для UI: код 1С, иначе внутренний код Clover. */
+/** Артикул для UI: только код 1С (внутренние CL-… не показываем). */
 export function productArticle(product = {}) {
-  return String(
-    product.oneCCode || product.oneCMatchCode || product.code || ""
-  ).trim();
+  const oneC = String(product.oneCCode || product.oneCMatchCode || "").trim();
+  if (oneC) return oneC;
+  const code = String(product.code || "").trim();
+  if (/^cl-\d+$/i.test(code)) return "";
+  return code;
 }
 
 export function normalizeProduct(product) {
@@ -4901,16 +4934,26 @@ export function normalizeProduct(product) {
       ? { ...emptyPurchasePrices(), ...product.purchasePrices }
       : emptyPurchasePrices();
 
+  const oneCCode = String(product.oneCCode || "").trim();
+  const oneCMatchCode = String(product.oneCMatchCode || "").trim();
+  const rawCode = String(product.code || "").trim();
+  const articleFromOneC = oneCCode || oneCMatchCode;
+  const code = articleFromOneC
+    ? articleFromOneC
+    : /^cl-\d+$/i.test(rawCode)
+      ? ""
+      : rawCode;
+
   return {
     ...product,
     id: hasNumericId ? numericId : product.id,
-    code: product.code || (hasNumericId ? `CL-${String(numericId).padStart(4, "0")}` : ""),
+    code,
     oneCId: product.oneCId || "",
-    oneCCode: product.oneCCode || "",
+    oneCCode: oneCCode || articleFromOneC,
     oneCName: product.oneCName || "",
     oneCLinkMode: product.oneCLinkMode || "",
     oneCLinkedAt: product.oneCLinkedAt || "",
-    oneCMatchCode: product.oneCMatchCode || "",
+    oneCMatchCode: oneCMatchCode || articleFromOneC,
     oneCMatchName: product.oneCMatchName || "",
     oneCSearchQuery: product.oneCSearchQuery || "",
     oneCSearchRequestedAt: product.oneCSearchRequestedAt || "",
@@ -4921,6 +4964,8 @@ export function normalizeProduct(product) {
     certificateUpdatedAt: product.certificateUpdatedAt || "",
     active: product.active !== false,
     showOnStorefront: product.showOnStorefront === true,
+    subcategory: String(product.subcategory || "").trim(),
+    facet: String(product.facet || "").trim(),
     storefrontDetails: (() => {
       const details =
         product.storefrontDetails && typeof product.storefrontDetails === "object"
@@ -4932,9 +4977,36 @@ export function normalizeProduct(product) {
         characteristics: String(details.characteristics || "").trim(),
       };
     })(),
+    storefrontPricing: (() => {
+      const raw =
+        product.storefrontPricing && typeof product.storefrontPricing === "object"
+          ? product.storefrontPricing
+          : {};
+      const source =
+        String(raw.source || "").trim() === "manual" ? "manual" : "inherit";
+      const pricing = { source };
+      for (const unit of UNIT_ORDER) {
+        const value = raw[unit];
+        if (value === "" || value === null || value === undefined) {
+          pricing[unit] = null;
+          continue;
+        }
+        const numeric = Number(String(value).replace(",", "."));
+        pricing[unit] =
+          Number.isFinite(numeric) && numeric >= 0
+            ? Math.round(numeric * 100) / 100
+            : null;
+      }
+      return pricing;
+    })(),
     ...sizes,
     ...prices,
     ...basePrices,
+    pieceOrderMultiple: (() => {
+      const raw = Number(product.pieceOrderMultiple);
+      if (!Number.isFinite(raw) || raw < 1) return 1;
+      return Math.max(1, Math.floor(raw));
+    })(),
     priceSources:
       product.priceSources &&
       typeof product.priceSources === "object"
@@ -5018,6 +5090,30 @@ export function getUnitMultiplier(product, unit) {
 }
 
 /**
+ * Кратность заказа в шт.: цена за 1 шт., количество только 5, 10, 15…
+ * (не путать с packSize — там цена за упаковку).
+ */
+export function getPieceOrderMultiple(product) {
+  const raw = Number(product?.pieceOrderMultiple);
+  if (!Number.isFinite(raw) || raw < 1) return 1;
+  return Math.max(1, Math.floor(raw));
+}
+
+/** Шаг изменения количества в единицах продажи (для шт. — кратность). */
+export function getUnitOrderStep(product, unit) {
+  if (unit === "piece") return getPieceOrderMultiple(product);
+  return 1;
+}
+
+/** Округлить количество до кратности (0 остаётся 0). */
+export function snapQuantityToStep(quantity, step) {
+  const s = Math.max(1, Number(step) || 1);
+  const q = Math.max(0, Number(quantity) || 0);
+  if (q <= 0) return 0;
+  return Math.max(s, Math.round(q / s) * s);
+}
+
+/**
  * Поле количества: для упаковки/пачки с размером >1 показываем штуки (100, 200…),
  * в заказе храним число единиц продажи (1, 2 уп.).
  */
@@ -5028,17 +5124,20 @@ export function toQuantityInputValue(unitQuantity, multiplier) {
 }
 
 /** Ввод из поля (штуки при mult>1) → количество единиц продажи. */
-export function fromQuantityInputValue(inputValue, multiplier) {
+export function fromQuantityInputValue(inputValue, multiplier, orderStep = 1) {
   const raw = Math.max(0, Number.parseInt(String(inputValue), 10) || 0);
   const mult = Math.max(1, Number(multiplier) || 1);
-  if (mult <= 1) return raw;
-  if (raw <= 0) return 0;
-  return Math.max(1, Math.round(raw / mult));
+  if (mult > 1) {
+    if (raw <= 0) return 0;
+    return Math.max(1, Math.round(raw / mult));
+  }
+  return snapQuantityToStep(raw, orderStep);
 }
 
-export function quantityInputStep(multiplier) {
+export function quantityInputStep(multiplier, orderStep = 1) {
   const mult = Math.max(1, Number(multiplier) || 1);
-  return mult > 1 ? mult : 1;
+  if (mult > 1) return mult;
+  return Math.max(1, Number(orderStep) || 1);
 }
 
 export function quantityInputUnitLabel(unit, multiplier) {

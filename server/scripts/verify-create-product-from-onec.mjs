@@ -26,6 +26,54 @@ assert.equal(reused.created, false);
 assert.equal(reused.product.id, empty.product.id);
 assert.equal(reused.products.length, 1);
 
+const reusedByName = createOrReuseCloverProductFromOneC(
+  [
+    {
+      id: 50,
+      name: catalogItem.name,
+      category: "Упаковка",
+      code: "CL-0050",
+    },
+  ],
+  catalogItem,
+  "2026-07-30T12:01:30.000Z"
+);
+assert.equal(reusedByName.created, false);
+assert.equal(reusedByName.product.id, 50);
+assert.equal(reusedByName.product.oneCId, catalogItem.id);
+
+const reusedByCode = createOrReuseCloverProductFromOneC(
+  [
+    {
+      id: 51,
+      name: "Другое имя",
+      category: "Упаковка",
+      oneCCode: catalogItem.code,
+    },
+  ],
+  catalogItem,
+  "2026-07-30T12:01:45.000Z"
+);
+assert.equal(reusedByCode.created, false);
+assert.equal(reusedByCode.product.id, 51);
+
+const reusedByExcelName = createOrReuseCloverProductFromOneC(
+  [
+    {
+      id: 77,
+      name: "Суп для матрицы Excel 500 мл",
+      category: "Упаковка",
+      code: "",
+    },
+  ],
+  catalogItem,
+  "2026-07-30T12:02:00.000Z",
+  { preferredName: "Суп для матрицы Excel 500 мл" }
+);
+assert.equal(reusedByExcelName.created, false);
+assert.equal(reusedByExcelName.product.id, 77);
+assert.equal(reusedByExcelName.product.oneCId, catalogItem.id);
+
 const matrixPending = addProductIdToClientMatrix({}, "client-1", empty.product.id);
 assert.equal(matrixPending.clientLink.matrixMode, "selected");
 assert.deepEqual(matrixPending.clientLink.matrixProductIds, [1]);
@@ -83,15 +131,15 @@ assert.equal(
 );
 assert.equal(
   inferCloverProductCategory("Влажные чистящие салфетки в банке", seed),
-  "Уборка"
+  "Уборочный инвентарь и оборудование"
 );
 assert.equal(
   inferCloverProductCategory("Банка суповая 500 мл Перинт (50/400)", []),
-  "Упаковка"
+  "Упаковочные материалы"
 );
 assert.equal(
   inferCloverProductCategory("Салфетки белые PRO 24х24 1-сл. 100 листов", seed),
-  "Уборка"
+  "Уборочный инвентарь и оборудование"
 );
 
 const gloves = createOrReuseCloverProductFromOneC(
@@ -116,7 +164,7 @@ const fixed = applyInferredCategories([...seed, placeholder]);
 assert.equal(fixed.changed, 1);
 assert.equal(
   fixed.products.find((item) => item.id === 99).category,
-  "Упаковка"
+  "Контейнеры"
 );
 
 const reusePlaceholder = createOrReuseCloverProductFromOneC(
@@ -125,6 +173,6 @@ const reusePlaceholder = createOrReuseCloverProductFromOneC(
   "2026-07-30T12:03:00.000Z"
 );
 assert.equal(reusePlaceholder.created, false);
-assert.equal(reusePlaceholder.product.category, "Упаковка");
+assert.equal(reusePlaceholder.product.category, "Контейнеры");
 
 console.log("verify-create-product-from-onec: ok");

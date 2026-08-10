@@ -294,7 +294,7 @@ export function ManagerProducts({ products, setProducts, oneCPriceTypes = [] }) 
         normalizeProduct({
           ...normalized,
           id,
-          code: normalized.code || `CL-${String(id).padStart(4, "0")}`,
+          code: normalized.code || normalized.oneCCode || "",
         }),
         ...products,
       ];

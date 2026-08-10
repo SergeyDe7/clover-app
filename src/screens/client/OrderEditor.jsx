@@ -11,6 +11,7 @@ import {
   roundPriceUp,
   getUnitMultiplier,
   getUnitPrice,
+  getUnitOrderStep,
   toQuantityInputValue,
   fromQuantityInputValue,
   quantityInputStep,
@@ -223,9 +224,11 @@ export function OrderEditor({
         quantity,
         unit,
         multiplier: getUnitMultiplier(product, unit),
+        orderStep: getUnitOrderStep(product, unit),
         unitPrice,
         lineTotal: quantity * unitPrice,
         pieceSize: product.pieceSize,
+        pieceOrderMultiple: product.pieceOrderMultiple,
         packSize: product.packSize,
         bundleSize: product.bundleSize,
       };
@@ -267,28 +270,34 @@ export function OrderEditor({
     });
   };
 
-  const changeQuantity = (id, delta) => {
+  const changeQuantity = (id, delta, step = 1) => {
+    const orderStep = Math.max(1, Number(step) || 1);
     clearQtyDraft(id);
     setCart((current) => {
-      const nextValue = Math.max(0, (Number(current[id]) || 0) + delta);
+      const nextValue = Math.max(
+        0,
+        (Number(current[id]) || 0) + delta * orderStep
+      );
       const next = { ...current };
-      if (nextValue) next[id] = nextValue; else delete next[id];
+      if (nextValue) next[id] = nextValue;
+      else delete next[id];
       return next;
     });
   };
 
-  const setItemQuantity = (id, value, multiplier = 1) => {
-    const nextValue = fromQuantityInputValue(value, multiplier);
+  const setItemQuantity = (id, value, multiplier = 1, orderStep = 1) => {
+    const nextValue = fromQuantityInputValue(value, multiplier, orderStep);
     setCart((current) => {
       const next = { ...current };
-      if (nextValue) next[id] = nextValue; else delete next[id];
+      if (nextValue) next[id] = nextValue;
+      else delete next[id];
       return next;
     });
   };
 
-  const commitQtyDraft = (id, multiplier = 1) => {
+  const commitQtyDraft = (id, multiplier = 1, orderStep = 1) => {
     if (qtyDrafts[id] === undefined) return;
-    setItemQuantity(id, qtyDrafts[id], multiplier);
+    setItemQuantity(id, qtyDrafts[id], multiplier, orderStep);
     clearQtyDraft(id);
   };
 
@@ -298,8 +307,19 @@ export function OrderEditor({
   };
 
   const setProductUnit = (productId, nextUnit) => {
+    const product = products.find((item) => item.id === productId);
+    const currentUnit =
+      units[productId] || (product ? orderedSaleUnits(product)[0] : nextUnit);
+    if (currentUnit === nextUnit) return;
+
     clearQtyDraft(productId);
     setUnits((current) => ({ ...current, [productId]: nextUnit }));
+    setCart((current) => {
+      if (!(productId in current)) return current;
+      const next = { ...current };
+      delete next[productId];
+      return next;
+    });
   };
 
   const changeCustomQuantity = (id, delta) => {
@@ -570,6 +590,7 @@ export function OrderEditor({
                 const unit = units[product.id] || orderedSaleUnits(product)[0];
                 const quantity = Number(cart[product.id]) || 0;
                 const multiplier = getUnitMultiplier(product, unit);
+                const orderStep = getUnitOrderStep(product, unit);
                 const price = getUnitPrice(product, unit);
                 const isList = catalogView === "list";
                 const selected = quantity > 0;
@@ -633,22 +654,22 @@ export function OrderEditor({
                         })}
                       </div>
                       <div className="quantity-control">
-                        <button type="button" onClick={() => changeQuantity(product.id, -1)} aria-label="Уменьшить">−</button>
+                        <button type="button" onClick={() => changeQuantity(product.id, -1, orderStep)} aria-label="Уменьшить">−</button>
                         <div className="quantity-input-wrap">
                           <input
                             className="quantity-input"
                             type="number"
                             min="0"
-                            step={quantityInputStep(multiplier)}
+                            step={quantityInputStep(multiplier, orderStep)}
                             inputMode="numeric"
                             value={quantityFieldValue(product.id, quantity, multiplier)}
                             placeholder="0"
                             onChange={(e) => setQtyDrafts((current) => ({ ...current, [product.id]: e.target.value }))}
-                            onBlur={() => commitQtyDraft(product.id, multiplier)}
+                            onBlur={() => commitQtyDraft(product.id, multiplier, orderStep)}
                           />
                           <small>{quantityInputUnitLabel(unit, multiplier)}</small>
                         </div>
-                        <button type="button" onClick={() => changeQuantity(product.id, 1)} aria-label="Увеличить">+</button>
+                        <button type="button" onClick={() => changeQuantity(product.id, 1, orderStep)} aria-label="Увеличить">+</button>
                       </div>
                     </div>
                   </article>
@@ -738,21 +759,21 @@ export function OrderEditor({
                         </div>
                       </div>
                       <div className="quantity-control cart-sheet-qty">
-                        <button type="button" onClick={() => changeQuantity(item.productId, -1)} aria-label="Уменьшить">−</button>
+                        <button type="button" onClick={() => changeQuantity(item.productId, -1, item.orderStep)} aria-label="Уменьшить">−</button>
                         <div className="quantity-input-wrap">
                           <input
                             className="quantity-input"
                             type="number"
                             min="0"
-                            step={quantityInputStep(item.multiplier)}
+                            step={quantityInputStep(item.multiplier, item.orderStep)}
                             inputMode="numeric"
                             value={quantityFieldValue(item.productId, item.quantity, item.multiplier)}
                             onChange={(e) => setQtyDrafts((current) => ({ ...current, [item.productId]: e.target.value }))}
-                            onBlur={() => commitQtyDraft(item.productId, item.multiplier)}
+                            onBlur={() => commitQtyDraft(item.productId, item.multiplier, item.orderStep)}
                           />
                           <small>{quantityInputUnitLabel(item.unit, item.multiplier)}</small>
                         </div>
-                        <button type="button" onClick={() => changeQuantity(item.productId, 1)} aria-label="Увеличить">+</button>
+                        <button type="button" onClick={() => changeQuantity(item.productId, 1, item.orderStep)} aria-label="Увеличить">+</button>
                       </div>
                     </div>
                   ))}

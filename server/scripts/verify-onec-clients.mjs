@@ -89,7 +89,7 @@ assert.equal(partialMatrix["client-1"].oneCId, "onec-client-1");
 assert.equal(partialMatrix["client-2"].oneCId, "keep-me");
 assert.deepEqual(partialMatrix["client-2"].matrixProductIds, ["x1"]);
 
-// M1: пустые nested в partial не затирают цены/матрицу.
+// Явный matrixProductIds: [] очищает матрицу; пустой personalPrices {} в merge не затирает цены.
 const emptyNestedWipe = mergeClientLinksPreservingOneCLinks(
   {
     "client-1": {
@@ -107,7 +107,7 @@ const emptyNestedWipe = mergeClientLinksPreservingOneCLinks(
     },
   }
 );
-assert.deepEqual(emptyNestedWipe["client-1"].matrixProductIds, ["p1", "p2"]);
+assert.deepEqual(emptyNestedWipe["client-1"].matrixProductIds, []);
 assert.equal(emptyNestedWipe["client-1"].personalPrices.p1.price, 10);
 assert.equal(emptyNestedWipe["client-1"].personalPrices.p2.price, 20);
 

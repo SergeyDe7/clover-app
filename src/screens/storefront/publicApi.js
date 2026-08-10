@@ -42,6 +42,8 @@ export const storefrontApi = {
   catalog(params = {}) {
     const query = new URLSearchParams();
     if (params.category) query.set("category", params.category);
+    if (params.subcategory) query.set("subcategory", params.subcategory);
+    if (params.facet) query.set("facet", params.facet);
     if (params.q) query.set("q", params.q);
     const suffix = query.toString() ? `?${query}` : "";
     return request(`/catalog${suffix}`);

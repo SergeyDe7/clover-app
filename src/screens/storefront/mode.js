@@ -45,6 +45,8 @@ export function parseStorefrontRoute(pathname = window.location.pathname) {
     return {
       name: "catalog",
       category: parts[1] ? decodeURIComponent(parts[1]) : "",
+      subcategory: parts[2] ? decodeURIComponent(parts[2]) : "",
+      facet: parts[3] ? decodeURIComponent(parts[3]) : "",
     };
   }
   if (parts[0] === "product" && parts[1]) {
@@ -66,9 +68,13 @@ export function storefrontHref(route) {
     return `${prefix}${path}`;
   }
   if (route.name === "catalog") {
-    return route.category
-      ? `${prefix}/catalog/${encodeURIComponent(route.category)}`
-      : `${prefix}/catalog`;
+    if (!route.category) return `${prefix}/catalog`;
+    let path = `${prefix}/catalog/${encodeURIComponent(route.category)}`;
+    if (route.subcategory) {
+      path += `/${encodeURIComponent(route.subcategory)}`;
+      if (route.facet) path += `/${encodeURIComponent(route.facet)}`;
+    }
+    return path;
   }
   if (route.name === "product") {
     return `${prefix}/product/${encodeURIComponent(route.code)}`;
