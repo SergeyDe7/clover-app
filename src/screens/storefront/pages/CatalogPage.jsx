@@ -60,6 +60,18 @@ export function CatalogPage({
 
   const sections = useMemo(() => {
     if (atParentOnly) {
+      const hasQuery = Boolean(query.trim());
+      if (hasQuery) {
+        return products.length
+          ? [
+              {
+                name: "Найдено",
+                products,
+                count: products.length,
+              },
+            ]
+          : [];
+      }
       const orphans = products.filter(
         (product) => !String(product.subcategory || "").trim()
       );
@@ -87,6 +99,7 @@ export function CatalogPage({
     subcategory,
     products,
     needsSubgroup,
+    query,
   ]);
 
   const showProducts = sections.length > 0 || Boolean(

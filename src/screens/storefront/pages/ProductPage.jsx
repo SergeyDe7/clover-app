@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
-import { addToCart } from "../cartStorage.js";
+import { addToCart, snapCartQty } from "../cartStorage.js";
 import { formatMoney, navigateStorefront } from "../components/StoreHeader.jsx";
+import { getUnitOrderStep } from "../../../shared/appHelpers.js";
 
 const UNIT_LABEL = {
   piece: "шт",
@@ -30,7 +31,9 @@ export function ProductPage({ code }) {
         const next = payload.product;
         setProduct(next);
         const units = Array.isArray(next?.saleUnits) ? next.saleUnits : ["piece"];
-        setUnit(units[0] || "piece");
+        const nextUnit = units[0] || "piece";
+        setUnit(nextUnit);
+        setQty(getUnitOrderStep(next, nextUnit));
       })
       .catch((err) => {
         if (!cancelled) setError(err.message || "Товар не найден.");
@@ -44,6 +47,7 @@ export function ProductPage({ code }) {
     () => (Array.isArray(product?.saleUnits) ? product.saleUnits : ["piece"]),
     [product]
   );
+  const orderStep = getUnitOrderStep(product, unit);
   const price = Number(product?.prices?.[unit]) || 0;
   const details = product?.details || {};
 
@@ -105,7 +109,11 @@ export function ProductPage({ code }) {
               <select
                 className="sf-input"
                 value={unit}
-                onChange={(e) => setUnit(e.target.value)}
+                onChange={(e) => {
+                  const nextUnit = e.target.value;
+                  setUnit(nextUnit);
+                  setQty(getUnitOrderStep(product, nextUnit));
+                }}
               >
                 {units.map((item) => (
                   <option key={item} value={item}>
@@ -115,14 +123,23 @@ export function ProductPage({ code }) {
               </select>
             </label>
             <label className="sf-field">
-              <span>Количество</span>
+              <span>
+                Количество
+                {orderStep > 1 ? ` (кратно ${orderStep})` : ""}
+              </span>
               <input
                 className="sf-input"
                 type="number"
-                min="1"
+                min={orderStep}
+                step={orderStep}
                 value={qty}
                 onChange={(e) =>
-                  setQty(Math.max(1, Math.floor(Number(e.target.value) || 1)))
+                  setQty(
+                    snapCartQty(
+                      Math.floor(Number(e.target.value) || orderStep),
+                      orderStep
+                    )
+                  )
                 }
               />
             </label>
@@ -139,6 +156,7 @@ export function ProductPage({ code }) {
                     unitLabel: UNIT_LABEL[unit] || unit,
                     price,
                     imageUrl: product.imageUrl,
+                    orderStep,
                   },
                   qty
                 );

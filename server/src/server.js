@@ -3682,22 +3682,23 @@ app.put(
       storedProducts
     );
 
-    // Дедуп по oneCId в каталоге: оставляем первый (предпочтительно уже на витрине).
-    const seenOneC = new Set();
-    products = products
-      .slice()
-      .sort((a, b) => {
-        const as = a.showOnStorefront === true ? 0 : 1;
-        const bs = b.showOnStorefront === true ? 0 : 1;
-        return as - bs;
-      })
-      .filter((product) => {
-        const oneCId = String(product.oneCId || "").trim();
-        if (!oneCId) return true;
-        if (seenOneC.has(oneCId)) return false;
-        seenOneC.add(oneCId);
-        return true;
+    // Дубликаты oneCId не удаляем молча — отклоняем сохранение.
+    const oneCCounts = new Map();
+    for (const product of products) {
+      const oneCId = String(product.oneCId || "").trim();
+      if (!oneCId) continue;
+      oneCCounts.set(oneCId, (oneCCounts.get(oneCId) || 0) + 1);
+    }
+    const duplicateOneCIds = [...oneCCounts.entries()]
+      .filter(([, count]) => count > 1)
+      .map(([oneCId]) => oneCId);
+    if (duplicateOneCIds.length) {
+      return res.status(409).json({
+        error: `В каталоге несколько карточек с одним oneCId (${duplicateOneCIds.length}). Исправьте дубликаты перед сохранением.`,
+        code: "DUPLICATE_ONE_C_ID",
+        duplicateOneCIds: duplicateOneCIds.slice(0, 20),
       });
+    }
 
     setGlobalState("products", products);
 
@@ -4923,6 +4924,57 @@ app.post(
     } catch (error) {
       next(error);
     }
+  }
+);
+
+/** Массовое обновление фото/текстов витрины без предварительного обнуления в БД. */
+app.post(
+  "/api/admin/storefront/enrich-all",
+  authRequired,
+  roleRequired("admin"),
+  (req, res) => {
+    const forcePhoto = req.body?.forcePhoto === true;
+    const forceCopy = req.body?.forceCopy === true;
+    if (!forcePhoto && !forceCopy) {
+      return res.status(400).json({
+        error: "Укажите forcePhoto и/или forceCopy.",
+      });
+    }
+
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const targets = (Array.isArray(products) ? products : []).filter(
+      (product) => product?.active !== false && product?.showOnStorefront === true
+    );
+
+    for (const product of targets) {
+      scheduleProductWebEnrichment({
+        productId: product.id,
+        uploadsDirectory,
+        forceRefreshPhoto: forcePhoto,
+        forceRefreshCopy: forceCopy,
+        getProducts: () => getGlobalState("products", DEFAULT_PRODUCTS),
+        setProducts: (list) => {
+          setGlobalState("products", list);
+          setGlobalState("catalogPricesVersion", new Date().toISOString());
+        },
+      });
+    }
+
+    auditFromRequest(req, "storefront.enrich_all", {
+      forcePhoto,
+      forceCopy,
+      queued: targets.length,
+    });
+
+    res.json({
+      ok: true,
+      queued: targets.length,
+      forcePhoto,
+      forceCopy,
+      message: forcePhoto
+        ? "Обновление фото поставлено в очередь. Старые фото сохраняются, пока не найдётся новое."
+        : "Обновление описаний поставлено в очередь. Старые тексты сохраняются, пока не будет замены.",
+    });
   }
 );
 

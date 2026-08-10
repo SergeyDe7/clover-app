@@ -40,6 +40,13 @@ assert.equal(fromQuantityInputValue("0", 1, 5), 0);
 assert.equal(snapQuantityToStep(12, 5), 10);
 assert.equal(snapQuantityToStep(13, 5), 15);
 
+// Витрина: тот же шаг в корзине
+import { snapCartQty } from "../../src/screens/storefront/cartStorage.js";
+assert.equal(snapCartQty(1, 5), 5);
+assert.equal(snapCartQty(7, 5), 5);
+assert.equal(snapCartQty(8, 5), 10);
+assert.equal(snapCartQty(0, 5), 0);
+
 // Банка: продаём упаковками по 100 шт
 const jar = { pieceSize: 1, packSize: 100, bundleSize: 1, saleUnits: ["pack"] };
 assert.equal(getUnitMultiplier(jar, "pack"), 100);

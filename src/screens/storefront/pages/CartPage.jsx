@@ -63,13 +63,14 @@ export function CartPage() {
               <input
                 className="sf-input"
                 type="number"
-                min="1"
+                min={Math.max(1, Number(item.orderStep) || 1)}
+                step={Math.max(1, Number(item.orderStep) || 1)}
                 value={item.qty}
                 onChange={(e) =>
                   setCartQty(
                     item.productId,
                     item.unit,
-                    Math.max(1, Math.floor(Number(e.target.value) || 1))
+                    Math.floor(Number(e.target.value) || 0)
                   )
                 }
               />

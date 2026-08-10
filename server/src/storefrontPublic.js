@@ -240,10 +240,13 @@ function toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId = "")
 
   const cloverCode = String(product.code || "").trim();
   const oneCCode = String(product.oneCCode || oneCItem?.code || "").trim();
-  // На витрине артикул = только код 1С (не внутренний CL-…).
-  const code =
+  // На витрине артикул = код 1С; иначе не-CL код Clover; иначе стабильный slug по id
+  // (чтобы карточки без 1С не пропадали из каталога при showOnStorefront).
+  const publicCode =
     oneCCode ||
-    (/^cl-\d+$/i.test(cloverCode) ? "" : cloverCode);
+    (/^cl-\d+$/i.test(cloverCode) ? "" : cloverCode) ||
+    `id-${product.id}`;
+  const code = publicCode;
 
   // На витрине имя = как в матрице/каталоге Clover (не сырое имя 1С).
   const cloverName = String(product.name || "").trim();
@@ -302,7 +305,7 @@ function listStorefrontProducts(storeSettings) {
       const oneCItem = byId.get(String(product.oneCId || "")) || null;
       return toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId);
     })
-    .filter((product) => product.code && product.name);
+    .filter((product) => product.name);
 }
 
 /** Группы витрины — как Opticom, канон из productGroups.js. */
@@ -424,7 +427,13 @@ export function getPublicProductByCode(code) {
   );
   return (
     listStorefrontProducts(settings).find((product) => {
-      const aliases = [product.code, product.oneCCode, product.cloverCode]
+      const aliases = [
+        product.code,
+        product.oneCCode,
+        product.cloverCode,
+        `id-${product.id}`,
+        String(product.id),
+      ]
         .map((value) => String(value || "").trim().toLocaleLowerCase("ru-RU"))
         .filter(Boolean);
       return aliases.includes(needle);
@@ -556,6 +565,19 @@ export function createStorefrontOrder(input, { notify } = {}) {
 
     const stored = rawById.get(String(product.id)) || {};
     const quantity = raw.qty;
+    const pieceMultiple = (() => {
+      const rawMultiple = Number(product.pieceOrderMultiple);
+      if (!Number.isFinite(rawMultiple) || rawMultiple < 1) return 1;
+      return Math.max(1, Math.floor(rawMultiple));
+    })();
+    if (unit === "piece" && pieceMultiple > 1 && quantity % pieceMultiple !== 0) {
+      const error = new Error(
+        `Для «${product.name}» количество в шт. должно быть кратно ${pieceMultiple} (сейчас ${quantity}).`
+      );
+      error.status = 400;
+      error.code = "INVALID_QTY_STEP";
+      throw error;
+    }
     const unitPrice = Number(product.prices?.[unit]) || 0;
     const multiplier = unitSize(stored, unit);
     const lineTotal = unitPrice * quantity;
