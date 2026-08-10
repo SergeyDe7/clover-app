@@ -28,6 +28,7 @@ import {
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { MatrixOneCProductAdd } from "./MatrixOneCProductAdd";
 import { ProductEditor } from "./ProductEditor";
+import { expandMatrixRemovalIds, pickUniqueMatrixProductIds } from "./matrixMembership";
 
 /** Цена из вида цен 1С (категория клиента), с масштабом от шт. */
 function typedSalePriceForUnit(product, priceTypeId, unit) {
@@ -645,6 +646,7 @@ export function ManagerClients({
   setClientLinks,
   dirtyClientLinkIdsRef,
   oneCPriceTypes = [],
+  catalogPricesVersion = "",
   onReload,
 }) {
   const [search, setSearch] = useState("");
@@ -655,6 +657,11 @@ export function ManagerClients({
   const [matrixSettingsOpen, setMatrixSettingsOpen] = useState({});
   const [matrixPricePreview, setMatrixPricePreview] = useState({});
   const [matrixPricesStatus, setMatrixPricesStatus] = useState({});
+  /** idle | busy | review | done — блокирует «Сохранить матрицу» на время Excel-импорта */
+  const [excelImportState, setExcelImportState] = useState({});
+  const [oneCAddPanelOpen, setOneCAddPanelOpen] = useState({});
+  /** Снимок id позиций матрицы — чтобы после «Снять все» список оставался на экране. */
+  const [matrixListSnapshot, setMatrixListSnapshot] = useState({});
   const [openClientId, setOpenClientId] = useState(readOpenManagerClientId);
   const [approvalBusyId, setApprovalBusyId] = useState("");
   const [openMenuId, setOpenMenuId] = useState("");
@@ -707,19 +714,23 @@ export function ManagerClients({
         openLink?.defaultMarkupPercent ?? "",
         openLink?.oneCPriceTypeId || "",
         openLink?.matrixMode || "",
-        (openLink?.matrixProductIds || []).length,
+        (openLink?.matrixProductIds || []).map(String).sort().join(","),
         Object.keys(openLink?.personalPrices || {}).length,
+        String(catalogPricesVersion || ""),
       ].join(":")
     : "";
 
   useEffect(() => {
     if (!openClientId || !matrixPricesKey) return undefined;
     let cancelled = false;
-    setMatrixPricesStatus((current) => ({
-      ...current,
-      [openClientId]: { status: "loading" },
-    }));
-    (async () => {
+
+    const loadPrices = async ({ silent = false } = {}) => {
+      if (!silent) {
+        setMatrixPricesStatus((current) => ({
+          ...current,
+          [openClientId]: { status: "loading" },
+        }));
+      }
       try {
         const result = await api.getClientMatrixPrices(openClientId);
         if (cancelled) return;
@@ -728,7 +739,6 @@ export function ManagerClients({
           ...current,
           [openClientId]: items,
         }));
-        // Подмешиваем виды цен в товары менеджера — чтобы цена была и без повторного fetch.
         setProducts((prev) => {
           let changed = false;
           const next = (Array.isArray(prev) ? prev : []).map((product) => {
@@ -764,6 +774,12 @@ export function ManagerClients({
             status: "ok",
             count: Object.keys(items).length,
             priceTypeName: result.priceTypeName || "",
+            missingPrices: Object.values(items).filter((row) => {
+              const typed = row?.typed || {};
+              return !Object.values(typed).some(
+                (value) => Number(value) > 0
+              ) && !(Number(row?.pricePiece) > 0);
+            }).length,
           },
         }));
       } catch (error) {
@@ -776,11 +792,39 @@ export function ManagerClients({
           },
         }));
       }
-    })();
+    };
+
+    // Debounce при пакетном Excel-добавлении.
+    const timer = window.setTimeout(() => {
+      void loadPrices({ silent: false });
+    }, 350);
+
+    // Пока матрица открыта — тихо подтягиваем цены после обмена с 1С.
+    const poll = window.setInterval(() => {
+      void loadPrices({ silent: true });
+    }, 12000);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
+      window.clearInterval(poll);
     };
-  }, [openClientId, matrixPricesKey, setProducts]);
+  }, [openClientId, matrixPricesKey, catalogPricesVersion, setProducts]);
+
+  // Держим снимок состава матрицы, чтобы «Снять все» не прятало список позиций.
+  useEffect(() => {
+    if (!openClientId) return;
+    const ids = clientLinks[openClientId]?.matrixProductIds;
+    if (!Array.isArray(ids) || !ids.length) return;
+    const key = ids.map(String).sort().join(",");
+    setMatrixListSnapshot((current) => {
+      const existing = Array.isArray(current[openClientId])
+        ? current[openClientId].map(String).sort().join(",")
+        : "";
+      if (existing === key) return current;
+      return { ...current, [openClientId]: ids.map(String) };
+    });
+  }, [openClientId, clientLinks]);
 
   const setApproval = async (client, status) => {
     setApprovalBusyId(client.id);
@@ -818,6 +862,9 @@ export function ManagerClients({
         email,
         password,
       });
+      if (result.clientLinks && typeof result.clientLinks === "object") {
+        setClientLinks(result.clientLinks);
+      }
       await onReload();
       setProvisionOpen(false);
       setProvisionForm({
@@ -929,7 +976,7 @@ export function ManagerClients({
         normalizeProduct({
           ...normalized,
           id,
-          code: normalized.code || `CL-${String(id).padStart(4, "0")}`,
+          code: normalized.code || normalized.oneCCode || "",
         }),
         ...products,
       ];
@@ -1046,6 +1093,15 @@ export function ManagerClients({
         getDefaultMarkupDraft(clientId, link)
       ),
       personalPrices: { ...(link.personalPrices || {}) },
+      // На сохранении убираем скрытые дубли (один oneCId / имя / артикул).
+      matrixProductIds: pickUniqueMatrixProductIds(
+        (Array.isArray(products) ? products : []).filter((product) =>
+          (Array.isArray(link.matrixProductIds) ? link.matrixProductIds : []).some(
+            (id) => String(id) === String(product.id)
+          )
+        ),
+        link.matrixProductIds || []
+      ),
     };
 
     const productDrafts = individualMarkupDrafts[clientId] || {};
@@ -1091,7 +1147,39 @@ export function ManagerClients({
 
     try {
       setClientLinks(nextLinks);
-      await api.saveClientLinks(nextLinks);
+      const saved = await api.saveClientLinks(nextLinks);
+      if (saved?.clientLinks && typeof saved.clientLinks === "object") {
+        // Берём сохранённую матрицу клиента целиком — иначе bootstrap/merge
+        // может вернуть устаревший полный словарь со старыми id.
+        const savedLink = saved.clientLinks[clientId];
+        setClientLinks((current) => ({
+          ...current,
+          ...(saved.clientLinks || {}),
+          [clientId]: savedLink
+            ? {
+                ...EMPTY_LINK,
+                ...savedLink,
+                matrixProductIds: Array.isArray(savedLink.matrixProductIds)
+                  ? savedLink.matrixProductIds
+                  : [],
+              }
+            : {
+                ...EMPTY_LINK,
+                ...(current[clientId] || {}),
+                ...nextLink,
+              },
+        }));
+        const savedIds = savedLink?.matrixProductIds;
+        setMatrixListSnapshot((current) => ({
+          ...current,
+          [clientId]: Array.isArray(savedIds) ? savedIds.map(String) : [],
+        }));
+      } else {
+        setMatrixListSnapshot((current) => ({
+          ...current,
+          [clientId]: (nextLink.matrixProductIds || []).map(String),
+        }));
+      }
       setDefaultMarkupDrafts((current) => {
         const next = { ...current };
         delete next[clientId];
@@ -1302,21 +1390,83 @@ export function ManagerClients({
                 )
               ),
             ];
-            const matrixProducts = (Array.isArray(products) ? products : []).filter(
-              (product) =>
-                product.active !== false &&
-                (!matrixSearch ||
-                  String(product.name || "")
-                    .toLowerCase()
-                    .includes(matrixSearch.toLowerCase()) ||
-                  String(product.code || "")
-                    .toLowerCase()
-                    .includes(matrixSearch.toLowerCase()))
+            const matrixIdSet = new Set(matrixProductIds.map(String));
+            const snapshotIds = Array.isArray(matrixListSnapshot[client.id])
+              ? matrixListSnapshot[client.id]
+              : [];
+            const matrixDirty =
+              matrixSaveState[client.id]?.status === "dirty";
+            // Снимок только для несохранённого «Снять все»: иначе после удаления
+            // и сохранения старые id из снимка снова рисуют позиции в списке.
+            const displayIdSet = new Set([
+              ...matrixIdSet,
+              ...(matrixIdSet.size === 0 && matrixDirty
+                ? snapshotIds.map(String)
+                : []),
+            ]);
+            const matrixOpen = String(openClientId) === String(client.id);
+            const searchQuery = matrixOpen
+              ? String(matrixSearch || "").trim().toLocaleLowerCase("ru-RU")
+              : "";
+            const matrixProductsRaw = (Array.isArray(products) ? products : []).filter(
+              (product) => {
+                if (product.active === false) return false;
+                if (
+                  link.matrixMode === "selected" &&
+                  displayIdSet.size > 0 &&
+                  !displayIdSet.has(String(product.id))
+                ) {
+                  return false;
+                }
+                if (
+                  link.matrixMode === "selected" &&
+                  displayIdSet.size === 0
+                ) {
+                  return false;
+                }
+                if (!searchQuery) return true;
+                const haystack = [
+                  product.name,
+                  product.code,
+                  product.oneCCode,
+                  product.oneCMatchCode,
+                  product.oneCName,
+                  product.category,
+                  productArticle(product),
+                ]
+                  .map((value) => String(value || "").toLocaleLowerCase("ru-RU"))
+                  .join(" ");
+                return haystack.includes(searchQuery);
+              }
             );
+            // В списке матрицы убираем только полные дубли по oneCId (не по имени),
+            // чтобы новый товар из Excel не пропадал из поиска.
+            const matrixProducts = (() => {
+              const preferred = new Set(matrixProductIds.map(String));
+              const seenOneC = new Set();
+              const seenId = new Set();
+              const ordered = [...matrixProductsRaw].sort((a, b) => {
+                const ap = preferred.has(String(a.id)) ? 0 : 1;
+                const bp = preferred.has(String(b.id)) ? 0 : 1;
+                return ap - bp;
+              });
+              const result = [];
+              for (const product of ordered) {
+                const id = String(product.id);
+                if (seenId.has(id)) continue;
+                const oneCId = String(product.oneCId || "").trim();
+                if (oneCId) {
+                  if (seenOneC.has(oneCId)) continue;
+                  seenOneC.add(oneCId);
+                }
+                seenId.add(id);
+                result.push(product);
+              }
+              return result;
+            })();
             const personalPriceCount = Object.keys(
               link.personalPrices || {}
             ).length;
-            const matrixOpen = String(openClientId) === String(client.id);
 
             return (
               <article className="client-card" key={client.id} id={`client-card-${client.id}`}>
@@ -1931,8 +2081,7 @@ export function ManagerClients({
                             <option value="">Не задана</option>
                             {(oneCPriceTypes || []).map((item) => (
                               <option key={item.id} value={item.id}>
-                                {item.name}
-                                {item.code ? ` (${item.code})` : ""}
+                                {item.name || "Без названия"}
                               </option>
                             ))}
                           </select>
@@ -2047,9 +2196,31 @@ export function ManagerClients({
                       <MatrixOneCProductAdd
                         clientId={client.id}
                         link={link}
+                        products={products}
                         setProducts={setProducts}
                         setClientLinks={setClientLinks}
+                        onPanelChange={(open) => {
+                          setOneCAddPanelOpen((current) => ({
+                            ...current,
+                            [client.id]: Boolean(open),
+                          }));
+                        }}
+                        onExcelImportStateChange={(state) => {
+                          const next =
+                            state && typeof state === "object"
+                              ? state
+                              : { status: "idle" };
+                          setExcelImportState((current) => ({
+                            ...current,
+                            [client.id]: next,
+                          }));
+                        }}
+                        onAfterAdd={() => {
+                          // Сбрасываем поиск, чтобы новый товар из Excel сразу был виден в списке.
+                          setMatrixSearch("");
+                        }}
                       />
+                      {!oneCAddPanelOpen[client.id] ? (
                       <div className="client-matrix-search-bar">
                         <input
                           type="search"
@@ -2070,6 +2241,14 @@ export function ManagerClients({
                         ) : (
                           <span className="client-matrix-price-chip muted">
                             Категория цен не задана
+                          </span>
+                        )}
+                        {matrixPricesStatus[client.id]?.status === "ok" &&
+                          Number(matrixPricesStatus[client.id]?.missingPrices) >
+                            0 && (
+                          <span className="client-matrix-price-chip muted">
+                            Без цены: {matrixPricesStatus[client.id].missingPrices} — дождитесь
+                            «Обновить цены» в 1С
                           </span>
                         )}
                         {matrixPricesStatus[client.id]?.status === "loading" && (
@@ -2099,6 +2278,11 @@ export function ManagerClients({
                           </button>
                         )}
                       </div>
+                      ) : (
+                        <p className="muted small" style={{ marginTop: 10 }}>
+                          Открыт поиск по выгрузке 1С. Поиск по матрице Clover скрыт, чтобы не перепутать.
+                        </p>
+                      )}
 
                       <div className="matrix-summary">
                         <span>
@@ -2114,27 +2298,100 @@ export function ManagerClients({
                             <button
                               className="secondary-button"
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
+                                const source =
+                                  matrixProducts.length > 0
+                                    ? matrixProducts
+                                    : (Array.isArray(products) ? products : []).filter(
+                                        (item) =>
+                                          item.active !== false &&
+                                          snapshotIds.includes(String(item.id))
+                                      );
+                                const preferred =
+                                  snapshotIds.length > 0
+                                    ? snapshotIds
+                                    : matrixProductIds;
+                                const nextIds = pickUniqueMatrixProductIds(
+                                  source.length
+                                    ? source
+                                    : (Array.isArray(products) ? products : []).filter(
+                                        (item) => item.active !== false
+                                      ),
+                                  preferred
+                                );
+                                setMatrixListSnapshot((current) => ({
+                                  ...current,
+                                  [client.id]: nextIds.map(String),
+                                }));
                                 updateLink(client.id, {
                                   matrixMode: "selected",
-                                  matrixProductIds: products
-                                    .filter((item) => item.active)
-                                    .map((item) => item.id),
-                                })
-                              }
+                                  matrixProductIds: nextIds,
+                                });
+                              }}
                             >
                               Выбрать все
                             </button>
                             <button
                               className="secondary-button"
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
+                                const keepIds =
+                                  matrixProductIds.length > 0
+                                    ? matrixProductIds.map(String)
+                                    : snapshotIds.map(String);
+                                if (keepIds.length) {
+                                  setMatrixListSnapshot((current) => ({
+                                    ...current,
+                                    [client.id]: keepIds,
+                                  }));
+                                }
                                 updateLink(client.id, {
+                                  matrixMode: "selected",
                                   matrixProductIds: [],
-                                })
-                              }
+                                });
+                              }}
                             >
                               Снять все
+                            </button>
+                            <button
+                              className="secondary-button"
+                              type="button"
+                              disabled={
+                                !matrixProducts.some((product) =>
+                                  matrixProductIds.some(
+                                    (id) => String(id) === String(product.id)
+                                  )
+                                )
+                              }
+                              onClick={() => {
+                                const selectedVisible = matrixProducts.filter(
+                                  (product) =>
+                                    matrixProductIds.some(
+                                      (id) =>
+                                        String(id) === String(product.id)
+                                    )
+                                );
+                                if (!selectedVisible.length) return;
+                                // Удаляем и скрытые дубли с тем же oneCId / артикулом / именем.
+                                const removeIds = expandMatrixRemovalIds(
+                                  selectedVisible,
+                                  matrixProductIds,
+                                  products
+                                );
+                                const nextIds = matrixProductIds.filter(
+                                  (id) => !removeIds.has(String(id))
+                                );
+                                setMatrixListSnapshot((current) => ({
+                                  ...current,
+                                  [client.id]: nextIds.map(String),
+                                }));
+                                updateLink(client.id, {
+                                  matrixMode: "selected",
+                                  matrixProductIds: nextIds,
+                                });
+                              }}
+                            >
+                              Удалить выбранные товары
                             </button>
                           </>
                         )}
@@ -2191,22 +2448,31 @@ export function ManagerClients({
                                     type="checkbox"
                                     checked={selected}
                                     disabled={link.matrixMode === "all"}
-                                    onChange={(event) =>
+                                    onChange={(event) => {
+                                      if (event.target.checked) {
+                                        updateLink(client.id, {
+                                          matrixMode: "selected",
+                                          matrixProductIds: [
+                                            ...new Set([
+                                              ...matrixProductIds,
+                                              product.id,
+                                            ]),
+                                          ],
+                                        });
+                                        return;
+                                      }
+                                      const removeIds = expandMatrixRemovalIds(
+                                        [product],
+                                        matrixProductIds,
+                                        products
+                                      );
                                       updateLink(client.id, {
                                         matrixMode: "selected",
-                                        matrixProductIds: event.target.checked
-                                          ? [
-                                              ...new Set([
-                                                ...matrixProductIds,
-                                                product.id,
-                                              ]),
-                                            ]
-                                          : matrixProductIds.filter(
-                                              (id) =>
-                                                String(id) !== String(product.id)
-                                            ),
-                                      })
-                                    }
+                                        matrixProductIds: matrixProductIds.filter(
+                                          (id) => !removeIds.has(String(id))
+                                        ),
+                                      });
+                                    }}
                                   />
                                   <span>
                                     <strong>{product.name}</strong>
@@ -2477,14 +2743,34 @@ export function ManagerClients({
 
                   <div className="client-matrix-save-fab">
                     <button
-                      className="primary-button"
+                      className={
+                        ["busy", "review"].includes(
+                          excelImportState[client.id]?.status
+                        )
+                          ? "primary-button matrix-save-fab-excel-locked"
+                          : "primary-button"
+                      }
                       type="button"
-                      disabled={matrixSaveState[client.id]?.status === "saving"}
+                      disabled={
+                        matrixSaveState[client.id]?.status === "saving" ||
+                        ["busy", "review"].includes(
+                          excelImportState[client.id]?.status
+                        )
+                      }
+                      title={
+                        ["busy", "review"].includes(
+                          excelImportState[client.id]?.status
+                        )
+                          ? "Дождитесь загрузки товаров из Excel"
+                          : undefined
+                      }
                       onClick={() => saveClientMatrix(client.id, link)}
                     >
                       {matrixSaveState[client.id]?.status === "saving"
                         ? "Сохраняем..."
-                        : "Сохранить матрицу"}
+                        : matrixSaveState[client.id]?.status === "saved"
+                          ? "Сохранено"
+                          : "Сохранить матрицу"}
                     </button>
                   </div>
                       </>

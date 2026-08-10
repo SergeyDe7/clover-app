@@ -417,16 +417,15 @@ export function mergeClientLinksPreservingOneCLinks(incomingLinks, storedLinks) 
       next.personalPrices = { ...prevPrices, ...incPrices };
     }
     if (Object.prototype.hasOwnProperty.call(rawIncoming, "matrixProductIds")) {
-      const prevIds = Array.isArray(previous.matrixProductIds)
-        ? previous.matrixProductIds
-        : [];
       const incIds = Array.isArray(rawIncoming.matrixProductIds)
         ? rawIncoming.matrixProductIds
         : null;
-      // Пустой массив во входящем partial не очищает сохранённую матрицу.
-      if (incIds === null || (incIds.length === 0 && prevIds.length > 0)) {
-        next.matrixProductIds = prevIds;
+      if (incIds === null) {
+        next.matrixProductIds = Array.isArray(previous.matrixProductIds)
+          ? previous.matrixProductIds
+          : [];
       } else {
+        // Явный массив с UI (в том числе []) — полный снимок матрицы, не partial.
         next.matrixProductIds = incIds;
       }
     }

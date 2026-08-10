@@ -155,6 +155,18 @@ export function normalizePersonalPriceConfig(value = {}) {
   return normalized;
 }
 
+/** Цена товара на витрине: inherit (глобальный режим) или manual (своя). */
+export function normalizeStorefrontPricing(value = {}) {
+  const raw = value && typeof value === "object" ? value : {};
+  const source = String(raw.source || "").trim() === "manual" ? "manual" : "inherit";
+  const normalized = { source };
+  for (const unit of UNITS) {
+    const amount = finiteNonNegative(raw[unit]);
+    normalized[unit] = amount === null ? null : Math.round(amount * 100) / 100;
+  }
+  return normalized;
+}
+
 export function resolveClientProductPricing(
   product = {},
   rawConfig = {},
@@ -278,6 +290,7 @@ export function resolveClientProductPricing(
 /**
  * Цена продажи из вида цен 1С.
  * Если цены именно за единицу нет — берём цену за шт и масштабируем размером единицы.
+ * Источник: oneCItem.salePricesByType, иначе уже подмешанный product.salePricesByType.
  */
 export function resolveTypedSalePrice(
   product = {},
@@ -285,14 +298,23 @@ export function resolveTypedSalePrice(
   priceTypeId = "",
   unit = "piece"
 ) {
-  if (!oneCItem || !cleanTextPriceType(priceTypeId)) return null;
+  if (!cleanTextPriceType(priceTypeId)) return null;
 
-  const direct = salePriceForUnit(oneCItem, priceTypeId, unit);
+  const priceSource =
+    oneCItem && hasTypedSalePrices(oneCItem)
+      ? oneCItem
+      : hasTypedSalePrices(product)
+        ? product
+        : oneCItem;
+
+  if (!priceSource) return null;
+
+  const direct = salePriceForUnit(priceSource, priceTypeId, unit);
   if (direct !== null) {
     return { price: direct, source: "one_c_price_type" };
   }
 
-  const piece = salePriceForUnit(oneCItem, priceTypeId, "piece");
+  const piece = salePriceForUnit(priceSource, priceTypeId, "piece");
   if (piece === null) return null;
 
   if (unit === "piece") {
@@ -301,6 +323,20 @@ export function resolveTypedSalePrice(
 
   const sized = piece * unitSize(product, unit);
   return { price: sized, source: "one_c_price_type_from_piece" };
+}
+
+function hasTypedSalePrices(source = {}) {
+  const byType =
+    source?.salePricesByType && typeof source.salePricesByType === "object"
+      ? source.salePricesByType
+      : null;
+  if (!byType) return false;
+  return Object.values(byType).some(
+    (entry) =>
+      entry &&
+      typeof entry === "object" &&
+      UNITS.some((unit) => finiteNonNegative(entry[unit]) !== null)
+  );
 }
 
 function cleanTextPriceType(value) {
@@ -365,6 +401,23 @@ export function enrichProductWithPurchasePrices(product = {}, oneCItem = null) {
     purchasePrices[unit] = oneCItem ? purchasePriceForUnit(product, oneCItem, unit) : null;
   }
 
+  const fromOneC =
+    oneCItem?.salePricesByType && typeof oneCItem.salePricesByType === "object"
+      ? oneCItem.salePricesByType
+      : null;
+  const fromProduct =
+    product.salePricesByType && typeof product.salePricesByType === "object"
+      ? product.salePricesByType
+      : {};
+  const oneCHasTyped =
+    fromOneC &&
+    Object.values(fromOneC).some(
+      (entry) =>
+        entry &&
+        typeof entry === "object" &&
+        UNITS.some((unit) => finiteNonNegative(entry[unit]) !== null)
+    );
+
   return {
     ...product,
     purchasePrices,
@@ -378,12 +431,13 @@ export function enrichProductWithPurchasePrices(product = {}, oneCItem = null) {
     purchasePriceSourceDatabase: oneCItem?.purchasePriceSourceDatabase || "",
     purchasePriceUnit: normalizePurchaseUnit(oneCItem?.purchasePriceUnit),
     purchasePriceAvailable: UNITS.some((unit) => purchasePrices[unit] !== null),
-    salePricesByType:
-      oneCItem?.salePricesByType && typeof oneCItem.salePricesByType === "object"
-        ? oneCItem.salePricesByType
-        : {},
+    // Не затираем уже подтянутые виды цен пустым stub из products-preview.
+    salePricesByType: oneCHasTyped ? fromOneC : fromProduct,
     salePriceReceivedAt:
-      oneCItem?.salePriceReceivedAt || oneCItem?.salePriceUpdatedAt || "",
+      oneCItem?.salePriceReceivedAt ||
+      oneCItem?.salePriceUpdatedAt ||
+      product.salePriceReceivedAt ||
+      "",
   };
 }
 

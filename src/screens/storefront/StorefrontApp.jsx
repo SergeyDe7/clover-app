@@ -29,7 +29,13 @@ export default function StorefrontApp() {
   let page = null;
   let current = "home";
   if (route.name === "catalog") {
-    page = <CatalogPage category={route.category || ""} />;
+    page = (
+      <CatalogPage
+        category={route.category || ""}
+        subcategory={route.subcategory || ""}
+        facet={route.facet || ""}
+      />
+    );
     current = "catalog";
   } else if (route.name === "product") {
     page = <ProductPage code={route.code} />;

@@ -1,3 +1,5 @@
+import { inferSubcategoryFacetFromName } from "../../src/screens/storefront/productGroups.js";
+
 const ONE_C_PRODUCT_FIELDS = [
   "oneCId",
   "oneCCode",
@@ -35,6 +37,57 @@ const STOP_WORDS = new Set([
 
 function cleanText(value) {
   return String(value ?? "").trim();
+}
+
+/** Внутренний артикул Clover вида CL-0001 — не показывать как артикул товара. */
+export function isInternalCloverArticle(value) {
+  return /^cl-\d+$/i.test(cleanText(value));
+}
+
+/**
+ * Артикул товара = код 1С. Внутренние CL-… не считаются артикулом.
+ */
+export function resolveOneCProductArticle(product = {}) {
+  const oneC = cleanText(product.oneCCode || product.oneCMatchCode);
+  if (oneC) return oneC;
+  const code = cleanText(product.code);
+  if (code && !isInternalCloverArticle(code)) return code;
+  return "";
+}
+
+/**
+ * Проставляет product.code из кода 1С; снимает CL-… у связанных и несвязанных.
+ */
+export function applyOneCArticles(products) {
+  const source = Array.isArray(products) ? products : [];
+  let changed = 0;
+  const next = source.map((product) => {
+    const oneCCode = cleanText(product?.oneCCode || product?.oneCMatchCode);
+    const currentCode = cleanText(product?.code);
+    const linked = Boolean(cleanText(product?.oneCId) || oneCCode);
+
+    if (linked) {
+      if (currentCode === oneCCode && cleanText(product?.oneCCode) === oneCCode) {
+        return product;
+      }
+      changed += 1;
+      return {
+        ...product,
+        code: oneCCode,
+        oneCCode: oneCCode || cleanText(product?.oneCCode),
+        ...(oneCCode && !cleanText(product?.oneCMatchCode)
+          ? { oneCMatchCode: oneCCode }
+          : {}),
+      };
+    }
+
+    if (isInternalCloverArticle(currentCode)) {
+      changed += 1;
+      return { ...product, code: "" };
+    }
+    return product;
+  });
+  return { products: next, changed };
 }
 
 function firstNumeric(...values) {
@@ -420,6 +473,8 @@ export function autoLinkCloverProducts(products, oneCProducts, now = new Date().
         oneCSearchQuery: "",
         oneCLinkMode: product.oneCLinkMode || "manual",
         oneCLinkedAt: product.oneCLinkedAt || now,
+        // Артикул только из 1С (не CL-…).
+        code: catalogItem.code || "",
       };
 
       if (ONE_C_PRODUCT_FIELDS.some((field) => enriched[field] !== product[field])) {
@@ -476,6 +531,7 @@ export function autoLinkCloverProducts(products, oneCProducts, now = new Date().
         oneCSearchQuery: "",
         oneCLinkMode: "auto",
         oneCLinkedAt: now,
+        code: candidate.code || "",
       };
     }
 
@@ -528,6 +584,7 @@ export function linkCloverProduct(products, productId, rawOneCProduct, now = new
           oneCSearchRequestedAt: "",
           oneCLinkMode: "manual",
           oneCLinkedAt: now,
+          code: item.code || "",
         }
       : product
   );
@@ -542,25 +599,19 @@ export const PLACEHOLDER_PRODUCT_CATEGORIES = new Set(["Из 1С", "Новые �
 
 const CATEGORY_KEYWORD_RULES = [
   {
-    category: "Перчатки",
-    patterns: [/перчатк/u, /нитрил/u, /латекс/u, /винилов/u],
+    category: "Спецодежда, обувь и средства защиты",
+    patterns: [/перчатк/u, /нитрил/u, /латекс/u, /винилов/u, /спецодежд/u, /\bсиз\b/u],
   },
   {
-    category: "Пакеты и пленка",
-    patterns: [
-      /пакет/u,
-      /мешк/u,
-      /пленк/u,
-      /плёнк/u,
-      /пергамент/u,
-      /вакуумн/u,
-      /стрейч/u,
-      /stretch/u,
-    ],
+    category: "Пленка",
+    patterns: [/пленк/u, /плёнк/u, /стрейч/u, /stretch/u, /пергамент/u, /вакуумн/u],
   },
   {
-    // Салфетки / уборка — раньше «Упаковка», иначе «в банке» ложно даёт Упаковку.
-    category: "Уборка",
+    category: "Пакеты и сумки",
+    patterns: [/пакет/u, /мешк/u, /сумк/u],
+  },
+  {
+    category: "Уборочный инвентарь и оборудование",
     patterns: [
       /салфетк/u,
       /швабр/u,
@@ -578,28 +629,46 @@ const CATEGORY_KEYWORD_RULES = [
     ],
   },
   {
-    category: "Упаковка",
+    category: "Контейнеры",
+    patterns: [/контейнер/u],
+  },
+  {
+    category: "Лотки и подложки",
+    patterns: [/лоток/u, /подложк/u],
+  },
+  {
+    category: "Упаковочные материалы",
     patterns: [
       /банк[аиуы]/u,
       /крышк/u,
-      /контейнер/u,
       /бутылк/u,
       /oneclick/u,
       /стаканчик/u,
-      /лоток/u,
       /коробк/u,
     ],
   },
   {
-    category: "Одноразовая продукция",
-    patterns: [/трубочк/u, /вилк/u, /ложк/u, /тарелк/u, /зубочист/u, /шпател/u],
+    category: "Одноразовая посуда",
+    patterns: [/трубочк/u, /вилк/u, /ложк/u, /тарелк/u, /зубочист/u, /шпател/u, /стакан/u],
   },
   {
-    category: "Канцтовары",
-    patterns: [/кассов/u, /лент/u, /бумаг/u, /ручк/u, /степлер/u, /ножниц/u, /\bа4\b/u],
+    category: "Принадлежности для касс и торговли",
+    patterns: [/кассов/u, /лент.*кас/u],
   },
   {
-    category: "Бытовая химия",
+    category: "Бумага офисная",
+    patterns: [/\bа4\b/u, /бумаг.*офис/u, /офисн.*бумаг/u],
+  },
+  {
+    category: "Канцелярские товары",
+    patterns: [/лент/u, /бумаг/u, /ручк/u, /степлер/u, /ножниц/u],
+  },
+  {
+    category: "Химия профессиональная",
+    patterns: [/профессионал.*хим/u, /хим.*профессион/u],
+  },
+  {
+    category: "Химия бытовая",
     patterns: [
       /белизна/u,
       /санокс/u,
@@ -612,8 +681,24 @@ const CATEGORY_KEYWORD_RULES = [
     ],
   },
   {
-    category: "Текстиль",
-    patterns: [/полотн/u, /вафельн/u, /текстил/u, /полотенц/u, /тряпк[аи] для пола/u],
+    category: "Гигиеническая продукция",
+    patterns: [/полотн/u, /вафельн/u, /текстил/u, /полотенц/u, /тряпк[аи] для пола/u, /гигиен/u],
+  },
+  {
+    category: "Оборудование для туалетных комнат",
+    patterns: [/туалетн/u, /диспенсер.*бумаг/u, /мыльниц/u],
+  },
+  {
+    category: "Посуда и столовые приборы",
+    patterns: [/столов.*прибор/u, /посуд/u],
+  },
+  {
+    category: "Кухонные принадлежности",
+    patterns: [/кухон/u],
+  },
+  {
+    category: "Барные аксессуары и товары для сервировки",
+    patterns: [/барн/u, /сервировк/u],
   },
 ];
 
@@ -684,40 +769,173 @@ export function applyInferredCategories(products) {
 }
 
 /**
+ * Нормализация имени для анти-дублей: регистр, ё→е, без хвоста фасовки.
+ */
+export function normalizeProductNameKey(name) {
+  return cleanText(name)
+    .toLocaleLowerCase("ru-RU")
+    .replaceAll("ё", "е")
+    .replace(/\s*\(\d+\s*\/\s*\d+\)\s*$/g, "")
+    .replace(/\s*\(\d+\s*(?:шт|штук)?\)\s*$/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function productNameKeys(product = {}) {
+  return [
+    product.name,
+    product.oneCName,
+    product.oneCMatchName,
+  ]
+    .map((value) => normalizeProductNameKey(value))
+    .filter(Boolean);
+}
+
+function productCodeKeys(product = {}) {
+  return [product.oneCCode, product.oneCMatchCode, product.code]
+    .map((value) => cleanText(value).toLowerCase())
+    .filter((value) => value && !isInternalCloverArticle(value));
+}
+
+/**
+ * Ищет уже существующий товар Clover для позиции 1С / Excel:
+ * 1) oneCId, 2) код/артикул, 3) имя 1С или preferredName (Excel).
+ * Так повторный импорт и матрица нового клиента не плодят дубли каталога.
+ *
+ * @param {object} [options]
+ * @param {string} [options.preferredName] — имя из Excel / матрицы
+ */
+export function findExistingCloverProductForOneC(
+  products,
+  rawOneCProduct,
+  options = {}
+) {
+  const item = normalizeOneCProduct(rawOneCProduct);
+  const source = Array.isArray(products) ? products : [];
+  const preferredName = cleanText(options?.preferredName);
+  if (!item.id && !item.code && !item.name && !preferredName) return null;
+
+  if (item.id) {
+    const byOneCId = source.find(
+      (product) => cleanText(product.oneCId) === item.id
+    );
+    if (byOneCId) return byOneCId;
+  }
+
+  const codeKeys = new Set(
+    [item.code, cleanText(rawOneCProduct?.code)]
+      .map((value) => cleanText(value).toLowerCase())
+      .filter(Boolean)
+  );
+  if (codeKeys.size) {
+    // Код совпал, но oneCId уже другой — это чужой SKU, не переиспользуем.
+    const byCode = source.find((product) => {
+      if (!productCodeKeys(product).some((code) => codeKeys.has(code))) {
+        return false;
+      }
+      const linked = cleanText(product.oneCId);
+      return !linked || !item.id || linked === item.id;
+    });
+    if (byCode) return byCode;
+  }
+
+  const nameKeys = new Set(
+    [preferredName, item.name, cleanText(rawOneCProduct?.name)]
+      .map((value) => normalizeProductNameKey(value))
+      .filter(Boolean)
+  );
+  if (nameKeys.size) {
+    // Только свободные (без oneCId) или с тем же oneCId.
+    // Чужой oneCId при совпадении имени — не переиспользовать (иначе витрина/матрица на чужой SKU).
+    const ranked = source
+      .map((product, index) => {
+        const names = productNameKeys(product);
+        if (!names.some((name) => nameKeys.has(name))) return null;
+        const linked = cleanText(product.oneCId);
+        if (linked && item.id && linked !== item.id) return null;
+        if (linked && !item.id) return null;
+        return { product, index };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.index - b.index);
+    if (ranked[0]) return ranked[0].product;
+  }
+
+  return null;
+}
+
+function withOneCLinkOnProduct(product, item, now) {
+  const next = { ...product };
+  if (!cleanText(next.oneCId)) next.oneCId = item.id;
+  if (item.code) {
+    next.oneCCode = item.code;
+    next.code = item.code;
+    if (!cleanText(next.oneCMatchCode)) next.oneCMatchCode = item.code;
+  } else if (isInternalCloverArticle(next.code)) {
+    next.code = "";
+  }
+  if (!cleanText(next.oneCName)) next.oneCName = item.name;
+  if (!cleanText(next.oneCMatchName)) next.oneCMatchName = item.name;
+  if (!cleanText(next.oneCLinkMode)) next.oneCLinkMode = "manual-from-catalog";
+  if (!cleanText(next.oneCLinkedAt)) next.oneCLinkedAt = now;
+  return next;
+}
+
+/**
  * Создаёт товар Clover из позиции каталога 1С или возвращает уже связанный.
- * Не дублирует oneCId: при существующей связи переиспользует товар.
+ * Не дублирует oneCId / код / точное имя: при существующей связи переиспользует товар.
  * Категория: авто по похожим товарам / ключевым словам (не «Из 1С»).
+ *
+ * @param {object} [options]
+ * @param {string} [options.preferredName] — имя как в матрице/Excel; для нового товара
+ *   важнее названия 1С. Уже существующий товар Clover своё имя не меняет.
+ * @param {boolean} [options.showOnStorefront] — сразу показать на витрине сайта.
  */
 export function createOrReuseCloverProductFromOneC(
   products,
   rawOneCProduct,
-  now = new Date().toISOString()
+  now = new Date().toISOString(),
+  options = {}
 ) {
   const item = normalizeOneCProduct(rawOneCProduct);
   if (!item.id || !item.name) {
     throw new Error("Не удалось определить выбранную позицию 1С.");
   }
 
+  const preferredName = cleanText(options?.preferredName);
+  const wantStorefront = options?.showOnStorefront === true;
+
   const source = Array.isArray(products) ? products : [];
-  const existing = source.find((product) => cleanText(product.oneCId) === item.id);
+  const existing = findExistingCloverProductForOneC(source, item, {
+    preferredName,
+  });
   if (existing) {
-    const current = cleanText(existing.category);
-    if (current && current !== "Из 1С") {
-      return {
-        products: source,
-        product: existing,
-        created: false,
-      };
+    let product = withOneCLinkOnProduct(existing, item, now);
+    // Имя Clover/матрицы не перетираем названием 1С.
+    const current = cleanText(product.category);
+    if (!current || current === "Из 1С") {
+      const category = inferCloverProductCategory(product.name || item.name, source);
+      if (category !== current) {
+        product = { ...product, category };
+      }
     }
-    const category = inferCloverProductCategory(existing.name || item.name, source);
-    if (category === current) {
-      return {
-        products: source,
-        product: existing,
-        created: false,
-      };
+    if (!cleanText(product.subcategory)) {
+      const taxonomy = inferSubcategoryFacetFromName(
+        product.name || preferredName || item.name,
+        product.category,
+        source
+      );
+      if (taxonomy.subcategory) {
+        product = {
+          ...product,
+          subcategory: taxonomy.subcategory,
+          facet: cleanText(product.facet) || taxonomy.facet || "",
+        };
+      }
     }
-    const product = { ...existing, category };
+    if (wantStorefront && product.showOnStorefront !== true) {
+      product = { ...product, showOnStorefront: true };
+    }
     return {
       products: source.map((entry) =>
         String(entry.id) === String(existing.id) ? product : entry
@@ -728,11 +946,16 @@ export function createOrReuseCloverProductFromOneC(
   }
 
   const id = nextCloverProductId(source);
+  const displayName = preferredName || item.name;
+  const category = inferCloverProductCategory(displayName, source);
+  const taxonomy = inferSubcategoryFacetFromName(displayName, category, source);
   const product = {
     id,
-    category: inferCloverProductCategory(item.name, source),
-    name: item.name,
-    code: item.code || `CL-${String(id).padStart(4, "0")}`,
+    category,
+    subcategory: taxonomy.subcategory || "",
+    facet: taxonomy.facet || "",
+    name: displayName,
+    code: item.code || "",
     oneCId: item.id,
     oneCCode: item.code,
     oneCName: item.name,
@@ -743,7 +966,9 @@ export function createOrReuseCloverProductFromOneC(
     oneCLinkMode: "manual-from-catalog",
     oneCLinkedAt: now,
     active: true,
+    showOnStorefront: wantStorefront,
     pieceSize: 1,
+    pieceOrderMultiple: 1,
     packSize: 1,
     bundleSize: 1,
     boxSize: 1,
@@ -776,9 +1001,8 @@ export function addProductIdToClientMatrix(clientLinks, clientId, productId) {
     ? current.matrixProductIds.map(String)
     : [];
   const id = String(productId);
-  const nextIds = matrixProductIds.includes(id)
-    ? matrixProductIds
-    : [...matrixProductIds, id];
+  const alreadyInMatrix = matrixProductIds.includes(id);
+  const nextIds = alreadyInMatrix ? matrixProductIds : [...matrixProductIds, id];
 
   let matrixMode = cleanText(current.matrixMode) || "pending";
   if (matrixMode === "pending" || !matrixMode) {
@@ -805,7 +1029,8 @@ export function addProductIdToClientMatrix(clientLinks, clientId, productId) {
   return {
     clientLinks: links,
     clientLink: nextLink,
-    addedToMatrix: matrixMode === "selected" || matrixMode === "pending",
+    addedToMatrix: !alreadyInMatrix && (matrixMode === "selected" || matrixMode === "pending"),
+    alreadyInMatrix,
   };
 }
 

@@ -106,7 +106,7 @@ export function ensureOneCProductSearchIndex(items) {
   return cachedRows;
 }
 
-function rankRow(blob, tokens, rawNeedle) {
+function rankRowAnd(blob, tokens, rawNeedle) {
   if (!tokens.length) return 1;
   let score = 0;
   for (const token of tokens) {
@@ -118,6 +118,43 @@ function rankRow(blob, tokens, rawNeedle) {
   return score;
 }
 
+/** Хотя бы один токен — чтобы длинный запрос из Clover всё же находил позиции 1С. */
+function rankRowOr(blob, tokens, rawNeedle) {
+  if (!tokens.length) return 0;
+  let hit = 0;
+  for (const token of tokens) {
+    if (!blob.includes(token)) continue;
+    hit += 1;
+    if (blob.startsWith(token)) hit += 0.25;
+  }
+  if (!hit) return 0;
+  if (rawNeedle && blob.includes(rawNeedle)) hit += 2;
+  // Штраф относительно полного AND, чтобы OR не перебивал точные совпадения.
+  return hit * 0.5;
+}
+
+function scoreCatalog(rows, tokens, needle) {
+  const queryTokens = tokens.length ? tokens : needle ? [needle] : [];
+  const scored = [];
+  for (const row of rows) {
+    const score = rankRowAnd(row.blob, queryTokens, needle);
+    if (score > 0) scored.push({ item: row.item, score, name: row.item.name || "" });
+  }
+  // Если AND ничего не дал (типично при вставке названия из Clover) — OR по токенам.
+  if (!scored.length && queryTokens.length > 1) {
+    for (const row of rows) {
+      const score = rankRowOr(row.blob, queryTokens, needle);
+      if (score > 0) scored.push({ item: row.item, score, name: row.item.name || "" });
+    }
+  }
+  scored.sort(
+    (a, b) =>
+      b.score - a.score ||
+      String(a.name).localeCompare(String(b.name), "ru")
+  );
+  return scored.map((entry) => entry.item);
+}
+
 /**
  * @returns {{ items: object[], total: number }}
  */
@@ -127,22 +164,9 @@ export function searchOneCProductsIndexed(items, { search = "", limit = 50, offs
   const needle = normalizeSearchText(raw);
   const tokens = tokenizeSearchQuery(raw);
 
-  let matched;
-  if (!needle) {
-    matched = rows.map((row) => row.item);
-  } else {
-    const scored = [];
-    for (const row of rows) {
-      const score = rankRow(row.blob, tokens.length ? tokens : [needle], needle);
-      if (score > 0) scored.push({ item: row.item, score, name: row.item.name || "" });
-    }
-    scored.sort(
-      (a, b) =>
-        b.score - a.score ||
-        String(a.name).localeCompare(String(b.name), "ru")
-    );
-    matched = scored.map((entry) => entry.item);
-  }
+  const matched = !needle
+    ? rows.map((row) => row.item)
+    : scoreCatalog(rows, tokens, needle);
 
   const safeLimit = Math.min(200, Math.max(1, Number(limit) || 50));
   const safeOffset = Math.max(0, Number(offset) || 0);

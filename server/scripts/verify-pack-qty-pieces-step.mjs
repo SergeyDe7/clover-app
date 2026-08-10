@@ -1,11 +1,15 @@
 /**
  * Единицы в ЛК клиента:
  * - шт → поле 1,2,3; в заказ/1С 1,2,3 шт (multiplier=1)
+ * - шт с кратностью 5 → поле 5,10,15; цена за шт.; в 1С те же 5,10,15 шт
  * - упаковка/пачка с packSize=100 → поле 100,200,300; в заказе 1,2,3 уп.; в 1С totalPieces
  */
 import assert from "node:assert/strict";
 import {
   getUnitMultiplier,
+  getPieceOrderMultiple,
+  getUnitOrderStep,
+  snapQuantityToStep,
   toQuantityInputValue,
   fromQuantityInputValue,
   quantityInputStep,
@@ -21,6 +25,20 @@ assert.equal(toQuantityInputValue(3, 1), 3);
 assert.equal(quantityInputUnitLabel("piece", 1), "шт.");
 // pieceSize больше не раздувает шаг для «Штука»
 assert.equal(getUnitMultiplier({ pieceSize: 50, packSize: 400 }, "piece"), 1);
+assert.equal(getPieceOrderMultiple({ pieceSize: 50 }), 1);
+assert.equal(getUnitOrderStep({ pieceSize: 50 }, "piece"), 1);
+
+// Кратность шт.: цена за шт., количество 5/10/15
+const multi = { pieceOrderMultiple: 5, saleUnits: ["piece"], pricePiece: 10 };
+assert.equal(getPieceOrderMultiple(multi), 5);
+assert.equal(getUnitOrderStep(multi, "piece"), 5);
+assert.equal(quantityInputStep(1, 5), 5);
+assert.equal(fromQuantityInputValue("5", 1, 5), 5);
+assert.equal(fromQuantityInputValue("7", 1, 5), 5);
+assert.equal(fromQuantityInputValue("8", 1, 5), 10);
+assert.equal(fromQuantityInputValue("0", 1, 5), 0);
+assert.equal(snapQuantityToStep(12, 5), 10);
+assert.equal(snapQuantityToStep(13, 5), 15);
 
 // Банка: продаём упаковками по 100 шт
 const jar = { pieceSize: 1, packSize: 100, bundleSize: 1, saleUnits: ["pack"] };

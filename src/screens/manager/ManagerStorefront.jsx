@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
-import { normalizeProduct, productArticle } from "../../shared/appHelpers";
+import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber } from "../../shared/appHelpers";
+import { StorefrontProductAdd } from "./StorefrontProductAdd";
 
 function formatMarkupDraft(value) {
   if (value === "" || value === null || value === undefined) return "";
@@ -30,11 +31,14 @@ export function ManagerStorefront({
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [productBusy, setProductBusy] = useState(false);
   const [productQuery, setProductQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState({
     description: "",
     composition: "",
     characteristics: "",
+    pricingSource: "inherit",
+    prices: {},
   });
   const [draft, setDraft] = useState({
     storefrontPricingMode:
@@ -114,6 +118,8 @@ export function ManagerStorefront({
     [activeProducts]
   );
 
+  const selectedCount = selectedIds.size;
+
   const setField = (key, value) => {
     setSettingsSaved(false);
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -177,31 +183,61 @@ export function ManagerStorefront({
     }
   };
 
-  const toggleProduct = (productId, checked) => {
-    const next = (Array.isArray(products) ? products : []).map((item) =>
-      String(item.id) === String(productId)
-        ? { ...item, showOnStorefront: checked }
-        : item
-    );
-    void persistProducts(
-      next,
-      checked
-        ? "Товар добавлен на витрину сайта."
-        : "Товар скрыт с витрины сайта."
-    );
+  const toggleSelected = (productId, checked) => {
+    const key = String(productId);
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(key);
+      else next.delete(key);
+      return next;
+    });
   };
 
-  const setAllFiltered = (checked) => {
-    const ids = new Set(filteredProducts.map((item) => String(item.id)));
-    const next = (Array.isArray(products) ? products : []).map((item) =>
-      ids.has(String(item.id)) ? { ...item, showOnStorefront: checked } : item
-    );
-    void persistProducts(
+  const selectAllFiltered = () => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const item of filteredProducts) {
+        // Для добавления выбираем только ещё не на витрине.
+        if (item.showOnStorefront === true) continue;
+        next.add(String(item.id));
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  const applySelectionToStorefront = async (checked) => {
+    if (!selectedIds.size) return;
+    const ids = selectedIds;
+    let touched = 0;
+    const next = (Array.isArray(products) ? products : []).map((item) => {
+      if (!ids.has(String(item.id))) return item;
+      const on = item.showOnStorefront === true;
+      if (checked && on) return item;
+      if (!checked && !on) return item;
+      touched += 1;
+      return { ...item, showOnStorefront: checked };
+    });
+    if (!touched) {
+      await appAlert({
+        title: checked ? "Уже на витрине" : "Не на витрине",
+        message: checked
+          ? "Выбранные позиции уже добавлены на витрину."
+          : "Среди выбранных нет позиций на витрине.",
+      });
+      clearSelection();
+      return;
+    }
+    const saved = await persistProducts(
       next,
       checked
-        ? `На витрину добавлено: ${ids.size}.`
-        : `С витрины снято: ${ids.size}.`
+        ? `На витрину добавлено: ${touched}. Фото и описание подтянутся в фоне.`
+        : `С витрины снято: ${touched}.`
     );
+    if (saved) clearSelection();
   };
 
   const openEditor = (item) => {
@@ -209,22 +245,56 @@ export function ManagerStorefront({
       item.storefrontDetails && typeof item.storefrontDetails === "object"
         ? item.storefrontDetails
         : {};
+    const pricing =
+      item.storefrontPricing && typeof item.storefrontPricing === "object"
+        ? item.storefrontPricing
+        : {};
+    const prices = {};
+    for (const unit of UNIT_ORDER) {
+      prices[unit] =
+        pricing[unit] == null || pricing[unit] === ""
+          ? ""
+          : String(pricing[unit]);
+    }
     setEditingId(item.id);
     setEditDraft({
       description: String(details.description || ""),
       composition: String(details.composition || ""),
       characteristics: String(details.characteristics || ""),
+      pricingSource: pricing.source === "manual" ? "manual" : "inherit",
+      prices,
     });
   };
 
   const closeEditor = () => {
     setEditingId(null);
-    setEditDraft({ description: "", composition: "", characteristics: "" });
+    setEditDraft({
+      description: "",
+      composition: "",
+      characteristics: "",
+      pricingSource: "inherit",
+      prices: {},
+    });
   };
 
   const saveProductCard = async (productId) => {
     const next = (Array.isArray(products) ? products : []).map((item) => {
       if (String(item.id) !== String(productId)) return item;
+      const storefrontPricing = {
+        source: editDraft.pricingSource === "manual" ? "manual" : "inherit",
+      };
+      for (const unit of UNIT_ORDER) {
+        const raw = editDraft.prices?.[unit];
+        if (raw === "" || raw == null) {
+          storefrontPricing[unit] = null;
+          continue;
+        }
+        const numeric = Number(String(raw).replace(",", "."));
+        storefrontPricing[unit] =
+          Number.isFinite(numeric) && numeric >= 0
+            ? Math.round(numeric * 100) / 100
+            : null;
+      }
       return normalizeProduct({
         ...item,
         storefrontDetails: {
@@ -232,6 +302,7 @@ export function ManagerStorefront({
           composition: String(editDraft.composition || "").trim(),
           characteristics: String(editDraft.characteristics || "").trim(),
         },
+        storefrontPricing,
       });
     });
     const saved = await persistProducts(
@@ -251,8 +322,12 @@ export function ManagerStorefront({
       details.composition,
       details.characteristics,
     ].filter((value) => String(value || "").trim()).length;
-    if (!filled) return "Описание не заполнено";
-    return `Заполнено полей: ${filled} из 3`;
+    const manual = item.storefrontPricing?.source === "manual";
+    const parts = [];
+    if (filled) parts.push(`описание ${filled}/3`);
+    else parts.push("описание не заполнено");
+    if (manual) parts.push("своя цена");
+    return parts.join(" · ");
   };
 
   return (
@@ -328,20 +403,51 @@ export function ManagerStorefront({
             </p>
           </>
         ) : (
-          <label className="storefront-price-field">
-            <span>Вид цен витрины</span>
-            <select
-              value={draft.storefrontPriceTypeId || ""}
-              onChange={onPriceTypeChange}
-            >
-              <option value="">Не выбран</option>
-              {types.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <>
+            <label className="storefront-price-field">
+              <span>Вид цен витрины</span>
+              <select
+                value={draft.storefrontPriceTypeId || ""}
+                onChange={onPriceTypeChange}
+              >
+                <option value="">Не выбран</option>
+                {types.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="storefront-price-field" style={{ marginTop: 12 }}>
+              <span>Запасная наценка, %, если вида цен нет</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="0"
+                value={draft.storefrontMarkupPercent}
+                onChange={(event) => {
+                  const raw = String(event.target.value).replace(",", ".");
+                  if (raw === "") {
+                    setField("storefrontMarkupPercent", "");
+                    return;
+                  }
+                  if (!/^\d{0,4}(\.\d{0,2})?$/.test(raw)) return;
+                  setField("storefrontMarkupPercent", raw);
+                }}
+                onBlur={() => {
+                  setField(
+                    "storefrontMarkupPercent",
+                    String(parseMarkupPercent(draft.storefrontMarkupPercent))
+                  );
+                }}
+              />
+            </label>
+            <p className="storefront-settings-hint">
+              Сначала берётся выбранный вид цен 1С. Если его нет у товара —
+              цена = закупка / «Закупочная» × (1 + запасная наценка / 100).
+            </p>
+          </>
         )}
 
         <label className="storefront-check">
@@ -405,13 +511,22 @@ export function ManagerStorefront({
       <div className="manager-contact-settings" style={{ marginTop: 28 }}>
         <h3>Товары на витрине</h3>
         <p className="storefront-settings-hint">
-          Отметьте товары для сайта и прямо здесь заполните описание, состав и
-          характеристики. Сейчас на витрине:{" "}
+          На сайте имя товара = как в матрице Clover (не сырое название 1С).
+          Можно выбрать из каталога ниже или добавить из 1С / Excel, даже если
+          позиции ещё нет ни у одного клиента. Сейчас на витрине:{" "}
           <strong>{onStorefrontCount}</strong> из {activeProducts.length}.
+          Выбрано: <strong>{selectedCount}</strong>.
         </p>
+        <StorefrontProductAdd
+          products={products}
+          setProducts={setProducts}
+          onAfterAdd={() => {
+            setSelectedIds(new Set());
+          }}
+        />
         <div className="form-grid" style={{ marginBottom: 12 }}>
           <label className="field field-wide">
-            Поиск
+            Поиск по каталогу Clover
             <input
               value={productQuery}
               placeholder="Название, код, категория"
@@ -419,22 +534,98 @@ export function ManagerStorefront({
             />
           </label>
         </div>
-        <div className="form-actions" style={{ marginBottom: 12 }}>
+        <div className="form-actions" style={{ marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
           <button
             className="secondary-button"
             type="button"
-            disabled={productBusy || filteredProducts.length === 0}
-            onClick={() => setAllFiltered(true)}
+            disabled={
+              productBusy ||
+              filteredProducts.every((item) => item.showOnStorefront === true)
+            }
+            onClick={selectAllFiltered}
           >
-            Отметить найденные
+            Выбрать все
+            {(() => {
+              const n = filteredProducts.filter(
+                (item) => item.showOnStorefront !== true
+              ).length;
+              return n ? ` (${n})` : "";
+            })()}
           </button>
           <button
             className="secondary-button"
             type="button"
-            disabled={productBusy || filteredProducts.length === 0}
-            onClick={() => setAllFiltered(false)}
+            disabled={productBusy || selectedCount === 0}
+            onClick={clearSelection}
           >
-            Снять найденные
+            Снять выбор
+          </button>
+          <button
+            className="primary-button"
+            type="button"
+            disabled={productBusy || selectedCount === 0}
+            onClick={() => void applySelectionToStorefront(true)}
+          >
+            Добавить на витрину
+            {selectedCount ? ` (${selectedCount})` : ""}
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={productBusy || selectedCount === 0}
+            onClick={() => void applySelectionToStorefront(false)}
+          >
+            Убрать с витрины
+            {selectedCount ? ` (${selectedCount})` : ""}
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={productBusy || onStorefrontCount === 0}
+            onClick={() => {
+              const next = (Array.isArray(products) ? products : []).map((item) =>
+                item.showOnStorefront === true
+                  ? {
+                      ...item,
+                      imageUrl: "",
+                      imageUpdatedAt: "",
+                      enrichmentStatus: "pending",
+                    }
+                  : item
+              );
+              void persistProducts(
+                next,
+                "Обновляем фото витрины в стиле Clover (белый фон, без инфографики). Подождите и обновите страницу."
+              );
+            }}
+          >
+            Обновить фото (белый фон)
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={productBusy || onStorefrontCount === 0}
+            onClick={() => {
+              const next = (Array.isArray(products) ? products : []).map((item) =>
+                item.showOnStorefront === true
+                  ? {
+                      ...item,
+                      storefrontDetails: {
+                        description: "",
+                        composition: "",
+                        characteristics: "",
+                      },
+                      enrichmentStatus: "pending",
+                    }
+                  : item
+              );
+              void persistProducts(
+                next,
+                "Обновляем описания и характеристики для покупателей. Обновите страницу через минуту."
+              );
+            }}
+          >
+            Обновить описания
           </button>
         </div>
         <div className="storefront-product-pick-list">
@@ -443,30 +634,42 @@ export function ManagerStorefront({
           ) : (
             filteredProducts.map((item) => {
               const open = String(editingId) === String(item.id);
+              const selected = selectedIds.has(String(item.id));
+              const onStorefront = item.showOnStorefront === true;
               return (
                 <div
                   className={`storefront-product-card${open ? " is-open" : ""}${
-                    item.showOnStorefront ? " is-on" : ""
-                  }`}
+                    onStorefront ? " is-on" : ""
+                  }${selected ? " is-selected" : ""}`}
                   key={item.id}
                 >
                   <div className="storefront-product-card-head">
                     <label className="storefront-check storefront-product-row">
                       <input
                         type="checkbox"
-                        checked={item.showOnStorefront === true}
+                        checked={selected}
                         disabled={productBusy}
                         onChange={(event) =>
-                          toggleProduct(item.id, event.target.checked)
+                          toggleSelected(item.id, event.target.checked)
                         }
                       />
                       <span>
                         <strong>{item.name}</strong>
                         <span className="storefront-product-meta">
+                          {onStorefront ? (
+                            <span className="badge green" style={{ marginRight: 6 }}>
+                              На витрине
+                            </span>
+                          ) : (
+                            <span className="badge yellow" style={{ marginRight: 6 }}>
+                              Не на витрине
+                            </span>
+                          )}
                           {[productArticle(item), item.category].filter(Boolean).join(" · ") ||
                             "—"}
                           {" · "}
                           {detailsPreview(item)}
+                          {item.imageUrl ? " · фото есть" : " · без фото"}
                         </span>
                       </span>
                     </label>
@@ -527,7 +730,80 @@ export function ManagerStorefront({
                             }
                           />
                         </label>
+                        <label className="field field-wide">
+                          Цена на сайте
+                          <select
+                            value={editDraft.pricingSource}
+                            disabled={productBusy}
+                            onChange={(event) => {
+                              const pricingSource =
+                                event.target.value === "manual"
+                                  ? "manual"
+                                  : "inherit";
+                              setEditDraft((prev) => {
+                                const prices = { ...(prev.prices || {}) };
+                                if (pricingSource === "manual") {
+                                  const units =
+                                    Array.isArray(item.saleUnits) &&
+                                    item.saleUnits.length
+                                      ? item.saleUnits
+                                      : ["piece"];
+                                  for (const unit of units) {
+                                    if (prices[unit] === "" || prices[unit] == null) {
+                                      const catalog =
+                                        Number(item[unitPriceField(unit)]) || 0;
+                                      prices[unit] =
+                                        catalog > 0 ? String(catalog) : "";
+                                    }
+                                  }
+                                }
+                                return { ...prev, pricingSource, prices };
+                              });
+                            }}
+                          >
+                            <option value="inherit">
+                              Как в настройках витрины
+                            </option>
+                            <option value="manual">
+                              Своя цена для этого товара
+                            </option>
+                          </select>
+                        </label>
+                        {editDraft.pricingSource === "manual"
+                          ? (Array.isArray(item.saleUnits) && item.saleUnits.length
+                              ? item.saleUnits
+                              : ["piece"]
+                            ).map((unit) => (
+                              <label className="field" key={`sf-m-${item.id}-${unit}`}>
+                                {UNIT_CONFIG[unit]?.label || unit}, ₽
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  disabled={productBusy}
+                                  value={editDraft.prices?.[unit] ?? ""}
+                                  placeholder="0"
+                                  onFocus={selectDefaultNumber}
+                                  onChange={(event) =>
+                                    setEditDraft((prev) => ({
+                                      ...prev,
+                                      prices: {
+                                        ...(prev.prices || {}),
+                                        [unit]: event.target.value,
+                                      },
+                                    }))
+                                  }
+                                />
+                              </label>
+                            ))
+                          : null}
                       </div>
+                      {editDraft.pricingSource === "manual" &&
+                      draft.storefrontPricingMode === "purchase_markup" ? (
+                        <p className="storefront-settings-hint" style={{ marginTop: 8 }}>
+                          Перекрывает расчёт «закупочная + %» только на сайте.
+                        </p>
+                      ) : null}
                       <div className="form-actions" style={{ marginTop: 10 }}>
                         <button
                           className="primary-button"
