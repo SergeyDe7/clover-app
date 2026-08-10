@@ -57,19 +57,41 @@ export function CatalogPage({
   const facets = subcategory ? getSubgroupFacets(category, subcategory) : [];
   const needsSubgroup = category && groupRequiresSubgroup(category);
   const atParentOnly = Boolean(category && !subcategory && needsSubgroup);
-  const showProducts = Boolean(
-    !category || subcategory || !needsSubgroup
-  );
 
   const sections = useMemo(() => {
-    if (!showProducts) return [];
+    if (atParentOnly) {
+      const orphans = products.filter(
+        (product) => !String(product.subcategory || "").trim()
+      );
+      return orphans.length
+        ? [
+            {
+              name: "Без подгруппы",
+              products: orphans,
+              count: orphans.length,
+            },
+          ]
+        : [];
+    }
+    const canShow = Boolean(!category || subcategory || !needsSubgroup);
+    if (!canShow) return [];
     if (category) {
       return products.length
         ? [{ name: subcategory || category, products, count: products.length }]
         : [];
     }
     return groupProductsByCloverGroup(products);
-  }, [category, subcategory, products, showProducts]);
+  }, [
+    atParentOnly,
+    category,
+    subcategory,
+    products,
+    needsSubgroup,
+  ]);
+
+  const showProducts = sections.length > 0 || Boolean(
+    !category || subcategory || !needsSubgroup
+  );
 
   const title = facet || subcategory || category || "Каталог";
 
@@ -258,11 +280,18 @@ export function CatalogPage({
 
           {sections.map((section) => (
             <section className="sf-group-block" key={section.name}>
-              {!category ? (
+              {!category || atParentOnly ? (
                 <div className="sf-group-head">
                   <div>
                     <h2>{section.name}</h2>
-                    <p className="sf-muted">{getGroupMeta(section.name).lead}</p>
+                    {!atParentOnly ? (
+                      <p className="sf-muted">{getGroupMeta(section.name).lead}</p>
+                    ) : (
+                      <p className="sf-muted">
+                        Товары без выбранной подгруппы — укажите подкатегорию в
+                        карточке, чтобы они попали в меню.
+                      </p>
+                    )}
                   </div>
                 </div>
               ) : null}

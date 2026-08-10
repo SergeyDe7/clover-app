@@ -175,4 +175,45 @@ const reusePlaceholder = createOrReuseCloverProductFromOneC(
 assert.equal(reusePlaceholder.created, false);
 assert.equal(reusePlaceholder.product.category, "Контейнеры");
 
+// Имя совпало, но oneCId уже другой — не переиспользуем чужую карточку.
+const foreignNameConflict = createOrReuseCloverProductFromOneC(
+  [
+    {
+      id: 200,
+      name: "Контейнер универсальный 500 мл",
+      category: "Контейнеры",
+      subcategory: "Ланч-боксы",
+      oneCId: "onec-other-sku",
+      code: "НФ-OTHER",
+    },
+  ],
+  {
+    id: "onec-new-sku",
+    code: "НФ-NEW",
+    name: "Контейнер универсальный 500 мл",
+  },
+  "2026-07-30T12:04:00.000Z"
+);
+assert.equal(foreignNameConflict.created, true);
+assert.equal(foreignNameConflict.product.id, 201);
+assert.equal(foreignNameConflict.product.oneCId, "onec-new-sku");
+assert.equal(
+  foreignNameConflict.products.filter((p) => p.oneCId === "onec-other-sku").length,
+  1
+);
+
+// Иерархическая группа: из имени выставляем subcategory.
+const paperBox = createOrReuseCloverProductFromOneC(
+  [],
+  {
+    id: "onec-paper-box",
+    code: "НФ-PB",
+    name: "Контейнер бумажный прямоугольный крафт 800 мл",
+  },
+  "2026-07-30T12:05:00.000Z"
+);
+assert.equal(paperBox.created, true);
+assert.equal(paperBox.product.category, "Контейнеры");
+assert.equal(paperBox.product.subcategory, "Бумажные контейнеры");
+
 console.log("verify-create-product-from-onec: ok");

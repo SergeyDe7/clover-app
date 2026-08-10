@@ -1,3 +1,5 @@
+import { inferSubcategoryFacetFromName } from "../../src/screens/storefront/productGroups.js";
+
 const ONE_C_PRODUCT_FIELDS = [
   "oneCId",
   "oneCCode",
@@ -826,9 +828,14 @@ export function findExistingCloverProductForOneC(
       .filter(Boolean)
   );
   if (codeKeys.size) {
-    const byCode = source.find((product) =>
-      productCodeKeys(product).some((code) => codeKeys.has(code))
-    );
+    // Код совпал, но oneCId уже другой — это чужой SKU, не переиспользуем.
+    const byCode = source.find((product) => {
+      if (!productCodeKeys(product).some((code) => codeKeys.has(code))) {
+        return false;
+      }
+      const linked = cleanText(product.oneCId);
+      return !linked || !item.id || linked === item.id;
+    });
     if (byCode) return byCode;
   }
 
@@ -838,18 +845,19 @@ export function findExistingCloverProductForOneC(
       .filter(Boolean)
   );
   if (nameKeys.size) {
-    // Сначала свободные (без oneCId) или с тем же oneCId — безопаснее для линка.
+    // Только свободные (без oneCId) или с тем же oneCId.
+    // Чужой oneCId при совпадении имени — не переиспользовать (иначе витрина/матрица на чужой SKU).
     const ranked = source
       .map((product, index) => {
         const names = productNameKeys(product);
         if (!names.some((name) => nameKeys.has(name))) return null;
         const linked = cleanText(product.oneCId);
-        const linkRank =
-          !linked ? 0 : linked === item.id ? 0 : 2;
-        return { product, index, linkRank };
+        if (linked && item.id && linked !== item.id) return null;
+        if (linked && !item.id) return null;
+        return { product, index };
       })
       .filter(Boolean)
-      .sort((a, b) => a.linkRank - b.linkRank || a.index - b.index);
+      .sort((a, b) => a.index - b.index);
     if (ranked[0]) return ranked[0].product;
   }
 
@@ -911,6 +919,20 @@ export function createOrReuseCloverProductFromOneC(
         product = { ...product, category };
       }
     }
+    if (!cleanText(product.subcategory)) {
+      const taxonomy = inferSubcategoryFacetFromName(
+        product.name || preferredName || item.name,
+        product.category,
+        source
+      );
+      if (taxonomy.subcategory) {
+        product = {
+          ...product,
+          subcategory: taxonomy.subcategory,
+          facet: cleanText(product.facet) || taxonomy.facet || "",
+        };
+      }
+    }
     if (wantStorefront && product.showOnStorefront !== true) {
       product = { ...product, showOnStorefront: true };
     }
@@ -925,9 +947,13 @@ export function createOrReuseCloverProductFromOneC(
 
   const id = nextCloverProductId(source);
   const displayName = preferredName || item.name;
+  const category = inferCloverProductCategory(displayName, source);
+  const taxonomy = inferSubcategoryFacetFromName(displayName, category, source);
   const product = {
     id,
-    category: inferCloverProductCategory(displayName, source),
+    category,
+    subcategory: taxonomy.subcategory || "",
+    facet: taxonomy.facet || "",
     name: displayName,
     code: item.code || "",
     oneCId: item.id,

@@ -334,6 +334,111 @@ export function subcategoryMatchesFilter(productSubcategory, filterSubcategory) 
   );
 }
 
+/**
+ * Подгруппа/фасет по названию товара: совпадение с именами children группы
+ * или с уже размеченными товарами той же категории.
+ */
+export function inferSubcategoryFacetFromName(
+  productName,
+  category,
+  products = []
+) {
+  const cat = canonicalizeProductCategory(category);
+  const query = String(productName || "")
+    .trim()
+    .toLocaleLowerCase("ru-RU")
+    .replaceAll("ё", "е");
+  if (!cat || !query) return { subcategory: "", facet: "" };
+
+  const children = getGroupChildren(cat);
+  if (!children.length) return { subcategory: "", facet: "" };
+
+  const scoreLabel = (label) => {
+    const needle = String(label || "")
+      .trim()
+      .toLocaleLowerCase("ru-RU")
+      .replaceAll("ё", "е");
+    if (!needle) return 0;
+    if (query.includes(needle)) return 100 + needle.length;
+    const stem = (word) =>
+      String(word || "")
+        .replace(
+          /(ами|ями|ыми|ого|ему|ых|ии|ий|ый|ой|ая|ое|ые|ов|ев|ей|ом|ем|ах|ях|ам|ям|ую|юю|у|ю|а|я|ы|и|е|о)$/u,
+          ""
+        )
+        .slice(0, 12);
+    const tokens = needle.split(/\s+/).filter((w) => w.length >= 4);
+    if (!tokens.length) return 0;
+    const queryWords = query.split(/\s+/).filter(Boolean);
+    const hits = tokens.filter((token) => {
+      if (query.includes(token)) return true;
+      const tokenStem = stem(token);
+      if (tokenStem.length < 4) return false;
+      return queryWords.some((word) => {
+        const wordStem = stem(word);
+        return (
+          wordStem.startsWith(tokenStem) ||
+          tokenStem.startsWith(wordStem) ||
+          word.includes(tokenStem) ||
+          token.includes(wordStem)
+        );
+      });
+    }).length;
+    if (!hits) return 0;
+    return hits * 20 + Math.min(needle.length, 40);
+  };
+
+  let bestSub = null;
+  for (const child of children) {
+    const score = scoreLabel(child.name);
+    if (score <= 0) continue;
+    if (!bestSub || score > bestSub.score) {
+      bestSub = { name: child.name, score };
+    }
+  }
+
+  if (!bestSub) {
+    for (const product of Array.isArray(products) ? products : []) {
+      if (canonicalizeProductCategory(product?.category) !== cat) continue;
+      const sub = String(product?.subcategory || "").trim();
+      if (!sub) continue;
+      const other = String(product?.name || "")
+        .trim()
+        .toLocaleLowerCase("ru-RU")
+        .replaceAll("ё", "е");
+      if (!other) continue;
+      const shared = other
+        .split(/\s+/)
+        .filter((w) => w.length >= 4 && query.includes(w)).length;
+      if (shared < 2) continue;
+      if (!bestSub || shared > bestSub.score) {
+        bestSub = {
+          name: sub,
+          score: shared,
+          facet: String(product?.facet || "").trim(),
+        };
+      }
+    }
+  }
+
+  if (!bestSub) return { subcategory: "", facet: "" };
+
+  let facet = String(bestSub.facet || "").trim();
+  if (!facet) {
+    let bestFacet = null;
+    for (const item of getSubgroupFacets(cat, bestSub.name)) {
+      const score = scoreLabel(item.name);
+      if (score <= 0) continue;
+      if (!bestFacet || score > bestFacet.score) {
+        bestFacet = { name: item.name, score };
+      }
+    }
+    facet = bestFacet?.name || "";
+  }
+
+  return { subcategory: bestSub.name, facet };
+}
+
 export function facetMatchesFilter(productFacet, filterFacet) {
   const filter = String(filterFacet || "").trim();
   if (!filter) return true;

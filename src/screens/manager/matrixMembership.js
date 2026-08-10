@@ -67,7 +67,10 @@ export function findCloverCatalogProduct(
       const codes = [item.oneCCode, item.code, item.oneCMatchCode]
         .map((value) => String(value || "").trim().toLocaleLowerCase("ru-RU"))
         .filter((value) => value && !/^cl-\d+$/i.test(value));
-      return codes.includes(codeKey);
+      if (!codes.includes(codeKey)) return false;
+      const linked = String(item.oneCId || "").trim();
+      // Код совпал, но oneCId уже другой — чужой SKU.
+      return !linked || !oid || linked === oid;
     });
     if (byCode) return byCode;
   }
@@ -78,6 +81,7 @@ export function findCloverCatalogProduct(
       .filter(Boolean)
   );
   if (nameKeys.size) {
+    // Только свободные или с тем же oneCId — не переиспользовать чужой linked SKU.
     const ranked = source
       .map((item, index) => {
         const keys = [item.name, item.oneCName, item.oneCMatchName]
@@ -85,11 +89,12 @@ export function findCloverCatalogProduct(
           .filter(Boolean);
         if (!keys.some((key) => nameKeys.has(key))) return null;
         const linked = String(item.oneCId || "").trim();
-        const linkRank = !linked ? 0 : linked === oid ? 0 : 2;
-        return { item, index, linkRank };
+        if (linked && oid && linked !== oid) return null;
+        if (linked && !oid) return null;
+        return { item, index };
       })
       .filter(Boolean)
-      .sort((a, b) => a.linkRank - b.linkRank || a.index - b.index);
+      .sort((a, b) => a.index - b.index);
     if (ranked[0]) return ranked[0].item;
   }
 
