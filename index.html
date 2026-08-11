@@ -2,7 +2,9 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.png" type="image/png" sizes="64x64" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="shortcut icon" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <!-- Тот же hex, что splash/thank-you — иначе на iOS видна «линия» под status bar -->
     <meta name="theme-color" content="#f4f8f2" />
@@ -26,7 +28,7 @@
     <title>Clover</title>
     <script>
       (function () {
-        var BUILD = "ui-20260809-v151-selected-row";
+          var BUILD = "ui-20260811-v154-favicon-big";
         try {
           if (localStorage.getItem("clover-ui-build") === BUILD) return;
           if (navigator.serviceWorker) {
