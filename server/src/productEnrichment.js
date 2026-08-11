@@ -1417,18 +1417,10 @@ export function scheduleProductWebEnrichment({
       return;
     }
 
+    // Не обнуляем фото/тексты в БД до успеха: иначе сбой enrichment оставляет пустую карточку
+    // и параллельные правки менеджера не теряются из‑за stale snapshot.
     const pending = {
       ...current,
-      ...(forceRefreshPhoto ? { imageUrl: "", imageUpdatedAt: "" } : {}),
-      ...(forceRefreshCopy
-        ? {
-            storefrontDetails: {
-              description: "",
-              composition: "",
-              characteristics: "",
-            },
-          }
-        : {}),
       enrichmentStatus: "pending",
     };
     setProducts(
@@ -1437,66 +1429,74 @@ export function scheduleProductWebEnrichment({
       )
     );
 
-    const result = await enrichProductCardFromWeb(pending, {
+    const result = await enrichProductCardFromWeb(current, {
       uploadsDirectory,
       forceRefreshPhoto,
       forceRefreshCopy,
     });
-    if (!result.changed) {
-      const stillNeedsPhoto = !clean(result.product?.imageUrl || pending.imageUrl);
-      const cleared = {
-        ...pending,
-        ...result.product,
-        name: pending.name,
-        enrichmentStatus: stillNeedsPhoto ? "partial" : "done",
-        enrichmentUpdatedAt: new Date().toISOString(),
-      };
-      const latest = getProducts();
-      setProducts(
-        (Array.isArray(latest) ? latest : []).map((item) =>
-          String(item.id) === id ? cleared : item
-        )
-      );
-      onDone?.(cleared);
-      return;
-    }
 
-    const latest = getProducts();
-    const merged = (Array.isArray(latest) ? latest : []).map((item) => {
-      if (String(item.id) !== id) return item;
-      const liveDetails = emptyDetails(item);
-      const got = emptyDetails(result.product);
+    const applyEnrichmentFields = (live, enriched) => {
+      const liveDetails = emptyDetails(live);
+      const got = emptyDetails(enriched);
+      const prevImage = clean(live.imageUrl);
+      const gotImage = clean(enriched?.imageUrl);
+      // Force: берём новое фото только если оно реально нашлось, иначе оставляем прежнее.
       const nextImage = forceRefreshPhoto
-        ? clean(result.product.imageUrl) || ""
-        : clean(item.imageUrl) || clean(result.product.imageUrl) || "";
+        ? gotImage || prevImage
+        : prevImage || gotImage;
       const nextDetails = forceRefreshCopy
         ? {
-            description: got.description,
-            composition: got.composition,
-            characteristics: got.characteristics,
+            description: got.description || liveDetails.description,
+            composition: got.composition || liveDetails.composition,
+            characteristics: got.characteristics || liveDetails.characteristics,
           }
         : {
             description: liveDetails.description || got.description,
             composition: liveDetails.composition || got.composition,
             characteristics: liveDetails.characteristics || got.characteristics,
           };
+      const imageChanged = Boolean(nextImage && nextImage !== prevImage);
       return {
-        ...item,
-        ...result.product,
-        name: item.name,
+        ...live,
         storefrontDetails: nextDetails,
         imageUrl: nextImage,
         imageUpdatedAt: nextImage
-          ? result.product.imageUpdatedAt ||
-            item.imageUpdatedAt ||
-            new Date().toISOString()
-          : item.imageUpdatedAt || "",
+          ? imageChanged
+            ? enriched.imageUpdatedAt || new Date().toISOString()
+            : live.imageUpdatedAt || new Date().toISOString()
+          : live.imageUpdatedAt || "",
         enrichmentStatus: nextImage ? "done" : "partial",
         enrichmentUpdatedAt: new Date().toISOString(),
       };
+    };
+
+    if (!result.changed) {
+      const latest = getProducts();
+      let cleared = null;
+      const nextList = (Array.isArray(latest) ? latest : []).map((item) => {
+        if (String(item.id) !== id) return item;
+        const stillNeedsPhoto = !clean(item.imageUrl);
+        cleared = {
+          ...item,
+          enrichmentStatus: stillNeedsPhoto ? "partial" : "done",
+          enrichmentUpdatedAt: new Date().toISOString(),
+        };
+        return cleared;
+      });
+      setProducts(nextList);
+      onDone?.(cleared);
+      return;
+    }
+
+    const latest = getProducts();
+    let updated = null;
+    const merged = (Array.isArray(latest) ? latest : []).map((item) => {
+      if (String(item.id) !== id) return item;
+      updated = applyEnrichmentFields(item, result.product);
+      return updated;
     });
     setProducts(merged);
-    onDone?.(merged.find((item) => String(item.id) === id));
+    onDone?.(updated);
   });
   pumpEnrichQueue();
 }

@@ -1,5 +1,6 @@
 import { formatMoney, navigateStorefront } from "./StoreHeader.jsx";
 import { addToCart } from "../cartStorage.js";
+import { getUnitOrderStep } from "../../../shared/appHelpers.js";
 
 const UNIT_LABEL = {
   piece: "шт",
@@ -15,6 +16,7 @@ export function ProductCard({ product }) {
   const units = Array.isArray(product.saleUnits) ? product.saleUnits : ["piece"];
   const unit = units[0] || "piece";
   const price = Number(product.prices?.[unit]) || 0;
+  const orderStep = getUnitOrderStep(product, unit);
 
   return (
     <article className="sf-product-card">
@@ -56,15 +58,19 @@ export function ProductCard({ product }) {
             type="button"
             className="sf-btn sf-btn-primary sf-btn-sm"
             onClick={() =>
-              addToCart({
-                productId: product.id,
-                code: product.code,
-                name: product.name,
-                unit,
-                unitLabel: UNIT_LABEL[unit] || unit,
-                price,
-                imageUrl: product.imageUrl,
-              })
+              addToCart(
+                {
+                  productId: product.id,
+                  code: product.code,
+                  name: product.name,
+                  unit,
+                  unitLabel: UNIT_LABEL[unit] || unit,
+                  price,
+                  imageUrl: product.imageUrl,
+                  orderStep,
+                },
+                orderStep
+              )
             }
           >
             В корзину

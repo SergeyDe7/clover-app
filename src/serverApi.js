@@ -538,6 +538,13 @@ export const api = {
     });
   },
 
+  enrichStorefrontAll({ forcePhoto = false, forceCopy = false } = {}) {
+    return request("/admin/storefront/enrich-all", {
+      method: "POST",
+      body: { forcePhoto, forceCopy },
+    });
+  },
+
   matchOneCImportRows(rows = []) {
     return request("/admin/one-c/products/match-import", {
       method: "POST",

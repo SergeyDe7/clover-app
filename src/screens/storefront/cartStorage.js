@@ -16,6 +16,20 @@ function writeRaw(items) {
   window.dispatchEvent(new CustomEvent("clover:storefront-cart"));
 }
 
+function normalizeStep(step) {
+  const value = Math.floor(Number(step) || 1);
+  return Number.isFinite(value) && value > 1 ? value : 1;
+}
+
+/** Округлить qty до кратности (минимум = step). */
+export function snapCartQty(qty, step = 1) {
+  const orderStep = normalizeStep(step);
+  const raw = Math.floor(Number(qty) || 0);
+  if (raw <= 0) return 0;
+  if (orderStep <= 1) return Math.max(1, raw);
+  return Math.max(orderStep, Math.round(raw / orderStep) * orderStep);
+}
+
 export function getCartItems() {
   return readRaw();
 }
@@ -25,19 +39,22 @@ export function getCartCount() {
 }
 
 export function addToCart(
-  { productId, code, name, unit, unitLabel, price, imageUrl },
+  { productId, code, name, unit, unitLabel, price, imageUrl, orderStep = 1 },
   qty = 1
 ) {
-  const amount = Math.max(1, Math.floor(Number(qty) || 1));
+  const step = normalizeStep(orderStep);
+  const amount = snapCartQty(qty || step, step);
   const items = readRaw();
   const key = `${productId}::${unit}`;
   const index = items.findIndex(
     (item) => `${item.productId}::${item.unit}` === key
   );
   if (index >= 0) {
+    const prevStep = normalizeStep(items[index].orderStep || step);
     items[index] = {
       ...items[index],
-      qty: (Number(items[index].qty) || 0) + amount,
+      qty: snapCartQty((Number(items[index].qty) || 0) + amount, prevStep),
+      orderStep: prevStep,
       price: Number(price) || items[index].price,
       name: name || items[index].name,
       imageUrl: imageUrl || items[index].imageUrl,
@@ -51,6 +68,7 @@ export function addToCart(
       unitLabel: unitLabel || unit,
       price: Number(price) || 0,
       imageUrl: imageUrl || "",
+      orderStep: step,
       qty: amount,
     });
   }
@@ -59,8 +77,13 @@ export function addToCart(
 }
 
 export function setCartQty(productId, unit, qty) {
-  const amount = Math.floor(Number(qty) || 0);
   let items = readRaw();
+  const existing = items.find(
+    (item) =>
+      String(item.productId) === String(productId) && item.unit === unit
+  );
+  const step = normalizeStep(existing?.orderStep || 1);
+  const amount = snapCartQty(qty, step);
   if (amount <= 0) {
     items = items.filter(
       (item) =>
@@ -69,7 +92,7 @@ export function setCartQty(productId, unit, qty) {
   } else {
     items = items.map((item) =>
       String(item.productId) === String(productId) && item.unit === unit
-        ? { ...item, qty: amount }
+        ? { ...item, qty: amount, orderStep: step }
         : item
     );
   }

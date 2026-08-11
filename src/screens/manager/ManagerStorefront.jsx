@@ -583,20 +583,29 @@ export function ManagerStorefront({
             type="button"
             disabled={productBusy || onStorefrontCount === 0}
             onClick={() => {
-              const next = (Array.isArray(products) ? products : []).map((item) =>
-                item.showOnStorefront === true
-                  ? {
-                      ...item,
-                      imageUrl: "",
-                      imageUpdatedAt: "",
-                      enrichmentStatus: "pending",
-                    }
-                  : item
-              );
-              void persistProducts(
-                next,
-                "Обновляем фото витрины в стиле Clover (белый фон, без инфографики). Подождите и обновите страницу."
-              );
+              void (async () => {
+                setProductBusy(true);
+                try {
+                  const result = await api.enrichStorefrontAll({
+                    forcePhoto: true,
+                  });
+                  await appAlert({
+                    title: "Очередь запущена",
+                    message:
+                      result.message ||
+                      `Обновление фото: ${result.queued || 0} товар(ов). Старые фото не стираются до успеха.`,
+                    tone: "success",
+                  });
+                } catch (error) {
+                  await appAlert({
+                    title: "Не удалось обновить фото",
+                    message: error.message || "Ошибка очереди enrichment.",
+                    tone: "danger",
+                  });
+                } finally {
+                  setProductBusy(false);
+                }
+              })();
             }}
           >
             Обновить фото (белый фон)
@@ -606,23 +615,29 @@ export function ManagerStorefront({
             type="button"
             disabled={productBusy || onStorefrontCount === 0}
             onClick={() => {
-              const next = (Array.isArray(products) ? products : []).map((item) =>
-                item.showOnStorefront === true
-                  ? {
-                      ...item,
-                      storefrontDetails: {
-                        description: "",
-                        composition: "",
-                        characteristics: "",
-                      },
-                      enrichmentStatus: "pending",
-                    }
-                  : item
-              );
-              void persistProducts(
-                next,
-                "Обновляем описания и характеристики для покупателей. Обновите страницу через минуту."
-              );
+              void (async () => {
+                setProductBusy(true);
+                try {
+                  const result = await api.enrichStorefrontAll({
+                    forceCopy: true,
+                  });
+                  await appAlert({
+                    title: "Очередь запущена",
+                    message:
+                      result.message ||
+                      `Обновление описаний: ${result.queued || 0} товар(ов). Старые тексты сохраняются до замены.`,
+                    tone: "success",
+                  });
+                } catch (error) {
+                  await appAlert({
+                    title: "Не удалось обновить описания",
+                    message: error.message || "Ошибка очереди enrichment.",
+                    tone: "danger",
+                  });
+                } finally {
+                  setProductBusy(false);
+                }
+              })();
             }}
           >
             Обновить описания
