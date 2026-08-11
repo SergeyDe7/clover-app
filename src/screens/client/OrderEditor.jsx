@@ -483,9 +483,6 @@ export function OrderEditor({
                 </div>
               </>
             )}
-            {settings.enableDrafts && session.mode === "new" && (
-              <p className="summary-note">Черновик автоматически сохраняется в этом браузере.</p>
-            )}
           </aside>
 
           <div className="catalog-main">
