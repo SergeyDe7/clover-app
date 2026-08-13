@@ -56,14 +56,45 @@ export async function sendPushToSubscriptions(subscriptions, payload) {
   return { enabled: true, sent, failed };
 }
 
+function cabinetPathPrefix() {
+  let path = String(process.env.CABINET_PATH || "/lk").trim();
+  if (!path.startsWith("/")) path = `/${path}`;
+  return path.replace(/\/$/, "") || "/lk";
+}
+
+function toCabinetRelativeUrl(url) {
+  const cabinetPath = cabinetPathPrefix();
+  const path = String(url || "/").startsWith("/") ? String(url || "/") : `/${url}`;
+  if (path === cabinetPath || path.startsWith(`${cabinetPath}/`)) return path;
+  if (
+    path === "/vitrina" ||
+    path.startsWith("/vitrina/") ||
+    path.startsWith("/catalog") ||
+    path.startsWith("/product") ||
+    path.startsWith("/cart") ||
+    path.startsWith("/checkout")
+  ) {
+    return path;
+  }
+  return `${cabinetPath}${path === "/" ? "/" : path}`;
+}
+
 export function sendOrderPush(userId, payload) {
   const subscriptions = listPushSubscriptions(userId, "orders").filter(
     (item) => item.orderEvents
   );
-  return sendPushToSubscriptions(subscriptions, payload);
+  const next = {
+    ...payload,
+    url: toCabinetRelativeUrl(payload?.url || "/lk/"),
+  };
+  return sendPushToSubscriptions(subscriptions, next);
 }
 
 export function sendPromotionPush(payload) {
   const subscriptions = listPushSubscriptions(null, "promotions");
-  return sendPushToSubscriptions(subscriptions, payload);
+  const next = {
+    ...payload,
+    url: toCabinetRelativeUrl(payload?.url || "/lk/?section=promotions"),
+  };
+  return sendPushToSubscriptions(subscriptions, next);
 }

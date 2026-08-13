@@ -7,7 +7,7 @@ VLAVKA — рабочая 1С
 1. Backup VLAVKA.
 2. То же расширение, что в TEST.
 3. В ДобавитьЗаголовкиОбмена: X-Clover-Database = "VLAVKA" (см. ЗАГОЛОВКИ_VLAVKA.txt).
-4. URL/ключ как у TEST → DC :4100 (или https://clover-order.ru).
+4. URL/ключ как у TEST → https://clover-spb.ru (API /api/…) или DC :4100.
 5. Кнопки «Отправить товары / контрагентов / цены» из VLAVKA — Clover принимает
    (allowlist TEST,VLAVKA на DC). Последняя выгрузка перезаписывает каталог поиска —
    для боя выгружайте из VLAVKA.

@@ -500,7 +500,7 @@ export function ManagerStorefront({
         </button>
         <a
           className="secondary-button"
-          href="/vitrina"
+          href="/"
           target="_blank"
           rel="noreferrer"
         >

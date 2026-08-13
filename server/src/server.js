@@ -293,6 +293,17 @@ function allowedCorsOrigin(origin) {
   if (!origin) return true;
   const configured = String(process.env.APP_PUBLIC_URL || "").trim().replace(/\/$/, "");
   if (configured && origin === configured) return true;
+  if (configured) {
+    try {
+      const cfg = new URL(configured);
+      const got = new URL(origin);
+      const cfgHost = cfg.hostname.replace(/^www\./i, "").toLowerCase();
+      const gotHost = got.hostname.replace(/^www\./i, "").toLowerCase();
+      if (cfgHost && cfgHost === gotHost && cfg.protocol === got.protocol) return true;
+    } catch {
+      /* ignore */
+    }
+  }
   try {
     const url = new URL(origin);
     if (url.port !== "5273") return false;
@@ -406,6 +417,15 @@ function publicBaseUrl(req) {
   const configured = String(process.env.APP_PUBLIC_URL || "").trim().replace(/\/$/, "");
   if (configured) return configured;
   return `${req.protocol}://${req.get("host")}`.replace(/\/$/, "");
+}
+
+/** URL ЛК на каноническом домене (витрина занимает корень хоста). */
+function publicCabinetUrl(req) {
+  const base = publicBaseUrl(req);
+  let path = String(process.env.CABINET_PATH || "/lk").trim();
+  if (!path.startsWith("/")) path = `/${path}`;
+  path = path.replace(/\/$/, "") || "/lk";
+  return `${base}${path}`;
 }
 
 function allowDevelopmentAuthLinks(req) {
@@ -1614,7 +1634,7 @@ app.post("/api/auth/register", async (req, res, next) => {
       tokenHash: tokenHash(plainToken),
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     });
-    const verifyUrl = `${publicBaseUrl(req)}/?verify=${encodeURIComponent(plainToken)}`;
+    const verifyUrl = `${publicCabinetUrl(req)}/?verify=${encodeURIComponent(plainToken)}`;
     const message = verificationEmail({ companyName: input.companyName, verifyUrl });
     let mail = { sent: false, reason: "unknown" };
     try {
@@ -1695,7 +1715,7 @@ app.post("/api/auth/resend-verification", async (req, res, next) => {
         tokenHash: tokenHash(plainToken),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       });
-      const verifyUrl = `${publicBaseUrl(req)}/?verify=${encodeURIComponent(plainToken)}`;
+      const verifyUrl = `${publicCabinetUrl(req)}/?verify=${encodeURIComponent(plainToken)}`;
       const companyName = isClientRole(user.role)
         ? getClientState(user.id).profile?.companyName
         : "Менеджер Clover";
@@ -1727,7 +1747,7 @@ app.post("/api/auth/forgot-password", async (req, res, next) => {
         tokenHash: tokenHash(plainToken),
         expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       });
-      const resetUrl = `${publicBaseUrl(req)}/?reset=${encodeURIComponent(plainToken)}`;
+      const resetUrl = `${publicCabinetUrl(req)}/?reset=${encodeURIComponent(plainToken)}`;
       const message = resetPasswordEmail({ resetUrl });
       try { await sendCloverMail({ to: email, ...message }); } catch (error) { console.error(error); }
       if (allowDevelopmentAuthLinks(req)) developmentLink = resetUrl;

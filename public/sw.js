@@ -1,4 +1,4 @@
-const CACHE_NAME = "clover-v18-shell-v151";
+const CACHE_NAME = "clover-v18-shell-v174-spb";
 const SHELL = [
   "/offline.html",
   "/manifest.webmanifest",
@@ -84,7 +84,7 @@ self.addEventListener("push", (event) => {
     icon: "/icon-192.png",
     badge: "/icon-192.png",
     tag: data.tag || "clover-notification",
-    data: { url: data.url || "/", badgeCount: data.badgeCount },
+    data: { url: data.url || "/lk/", badgeCount: data.badgeCount },
   };
   event.waitUntil(
     Promise.all([
@@ -96,7 +96,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  const target = new URL(event.notification.data?.url || "/lk/", self.location.origin).href;
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
       for (const client of windows) {

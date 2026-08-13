@@ -1,4 +1,4 @@
-import { STORE_HOSTS } from "../../config/urls.js";
+import { STORE_HOSTS, CABINET_PATH, isCabinetPath } from "../../config/urls.js";
 
 const PREVIEW_PREFIX = "/vitrina";
 
@@ -10,7 +10,7 @@ function isStoreHost() {
   return STORE_HOSTS.has(hostName());
 }
 
-/** Превью до переноса DNS: /vitrina на любом хосте (в т.ч. clover-order.ru). */
+/** Превью витрины по пути /vitrina… (на любом хосте, в т.ч. localhost). */
 export function isStorefrontPreviewPath(pathname = window.location.pathname) {
   const path = String(pathname || "/");
   return path === PREVIEW_PREFIX || path.startsWith(`${PREVIEW_PREFIX}/`);
@@ -18,10 +18,12 @@ export function isStorefrontPreviewPath(pathname = window.location.pathname) {
 
 /**
  * Витрина:
- * - clover-spb.ru — всегда
- * - путь /vitrina… — только превью (ЛК на / и остальных URL не трогаем)
+ * - хост витрины (clover-spb.ru) — да, кроме пути ЛК (/lk)
+ * - путь /vitrina… — превью
+ * Иначе — ЛК (App).
  */
 export function shouldRenderStorefront() {
+  if (isCabinetPath(window.location.pathname)) return false;
   if (isStoreHost()) return true;
   if (isStorefrontPreviewPath()) return true;
   return false;
@@ -83,3 +85,5 @@ export function storefrontHref(route) {
   if (route.name === "checkout") return `${prefix}/checkout`;
   return prefix || "/";
 }
+
+export { CABINET_PATH, isCabinetPath };
