@@ -194,12 +194,12 @@ export function preserveOneCProductPricingFields(previousItems, nextItems) {
         cleanText(next.salePriceReceivedAt) || cleanText(previous.salePriceReceivedAt);
     }
 
-    // Закупка из preview может быть пустой — не обнуляем ранее принятую.
-    if (
-      (next.purchasePrice === null || next.purchasePrice === undefined) &&
-      previous.purchasePrice !== null &&
-      previous.purchasePrice !== undefined
-    ) {
+    // Канал закупочных цен пишет только POST /purchase-prices.
+    // Preview может прислать устаревший cost из номенклатуры — не затираем.
+    const previousHasPurchase =
+      (previous.purchasePrice !== null && previous.purchasePrice !== undefined) ||
+      Boolean(cleanText(previous.purchasePriceReceivedAt));
+    if (previousHasPurchase) {
       next.purchasePrice = previous.purchasePrice;
       next.purchasePricePiece = previous.purchasePricePiece ?? next.purchasePricePiece;
       next.purchasePricePack = previous.purchasePricePack ?? next.purchasePricePack;
@@ -208,12 +208,9 @@ export function preserveOneCProductPricingFields(previousItems, nextItems) {
       next.purchasePricePair = previous.purchasePricePair ?? next.purchasePricePair;
       next.purchasePriceRoll = previous.purchasePriceRoll ?? next.purchasePriceRoll;
       next.purchasePriceUnit = previous.purchasePriceUnit || next.purchasePriceUnit;
-      next.purchasePriceUpdatedAt =
-        previous.purchasePriceUpdatedAt || next.purchasePriceUpdatedAt;
-      next.purchasePriceReceivedAt =
-        previous.purchasePriceReceivedAt || next.purchasePriceReceivedAt;
-      next.purchasePriceSourceDatabase =
-        previous.purchasePriceSourceDatabase || next.purchasePriceSourceDatabase;
+      next.purchasePriceUpdatedAt = previous.purchasePriceUpdatedAt || "";
+      next.purchasePriceReceivedAt = previous.purchasePriceReceivedAt || "";
+      next.purchasePriceSourceDatabase = previous.purchasePriceSourceDatabase || "";
     }
 
     return next;

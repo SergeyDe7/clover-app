@@ -2067,6 +2067,7 @@ body:has(.clover-app) {
 
 .clover-app .product-card {
   height: 100% !important;
+  min-height: 0 !important;
   min-width: 0 !important;
   box-sizing: border-box !important;
   padding: 0 8px 8px !important;
@@ -2074,6 +2075,11 @@ body:has(.clover-app) {
   box-shadow: 0 4px 12px rgba(56, 97, 52, 0.04) !important;
   border-color: #e1e9de !important;
   transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.clover-app .product-card:not(.product-card-list) {
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 .clover-app .product-card.product-card-selected {
@@ -2121,11 +2127,16 @@ body:has(.clover-app) {
 }
 
 .clover-app .product-card:not(.product-card-list) h2 {
+  flex: 0 0 auto !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  overflow: hidden !important;
   margin: 4px 0 2px !important;
   font-size: 13px !important;
   line-height: 1.25 !important;
-  min-height: 0 !important;
-  -webkit-line-clamp: 2 !important;
+  min-height: calc(13px * 1.25 * 2) !important;
+  height: calc(13px * 1.25 * 2) !important;
 }
 
 .clover-app .product-card:not(.product-card-list) .product-code {
@@ -2133,27 +2144,37 @@ body:has(.clover-app) {
 }
 
 .clover-app .product-card:not(.product-card-list) .product-price {
+  flex: 0 0 auto !important;
   margin: 0 0 6px !important;
   font-size: 13px !important;
+  line-height: 1.25 !important;
+  min-height: calc(13px * 1.25) !important;
 }
 
 .clover-app .product-card:not(.product-card-list) .product-card-controls {
+  margin-top: auto !important;
   gap: 5px !important;
+  flex: 0 0 auto !important;
 }
 
 /*
- * Ед. измерения = сегменты той же рамки, что и количество:
- * ширина 100% колонки, высота как qty, равные доли, 1 ед. и несколько одинаково.
+ * 1 и 2 единицы — одна высота ряда: одна строка, равные колонки.
+ * min-height: 44px у .clover-app button иначе раздувает карточки с двумя кнопками.
  */
 .clover-app .product-card .unit-choice,
 .clover-app .product-card .unit-choice.unit-choice-single {
-  display: flex !important;
-  flex-wrap: nowrap !important;
+  display: grid !important;
+  grid-auto-flow: column !important;
+  grid-auto-columns: minmax(0, 1fr) !important;
+  grid-template-columns: none !important;
+  grid-template-rows: 30px !important;
   align-items: stretch !important;
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
-  min-height: 0 !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
   gap: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -2162,14 +2183,15 @@ body:has(.clover-app) {
   overflow: hidden !important;
   background: #fff !important;
   box-sizing: border-box !important;
-  grid-template-columns: unset !important;
   justify-content: stretch !important;
+  flex-wrap: unset !important;
 }
 
 .clover-app .product-card .unit-choice button,
-.clover-app .product-card .unit-choice.unit-choice-single button {
-  flex: 1 1 0 !important;
-  width: 0 !important;
+.clover-app .product-card .unit-choice.unit-choice-single button,
+.clover-app button.product-card .unit-choice button {
+  flex: unset !important;
+  width: auto !important;
   max-width: none !important;
   min-width: 0 !important;
   height: 30px !important;
@@ -2211,8 +2233,12 @@ body:has(.clover-app) {
 
 .clover-app .product-card:not(.product-card-list) .quantity-control {
   gap: 0 !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
   grid-template-columns: 30px minmax(0, 1fr) 30px !important;
   border-radius: 10px !important;
+  overflow: hidden !important;
 }
 
 .clover-app .product-card:not(.product-card-list) .quantity-control > button {
@@ -2234,6 +2260,10 @@ body:has(.clover-app) {
   gap: 4px !important;
 }
 
+.clover-app .product-card.product-card-list {
+  display: grid !important;
+}
+
 @media (min-width: 901px) {
   .clover-app .product-grid.product-grid-list {
     grid-template-columns: 1fr !important;
@@ -2244,18 +2274,20 @@ body:has(.clover-app) {
   .clover-app .product-grid:not(.product-grid-list) {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 6px !important;
-    align-items: start !important;
+    align-items: stretch !important;
   }
 
-  /* ~6 карточек с фото на экран: 2×3, ниже картинка */
+  /* Карточки 2 колонки, фото на всю ширину квадратом — без max-height+aspect-ratio */
   .clover-app .product-grid:not(.product-grid-list) .product-image-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
-    max-height: 84px !important;
-    aspect-ratio: 5 / 4 !important;
+    max-height: none !important;
+    aspect-ratio: 1 / 1 !important;
   }
 
   .clover-app .product-grid:not(.product-grid-list) .product-card {
-    height: auto !important;
+    height: 100% !important;
     padding: 0 6px 6px !important;
   }
 
@@ -2268,6 +2300,8 @@ body:has(.clover-app) {
     margin: 2px 0 1px !important;
     font-size: 12px !important;
     line-height: 1.2 !important;
+    min-height: calc(12px * 1.2 * 2) !important;
+    height: calc(12px * 1.2 * 2) !important;
     display: -webkit-box !important;
     -webkit-box-orient: vertical !important;
     -webkit-line-clamp: 2 !important;
@@ -2335,14 +2369,21 @@ body:has(.clover-app) {
 
   .clover-app .product-card-list .unit-choice,
   .clover-app .product-card-list .unit-choice.unit-choice-single {
+    display: grid !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 24px !important;
     width: 100% !important;
+    height: 24px !important;
+    min-height: 24px !important;
+    max-height: 24px !important;
     border-radius: 7px !important;
   }
 
   .clover-app .product-card-list .unit-choice button,
   .clover-app .product-card-list .unit-choice.unit-choice-single button {
-    flex: 1 1 0 !important;
-    width: 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
     height: 24px !important;
     min-height: 24px !important;
     max-height: 24px !important;
@@ -2417,14 +2458,21 @@ body:has(.clover-app) {
 
   .clover-app .product-card-list .unit-choice,
   .clover-app .product-card-list .unit-choice.unit-choice-single {
+    display: grid !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 30px !important;
     width: 100% !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
     border-radius: 10px !important;
   }
 
   .clover-app .product-card-list .unit-choice button,
   .clover-app .product-card-list .unit-choice.unit-choice-single button {
-    flex: 1 1 0 !important;
-    width: 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
     height: 30px !important;
     min-height: 30px !important;
     max-height: 30px !important;
@@ -2518,9 +2566,12 @@ body:has(.clover-app) {
 
 .clover-app .product-image-wrap {
   flex: 0 0 auto !important;
+  align-self: stretch !important;
   width: 100% !important;
+  max-width: 100% !important;
   aspect-ratio: 1 / 1 !important;
   height: auto !important;
+  max-height: none !important;
   margin: 0 0 2px !important;
   border-radius: 10px !important;
   border: 1px solid var(--clover-border-soft, #e8eee6) !important;
@@ -2619,8 +2670,11 @@ body:has(.clover-app) {
 }
 
 .clover-app .product-card .unit-choice button,
-.clover-app .product-card .unit-choice.unit-choice-single button {
-  width: 0 !important;
+.clover-app .product-card .unit-choice.unit-choice-single button,
+.clover-app .product-card .quantity-control > button {
+  min-height: 30px !important;
+  max-height: 30px !important;
+  min-width: 0 !important;
   box-sizing: border-box !important;
 }
 
@@ -3184,12 +3238,19 @@ body:has(.clover-app) {
     margin: 0 0 4px !important;
   }
 
-  /* Ед. измерения в ЛК: та же рамка/высота, что у количества */
+  /* Ед. измерения в ЛК: одна строка 30px и для 1, и для 2 единиц */
   .clover-app .page-content-client .product-card .unit-choice,
   .clover-app .embedded-catalog .product-card .unit-choice,
   .clover-app .page-content-client .product-card .unit-choice.unit-choice-single,
   .clover-app .embedded-catalog .product-card .unit-choice.unit-choice-single {
+    display: grid !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 30px !important;
     width: 100% !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
     gap: 0 !important;
     border: 1px solid #dfe7dc !important;
     border-radius: 10px !important;
@@ -3200,8 +3261,8 @@ body:has(.clover-app) {
   .clover-app .embedded-catalog .product-card .unit-choice button,
   .clover-app .page-content-client .product-card .unit-choice.unit-choice-single button,
   .clover-app .embedded-catalog .product-card .unit-choice.unit-choice-single button {
-    flex: 1 1 0 !important;
-    width: 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
     height: 30px !important;
     min-height: 30px !important;
     max-height: 30px !important;
@@ -3230,10 +3291,12 @@ body:has(.clover-app) {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    align-self: stretch !important;
     width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
-    max-height: 84px !important;
-    aspect-ratio: 5 / 4 !important;
+    max-height: none !important;
+    aspect-ratio: 1 / 1 !important;
     margin: 0 !important;
     overflow: hidden !important;
     border-radius: 12px !important;
@@ -3245,7 +3308,7 @@ body:has(.clover-app) {
   .clover-app .embedded-catalog .product-grid:not(.product-grid-list) {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 6px !important;
-    align-items: start !important;
+    align-items: stretch !important;
   }
 
   .clover-app .page-content-client .product-grid.product-grid-list,
@@ -3275,7 +3338,14 @@ body:has(.clover-app) {
   .clover-app .embedded-catalog .product-card-list .unit-choice,
   .clover-app .page-content-client .product-card-list .unit-choice.unit-choice-single,
   .clover-app .embedded-catalog .product-card-list .unit-choice.unit-choice-single {
+    display: grid !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 24px !important;
     width: 100% !important;
+    height: 24px !important;
+    min-height: 24px !important;
+    max-height: 24px !important;
     border-radius: 7px !important;
   }
 
@@ -3283,8 +3353,8 @@ body:has(.clover-app) {
   .clover-app .embedded-catalog .product-card-list .unit-choice button,
   .clover-app .page-content-client .product-card-list .unit-choice.unit-choice-single button,
   .clover-app .embedded-catalog .product-card-list .unit-choice.unit-choice-single button {
-    flex: 1 1 0 !important;
-    width: 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
     height: 24px !important;
     min-height: 24px !important;
     max-height: 24px !important;
@@ -3304,8 +3374,12 @@ body:has(.clover-app) {
 
   .clover-app .page-content-client .product-grid:not(.product-grid-list) .product-image-wrap,
   .clover-app .embedded-catalog .product-grid:not(.product-grid-list) .product-image-wrap {
-    max-height: 84px !important;
-    aspect-ratio: 5 / 4 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    aspect-ratio: 1 / 1 !important;
+    align-self: stretch !important;
   }
 
   .clover-app .product-image {

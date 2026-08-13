@@ -46,7 +46,8 @@ assert.ok(
 assert.ok(
   source.includes("pickProductCardOneCCost") &&
     source.includes("Из «Обновить цены» (вид цен)") &&
-    source.includes("findZakupPriceType"),
+    source.includes("findZakupPriceType") &&
+    source.includes("settingsPriceLabel(product, oneCPriceTypes)"),
   "Карточка товара должна показывать свежий вид «Закупочная», а не устаревший purchase-prices."
 );
 

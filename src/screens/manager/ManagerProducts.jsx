@@ -6,7 +6,9 @@ import {
   unitPriceField,
   formatMoney,
   formatDateTime,
+  hasPurchasePrice,
   normalizeProduct,
+  pickProductCardOneCCost,
   productArticle,
 } from "../../shared/appHelpers";
 import { appAlert } from "../../shared/AppModal";
@@ -381,7 +383,7 @@ export function ManagerProducts({ products, setProducts, oneCPriceTypes = [] }) 
             {product.showOnStorefront ? (
               <span className="badge green">Витрина</span>
             ) : null}
-            <strong>{settingsPriceLabel(product)}</strong>
+            <strong>{settingsPriceLabel(product, oneCPriceTypes)}</strong>
             <button className="secondary-button" type="button" onClick={() => setEditorProduct(product)}>Изменить</button>
           </div>
         </article>
@@ -409,7 +411,20 @@ export function ManagerProducts({ products, setProducts, oneCPriceTypes = [] }) 
   );
 }
 
-function settingsPriceLabel(product) {
-  const prices = UNIT_ORDER.map((unit) => product[unitPriceField(unit)]).filter((value) => Number(value) > 0);
+function settingsPriceLabel(product, oneCPriceTypes = []) {
+  const card = pickProductCardOneCCost({
+    purchasePrices: product.purchasePrices,
+    purchaseUpdatedAt:
+      product.purchasePriceReceivedAt || product.purchasePriceUpdatedAt || "",
+    salePricesByType: product.salePricesByType,
+    salePriceReceivedAt: product.salePriceReceivedAt || "",
+    oneCPriceTypes,
+  });
+  if (hasPurchasePrice(card.cost)) {
+    return formatMoney(card.cost);
+  }
+  const prices = UNIT_ORDER.map((unit) => product[unitPriceField(unit)]).filter(
+    (value) => Number(value) > 0
+  );
   return prices.length ? `от ${formatMoney(Math.min(...prices))}` : "";
 }

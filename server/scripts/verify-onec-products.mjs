@@ -5,6 +5,7 @@ import {
   linkCloverProduct,
   mergeProductsPreservingOneCLinks,
   normalizeOneCProducts,
+  preserveOneCProductPricingFields,
   selectRelevantOneCProducts,
 } from "../src/oneCProducts.js";
 
@@ -138,6 +139,29 @@ const clearedLink = mergeProductsPreservingOneCLinks(
   manuallyLinked
 );
 assert.equal(clearedLink.find((item) => item.id === 27).oneCId, "");
+
+const preservedPurchase = preserveOneCProductPricingFields(
+  [
+    {
+      id: "onec-keep",
+      purchasePrice: 100,
+      purchasePriceReceivedAt: "2026-08-09T12:38:45.318Z",
+      purchasePriceUpdatedAt: "2026-08-09T12:38:45.318Z",
+      salePricesByType: { "type-zakup": { piece: 99 } },
+    },
+  ],
+  [
+    {
+      id: "onec-keep",
+      name: "Салфетки",
+      purchasePrice: 80,
+      purchasePriceReceivedAt: "2026-08-13T15:00:00.000Z",
+    },
+  ]
+);
+assert.equal(preservedPurchase[0].purchasePrice, 100);
+assert.equal(preservedPurchase[0].purchasePriceReceivedAt, "2026-08-09T12:38:45.318Z");
+assert.equal(preservedPurchase[0].salePricesByType["type-zakup"].piece, 99);
 
 console.log("Проверка точного и адресного сопоставления номенклатуры 1С пройдена успешно.");
 console.log(

@@ -64,8 +64,15 @@ assert.ok(
   "products-preview: принимать каталог из любой allowlist-базы (в т.ч. VLAVKA)."
 );
 assert.ok(
-  productsSlice.includes("purchasePriceSourceDatabase: hasPurchasePrice(item) ? sourceDatabase : \"\""),
-  "products-preview должен помечать источник закупочной цены фактической базой."
+  productsSlice.includes("preserveOneCProductPricingFields") ||
+    serverSource.includes("preserveOneCProductPricingFields(previousOneCProducts"),
+  "products-preview должен сохранять закупочные цены из канала purchase-prices."
+);
+assert.ok(
+  !productsSlice.includes(
+    "purchasePriceReceivedAt: hasPurchasePrice(item) ? receivedAt"
+  ),
+  "products-preview не должен помечать выгрузку каталога как свежий приём закупочных цен."
 );
 
 assert.equal(normalizeExchangeState({ status: "sending" }).status, "sending");

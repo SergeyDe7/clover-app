@@ -142,7 +142,7 @@
 }
 
 .product-card h2 {
-  flex: 1;
+  flex: 0 0 auto;
   margin: 16px 0 12px;
   color: #394639;
   font-size: 17px;
@@ -401,9 +401,14 @@
 
 
 .unit-choice {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 9px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-template-rows: 30px;
+  gap: 0;
+  margin-bottom: 0;
+  height: 30px;
+  overflow: hidden;
 }
 
 .unit-choice-button {
