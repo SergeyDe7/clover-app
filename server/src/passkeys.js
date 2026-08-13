@@ -14,7 +14,8 @@ export function passkeyConfiguration(req) {
   const requestOrigin = stripTrailingSlash(`${req.protocol}://${req.get("host")}`);
   const origin = configuredOrigin || requestOrigin;
   const originUrl = new URL(origin);
-  const rpID = String(process.env.PASSKEY_RP_ID || hostWithoutPort(originUrl.hostname || req.hostname)).trim();
+  const defaultRpId = hostWithoutPort(originUrl.hostname || req.hostname);
+  const rpID = String(process.env.PASSKEY_RP_ID || defaultRpId).trim() || defaultRpId;
   const rpName = String(process.env.PASSKEY_RP_NAME || "Clover").trim() || "Clover";
   return { origin, rpID, rpName };
 }

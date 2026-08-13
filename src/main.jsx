@@ -7,7 +7,7 @@ import { AppModalHost } from './shared/AppModal.jsx'
 import StorefrontApp from './screens/storefront/StorefrontApp.jsx'
 import { shouldRenderStorefront } from './screens/storefront/mode.js'
 
-// Витрина: clover-spb.ru или превью /vitrina. Иначе — ЛК (в т.ч. clover-order.ru/).
+// Витрина: хост витрины (/) или превью /vitrina. ЛК: /lk (и localhost без store-хоста).
 const storefront = shouldRenderStorefront()
 
 createRoot(document.getElementById('root')).render(
@@ -19,7 +19,7 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-const CLOVER_UI_BUILD = "ui-20260809-v172-storefront-price-harden";
+const CLOVER_UI_BUILD = "ui-20260812-v174-canonical-spb";
 const BOOT_SPLASH_MS = 450;
 const APP_THEME_COLOR = "#f4f8f2";
 const VIEWPORT_BASE = "width=device-width, initial-scale=1.0, viewport-fit=cover";

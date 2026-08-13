@@ -2,7 +2,7 @@
   "name": "Clover — личный кабинет",
   "short_name": "Clover",
   "description": "Заказы, статусы, документы и связь с менеджером",
-  "start_url": "/",
+  "start_url": "/lk/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#d2e8cb",

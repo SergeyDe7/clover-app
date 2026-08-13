@@ -79,10 +79,36 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function cabinetPathPrefix() {
+  let path = String(process.env.CABINET_PATH || "/lk").trim();
+  if (!path.startsWith("/")) path = `/${path}`;
+  return path.replace(/\/$/, "") || "/lk";
+}
+
+/** Относительный URL внутри ЛК (для push / in-app), не витрина. */
+function toCabinetRelativeUrl(url) {
+  const cabinetPath = cabinetPathPrefix();
+  const path = String(url || "/").startsWith("/") ? String(url || "/") : `/${url}`;
+  if (path === cabinetPath || path.startsWith(`${cabinetPath}/`)) return path;
+  // Публичная витрина — не трогаем
+  if (
+    path === "/vitrina" ||
+    path.startsWith("/vitrina/") ||
+    path.startsWith("/catalog") ||
+    path.startsWith("/product") ||
+    path.startsWith("/cart") ||
+    path.startsWith("/checkout")
+  ) {
+    return path;
+  }
+  return `${cabinetPath}${path === "/" ? "/" : path}`;
+}
+
 function publicUrl(notification) {
   const base = String(process.env.CLOVER_PUBLIC_URL || process.env.APP_PUBLIC_URL || "").trim().replace(/\/$/, "");
   if (!base || !notification.url) return "";
-  return `${base}${notification.url.startsWith("/") ? "" : "/"}${notification.url}`;
+  const path = toCabinetRelativeUrl(notification.url);
+  return `${base}${path}`;
 }
 
 async function sendTelegram(notification, settings) {
@@ -200,7 +226,7 @@ async function sendManagerPush(notification, settings) {
     managers.map((manager) => sendOrderPush(manager.id, {
       title: notification.title,
       body: notification.body,
-      url: notification.url || "/?section=manager-notifications",
+      url: toCabinetRelativeUrl(notification.url || "/?section=manager-notifications"),
       tag: `manager-${notification.type}-${notification.sourceId || notification.id}`,
       badgeCount,
     }))

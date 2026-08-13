@@ -9,8 +9,13 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 const PRODUCT_PHOTO_SIZE = 800;
-const USER_AGENT =
-  "CloverProductEnrichment/1.0 (https://clover-order.ru; clover-order@mail.ru)";
+const USER_AGENT = (() => {
+  const base = String(process.env.APP_PUBLIC_URL || process.env.CLOVER_PUBLIC_URL || "")
+    .trim()
+    .replace(/\/$/, "");
+  const site = base || "https://clover-spb.ru";
+  return `CloverProductEnrichment/1.0 (${site}; clover-order@mail.ru)`;
+})();
 /** Браузерный UA — DDG/магазины чаще отдают картинки. */
 const BROWSER_UA =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
