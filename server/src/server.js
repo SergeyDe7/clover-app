@@ -148,7 +148,6 @@ import {
 } from "./oneCClients.js";
 import {
   enrichProductWithPurchasePrices,
-  hasPurchasePrice,
   normalizeDefaultPricingConfig,
   normalizePersonalPriceConfig,
   resolveClientProductPricing,
@@ -188,6 +187,7 @@ import {
   mergeOneCPriceTypes,
   mergeSalePricesByType,
   normalizeOneCPriceTypes,
+  syncPurchasePriceIntoType,
 } from "./oneCSalePrices.js";
 import {
   publicMailStatus,
@@ -1086,6 +1086,16 @@ function oneCProductsById(items) {
   );
 }
 
+function enrichManagerCatalogProducts(products) {
+  const oneCById = oneCProductsById(getGlobalState("oneCProducts", []));
+  return (Array.isArray(products) ? products : []).map((product) =>
+    enrichProductWithPurchasePrices(
+      product,
+      oneCById.get(String(product.oneCId || "")) || null
+    )
+  );
+}
+
 function applyClientPrices(product, link, isMatrixProduct, oneCById = new Map()) {
   const priceConfig =
     link.personalPrices?.[String(product.id)] ||
@@ -1461,7 +1471,28 @@ function receivePurchasePrices({ items, database, receivedAt = new Date().toISOS
     allowedIds: linkedOneCProductIds(products),
   });
 
-  setGlobalState("oneCProducts", merged.products);
+  const zakupTypeId = findPurchasePriceTypeId(
+    normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", []))
+  );
+  const syncedProducts = zakupTypeId
+    ? merged.products.map((item) => {
+        const accepted = merged.accepted.some(
+          (row) => String(row.id) === String(item.id)
+        );
+        return accepted
+          ? syncPurchasePriceIntoType(
+              item,
+              zakupTypeId,
+              receivedAt,
+              "Закупочная цена"
+            )
+          : item;
+      })
+    : merged.products;
+  setGlobalState("oneCProducts", syncedProducts);
+  if (merged.accepted.length) {
+    setGlobalState("catalogPricesVersion", receivedAt);
+  }
   const previousMeta = getGlobalState("oneCProductsMeta", {});
   setGlobalState("oneCProductsMeta", {
     ...previousMeta,
@@ -1479,7 +1510,7 @@ function receivePurchasePrices({ items, database, receivedAt = new Date().toISOS
     },
   });
 
-  return merged;
+  return { ...merged, products: syncedProducts };
 }
 
 function freshPriceIssuesForOrders(orders, products, clientLinks, oneCProducts) {
@@ -2309,13 +2340,7 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
   const oneCProducts = normalizeOneCProducts(
     getGlobalState("oneCProducts", [])
   );
-  const oneCById = oneCProductsById(oneCProducts);
-  const managerProducts = products.map((product) =>
-    enrichProductWithPurchasePrices(
-      product,
-      oneCById.get(String(product.oneCId || "")) || null
-    )
-  );
+  const managerProducts = enrichManagerCatalogProducts(products);
 
   if (isStaffRole(req.user.role)) {
     const normalizedClientLinks = Object.fromEntries(
@@ -3744,7 +3769,7 @@ app.put(
 
     auditFromRequest(req, "products.save", { count: products.length });
 
-    res.json({ ok: true, products });
+    res.json({ ok: true, products: enrichManagerCatalogProducts(products) });
   }
 );
 
@@ -4524,13 +4549,7 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
     // Allowlist (TEST / VLAVKA при prod). Каталог принимаем из любой разрешённой базы.
     const sourceDatabase = requireOneCAllowedDatabase(req, res);
     if (!sourceDatabase) return;
-    const allOneCProducts = normalizeOneCProducts(req.body?.items).map((item) => ({
-      ...item,
-      purchasePriceUpdatedAt:
-        item.purchasePriceUpdatedAt || (hasPurchasePrice(item) ? receivedAt : ""),
-      purchasePriceReceivedAt: hasPurchasePrice(item) ? receivedAt : "",
-      purchasePriceSourceDatabase: hasPurchasePrice(item) ? sourceDatabase : "",
-    }));
+    const allOneCProducts = normalizeOneCProducts(req.body?.items);
     const currentProducts = getGlobalState("products", DEFAULT_PRODUCTS);
     const candidateMap = buildOneCProductCandidates(
       currentProducts,
@@ -5177,7 +5196,8 @@ app.post(
         setGlobalState("oneCProductsMeta", { ...meta, candidateMap: nextCandidateMap });
       }
 
-      const product = updatedProducts.find(
+      const productsOut = enrichManagerCatalogProducts(updatedProducts);
+      const product = productsOut.find(
         (entry) => String(entry.id) === String(req.params.productId)
       );
       auditFromRequest(req, "one-c.product.link", {
@@ -5186,7 +5206,7 @@ app.post(
         oneCId: item.id,
         oneCName: item.name,
       });
-      res.json({ ok: true, product, products: updatedProducts });
+      res.json({ ok: true, product, products: productsOut });
     } catch (error) {
       next(error);
     }
@@ -5223,7 +5243,7 @@ app.post(
 
     res.json({
       ok: true,
-      products: linked.products,
+      products: enrichManagerCatalogProducts(linked.products),
       report: linked.report,
       summary: buildOneCProductsSummary(
         linked.products,

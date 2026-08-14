@@ -2056,19 +2056,23 @@ textarea { resize: vertical; }
 }
 .product-card-list .unit-choice,
 .product-card-list .unit-choice.unit-choice-single {
-  display: flex !important;
+  display: grid !important;
+  grid-auto-flow: column !important;
+  grid-auto-columns: minmax(0, 1fr) !important;
+  grid-template-rows: 30px !important;
   width: 100% !important;
   max-width: 100% !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
   gap: 0 !important;
   border: 1px solid #dfe7dc !important;
   border-radius: 10px !important;
   overflow: hidden !important;
-  grid-template-columns: unset !important;
 }
 .product-card-list .unit-choice button,
 .product-card-list .unit-choice.unit-choice-single button {
-  flex: 1 1 0 !important;
-  width: 0 !important;
+  width: auto !important;
   min-width: 0 !important;
   height: 30px !important;
   min-height: 30px !important;
@@ -2407,22 +2411,33 @@ textarea { resize: vertical; }
 }
 .unit-choice {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-  gap: 4px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-template-rows: 30px;
+  gap: 0;
   width: 100%;
+  height: 30px;
+  min-height: 30px;
+  max-height: 30px;
   margin-bottom: 0;
-  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #dfe7dc;
+  border-radius: 10px;
+  box-sizing: border-box;
 }
 .unit-choice button {
-  width: 100%;
+  width: auto;
   min-width: 0;
-  min-height: 28px;
-  padding: 4px 3px;
-  border: 1px solid #d8e3d4;
-  border-radius: 8px;
+  height: 30px;
+  min-height: 30px;
+  max-height: 30px;
+  padding: 0 4px;
+  border: 0;
+  border-right: 1px solid #dfe7dc;
+  border-radius: 0;
   background: #fff;
   color: #5f695f;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4136,11 +4151,17 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     font-size: 11px;
     line-height: 1.3;
   }
-  .product-card-controls { gap: 6px; }
+  .product-card-controls { gap: 5px; margin-top: auto; }
   .product-card .unit-choice,
   .product-card .unit-choice.unit-choice-single {
-    display: flex !important;
+    display: grid !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 30px !important;
     width: 100% !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
     gap: 0 !important;
     border: 1px solid #dfe7dc !important;
     border-radius: 10px !important;
@@ -4148,8 +4169,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   }
   .product-card .unit-choice button,
   .product-card .unit-choice.unit-choice-single button {
-    flex: 1 1 0 !important;
-    width: 0 !important;
+    width: auto !important;
     min-width: 0 !important;
     height: 30px !important;
     min-height: 30px !important;
@@ -4367,13 +4387,20 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   }
   .product-card-list .unit-choice,
   .product-card-list .unit-choice.unit-choice-single {
+    display: grid !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 24px !important;
     width: 100% !important;
+    height: 24px !important;
+    min-height: 24px !important;
+    max-height: 24px !important;
     border-radius: 7px !important;
   }
   .product-card-list .unit-choice button,
   .product-card-list .unit-choice.unit-choice-single button {
-    flex: 1 1 0 !important;
-    width: 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
     height: 24px !important;
     min-height: 24px !important;
     max-height: 24px !important;
@@ -4700,8 +4727,9 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   .stat-card strong { font-size: 23px; }
   .app-header-logo { width: 90px; max-width: 90px; max-height: 48px; }
   .product-image-wrap {
-    aspect-ratio: 5 / 4 !important;
-    max-height: 84px !important;
+    aspect-ratio: 1 / 1 !important;
+    max-height: none !important;
+    width: 100% !important;
     height: auto !important;
     margin: 0 !important;
   }

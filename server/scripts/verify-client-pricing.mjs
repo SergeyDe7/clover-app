@@ -9,6 +9,10 @@ import {
   resolveClientProductPricing,
   roundPriceUp,
 } from "../src/pricing.js";
+import {
+  mergeSalePricesByType,
+  syncPurchasePriceIntoType,
+} from "../src/oneCSalePrices.js";
 
 const product = {
   id: 7,
@@ -255,6 +259,73 @@ assert.equal(baseEmptyWithType.prices.piece, 50);
 assert.equal(baseEmptyWithType.priceSources.piece, "one_c_price_type");
 assert.equal(baseEmptyWithType.prices.pack, 5000);
 assert.equal(baseEmptyWithType.priceSources.pack, "one_c_price_type_from_piece");
+
+// Повторная выгрузка того же вида цен не должна сдвигать receivedAt —
+// иначе старая «Закупочная» из «Обновить цены» бьёт свежий purchase-prices.
+const restampBase = [
+  {
+    id: "onec-7",
+    salePricesByType: {
+      "type-zakup": {
+        piece: 99,
+        receivedAt: "2026-08-13T15:16:12.757Z",
+        updatedAt: "2026-08-13T15:16:12.757Z",
+      },
+    },
+  },
+];
+const restampSame = mergeSalePricesByType(
+  restampBase,
+  [{ id: "onec-7", priceTypeId: "type-zakup", price: 99 }],
+  { receivedAt: "2026-08-14T10:00:00.000Z" }
+);
+assert.equal(
+  restampSame.products[0].salePricesByType["type-zakup"].receivedAt,
+  "2026-08-13T15:16:12.757Z"
+);
+const restampChanged = mergeSalePricesByType(
+  restampBase,
+  [{ id: "onec-7", priceTypeId: "type-zakup", price: 110 }],
+  { receivedAt: "2026-08-14T10:00:00.000Z" }
+);
+assert.equal(
+  restampChanged.products[0].salePricesByType["type-zakup"].receivedAt,
+  "2026-08-14T10:00:00.000Z"
+);
+assert.equal(restampChanged.products[0].salePricesByType["type-zakup"].piece, 110);
+
+const syncedZakup = syncPurchasePriceIntoType(
+  {
+    id: "onec-7",
+    purchasePrice: 100,
+    salePricesByType: {
+      "type-zakup": {
+        piece: 99,
+        receivedAt: "2026-08-13T15:16:12.757Z",
+        updatedAt: "2026-08-13T15:16:12.757Z",
+      },
+    },
+  },
+  "type-zakup",
+  "2026-08-13T18:00:00.000Z",
+  "Закупочная цена"
+);
+assert.equal(syncedZakup.salePricesByType["type-zakup"].piece, 100);
+assert.equal(
+  syncedZakup.salePricesByType["type-zakup"].receivedAt,
+  "2026-08-13T18:00:00.000Z"
+);
+const afterPurchaseSync = resolveClientProductPricing(
+  { ...product, pricePiece: 0, pricePack: 0 },
+  {},
+  syncedZakup,
+  {
+    defaultPricingMode: "purchase_markup",
+    defaultMarkupPercent: 5,
+    oneCPriceTypeId: "type-zakup",
+  }
+);
+assert.equal(afterPurchaseSync.prices.piece, 105);
 
 console.log("Проверка общей наценки клиента и индивидуальных исключений прошла успешно.");
 console.log("Приоритет проверен: фиксированная цена -> индивидуальный процент -> общий процент.");

@@ -157,10 +157,18 @@ export function mergeSalePricesByType(
         mergedUnits[unit] = null;
       }
     }
+    const unitsChanged = UNITS.some(
+      (unit) => finiteNonNegative(previousType[unit]) !== finiteNonNegative(mergedUnits[unit])
+    );
+    const stamp = unitsChanged
+      ? receivedAt
+      : cleanText(previousType.receivedAt || previousType.updatedAt) || receivedAt;
     salePricesByType[priceTypeId] = {
       ...mergedUnits,
-      updatedAt: receivedAt,
-      receivedAt,
+      updatedAt: unitsChanged
+        ? receivedAt
+        : cleanText(previousType.updatedAt) || stamp,
+      receivedAt: stamp,
       priceTypeId,
       priceTypeName: cleanText(
         raw?.priceTypeName ?? raw?.priceTypeTitle ?? previousType.priceTypeName
@@ -191,6 +199,58 @@ export function mergeSalePricesByType(
     accepted,
     rejected,
     receivedAt,
+  };
+}
+
+/**
+ * Канал purchase-prices обновляет и вид «Закупочная», чтобы наценка клиента
+ * не держалась за более поздний bulk «Обновить цены» со старым значением.
+ */
+export function syncPurchasePriceIntoType(
+  oneCItem = {},
+  priceTypeId = "",
+  receivedAt = "",
+  priceTypeName = ""
+) {
+  const typeId = cleanText(priceTypeId);
+  const stamp = cleanText(receivedAt);
+  const piece = finiteNonNegative(
+    oneCItem.purchasePrice ?? oneCItem.purchasePricePiece ?? oneCItem.costPrice
+  );
+  if (!typeId || !stamp || piece === null) return oneCItem;
+
+  const previousByType =
+    oneCItem.salePricesByType && typeof oneCItem.salePricesByType === "object"
+      ? oneCItem.salePricesByType
+      : {};
+  const previousType =
+    previousByType[typeId] && typeof previousByType[typeId] === "object"
+      ? previousByType[typeId]
+      : {};
+
+  return {
+    ...oneCItem,
+    salePricesByType: {
+      ...previousByType,
+      [typeId]: {
+        ...previousType,
+        piece,
+        pack: finiteNonNegative(oneCItem.purchasePricePack) ?? previousType.pack ?? null,
+        bundle:
+          finiteNonNegative(oneCItem.purchasePriceBundle) ?? previousType.bundle ?? null,
+        box: finiteNonNegative(oneCItem.purchasePriceBox) ?? previousType.box ?? null,
+        pair: finiteNonNegative(oneCItem.purchasePricePair) ?? previousType.pair ?? null,
+        meter: finiteNonNegative(oneCItem.purchasePriceMeter) ?? previousType.meter ?? null,
+        roll: finiteNonNegative(oneCItem.purchasePriceRoll) ?? previousType.roll ?? null,
+        receivedAt: stamp,
+        updatedAt: stamp,
+        priceTypeId: typeId,
+        priceTypeName:
+          cleanText(priceTypeName) ||
+          cleanText(previousType.priceTypeName) ||
+          "Закупочная цена",
+      },
+    },
   };
 }
 
