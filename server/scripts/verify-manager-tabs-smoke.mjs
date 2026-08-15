@@ -23,6 +23,7 @@ const MAIN_TAB_TO_PANEL = {
 
 const MORE_TAB_TO_PANEL = {
   access: "ManagerAccessVault",
+  storefront: "ManagerStorefront",
   settings: "ManagerSettings",
   backup: "ManagerBackup",
   audit: "ManagerAudit",
@@ -35,6 +36,7 @@ const PANEL_FILES = {
   ManagerExchange: "ManagerExchange.jsx",
   ManagerReconciliation: "ManagerReconciliation.jsx",
   ManagerAccessVault: "ManagerAccessVault.jsx",
+  ManagerStorefront: "ManagerStorefront.jsx",
   ManagerSettings: "ManagerSettings.jsx",
   ManagerBackup: "ManagerBackup.jsx",
   ManagerAudit: "ManagerAudit.jsx",
@@ -87,7 +89,8 @@ for (const [tabId, panel] of Object.entries(MAIN_TAB_TO_PANEL)) {
 }
 
 assert.ok(
-  screenSource.includes('MANAGER_MORE_TABS.map'),
+  screenSource.includes("MANAGER_MORE_TABS.filter") ||
+    screenSource.includes("MANAGER_MORE_TABS.map"),
   "ManagerScreen не рендерит навигацию MANAGER_MORE_TABS"
 );
 

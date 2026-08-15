@@ -109,10 +109,11 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
     setNotice("");
     const addedNames = [];
     let skipped = 0;
+    const byOneCId = new Map(productsByOneCId);
 
     try {
       for (const item of list) {
-        const existing = productsByOneCId.get(String(item.id));
+        const existing = byOneCId.get(String(item.id));
         if (existing?.showOnStorefront) {
           skipped += 1;
           continue;
@@ -131,7 +132,7 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
           );
         }
         if (result.product?.oneCId) {
-          productsByOneCId.set(String(result.product.oneCId), result.product);
+          byOneCId.set(String(result.product.oneCId), result.product);
         }
         addedNames.push(result.product?.name || preferredName || item.name);
         onAfterAdd?.(result);

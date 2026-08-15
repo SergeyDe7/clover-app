@@ -1,4 +1,4 @@
-const CACHE_NAME = "clover-v18-shell-v186-lk";
+const CACHE_NAME = "clover-v18-shell-v187-lint";
 const SHELL = [
   "/offline.html",
   "/manifest.webmanifest",
@@ -76,7 +76,7 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let data = {};
+  let data;
   try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data?.text() || "" }; }
   const title = data.title || "Clover";
   const options = {

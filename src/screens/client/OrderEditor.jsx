@@ -72,8 +72,8 @@ export function OrderEditor({
   favorites,
   setFavorites,
   settings,
-  profile,
-  orders,
+  profile: _profile,
+  orders: _orders,
   catalogPolicy,
   showFullCatalog,
   setShowFullCatalog,
@@ -507,11 +507,6 @@ export function OrderEditor({
         // Заказ не создан — снова разрешаем черновик и оставляем корзину.
         draftSaveLockedRef.current = false;
       });
-  };
-
-  const submit = (event) => {
-    event.preventDefault();
-    submitOrder();
   };
 
   const catalogBody = (

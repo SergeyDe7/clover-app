@@ -148,7 +148,7 @@ function ManagerNotificationSettings({ settings, set }) {
   );
 }
 
-export function ManagerSettings({ settings, setSettings, authUser }) {
+export function ManagerSettings({ settings, setSettings, authUser: _authUser }) {
   const set = (key, value) => setSettings((current) => ({ ...current, [key]: value }));
 
   return (

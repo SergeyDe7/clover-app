@@ -20,7 +20,6 @@ import {
   STORAGE,
   DEFAULT_SETTINGS,
   EMPTY_PROFILE,
-  EMPTY_LINK,
   isClientProfileComplete,
   normalizeProfileContacts,
   normalizeOrderExchange,
@@ -391,6 +390,11 @@ function LoginView({ onAuth, authBusy, authError }) {
 
         {(localError || authError) && <div className="auth-error">{localError || authError}</div>}
         {message && <div className="auth-success">{message}</div>}
+        {mode === "login" && message && (
+          <button type="button" disabled={authBusy || !form.email} onClick={() => void resend()}>
+            Отправить письмо подтверждения ещё раз
+          </button>
+        )}
         {developmentLink && (
           <div className="test-note">
             Тестовая ссылка для локальной настройки: <a href={developmentLink}>открыть</a>
@@ -1147,11 +1151,6 @@ function App() {
   const clientId = authUser?.id || "";
   const profileComplete = isClientProfileComplete(profile);
 
-  const link = {
-    ...EMPTY_LINK,
-    ...(clientLinks[clientId] || {}),
-  };
-
   const catalogProducts = useMemo(() => {
     const source =
       showFullCatalog && catalogPolicy.allowFullCatalog
@@ -1332,7 +1331,7 @@ function App() {
 
     const session = catalogSession || { mode: "new" };
     const previousOrders = orders;
-    let nextOrders = orders;
+    let nextOrders;
 
     if (session.mode === "edit") {
       nextOrders = orders.map((order) => {
@@ -1380,7 +1379,6 @@ function App() {
           customerEmail: profile.email,
           managerComment: "",
           internalNote: "",
-          clientComment: String(payload.clientComment || "").trim(),
           history: [
             {
               ...makeOrderHistoryEvent(

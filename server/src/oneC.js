@@ -197,7 +197,8 @@ async function requestJson(config, endpointPath, options = {}) {
   } catch (error) {
     if (error?.name === "AbortError") {
       throw new Error(
-        `1С не ответила за ${Math.round(config.timeoutMs / 1000)} секунд.`
+        `1С не ответила за ${Math.round(config.timeoutMs / 1000)} секунд.`,
+        { cause: error }
       );
     }
     throw error;

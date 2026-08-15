@@ -8,7 +8,6 @@ import {
   UNIT_ORDER,
   UNIT_CONFIG,
   unitPriceField,
-  hasPurchasePrice,
   hasManualUnitValue,
   prefillManualPriceFromProduct,
   calculateMarkupPreview,
@@ -1384,15 +1383,6 @@ export function ManagerClients({
                   : {},
             };
             const matrixProductIds = link.matrixProductIds;
-            const orderedIds = [
-              ...new Set(
-                (Array.isArray(client.orders) ? client.orders : []).flatMap((order) =>
-                  (order.items || []).map(
-                    (item) => item.productId ?? item.id
-                  )
-                )
-              ),
-            ];
             const matrixIdSet = new Set(matrixProductIds.map(String));
             const snapshotIds = Array.isArray(matrixListSnapshot[client.id])
               ? matrixListSnapshot[client.id]

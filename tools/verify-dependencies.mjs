@@ -3,13 +3,18 @@ import path from "node:path";
 
 function readJson(filePath) { return JSON.parse(readFileSync(filePath, "utf8")); }
 
+function installedVersionFromSpec(spec) {
+  return String(spec || "").trim().replace(/^[~^]/, "");
+}
+
 function verifyExpected(root, expected, label) {
   const errors = [];
   for (const [name, requiredVersion] of Object.entries(expected)) {
     const installedPath = path.join(root, "node_modules", ...name.split("/"), "package.json");
     try {
       const installed = readJson(installedPath);
-      if (installed.version !== requiredVersion) errors.push(`${name}: expected ${requiredVersion}, installed ${installed.version}`);
+      const wanted = installedVersionFromSpec(requiredVersion);
+      if (installed.version !== wanted) errors.push(`${name}: expected ${wanted} (spec ${requiredVersion}), installed ${installed.version}`);
     } catch { errors.push(`${name}: not installed`); }
   }
   if (errors.length) throw new Error(`Dependency verification failed for ${label}:\n${errors.join("\n")}`);
