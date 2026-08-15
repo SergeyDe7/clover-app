@@ -631,6 +631,8 @@ function oneCAuthRequired(req, res, next) {
   });
 }
 
+/** Строгий TEST-only gate; текущие маршруты используют requireOneCAllowedDatabase. */
+// eslint-disable-next-line no-unused-vars -- retained for TEST-only routes
 function requireOneCTestDatabase(req, res) {
   const database = extractOneCDatabase(req);
   if (!isTestDatabase(database)) {
@@ -1513,6 +1515,7 @@ function receivePurchasePrices({ items, database, receivedAt = new Date().toISOS
   return { ...merged, products: syncedProducts };
 }
 
+// eslint-disable-next-line no-unused-vars -- preflight helper kept for order price gates
 function freshPriceIssuesForOrders(orders, products, clientLinks, oneCProducts) {
   const requirements = [];
   for (const order of Array.isArray(orders) ? orders : []) {
@@ -2808,7 +2811,7 @@ app.delete(
   }
 );
 
-function notifyClientOrderStatusChanged(order, previousStatus) {
+function notifyClientOrderStatusChanged(order, _previousStatus) {
   const clientId = order.clientId || order.user_id;
   if (!clientId) return;
   sendOrderPush(clientId, {
@@ -6537,7 +6540,7 @@ app.post(
   }
 );
 
-app.use((error, req, res, next) => {
+app.use((error, req, res, _next) => {
   console.error(error);
 
   if (Number.isInteger(error?.status) && error.status >= 400 && error.status < 600) {

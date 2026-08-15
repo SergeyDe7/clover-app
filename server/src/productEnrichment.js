@@ -25,7 +25,7 @@ function clean(value) {
 }
 
 /** Укорачиваем запрос для картинок: без фасовки «(250шт)» и лишних хвостов. */
-function imageSearchQuery(name, code = "") {
+function imageSearchQuery(name, _code = "") {
   let q = clean(name)
     .replace(/\([^)]*шт[^)]*\)/gi, " ")
     .replace(/\b\d+\s*\/\s*\d+\b/g, " ")
@@ -1142,7 +1142,7 @@ async function renderCloverStudioPhoto(buffer) {
     .png()
     .toBuffer();
 
-  let productBuf = cleaned;
+  let productBuf;
   try {
     productBuf = await sharp(cleaned)
       .trim({

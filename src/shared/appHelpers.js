@@ -911,7 +911,7 @@ export function printOrderDocument(order, settings) {
     ${order.clientComment ? `<div class="note"><strong>Комментарий клиента:</strong><br>${escapeHtml(order.clientComment)}</div>` : ""}
     ${order.managerComment ? `<div class="note"><strong>Комментарий менеджера:</strong><br>${escapeHtml(order.managerComment)}</div>` : ""}
     <div class="footer">Внешний ID: ${escapeHtml(order.externalId || order.id || "")}</div>
-    <script>window.onload=()=>window.print();<\/script>
+    <script>window.onload=()=>window.print();</script>
   </body></html>`);
   printWindow.document.close();
 }

@@ -46,7 +46,7 @@ export function normalizeSearchText(value) {
     // 400мм / 70мкм → 400 мм / 70 мкм
     .replace(/(\d)([a-zа-я]+)/gi, "$1 $2")
     .replace(/([a-zа-я]+)(\d)/gi, "$1 $2")
-    .replace(/[^0-9a-zа-яё\-]+/gi, " ")
+    .replace(/[^0-9a-zа-яё-]+/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
 }

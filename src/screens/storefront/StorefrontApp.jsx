@@ -26,7 +26,7 @@ export default function StorefrontApp() {
     };
   }, []);
 
-  let page = null;
+  let page;
   let current = "home";
   if (route.name === "catalog") {
     page = (

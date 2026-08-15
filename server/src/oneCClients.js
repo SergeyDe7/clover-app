@@ -136,8 +136,8 @@ export function buildOneCClientCandidates(
 
     for (const item of sourceOneC) {
       if (usedIds.has(item.id)) continue;
-      let score = 0;
-      let reason = "similar";
+      let score;
+      let reason;
 
       if (values.inn && digits(item.inn) === values.inn) {
         score = 1;
