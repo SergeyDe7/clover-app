@@ -89,10 +89,7 @@ function emptyDetails(product = {}) {
 
 export function productNeedsWebEnrichment(product = {}) {
   const details = emptyDetails(product);
-  const missingText =
-    !details.description || !details.composition || !details.characteristics;
-  const missingImage = !clean(product.imageUrl);
-  return missingText || missingImage;
+  return !details.description || !details.composition || !details.characteristics;
 }
 
 /** Разбор фактов из названия (номенклатура 1С). */
@@ -1274,8 +1271,8 @@ export async function enrichProductCardFromWeb(
   const query = [clean(working.name), clean(working.code)].filter(Boolean).join(" ");
   const photoQuery = imageSearchQuery(working.name, working.code) || query;
   let hits = [];
-  // Поиск в сети — только если нужно фото; тексты пишем своим копирайтом Clover.
-  if (!clean(working.imageUrl)) {
+  // Фото из сети — только по явному forceRefreshPhoto. Тексты пишем копирайтом Clover.
+  if (forceRefreshPhoto && !clean(working.imageUrl)) {
     try {
       hits = await searchWebForProduct(query);
     } catch {
@@ -1302,7 +1299,7 @@ export async function enrichProductCardFromWeb(
 
   let imageUrl = clean(working.imageUrl);
   let imageUpdatedAt = working.imageUpdatedAt || "";
-  if (!imageUrl && uploadsDirectory) {
+  if (!imageUrl && forceRefreshPhoto && uploadsDirectory) {
     try {
       const images = await searchProductImages(photoQuery, hits);
       let best = null;
