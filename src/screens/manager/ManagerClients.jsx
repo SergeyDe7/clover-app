@@ -4,7 +4,6 @@ import { api } from "../../serverApi";
 import { PanelErrorBoundary } from "../../shared/SharedPanels";
 import {
   EMPTY_LINK,
-  readOpenManagerClientId,
   writeOpenManagerClientId,
   UNIT_ORDER,
   UNIT_CONFIG,
@@ -662,7 +661,7 @@ export function ManagerClients({
   const [oneCAddPanelOpen, setOneCAddPanelOpen] = useState({});
   /** Снимок id позиций матрицы — чтобы после «Снять все» список оставался на экране. */
   const [matrixListSnapshot, setMatrixListSnapshot] = useState({});
-  const [openClientId, setOpenClientId] = useState(readOpenManagerClientId);
+  const [openClientId, setOpenClientId] = useState("");
   const [approvalBusyId, setApprovalBusyId] = useState("");
   const [openMenuId, setOpenMenuId] = useState("");
   const [profileOpenId, setProfileOpenId] = useState("");
@@ -680,6 +679,10 @@ export function ManagerClients({
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [editorProduct, setEditorProduct] = useState(undefined);
   const restoredOpenClient = useRef(false);
+
+  useEffect(() => {
+    writeOpenManagerClientId("");
+  }, []);
 
   const ordersByClientId = useMemo(() => {
     const map = {};
@@ -1218,7 +1221,7 @@ export function ManagerClients({
   return (
     <PanelErrorBoundary label="Ошибка раздела «Клиенты»">
     <section>
-      <div className="toolbar two">
+      <div className="toolbar two manager-clients-toolbar">
         <div className="manager-search-block">
           <input
             type="search"

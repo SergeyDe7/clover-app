@@ -2199,7 +2199,7 @@ textarea { resize: vertical; }
   display: block;
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 500;
 }
 .delivery-date-sheet-backdrop {
   position: absolute;
@@ -2500,7 +2500,7 @@ textarea { resize: vertical; }
 .cart-sheet {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  z-index: 500;
 }
 .cart-sheet-backdrop {
   position: absolute;
@@ -2518,9 +2518,8 @@ textarea { resize: vertical; }
   display: flex;
   flex-direction: column;
   gap: 0;
-  width: min(560px, calc(100vw - 24px));
+  width: min(560px, calc(100% - 24px));
   max-height: min(88vh, 740px);
-  max-height: min(88dvh, 740px);
   overflow: hidden;
   padding: 18px 18px 0;
   border-radius: 20px;
@@ -2637,7 +2636,7 @@ textarea { resize: vertical; }
   flex: 0 0 auto;
   display: grid;
   gap: 12px;
-  margin: 0 -18px 0;
+  margin: 0;
   padding: 12px 18px calc(16px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid #e4ece1;
   background: #fff;
@@ -3985,7 +3984,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 80;
+    z-index: 500;
   }
   .delivery-date-sheet-backdrop {
     position: absolute;
@@ -4003,12 +4002,12 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     bottom: 0;
     transform: none;
     width: 100%;
-    max-height: min(88vh, 720px);
+    max-height: 85svh;
     padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
     border-radius: 18px 18px 0 0;
     background: #fff;
     box-shadow: 0 -12px 36px rgba(40, 64, 40, 0.18);
-    animation: clover-sheet-up-in 0.4s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+    animation: none;
   }
   .delivery-date-sheet-head {
     display: flex;
@@ -4238,7 +4237,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 70;
+    z-index: 500;
   }
   .cart-sheet-backdrop {
     position: absolute;
@@ -4259,14 +4258,13 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     display: flex;
     flex-direction: column;
     gap: 0;
-    max-height: 88vh;
-    max-height: 88dvh;
+    max-height: 85svh;
     overflow: hidden;
     padding: 16px 16px 0;
     border-radius: 18px 18px 0 0;
     background: #fff;
     box-shadow: 0 -12px 40px rgba(30, 42, 30, 0.18);
-    animation: clover-sheet-up-in 0.4s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+    animation: none;
   }
   .cart-sheet-head {
     flex: 0 0 auto;
@@ -4327,7 +4325,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     flex: 0 0 auto;
     display: grid;
     gap: 10px;
-    margin: 0 -16px 0;
+    margin: 0;
     padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid #e4ece1;
     background: #fff;
