@@ -1,5 +1,6 @@
 // Редактор заказа клиента: каталог, корзина и оформление.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Header } from "../../shared/SharedPanels";
 import {
   UNIT_CONFIG,
@@ -140,6 +141,81 @@ export function OrderEditor({
       setMissingFields((current) => ({ ...current, address: false }));
     }
   }, [addresses, addressId]);
+
+  useLayoutEffect(() => {
+    if (!cartSheetOpen && !datePickerOpen) return undefined;
+    const html = document.documentElement;
+    const body = document.body;
+    const scrollY = window.scrollY;
+    html.classList.add("clover-cart-open");
+    body.classList.add("clover-cart-open");
+    html.style.overflow = "hidden";
+    html.style.overflowX = "hidden";
+    body.style.overflow = "hidden";
+    body.style.overflowX = "hidden";
+    body.style.position = "fixed";
+    body.style.left = "0";
+    body.style.width = "100%";
+    body.style.maxWidth = "100%";
+    body.style.top = `-${scrollY}px`;
+
+    let startX = 0;
+    let startY = 0;
+    const scrollRoot = (event) =>
+      event.target instanceof Element
+        ? event.target.closest(".cart-sheet-scroll, .delivery-date-sheet-panel")
+        : null;
+    const onTouchStart = (event) => {
+      startX = event.touches[0]?.clientX ?? 0;
+      startY = event.touches[0]?.clientY ?? 0;
+      const scroll = scrollRoot(event);
+      if (!scroll) return;
+      const max = scroll.scrollHeight - scroll.clientHeight;
+      if (max <= 0) return;
+      if (scroll.scrollTop <= 0) scroll.scrollTop = 1;
+      else if (scroll.scrollTop >= max) scroll.scrollTop = max - 1;
+    };
+    const onTouchMove = (event) => {
+      const x = event.touches[0]?.clientX ?? startX;
+      const y = event.touches[0]?.clientY ?? startY;
+      const dx = x - startX;
+      const dy = y - startY;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        event.preventDefault();
+        return;
+      }
+      const scroll = scrollRoot(event);
+      if (!scroll) {
+        event.preventDefault();
+        return;
+      }
+      const max = scroll.scrollHeight - scroll.clientHeight;
+      const atTop = scroll.scrollTop <= 0;
+      const atBottom = scroll.scrollTop >= max - 1;
+      if (max <= 0 || (atTop && dy > 0) || (atBottom && dy < 0)) {
+        event.preventDefault();
+      }
+    };
+    document.addEventListener("touchstart", onTouchStart, { passive: true });
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+
+    return () => {
+      html.classList.remove("clover-cart-open");
+      body.classList.remove("clover-cart-open");
+      html.style.overflow = "";
+      html.style.overflowX = "";
+      body.style.overflow = "";
+      body.style.overflowX = "";
+      body.style.position = "";
+      body.style.left = "";
+      body.style.width = "";
+      body.style.maxWidth = "";
+      body.style.top = "";
+      window.scrollTo(0, scrollY);
+      document.removeEventListener("touchstart", onTouchStart);
+      document.removeEventListener("touchmove", onTouchMove);
+    };
+  }, [cartSheetOpen, datePickerOpen]);
 
   const updateDeliveryDate = async (value) => {
     if (!value) {
@@ -483,9 +559,6 @@ export function OrderEditor({
                 </div>
               </>
             )}
-            {settings.enableDrafts && session.mode === "new" && (
-              <p className="summary-note">Черновик автоматически сохраняется в этом браузере.</p>
-            )}
           </aside>
 
           <div className="catalog-main">
@@ -694,7 +767,8 @@ export function OrderEditor({
           </button>
         </div>
 
-        {cartSheetOpen && (
+        {cartSheetOpen && typeof document !== "undefined"
+          ? createPortal(
           <div className="cart-sheet" role="dialog" aria-modal="true" aria-label="Корзина заказа">
             <button
               className="cart-sheet-backdrop"
@@ -892,10 +966,13 @@ export function OrderEditor({
                 </button>
               </div>
             </div>
-          </div>
-        )}
+          </div>,
+          document.documentElement
+        )
+        : null}
 
-        {datePickerOpen && (
+        {datePickerOpen && typeof document !== "undefined"
+          ? createPortal(
           <div className="delivery-date-sheet" role="dialog" aria-modal="true" aria-label="Дата доставки">
             <button
               className="delivery-date-sheet-backdrop"
@@ -925,8 +1002,10 @@ export function OrderEditor({
                 onPick={handleCalendarPick}
               />
             </div>
-          </div>
-        )}
+          </div>,
+          document.documentElement
+        )
+        : null}
       </section>
   );
 

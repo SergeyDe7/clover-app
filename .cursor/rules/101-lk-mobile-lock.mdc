@@ -1,0 +1,16 @@
+---
+description: "Не ломать уже починенные окна ЛК на телефоне: корзина, каталог, матрица."
+globs: ""
+alwaysApply: true
+---
+
+Перед любой правкой `html`/`body`/`overflow`/`100dvh`/`100svh`/`position: fixed`/`transform` в ЛК:
+
+1. Корзина и календарь даты порталятся в `document.documentElement`, не в `document.body`.
+2. Антискролл страницы: `body.style.position = "fixed"` только пока оверлей висит на `html`. Если оверлей снова окажется внутри `body`, окно поедет.
+3. Слой `.cart-sheet` на телефоне: `width: auto` + `left/right: 0`, без тройки `left + right + width: 100%` и без `100vw`.
+4. Не возвращать `grid-auto-rows` от `100dvh` и не делать каталогу `overflow: hidden` + `100%` ряды — карточки схлопываются.
+5. Матрица клиента после F5 свёрнута: `useState("")`, не `readOpenManagerClientId`.
+6. Стили окон в двух местах: `src/styles/clover-theme.css` и `APP_STYLES` в `src/shared/appHelpers.js`. Менять оба.
+7. После правки прогнать `node scripts/verify-v17-ui.mjs` из `server/`. Если проверка падает — не деплоить.
+8. Не чинить каталог через те же `html/body`, которыми держится корзина, одним коммитом вперемешку.

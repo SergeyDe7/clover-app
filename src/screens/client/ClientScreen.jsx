@@ -135,6 +135,17 @@ function ClientDashboard({
   };
 
   useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    html.classList.add("clover-client-lk");
+    body.classList.add("clover-client-lk");
+    return () => {
+      html.classList.remove("clover-client-lk");
+      body.classList.remove("clover-client-lk");
+    };
+  }, []);
+
+  useEffect(() => {
     if (
       catalogSession &&
       (catalogSession.mode === "edit" || catalogSession.mode === "repeat")
@@ -474,7 +485,7 @@ function ClientDashboard({
   );
 
   return (
-    <main className="clover-app">
+    <main className="clover-app clover-app-client">
       <StickyCabinetChrome className="app-top-chrome-client">
         <Header
           title={
