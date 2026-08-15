@@ -194,15 +194,7 @@ export function ManagerStorefront({
   };
 
   const selectAllFiltered = () => {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      for (const item of filteredProducts) {
-        // Для добавления выбираем только ещё не на витрине.
-        if (item.showOnStorefront === true) continue;
-        next.add(String(item.id));
-      }
-      return next;
-    });
+    setSelectedIds(new Set(filteredProducts.map((item) => String(item.id))));
   };
 
   const clearSelection = () => {
@@ -234,7 +226,7 @@ export function ManagerStorefront({
     const saved = await persistProducts(
       next,
       checked
-        ? `На витрину добавлено: ${touched}. Фото и описание подтянутся в фоне.`
+        ? `На витрину добавлено: ${touched}.`
         : `С витрины снято: ${touched}.`
     );
     if (saved) clearSelection();
@@ -534,23 +526,14 @@ export function ManagerStorefront({
             />
           </label>
         </div>
-        <div className="form-actions" style={{ marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+        <div className="storefront-pick-actions">
           <button
             className="secondary-button"
             type="button"
-            disabled={
-              productBusy ||
-              filteredProducts.every((item) => item.showOnStorefront === true)
-            }
+            disabled={productBusy || filteredProducts.length === 0}
             onClick={selectAllFiltered}
           >
             Выбрать все
-            {(() => {
-              const n = filteredProducts.filter(
-                (item) => item.showOnStorefront !== true
-              ).length;
-              return n ? ` (${n})` : "";
-            })()}
           </button>
           <button
             className="secondary-button"
@@ -567,7 +550,6 @@ export function ManagerStorefront({
             onClick={() => void applySelectionToStorefront(true)}
           >
             Добавить на витрину
-            {selectedCount ? ` (${selectedCount})` : ""}
           </button>
           <button
             className="secondary-button"
@@ -576,39 +558,6 @@ export function ManagerStorefront({
             onClick={() => void applySelectionToStorefront(false)}
           >
             Убрать с витрины
-            {selectedCount ? ` (${selectedCount})` : ""}
-          </button>
-          <button
-            className="secondary-button"
-            type="button"
-            disabled={productBusy || onStorefrontCount === 0}
-            onClick={() => {
-              void (async () => {
-                setProductBusy(true);
-                try {
-                  const result = await api.enrichStorefrontAll({
-                    forcePhoto: true,
-                  });
-                  await appAlert({
-                    title: "Очередь запущена",
-                    message:
-                      result.message ||
-                      `Обновление фото: ${result.queued || 0} товар(ов). Старые фото не стираются до успеха.`,
-                    tone: "success",
-                  });
-                } catch (error) {
-                  await appAlert({
-                    title: "Не удалось обновить фото",
-                    message: error.message || "Ошибка очереди enrichment.",
-                    tone: "danger",
-                  });
-                } finally {
-                  setProductBusy(false);
-                }
-              })();
-            }}
-          >
-            Обновить фото (белый фон)
           </button>
           <button
             className="secondary-button"
