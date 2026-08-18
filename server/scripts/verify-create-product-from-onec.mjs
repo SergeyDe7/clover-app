@@ -5,6 +5,9 @@ import {
   createOrReuseCloverProductFromOneC,
   inferCloverProductCategory,
   normalizeOneCProduct,
+  upsertManagerCatalogProduct,
+  pruneOneCProductCandidates,
+  buildOneCProductsSummary,
 } from "../src/oneCProducts.js";
 
 const catalogItem = normalizeOneCProduct({
@@ -215,5 +218,46 @@ const paperBox = createOrReuseCloverProductFromOneC(
 assert.equal(paperBox.created, true);
 assert.equal(paperBox.product.category, "Контейнеры");
 assert.equal(paperBox.product.subcategory, "Бумажные контейнеры");
+
+const renamed = upsertManagerCatalogProduct(
+  [{ id: 7, name: "Старое имя", category: "Химия бытовая", oneCId: "sku-1" }],
+  { id: 7, name: "Новое имя", category: "Химия бытовая", oneCId: "sku-1" }
+);
+assert.equal(renamed.found, true);
+assert.equal(renamed.created, false);
+assert.equal(renamed.product.name, "Новое имя");
+assert.equal(renamed.products.length, 1);
+
+const createdCard = upsertManagerCatalogProduct(
+  renamed.products,
+  { name: "Ещё товар", category: "Новые товары" },
+  { create: true }
+);
+assert.equal(createdCard.created, true);
+assert.equal(createdCard.product.id, 8);
+assert.equal(createdCard.products.length, 2);
+
+const pruned = pruneOneCProductCandidates(
+  {
+    1: [{ id: "a" }],
+    2: [{ id: "b" }],
+    3: [],
+  },
+  [
+    { id: 1, name: "Связан", oneCId: "sku-1" },
+    { id: 2, name: "Без связи", oneCId: "" },
+  ]
+);
+assert.deepEqual(Object.keys(pruned), ["2"]);
+const summaryAfterLink = buildOneCProductsSummary(
+  [
+    { id: 1, name: "Связан", oneCId: "sku-1" },
+    { id: 2, name: "Без связи", oneCId: "" },
+  ],
+  [],
+  { candidateMap: { 1: [{ id: "a" }], 2: [{ id: "b" }] } }
+);
+assert.equal(summaryAfterLink.candidateProducts, 1);
+assert.deepEqual(summaryAfterLink.candidateProductIds, ["2"]);
 
 console.log("verify-create-product-from-onec: ok");

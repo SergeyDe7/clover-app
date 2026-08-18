@@ -121,12 +121,15 @@ import {
   applyInferredCategories,
   applyOneCArticles,
   autoLinkCloverProducts,
+  pruneOneCProductCandidates,
   buildOneCProductCandidates,
   buildOneCProductsSummary,
   createOrReuseCloverProductFromOneC,
+  inferCloverProductCategory,
   linkCloverProduct,
   mergeProductsPreservingOneCLinks,
   removeCloverProductFromState,
+  upsertManagerCatalogProduct,
   normalizeOneCProduct,
   normalizeOneCProducts,
   preserveOneCProductPricingFields,
@@ -1215,6 +1218,57 @@ function stripRuntimeProductPricing(product = {}) {
     ...stored
   } = product;
   return stored;
+}
+
+function persistPrunedOneCCandidates(products, candidateMap = null) {
+  const current =
+    candidateMap || getGlobalState("oneCProductCandidates", {});
+  const next = pruneOneCProductCandidates(current, products);
+  setGlobalState("oneCProductCandidates", next);
+  const meta = getGlobalState("oneCProductsMeta", {});
+  setGlobalState("oneCProductsMeta", { ...meta, candidateMap: next });
+  return next;
+}
+
+function persistSingleCatalogProduct(req, res, { create = false } = {}) {
+  const storedProducts = getGlobalState("products", DEFAULT_PRODUCTS);
+  const incoming = stripRuntimeProductPricing(req.body?.product || req.body || {});
+  if (!String(incoming.name || "").trim()) {
+    return res.status(400).json({ error: "Укажите название товара." });
+  }
+  if (create) {
+    delete incoming.id;
+  } else {
+    incoming.id = req.params.productId;
+  }
+
+  const upsert = upsertManagerCatalogProduct(storedProducts, incoming, { create });
+  if (!upsert.found) {
+    return res.status(404).json({ error: "Товар не найден." });
+  }
+
+  setGlobalState("products", upsert.products);
+  persistPrunedOneCCandidates(upsert.products);
+  auditFromRequest(req, upsert.created ? "product.create" : "product.update", {
+    productId: upsert.product.id,
+    productName: upsert.product.name,
+  });
+
+  const oneCById = oneCProductsById(
+    normalizeOneCProducts(getGlobalState("oneCProducts", []))
+  );
+  const enrichOne = (product) =>
+    enrichProductWithPurchasePrices(
+      product,
+      oneCById.get(String(product.oneCId || "")) || null
+    );
+  const enriched = enrichOne(upsert.product);
+  res.json({
+    ok: true,
+    created: upsert.created,
+    product: enriched,
+    products: upsert.changed.map(enrichOne),
+  });
 }
 
 function priceForOrderUnit(product, unit) {
@@ -3721,6 +3775,20 @@ app.put(
       ? req.body.products.map(stripRuntimeProductPricing)
       : DEFAULT_PRODUCTS;
     const storedProducts = getGlobalState("products", DEFAULT_PRODUCTS);
+    if (
+      incomingProducts.length === 0 &&
+      Array.isArray(storedProducts) &&
+      storedProducts.length > 0
+    ) {
+      auditFromRequest(req, "products.save_rejected_empty", {
+        kept: storedProducts.length,
+      });
+      return res.json({
+        ok: true,
+        products: enrichManagerCatalogProducts(storedProducts),
+        rejectedEmpty: true,
+      });
+    }
     const storedById = new Map(
       (Array.isArray(storedProducts) ? storedProducts : []).map((item) => [
         String(item.id),
@@ -3774,7 +3842,7 @@ app.put(
 
     auditFromRequest(req, "products.save", { count: products.length });
 
-    res.json({ ok: true, products: enrichManagerCatalogProducts(products) });
+    res.json({ ok: true, products });
   }
 );
 
@@ -4276,6 +4344,24 @@ app.delete(
   }
 );
 
+app.post(
+  "/api/admin/products",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    persistSingleCatalogProduct(req, res, { create: true });
+  }
+);
+
+app.put(
+  "/api/admin/products/:productId",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    persistSingleCatalogProduct(req, res, { create: false });
+  }
+);
+
 app.delete(
   "/api/admin/products/:productId",
   authRequired,
@@ -4736,7 +4822,15 @@ app.get(
     const items = normalizeOneCProducts(
       getGlobalState("oneCProducts", [])
     );
-    const meta = getGlobalState("oneCProductsMeta", {});
+    const storedMeta = getGlobalState("oneCProductsMeta", {});
+    const candidateMap = persistPrunedOneCCandidates(
+      products,
+      getGlobalState("oneCProductCandidates", {}) || storedMeta.candidateMap || {}
+    );
+    const meta = {
+      ...storedMeta,
+      candidateMap,
+    };
     const search = String(req.query.search || "")
       .trim()
       .toLocaleLowerCase("ru-RU");
@@ -4791,9 +4885,35 @@ app.post(
         preferredName,
         showOnStorefront,
       });
-      const reclassified = applyInferredCategories(result.products);
-      const articled = applyOneCArticles(reclassified.products);
-      let nextProducts = articled.products;
+      const skipEnrichment = req.body?.skipEnrichment === true;
+      let reclassified;
+      let articled;
+      let nextProducts;
+      if (skipEnrichment) {
+        const targetId = String(result.product.id);
+        const current =
+          result.products.find((entry) => String(entry.id) === targetId) ||
+          result.product;
+        const currentCategory = String(current.category || "").trim();
+        const nextCategory =
+          currentCategory && currentCategory !== "Из 1С"
+            ? currentCategory
+            : inferCloverProductCategory(current.name, result.products);
+        const patched = applyOneCArticles([
+          { ...current, category: nextCategory },
+        ]).products[0];
+        nextProducts = result.products.map((entry) =>
+          String(entry.id) === targetId ? patched : entry
+        );
+        reclassified = {
+          changed: nextCategory !== currentCategory ? 1 : 0,
+        };
+        articled = { products: nextProducts, changed: 0 };
+      } else {
+        reclassified = applyInferredCategories(result.products);
+        articled = applyOneCArticles(reclassified.products);
+        nextProducts = articled.products;
+      }
       // Если товар уже был — всё равно можно явно выставить витрину.
       if (showOnStorefront) {
         nextProducts = nextProducts.map((entry) =>
@@ -4812,7 +4932,7 @@ app.post(
         nextProducts.find((entry) => String(entry.id) === String(product.id)) ||
         product;
       let enrichmentQueued = false;
-      if (productNeedsWebEnrichment(enrichTarget)) {
+      if (!skipEnrichment && productNeedsWebEnrichment(enrichTarget)) {
         enrichmentQueued = true;
         scheduleProductWebEnrichment({
           productId: enrichTarget.id,
@@ -4836,15 +4956,7 @@ app.post(
       const fullOneCItem =
         oneCById.get(String(product.oneCId || item.id || "")) ||
         (item.id ? item : null);
-      const enrichedProducts = nextProducts.map((entry) =>
-        enrichProductWithPurchasePrices(
-          entry,
-          oneCById.get(String(entry.oneCId || "")) || null
-        )
-      );
-      const enrichedProduct =
-        enrichedProducts.find((entry) => String(entry.id) === String(product.id)) ||
-        enrichProductWithPurchasePrices(product, fullOneCItem);
+      const enrichedProduct = enrichProductWithPurchasePrices(product, fullOneCItem);
 
       let clientLink = null;
       let clientLinks = getGlobalState("clientLinks", {});
@@ -4908,7 +5020,7 @@ app.post(
         addedToMatrix,
         enrichmentQueued,
         product: enrichedProduct,
-        products: enrichedProducts,
+        products: [enrichedProduct],
         clientId: clientId || null,
         clientLink,
         clientLinks: clientId ? clientLinks : undefined,
@@ -5233,15 +5345,7 @@ app.post(
         linkedAt
       );
       setGlobalState("products", updatedProducts);
-
-      const candidateMap = getGlobalState("oneCProductCandidates", {});
-      if (candidateMap[String(req.params.productId)]) {
-        const nextCandidateMap = { ...candidateMap };
-        delete nextCandidateMap[String(req.params.productId)];
-        setGlobalState("oneCProductCandidates", nextCandidateMap);
-        const meta = getGlobalState("oneCProductsMeta", {});
-        setGlobalState("oneCProductsMeta", { ...meta, candidateMap: nextCandidateMap });
-      }
+      persistPrunedOneCCandidates(updatedProducts);
 
       const productsOut = enrichManagerCatalogProducts(updatedProducts);
       const product = productsOut.find(
@@ -5278,11 +5382,17 @@ app.post(
       setGlobalState("products", linked.products);
     }
 
+    const nextCandidates = buildOneCProductCandidates(
+      linked.products,
+      linked.oneCProducts
+    );
+    setGlobalState("oneCProductCandidates", nextCandidates);
     const previousMeta = getGlobalState("oneCProductsMeta", {});
     const meta = {
       ...previousMeta,
       lastAutoLinkAt: linkedAt,
       lastReport: linked.report,
+      candidateMap: nextCandidates,
     };
     setGlobalState("oneCProductsMeta", meta);
 

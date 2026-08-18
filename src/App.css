@@ -447,15 +447,17 @@ html.login-lock body {
 }
 
 .one-c-products-search input {
-  flex: 1 1 360px;
-  min-width: 220px;
-  min-height: 42px;
-  padding: 11px 14px;
+  flex: 0 1 220px;
+  width: 220px;
+  max-width: 100%;
+  min-width: 160px;
+  min-height: 34px;
+  padding: 6px 10px;
   border: 1px solid #e6eee3;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #fbfdfb;
   color: #394639;
-  font: inherit;
+  font-size: 13px;
   outline: none;
   box-sizing: border-box;
 }

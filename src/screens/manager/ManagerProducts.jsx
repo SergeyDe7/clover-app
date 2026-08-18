@@ -1,44 +1,33 @@
 // Раздел менеджера: каталог товаров и связь с 1С.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../serverApi";
 import {
   UNIT_ORDER,
   unitPriceField,
   formatMoney,
   formatDateTime,
-  hasPurchasePrice,
   normalizeProduct,
   pickProductCardOneCCost,
-  productArticle,
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { productImageSrc } from "../../shared/productPhoto";
 import { ProductEditor } from "./ProductEditor";
 import { MatrixExcelReview } from "./MatrixExcelImport";
+import { mergeProductsFromCatalogResponse } from "./matrixMembership";
 
-function clearConflictingOneCLink(product) {
-  return normalizeProduct({
-    ...product,
-    oneCId: "",
-    oneCCode: "",
-    oneCName: "",
-    oneCMatchCode: "",
-    oneCMatchName: "",
-    oneCSearchQuery: "",
-    oneCSearchRequestedAt: "",
-    oneCLinkMode: "",
-    oneCLinkedAt: "",
-  });
-}
-
-function OneCProductsPanel({ products, setProducts, visibility, onVisibilityChange }) {
+function OneCProductsPanel({
+  products,
+  setProducts,
+  visibility,
+  onVisibilityChange,
+  onCandidateIdsChange,
+}) {
   const [catalog, setCatalog] = useState(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [linking, setLinking] = useState(false);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
-  const initialLinkDone = useRef(false);
 
   const selectLinkFilter = (nextVisibility) => {
     if (typeof onVisibilityChange !== "function") return;
@@ -75,7 +64,10 @@ function OneCProductsPanel({ products, setProducts, visibility, onVisibilityChan
     if (!silent) setError("");
     try {
       const result = await api.autoLinkOneCProducts();
-      setProducts((result.products || []).map(normalizeProduct));
+      const nextProducts = (result.products || []).map(normalizeProduct);
+      if (nextProducts.length > 0) {
+        setProducts(nextProducts);
+      }
       const refreshed = await api.getOneCProducts({
         search,
         limit: 50,
@@ -100,25 +92,26 @@ function OneCProductsPanel({ products, setProducts, visibility, onVisibilityChan
   };
 
   useEffect(() => {
-    let cancelled = false;
-
-    const initialize = async () => {
-      const result = await loadCatalog("");
-      if (cancelled || initialLinkDone.current) return;
-      initialLinkDone.current = true;
-
-      if (result?.summary?.oneCTotal > 0) {
-        await runAutoLink({ silent: true });
-      }
-    };
-
-    initialize();
-    return () => {
-      cancelled = true;
-    };
+    void loadCatalog("");
   }, []);
 
   const summary = catalog?.summary || {};
+  const candidateProductIds = useMemo(() => {
+    const fromSummary = Array.isArray(summary.candidateProductIds)
+      ? summary.candidateProductIds.map(String)
+      : [];
+    const linkedIds = new Set(
+      (Array.isArray(products) ? products : [])
+        .filter((item) => String(item.oneCId || "").trim())
+        .map((item) => String(item.id))
+    );
+    return fromSummary.filter((id) => !linkedIds.has(String(id)));
+  }, [summary.candidateProductIds, products]);
+
+  useEffect(() => {
+    if (typeof onCandidateIdsChange !== "function") return;
+    onCandidateIdsChange(candidateProductIds);
+  }, [candidateProductIds.join("|")]);
 
   return (
     <section className="one-c-products-panel one-c-products-panel-compact">
@@ -178,9 +171,21 @@ function OneCProductsPanel({ products, setProducts, visibility, onVisibilityChan
           <span>Без связи</span>
           <strong>{summary.unmatched ?? products.filter((item) => !item.oneCId).length}</strong>
         </article>
-        {Number(summary.candidateProducts) > 0 && (
-          <article><span>Есть варианты</span><strong>{summary.candidateProducts}</strong></article>
-        )}
+        <article
+          className={`one-c-products-stat-clickable${visibility === "Есть варианты" ? " is-active" : ""}`}
+          role="button"
+          tabIndex={0}
+          onClick={() => selectLinkFilter("Есть варианты")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              selectLinkFilter("Есть варианты");
+            }
+          }}
+        >
+          <span>Есть варианты</span>
+          <strong>{candidateProductIds.length}</strong>
+        </article>
       </div>
 
       <div className="one-c-products-meta">
@@ -209,7 +214,7 @@ function OneCProductsPanel({ products, setProducts, visibility, onVisibilityChan
           >
             <input
               type="search"
-              placeholder="Поиск: название, код или ID"
+              placeholder="Поиск по названию или артикулу 1С"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -239,7 +244,7 @@ function OneCProductsPanel({ products, setProducts, visibility, onVisibilityChan
               <article key={item.id}>
                 <div>
                   <strong>{item.name}</strong>
-                  <span>Код: {item.code || "—"} · ID: {item.id}</span>
+                  <span>Артикул 1С: {item.code || "—"}</span>
                 </div>
                 {item.cloverLink ? (
                   <span className="badge green">
@@ -264,6 +269,7 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Все");
   const [visibility, setVisibility] = useState("Все");
+  const [candidateProductIds, setCandidateProductIds] = useState([]);
   const [editorProduct, setEditorProduct] = useState(undefined);
   const [excelFile, setExcelFile] = useState(null);
   const excelFileRef = useRef(null);
@@ -274,51 +280,31 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
     const bySearch = !search || `${product.name} ${product.code} ${product.oneCId} ${product.oneCCode} ${product.oneCName} ${product.oneCMatchCode} ${product.oneCMatchName} ${product.oneCSearchQuery}`.toLowerCase().includes(search.toLowerCase());
     const byCategory = category === "Все" || product.category === category;
     const hasOneCLink = Boolean(String(product.oneCId || "").trim());
+    const hasVariants = candidateProductIds.some(
+      (id) => String(id) === String(product.id)
+    );
     const byVisibility =
       visibility === "Все" ||
       (visibility === "Активные" && product.active) ||
       (visibility === "Скрытые" && !product.active) ||
       (visibility === "На витрине сайта" && product.showOnStorefront === true) ||
       (visibility === "Связанные с 1С" && hasOneCLink) ||
-      (visibility === "Без связи с 1С" && !hasOneCLink);
+      (visibility === "Без связи с 1С" && !hasOneCLink) ||
+      (visibility === "Есть варианты" && hasVariants);
     return bySearch && byCategory && byVisibility;
   });
 
   const save = async (value) => {
     const normalized = normalizeProduct(value);
-    let nextProducts;
-    let targetId;
-
-    if (normalized.id) {
-      targetId = String(normalized.id);
-      nextProducts = products.map((item) =>
-        String(item.id) === targetId ? normalized : item
-      );
-    } else {
-      const id = Math.max(0, ...products.map((item) => Number(item.id) || 0)) + 1;
-      targetId = String(id);
-      nextProducts = [
-        normalizeProduct({
-          ...normalized,
-          id,
-          code: normalized.code || normalized.oneCCode || "",
-        }),
-        ...products,
-      ];
-    }
-
-    const oneCId = String(normalized.oneCId || "").trim();
-    if (oneCId) {
-      nextProducts = nextProducts.map((item) => {
-        if (String(item.id) === targetId) return item;
-        if (String(item.oneCId || "").trim() !== oneCId) return item;
-        return clearConflictingOneCLink(item);
-      });
-    }
-
     try {
-      const result = await api.saveProducts(nextProducts);
-      setProducts((result.products || nextProducts).map(normalizeProduct));
+      const result = await api.saveProduct(normalized);
+      const incoming =
+        Array.isArray(result.products) && result.products.length
+          ? result.products
+          : result.product
+            ? [result.product]
+            : [normalized];
+      setProducts((current) => mergeProductsFromCatalogResponse(current, incoming));
       setEditorProduct(undefined);
     } catch (error) {
       void appAlert({
@@ -382,13 +368,33 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
       .map(String)
       .filter((id) => products.some((item) => String(item.id) === id));
     if (!ids.length) return;
+    const wipingAll =
+      products.length > 0 && ids.length >= products.length;
+    const wipingMany = ids.length >= 20;
     const ok = await appConfirm({
-      title: "Удалить выбранные товары?",
-      message: `Будет удалено из каталога Clover, с витрины сайта и из матриц клиентов: ${ids.length}. Заказы с этими товарами не меняются.`,
-      confirmLabel: "Удалить выбранные",
+      title: wipingAll
+        ? "Удалить весь каталог Clover?"
+        : wipingMany
+          ? "Удалить много товаров?"
+          : "Удалить выбранные товары?",
+      message: wipingAll
+        ? `Будет удалён весь каталог (${ids.length} поз.): с витрины сайта и из матриц клиентов. Это не отмена Excel и не загрузка файла. Заказы не меняются.`
+        : `Будет удалено из каталога Clover, с витрины сайта и из матриц клиентов: ${ids.length}. Заказы с этими товарами не меняются.`,
+      confirmLabel: wipingAll ? "Да, удалить весь каталог" : "Удалить выбранные",
       tone: "danger",
     });
     if (!ok) return;
+    if (wipingAll || wipingMany) {
+      const again = await appConfirm({
+        title: "Подтвердите ещё раз",
+        message: wipingAll
+          ? "Каталог станет пустым. Восстановить можно только из резервной копии."
+          : `Точно удалить ${ids.length} товаров из каталога Clover?`,
+        confirmLabel: "Подтверждаю удаление",
+        tone: "danger",
+      });
+      if (!again) return;
+    }
     setDeleteBusy(true);
     try {
       let lastResult = null;
@@ -423,10 +429,11 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
         setProducts={setProducts}
         visibility={visibility}
         onVisibilityChange={setVisibility}
+        onCandidateIdsChange={setCandidateProductIds}
       />
 
-      <div className="toolbar four" id="manager-products-toolbar">
-        <input type="search" placeholder="Поиск товара, кода или ID 1С" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="toolbar products-filter-bar" id="manager-products-toolbar">
+        <input type="search" placeholder="Поиск товара или артикула 1С" value={search} onChange={(e) => setSearch(e.target.value)} />
         <select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select>
         <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>
           <option>Все</option>
@@ -435,6 +442,7 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
           <option>На витрине сайта</option>
           <option>Связанные с 1С</option>
           <option>Без связи с 1С</option>
+          <option>Есть варианты</option>
         </select>
         <div className="inline-actions">
           <button className="primary-button" type="button" onClick={() => setEditorProduct(null)}>+ Добавить товар</button>
@@ -459,6 +467,7 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
           />
         </div>
       </div>
+      {excelFile ? null : (
       <div className="catalog-pick-actions">
         <button
           className="secondary-button"
@@ -486,6 +495,7 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
         </button>
         <span>Отмечено: {selectedCount}</span>
       </div>
+      )}
       {excelFile ? (
         <MatrixExcelReview
           products={products}
@@ -516,6 +526,7 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
       <div className="product-manager-list" style={{ marginTop: 14 }}>
         {visible.map((product) => (
         <article className={product.active ? "product-manager-row" : "product-manager-row inactive"} key={product.id}>
+          {excelFile ? null : (
           <label className="product-manager-check">
             <input
               type="checkbox"
@@ -524,17 +535,25 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
               aria-label={`Выбрать «${product.name || "товар"}»`}
             />
           </label>
+          )}
           <div className="product-manager-thumb">
             {product.imageUrl ? <img src={productImageSrc(product)} alt={product.name} /> : <span>Нет фото</span>}
           </div>
           <div className="product-manager-info">
-            <h3>{product.name}</h3>
-            <p>{product.category} · {productArticle(product)}</p>
+            <div className="product-manager-title-row">
+              <h3>{product.name}</h3>
+              <div className="product-manager-badges">
+                <span className={product.active ? "badge green" : "badge gray"}>{product.active ? "Активен" : "Скрыт"}</span>
+                {product.showOnStorefront ? (
+                  <span className="badge green">На витрине</span>
+                ) : null}
+              </div>
+            </div>
+            <p>{product.category}</p>
             <p className="product-one-c-line">
-              {product.oneCId
-                ? `1С: ${product.oneCCode || "без кода"} · ${product.oneCId}`
-                : "1С: не связан"}
-              {product.oneCLinkMode === "auto" ? " · автоматически" : product.oneCId ? " · вручную" : ""}
+              {String(product.oneCCode || "").trim()
+                ? `Артикул 1С: ${product.oneCCode}`
+                : "Артикул 1С: не связан"}
             </p>
             {product.certificateUrl ? (
               <p>
@@ -549,14 +568,14 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
               </p>
             ) : null}
           </div>
-          <div className="product-manager-meta">
-            <span className={product.active ? "badge green" : "badge gray"}>{product.active ? "Активен" : "Скрыт"}</span>
-            {product.showOnStorefront ? (
-              <span className="badge green">Витрина</span>
-            ) : null}
-            <strong>{settingsPriceLabel(product, oneCPriceTypes)}</strong>
-            <button className="secondary-button" type="button" onClick={() => setEditorProduct(product)}>Изменить</button>
-            <button className="danger-button" type="button" onClick={() => deleteCatalogProduct(product)}>Удалить</button>
+          <div className="product-manager-side">
+            <strong className="product-manager-price">
+              {settingsPriceLabel(product, oneCPriceTypes)}
+            </strong>
+            <div className="product-row-actions">
+              <button className="secondary-button product-row-action" type="button" onClick={() => setEditorProduct(product)}>Изменить</button>
+              <button className="danger-button product-row-action" type="button" onClick={() => deleteCatalogProduct(product)}>Удалить</button>
+            </div>
           </div>
         </article>
         ))}
@@ -593,8 +612,18 @@ function settingsPriceLabel(product, oneCPriceTypes = []) {
     salePriceReceivedAt: product.salePriceReceivedAt || "",
     oneCPriceTypes,
   });
-  if (hasPurchasePrice(card.cost)) {
+  if (Number(card.cost) > 0) {
     return formatMoney(card.cost);
+  }
+  const typedPieces = Object.values(
+    product.salePricesByType && typeof product.salePricesByType === "object"
+      ? product.salePricesByType
+      : {}
+  )
+    .map((entry) => Number(entry?.piece))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  if (typedPieces.length) {
+    return `от ${formatMoney(Math.min(...typedPieces))}`;
   }
   const prices = UNIT_ORDER.map((unit) => product[unitPriceField(unit)]).filter(
     (value) => Number(value) > 0

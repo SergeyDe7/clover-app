@@ -37,6 +37,7 @@ import {
   uniqueMatrixProductIds,
 } from "./matrixIds";
 import { downloadClientMatrixExcel } from "../../shared/matrixExcelImport";
+import { mergeProductsFromCatalogResponse } from "./matrixMembership";
 
 /** Цена из вида цен 1С (категория клиента), с масштабом от шт. */
 function typedSalePriceForUnit(product, priceTypeId, unit) {
@@ -49,7 +50,9 @@ function typedSalePriceForUnit(product, priceTypeId, unit) {
   const entry = byType?.[typeId];
   if (!entry || typeof entry !== "object") return null;
   const direct = Number(entry[unit]);
-  if (Number.isFinite(direct) && direct >= 0) return direct;
+  if (entry[unit] != null && entry[unit] !== "" && Number.isFinite(direct) && direct > 0) {
+    return direct;
+  }
   if (unit === "piece" || unit === "pair" || unit === "roll") return null;
   const piece = Number(entry.piece);
   if (!Number.isFinite(piece) || piece < 0) return null;
@@ -1127,51 +1130,15 @@ export function ManagerClients({
 
   const saveCatalogProduct = async (value) => {
     const normalized = normalizeProduct(value);
-    let nextProducts;
-    let targetId;
-
-    if (normalized.id) {
-      targetId = String(normalized.id);
-      nextProducts = products.map((item) =>
-        String(item.id) === targetId ? normalized : item
-      );
-    } else {
-      const id =
-        Math.max(0, ...products.map((item) => Number(item.id) || 0)) + 1;
-      targetId = String(id);
-      nextProducts = [
-        normalizeProduct({
-          ...normalized,
-          id,
-          code: normalized.code || normalized.oneCCode || "",
-        }),
-        ...products,
-      ];
-    }
-
-    const oneCId = String(normalized.oneCId || "").trim();
-    if (oneCId) {
-      nextProducts = nextProducts.map((item) => {
-        if (String(item.id) === targetId) return item;
-        if (String(item.oneCId || "").trim() !== oneCId) return item;
-        return normalizeProduct({
-          ...item,
-          oneCId: "",
-          oneCCode: "",
-          oneCName: "",
-          oneCMatchCode: "",
-          oneCMatchName: "",
-          oneCSearchQuery: "",
-          oneCSearchRequestedAt: "",
-          oneCLinkMode: "",
-          oneCLinkedAt: "",
-        });
-      });
-    }
-
     try {
-      const result = await api.saveProducts(nextProducts);
-      setProducts((result.products || nextProducts).map(normalizeProduct));
+      const result = await api.saveProduct(normalized);
+      const incoming =
+        Array.isArray(result.products) && result.products.length
+          ? result.products
+          : result.product
+            ? [result.product]
+            : [normalized];
+      setProducts((current) => mergeProductsFromCatalogResponse(current, incoming));
       setEditorProduct(undefined);
     } catch (error) {
       void appAlert({

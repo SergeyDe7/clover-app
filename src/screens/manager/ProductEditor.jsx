@@ -1,5 +1,6 @@
 // Модалка редактирования товара каталога: поля, ед. измерения, фото, связь с 1С.
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { api } from "../../serverApi";
 import {
   UNIT_ORDER,
@@ -490,7 +491,7 @@ export function ProductEditor({
     );
   };
 
-  return (
+  const editor = (
     <div
       className="product-editor"
       onMouseDown={(e) => {
@@ -747,10 +748,11 @@ export function ProductEditor({
             </label>
           ) : null}
           <label className="field">
-            Внутренний код
+            Артикул 1С
             <input
-              value={form.code}
-              onChange={(e) => setForm({ ...form, code: e.target.value })}
+              value={form.oneCCode || ""}
+              readOnly
+              placeholder="Появится после связи с 1С"
             />
           </label>
           <label className="field">
@@ -966,7 +968,7 @@ export function ProductEditor({
               <div>
                 <strong>{form.oneCName || "Выбранный товар 1С"}</strong>
                 <span>
-                  Код: {form.oneCCode || "—"} · ID: {form.oneCId}
+                  Артикул 1С: {form.oneCCode || "—"}
                 </span>
               </div>
               <button
@@ -1077,7 +1079,7 @@ export function ProductEditor({
                       <div>
                         <strong>{item.name}</strong>
                         <span>
-                          Код: {item.code || "—"} · ID: {item.id}
+                          Артикул 1С: {item.code || "—"}
                         </span>
                         {Number(item.score) > 0 && (
                           <span className="muted small">
@@ -1263,5 +1265,11 @@ export function ProductEditor({
         </div>
       </form>
     </div>
+  );
+
+  if (typeof document === "undefined") return editor;
+  return createPortal(
+    editor,
+    document.querySelector(".clover-app") || document.body
   );
 }

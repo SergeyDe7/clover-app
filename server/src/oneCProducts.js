@@ -402,6 +402,25 @@ export function buildOneCProductCandidates(
   return result;
 }
 
+export function pruneOneCProductCandidates(candidateMap, products) {
+  const source =
+    candidateMap && typeof candidateMap === "object" ? candidateMap : {};
+  const byId = new Map(
+    (Array.isArray(products) ? products : []).map((product) => [
+      String(product.id),
+      product,
+    ])
+  );
+  const next = {};
+  for (const [productId, items] of Object.entries(source)) {
+    const product = byId.get(String(productId));
+    if (!product || cleanText(product.oneCId)) continue;
+    if (!Array.isArray(items) || !items.length) continue;
+    next[String(productId)] = items;
+  }
+  return next;
+}
+
 export function selectRelevantOneCProducts(products, oneCProducts, candidateMap = null) {
   const sourceOneC = normalizeOneCProducts(oneCProducts);
   const requiredIds = exactRelevantProductIds(products, sourceOneC);
@@ -1139,10 +1158,12 @@ export function buildOneCProductsSummary(products, oneCProducts, meta = {}) {
     if (!catalogIds.has(oneCId)) stale += 1;
   });
 
-  const candidateMap = meta.candidateMap || {};
-  const candidateProducts = Object.values(candidateMap).filter(
-    (items) => Array.isArray(items) && items.length
-  ).length;
+  const candidateMap = pruneOneCProductCandidates(
+    meta.candidateMap || {},
+    sourceProducts
+  );
+  const candidateProductIds = Object.keys(candidateMap);
+  const candidateProducts = candidateProductIds.length;
 
   const pricedProducts = sourceOneC.filter((item) =>
     [
@@ -1165,6 +1186,7 @@ export function buildOneCProductsSummary(products, oneCProducts, meta = {}) {
     stale,
     unmatched: Math.max(0, sourceProducts.length - linked),
     candidateProducts,
+    candidateProductIds,
     lastReport: meta.lastReport || null,
   };
 }
@@ -1283,4 +1305,68 @@ export function matchOneCImportRows(
       candidates,
     };
   });
+}
+
+function blankOneCProductFields() {
+  return Object.fromEntries(ONE_C_PRODUCT_FIELDS.map((field) => [field, ""]));
+}
+
+/**
+ * Создаёт или обновляет одну карточку каталога, не требуя PUT всего списка.
+ * При занятом oneCId снимает связь с остальных карточек.
+ */
+export function upsertManagerCatalogProduct(
+  storedProducts,
+  incomingProduct,
+  { create = false } = {}
+) {
+  const source = Array.isArray(storedProducts) ? storedProducts : [];
+  const incoming =
+    incomingProduct && typeof incomingProduct === "object" ? incomingProduct : {};
+  const requestedId = String(incoming.id ?? "").trim();
+  const changed = [];
+
+  let product;
+  let next;
+
+  if (create || !requestedId) {
+    const id = Math.max(0, ...source.map((item) => Number(item.id) || 0)) + 1;
+    product = { ...incoming, id };
+    next = [product, ...source];
+  } else {
+    const index = source.findIndex((item) => String(item.id) === requestedId);
+    if (index < 0) {
+      return {
+        found: false,
+        created: false,
+        products: source,
+        product: null,
+        changed: [],
+      };
+    }
+    const stored = source[index];
+    product = { ...stored, ...incoming, id: stored.id };
+    next = source.map((item, idx) => (idx === index ? product : item));
+  }
+
+  const oneCId = String(product.oneCId || "").trim();
+  if (oneCId) {
+    next = next.map((item) => {
+      if (String(item.id) === String(product.id)) return item;
+      if (String(item.oneCId || "").trim() !== oneCId) return item;
+      const cleared = { ...item, ...blankOneCProductFields() };
+      changed.push(cleared);
+      return cleared;
+    });
+  }
+
+  const saved =
+    next.find((item) => String(item.id) === String(product.id)) || product;
+  return {
+    found: true,
+    created: Boolean(create || !requestedId),
+    products: next,
+    product: saved,
+    changed: [saved, ...changed],
+  };
 }
