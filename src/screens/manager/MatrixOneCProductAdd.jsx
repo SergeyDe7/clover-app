@@ -228,37 +228,24 @@ export function MatrixOneCProductAdd({
   );
 
   return (
-    <div className="matrix-onec-add" style={{ marginTop: 12 }}>
-      <div className="toolbar two">
-        <p className="muted small" style={{ margin: 0 }}>
-          Добавление из каталога 1С: вручную или списком из Excel. Товары появятся в разделе «Товары» и в матрице клиента.
-          {link.matrixMode === "all"
-            ? " В режиме «все товары» позиция сразу доступна клиенту."
-            : ""}
-        </p>
-        <button
-          className="secondary-button"
-          type="button"
-          onClick={openChooser}
-          disabled={loading || step !== "closed"}
-        >
-          Добавить из 1С
-        </button>
-      </div>
+    <div className="matrix-onec-add">
+      <button
+        className="secondary-button"
+        type="button"
+        onClick={openChooser}
+        disabled={loading || step !== "closed"}
+      >
+        Добавить из 1С
+      </button>
       {notice && step === "closed" && (
-        <div className="matrix-save-message saved" style={{ marginTop: 8 }}>
+        <div className="matrix-save-message saved">
           {notice}
         </div>
       )}
 
       {step === "choose" && (
-        <div className="one-c-picker" style={{ marginTop: 10 }}>
-          <strong>Как добавить товары из 1С?</strong>
-          <p className="muted small" style={{ marginTop: 6 }}>
-            Вручную — поиск по полной выгрузке номенклатуры 1С (не по каталогу Clover).
-            Excel — загрузка файла, сопоставление названий с 1С, затем добавление.
-          </p>
-          <div className="bulk-photo-actions" style={{ marginTop: 12 }}>
+        <div className="one-c-picker matrix-add-panel">
+          <div className="matrix-add-actions">
             <button className="primary-button" type="button" onClick={openManual}>
               Вручную
             </button>
@@ -267,7 +254,7 @@ export function MatrixOneCProductAdd({
               type="button"
               onClick={() => setStep("excel")}
             >
-              Загрузить Excel
+              Excel
             </button>
             <button className="secondary-button" type="button" onClick={closeAll}>
               Отмена
@@ -307,14 +294,7 @@ export function MatrixOneCProductAdd({
       )}
 
       {step === "manual" && (
-        <div className="one-c-picker" style={{ marginTop: 10 }}>
-          <strong>Поиск по выгрузке 1С</strong>
-          <p className="muted small" style={{ marginTop: 6, marginBottom: 8 }}>
-            Это номенклатура из 1С
-            {catalogTotal ? ` (${catalogTotal} поз.)` : ""}
-            , а не каталог товаров Clover и не список матрицы ниже.
-            Введите название или код 1С — поиск идёт сам при вводе.
-          </p>
+        <div className="one-c-picker matrix-add-panel">
           <div className="one-c-products-search">
             <input
               ref={searchInputRef}
@@ -357,23 +337,22 @@ export function MatrixOneCProductAdd({
           </div>
           {error && <div className="sync-error">{error}</div>}
           {notice && (
-            <div className="matrix-save-message saved" style={{ marginTop: 8 }}>
+            <div className="matrix-save-message saved">
               {notice}
             </div>
           )}
-          <div className="toolbar two" style={{ marginTop: 8, marginBottom: 8 }}>
-            <p className="muted small" style={{ margin: 0 }}>
-              В выгрузке 1С: {catalogTotal || "—"}. По запросу: {total}. В списке:{" "}
-              {items.length || 0}. К добавлению: {selectedItems.length}.
-              Сверху — позиции, которых ещё нет в Clover/матрице.
-            </p>
+          <div className="matrix-add-actions">
+            <span className="muted small">
+              1С: {catalogTotal || "—"} · найдено: {total} · к добавлению:{" "}
+              {selectedItems.length}
+            </span>
             <button
               className="primary-button"
               type="button"
               disabled={loading || selectedItems.length === 0}
               onClick={() => void addItems(selectedItems)}
             >
-              {loading ? "Добавляем..." : `Добавить товары (${selectedItems.length})`}
+              {loading ? "Добавляем..." : `Добавить (${selectedItems.length})`}
             </button>
           </div>
           <div className="one-c-products-list one-c-picker-list">

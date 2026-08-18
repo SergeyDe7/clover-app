@@ -17,6 +17,12 @@ function statusLabel(status) {
   return "Не найдено";
 }
 
+function excelTargetAlreadyPresent(row, target) {
+  if (target === "storefront") return Boolean(row.alreadyOnStorefront);
+  if (target === "catalog") return Boolean(row.alreadyInClover);
+  return Boolean(row.alreadyInMatrix);
+}
+
 function buildReviewRows(matchedRows, membership, { target = "matrix", products = [] } = {}) {
   return (Array.isArray(matchedRows) ? matchedRows : []).map((row) => {
     const matchItem = {
@@ -43,7 +49,11 @@ function buildReviewRows(matchedRows, membership, { target = "matrix", products 
     const autoSelect =
       (row.status === "exact" || row.status === "code") &&
       row.match?.id &&
-      (target === "storefront" ? !alreadyOnStorefront : !alreadyInMatrix);
+      (target === "storefront"
+        ? !alreadyOnStorefront
+        : target === "catalog"
+          ? !alreadyInClover
+          : !alreadyInMatrix);
     return {
       ...row,
       alreadyInClover,
@@ -63,7 +73,7 @@ function buildReviewRows(matchedRows, membership, { target = "matrix", products 
 /**
  * Шаг Excel внутри «Добавить из 1С»:
  * выбор файла → окно сопоставления → «Добавить товары» → «Добавлено».
- * target: "matrix" (клиент) | "storefront" (витрина сайта).
+ * target: "matrix" (клиент) | "storefront" (витрина сайта) | "catalog" (каталог Clover).
  */
 export function MatrixExcelReview({
   clientId,
@@ -76,12 +86,15 @@ export function MatrixExcelReview({
   onAdded,
   onImportStateChange,
   autoOpenFile = false,
+  initialFile = null,
   target = "matrix",
 }) {
   const isStorefront = target === "storefront";
+  const isCatalog = target === "catalog";
+  const skipClient = isStorefront || isCatalog;
   const fileRef = useRef(null);
   const autoOpenedRef = useRef(false);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(() => Boolean(initialFile));
   const [error, setError] = useState("");
   const [fileName, setFileName] = useState("");
   const [summary, setSummary] = useState(null);
@@ -99,16 +112,15 @@ export function MatrixExcelReview({
 
   // Сразу системный диалог выбора файла (без лишнего клика «Выбрать файл»).
   useEffect(() => {
-    if (!autoOpenFile || rows || busy || autoOpenedRef.current) return undefined;
+    if (initialFile || !autoOpenFile || rows || busy || autoOpenedRef.current) return undefined;
     autoOpenedRef.current = true;
     const timer = window.setTimeout(() => {
       fileRef.current?.click();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [autoOpenFile, rows, busy]);
+  }, [autoOpenFile, initialFile, rows, busy]);
 
-  const onPickFile = async (event) => {
-    const file = event.target.files?.[0];
+  const parsePickedFile = async (file) => {
     if (!file) return;
 
     setBusy(true);
@@ -120,7 +132,7 @@ export function MatrixExcelReview({
     try {
       const parsed = await parseMatrixExcelFile(file);
       const matchResult = await api.matchOneCImportRows(parsed.rows || []);
-      const membership = isStorefront
+      const membership = skipClient
         ? getClientMatrixMembership({}, products)
         : getClientMatrixMembership(link, products);
       setFileName(file.name || "file.xlsx");
@@ -139,6 +151,25 @@ export function MatrixExcelReview({
     } finally {
       setBusy(false);
     }
+  };
+
+  useEffect(() => {
+    if (!initialFile || autoOpenedRef.current) return undefined;
+    autoOpenedRef.current = true;
+    void parsePickedFile(initialFile);
+    return undefined;
+  }, [initialFile]);
+
+  const onPickFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      if (autoOpenFile && !initialFile && !rows) {
+        setImportState({ status: "idle" });
+        (onBack || onCancel)?.();
+      }
+      return;
+    }
+    await parsePickedFile(file);
   };
 
   const updateRow = (rowIndex, patch) => {
@@ -181,12 +212,19 @@ export function MatrixExcelReview({
               excelName: row.name,
             })
           : null;
+        const alreadyInClover = Boolean(cloverProduct || match?.cloverLink?.productId);
+        const alreadyOnStorefront = Boolean(cloverProduct?.showOnStorefront);
+        const alreadyHere = excelTargetAlreadyPresent(
+          { alreadyInMatrix, alreadyInClover, alreadyOnStorefront },
+          target
+        );
         return {
           ...row,
           selectedOneCId: key,
-          selected: Boolean(key) && !alreadyInMatrix,
+          selected: Boolean(key) && !alreadyHere,
           alreadyInMatrix,
-          alreadyInClover: Boolean(cloverProduct || match?.cloverLink?.productId),
+          alreadyInClover,
+          alreadyOnStorefront,
           cloverProductId: cloverProduct?.id ?? match?.cloverLink?.productId ?? null,
           match,
           status: key ? (row.status === "miss" ? "fuzzy" : row.status) : "miss",
@@ -222,19 +260,9 @@ export function MatrixExcelReview({
   ).length;
 
   const addSelected = async () => {
-    const membership = isStorefront
-      ? getClientMatrixMembership({}, products)
-      : getClientMatrixMembership(link, products);
     const toAdd = (rows || []).filter((row) => {
       if (!row.selected || !row.selectedOneCId) return false;
-      if (isStorefront) return !row.alreadyOnStorefront;
-      return !isOneCItemInClientMatrix(
-        {
-          id: row.selectedOneCId,
-          cloverLink: row.match?.cloverLink || null,
-        },
-        membership
-      );
+      return !excelTargetAlreadyPresent(row, target);
     });
     if (!toAdd.length || importDone) {
       if (!importDone) {
@@ -243,12 +271,16 @@ export function MatrixExcelReview({
           status: "done",
           message: isStorefront
             ? "Товары уже на витрине"
-            : "Товары уже в матрице",
+            : isCatalog
+              ? "Товары уже в каталоге"
+              : "Товары уже в матрице",
         });
         setError(
           isStorefront
             ? "Новых позиций нет — все отмеченные уже на витрине."
-            : "Новых позиций нет — все отмеченные уже в матрице."
+            : isCatalog
+              ? "Новых позиций нет — все отмеченные уже в каталоге Clover."
+              : "Новых позиций нет — все отмеченные уже в матрице."
         );
         onAdded?.([]);
       }
@@ -278,12 +310,17 @@ export function MatrixExcelReview({
     const addedNames = [];
     let reusedCount = 0;
     let createdCount = 0;
-    const liveMembership = isStorefront
+    const liveMembership = skipClient
       ? null
       : getClientMatrixMembership(link, products);
     const liveOnStorefront = new Set(
       (Array.isArray(products) ? products : [])
         .filter((item) => item.showOnStorefront === true)
+        .map((item) => String(item.oneCId || "").trim())
+        .filter(Boolean)
+    );
+    const liveInClover = new Set(
+      (Array.isArray(products) ? products : [])
         .map((item) => String(item.oneCId || "").trim())
         .filter(Boolean)
     );
@@ -294,6 +331,12 @@ export function MatrixExcelReview({
         const oneCId = String(row.selectedOneCId);
         if (isStorefront) {
           if (liveOnStorefront.has(oneCId)) {
+            skipped += 1;
+            setProgress({ done: index + 1, total: unique.length });
+            continue;
+          }
+        } else if (isCatalog) {
+          if (liveInClover.has(oneCId) || row.alreadyInClover) {
             skipped += 1;
             setProgress({ done: index + 1, total: unique.length });
             continue;
@@ -320,7 +363,7 @@ export function MatrixExcelReview({
         const result = await api.createProductFromOneCCatalog({
           oneCId,
           item,
-          clientId: isStorefront ? "" : clientId,
+          clientId: skipClient ? "" : clientId,
           preferredName: excelName,
           showOnStorefront: isStorefront,
         });
@@ -329,7 +372,7 @@ export function MatrixExcelReview({
             mergeProductsFromCatalogResponse(current, result.products)
           );
         }
-        if (!isStorefront) {
+        if (!skipClient) {
           if (result.clientLinks) {
             setClientLinks(result.clientLinks);
           } else if (result.clientLink) {
@@ -352,8 +395,11 @@ export function MatrixExcelReview({
         if (isStorefront) {
           liveOnStorefront.add(oneCId);
         }
+        if (isCatalog) {
+          liveInClover.add(oneCId);
+        }
 
-        if (!isStorefront && result.alreadyInMatrix) {
+        if (!skipClient && result.alreadyInMatrix) {
           skipped += 1;
         } else {
           addedNames.push(result.product?.name || excelName || item.name || oneCId);
@@ -376,7 +422,9 @@ export function MatrixExcelReview({
         parts.push(
           isStorefront
             ? `На витрину: ${addedNames.length}`
-            : `В матрицу: ${addedNames.length}`
+            : isCatalog
+              ? `В каталог: ${addedNames.length}`
+              : `В матрицу: ${addedNames.length}`
         );
       }
       if (reusedCount) parts.push(`из каталога Clover без дублей: ${reusedCount}`);
@@ -385,7 +433,9 @@ export function MatrixExcelReview({
         parts.push(
           isStorefront
             ? `пропущено (уже на витрине/дубли): ${skipped}`
-            : `пропущено (уже в матрице/дубли): ${skipped}`
+            : isCatalog
+              ? `пропущено (уже в каталоге/дубли): ${skipped}`
+              : `пропущено (уже в матрице/дубли): ${skipped}`
         );
       }
       if (parts.length) setError(parts.join(". ") + ".");
@@ -398,25 +448,41 @@ export function MatrixExcelReview({
     }
   };
 
-  // Ещё нет файла — только выбор Excel и Отмена.
+  // Ещё нет файла: системный диалог уже открыт, либо читаем выбранный файл.
   if (!rows) {
+    const skipChooser = Boolean(autoOpenFile || initialFile);
     return (
       <div className="one-c-picker matrix-excel-review" style={{ marginTop: 10 }}>
-        <strong>{isStorefront ? "Загрузка на витрину из Excel" : "Загрузка из Excel"}</strong>
-        <p className="muted small" style={{ marginTop: 6 }}>
-          Колонки: «Название» / «Товар» (обязательно), «Код» / «Артикул» (необязательно).
-          Название из Excel станет именем на витрине/в каталоге Clover (как в матрице),
-          сопоставление идёт с номенклатурой 1С.
-        </p>
+        {!skipChooser || error || busy ? (
+          <strong>
+            {isStorefront
+              ? "Excel на витрину"
+              : isCatalog
+                ? "Excel в каталог Clover"
+                : "Excel"}
+          </strong>
+        ) : null}
         {error && <div className="sync-error" style={{ marginTop: 8 }}>{error}</div>}
-        <div className="bulk-photo-actions" style={{ marginTop: 12 }}>
+        {busy ? (
+          <p className="muted small" style={{ marginTop: 8 }}>Читаем файл…</p>
+        ) : null}
+        {skipChooser && !error ? (
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+            hidden
+            onChange={(event) => void onPickFile(event)}
+          />
+        ) : (
+        <div className="matrix-add-actions" style={{ marginTop: 8 }}>
           <button
             className="primary-button"
             type="button"
             disabled={busy}
             onClick={() => fileRef.current?.click()}
           >
-            {busy ? "Читаем файл…" : "Выбрать файл Excel"}
+            {busy ? "Читаем файл…" : skipChooser ? "Выбрать другой файл" : "Выбрать файл Excel"}
           </button>
           <button
             className="secondary-button"
@@ -437,6 +503,7 @@ export function MatrixExcelReview({
             onChange={(event) => void onPickFile(event)}
           />
         </div>
+        )}
       </div>
     );
   }
@@ -444,11 +511,7 @@ export function MatrixExcelReview({
   // Окно сопоставления и редактирования.
   return (
     <div className="bulk-photo-panel matrix-excel-review" style={{ marginTop: 10 }}>
-      <strong>Сопоставление с каталогом 1С</strong>
-      <p className="muted small" style={{ marginTop: 6 }}>
-        Файл{fileName ? ` «${fileName}»` : ""}. Проверьте пары с точными названиями 1С,
-        при необходимости исправьте — затем «Добавить товары».
-      </p>
+      <strong>{fileName ? `Excel: ${fileName}` : "Сопоставление с 1С"}</strong>
       {summary && (
         <div className="matrix-summary" style={{ marginTop: 8 }}>
           <span>Строк: {summary.total}</span>
@@ -457,10 +520,17 @@ export function MatrixExcelReview({
           <span>Похожих: {summary.fuzzy}</span>
           <span>Без пары: {summary.miss}</span>
           <span>
-            {isStorefront ? "Уже на витрине" : "Уже в матрице"}:{" "}
+            {isStorefront
+              ? "Уже на витрине"
+              : isCatalog
+                ? "Уже в каталоге"
+                : "Уже в матрице"}
+            :{" "}
             {isStorefront
               ? (rows || []).filter((row) => row.alreadyOnStorefront).length
-              : summary.alreadyInMatrix || 0}
+              : isCatalog
+                ? (rows || []).filter((row) => row.alreadyInClover).length
+                : summary.alreadyInMatrix || 0}
           </span>
           <span>К добавлению: {selectedCount}</span>
           {busy && progress.total > 0 ? (
@@ -479,11 +549,12 @@ export function MatrixExcelReview({
             : row.match
               ? [{ ...row.match, score: row.score }]
               : [];
+          const present = excelTargetAlreadyPresent(row, target);
           return (
             <div
               key={`excel-row-${row.rowIndex}`}
               className={
-                (isStorefront ? row.alreadyOnStorefront : row.alreadyInMatrix)
+                present
                   ? "bulk-photo-row matrix-excel-row muted"
                   : row.selectedOneCId
                     ? "bulk-photo-row matrix-excel-row"
@@ -496,19 +567,19 @@ export function MatrixExcelReview({
                   checked={Boolean(
                     row.selected &&
                       row.selectedOneCId &&
-                      !(isStorefront ? row.alreadyOnStorefront : row.alreadyInMatrix)
+                      !present
                   )}
                   disabled={
                     !row.selectedOneCId ||
                     busy ||
                     importDone ||
-                    (isStorefront ? row.alreadyOnStorefront : row.alreadyInMatrix)
+                    present
                   }
                   onChange={(event) =>
                     updateRow(row.rowIndex, {
                       selected:
                         event.target.checked &&
-                        !(isStorefront ? row.alreadyOnStorefront : row.alreadyInMatrix),
+                        !present,
                     })
                   }
                 />
@@ -559,7 +630,11 @@ export function MatrixExcelReview({
                   <span className="muted small">
                     Уже на витрине — дубликат не добавляется
                   </span>
-                ) : !isStorefront && row.alreadyInMatrix ? (
+                ) : isCatalog && row.alreadyInClover ? (
+                  <span className="muted small">
+                    Уже в каталоге Clover — дубликат не добавляется
+                  </span>
+                ) : !skipClient && row.alreadyInMatrix ? (
                   <span className="muted small">
                     Уже в матрице клиента — дубликат не добавляется
                   </span>
@@ -606,10 +681,25 @@ export function MatrixExcelReview({
                         type="button"
                         className="secondary-button"
                         onClick={() => {
-                          const membership = getClientMatrixMembership(link, products);
+                          const membership = getClientMatrixMembership(
+                            skipClient ? {} : link,
+                            products
+                          );
                           const alreadyInMatrix = isOneCItemInClientMatrix(
                             { id: item.id, cloverLink: item.cloverLink || null },
                             membership
+                          );
+                          const cloverProduct = findCloverCatalogProduct(products, {
+                            oneCId: item.id,
+                            code: item.code,
+                            name: item.name,
+                            excelName: row.name,
+                          });
+                          const alreadyInClover = Boolean(
+                            cloverProduct || item.cloverLink?.productId
+                          );
+                          const alreadyOnStorefront = Boolean(
+                            cloverProduct?.showOnStorefront
                           );
                           updateRow(row.rowIndex, {
                             candidates: [
@@ -626,9 +716,13 @@ export function MatrixExcelReview({
                             ],
                             searchOpen: false,
                             selectedOneCId: String(item.id),
-                            selected: !alreadyInMatrix,
+                            selected: !excelTargetAlreadyPresent(
+                              { alreadyInMatrix, alreadyInClover, alreadyOnStorefront },
+                              target
+                            ),
                             alreadyInMatrix,
-                            alreadyInClover: Boolean(item.cloverLink?.productId),
+                            alreadyInClover,
+                            alreadyOnStorefront,
                             match: {
                               id: item.id,
                               name: item.name,
@@ -668,7 +762,9 @@ export function MatrixExcelReview({
               ? progress.total
                 ? `Добавляем… ${progress.done}/${progress.total}`
                 : "Добавляем…"
-              : `Добавить товары (${selectedCount})`}
+              : isCatalog
+                ? `Добавить в каталог (${selectedCount})`
+                : `Добавить товары (${selectedCount})`}
         </button>
         <button
           className="secondary-button"
@@ -678,7 +774,9 @@ export function MatrixExcelReview({
             setRows((current) =>
               (current || []).map((row) => ({
                 ...row,
-                selected: Boolean(row.selectedOneCId) && !row.alreadyInMatrix,
+                selected:
+                  Boolean(row.selectedOneCId) &&
+                  !excelTargetAlreadyPresent(row, target),
               }))
             );
           }}

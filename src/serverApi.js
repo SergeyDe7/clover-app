@@ -397,6 +397,12 @@ export const api = {
     });
   },
 
+  deleteProduct(productId) {
+    return request(`/admin/products/${encodeURIComponent(productId)}`, {
+      method: "DELETE",
+    });
+  },
+
   uploadProductCertificate(productId, file) {
     const formData = new FormData();
     formData.append("certificate", file);

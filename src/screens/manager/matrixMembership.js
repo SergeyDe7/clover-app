@@ -1,3 +1,4 @@
+import { uniqueMatrixProductIds } from "./matrixIds.js";
 import { normalizeProduct } from "../../shared/appHelpers";
 
 /** Состав матрицы клиента: id товаров и oneCId, которые уже в матрице. */
@@ -172,6 +173,8 @@ export function pickUniqueMatrixProductIds(productList, preferredIds = []) {
 
   return picked;
 }
+
+export { uniqueMatrixProductIds };
 
 /**
  * Все id в matrixProductIds, связанные с выбранными товарами

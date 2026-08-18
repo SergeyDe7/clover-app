@@ -54,8 +54,12 @@ assert.ok(
   "UI reset/send должны быть disabled при sending."
 );
 assert.ok(
-  appSource.includes("open={matrixOpen}"),
-  "Матрица клиента должна восстанавливать open после F5."
+  appSource.includes('const [openClientId, setOpenClientId] = useState("")'),
+  "Матрица клиента не должна восстанавливать open после F5."
+);
+assert.ok(
+  !appSource.includes("useState(readOpenManagerClientId)"),
+  "Матрица клиента не должна восстанавливать open после F5."
 );
 assert.ok(
   !appSource.includes("scheduleSync(() => api.saveClientLinks(clientLinks))"),

@@ -17,6 +17,7 @@ export const AUDIT_ACTION_LABELS = {
   "client.profile.manager_update": "Менеджер изменил данные клиента",
   "product.image.upload": "Загружено фото товара",
   "product.image.delete": "Удалено фото товара",
+  "product.delete": "Удалён товар из каталога",
   "backup.create": "Создана резервная копия",
   "backup.restore": "Восстановлена резервная копия",
   "backup.cleanup": "Удалены старые резервные копии",
@@ -58,6 +59,10 @@ function formatAuditDetails(item) {
       return details.productName
         ? `Товар: ${details.productName}`
         : "Фотография удалена";
+    case "product.delete":
+      return details.productName
+        ? `Товар: ${details.productName} · матриц: ${Number(details.matricesChanged) || 0}`
+        : "Товар удалён из каталога";
     case "backup.create":
       return `${details.reason || "Резервная копия"}${
         details.photoCount !== undefined

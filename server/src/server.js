@@ -25,6 +25,7 @@ import {
   resetServerData,
   setClientStateField,
   setGlobalState,
+  removeProductIdFromAllFavorites,
   listAudit,
   listExchangeAudit,
   getOrderById,
@@ -125,6 +126,7 @@ import {
   createOrReuseCloverProductFromOneC,
   linkCloverProduct,
   mergeProductsPreservingOneCLinks,
+  removeCloverProductFromState,
   normalizeOneCProduct,
   normalizeOneCProducts,
   preserveOneCProductPricingFields,
@@ -924,7 +926,7 @@ const managerClientUpdateSchema = z.object({
           isPrimary: z.boolean().optional().default(false),
         })
       )
-      .max(2)
+      .max(5)
       .optional(),
   }),
   addresses: z.array(managerClientAddressSchema).max(50),
@@ -4271,6 +4273,48 @@ app.delete(
     });
 
     res.json({ ok: true, product: updatedProduct });
+  }
+);
+
+app.delete(
+  "/api/admin/products/:productId",
+  authRequired,
+  roleRequired("manager"),
+  (req, res) => {
+    const productId = String(req.params.productId || "").trim();
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const clientLinks = getGlobalState("clientLinks", {});
+    const removed = removeCloverProductFromState(productId, { products, clientLinks });
+    if (!removed.found) {
+      return res.status(404).json({ error: "Товар не найден." });
+    }
+
+    removeUploadedImage(removed.product.imageUrl);
+    removeUploadedImage(removed.product.certificateUrl);
+    setGlobalState("products", removed.products);
+    setGlobalState("clientLinks", removed.clientLinks);
+    setGlobalState("catalogPricesVersion", new Date().toISOString());
+    const favoritesChanged = removeProductIdFromAllFavorites(productId);
+
+    auditFromRequest(req, "product.delete", {
+      productId: removed.product.id,
+      productName: removed.product.name,
+      showOnStorefront: removed.product.showOnStorefront === true,
+      matricesChanged: removed.matricesChanged,
+      favoritesChanged,
+    });
+
+    res.json({
+      ok: true,
+      productId: removed.product.id,
+      products: enrichManagerCatalogProducts(removed.products),
+      clientLinks: Object.fromEntries(
+        Object.entries(removed.clientLinks).map(([id, link]) => [
+          id,
+          normalizeClientLink(link),
+        ])
+      ),
+    });
   }
 );
 

@@ -1,5 +1,6 @@
 // Раздел менеджера: клиенты, матрицы товаров и связи с 1С.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { api } from "../../serverApi";
 import { PanelErrorBoundary } from "../../shared/SharedPanels";
 import {
@@ -20,13 +21,22 @@ import {
   buildOrderSearchHaystack,
   RUSSIAN_PHONE_PREFIX,
   formatRussianPhone,
+  getRussianPhoneLocalDigits,
   normalizeProfileContacts,
+  createEmptyProfileContact,
   productArticle,
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { MatrixOneCProductAdd } from "./MatrixOneCProductAdd";
+import { MatrixCloverCatalogAdd } from "./MatrixCloverCatalogAdd";
 import { ProductEditor } from "./ProductEditor";
-import { expandMatrixRemovalIds, pickUniqueMatrixProductIds } from "./matrixMembership";
+import {
+  growMatrixIdList,
+  idsWithout,
+  toggleMatrixProductId,
+  uniqueMatrixProductIds,
+} from "./matrixIds";
+import { downloadClientMatrixExcel } from "../../shared/matrixExcelImport";
 
 /** Цена из вида цен 1С (категория клиента), с масштабом от шт. */
 function typedSalePriceForUnit(product, priceTypeId, unit) {
@@ -253,6 +263,12 @@ export function normalizeManagerClientAddresses(addresses = []) {
   });
 }
 
+const MAX_PROFILE_CONTACTS = 5;
+
+function extraClientContacts(contacts) {
+  return (Array.isArray(contacts) ? contacts : []).filter((item) => !item.isPrimary);
+}
+
 function createManagerClientForm(client) {
   const normalized = normalizeProfileContacts({
     companyName: client.companyName || "",
@@ -277,6 +293,8 @@ function ManagerClientEditor({ client, onReload, onClose }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [passwordDraft, setPasswordDraft] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
   const clientVersion = JSON.stringify({
     id: client.id,
     companyName: client.companyName || "",
@@ -335,6 +353,53 @@ function ManagerClientEditor({ client, onReload, onClose }) {
     setError("");
   };
 
+  const addExtraPhone = () => {
+    setForm((current) => {
+      const contacts = Array.isArray(current.contacts) ? current.contacts : [];
+      if (contacts.length >= MAX_PROFILE_CONTACTS) return current;
+      const withPrimary =
+        contacts.length > 0
+          ? contacts
+          : [
+              {
+                id: "contact-primary",
+                name: current.contactName || "",
+                label: "Основной",
+                phone: current.phone || "",
+                isPrimary: true,
+              },
+            ];
+      return {
+        ...current,
+        contacts: [...withPrimary, createEmptyProfileContact({ isPrimary: false })],
+      };
+    });
+    setMessage("");
+    setError("");
+  };
+
+  const updateExtraContact = (contactId, patch) => {
+    setForm((current) => ({
+      ...current,
+      contacts: (Array.isArray(current.contacts) ? current.contacts : []).map((item) =>
+        String(item.id) === String(contactId) ? { ...item, ...patch } : item
+      ),
+    }));
+    setMessage("");
+    setError("");
+  };
+
+  const removeExtraContact = (contactId) => {
+    setForm((current) => ({
+      ...current,
+      contacts: (Array.isArray(current.contacts) ? current.contacts : []).filter(
+        (item) => item.isPrimary || String(item.id) !== String(contactId)
+      ),
+    }));
+    setMessage("");
+    setError("");
+  };
+
   const removeAddress = (addressId) => {
     setForm((current) => {
       const removed = current.addresses.find((item) => item.id === addressId);
@@ -379,16 +444,14 @@ function ManagerClientEditor({ client, onReload, onClose }) {
 
     try {
       const existingContacts = Array.isArray(form.contacts) ? form.contacts : [];
-      const secondary = existingContacts
-        .filter((item) => !item.isPrimary)
-        .slice(0, 1)
+      const extras = extraClientContacts(existingContacts)
+        .filter((item) => getRussianPhoneLocalDigits(item.phone) || String(item.name || "").trim())
+        .slice(0, MAX_PROFILE_CONTACTS - 1)
         .map((item) => ({
           ...item,
           isPrimary: false,
           label:
-            !item.label ||
-            item.label === "Основной" ||
-            item.label === "Дополнительный"
+            !item.label || item.label === "Основной" || item.label === "Дополнительный"
               ? "Дополнительный"
               : item.label,
         }));
@@ -407,7 +470,7 @@ function ManagerClientEditor({ client, onReload, onClose }) {
             phone,
             isPrimary: true,
           },
-          ...secondary,
+          ...extras,
         ],
       }).contacts;
       await api.updateClient(client.id, {
@@ -427,6 +490,37 @@ function ManagerClientEditor({ client, onReload, onClose }) {
       setError(saveError.message || "Не удалось сохранить данные клиента.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const savePassword = async () => {
+    const password = passwordDraft.trim();
+    if (password.length < 6) {
+      await appAlert({
+        title: "Короткий пароль",
+        message: "Пароль должен быть не короче 6 символов.",
+        tone: "warn",
+      });
+      return;
+    }
+    setPasswordBusy(true);
+    try {
+      const result = await api.setClientPassword(client.id, password);
+      await onReload();
+      setPasswordDraft("");
+      await appAlert({
+        title: "Пароль обновлён",
+        message: `Логин: ${result.login || client.email}\nПароль: ${password}\n\nСохранено в «Ещё → Доступы». Передайте клиенту.`,
+        tone: "success",
+      });
+    } catch (saveError) {
+      await appAlert({
+        title: "Не удалось сменить пароль",
+        message: saveError.message,
+        tone: "danger",
+      });
+    } finally {
+      setPasswordBusy(false);
     }
   };
 
@@ -476,34 +570,76 @@ function ManagerClientEditor({ client, onReload, onClose }) {
         </label>
       </div>
 
-      {Array.isArray(form.contacts) && form.contacts.length > 0 ? (
-        <div className="profile-contacts-block" style={{ marginTop: 14 }}>
-          <strong>Контакты и телефоны</strong>
+      <div className="profile-contacts-block" style={{ marginTop: 14 }}>
+        <div className="profile-contacts-head">
+          <div>
+            <strong>Доп. номера</strong>
+            <p className="muted small">
+              Кроме основного телефона выше можно добавить ещё номера для связи. До {MAX_PROFILE_CONTACTS} контактов всего.
+            </p>
+          </div>
+          {form.contacts.length < MAX_PROFILE_CONTACTS ? (
+            <button className="secondary-button" type="button" onClick={addExtraPhone}>
+              + Доп. номер
+            </button>
+          ) : null}
+        </div>
+        {extraClientContacts(form.contacts).length ? (
           <div className="profile-contacts-list" style={{ marginTop: 8 }}>
-            {form.contacts.map((item) => (
-              <div
-                className={
-                  item.isPrimary
-                    ? "profile-contact-card is-primary"
-                    : "profile-contact-card"
-                }
-                key={item.id || `${item.phone}-${item.name}`}
-              >
+            {extraClientContacts(form.contacts).map((item, index) => (
+              <div className="profile-contact-card" key={item.id || `${item.phone}-${index}`}>
                 <div className="profile-contact-card-top">
-                  <span className={item.isPrimary ? "badge green" : "badge yellow"}>
-                    {item.isPrimary ? "Основной" : item.label || "Дополнительный"}
-                  </span>
+                  <span className="badge yellow">{item.label || "Дополнительный"}</span>
+                  <button
+                    className="danger-button"
+                    type="button"
+                    onClick={() => removeExtraContact(item.id)}
+                  >
+                    Удалить
+                  </button>
                 </div>
-                <strong>{item.name || "Без подписи"}</strong>
-                <em style={{ fontStyle: "normal" }}>{item.phone || "—"}</em>
+                <div className="form-grid">
+                  <label className="field">
+                    Подпись
+                    <input
+                      value={item.name || ""}
+                      placeholder="Например: склад, бухгалтер"
+                      onChange={(event) =>
+                        updateExtraContact(item.id, { name: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="field">
+                    Телефон
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder="+7 (999) 000-00-00"
+                      maxLength="18"
+                      value={item.phone || RUSSIAN_PHONE_PREFIX}
+                      onFocus={(event) => {
+                        if (!getRussianPhoneLocalDigits(event.currentTarget.value)) {
+                          updateExtraContact(item.id, { phone: RUSSIAN_PHONE_PREFIX });
+                        }
+                      }}
+                      onChange={(event) =>
+                        updateExtraContact(item.id, {
+                          phone: formatRussianPhone(event.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                </div>
               </div>
             ))}
           </div>
+        ) : (
           <p className="muted small" style={{ marginTop: 8 }}>
-            Поля «Контактное лицо» и «Телефон» выше — основной контакт. Доп. контакты клиент задаёт в своём профиле.
+            Дополнительных номеров пока нет.
           </p>
-        </div>
-      ) : null}
+        )}
+      </div>
 
       <div className="manager-client-addresses">
         <div className="manager-client-addresses-heading">
@@ -567,6 +703,44 @@ function ManagerClientEditor({ client, onReload, onClose }) {
 
       <div className="matrix-catalog-note" style={{ marginTop: 14 }}>
         Изменения используются в новых заказах Clover. Данные контрагента в 1С автоматически не перезаписываются. При изменении email клиент будет входить по новому адресу.
+      </div>
+
+      <div className="client-password-block" style={{ marginTop: 18 }}>
+        <strong>Сменить пароль</strong>
+        <p className="muted small" style={{ marginTop: 4 }}>
+          Логин остаётся {client.email}. Матрица и заказы не меняются.
+        </p>
+        <div className="form-grid" style={{ marginTop: 10 }}>
+          <label className="field">
+            Новый пароль
+            <input
+              type="text"
+              autoComplete="new-password"
+              value={passwordDraft}
+              onChange={(event) => setPasswordDraft(event.target.value)}
+              minLength={6}
+              disabled={passwordBusy}
+            />
+          </label>
+        </div>
+        <div className="form-actions" style={{ marginTop: 10 }}>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={passwordBusy}
+            onClick={() => setPasswordDraft(generateAccessPassword())}
+          >
+            Сгенерировать пароль
+          </button>
+          <button
+            className="primary-button"
+            type="button"
+            disabled={passwordBusy}
+            onClick={() => void savePassword()}
+          >
+            {passwordBusy ? "Сохраняем..." : "Сохранить пароль"}
+          </button>
+        </div>
       </div>
 
       {error && <div className="auth-error" style={{ marginTop: 12 }}>{error}</div>}
@@ -652,14 +826,18 @@ export function ManagerClients({
   const [defaultMarkupDrafts, setDefaultMarkupDrafts] = useState({});
   const [individualMarkupDrafts, setIndividualMarkupDrafts] = useState({});
   const [matrixSaveState, setMatrixSaveState] = useState({});
-  const [matrixSettingsOpen, setMatrixSettingsOpen] = useState({});
   const [matrixPricePreview, setMatrixPricePreview] = useState({});
   const [matrixPricesStatus, setMatrixPricesStatus] = useState({});
   /** idle | busy | review | done — блокирует «Сохранить матрицу» на время Excel-импорта */
   const [excelImportState, setExcelImportState] = useState({});
   const [oneCAddPanelOpen, setOneCAddPanelOpen] = useState({});
-  /** Снимок id позиций матрицы — чтобы после «Снять все» список оставался на экране. */
+  const [cloverAddPanelOpen, setCloverAddPanelOpen] = useState({});
+  /** Снимок id позиций матрицы — чтобы новые из Excel сразу были в списке. */
   const [matrixListSnapshot, setMatrixListSnapshot] = useState({});
+  const snapshotClientRef = useRef("");
+  /** Отмеченные в списке матрицы для удаления. Не равно составу матрицы. */
+  const [matrixPickIds, setMatrixPickIds] = useState({});
+  const [matrixWindowClientId, setMatrixWindowClientId] = useState("");
   const [openClientId, setOpenClientId] = useState("");
   const [approvalBusyId, setApprovalBusyId] = useState("");
   const [openMenuId, setOpenMenuId] = useState("");
@@ -673,15 +851,21 @@ export function ManagerClients({
     email: "",
     password: "",
   });
-  const [passwordClientId, setPasswordClientId] = useState("");
-  const [passwordDraft, setPasswordDraft] = useState("");
-  const [passwordBusy, setPasswordBusy] = useState(false);
   const [editorProduct, setEditorProduct] = useState(undefined);
   const restoredOpenClient = useRef(false);
 
   useEffect(() => {
     writeOpenManagerClientId("");
   }, []);
+
+  useEffect(() => {
+    if (!matrixWindowClientId) return undefined;
+    const onKey = (event) => {
+      if (event.key === "Escape") setMatrixWindowClientId("");
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [matrixWindowClientId]);
 
   const ordersByClientId = useMemo(() => {
     const map = {};
@@ -695,7 +879,7 @@ export function ManagerClients({
   }, [orders]);
 
   useEffect(() => {
-    if (restoredOpenClient.current || !openClientId) return;
+    if (matrixWindowClientId || restoredOpenClient.current || !openClientId) return;
     const target = document.getElementById(`client-matrix-${openClientId}`);
     if (!target) return;
 
@@ -706,7 +890,7 @@ export function ManagerClients({
     window.requestAnimationFrame(() => {
       target.scrollIntoView({ block: "start" });
     });
-  }, [openClientId, clients]);
+  }, [openClientId, clients, matrixWindowClientId]);
 
   const openLink = openClientId ? clientLinks[openClientId] : null;
   const matrixPricesKey = openClientId
@@ -813,18 +997,31 @@ export function ManagerClients({
     };
   }, [openClientId, matrixPricesKey, catalogPricesVersion, setProducts]);
 
-  // Держим снимок состава матрицы, чтобы «Снять все» не прятало список позиций.
+  // Снимок состава матрицы: при смене клиента — замена, при правках — только рост.
+  // Иначе снятие галочки сразу перезаписывает снимок и строка пропадает из списка.
   useEffect(() => {
     if (!openClientId) return;
-    const ids = clientLinks[openClientId]?.matrixProductIds;
-    if (!Array.isArray(ids) || !ids.length) return;
-    const key = ids.map(String).sort().join(",");
+    const ids = (clientLinks[openClientId]?.matrixProductIds || []).map(String);
+    if (snapshotClientRef.current !== String(openClientId)) {
+      snapshotClientRef.current = String(openClientId);
+      setMatrixListSnapshot((current) => ({
+        ...current,
+        [openClientId]: ids,
+      }));
+      return;
+    }
     setMatrixListSnapshot((current) => {
       const existing = Array.isArray(current[openClientId])
-        ? current[openClientId].map(String).sort().join(",")
-        : "";
-      if (existing === key) return current;
-      return { ...current, [openClientId]: ids.map(String) };
+        ? current[openClientId]
+        : [];
+      const merged = growMatrixIdList(existing, ids);
+      if (
+        merged.length === existing.length &&
+        merged.every((id, index) => String(id) === String(existing[index]))
+      ) {
+        return current;
+      }
+      return { ...current, [openClientId]: merged };
     });
   }, [openClientId, clientLinks]);
 
@@ -893,38 +1090,6 @@ export function ManagerClients({
       });
     } finally {
       setProvisionBusy(false);
-    }
-  };
-
-  const saveClientPassword = async (client) => {
-    const password = passwordDraft.trim();
-    if (password.length < 6) {
-      await appAlert({
-        title: "Короткий пароль",
-        message: "Пароль должен быть не короче 6 символов.",
-        tone: "warn",
-      });
-      return;
-    }
-    setPasswordBusy(true);
-    try {
-      const result = await api.setClientPassword(client.id, password);
-      await onReload();
-      setPasswordClientId("");
-      setPasswordDraft("");
-      await appAlert({
-        title: "Пароль обновлён",
-        message: `Логин: ${result.login || client.email}\nПароль: ${password}\n\nСохранено в «Ещё → Доступы». Передайте клиенту.`,
-        tone: "success",
-      });
-    } catch (error) {
-      await appAlert({
-        title: "Не удалось сменить пароль",
-        message: error.message,
-        tone: "danger",
-      });
-    } finally {
-      setPasswordBusy(false);
     }
   };
 
@@ -1017,6 +1182,31 @@ export function ManagerClients({
     }
   };
 
+  const deleteCatalogProduct = async (product) => {
+    if (!product?.id) return;
+    const ok = await appConfirm({
+      title: "Удалить товар из каталога?",
+      message: `«${product.name || "товар"}» будет удалён из каталога Clover, с витрины сайта и из матриц всех клиентов. Заказы с этим товаром не меняются.`,
+      confirmLabel: "Удалить",
+      tone: "danger",
+    });
+    if (!ok) return;
+    try {
+      const result = await api.deleteProduct(product.id);
+      setProducts((result.products || []).map(normalizeProduct));
+      if (result.clientLinks && typeof result.clientLinks === "object") {
+        setClientLinks(result.clientLinks);
+      }
+      setEditorProduct(undefined);
+    } catch (error) {
+      void appAlert({
+        title: "Не удалось удалить",
+        message: error.message || "Не удалось удалить товар.",
+        tone: "danger",
+      });
+    }
+  };
+
   const updatePersonalPrice = (
     clientId,
     link,
@@ -1095,15 +1285,9 @@ export function ManagerClients({
         getDefaultMarkupDraft(clientId, link)
       ),
       personalPrices: { ...(link.personalPrices || {}) },
-      // На сохранении убираем скрытые дубли (один oneCId / имя / артикул).
-      matrixProductIds: pickUniqueMatrixProductIds(
-        (Array.isArray(products) ? products : []).filter((product) =>
-          (Array.isArray(link.matrixProductIds) ? link.matrixProductIds : []).some(
-            (id) => String(id) === String(product.id)
-          )
-        ),
-        link.matrixProductIds || []
-      ),
+      // Полный снимок выбранных id. Не фильтруем по локальному каталогу и не
+      // схлопываем по имени — иначе только что загруженные позиции пропадают.
+      matrixProductIds: uniqueMatrixProductIds(link.matrixProductIds || []),
     };
 
     const productDrafts = individualMarkupDrafts[clientId] || {};
@@ -1182,6 +1366,10 @@ export function ManagerClients({
           [clientId]: (nextLink.matrixProductIds || []).map(String),
         }));
       }
+      setMatrixPickIds((current) => ({
+        ...current,
+        [clientId]: [],
+      }));
       setDefaultMarkupDrafts((current) => {
         const next = { ...current };
         delete next[clientId];
@@ -1387,20 +1575,19 @@ export function ManagerClients({
             const snapshotIds = Array.isArray(matrixListSnapshot[client.id])
               ? matrixListSnapshot[client.id]
               : [];
-            const matrixDirty =
-              matrixSaveState[client.id]?.status === "dirty";
-            // Снимок только для несохранённого «Снять все»: иначе после удаления
-            // и сохранения старые id из снимка снова рисуют позиции в списке.
-            const displayIdSet = new Set([
-              ...matrixIdSet,
-              ...(matrixIdSet.size === 0 && matrixDirty
-                ? snapshotIds.map(String)
-                : []),
-            ]);
+            const pickedIds = Array.isArray(matrixPickIds[client.id])
+              ? matrixPickIds[client.id]
+              : [];
+            const pickedSet = new Set(pickedIds.map(String));
+            // Список матрицы = состав матрицы. Галочки — отдельный выбор на удаление.
+            const displayIdSet = matrixIdSet;
             const matrixOpen = String(openClientId) === String(client.id);
-            const searchQuery = matrixOpen
-              ? String(matrixSearch || "").trim().toLocaleLowerCase("ru-RU")
-              : "";
+            const matrixWindowOpen =
+              String(matrixWindowClientId) === String(client.id);
+            const searchQuery =
+              matrixOpen || matrixWindowOpen
+                ? String(matrixSearch || "").trim().toLocaleLowerCase("ru-RU")
+                : "";
             const matrixProductsRaw = (Array.isArray(products) ? products : []).filter(
               (product) => {
                 if (product.active === false) return false;
@@ -1456,6 +1643,30 @@ export function ManagerClients({
                 result.push(product);
               }
               return result;
+            })();
+            const matrixExportProducts = (() => {
+              if (link.matrixMode === "all") {
+                return (Array.isArray(products) ? products : []).filter(
+                  (item) => item.active !== false
+                );
+              }
+              const byId = new Map(
+                (Array.isArray(products) ? products : []).map((item) => [
+                  String(item.id),
+                  item,
+                ])
+              );
+              const list = [];
+              const seen = new Set();
+              for (const raw of matrixProductIds) {
+                const id = String(raw);
+                if (seen.has(id)) continue;
+                const product = byId.get(id);
+                if (!product || product.active === false) continue;
+                seen.add(id);
+                list.push(product);
+              }
+              return list;
             })();
             const personalPriceCount = Object.keys(
               link.personalPrices || {}
@@ -1536,40 +1747,15 @@ export function ManagerClients({
                                   }, 50);
                                 },
                               },
-                              {
-                                id: "password",
-                                label: "Сменить пароль",
-                                onSelect: () => {
-                                  setPasswordClientId(client.id);
-                                  setPasswordDraft(generateAccessPassword());
-                                  setProfileOpenId("");
-                                  window.setTimeout(() => {
-                                    document
-                                      .getElementById(`client-password-${client.id}`)
-                                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                                  }, 50);
-                                },
-                              },
                             ]
                           : []),
                         {
                           id: "matrix",
-                          label: "Матрица и 1С",
+                          label: "Матрица",
                           onSelect: () => {
+                            restoredOpenClient.current = true;
                             setOpenClientId(client.id);
-                            writeOpenManagerClientId(client.id);
-                            window.setTimeout(() => {
-                              const target = document.getElementById(
-                                `client-matrix-${client.id}`
-                              );
-                              if (target instanceof HTMLDetailsElement) {
-                                target.open = true;
-                              }
-                              target?.scrollIntoView({
-                                behavior: "smooth",
-                                block: "start",
-                              });
-                            }, 50);
+                            setMatrixWindowClientId(String(client.id));
                           },
                         },
                         ...(client.isRegistered !== false &&
@@ -1577,14 +1763,14 @@ export function ManagerClients({
                           ? [
                               {
                                 id: "block",
-                                label: "Заблокировать вход",
+                                label: "Заблокировать доступ",
                                 danger: true,
                                 disabled: approvalBusyId === client.id,
                                 onSelect: async () => {
                                   const ok = await appConfirm({
-                                    title: "Заблокировать вход?",
+                                    title: "Заблокировать доступ?",
                                     message:
-                                      "Заблокировать вход этому клиенту? Он не сможет войти в Clover, пока вы снова не разрешите доступ.",
+                                      "Заблокировать доступ этому клиенту? Он не сможет войти в Clover, пока вы снова не разрешите доступ.",
                                     confirmLabel: "Заблокировать",
                                     cancelLabel: "Отмена",
                                     tone: "danger",
@@ -1601,43 +1787,11 @@ export function ManagerClients({
                           ? [
                               {
                                 id: "allow",
-                                label: "Разрешить вход",
+                                label: "Разрешить доступ",
                                 disabled:
                                   approvalBusyId === client.id ||
                                   !client.emailVerified,
                                 onSelect: () => setApproval(client, "approved"),
-                              },
-                            ]
-                          : []),
-                        ...(client.isRegistered !== false &&
-                        client.approvalStatus === "pending"
-                          ? [
-                              {
-                                id: "approve",
-                                label: "Разрешить вход",
-                                disabled:
-                                  approvalBusyId === client.id ||
-                                  !client.emailVerified,
-                                onSelect: () => setApproval(client, "approved"),
-                              },
-                              {
-                                id: "reject",
-                                label: "Отклонить регистрацию",
-                                danger: true,
-                                disabled: approvalBusyId === client.id,
-                                onSelect: async () => {
-                                  const ok = await appConfirm({
-                                    title: "Отклонить регистрацию?",
-                                    message:
-                                      "Отклонить регистрацию? Клиент не сможет войти, пока доступ не разрешат снова.",
-                                    confirmLabel: "Отклонить",
-                                    cancelLabel: "Отмена",
-                                    tone: "danger",
-                                  });
-                                  if (ok) {
-                                    setApproval(client, "rejected");
-                                  }
-                                },
                               },
                             ]
                           : []),
@@ -1669,10 +1823,6 @@ export function ManagerClients({
                                     }
                                     if (String(profileOpenId) === String(client.id)) {
                                       setProfileOpenId("");
-                                    }
-                                    if (String(passwordClientId) === String(client.id)) {
-                                      setPasswordClientId("");
-                                      setPasswordDraft("");
                                     }
                                     await onReload();
                                     await appAlert({
@@ -1792,66 +1942,6 @@ export function ManagerClients({
                 )}
 
                 {client.isRegistered !== false &&
-                String(passwordClientId) === String(client.id) ? (
-                  <section
-                    className="client-profile-panel"
-                    id={`client-password-${client.id}`}
-                    style={{ marginTop: 15 }}
-                  >
-                    <div className="client-profile-panel-head">
-                      <div>
-                        <p className="eyebrow">Доступ</p>
-                        <h3>Сменить пароль</h3>
-                        <p className="muted small">
-                          Логин остаётся {client.email}. Матрица и заказы не меняются.
-                        </p>
-                      </div>
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        onClick={() => {
-                          setPasswordClientId("");
-                          setPasswordDraft("");
-                        }}
-                      >
-                        Закрыть
-                      </button>
-                    </div>
-                    <div className="form-grid" style={{ marginTop: 14 }}>
-                      <label className="field">
-                        Новый пароль
-                        <input
-                          type="text"
-                          autoComplete="new-password"
-                          value={passwordDraft}
-                          onChange={(event) => setPasswordDraft(event.target.value)}
-                          minLength={6}
-                          disabled={passwordBusy}
-                        />
-                      </label>
-                    </div>
-                    <div className="form-actions" style={{ marginTop: 14 }}>
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        disabled={passwordBusy}
-                        onClick={() => setPasswordDraft(generateAccessPassword())}
-                      >
-                        Сгенерировать пароль
-                      </button>
-                      <button
-                        className="primary-button"
-                        type="button"
-                        disabled={passwordBusy}
-                        onClick={() => saveClientPassword(client)}
-                      >
-                        {passwordBusy ? "Сохраняем..." : "Сохранить пароль"}
-                      </button>
-                    </div>
-                  </section>
-                ) : null}
-
-                {client.isRegistered !== false &&
                 String(profileOpenId) === String(client.id) ? (
                   <ManagerClientEditor
                     client={client}
@@ -1866,40 +1956,9 @@ export function ManagerClients({
                   </div>
                 )}
 
-                <details
-                  id={`client-matrix-${client.id}`}
-                  className="order-details client-matrix-details"
-                  style={{ marginTop: 15 }}
-                  open={matrixOpen}
-                  onToggle={(event) => {
-                    const isOpen = Boolean(event.currentTarget.open);
-                    setOpenClientId((current) => {
-                      const value = isOpen
-                        ? String(client.id)
-                        : String(current) === String(client.id)
-                          ? ""
-                          : current;
-                      writeOpenManagerClientId(value);
-                      return value;
-                    });
-                    if (isOpen && link.matrixMode === "pending") {
-                      setMatrixSettingsOpen((current) => ({
-                        ...current,
-                        [client.id]: true,
-                      }));
-                    }
-                  }}
-                >
-                  <summary>Товарная матрица</summary>
-
-                  {matrixOpen && (
+                {matrixWindowOpen && (
                   <PanelErrorBoundary label="Ошибка блока матрицы клиента">
                   {(() => {
-                    const settingsOpen = Boolean(
-                      matrixSettingsOpen[client.id] ||
-                        (matrixSettingsOpen[client.id] === undefined &&
-                          link.matrixMode === "pending")
-                    );
                     const pricingLabel =
                       link.defaultPricingMode === "purchase_markup"
                         ? `Наценка ${normalizePercentInput(getDefaultMarkupDraft(client.id, link))}%` +
@@ -1918,6 +1977,58 @@ export function ManagerClients({
 
                     return (
                       <>
+                  {matrixWindowOpen && typeof document !== "undefined"
+                    ? createPortal(
+                        <div
+                          className="matrix-window"
+                          role="dialog"
+                          aria-modal="true"
+                          aria-labelledby={`matrix-window-title-${client.id}`}
+                          onClick={() => setMatrixWindowClientId("")}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              setMatrixWindowClientId("");
+                            }
+                          }}
+                        >
+                          <div
+                            className="matrix-window-card"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <div className="matrix-window-head">
+                              <div>
+                                <p className="eyebrow">Матрица</p>
+                                <h3 id={`matrix-window-title-${client.id}`}>
+                                  {client.companyName || "Клиент без названия"}
+                                </h3>
+                              </div>
+                              <div className="matrix-window-head-actions">
+                                <button
+                                  className="secondary-button"
+                                  type="button"
+                                  disabled={
+                                    link.matrixMode === "pending" ||
+                                    matrixExportProducts.length === 0
+                                  }
+                                  onClick={() => {
+                                    downloadClientMatrixExcel({
+                                      clientName: client.companyName,
+                                      products: matrixExportProducts,
+                                    });
+                                  }}
+                                >
+                                  Скачать Excel
+                                </button>
+                                <button
+                                  className="secondary-button"
+                                  type="button"
+                                  onClick={() => setMatrixWindowClientId("")}
+                                >
+                                  Закрыть
+                                </button>
+                              </div>
+                            </div>
+                            <div className="matrix-window-body">
                   <div className="client-matrix-toolbar">
                     <div className="client-matrix-toolbar-meta">
                       <span className="badge green">{modeLabel}</span>
@@ -1927,23 +2038,6 @@ export function ManagerClients({
                           1С: {link.oneCName || link.oneCCode || "связан"}
                         </span>
                       ) : null}
-                    </div>
-                    <div className="client-matrix-toolbar-actions">
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        aria-expanded={settingsOpen}
-                        onClick={() =>
-                          setMatrixSettingsOpen((current) => ({
-                            ...current,
-                            [client.id]: !settingsOpen,
-                          }))
-                        }
-                      >
-                        {settingsOpen
-                          ? "Скрыть настройки клиента"
-                          : "Настройки клиента"}
-                      </button>
                     </div>
                   </div>
 
@@ -1958,9 +2052,8 @@ export function ManagerClients({
                     </span>
                   )}
 
-                  {settingsOpen && (
-                    <div className="client-matrix-settings">
-                      <h4>Настройки клиента и 1С</h4>
+                  <details className="client-matrix-settings" open={link.matrixMode === "pending"}>
+                      <summary>1С и цены</summary>
                       <p className="muted small" style={{ marginTop: 0 }}>
                         Связь с контрагентом, режим матрицы, вид цен и наценка.
                         После «Обновить цены» в 1С ЛК клиента подтягивает каталог автоматически.
@@ -2159,33 +2252,15 @@ export function ManagerClients({
                         />
                         <small>Только для менеджеров</small>
                       </label>
-
-                      <div className="comment-box" style={{ marginTop: 14 }}>
-                        <strong>Адреса клиента</strong>
-                        <p>
-                          {(() => {
-                            const addresses = Array.isArray(client.addresses)
-                              ? client.addresses
-                              : [];
-                            const text = addresses
-                              .map((item) =>
-                                typeof item === "string" ? item : item?.address
-                              )
-                              .filter(Boolean)
-                              .join("; ");
-                            return text || "Нет адресов";
-                          })()}
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                    </details>
 
                   {link.matrixMode === "pending" ? (
                     <div className="matrix-catalog-note pending" style={{ marginTop: 14 }}>
-                      Выберите режим матрицы в «Настройки клиента», затем сохраните матрицу.
+                      Выберите режим матрицы выше, затем сохраните матрицу.
                     </div>
                   ) : (
-                    <div className="client-matrix-products" style={{ marginTop: 14 }}>
+                    <div className="client-matrix-products">
+                      <div className="matrix-add-compact">
                       <MatrixOneCProductAdd
                         clientId={client.id}
                         link={link}
@@ -2213,7 +2288,39 @@ export function ManagerClients({
                           setMatrixSearch("");
                         }}
                       />
-                      {!oneCAddPanelOpen[client.id] ? (
+                      <MatrixCloverCatalogAdd
+                        clientId={client.id}
+                        link={link}
+                        products={products}
+                        onPanelChange={(open) => {
+                          setCloverAddPanelOpen((current) => ({
+                            ...current,
+                            [client.id]: Boolean(open),
+                          }));
+                        }}
+                        onAddToMatrix={(ids) => {
+                          const nextIds = uniqueMatrixProductIds([
+                            ...(matrixProductIds || []),
+                            ...(Array.isArray(ids) ? ids : []),
+                          ]);
+                          setMatrixListSnapshot((current) => ({
+                            ...current,
+                            [client.id]: growMatrixIdList(
+                              current[client.id],
+                              nextIds
+                            ),
+                          }));
+                          updateLink(client.id, {
+                            matrixMode:
+                              link.matrixMode === "all" ? "all" : "selected",
+                            matrixProductIds: nextIds,
+                          });
+                          setMatrixSearch("");
+                        }}
+                      />
+                      </div>
+                      {!oneCAddPanelOpen[client.id] &&
+                      !cloverAddPanelOpen[client.id] ? (
                       <div className="client-matrix-search-bar">
                         <input
                           type="search"
@@ -2271,134 +2378,93 @@ export function ManagerClients({
                           </button>
                         )}
                       </div>
-                      ) : (
-                        <p className="muted small" style={{ marginTop: 10 }}>
-                          Открыт поиск по выгрузке 1С. Поиск по матрице Clover скрыт, чтобы не перепутать.
-                        </p>
-                      )}
+                      ) : null}
 
                       <div className="matrix-summary">
                         <span>
                           {link.matrixMode === "all"
                             ? `Товаров в матрице: ${products.filter((item) => item.active).length}`
-                            : `Выбрано: ${matrixProductIds.length}`}
+                            : `В матрице: ${matrixProductIds.length}`}
                         </span>
                         <span>
                           Индивидуальных исключений: {personalPriceCount}
                         </span>
-                        {link.matrixMode === "selected" && (
-                          <>
-                            <button
-                              className="secondary-button"
-                              type="button"
-                              onClick={() => {
-                                const source =
-                                  matrixProducts.length > 0
-                                    ? matrixProducts
-                                    : (Array.isArray(products) ? products : []).filter(
-                                        (item) =>
-                                          item.active !== false &&
-                                          snapshotIds.includes(String(item.id))
-                                      );
-                                const preferred =
-                                  snapshotIds.length > 0
-                                    ? snapshotIds
-                                    : matrixProductIds;
-                                const nextIds = pickUniqueMatrixProductIds(
-                                  source.length
-                                    ? source
-                                    : (Array.isArray(products) ? products : []).filter(
-                                        (item) => item.active !== false
-                                      ),
-                                  preferred
-                                );
-                                setMatrixListSnapshot((current) => ({
-                                  ...current,
-                                  [client.id]: nextIds.map(String),
-                                }));
-                                updateLink(client.id, {
-                                  matrixMode: "selected",
-                                  matrixProductIds: nextIds,
-                                });
-                              }}
-                            >
-                              Выбрать все
-                            </button>
-                            <button
-                              className="secondary-button"
-                              type="button"
-                              onClick={() => {
-                                const keepIds =
-                                  matrixProductIds.length > 0
-                                    ? matrixProductIds.map(String)
-                                    : snapshotIds.map(String);
-                                if (keepIds.length) {
-                                  setMatrixListSnapshot((current) => ({
-                                    ...current,
-                                    [client.id]: keepIds,
-                                  }));
-                                }
-                                updateLink(client.id, {
-                                  matrixMode: "selected",
-                                  matrixProductIds: [],
-                                });
-                              }}
-                            >
-                              Снять все
-                            </button>
-                            <button
-                              className="secondary-button"
-                              type="button"
-                              disabled={
-                                !matrixProducts.some((product) =>
-                                  matrixProductIds.some(
-                                    (id) => String(id) === String(product.id)
-                                  )
-                                )
-                              }
-                              onClick={() => {
-                                const selectedVisible = matrixProducts.filter(
-                                  (product) =>
-                                    matrixProductIds.some(
-                                      (id) =>
-                                        String(id) === String(product.id)
-                                    )
-                                );
-                                if (!selectedVisible.length) return;
-                                // Удаляем и скрытые дубли с тем же oneCId / артикулом / именем.
-                                const removeIds = expandMatrixRemovalIds(
-                                  selectedVisible,
-                                  matrixProductIds,
-                                  products
-                                );
-                                const nextIds = matrixProductIds.filter(
-                                  (id) => !removeIds.has(String(id))
-                                );
-                                setMatrixListSnapshot((current) => ({
-                                  ...current,
-                                  [client.id]: nextIds.map(String),
-                                }));
-                                updateLink(client.id, {
-                                  matrixMode: "selected",
-                                  matrixProductIds: nextIds,
-                                });
-                              }}
-                            >
-                              Удалить выбранные товары
-                            </button>
-                          </>
-                        )}
+                        {link.matrixMode === "selected" ? (
+                          <span className="muted small">
+                            Галочка — выбор для удаления из матрицы. Снятие галочки товар не убирает.
+                          </span>
+                        ) : null}
                       </div>
+                      {link.matrixMode === "selected" && (
+                        <div className="matrix-pick-actions">
+                          <span>Отмечено: {pickedIds.length}</span>
+                          <button
+                            className="secondary-button"
+                            type="button"
+                            onClick={() => {
+                              const visibleIds = matrixProducts.map(
+                                (product) => String(product.id)
+                              );
+                              setMatrixPickIds((current) => ({
+                                ...current,
+                                [client.id]: uniqueMatrixProductIds([
+                                  ...(current[client.id] || []),
+                                  ...visibleIds,
+                                ]).map(String),
+                              }));
+                            }}
+                          >
+                            Выбрать все
+                          </button>
+                          <button
+                            className="secondary-button"
+                            type="button"
+                            onClick={() => {
+                              setMatrixPickIds((current) => ({
+                                ...current,
+                                [client.id]: [],
+                              }));
+                            }}
+                          >
+                            Снять все
+                          </button>
+                          <button
+                            className="secondary-button"
+                            type="button"
+                            disabled={pickedIds.length === 0}
+                            onClick={() => {
+                              if (!pickedIds.length) return;
+                              const nextIds = idsWithout(
+                                matrixProductIds,
+                                pickedIds
+                              );
+                              setMatrixListSnapshot((current) => ({
+                                ...current,
+                                [client.id]: idsWithout(
+                                  current[client.id] || snapshotIds,
+                                  pickedIds
+                                ),
+                              }));
+                              setMatrixPickIds((current) => ({
+                                ...current,
+                                [client.id]: [],
+                              }));
+                              updateLink(client.id, {
+                                matrixMode: "selected",
+                                matrixProductIds: nextIds,
+                              });
+                            }}
+                          >
+                            Удалить выбранные из матрицы
+                          </button>
+                        </div>
+                      )}
 
                       <div className="matrix-editor-list">
                         {matrixProducts.map((product) => {
                           const price =
                             link.personalPrices?.[String(product.id)] || {};
-                          const selected =
-                            link.matrixMode === "all" ||
-                            matrixProductIds.some(
-                              (id) => String(id) === String(product.id)
-                            );
+                          const picked = pickedSet.has(String(product.id));
                           const priceMode = ["manual", "purchase_markup"].includes(
                             price.source
                           )
@@ -2439,32 +2505,19 @@ export function ManagerClients({
                                 <label className="matrix-editor-product-check">
                                   <input
                                     type="checkbox"
-                                    checked={selected}
+                                    checked={picked}
                                     disabled={link.matrixMode === "all"}
+                                    title="Отметить, чтобы удалить из матрицы этого клиента. Снятие галочки товар из матрицы не убирает."
                                     onChange={(event) => {
-                                      if (event.target.checked) {
-                                        updateLink(client.id, {
-                                          matrixMode: "selected",
-                                          matrixProductIds: [
-                                            ...new Set([
-                                              ...matrixProductIds,
-                                              product.id,
-                                            ]),
-                                          ],
-                                        });
-                                        return;
-                                      }
-                                      const removeIds = expandMatrixRemovalIds(
-                                        [product],
-                                        matrixProductIds,
-                                        products
-                                      );
-                                      updateLink(client.id, {
-                                        matrixMode: "selected",
-                                        matrixProductIds: matrixProductIds.filter(
-                                          (id) => !removeIds.has(String(id))
-                                        ),
-                                      });
+                                      // Галочка в списке матрицы — выбор для удаления, а не членство. Снятие не убирает товар из матрицы.
+                                      setMatrixPickIds((current) => ({
+                                        ...current,
+                                        [client.id]: toggleMatrixProductId(
+                                          current[client.id] || [],
+                                          product.id,
+                                          event.target.checked
+                                        ).map(String),
+                                      }));
                                     }}
                                   />
                                   <span>
@@ -2766,12 +2819,17 @@ export function ManagerClients({
                           : "Сохранить матрицу"}
                     </button>
                   </div>
+                            </div>
+                          </div>
+                        </div>,
+                        document.querySelector(".clover-app") || document.documentElement
+                      )
+                    : null}
                       </>
                     );
                   })()}
                   </PanelErrorBoundary>
                   )}
-                </details>
               </article>
             );
           })}
@@ -2786,6 +2844,7 @@ export function ManagerClients({
           oneCPriceTypes={oneCPriceTypes}
           onClose={() => setEditorProduct(undefined)}
           onSave={saveCatalogProduct}
+          onDelete={deleteCatalogProduct}
           onProductLiveUpdate={(updated) => {
             if (!updated?.id) return;
             setProducts((current) =>

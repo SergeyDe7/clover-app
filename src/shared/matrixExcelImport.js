@@ -108,3 +108,42 @@ export async function parseMatrixExcelFile(file) {
     rows: parsed,
   };
 }
+
+function matrixExportArticle(product) {
+  const oneC = String(product?.oneCCode || product?.oneCMatchCode || "").trim();
+  if (oneC) return oneC;
+  const code = String(product?.code || "").trim();
+  if (/^cl-\d+$/i.test(code)) return "";
+  return code;
+}
+
+function matrixExportFilePart(value) {
+  return (
+    String(value || "клиент")
+      .replace(/[\\/:*?"<>|]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 60) || "клиент"
+  );
+}
+
+/** Скачать Excel всей матрицы клиента: колонки Название / Код / Категория. */
+export function downloadClientMatrixExcel({ clientName, products } = {}) {
+  const list = (Array.isArray(products) ? products : []).filter(
+    (product) => product && product.active !== false
+  );
+  const rows = [
+    ["Название", "Код", "Категория"],
+    ...list.map((product) => [
+      String(product.name || "").trim(),
+      matrixExportArticle(product),
+      String(product.category || "").trim(),
+    ]),
+  ];
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  sheet["!cols"] = [{ wch: 52 }, { wch: 18 }, { wch: 22 }];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Матрица");
+  XLSX.writeFile(workbook, `матрица-${matrixExportFilePart(clientName)}.xlsx`);
+  return list.length;
+}

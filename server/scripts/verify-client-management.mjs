@@ -101,6 +101,36 @@ assert.equal(listedClient.addresses[1].label, "Склад");
 assert.equal(listedClient.managerNote, "Звонить перед доставкой. Принимает товар до 16:00.");
 assert.equal(state.profile.managerNote, undefined);
 
+const withExtraPhone = updateClientByManager({
+  clientId: client.id,
+  profile: {
+    companyName: "Восточная лавка",
+    contactName: "Анна",
+    phone: "+7 911 111-22-33",
+    email: "new-client@example.local",
+    contacts: [
+      {
+        id: "contact-primary",
+        name: "Анна",
+        label: "Основной",
+        phone: "+7 911 111-22-33",
+        isPrimary: true,
+      },
+      {
+        id: "contact-extra",
+        name: "Склад",
+        label: "Дополнительный",
+        phone: "+7 911 000-11-22",
+        isPrimary: false,
+      },
+    ],
+  },
+  addresses,
+  managerNote: "Звонить перед доставкой. Принимает товар до 16:00.",
+});
+assert.equal(withExtraPhone.contacts.length, 2);
+assert.equal(withExtraPhone.contacts.some((item) => item.phone.includes("000-11-22") && !item.isPrimary), true);
+
 db.close();
 rmSync(tempDirectory, { recursive: true, force: true });
 
