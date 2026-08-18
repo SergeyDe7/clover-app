@@ -260,17 +260,19 @@ function hasPurchasePrices(value) {
  * если в ответе пришёл «голый» товар без salePricesByType.
  */
 export function mergeProductsFromCatalogResponse(previous, incoming) {
-  const prevById = new Map(
-    (Array.isArray(previous) ? previous : []).map((product) => [
-      String(product.id),
-      product,
-    ])
+  const prevList = Array.isArray(previous) ? previous : [];
+  const nextById = new Map(
+    prevList.map((product) => [String(product.id), product])
   );
-  return (Array.isArray(incoming) ? incoming : []).map((raw) => {
+  for (const raw of Array.isArray(incoming) ? incoming : []) {
     const next = normalizeProduct(raw);
-    const prev = prevById.get(String(next.id));
-    if (!prev) return next;
-    return {
+    const id = String(next.id);
+    const prev = nextById.get(id);
+    if (!prev) {
+      nextById.set(id, next);
+      continue;
+    }
+    nextById.set(id, {
       ...next,
       salePricesByType: hasTypedPrices(next.salePricesByType)
         ? next.salePricesByType
@@ -284,6 +286,7 @@ export function mergeProductsFromCatalogResponse(previous, incoming) {
         next.purchasePriceUpdatedAt || prev.purchasePriceUpdatedAt || "",
       purchasePriceReceivedAt:
         next.purchasePriceReceivedAt || prev.purchasePriceReceivedAt || "",
-    };
-  });
+    });
+  }
+  return [...nextById.values()];
 }

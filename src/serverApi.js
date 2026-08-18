@@ -1,3 +1,5 @@
+import { stripProductForSave } from "./shared/appHelpers";
+
 const TOKEN_KEY = "clover-api-token";
 
 export function getApiToken() {
@@ -51,10 +53,12 @@ async function request(path, options = {}) {
     try {
       payload = JSON.parse(rawText);
     } catch {
-      const gatewayDown = response.status === 502 || response.status === 503 || response.status === 504;
+          const gatewayDown = response.status === 502 || response.status === 503 || response.status === 504;
       payload = {
         error: gatewayDown
           ? "Сервер API сейчас недоступен. Обновите страницу через минуту или обратитесь к менеджеру."
+          : response.status === 413
+            ? "Запрос слишком большой для сервера. Обновите страницу и сохраните товар ещё раз."
           : "Не удалось прочитать ответ сервера. Обновите страницу или войдите снова.",
         raw: rawText.slice(0, 120),
       };
@@ -302,7 +306,23 @@ export const api = {
   saveProducts(products) {
     return request("/state/products", {
       method: "PUT",
-      body: { products },
+      body: {
+        products: (Array.isArray(products) ? products : []).map(stripProductForSave),
+      },
+    });
+  },
+
+  saveProduct(product) {
+    const body = { product: stripProductForSave(product) };
+    if (product?.id) {
+      return request(`/admin/products/${encodeURIComponent(product.id)}`, {
+        method: "PUT",
+        body,
+      });
+    }
+    return request("/admin/products", {
+      method: "POST",
+      body,
     });
   },
 
@@ -524,6 +544,7 @@ export const api = {
     clientId = "",
     preferredName = "",
     showOnStorefront = false,
+    skipEnrichment = false,
   } = {}) {
     return request("/admin/one-c/products/from-catalog", {
       method: "POST",
@@ -533,6 +554,7 @@ export const api = {
         clientId: clientId || undefined,
         preferredName: preferredName || undefined,
         showOnStorefront: showOnStorefront || undefined,
+        skipEnrichment: skipEnrichment || undefined,
       },
     });
   },

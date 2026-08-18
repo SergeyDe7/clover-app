@@ -366,6 +366,7 @@ export function MatrixExcelReview({
           clientId: skipClient ? "" : clientId,
           preferredName: excelName,
           showOnStorefront: isStorefront,
+          skipEnrichment: isCatalog || unique.length > 20,
         });
         if (Array.isArray(result.products)) {
           setProducts((current) =>

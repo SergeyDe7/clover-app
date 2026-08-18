@@ -1559,6 +1559,35 @@ textarea { resize: vertical; }
 .toolbar.two { grid-template-columns: minmax(220px,1fr) 220px; }
 .toolbar.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .toolbar.four { grid-template-columns: minmax(220px,1fr) 180px 180px 180px; }
+.products-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.products-filter-bar input[type="search"] {
+  width: 420px;
+  max-width: 100%;
+  flex: 1 1 360px;
+  min-height: 42px;
+  padding: 10px 14px;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+.products-filter-bar select {
+  width: auto;
+  min-width: 108px;
+  max-width: 168px;
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 6px 8px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.products-filter-bar .inline-actions {
+  margin-left: auto;
+}
 .manager-orders-section {
   display: flex;
   flex-direction: column;
@@ -3510,7 +3539,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 }
 .matrix-editor-row {
   display: grid;
-  grid-template-columns: minmax(200px, 1.25fr) minmax(0, 1.4fr) minmax(160px, 0.85fr);
+  grid-template-columns: minmax(180px, 1.15fr) minmax(168px, 1.4fr) minmax(160px, 0.85fr);
   gap: 12px;
   align-items: start;
   padding: 12px;
@@ -3519,6 +3548,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   background: #f8fbf6;
   box-sizing: border-box;
   min-width: 0;
+  overflow: visible;
 }
 .matrix-editor-product {
   display: grid;
@@ -3538,13 +3568,14 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  min-width: 0;
+  min-width: 168px;
   align-items: stretch;
+  overflow: visible;
 }
 .matrix-editor-units .matrix-price-field {
   flex: 1 1 112px;
   max-width: 180px;
-  min-width: 104px;
+  min-width: 112px;
 }
 .matrix-price-field {
   display: grid;
@@ -3667,13 +3698,26 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin: 0 0 8px;
+  margin: 16px 0 12px;
   width: 100%;
   min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 .matrix-add-compact .matrix-onec-add,
 .matrix-add-compact .matrix-clover-catalog-add {
-  display: contents;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.matrix-add-compact .matrix-onec-add:has(.one-c-picker),
+.matrix-add-compact .matrix-onec-add:has(.matrix-excel-review),
+.matrix-add-compact .matrix-clover-catalog-add:has(.one-c-picker) {
+  flex: 1 1 100%;
+  width: 100%;
 }
 .matrix-add-compact .one-c-picker,
 .matrix-add-compact .matrix-excel-review,
@@ -3707,9 +3751,9 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 .product-manager-list { display: grid; gap: 12px; align-content: start; }
 .product-manager-row {
   display: grid;
-  grid-template-columns: 28px 112px minmax(0, 1fr) auto;
+  grid-template-columns: 28px 80px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 14px;
+  gap: 12px 14px;
   padding: 12px 14px;
   border: 1px solid #e1e9de;
   border-radius: 14px;
@@ -3730,10 +3774,10 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 .product-manager-thumb {
   display: grid;
   place-items: center;
-  width: 112px;
-  height: 112px;
+  width: 80px;
+  height: 80px;
   overflow: hidden;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid #e1e9de;
   background: #fff;
   color: #9aaa98;
@@ -3749,12 +3793,66 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   background: #fff;
 }
 .product-manager-info { min-width: 0; display: grid; gap: 4px; }
-.product-manager-meta {
-  display: grid;
+.product-manager-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+.product-manager-title-row h3 {
+  flex: 1 1 160px;
+  min-width: 0;
+  margin: 0;
+}
+.product-manager-side {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+.product-manager-price {
+  display: block;
+  color: #315f31;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-align: right;
+}
+.product-manager-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  width: auto;
+  white-space: normal;
+}
+.product-row-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
   gap: 8px;
-  justify-items: end;
-  align-content: center;
-  min-width: 120px;
+  width: auto;
+}
+.product-row-action {
+  width: auto;
+  min-width: 92px;
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 12px;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  white-space: nowrap;
 }
 .image-actions { display: flex; flex-wrap: wrap; gap: 7px; }
 .image-upload-label { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 7px 10px; border: 1px solid #d5dfd2; border-radius: 9px; background: #fff; color: #587058; font-size: 11px; font-weight: 800; cursor: pointer; }
@@ -3796,7 +3894,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 .product-editor {
   position: fixed;
   inset: 0;
-  z-index: 1100 !important;
+  z-index: 1300 !important;
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -4672,7 +4770,12 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   }
   .order-meta { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .toolbar.four { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  .product-manager-row { grid-template-columns: 28px 70px minmax(0,1fr) auto; }
+  .products-filter-bar {
+    display: flex;
+    grid-template-columns: none;
+  }
+  .product-manager-row { grid-template-columns: 28px 68px minmax(0, 1fr); }
+  .product-manager-side { grid-column: 2 / -1; justify-content: space-between; width: 100%; }
   .product-manager-row .image-actions,
   .product-manager-row .row-actions { grid-column: 1 / -1; }
   .client-metrics { grid-template-columns: repeat(2,1fr); }
@@ -4893,9 +4996,10 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   .matrix-grid { grid-template-columns: 1fr; }
   .matrix-editor-row { grid-template-columns: 1fr; }
   .matrix-editor-product { grid-column: auto; }
-  .product-manager-row { grid-template-columns: 1fr; }
-  .form-actions, .inline-actions, .backup-actions { align-items: stretch; flex-direction: column; }
-  .form-actions button, .inline-actions button, .backup-actions button, .import-label { width: 100%; justify-content: center; }
+  .product-manager-row { grid-template-columns: 24px 56px minmax(0, 1fr); }
+  .product-manager-side { grid-column: 1 / -1; }
+  .form-actions, .backup-actions { align-items: stretch; flex-direction: column; }
+  .form-actions button, .backup-actions button, .import-label { width: 100%; justify-content: center; }
 }
 @media (max-width: 480px) {
   .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -5234,6 +5338,37 @@ export function normalizeProduct(product) {
         ? product.salePricesByType
         : {},
   };
+}
+
+/** Поля цен 1С живут в ответе API, в PUT каталога их не отправляем — иначе nginx 413. */
+export function stripProductForSave(product = {}) {
+  const {
+    purchasePrices,
+    purchasePriceUpdatedAt,
+    purchasePriceReceivedAt,
+    purchasePriceSourceUpdatedAt,
+    purchasePriceSourceDatabase,
+    purchasePriceUnit,
+    purchasePriceAvailable,
+    salePricesByType,
+    salePriceReceivedAt,
+    clientPriceMode,
+    clientPriceOverrideMode,
+    markupPercent,
+    defaultPricingMode,
+    defaultMarkupPercent,
+    oneCPriceTypeId,
+    priceSources,
+    basePricePiece,
+    basePricePack,
+    basePriceBundle,
+    basePriceBox,
+    basePricePair,
+    basePriceRoll,
+    isMatrixProduct,
+    ...stored
+  } = product;
+  return stored;
 }
 
 export function formatDate(value) {

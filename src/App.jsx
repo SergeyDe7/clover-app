@@ -1030,13 +1030,8 @@ function App() {
     return scheduleSync(() => api.saveFavorites(favorites));
   }, [favorites, hydrated, authUser?.role]);
 
-  useEffect(() => {
-    if (!hydrated || (authUser?.role !== "manager" && authUser?.role !== "admin")) {
-      return undefined;
-    }
-
-    return scheduleSync(() => api.saveProducts(products));
-  }, [products, hydrated, authUser?.role]);
+  // Каталог сохраняется явно (редактор, удаление, Excel, 1С).
+  // Автосейв при каждом setProducts затирал товары и ронял API 502 при массовом добавлении.
 
   useEffect(() => {
     if (!hydrated || (authUser?.role !== "manager" && authUser?.role !== "admin")) {

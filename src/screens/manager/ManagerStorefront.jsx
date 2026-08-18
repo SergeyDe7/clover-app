@@ -31,6 +31,7 @@ export function ManagerStorefront({
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [productBusy, setProductBusy] = useState(false);
   const [productQuery, setProductQuery] = useState("");
+  const [storefrontFilter, setStorefrontFilter] = useState("Все");
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState({
@@ -96,22 +97,28 @@ export function ManagerStorefront({
       (Array.isArray(products) ? products : [])
         .filter((item) => item?.active !== false)
         .slice()
-        .sort((a, b) =>
-          String(a.name || "").localeCompare(String(b.name || ""), "ru")
-        ),
+        .sort((a, b) => {
+          const aOn = a.showOnStorefront === true ? 0 : 1;
+          const bOn = b.showOnStorefront === true ? 0 : 1;
+          if (aOn !== bOn) return aOn - bOn;
+          return String(a.name || "").localeCompare(String(b.name || ""), "ru");
+        }),
     [products]
   );
 
   const filteredProducts = useMemo(() => {
-    const q = productQuery.trim().toLocaleLowerCase("ru-RU");
-    if (!q) return activeProducts;
+    const q = productQuery.trim().toLocaleLowerCase("ru-RU").replaceAll("ё", "е");
     return activeProducts.filter((item) => {
+      const onStorefront = item.showOnStorefront === true;
+      if (storefrontFilter === "На витрине" && !onStorefront) return false;
+      if (storefrontFilter === "Не на витрине" && onStorefront) return false;
+      if (!q) return true;
       const hay = `${item.name || ""} ${productArticle(item)} ${item.code || ""} ${item.category || ""}`
         .toLocaleLowerCase("ru-RU")
         .replaceAll("ё", "е");
-      return hay.includes(q.replaceAll("ё", "е"));
+      return hay.includes(q);
     });
-  }, [activeProducts, productQuery]);
+  }, [activeProducts, productQuery, storefrontFilter]);
 
   const onStorefrontCount = useMemo(
     () => activeProducts.filter((item) => item.showOnStorefront === true).length,
@@ -516,14 +523,25 @@ export function ManagerStorefront({
             setSelectedIds(new Set());
           }}
         />
-        <div className="form-grid" style={{ marginBottom: 12 }}>
-          <label className="field field-wide">
+        <div className="form-grid storefront-catalog-filters" style={{ marginBottom: 12 }}>
+          <label className="field">
             Поиск по каталогу Clover
             <input
               value={productQuery}
-              placeholder="Название, код, категория"
+              placeholder="Название, артикул, категория"
               onChange={(event) => setProductQuery(event.target.value)}
             />
+          </label>
+          <label className="field">
+            На витрине
+            <select
+              value={storefrontFilter}
+              onChange={(event) => setStorefrontFilter(event.target.value)}
+            >
+              <option>Все</option>
+              <option>На витрине</option>
+              <option>Не на витрине</option>
+            </select>
           </label>
         </div>
         <div className="storefront-pick-actions">
