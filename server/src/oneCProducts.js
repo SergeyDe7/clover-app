@@ -1032,21 +1032,21 @@ export function addProductIdToClientMatrix(clientLinks, clientId, productId) {
 }
 
 export function mergeProductsPreservingOneCLinks(incomingProducts, storedProducts) {
+  const storedList = Array.isArray(storedProducts) ? storedProducts : [];
   const storedById = new Map(
-    (Array.isArray(storedProducts) ? storedProducts : []).map((product) => [
-      String(product.id),
-      product,
-    ])
+    storedList.map((product) => [String(product.id), product])
   );
+  const incomingIds = new Set();
 
-  return (Array.isArray(incomingProducts) ? incomingProducts : []).map((incoming) => {
+  const merged = (Array.isArray(incomingProducts) ? incomingProducts : []).map((incoming) => {
+    incomingIds.add(String(incoming.id));
     const stored = storedById.get(String(incoming.id));
     if (!stored) return incoming;
 
-    let merged = { ...incoming };
+    let next = { ...incoming };
     for (const field of ["oneCMatchCode", "oneCMatchName", "oneCSearchQuery", "oneCSearchRequestedAt"]) {
       if (!(field in incoming) && stored[field] !== undefined) {
-        merged[field] = stored[field];
+        next[field] = stored[field];
       }
     }
 
@@ -1055,16 +1055,69 @@ export function mergeProductsPreservingOneCLinks(incomingProducts, storedProduct
     const storedId = cleanText(stored.oneCId);
 
     if (!incomingMode && !incomingId && storedId) {
-      merged = {
-        ...merged,
+      next = {
+        ...next,
         ...Object.fromEntries(
           ONE_C_PRODUCT_FIELDS.map((field) => [field, stored[field] ?? ""])
         ),
       };
     }
 
-    return merged;
+    return next;
   });
+
+  // Неполный PUT с UI не должен молча стереть остальные позиции каталога.
+  for (const stored of storedList) {
+    if (!incomingIds.has(String(stored.id))) merged.push(stored);
+  }
+
+  return merged;
+}
+
+/** Удаляет товар из каталога Clover и из матриц/инд. цен всех клиентов. */
+export function removeCloverProductFromState(productId, { products = [], clientLinks = {} } = {}) {
+  const id = String(productId ?? "").trim();
+  const source = Array.isArray(products) ? products : [];
+  const existing = source.find((item) => String(item.id) === id);
+  if (!existing) {
+    return { found: false, products: source, clientLinks, matricesChanged: 0 };
+  }
+
+  const nextProducts = source.filter((item) => String(item.id) !== id);
+  let matricesChanged = 0;
+  const nextLinks = {};
+  for (const [clientId, link] of Object.entries(
+    clientLinks && typeof clientLinks === "object" ? clientLinks : {}
+  )) {
+    if (!link || typeof link !== "object") {
+      nextLinks[clientId] = link;
+      continue;
+    }
+    const ids = Array.isArray(link.matrixProductIds) ? link.matrixProductIds : [];
+    const nextIds = ids.filter((item) => String(item) !== id);
+    const prices =
+      link.personalPrices && typeof link.personalPrices === "object" && !Array.isArray(link.personalPrices)
+        ? { ...link.personalPrices }
+        : {};
+    const hadPrice = Object.prototype.hasOwnProperty.call(prices, id)
+      || Object.prototype.hasOwnProperty.call(prices, existing.id);
+    delete prices[id];
+    if (existing.id !== undefined) delete prices[existing.id];
+    if (nextIds.length !== ids.length || hadPrice) matricesChanged += 1;
+    nextLinks[clientId] = {
+      ...link,
+      matrixProductIds: nextIds,
+      personalPrices: prices,
+    };
+  }
+
+  return {
+    found: true,
+    product: existing,
+    products: nextProducts,
+    clientLinks: nextLinks,
+    matricesChanged,
+  };
 }
 
 export function buildOneCProductsSummary(products, oneCProducts, meta = {}) {

@@ -233,6 +233,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
         <ManagerProducts
           products={products}
           setProducts={setProducts}
+          setClientLinks={setClientLinks}
           oneCPriceTypes={oneCPriceTypes}
         />
       )}

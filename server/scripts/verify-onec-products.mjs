@@ -4,6 +4,7 @@ import {
   buildOneCProductCandidates,
   linkCloverProduct,
   mergeProductsPreservingOneCLinks,
+  removeCloverProductFromState,
   normalizeOneCProducts,
   preserveOneCProductPricingFields,
   selectRelevantOneCProducts,
@@ -139,6 +140,39 @@ const clearedLink = mergeProductsPreservingOneCLinks(
   manuallyLinked
 );
 assert.equal(clearedLink.find((item) => item.id === 27).oneCId, "");
+
+const partialSave = mergeProductsPreservingOneCLinks(
+  [{ id: 27, name: "Частичное сохранение" }],
+  cloverProducts
+);
+assert.ok(partialSave.length >= cloverProducts.length);
+assert.equal(partialSave.find((item) => item.id === 27).name, "Частичное сохранение");
+assert.ok(partialSave.some((item) => item.id === cloverProducts[0].id));
+
+const removed = removeCloverProductFromState(27, {
+  products: [
+    { id: 1, name: "Оставить" },
+    { id: 27, name: "Удалить", showOnStorefront: true },
+  ],
+  clientLinks: {
+    "client-a": {
+      matrixProductIds: [1, 27, "27"],
+      personalPrices: { 27: { source: "manual" }, 1: { source: "inherit" } },
+    },
+  },
+});
+assert.equal(removed.found, true);
+assert.equal(removed.products.length, 1);
+assert.equal(removed.products[0].id, 1);
+assert.deepEqual(removed.clientLinks["client-a"].matrixProductIds, [1]);
+assert.equal(removed.clientLinks["client-a"].personalPrices[27], undefined);
+assert.equal(removed.matricesChanged, 1);
+
+const missing = removeCloverProductFromState("no-such", {
+  products: [{ id: 1, name: "Оставить" }],
+  clientLinks: {},
+});
+assert.equal(missing.found, false);
 
 const preservedPurchase = preserveOneCProductPricingFields(
   [

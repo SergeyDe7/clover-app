@@ -592,6 +592,22 @@ export function setClientStateField(userId, field, value) {
   `).run(JSON.stringify(value), now(), userId);
 }
 
+export function removeProductIdFromAllFavorites(productId) {
+  const id = String(productId ?? "").trim();
+  if (!id) return 0;
+  const rows = db.prepare(`SELECT user_id, favorites_json FROM client_state`).all();
+  let changed = 0;
+  for (const row of rows) {
+    const favs = parseJson(row.favorites_json, []);
+    if (!Array.isArray(favs) || !favs.length) continue;
+    const next = favs.filter((item) => String(item) !== id);
+    if (next.length === favs.length) continue;
+    setClientStateField(row.user_id, "favorites", next);
+    changed += 1;
+  }
+  return changed;
+}
+
 export function listOrders(userId = null, options = {}) {
   const includeDeleted = options?.includeDeleted === true;
   const rows = userId

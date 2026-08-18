@@ -11,9 +11,10 @@ import {
   pickProductCardOneCCost,
   productArticle,
 } from "../../shared/appHelpers";
-import { appAlert } from "../../shared/AppModal";
+import { appAlert, appConfirm } from "../../shared/AppModal";
 import { productImageSrc } from "../../shared/productPhoto";
 import { ProductEditor } from "./ProductEditor";
+import { MatrixExcelReview } from "./MatrixExcelImport";
 
 function clearConflictingOneCLink(product) {
   return normalizeProduct({
@@ -259,11 +260,15 @@ function OneCProductsPanel({ products, setProducts, visibility, onVisibilityChan
   );
 }
 
-export function ManagerProducts({ products, setProducts, oneCPriceTypes = [] }) {
+export function ManagerProducts({ products, setProducts, setClientLinks, oneCPriceTypes = [] }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Все");
   const [visibility, setVisibility] = useState("Все");
   const [editorProduct, setEditorProduct] = useState(undefined);
+  const [excelFile, setExcelFile] = useState(null);
+  const excelFileRef = useRef(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const categories = ["Все", ...new Set(products.map((item) => item.category))];
   const visible = products.filter((product) => {
     const bySearch = !search || `${product.name} ${product.code} ${product.oneCId} ${product.oneCCode} ${product.oneCName} ${product.oneCMatchCode} ${product.oneCMatchName} ${product.oneCSearchQuery}`.toLowerCase().includes(search.toLowerCase());
@@ -324,6 +329,93 @@ export function ManagerProducts({ products, setProducts, oneCPriceTypes = [] }) 
     }
   };
 
+  const deleteCatalogProduct = async (product) => {
+    if (!product?.id) return;
+    const ok = await appConfirm({
+      title: "Удалить товар из каталога?",
+      message: `«${product.name || "товар"}» будет удалён из каталога Clover, с витрины сайта и из матриц всех клиентов. Заказы с этим товаром не меняются.`,
+      confirmLabel: "Удалить",
+      tone: "danger",
+    });
+    if (!ok) return;
+    try {
+      const result = await api.deleteProduct(product.id);
+      setProducts((result.products || []).map(normalizeProduct));
+      if (result.clientLinks && typeof setClientLinks === "function") {
+        setClientLinks(result.clientLinks);
+      }
+      setSelectedIds((current) =>
+        current.filter((id) => String(id) !== String(product.id))
+      );
+      setEditorProduct(undefined);
+    } catch (error) {
+      void appAlert({
+        title: "Не удалось удалить",
+        message: error.message || "Не удалось удалить товар.",
+        tone: "danger",
+      });
+    }
+  };
+
+  const visibleIds = visible.map((product) => String(product.id));
+  const selectedSet = new Set(selectedIds.map(String));
+  const selectedCount = selectedIds.length;
+
+  const toggleSelected = (productId, checked) => {
+    const id = String(productId);
+    setSelectedIds((current) => {
+      const next = new Set(current.map(String));
+      if (checked) next.add(id);
+      else next.delete(id);
+      return [...next];
+    });
+  };
+
+  const selectAllVisible = () => {
+    setSelectedIds((current) => [...new Set([...current.map(String), ...visibleIds])]);
+  };
+
+  const clearSelected = () => setSelectedIds([]);
+
+  const deleteSelectedProducts = async () => {
+    const ids = selectedIds
+      .map(String)
+      .filter((id) => products.some((item) => String(item.id) === id));
+    if (!ids.length) return;
+    const ok = await appConfirm({
+      title: "Удалить выбранные товары?",
+      message: `Будет удалено из каталога Clover, с витрины сайта и из матриц клиентов: ${ids.length}. Заказы с этими товарами не меняются.`,
+      confirmLabel: "Удалить выбранные",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setDeleteBusy(true);
+    try {
+      let lastResult = null;
+      for (const id of ids) {
+        lastResult = await api.deleteProduct(id);
+      }
+      if (lastResult) {
+        setProducts((lastResult.products || []).map(normalizeProduct));
+        if (lastResult.clientLinks && typeof setClientLinks === "function") {
+          setClientLinks(lastResult.clientLinks);
+        }
+      }
+      setSelectedIds([]);
+      if (editorProduct?.id && ids.includes(String(editorProduct.id))) {
+        setEditorProduct(undefined);
+      }
+    } catch (error) {
+      void appAlert({
+        title: "Не удалось удалить",
+        message: error.message || "Не удалось удалить выбранные товары.",
+        tone: "danger",
+      });
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   return (
     <section>
       <OneCProductsPanel
@@ -344,8 +436,79 @@ export function ManagerProducts({ products, setProducts, oneCPriceTypes = [] }) 
           <option>Связанные с 1С</option>
           <option>Без связи с 1С</option>
         </select>
-        <button className="primary-button" type="button" onClick={() => setEditorProduct(null)}>+ Добавить товар</button>
+        <div className="inline-actions">
+          <button className="primary-button" type="button" onClick={() => setEditorProduct(null)}>+ Добавить товар</button>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={Boolean(excelFile)}
+            onClick={() => excelFileRef.current?.click()}
+          >
+            Загрузить Excel
+          </button>
+          <input
+            ref={excelFileRef}
+            type="file"
+            accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) setExcelFile(file);
+            }}
+          />
+        </div>
       </div>
+      <div className="catalog-pick-actions">
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={!visibleIds.length}
+          onClick={selectAllVisible}
+        >
+          Выбрать все
+        </button>
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={selectedCount === 0}
+          onClick={clearSelected}
+        >
+          Снять все
+        </button>
+        <button
+          className="danger-button"
+          type="button"
+          disabled={selectedCount === 0 || deleteBusy}
+          onClick={() => void deleteSelectedProducts()}
+        >
+          {deleteBusy ? "Удаляем..." : "Удалить выбранные"}
+        </button>
+        <span>Отмечено: {selectedCount}</span>
+      </div>
+      {excelFile ? (
+        <MatrixExcelReview
+          products={products}
+          setProducts={setProducts}
+          setClientLinks={setClientLinks}
+          target="catalog"
+          initialFile={excelFile}
+          onBack={() => setExcelFile(null)}
+          onCancel={() => setExcelFile(null)}
+          onAdded={(addedNames = []) => {
+            setExcelFile(null);
+            void appAlert({
+              title: addedNames.length ? "Excel загружен в каталог" : "Новых товаров нет",
+              message: addedNames.length === 1
+                ? `В каталог: «${addedNames[0]}».`
+                : addedNames.length
+                  ? `В каталог из Excel: ${addedNames.length} поз.`
+                  : "Все отмеченные позиции уже есть в каталоге Clover.",
+              tone: addedNames.length ? "success" : "default",
+            });
+          }}
+        />
+      ) : null}
       <div className="server-safe-note">
         Фото загружается на сервер и автоматически появляется в личном кабинете клиента. JPG, PNG и WEBP до 5 МБ — при загрузке приводятся к квадрату 800×800 на белом фоне (JPEG).
       </div>
@@ -353,6 +516,14 @@ export function ManagerProducts({ products, setProducts, oneCPriceTypes = [] }) 
       <div className="product-manager-list" style={{ marginTop: 14 }}>
         {visible.map((product) => (
         <article className={product.active ? "product-manager-row" : "product-manager-row inactive"} key={product.id}>
+          <label className="product-manager-check">
+            <input
+              type="checkbox"
+              checked={selectedSet.has(String(product.id))}
+              onChange={(event) => toggleSelected(product.id, event.target.checked)}
+              aria-label={`Выбрать «${product.name || "товар"}»`}
+            />
+          </label>
           <div className="product-manager-thumb">
             {product.imageUrl ? <img src={productImageSrc(product)} alt={product.name} /> : <span>Нет фото</span>}
           </div>
@@ -385,6 +556,7 @@ export function ManagerProducts({ products, setProducts, oneCPriceTypes = [] }) 
             ) : null}
             <strong>{settingsPriceLabel(product, oneCPriceTypes)}</strong>
             <button className="secondary-button" type="button" onClick={() => setEditorProduct(product)}>Изменить</button>
+            <button className="danger-button" type="button" onClick={() => deleteCatalogProduct(product)}>Удалить</button>
           </div>
         </article>
         ))}
@@ -396,6 +568,7 @@ export function ManagerProducts({ products, setProducts, oneCPriceTypes = [] }) 
           oneCPriceTypes={oneCPriceTypes}
           onClose={() => setEditorProduct(undefined)}
           onSave={save}
+          onDelete={deleteCatalogProduct}
           onProductLiveUpdate={(updated) => {
             if (!updated?.id) return;
             setProducts((current) =>
