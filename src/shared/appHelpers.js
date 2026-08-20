@@ -5356,6 +5356,8 @@ export function productCatalogSearchHaystack(product = {}, { includeAdminFields 
     product.oneCMatchCode,
     product.oneCName,
     product.category,
+    product.subcategory,
+    product.facet,
   ];
   if (includeAdminFields) {
     parts.push(product.oneCSearchQuery, product.oneCMatchName, product.oneCId);

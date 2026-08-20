@@ -33,4 +33,14 @@ assert.equal(
 const hay = productCatalogSearchHaystack(cup);
 assert.equal(hay.includes("CL-9"), false);
 
+const boxed = {
+  name: "Контейнер 500 мл",
+  category: "Посуда",
+  subcategory: "Ланч-боксы",
+  facet: "Чёрные",
+};
+assert.equal(matchesCatalogPrefixSearch(productCatalogSearchHaystack(boxed), "ланч"), true);
+assert.equal(matchesCatalogPrefixSearch(productCatalogSearchHaystack(boxed), "чёрн"), true);
+assert.equal(matchesCatalogPrefixSearch(productCatalogSearchHaystack(boxed), "боксы"), true);
+
 console.log("verify-catalog-prefix-search: ok");
