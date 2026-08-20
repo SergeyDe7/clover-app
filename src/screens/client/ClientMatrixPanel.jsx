@@ -7,6 +7,8 @@ import {
   getUnitPrice,
   orderedSaleUnits,
   productArticle,
+  matchesCatalogPrefixSearch,
+  productCatalogSearchHaystack,
 } from "../../shared/appHelpers";
 import { productImageSrc } from "../../shared/productPhoto";
 import { CatalogSearchInput } from "./CatalogSearchInput";
@@ -37,13 +39,12 @@ export function ClientMatrixPanel({
   const activeCategory = categories.includes(category) ? category : "Все";
 
   const filtered = useMemo(() => {
-    const needle = search.trim().toLowerCase();
     return activeProducts.filter((item) => {
       const byCategory = activeCategory === "Все" || item.category === activeCategory;
-      const bySearch =
-        !needle ||
-        String(item.name || "").toLowerCase().includes(needle) ||
-        String(item.code || "").toLowerCase().includes(needle);
+      const bySearch = matchesCatalogPrefixSearch(
+        productCatalogSearchHaystack(item),
+        search
+      );
       const byFavorite = !favoritesOnly || favorites.includes(item.id);
       return byCategory && bySearch && byFavorite;
     });

@@ -221,6 +221,31 @@ const enriched = enrichProductWithPurchasePrices(product, oneCItem);
 assert.equal(enriched.purchasePriceAvailable, true);
 assert.equal(enriched.purchasePrices.piece, 83.4);
 
+const typedZakupOnly = {
+  id: "onec-typed-zakup",
+  name: "Только вид Закупочная",
+  purchasePrice: null,
+  purchasePricePiece: null,
+  salePricesByType: {
+    "type-zakup": {
+      piece: 44.2,
+      pack: null,
+      bundle: null,
+      box: null,
+      pair: null,
+      roll: null,
+      priceTypeName: "",
+    },
+  },
+};
+const enrichedFromType = enrichProductWithPurchasePrices(
+  { ...product, purchasePrices: {} },
+  typedZakupOnly,
+  "type-zakup"
+);
+assert.equal(enrichedFromType.purchasePrices.piece, 44.2);
+assert.equal(enrichedFromType.purchasePriceAvailable, true);
+
 // Категория цен 1С: в карточке товара цену не задали — берём шт из вида цен,
 // упаковку = шт × packSize.
 const typedOneC = {

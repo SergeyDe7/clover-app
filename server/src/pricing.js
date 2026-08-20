@@ -395,10 +395,21 @@ export function pickPurchaseMarkupCost(
   return { cost: purchase, costKind: "purchase" };
 }
 
-export function enrichProductWithPurchasePrices(product = {}, oneCItem = null) {
+export function enrichProductWithPurchasePrices(
+  product = {},
+  oneCItem = null,
+  costPriceTypeId = ""
+) {
+  const zakupId = String(costPriceTypeId || "").trim();
   const purchasePrices = {};
   for (const unit of UNITS) {
-    purchasePrices[unit] = oneCItem ? purchasePriceForUnit(product, oneCItem, unit) : null;
+    let purchase = oneCItem ? purchasePriceForUnit(product, oneCItem, unit) : null;
+    if (purchase === null && oneCItem && zakupId) {
+      const typed = resolveTypedSalePrice(product, oneCItem, zakupId, unit);
+      const amount = typed ? finiteNonNegative(typed.price) : null;
+      if (amount !== null) purchase = amount;
+    }
+    purchasePrices[unit] = purchase;
   }
 
   const fromOneC =

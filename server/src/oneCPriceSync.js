@@ -141,19 +141,26 @@ export function buildAllPriceRequirements(
   products,
   clientLinks = {},
   orders = [],
-  { includeStorefrontPurchaseMarkup = false } = {}
+  { includeStorefrontPurchaseMarkup = false, includeAllCatalog = false } = {}
 ) {
   const required = new Map();
   const sourceProducts = Array.isArray(products) ? products : [];
 
-  for (const product of sourceProducts) {
-    if (product.active === false || !cleanText(product.oneCId)) continue;
-    const isRequired = Object.values(clientLinks || {}).some(
-      (link) =>
-        matrixIncludesProduct(link, product.id) &&
-        purchasePricingRequired(product, link)
-    );
-    if (isRequired) required.set(String(product.oneCId), productReference(product));
+  if (includeAllCatalog) {
+    for (const product of sourceProducts) {
+      if (product.active === false || !cleanText(product.oneCId)) continue;
+      required.set(String(product.oneCId), productReference(product));
+    }
+  } else {
+    for (const product of sourceProducts) {
+      if (product.active === false || !cleanText(product.oneCId)) continue;
+      const isRequired = Object.values(clientLinks || {}).some(
+        (link) =>
+          matrixIncludesProduct(link, product.id) &&
+          purchasePricingRequired(product, link)
+      );
+      if (isRequired) required.set(String(product.oneCId), productReference(product));
+    }
   }
 
   for (const order of Array.isArray(orders) ? orders : []) {
@@ -337,11 +344,13 @@ export function buildPriceRequest({
   maxAgeMs = priceMaxAgeMs(),
   database = TEST_DATABASE_NAME,
   includeStorefrontPurchaseMarkup = false,
+  includeAllCatalog = false,
 } = {}) {
   const requirements =
     scope === "all"
       ? buildAllPriceRequirements(products, clientLinks, orders, {
           includeStorefrontPurchaseMarkup,
+          includeAllCatalog,
         })
       : order
         ? buildOrderPriceRequirements(

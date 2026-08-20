@@ -2,12 +2,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../serverApi";
 import {
-  UNIT_ORDER,
-  unitPriceField,
   formatMoney,
   formatDateTime,
   normalizeProduct,
-  pickProductCardOneCCost,
+  firstPositiveCatalogPrice,
+  matchesCatalogPrefixSearch,
+  productCatalogSearchHaystack,
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { productImageSrc } from "../../shared/productPhoto";
@@ -277,7 +277,10 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
   const [deleteBusy, setDeleteBusy] = useState(false);
   const categories = ["Все", ...new Set(products.map((item) => item.category))];
   const visible = products.filter((product) => {
-    const bySearch = !search || `${product.name} ${product.code} ${product.oneCId} ${product.oneCCode} ${product.oneCName} ${product.oneCMatchCode} ${product.oneCMatchName} ${product.oneCSearchQuery}`.toLowerCase().includes(search.toLowerCase());
+    const bySearch = matchesCatalogPrefixSearch(
+      productCatalogSearchHaystack(product, { includeAdminFields: true }),
+      search
+    );
     const byCategory = category === "Все" || product.category === category;
     const hasOneCLink = Boolean(String(product.oneCId || "").trim());
     const hasVariants = candidateProductIds.some(
@@ -524,7 +527,9 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
       </div>
 
       <div className="product-manager-list" style={{ marginTop: 14 }}>
-        {visible.map((product) => (
+        {visible.map((product) => {
+        const priceLabel = settingsPriceLabel(product, oneCPriceTypes);
+        return (
         <article className={product.active ? "product-manager-row" : "product-manager-row inactive"} key={product.id}>
           {excelFile ? null : (
           <label className="product-manager-check">
@@ -540,16 +545,13 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
             {product.imageUrl ? <img src={productImageSrc(product)} alt={product.name} /> : <span>Нет фото</span>}
           </div>
           <div className="product-manager-info">
-            <div className="product-manager-title-row">
-              <h3>{product.name}</h3>
-              <div className="product-manager-badges">
-                <span className={product.active ? "badge green" : "badge gray"}>{product.active ? "Активен" : "Скрыт"}</span>
-                {product.showOnStorefront ? (
-                  <span className="badge green">На витрине</span>
-                ) : null}
-              </div>
-            </div>
+            <h3>{product.name}</h3>
             <p>{product.category}</p>
+            {priceLabel ? (
+              <strong className="product-manager-price">
+                {priceLabel}
+              </strong>
+            ) : null}
             <p className="product-one-c-line">
               {String(product.oneCCode || "").trim()
                 ? `Артикул 1С: ${product.oneCCode}`
@@ -569,16 +571,20 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
             ) : null}
           </div>
           <div className="product-manager-side">
-            <strong className="product-manager-price">
-              {settingsPriceLabel(product, oneCPriceTypes)}
-            </strong>
+            <div className="product-manager-badges">
+              <span className={product.active ? "badge green" : "badge gray"}>{product.active ? "Активен" : "Скрыт"}</span>
+              {product.showOnStorefront ? (
+                <span className="badge green">На витрине</span>
+              ) : null}
+            </div>
             <div className="product-row-actions">
               <button className="secondary-button product-row-action" type="button" onClick={() => setEditorProduct(product)}>Изменить</button>
               <button className="danger-button product-row-action" type="button" onClick={() => deleteCatalogProduct(product)}>Удалить</button>
             </div>
           </div>
         </article>
-        ))}
+        );
+        })}
       </div>
       {editorProduct !== undefined && (
         <ProductEditor
@@ -604,29 +610,6 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
 }
 
 function settingsPriceLabel(product, oneCPriceTypes = []) {
-  const card = pickProductCardOneCCost({
-    purchasePrices: product.purchasePrices,
-    purchaseUpdatedAt:
-      product.purchasePriceReceivedAt || product.purchasePriceUpdatedAt || "",
-    salePricesByType: product.salePricesByType,
-    salePriceReceivedAt: product.salePriceReceivedAt || "",
-    oneCPriceTypes,
-  });
-  if (Number(card.cost) > 0) {
-    return formatMoney(card.cost);
-  }
-  const typedPieces = Object.values(
-    product.salePricesByType && typeof product.salePricesByType === "object"
-      ? product.salePricesByType
-      : {}
-  )
-    .map((entry) => Number(entry?.piece))
-    .filter((value) => Number.isFinite(value) && value > 0);
-  if (typedPieces.length) {
-    return `от ${formatMoney(Math.min(...typedPieces))}`;
-  }
-  const prices = UNIT_ORDER.map((unit) => product[unitPriceField(unit)]).filter(
-    (value) => Number(value) > 0
-  );
-  return prices.length ? `от ${formatMoney(Math.min(...prices))}` : "";
+  const found = firstPositiveCatalogPrice(product, oneCPriceTypes);
+  return found !== null ? formatMoney(found) : "";
 }

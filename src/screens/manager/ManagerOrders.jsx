@@ -19,6 +19,7 @@ import {
   statusClass,
   matchesTextSearch,
   buildOrderSearchHaystack,
+  productArticle,
 } from "../../shared/appHelpers";
 import { canTrashOrder } from "../../shared/orderTrash";
 import { appAlert, appConfirm } from "../../shared/AppModal";
@@ -49,6 +50,72 @@ function exchangeSendButtonClass(exchange) {
     return "manager-send-onec-button manager-send-onec-retry";
   }
   return "manager-send-onec-button manager-send-onec-idle";
+}
+
+function orderLineQty(item) {
+  const qty = Number(item.quantity) || 0;
+  const unit = UNIT_CONFIG[item.unit]?.shortLabel || item.unit || "шт";
+  return `${qty} ${unit}`;
+}
+
+function orderLinePrice(item, settings) {
+  if (!settings?.showPrices) return "—";
+  const unitPrice = Number(item.unitPrice);
+  if (Number.isFinite(unitPrice) && unitPrice > 0) return formatMoney(unitPrice);
+  const qty = Number(item.quantity) || 0;
+  const total = Number(item.lineTotal) || 0;
+  if (qty > 0 && total > 0) return formatMoney(total / qty);
+  return "—";
+}
+
+function OrderLinesTable({ order, settings }) {
+  const items = Array.isArray(order.items) ? order.items : [];
+  const customItems = Array.isArray(order.customItems) ? order.customItems : [];
+  if (!items.length && !customItems.length) {
+    return <p className="muted small">Позиции в заказе не сохранены.</p>;
+  }
+  return (
+    <table className="order-lines-table">
+      <thead>
+        <tr>
+          <th>Наименование</th>
+          <th>Количество</th>
+          <th>Цена</th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((item) => {
+          const article = productArticle(item);
+          return (
+            <tr key={`${order.id}-item-${item.productId ?? item.id}`}>
+              <td>
+                <span className="order-lines-name">{item.name}</span>
+                {article ? <span className="order-lines-article">{article}</span> : null}
+              </td>
+              <td>{orderLineQty(item)}</td>
+              <td>{orderLinePrice(item, settings)}</td>
+            </tr>
+          );
+        })}
+        {customItems.map((item) => (
+          <tr key={`${order.id}-custom-${item.id}`}>
+            <td>
+              <span className="order-lines-name">{item.name}</span>
+              <span className="order-lines-article">Вне матрицы</span>
+            </td>
+            <td>
+              {Number(item.quantity) || 0} {item.unit || "шт"}
+            </td>
+            <td>
+              {Number(item.unitPrice) > 0
+                ? formatMoney(Number(item.unitPrice))
+                : "Цена уточняется"}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
 export function ManagerOrders({
   orders,
@@ -534,263 +601,214 @@ export function ManagerOrders({
         return (
         <article className="order-card manager-order-card-item" key={order.id}>
           <div className="order-card-header manager-order-card-header">
-            <div className="manager-order-select">
-              <input
-                className="manager-order-checkbox"
-                type="checkbox"
-                checked={selectedIds.includes(order.id)}
-                onChange={() => toggleSelected(order.id)}
-                onClick={(event) => event.stopPropagation()}
-                aria-label={`Выбрать заказ ${order.number}`}
-              />
-              <div className="manager-order-select-body">
-                <div className="exchange-status-line">
-                  {inTrash || allowedNextOrderStatuses(order.status).length <= 1 ? (
-                    <span className={`badge ${statusClass(order.status)}`}>{order.status}</span>
-                  ) : (
-                    <select
-                      className={`badge ${statusClass(order.status)} manager-order-status-select`}
-                      value={order.status || "Новый"}
-                      aria-label={`Статус заказа ${order.number || ""}`}
-                      onClick={(event) => event.stopPropagation()}
-                      onChange={(event) => {
-                        const nextStatus = event.target.value;
-                        if (nextStatus === order.status) return;
-                        onUpdateOrder(order.id, { status: nextStatus });
-                      }}
-                    >
-                      {allowedNextOrderStatuses(order.status).map((item) => (
-                        <option key={item} value={item}>{item}</option>
-                      ))}
-                    </select>
-                  )}
-                  <span className={`badge ${exchangeBadgeClass(exchange.status)}`}>
-                    1С: {exchangeStatusLabel(exchange)}
-                  </span>
-                </div>
+            <input
+              className="manager-order-checkbox"
+              type="checkbox"
+              checked={selectedIds.includes(order.id)}
+              onChange={() => toggleSelected(order.id)}
+              onClick={(event) => event.stopPropagation()}
+              aria-label={`Выбрать заказ ${order.number}`}
+            />
+            <div className="manager-order-main">
+              <div className="manager-order-title-row">
                 <h3 className="manager-order-client">{order.customerName || "Клиент"}</h3>
-              </div>
-            </div>
-            <div className="nowrap manager-order-sum-wrap">
-              <strong className="manager-order-sum success-text">
-                {settings.showPrices && getOrderTotal(order) > 0
-                  ? formatMoney(getOrderTotal(order))
-                  : "уточняется"}
-              </strong>
-            </div>
-          </div>
-          <div className="order-meta manager-order-meta">
-            <div>
-              <span>Номер</span>
-              <strong>{order.number || "—"}</strong>
-            </div>
-            <div>
-              <span>Создан</span>
-              <strong>{order.createdAt ? formatDateTime(order.createdAt) : "—"}</strong>
-            </div>
-            <div>
-              <span>Дата доставки</span>
-              <strong>{order.firstDeliveryDate ? formatDate(order.firstDeliveryDate) : "не указана"}</strong>
-            </div>
-            <div>
-              <span>Позиций</span>
-              <strong>{getPositionCount(order)}</strong>
-            </div>
-            {(order.customerContact || order.customerPhone || order.customerEmail) ? (
-              <div className="order-meta-wide">
-                <span>Контакт</span>
-                <strong>
-                  {[order.customerContact, order.customerPhone, order.customerEmail]
-                    .filter(Boolean)
-                    .join(" · ")}
+                <strong className="manager-order-sum success-text">
+                  {settings.showPrices && getOrderTotal(order) > 0
+                    ? formatMoney(getOrderTotal(order))
+                    : "уточняется"}
                 </strong>
               </div>
-            ) : null}
-            <div className="order-meta-wide">
-              <span>Адрес</span>
-              <strong>{order.address || "—"}</strong>
-            </div>
-          </div>
-          {order.clientComment ? (
-            <div className="manager-client-comment">
-              <div className="comment-box comment-box-compact">
-                <strong>Комментарий клиента:</strong>
-                <p>{order.clientComment}</p>
+              <div className="manager-order-status-row exchange-status-line">
+                {inTrash || allowedNextOrderStatuses(order.status).length <= 1 ? (
+                  <span className={`badge ${statusClass(order.status)}`}>{order.status}</span>
+                ) : (
+                  <select
+                    className={`badge ${statusClass(order.status)} manager-order-status-select`}
+                    value={order.status || "Новый"}
+                    aria-label={`Статус заказа ${order.number || ""}`}
+                    onClick={(event) => event.stopPropagation()}
+                    onChange={(event) => {
+                      const nextStatus = event.target.value;
+                      if (nextStatus === order.status) return;
+                      onUpdateOrder(order.id, { status: nextStatus });
+                    }}
+                  >
+                    {allowedNextOrderStatuses(order.status).map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </select>
+                )}
+                <span className={`badge ${exchangeBadgeClass(exchange.status)}`}>
+                  1С: {exchangeStatusLabel(exchange)}
+                </span>
+                {inTrash ? (
+                  <>
+                    <button className="primary-button manager-order-inline-action" type="button" onClick={() => onRestoreOrder?.(order)}>
+                      Восстановить
+                    </button>
+                    <button className="danger-button manager-order-inline-action" type="button" onClick={() => onPurgeOrder?.(order)}>
+                      Удалить навсегда
+                    </button>
+                  </>
+                ) : order.status === "Обработан вручную" ? (
+                  <span
+                    className="badge status-work manager-manual-processed-badge"
+                    title="Заказ обработан вручную. Передача в 1С не требуется или отменена."
+                  >
+                    Обработан вручную
+                  </span>
+                ) : (
+                  <button
+                    className={
+                      busy && (exchange.status === "not_sent" || exchange.status === "error")
+                        ? "manager-send-onec-button manager-send-onec-done"
+                        : exchangeSendButtonClass(exchange)
+                    }
+                    disabled={
+                      busy
+                      || exchange.status === "sending"
+                      || exchange.status === "ready"
+                      || exchange.status === "draft"
+                      || exchange.status === "sent"
+                    }
+                    type="button"
+                    title={
+                      exchange.status === "ready"
+                        ? "Заказ уже в очереди 1С. 1С сама заберёт его при следующем обмене."
+                        : exchange.status === "sent" || exchange.status === "draft"
+                          ? "Заказ уже передан в 1С."
+                          : exchange.status === "sending"
+                            ? "Ждём подтверждение от 1С"
+                            : exchange.status === "error"
+                              ? "Произошла ошибка — нажмите, чтобы передать снова"
+                              : "Поставить заказ в очередь обмена с 1С"
+                    }
+                    onClick={() => runExchangeAction(order, "send")}
+                  >
+                    {busy ? "Передача…" : exchangeSendLabel(exchange)}
+                  </button>
+                )}
               </div>
             </div>
-          ) : null}
-          <div className="manager-order-controls">
-            <div className="exchange-actions">
-              {inTrash ? (
-                <>
-                  <button className="primary-button" type="button" onClick={() => onRestoreOrder?.(order)}>
-                    Восстановить
-                  </button>
-                  <button className="danger-button" type="button" onClick={() => onPurgeOrder?.(order)}>
-                    Удалить навсегда
-                  </button>
-                  <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
-                </>
-              ) : (
-                <>
-                  {order.status === "Обработан вручную" ? (
-                    <span
-                      className="badge status-work manager-manual-processed-badge"
-                      title="Заказ обработан вручную. Передача в 1С не требуется или отменена."
-                    >
-                      Обработан вручную
-                    </span>
-                  ) : (
-                    <>
-                      <button
-                        className={
-                          busy && (exchange.status === "not_sent" || exchange.status === "error")
-                            ? "manager-send-onec-button manager-send-onec-done"
-                            : exchangeSendButtonClass(exchange)
-                        }
-                        disabled={
-                          busy
-                          || exchange.status === "sending"
-                          || exchange.status === "ready"
-                          || exchange.status === "draft"
-                          || exchange.status === "sent"
-                        }
-                        type="button"
-                        title={
-                          exchange.status === "ready"
-                            ? "Заказ уже в очереди 1С. 1С сама заберёт его при следующем обмене."
-                            : exchange.status === "sent" || exchange.status === "draft"
-                              ? "Заказ уже передан в 1С."
-                              : exchange.status === "sending"
-                                ? "Ждём подтверждение от 1С"
-                                : exchange.status === "error"
-                                  ? "Произошла ошибка — нажмите, чтобы передать снова"
-                                  : "Поставить заказ в очередь обмена с 1С"
-                        }
-                        onClick={() => runExchangeAction(order, "send")}
-                      >
-                        {busy ? "Передача…" : exchangeSendLabel(exchange)}
-                      </button>
-                      {canCancelOneCTransfer(exchange) ? (
-                        <button
-                          className="danger-button manager-cancel-onec-button"
-                          type="button"
-                          disabled={busy}
-                          title="Вернуть заказ из очереди 1С. После принятия в 1С отменить нельзя."
-                          onClick={() => void runExchangeAction(order, "cancel")}
-                        >
-                          Отменить передачу в 1С
-                        </button>
-                      ) : null}
-                    </>
-                  )}
-                  <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
-                  {settings.managerCanDeleteOrders && canTrashOrder(order, "manager").ok && (
-                    <button className="danger-button" type="button" onClick={() => onDeleteOrder(order)}>
-                      В корзину
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
           </div>
-          {inTrash && order.deletedAt && (
-            <div className="exchange-message manager-order-exchange-note">
-              В корзине с {formatDateTime(order.deletedAt)}
-              {order.deletedBy?.role ? ` · удалил: ${order.deletedBy.role}` : ""}
+          <details className="manager-order-extra" open={false}>
+            <summary>Подробнее</summary>
+            <div className="order-meta manager-order-meta">
+              <div>
+                <span>Номер</span>
+                <strong>{order.number || "—"}</strong>
+              </div>
+              <div>
+                <span>Создан</span>
+                <strong>{order.createdAt ? formatDateTime(order.createdAt) : "—"}</strong>
+              </div>
+              <div>
+                <span>Дата доставки</span>
+                <strong>{order.firstDeliveryDate ? formatDate(order.firstDeliveryDate) : "не указана"}</strong>
+              </div>
+              <div>
+                <span>Позиций</span>
+                <strong>{getPositionCount(order)}</strong>
+              </div>
+              {(order.customerContact || order.customerPhone || order.customerEmail) ? (
+                <div className="order-meta-wide">
+                  <span>Контакт</span>
+                  <strong>
+                    {[order.customerContact, order.customerPhone, order.customerEmail]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </strong>
+                </div>
+              ) : null}
+              <div className="order-meta-wide">
+                <span>Адрес</span>
+                <strong>{order.address || "—"}</strong>
+              </div>
             </div>
-          )}
-          {!inTrash && exchange.message && (
-            <div className="exchange-message manager-order-exchange-note">
-              {exchange.message}{exchange.receipt ? ` · Заказ покупателя ${exchange.receipt}` : ""}
+            {order.clientComment ? (
+              <div className="manager-client-comment">
+                <div className="comment-box comment-box-compact">
+                  <strong>Комментарий клиента:</strong>
+                  <p>{order.clientComment}</p>
+                </div>
+              </div>
+            ) : null}
+            <div className="manager-order-controls">
+              <div className="exchange-actions">
+                {inTrash ? (
+                  <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
+                ) : (
+                  <>
+                    {canCancelOneCTransfer(exchange) ? (
+                      <button
+                        className="danger-button manager-cancel-onec-button"
+                        type="button"
+                        disabled={busy}
+                        title="Вернуть заказ из очереди 1С. После принятия в 1С отменить нельзя."
+                        onClick={() => void runExchangeAction(order, "cancel")}
+                      >
+                        Отменить передачу в 1С
+                      </button>
+                    ) : null}
+                    <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
+                    {settings.managerCanDeleteOrders && canTrashOrder(order, "manager").ok && (
+                      <button className="danger-button" type="button" onClick={() => onDeleteOrder(order)}>
+                        В корзину
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-          )}
-          {inTrash ? (
-            <details className="order-details" open={false}>
-              <summary>Состав удалённого заказа</summary>
-              <div className="order-products">
-                {(order.items || []).map((item) => (
-                  <div className="order-product" key={`${order.id}-${item.productId ?? item.id}`}>
-                    <span>
-                      {item.name}
-                      <small>{item.code || item.category} · ID 1С: {item.oneCId || "—"}</small>
-                    </span>
-                    <strong>
-                      {item.quantity} {UNIT_CONFIG[item.unit]?.shortLabel || item.unit}
-                      <small>
-                        {settings.showPrices && item.lineTotal > 0
-                          ? formatMoney(item.lineTotal)
-                          : item.multiplier > 1
-                            ? `${item.quantity * item.multiplier} шт. всего`
-                            : ""}
-                      </small>
-                    </strong>
-                  </div>
-                ))}
-                {(order.customItems || []).map((item) => (
-                  <div className="custom-line" key={`${order.id}-${item.id}`}>
-                    <div className="order-product" style={{ border: 0, paddingTop: 0 }}>
-                      <span>
-                        <span className="badge yellow">Товар вне матрицы</span>
-                        {item.name}
-                        <small>{item.details}</small>
-                        {item.managerComment ? <small>Менеджер: {item.managerComment}</small> : null}
-                      </span>
-                      <strong>
-                        {item.quantity} {item.unit}
-                        <small>
-                          {Number(item.unitPrice) > 0
-                            ? formatMoney(item.unitPrice * item.quantity)
-                            : "Цена уточняется"}
-                        </small>
-                      </strong>
+            {inTrash && order.deletedAt && (
+              <div className="exchange-message manager-order-exchange-note">
+                В корзине с {formatDateTime(order.deletedAt)}
+                {order.deletedBy?.role ? ` · удалил: ${order.deletedBy.role}` : ""}
+              </div>
+            )}
+            {!inTrash && exchange.message && (
+              <div className="exchange-message manager-order-exchange-note">
+                {exchange.message}{exchange.receipt ? ` · Заказ покупателя ${exchange.receipt}` : ""}
+              </div>
+            )}
+            <div className="order-products">
+              <OrderLinesTable order={order} settings={settings} />
+              {(order.customItems || []).map((item) => (
+                inTrash ? (
+                  item.photo?.dataUrl ? (
+                    <div className="custom-line" key={`${order.id}-${item.id}-photo`}>
+                      <div className="manager-request-photo-block">
+                        <strong>Фотография клиента</strong>
+                        <CustomRequestPhoto photo={item.photo} className="custom-request-photo-manager" />
+                      </div>
                     </div>
+                  ) : null
+                ) : (
+                  <div className="custom-line" key={`${order.id}-${item.id}`}>
                     {item.photo?.dataUrl && (
                       <div className="manager-request-photo-block">
                         <strong>Фотография клиента</strong>
                         <CustomRequestPhoto photo={item.photo} className="custom-request-photo-manager" />
                       </div>
                     )}
-                  </div>
-                ))}
-                {!(order.items || []).length && !(order.customItems || []).length && (
-                  <p className="muted small">Позиции в заказе не сохранены.</p>
-                )}
-              </div>
-              <OrderTimeline order={order} />
-            </details>
-          ) : (
-          <details className="order-details" open={false}>
-            <summary>Состав и обработка заказа</summary>
-            <div className="order-products">
-              {(order.items || []).map((item) => <div className="order-product" key={`${order.id}-${item.productId ?? item.id}`}><span>{item.name}<small>{item.code || item.category} · ID 1С: {item.oneCId || "проверяется по каталогу"}</small></span><strong>{item.quantity} {UNIT_CONFIG[item.unit]?.shortLabel || item.unit}<small>{settings.showPrices && item.lineTotal > 0 ? formatMoney(item.lineTotal) : item.multiplier > 1 ? `${item.quantity * item.multiplier} шт. всего` : ""}</small></strong></div>)}
-              {(order.customItems || []).map((item) => (
-                <div className="custom-line" key={`${order.id}-${item.id}`}>
-                  <div className="order-product" style={{ border: 0, paddingTop: 0 }}><span><span className="badge yellow">Товар вне матрицы</span>{item.name}<small>{item.details}</small></span><strong>{item.quantity} {item.unit}<small>{Number(item.unitPrice) > 0 ? formatMoney(item.unitPrice * item.quantity) : "Цена уточняется"}</small></strong></div>
-                  {item.photo?.dataUrl && (
-                    <div className="manager-request-photo-block">
-                      <strong>Фотография клиента</strong>
-                      <CustomRequestPhoto photo={item.photo} className="custom-request-photo-manager" />
+                    <div className="form-grid">
+                      <label className="field">Статус запроса
+                        <select value={item.requestStatus || "Новый запрос"} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, requestStatus: e.target.value } : value) })}>{CUSTOM_STATUSES.map((value) => <option key={value}>{value}</option>)}</select>
+                      </label>
+                      <label className="field">Цена за указанную единицу
+                        <input type="number" min="0" step="0.01" value={item.unitPrice || ""} onFocus={selectDefaultNumber} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, unitPrice: Number(e.target.value) || 0 } : value) })} />
+                      </label>
+                      <label className="field">Комментарий клиенту
+                        <input value={item.managerComment || ""} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, managerComment: e.target.value } : value) })} />
+                      </label>
+                      <div className="field"><span>Действие</span><button className="primary-button" type="button" onClick={() => onCreateProductFromCustom(order, item)}>Создать товар в каталоге</button></div>
                     </div>
-                  )}
-                  <div className="form-grid">
-                    <label className="field">Статус запроса
-                      <select value={item.requestStatus || "Новый запрос"} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, requestStatus: e.target.value } : value) })}>{CUSTOM_STATUSES.map((value) => <option key={value}>{value}</option>)}</select>
-                    </label>
-                    <label className="field">Цена за указанную единицу
-                      <input type="number" min="0" step="0.01" value={item.unitPrice || ""} onFocus={selectDefaultNumber} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, unitPrice: Number(e.target.value) || 0 } : value) })} />
-                    </label>
-                    <label className="field">Комментарий клиенту
-                      <input value={item.managerComment || ""} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, managerComment: e.target.value } : value) })} />
-                    </label>
-                    <div className="field"><span>Действие</span><button className="primary-button" type="button" onClick={() => onCreateProductFromCustom(order, item)}>Создать товар в каталоге</button></div>
                   </div>
-                </div>
+                )
               ))}
             </div>
             <OrderTimeline order={order} />
           </details>
-          )}
         </article>
         );
           })}

@@ -1093,12 +1093,20 @@ function oneCProductsById(items) {
   );
 }
 
+function catalogCostPriceTypeId() {
+  return findPurchasePriceTypeId(
+    normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", []))
+  );
+}
+
 function enrichManagerCatalogProducts(products) {
   const oneCById = oneCProductsById(getGlobalState("oneCProducts", []));
+  const costPriceTypeId = catalogCostPriceTypeId();
   return (Array.isArray(products) ? products : []).map((product) =>
     enrichProductWithPurchasePrices(
       product,
-      oneCById.get(String(product.oneCId || "")) || null
+      oneCById.get(String(product.oneCId || "")) || null,
+      costPriceTypeId
     )
   );
 }
@@ -1112,7 +1120,7 @@ function applyClientPrices(product, link, isMatrixProduct, oneCById = new Map())
   const pricing = resolveClientProductPricing(product, priceConfig, oneCItem, link);
 
   const priced = {
-    ...enrichProductWithPurchasePrices(product, oneCItem),
+    ...enrichProductWithPurchasePrices(product, oneCItem, catalogCostPriceTypeId()),
     isMatrixProduct,
     priceSources: pricing.priceSources,
     clientPriceMode: pricing.source,
@@ -1260,7 +1268,8 @@ function persistSingleCatalogProduct(req, res, { create = false } = {}) {
   const enrichOne = (product) =>
     enrichProductWithPurchasePrices(
       product,
-      oneCById.get(String(product.oneCId || "")) || null
+      oneCById.get(String(product.oneCId || "")) || null,
+      catalogCostPriceTypeId()
     );
   const enriched = enrichOne(upsert.product);
   res.json({
@@ -3226,7 +3235,7 @@ app.get("/api/one-c/purchase-price-request", (req, res) => {
   const settings = getGlobalState("settings", DEFAULT_SETTINGS);
   const includeStorefrontPurchaseMarkup =
     String(settings?.storefrontPricingMode || "").trim() === "purchase_markup";
-  const scope = String(req.query.scope || "next-order") === "all" ? "all" : "next-order";
+  const scope = String(req.query.scope || "all") === "next-order" ? "next-order" : "all";
   const order = scope === "next-order" ? nextOrderForOneC(database) : null;
   const request = buildPriceRequest({
     scope,
@@ -3237,11 +3246,13 @@ app.get("/api/one-c/purchase-price-request", (req, res) => {
     maxAgeMs: priceMaxAgeMs(),
     database,
     includeStorefrontPurchaseMarkup,
+    includeAllCatalog: scope === "all",
   });
 
   const requirements = scope === "all"
     ? buildAllPriceRequirements(products, clientLinks, orders, {
         includeStorefrontPurchaseMarkup,
+        includeAllCatalog: true,
       })
     : request.items;
   const issues = validatePriceRequirements(
@@ -4956,7 +4967,11 @@ app.post(
       const fullOneCItem =
         oneCById.get(String(product.oneCId || item.id || "")) ||
         (item.id ? item : null);
-      const enrichedProduct = enrichProductWithPurchasePrices(product, fullOneCItem);
+      const enrichedProduct = enrichProductWithPurchasePrices(
+        product,
+        fullOneCItem,
+        catalogCostPriceTypeId()
+      );
 
       let clientLink = null;
       let clientLinks = getGlobalState("clientLinks", {});

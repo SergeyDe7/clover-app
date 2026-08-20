@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
-import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber } from "../../shared/appHelpers";
+import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber, matchesCatalogPrefixSearch, productCatalogSearchHaystack } from "../../shared/appHelpers";
 import { StorefrontProductAdd } from "./StorefrontProductAdd";
+import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE } from "../storefront/siteCopy.js";
 
 function formatMarkupDraft(value) {
   if (value === "" || value === null || value === undefined) return "";
@@ -107,16 +108,14 @@ export function ManagerStorefront({
   );
 
   const filteredProducts = useMemo(() => {
-    const q = productQuery.trim().toLocaleLowerCase("ru-RU").replaceAll("ё", "е");
     return activeProducts.filter((item) => {
       const onStorefront = item.showOnStorefront === true;
       if (storefrontFilter === "На витрине" && !onStorefront) return false;
       if (storefrontFilter === "Не на витрине" && onStorefront) return false;
-      if (!q) return true;
-      const hay = `${item.name || ""} ${productArticle(item)} ${item.code || ""} ${item.category || ""}`
-        .toLocaleLowerCase("ru-RU")
-        .replaceAll("ё", "е");
-      return hay.includes(q);
+      return matchesCatalogPrefixSearch(
+        productCatalogSearchHaystack(item, { includeAdminFields: true }),
+        productQuery
+      );
     });
   }, [activeProducts, productQuery, storefrontFilter]);
 
@@ -468,7 +467,7 @@ export function ManagerStorefront({
             Заголовок
             <input
               value={draft.storefrontHeroTitle || ""}
-              placeholder="Оптовые поставки для HoReCa и бизнеса"
+              placeholder={STOREFRONT_HERO_TITLE}
               onChange={(event) =>
                 setField("storefrontHeroTitle", event.target.value)
               }
@@ -479,7 +478,7 @@ export function ManagerStorefront({
             <textarea
               rows={3}
               value={draft.storefrontHeroLead || ""}
-              placeholder="Каталог с артикулами из 1С…"
+              placeholder={STOREFRONT_HERO_LEAD}
               onChange={(event) =>
                 setField("storefrontHeroLead", event.target.value)
               }

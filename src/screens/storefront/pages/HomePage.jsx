@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
 import { GroupTile } from "../components/GroupTile.jsx";
 import { CLOVER_PRODUCT_GROUPS } from "../productGroups.js";
+import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE } from "../siteCopy.js";
 
 export function HomePage() {
   const [error, setError] = useState("");
@@ -37,11 +38,10 @@ export function HomePage() {
         <div className="sf-hero-copy">
           <p className="sf-hero-brand">Clover</p>
           <h1>
-            {hero.title || "Оптовые поставки для HoReCa и бизнеса"}
+            {hero.title || STOREFRONT_HERO_TITLE}
           </h1>
           <p className="sf-hero-lead">
-            {hero.lead ||
-              "Каталог с артикулами из 1С. Заказ с сайта без регистрации — или войдите в личный кабинет за персональными условиями."}
+            {hero.lead || STOREFRONT_HERO_LEAD}
           </p>
         </div>
       </section>
