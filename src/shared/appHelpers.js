@@ -468,6 +468,38 @@ export function matchesTextSearch(haystack, needle) {
   );
 }
 
+function normalizeCatalogSearchText(value) {
+  return String(value || "")
+    .toLocaleLowerCase("ru-RU")
+    .replaceAll("ё", "е")
+    .trim();
+}
+
+function splitCatalogSearchTokens(value) {
+  return normalizeCatalogSearchText(value)
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+}
+
+/**
+ * Поиск каталога по началам слов: «ста бум» находит «Стакан бумажный».
+ * Не подменяет matchesTextSearch (клиенты/заказы остаются подстрокой).
+ */
+export function matchesCatalogPrefixSearch(haystack, needle) {
+  const tokens = splitCatalogSearchTokens(needle);
+  if (!tokens.length) return true;
+  const words = splitCatalogSearchTokens(haystack);
+  const compact = normalizeCatalogSearchText(haystack).replace(/[^\p{L}\p{N}]+/gu, "");
+  if (compact) words.push(compact);
+  if (!words.length) return false;
+  const wordsLat = words.map((word) => translitRuToLat(word)).filter(Boolean);
+  return tokens.every((token) => {
+    if (words.some((word) => word.startsWith(token))) return true;
+    const tokenLat = translitRuToLat(token);
+    return Boolean(tokenLat && wordsLat.some((word) => word.startsWith(tokenLat)));
+  });
+}
+
 /** Поля клиента Clover + связь с 1С для поиска менеджера. */
 export function buildClientSearchHaystack(client = {}, link = {}) {
   const addresses = Array.isArray(client.addresses)
@@ -881,7 +913,7 @@ export function printOrderDocument(order, settings) {
   const itemRows = (order.items || []).map((item, index) => `
     <tr>
       <td>${index + 1}</td>
-      <td><strong>${escapeHtml(item.name)}</strong><br><small>${escapeHtml(item.code || item.category || "")}</small></td>
+      <td><strong>${escapeHtml(item.name)}</strong>${productArticle(item) ? `<br><small>${escapeHtml(productArticle(item))}</small>` : ""}</td>
       <td>${escapeHtml(UNIT_CONFIG[item.unit]?.label || item.unit)}</td>
       <td>${Number(item.quantity) || 0}</td>
       <td>${settings.showPrices ? escapeHtml(formatMoney(Number(item.unitPrice) || 0)) : "—"}</td>
@@ -1710,9 +1742,11 @@ textarea { resize: vertical; }
 .manager-orders-filters { margin-bottom: 12px; }
 .manager-send-onec-button {
   width: auto;
-  min-width: 180px;
-  min-height: 40px;
-  font-weight: 800;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
 }
 .manager-order-exchange-note {
   margin: 0 0 10px;
@@ -1729,17 +1763,31 @@ textarea { resize: vertical; }
 .manager-order-card-header {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-start;
+  gap: 10px;
   width: 100%;
   min-width: 0;
 }
-.manager-order-select {
+.manager-order-main {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   min-width: 0;
   flex: 1 1 auto;
+}
+.manager-order-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.manager-order-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
 }
 .manager-order-checkbox {
   flex: 0 0 auto;
@@ -1749,13 +1797,8 @@ textarea { resize: vertical; }
   cursor: pointer;
   accent-color: #5b9d57;
 }
-.manager-order-select-body,
-.manager-order-select > div {
-  min-width: 0;
-  flex: 1 1 auto;
-}
 .manager-order-card-header .exchange-status-line {
-  margin: 0 0 4px;
+  margin: 0;
 }
 .manager-order-status-select {
   -webkit-appearance: none;
@@ -1765,17 +1808,18 @@ textarea { resize: vertical; }
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  width: fit-content;
+  justify-content: center;
+  width: auto;
   max-width: 100%;
-  min-height: 0;
-  height: auto;
+  min-height: 28px;
+  height: 28px;
   margin: 0;
-  padding: 5px 28px 5px 10px;
-  border-radius: 13px;
+  padding: 0 26px 0 10px;
+  border-radius: 14px;
   font: inherit;
   font-size: 11px;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1;
   vertical-align: middle;
 }
 .manager-order-status-select:focus-visible {
@@ -1784,7 +1828,7 @@ textarea { resize: vertical; }
 }
 .manager-order-card-header h3.manager-order-client,
 .manager-order-client {
-  margin: 4px 0 2px;
+  margin: 0;
   color: #2f3f2f;
   font-size: 18px;
   font-weight: 800;
@@ -1809,6 +1853,34 @@ textarea { resize: vertical; }
   flex-wrap: wrap;
   gap: 8px;
   margin: 14px 0 8px;
+}
+.manager-order-controls-compact {
+  margin: 8px 0 0;
+}
+.manager-order-extra {
+  margin: 4px 0 0;
+}
+.manager-order-extra > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 0;
+  color: #4f8d4b;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.manager-order-extra > summary::-webkit-details-marker {
+  display: none;
+}
+.manager-order-extra > summary::before {
+  content: "▸";
+  color: #5f6b5f;
+}
+.manager-order-extra[open] > summary::before {
+  content: "▾";
 }
 .manager-order-controls .exchange-actions {
   margin-top: 0;
@@ -1865,6 +1937,47 @@ textarea { resize: vertical; }
 .order-details { border-top: 1px solid #edf1eb; padding-top: 14px; }
 .order-details summary { color: #4f8d4b; font-weight: 800; cursor: pointer; }
 .order-products { display: grid; gap: 0; margin-top: 12px; }
+.order-lines-table {
+  width: auto;
+  max-width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+  table-layout: auto;
+}
+.order-lines-table th,
+.order-lines-table td {
+  padding: 6px 12px 6px 0;
+  vertical-align: top;
+  border-bottom: 1px solid #edf1eb;
+}
+.order-lines-table th {
+  color: #7a847a;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+}
+.order-lines-table th:nth-child(1),
+.order-lines-table td:nth-child(1) {
+  padding-right: 20px;
+}
+.order-lines-table th:nth-child(2),
+.order-lines-table td:nth-child(2) {
+  text-align: right;
+  white-space: nowrap;
+  width: auto;
+  padding-left: 8px;
+  padding-right: 20px;
+}
+.order-lines-table th:nth-child(3),
+.order-lines-table td:nth-child(3) {
+  text-align: right;
+  white-space: nowrap;
+  width: auto;
+  padding-left: 8px;
+  padding-right: 0;
+}
+.order-lines-name { display: block; color: #394639; font-size: 13px; font-weight: 650; line-height: 1.35; }
+.order-lines-article { display: block; margin-top: 2px; color: #7a847a; font-size: 11px; font-weight: 500; }
 .order-product { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 16px; padding: 11px 0; border-bottom: 1px solid #edf1eb; }
 .order-product > span { color: #596359; line-height: 1.45; }
 .order-product > strong { display: flex; align-items: flex-end; flex-direction: column; color: #386f37; white-space: nowrap; }
@@ -3792,42 +3905,39 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   object-position: center;
   background: #fff;
 }
-.product-manager-info { min-width: 0; display: grid; gap: 4px; }
-.product-manager-title-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
+.product-manager-info {
   min-width: 0;
-}
-.product-manager-title-row h3 {
-  flex: 1 1 160px;
-  min-width: 0;
-  margin: 0;
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  align-self: center;
 }
 .product-manager-side {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   flex-wrap: nowrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  min-width: 0;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  min-width: max-content;
 }
 .product-manager-price {
   display: block;
+  flex: 0 0 auto;
+  min-width: 0;
+  margin: 2px 0 0;
   color: #315f31;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 800;
   line-height: 1.25;
   white-space: nowrap;
-  text-align: right;
+  text-align: left;
 }
 .product-manager-badges {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-end;
   gap: 6px;
   width: auto;
   white-space: normal;
@@ -3839,6 +3949,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  flex: 0 0 auto;
   width: auto;
 }
 .product-row-action {
@@ -4111,6 +4222,24 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 .success-box { padding: 13px; border: 1px solid #cfe3ca; border-radius: 12px; background: #eef8eb; color: #3f713d; line-height: 1.5; }
 .section-toggle { cursor: pointer; color: #4f684f; font-weight: 800; }
 .exchange-status-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.exchange-status-line > .badge,
+.exchange-status-line > .manager-order-status-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 28px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  width: auto;
+}
+.exchange-status-line > .manager-order-status-select {
+  padding: 0 26px 0 10px;
+}
 .exchange-pending { background: #edf0ed; color: #687168; }
 .exchange-ready { background: #e7f2ff; color: #2f6592; }
 .exchange-sent { background: #e5f4e2; color: #3e7b3b; }
@@ -4775,7 +4904,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     grid-template-columns: none;
   }
   .product-manager-row { grid-template-columns: 28px 68px minmax(0, 1fr); }
-  .product-manager-side { grid-column: 2 / -1; justify-content: space-between; width: 100%; }
+  .product-manager-side { grid-column: 1 / -1; align-items: flex-end; justify-content: flex-end; width: 100%; }
   .product-manager-row .image-actions,
   .product-manager-row .row-actions { grid-column: 1 / -1; }
   .client-metrics { grid-template-columns: repeat(2,1fr); }
@@ -5211,7 +5340,26 @@ export function productArticle(product = {}) {
   if (oneC) return oneC;
   const code = String(product.code || "").trim();
   if (/^cl-\d+$/i.test(code)) return "";
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)) {
+    return "";
+  }
   return code;
+}
+
+/** Поля товара для поиска каталога по началам слов. */
+export function productCatalogSearchHaystack(product = {}, { includeAdminFields = false } = {}) {
+  const parts = [
+    product.name,
+    productArticle(product),
+    product.oneCCode,
+    product.oneCMatchCode,
+    product.oneCName,
+    product.category,
+  ];
+  if (includeAdminFields) {
+    parts.push(product.oneCSearchQuery, product.oneCMatchName, product.oneCId);
+  }
+  return parts.filter(Boolean).join(" ");
 }
 
 export function normalizeProduct(product) {
@@ -5699,6 +5847,90 @@ export function pickProductCardOneCCost({
       ? "Из «Обновить цены» (вид цен)"
       : "Из выгрузки закупочных цен",
   };
+}
+
+function firstPositiveNumber(...values) {
+  for (const value of values) {
+    if (value == null || value === "") continue;
+    const n = Number(String(value).replace(/\s/g, "").replace(",", "."));
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
+function typedEntryValues(entry) {
+  if (!entry || typeof entry !== "object") return [];
+  return [entry.piece, ...UNIT_ORDER.map((unit) => entry[unit])];
+}
+
+function firstTypedPriceByName(salePricesByType, pattern) {
+  const byType =
+    salePricesByType && typeof salePricesByType === "object" ? salePricesByType : {};
+  for (const entry of Object.values(byType)) {
+    const name = String(entry?.priceTypeName || entry?.name || "");
+    if (!pattern.test(name)) continue;
+    const found = firstPositiveNumber(...typedEntryValues(entry));
+    if (found != null) return found;
+  }
+  return null;
+}
+
+function firstTypedPriceByTypeList(salePricesByType, oneCPriceTypes, pattern) {
+  const byType =
+    salePricesByType && typeof salePricesByType === "object" ? salePricesByType : {};
+  const listed = Array.isArray(oneCPriceTypes) ? oneCPriceTypes : [];
+  for (const type of listed) {
+    if (!pattern.test(String(type?.name || ""))) continue;
+    const id = String(type?.id || "").trim();
+    if (!id) continue;
+    const found = firstPositiveNumber(...typedEntryValues(byType[id]));
+    if (found != null) return found;
+  }
+  return null;
+}
+
+/**
+ * Цена в списке товаров менеджера: закупка, «Закупочная» / «Продажная», любой вид цен 1С, каталог.
+ * Одно положительное число без префикса «от».
+ */
+export function firstPositiveCatalogPrice(product, oneCPriceTypes = []) {
+  if (!product || typeof product !== "object") return null;
+  const card = pickProductCardOneCCost({
+    purchasePrices: product.purchasePrices,
+    purchaseUpdatedAt:
+      product.purchasePriceReceivedAt || product.purchasePriceUpdatedAt || "",
+    salePricesByType: product.salePricesByType,
+    salePriceReceivedAt: product.salePriceReceivedAt || "",
+    oneCPriceTypes,
+  });
+  const byType =
+    product.salePricesByType && typeof product.salePricesByType === "object"
+      ? product.salePricesByType
+      : {};
+  const typedValues = [];
+  for (const entry of Object.values(byType)) {
+    typedValues.push(...typedEntryValues(entry));
+  }
+  const storefront =
+    product.storefrontPricing && typeof product.storefrontPricing === "object"
+      ? product.storefrontPricing
+      : {};
+  return firstPositiveNumber(
+    card.cost,
+    ...UNIT_ORDER.map((unit) => product.purchasePrices?.[unit]),
+    firstTypedPriceByName(byType, /закупочн/i),
+    firstTypedPriceByTypeList(byType, oneCPriceTypes, /закупочн/i),
+    firstTypedPriceByName(byType, /продажн/i),
+    firstTypedPriceByTypeList(byType, oneCPriceTypes, /продажн/i),
+    firstTypedPriceByName(byType, /рознич/i),
+    firstTypedPriceByTypeList(byType, oneCPriceTypes, /рознич/i),
+    ...typedValues,
+    product.pricePiece,
+    product.price,
+    ...UNIT_ORDER.map((unit) => product[unitPriceField(unit)]),
+    ...UNIT_ORDER.map((unit) => storefront[unit]),
+    ...UNIT_ORDER.map((unit) => product[unitBasePriceField(unit)])
+  );
 }
 
 export function getOrderTotal(order) {

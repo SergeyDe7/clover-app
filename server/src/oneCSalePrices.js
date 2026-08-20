@@ -295,10 +295,14 @@ export function buildSalePriceRequirements(
   if (storefrontTypeId) {
     typeIds.add(storefrontTypeId);
   }
+  const catalogCostTypeId = cleanText(storefrontCostPriceTypeId);
+  if (catalogCostTypeId) {
+    typeIds.add(catalogCostTypeId);
+  }
 
   if (!typeIds.size) return [];
 
-  // Товары из матриц клиентов с этими видами цен + товары витрины.
+  // Товары из матриц клиентов с этими видами цен + товары витрины + весь каталог для закупки.
   const neededOneCIds = new Set();
   for (const link of Object.values(clientLinks || {})) {
     const typeId = cleanText(link?.oneCPriceTypeId);
@@ -334,6 +338,14 @@ export function buildSalePriceRequirements(
     }
   }
 
+  if (catalogCostTypeId) {
+    for (const product of Array.isArray(products) ? products : []) {
+      if (product.active === false) continue;
+      const oneCId = cleanText(product.oneCId);
+      if (oneCId) neededOneCIds.add(oneCId);
+    }
+  }
+
   const required = [];
   for (const product of Array.isArray(products) ? products : []) {
     if (product.active === false) continue;
@@ -358,6 +370,9 @@ export function buildSalePriceRequirements(
     }
     if (storefrontTypeId && product.showOnStorefront === true) {
       productTypeIds.add(storefrontTypeId);
+    }
+    if (catalogCostTypeId) {
+      productTypeIds.add(catalogCostTypeId);
     }
 
     for (const priceTypeId of productTypeIds) {

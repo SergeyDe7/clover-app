@@ -1,7 +1,9 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import assert from "node:assert/strict";
 import { projectRoot, readFrontendUiSource } from "./readFrontendUiSource.mjs";
+import { firstPositiveCatalogPrice } from "../../src/shared/appHelpers.js";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const exchangePath = path.resolve(scriptDir, "../src/exchange.js");
@@ -46,8 +48,8 @@ const checks = [
     "Карточки с 1 и 2 единицами измерения одной высоты",
   ],
   [
-    "Телефон ЛК, вид «Фото»: 2 колонки × 2 ряда ≈ 4 карточки на экран",
-    "В ЛК клиента на телефоне вид «Фото» показывает 4 товара на экран",
+    "Телефон ЛК, вид «Фото»: компактные карточки, бейджи над фото",
+    "В ЛК клиента на телефоне вид «Фото» — компактные карточки, бейджи над рамкой фото",
   ],
   [
     'setSelectedIds(new Set(filteredProducts.map((item) => String(item.id))))',
@@ -78,8 +80,8 @@ const checks = [
     "На телефоне оболочка ЛК клиента зафиксирована и не смещается",
   ],
   [
-    "grid-auto-rows: calc((100svh - var(--clover-chrome-offset, 56px) - var(--lk-catalog-below)) / 2) !important",
-    "Ряды фото-каталога считаются от устойчивой высоты экрана",
+    "grid-template-columns: repeat(2, minmax(0, 1fr)) !important;\n    grid-auto-rows: auto !important;",
+    "Ряды фото-каталога по высоте карточки, не от экрана",
   ],
   [
     'className="toolbar two manager-clients-toolbar"',
@@ -161,6 +163,34 @@ const checks = [
     "                            Выбрать все",
     "В матрице клиента кнопка выбора называется «Выбрать все»",
   ],
+  [
+    'className="order-lines-table"',
+    "Состав заказа в карточке — таблица как в 1С: наименование, количество, цена",
+  ],
+  [
+    "matchesCatalogPrefixSearch",
+    "Поиск каталога идёт по начальным буквам слов",
+  ],
+  [
+    'className="manager-order-extra"',
+    "В ЛК админа номер, телефон, адрес и состав заказа спрятаны за «Подробнее»",
+  ],
+  [
+    "width: auto !important;\n  padding-left: 8px !important;\n  padding-right: 20px !important;",
+    "В составе заказа количество и цена стоят рядом с наименованием, не внахлёст",
+  ],
+  [
+    'className="manager-order-title-row"',
+    "В карточке заказа сначала клиент и сумма, ниже статусы и действие 1С",
+  ],
+  [
+    "firstPositiveCatalogPrice",
+    "В списке товаров цена берётся из закупки, вида цен или каталога",
+  ],
+  [
+    ".exchange-status-line > .badge,\n.exchange-status-line > .manager-order-status-select {",
+    "Бейджи статуса заказа и 1С одной высоты",
+  ],
 ];
 
 for (const [fragment, description] of checks) {
@@ -203,6 +233,55 @@ if (source.includes("<summary>Товарная матрица</summary>")) {
 
 if (source.includes('id: "password"')) {
   throw new Error("Пункт «Сменить пароль» снова в меню трёх точек, а не в данных клиента.");
+}
+
+const productsPath = path.resolve(projectRoot, "src/screens/manager/ManagerProducts.jsx");
+const productsSource = await readFile(productsPath, "utf8");
+if (productsSource.includes("от ${formatMoney")) {
+  throw new Error("В списке товаров снова подпись цены «от …» вместо одной суммы.");
+}
+if (productsSource.includes("product-manager-title-row")) {
+  throw new Error("Название товара снова в одной строке с бейджами.");
+}
+if (!/product-manager-side[\s\S]*product-manager-badges/.test(productsSource)) {
+  throw new Error("Бейджи «Активен» должны стоять в правой колонке над кнопками.");
+}
+
+assert.equal(
+  firstPositiveCatalogPrice({
+    purchasePrices: {},
+    salePricesByType: { t1: { piece: 12.5, priceTypeName: "Розничная" } },
+  }),
+  12.5
+);
+assert.equal(
+  firstPositiveCatalogPrice({
+    purchasePrices: {},
+    salePricesByType: { "7be6c8b6-23bb-11e9-9b9b-9cda3efabffd": { piece: 88 } },
+  }, [{ id: "7be6c8b6-23bb-11e9-9b9b-9cda3efabffd", name: "Закупочная цена" }]),
+  88
+);
+assert.equal(
+  firstPositiveCatalogPrice({
+    purchasePrices: { pack: 80 },
+    salePricesByType: {},
+    pricePiece: 0,
+  }),
+  80
+);
+assert.equal(
+  firstPositiveCatalogPrice({
+    purchasePrices: {},
+    salePricesByType: {},
+    pricePack: 40,
+  }),
+  40
+);
+
+const ordersPath = path.resolve(projectRoot, "src/screens/manager/ManagerOrders.jsx");
+const ordersSource = await readFile(ordersPath, "utf8");
+if (ordersSource.includes("ID 1С:")) {
+  throw new Error("В составе заказа снова показываются два идентификатора (код и UUID 1С).");
 }
 
 if (source.includes("useState(readOpenManagerClientId)")) {

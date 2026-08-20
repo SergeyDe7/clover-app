@@ -187,5 +187,15 @@ assert.equal(
   true
 );
 
+const allCatalog = buildAllPriceRequirements(
+  storefrontProducts,
+  selectedLinks,
+  [],
+  { includeAllCatalog: true }
+);
+assert.equal(allCatalog.some((item) => item.id === products[0].oneCId), true);
+assert.equal(allCatalog.some((item) => item.id === products[1].oneCId), true);
+assert.equal(allCatalog.some((item) => item.id === storefrontOnlyId), true);
+
 console.log("Проверка запроса и приёма свежих закупочных цен из 1С TEST прошла успешно.");
 console.log("Проверено: только нужные товары, запрет VLAVKA, контроль давности и фиксированное исключение.");

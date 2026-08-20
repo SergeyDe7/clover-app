@@ -11,6 +11,10 @@ import {
   groupProductsByCloverGroup,
   groupRequiresSubgroup,
 } from "../productGroups.js";
+import {
+  matchesCatalogPrefixSearch,
+  productCatalogSearchHaystack,
+} from "../../../shared/appHelpers.js";
 
 export function CatalogPage({
   category = "",
@@ -43,12 +47,8 @@ export function CatalogPage({
 
   const products = useMemo(() => {
     const list = data?.products || [];
-    const q = query.trim().toLocaleLowerCase("ru-RU");
-    if (!q) return list;
     return list.filter((product) =>
-      `${product.name} ${product.code} ${product.category} ${product.subcategory || ""} ${product.facet || ""}`
-        .toLocaleLowerCase("ru-RU")
-        .includes(q)
+      matchesCatalogPrefixSearch(productCatalogSearchHaystack(product), query)
     );
   }, [data, query]);
 

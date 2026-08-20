@@ -462,6 +462,8 @@ function productPriceLiveSignature(product) {
     String(product?.markupPercent ?? ""),
     String(product?.oneCPriceTypeId || ""),
     String(product?.salePriceReceivedAt || ""),
+    String(product?.purchasePrices?.piece ?? ""),
+    String(product?.purchasePriceAvailable ?? ""),
     String(product?.imageUrl || ""),
     String(product?.imageUpdatedAt || ""),
     typedKeys,

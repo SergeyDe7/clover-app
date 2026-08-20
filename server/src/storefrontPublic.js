@@ -33,6 +33,10 @@ import {
   subcategoryMatchesFilter,
   facetMatchesFilter,
 } from "../../src/screens/storefront/productGroups.js";
+import {
+  matchesCatalogPrefixSearch,
+  productCatalogSearchHaystack,
+} from "../../src/shared/appHelpers.js";
 
 const STOREFRONT_GUEST_EMAIL = "storefront-guest@clover.local";
 
@@ -380,12 +384,10 @@ export function getPublicCatalog({
     );
   }
 
-  const query = String(q || "").trim().toLocaleLowerCase("ru-RU");
+  const query = String(q || "").trim();
   if (query) {
     products = products.filter((product) =>
-      `${product.name} ${product.code} ${product.cloverCode || ""} ${product.oneCCode || ""} ${product.category} ${product.subcategory || ""} ${product.facet || ""}`
-        .toLocaleLowerCase("ru-RU")
-        .includes(query)
+      matchesCatalogPrefixSearch(productCatalogSearchHaystack(product), query)
     );
   }
 

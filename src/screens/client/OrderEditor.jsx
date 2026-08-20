@@ -19,6 +19,8 @@ import {
   quantityInputUnitLabel,
   orderedSaleUnits,
   productArticle,
+  matchesCatalogPrefixSearch,
+  productCatalogSearchHaystack,
 } from "../../shared/appHelpers";
 import {
   getEarliestDeliveryDateIso,
@@ -275,10 +277,12 @@ export function OrderEditor({
 
   const categories = useMemo(() => ["Все", ...new Set(products.map((item) => item.category))], [products]);
   const filtered = useMemo(() => {
-    const needle = search.trim().toLowerCase();
     return products.filter((item) => {
       const byCategory = category === "Все" || item.category === category;
-      const bySearch = !needle || item.name.toLowerCase().includes(needle) || item.code.toLowerCase().includes(needle);
+      const bySearch = matchesCatalogPrefixSearch(
+        productCatalogSearchHaystack(item),
+        search
+      );
       const byFavorite = !favoritesOnly || favorites.includes(item.id);
       return byCategory && bySearch && byFavorite;
     });
@@ -295,6 +299,7 @@ export function OrderEditor({
         productId: product.id,
         code: productArticle(product),
         oneCId: product.oneCId || "",
+        oneCCode: String(product.oneCCode || product.oneCMatchCode || "").trim(),
         name: product.name,
         category: product.category,
         quantity,

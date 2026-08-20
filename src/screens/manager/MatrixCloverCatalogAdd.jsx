@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { matchesTextSearch, productArticle } from "../../shared/appHelpers";
+import { matchesCatalogPrefixSearch, productArticle, productCatalogSearchHaystack } from "../../shared/appHelpers";
 import { getClientMatrixMembership } from "./matrixMembership";
 
 const CATALOG_LIST_LIMIT = 80;
@@ -45,15 +45,10 @@ export function MatrixCloverCatalogAdd({
 
   const items = useMemo(() => {
     const filtered = available.filter((product) => {
-      const haystack = [
-        product.name,
-        product.code,
-        product.oneCCode,
-        product.oneCName,
-        product.category,
-        productArticle(product),
-      ].join(" ");
-      return matchesTextSearch(haystack, search);
+      return matchesCatalogPrefixSearch(
+        productCatalogSearchHaystack(product, { includeAdminFields: true }),
+        search
+      );
     });
     return filtered.slice(0, CATALOG_LIST_LIMIT);
   }, [available, search]);

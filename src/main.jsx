@@ -19,7 +19,7 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-const CLOVER_UI_BUILD = "ui-20260818-v216-editor-photo";
+const CLOVER_UI_BUILD = "ui-20260820-v224-purchase-prices";
 const BOOT_SPLASH_MS = 450;
 const APP_THEME_COLOR = "#f4f8f2";
 const VIEWPORT_BASE = "width=device-width, initial-scale=1.0, viewport-fit=cover";

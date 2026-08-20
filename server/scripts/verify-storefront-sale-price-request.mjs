@@ -46,9 +46,15 @@ assert.equal(
 );
 assert.equal(
   priceTypeMode.some(
+    (item) => item.id === "onec-1" && item.priceTypeId === purchaseTypeId
+  ),
+  true
+);
+assert.equal(
+  priceTypeMode.some(
     (item) => item.id === "onec-2" && item.priceTypeId === purchaseTypeId
   ),
-  false
+  true
 );
 
 const markupMode = buildSalePriceRequirements(products, clientLinks, {

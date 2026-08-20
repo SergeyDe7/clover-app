@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
-import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber } from "../../shared/appHelpers";
+import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber, matchesCatalogPrefixSearch, productCatalogSearchHaystack } from "../../shared/appHelpers";
 import { StorefrontProductAdd } from "./StorefrontProductAdd";
 
 function formatMarkupDraft(value) {
@@ -107,16 +107,14 @@ export function ManagerStorefront({
   );
 
   const filteredProducts = useMemo(() => {
-    const q = productQuery.trim().toLocaleLowerCase("ru-RU").replaceAll("ё", "е");
     return activeProducts.filter((item) => {
       const onStorefront = item.showOnStorefront === true;
       if (storefrontFilter === "На витрине" && !onStorefront) return false;
       if (storefrontFilter === "Не на витрине" && onStorefront) return false;
-      if (!q) return true;
-      const hay = `${item.name || ""} ${productArticle(item)} ${item.code || ""} ${item.category || ""}`
-        .toLocaleLowerCase("ru-RU")
-        .replaceAll("ё", "е");
-      return hay.includes(q);
+      return matchesCatalogPrefixSearch(
+        productCatalogSearchHaystack(item, { includeAdminFields: true }),
+        productQuery
+      );
     });
   }, [activeProducts, productQuery, storefrontFilter]);
 

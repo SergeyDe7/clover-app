@@ -25,6 +25,8 @@ import {
   normalizeProfileContacts,
   createEmptyProfileContact,
   productArticle,
+  matchesCatalogPrefixSearch,
+  productCatalogSearchHaystack,
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { MatrixOneCProductAdd } from "./MatrixOneCProductAdd";
@@ -1553,7 +1555,7 @@ export function ManagerClients({
               String(matrixWindowClientId) === String(client.id);
             const searchQuery =
               matrixOpen || matrixWindowOpen
-                ? String(matrixSearch || "").trim().toLocaleLowerCase("ru-RU")
+                ? String(matrixSearch || "").trim()
                 : "";
             const matrixProductsRaw = (Array.isArray(products) ? products : []).filter(
               (product) => {
@@ -1572,18 +1574,10 @@ export function ManagerClients({
                   return false;
                 }
                 if (!searchQuery) return true;
-                const haystack = [
-                  product.name,
-                  product.code,
-                  product.oneCCode,
-                  product.oneCMatchCode,
-                  product.oneCName,
-                  product.category,
-                  productArticle(product),
-                ]
-                  .map((value) => String(value || "").toLocaleLowerCase("ru-RU"))
-                  .join(" ");
-                return haystack.includes(searchQuery);
+                return matchesCatalogPrefixSearch(
+                  productCatalogSearchHaystack(product, { includeAdminFields: true }),
+                  searchQuery
+                );
               }
             );
             // В списке матрицы убираем только полные дубли по oneCId (не по имени),
