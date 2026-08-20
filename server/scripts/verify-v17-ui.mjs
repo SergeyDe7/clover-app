@@ -88,6 +88,10 @@ const checks = [
     "Окно «Клиентов» той же высоты, что и поиск",
   ],
   [
+    ".clover-app .client-card {\n  padding: 12px 14px !important;",
+    "Карточка клиента компактная, без лишней пустоты",
+  ],
+  [
     "grid-template-columns: 38px minmax(0, 1fr) 38px !important",
     "На телефоне в ЛК кнопки количества крупнее",
   ],

@@ -3401,20 +3401,21 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 .manager-textareas { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 12px; }
 .manager-textareas textarea { min-height: 90px; border: 1px solid #e6eee3; border-radius: 11px; background: #fbfdfb; }
 
-.client-list { display: grid; gap: 16px; }
-.client-card { padding: 21px; border: 1px solid #e1e9de; border-radius: 18px; background: #fff; }
+.client-list { display: grid; gap: 8px; }
+.client-card { padding: 12px 14px; border: 1px solid #e1e9de; border-radius: 14px; background: #fff; }
 .client-card-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  gap: 12px 18px;
+  gap: 8px 12px;
 }
 .client-card-header > div:first-child { min-width: 0; }
-.client-card h3 { margin: 5px 0; color: #394639; }
-.client-metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 15px; }
-.client-metrics article { padding: 12px; border-radius: 12px; background: #f7faf5; }
-.client-metrics span { display: block; color: #7a847a; font-size: 10px; }
-.client-metrics strong { display: block; margin-top: 5px; color: #386f37; font-size: 15px; }
+.client-card h3 { margin: 2px 0 0; color: #394639; font-size: 16px; line-height: 1.25; }
+.client-card .muted.small { margin: 2px 0 0; }
+.client-metrics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.client-metrics article { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex: 1 1 calc(25% - 6px); min-width: 118px; padding: 6px 10px; border-radius: 10px; background: #f7faf5; }
+.client-metrics span { display: block; color: #7a847a; font-size: 11px; line-height: 1.2; }
+.client-metrics strong { display: block; margin-top: 0; color: #386f37; font-size: 13px; line-height: 1.2; }
 .matrix-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; max-height: 330px; overflow: auto; margin-top: 12px; padding: 10px; border: 1px solid #e1e9de; border-radius: 12px; }
 .matrix-item { display: flex; align-items: flex-start; gap: 7px; padding: 8px; border-radius: 9px; background: #f8fbf6; color: #596359; font-size: 11px; line-height: 1.35; }
 .matrix-catalog-note {
@@ -4907,7 +4908,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   .product-manager-side { grid-column: 1 / -1; align-items: flex-end; justify-content: flex-end; width: 100%; }
   .product-manager-row .image-actions,
   .product-manager-row .row-actions { grid-column: 1 / -1; }
-  .client-metrics { grid-template-columns: repeat(2,1fr); }
+  .client-metrics article { flex: 1 1 calc(50% - 6px); min-width: 0; }
 }
 @media (max-width: 820px) {
   .mobile-checkout-bar {

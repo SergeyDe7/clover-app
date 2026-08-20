@@ -3,6 +3,7 @@ import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
 import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber, matchesCatalogPrefixSearch, productCatalogSearchHaystack } from "../../shared/appHelpers";
 import { StorefrontProductAdd } from "./StorefrontProductAdd";
+import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE } from "../storefront/siteCopy.js";
 
 function formatMarkupDraft(value) {
   if (value === "" || value === null || value === undefined) return "";
@@ -466,7 +467,7 @@ export function ManagerStorefront({
             Заголовок
             <input
               value={draft.storefrontHeroTitle || ""}
-              placeholder="Оптовые поставки для HoReCa и бизнеса"
+              placeholder={STOREFRONT_HERO_TITLE}
               onChange={(event) =>
                 setField("storefrontHeroTitle", event.target.value)
               }
@@ -477,7 +478,7 @@ export function ManagerStorefront({
             <textarea
               rows={3}
               value={draft.storefrontHeroLead || ""}
-              placeholder="Каталог с артикулами из 1С…"
+              placeholder={STOREFRONT_HERO_LEAD}
               onChange={(event) =>
                 setField("storefrontHeroLead", event.target.value)
               }

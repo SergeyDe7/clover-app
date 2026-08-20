@@ -509,9 +509,9 @@ body:has(.clover-app) {
 
 .clover-app .manager-clients-toolbar .manager-search-block input[type="search"],
 .clover-app .manager-clients-toolbar .mini-card {
-  height: 44px !important;
-  min-height: 44px !important;
-  max-height: 44px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
   box-sizing: border-box !important;
 }
 
@@ -5392,12 +5392,73 @@ html.clover-cart-open body {
   min-width: 0;
 }
 
+.clover-app .client-list {
+  gap: 8px !important;
+}
+
+.clover-app .client-card {
+  padding: 12px 14px !important;
+  border-radius: 14px !important;
+}
+
+.clover-app .client-card h3 {
+  margin: 2px 0 0 !important;
+  font-size: 16px !important;
+  line-height: 1.25 !important;
+}
+
+.clover-app .client-card .muted.small {
+  margin: 2px 0 0 !important;
+}
+
+.clover-app .client-card-contacts {
+  gap: 4px !important;
+  margin-top: 4px !important;
+}
+
+.clover-app .client-metrics {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  margin-top: 8px !important;
+}
+
+.clover-app .client-metrics article {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: baseline !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  flex: 1 1 calc(25% - 6px) !important;
+  min-width: 118px !important;
+  padding: 6px 10px !important;
+  border-radius: 10px !important;
+}
+
+.clover-app .client-metrics span {
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+}
+
+.clover-app .client-metrics strong {
+  margin-top: 0 !important;
+  font-size: 13px !important;
+  line-height: 1.2 !important;
+}
+
+@media (max-width: 820px) {
+  .clover-app .client-metrics article {
+    flex: 1 1 calc(50% - 6px) !important;
+    min-width: 0 !important;
+  }
+}
+
 .clover-app .client-card-header {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) auto !important;
   align-items: start !important;
   flex-direction: row !important;
-  gap: 12px 14px;
+  gap: 8px 12px;
 }
 
 .clover-app .client-card-header-actions {
