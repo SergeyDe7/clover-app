@@ -6,7 +6,6 @@ import { CatalogGroupNav } from "../components/CatalogGroupNav.jsx";
 import { GroupIcon } from "../components/GroupIcon.jsx";
 import {
   getGroupMeta,
-  getGroupChildren,
   getSubgroupFacets,
   groupProductsByCloverGroup,
   groupRequiresSubgroup,
@@ -53,7 +52,6 @@ export function CatalogPage({
   }, [data, query]);
 
   const activeMeta = category ? getGroupMeta(category) : null;
-  const subgroups = category ? getGroupChildren(category) : [];
   const facets = subcategory ? getSubgroupFacets(category, subcategory) : [];
   const needsSubgroup = category && groupRequiresSubgroup(category);
   const atParentOnly = Boolean(category && !subcategory && needsSubgroup);
@@ -106,7 +104,7 @@ export function CatalogPage({
     !category || subcategory || !needsSubgroup
   );
 
-  const title = facet || subcategory || category || "Каталог";
+  const title = category || "Каталог";
 
   return (
     <div className="sf-catalog">
@@ -150,24 +148,6 @@ export function CatalogPage({
                       </button>
                     </>
                   ) : null}
-                  {subcategory ? (
-                    <>
-                      <span className="sf-crumb-sep">/</span>
-                      <button
-                        type="button"
-                        className="sf-back"
-                        onClick={() =>
-                          navigateStorefront({
-                            name: "catalog",
-                            category,
-                            subcategory,
-                          })
-                        }
-                      >
-                        {subcategory}
-                      </button>
-                    </>
-                  ) : null}
                   {facet ? (
                     <>
                       <span className="sf-crumb-sep">/</span>
@@ -185,30 +165,6 @@ export function CatalogPage({
               <p>Выберите группу в дереве слева.</p>
             </div>
           )}
-
-          {atParentOnly ? (
-            <section className="sf-subgroup-strip" aria-label="Подгруппы">
-              <div className="sf-facet-tree" role="list">
-                {subgroups.map((child) => (
-                  <button
-                    key={child.name}
-                    type="button"
-                    className="sf-facet-item"
-                    role="listitem"
-                    onClick={() =>
-                      navigateStorefront({
-                        name: "catalog",
-                        category,
-                        subcategory: child.name,
-                      })
-                    }
-                  >
-                    {child.name}
-                  </button>
-                ))}
-              </div>
-            </section>
-          ) : null}
 
           {subcategory && facets.length > 0 ? (
             <section className="sf-subgroup-strip" aria-label="Уточнение">

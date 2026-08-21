@@ -53,6 +53,9 @@ export function ManagerStorefront({
     storefrontShowOnlyLinked: settings?.storefrontShowOnlyLinked !== false,
     storefrontHeroTitle: settings?.storefrontHeroTitle || "",
     storefrontHeroLead: settings?.storefrontHeroLead || "",
+    storefrontOneCClientId: settings?.storefrontOneCClientId || "",
+    storefrontOneCClientName:
+      settings?.storefrontOneCClientName || "Интернет магазин Clover",
   });
 
   useEffect(() => {
@@ -70,6 +73,9 @@ export function ManagerStorefront({
         storefrontShowOnlyLinked: settings?.storefrontShowOnlyLinked !== false,
         storefrontHeroTitle: settings?.storefrontHeroTitle || "",
         storefrontHeroLead: settings?.storefrontHeroLead || "",
+        storefrontOneCClientId: settings?.storefrontOneCClientId || "",
+        storefrontOneCClientName:
+          settings?.storefrontOneCClientName || "Интернет магазин Clover",
       };
       const same =
         prev.storefrontPricingMode === next.storefrontPricingMode &&
@@ -78,7 +84,9 @@ export function ManagerStorefront({
         prev.storefrontPriceTypeName === next.storefrontPriceTypeName &&
         prev.storefrontShowOnlyLinked === next.storefrontShowOnlyLinked &&
         prev.storefrontHeroTitle === next.storefrontHeroTitle &&
-        prev.storefrontHeroLead === next.storefrontHeroLead;
+        prev.storefrontHeroLead === next.storefrontHeroLead &&
+        prev.storefrontOneCClientId === next.storefrontOneCClientId &&
+        prev.storefrontOneCClientName === next.storefrontOneCClientName;
       return same ? prev : next;
     });
   }, [
@@ -89,6 +97,8 @@ export function ManagerStorefront({
     settings?.storefrontShowOnlyLinked,
     settings?.storefrontHeroTitle,
     settings?.storefrontHeroLead,
+    settings?.storefrontOneCClientId,
+    settings?.storefrontOneCClientName,
   ]);
 
   const types = Array.isArray(oneCPriceTypes) ? oneCPriceTypes : [];
@@ -458,6 +468,37 @@ export function ManagerStorefront({
           />
           <span>Только товары, связанные с 1С</span>
         </label>
+      </div>
+
+      <div className="manager-contact-settings" style={{ marginTop: 20 }}>
+        <h3>Контрагент 1С для заказов с сайта</h3>
+        <p className="storefront-settings-hint">
+          Гостевые заказы без регистрации уходят в 1С на одного контрагента.
+          Контакт покупателя остаётся в комментарии заказа. В 1С у этого
+          контрагента должен быть договор «Основной договор».
+        </p>
+        <div className="form-grid">
+          <label className="field field-wide">
+            Название в 1С
+            <input
+              value={draft.storefrontOneCClientName || ""}
+              placeholder="Интернет магазин Clover"
+              onChange={(event) =>
+                setField("storefrontOneCClientName", event.target.value)
+              }
+            />
+          </label>
+          <label className="field field-wide">
+            ID контрагента 1С (необязательно)
+            <input
+              value={draft.storefrontOneCClientId || ""}
+              placeholder="если известен GUID из выгрузки"
+              onChange={(event) =>
+                setField("storefrontOneCClientId", event.target.value)
+              }
+            />
+          </label>
+        </div>
       </div>
 
       <div className="manager-contact-settings" style={{ marginTop: 20 }}>

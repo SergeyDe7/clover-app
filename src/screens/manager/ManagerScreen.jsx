@@ -116,7 +116,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
         onLogout={onLogout}
         nav={
           <nav className="manager-nav" aria-label={authUser?.role === "admin" ? "Разделы админа" : "Разделы менеджера"}>
-            {MANAGER_TABS.map(([id, label]) => (
+            {MANAGER_TABS.filter(([id]) => id !== "storefront" || authUser?.role === "admin").map(([id, label]) => (
               <button
                 className={tab === id ? "active" : ""}
                 type="button"
@@ -238,13 +238,19 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
         />
       )}
       {tab === "acts" && <ManagerReconciliation requests={reconciliationRequests} onReload={onReload} />}
+      {tab === "storefront" && authUser?.role === "admin" && (
+        <ManagerStorefront
+          settings={settings}
+          setSettings={setSettings}
+          oneCPriceTypes={oneCPriceTypes}
+          products={products}
+          setProducts={setProducts}
+        />
+      )}
       {tab === "more" && (
         <section>
           <nav className="manager-more-nav" aria-label="Дополнительно">
-            {MANAGER_MORE_TABS.filter(([id]) => {
-              if (id === "storefront") return authUser?.role === "admin";
-              return true;
-            }).map(([id, label]) => (
+            {MANAGER_MORE_TABS.map(([id, label]) => (
               <button
                 className={moreTab === id ? "category-button active" : "category-button"}
                 type="button"
@@ -255,15 +261,6 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
               </button>
             ))}
           </nav>
-          {moreTab === "storefront" && authUser?.role === "admin" && (
-            <ManagerStorefront
-              settings={settings}
-              setSettings={setSettings}
-              oneCPriceTypes={oneCPriceTypes}
-              products={products}
-              setProducts={setProducts}
-            />
-          )}
           {moreTab === "access" && <ManagerAccessVault authUser={authUser} />}
           {moreTab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} authUser={authUser} />}
           {moreTab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} onReload={onReload} />}

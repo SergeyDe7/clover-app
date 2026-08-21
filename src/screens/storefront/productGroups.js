@@ -1,204 +1,253 @@
 /**
- * Группы витрины — названия как у Opticom (популярные категории),
- * в стиле и структуре Clover. children: [] — крючок под подгруппы.
+ * Категории и подкатегории витрины Clover.
+ * children: [] — у группы нет подгрупп, товары показываем сразу.
  */
 export const CLOVER_PRODUCT_GROUPS = [
-  "Контейнеры",
-  "Гигиеническая продукция",
   "Одноразовая посуда",
-  "Химия профессиональная",
+  "Хозяйственные товары",
+  "Химия, чистящие средства",
+  "Барные аксессуары",
+  "Бумажная продукция",
+  "Пакеты, упаковочные материалы",
   "Канцелярские товары",
-  "Бумага офисная",
-  "Лотки и подложки",
-  "Химия бытовая",
-  "Уборочный инвентарь и оборудование",
-  "Барные аксессуары и товары для сервировки",
-  "Кухонные принадлежности",
-  "Пленка",
-  "Пакеты и сумки",
-  "Упаковочные материалы",
-  "Товары для гостиниц, отелей и бань",
-  "Спецодежда, обувь и средства защиты",
-  "Принадлежности для касс и торговли",
-  "Оборудование для туалетных комнат",
-  "Офисная техника и расходные материалы",
-  "Продукты питания",
-  "Бытовая техника и электротовары",
-  "Мебель",
-  "Посуда и столовые приборы",
+  "Прочее",
 ];
 
-/** Старые имена Clover → канон витрины (Opticom-стиль). */
+const DISPOSABLE = "Одноразовая посуда";
+const HOUSEHOLD = "Хозяйственные товары";
+const CHEM = "Химия, чистящие средства";
+const BAR = "Барные аксессуары";
+const PAPER = "Бумажная продукция";
+const BAGS = "Пакеты, упаковочные материалы";
+const OFFICE = "Канцелярские товары";
+const OTHER = "Прочее";
+
+/** Старые имена каталога → канон витрины. */
 export const LEGACY_CATEGORY_TO_CANONICAL = {
-  Перчатки: "Спецодежда, обувь и средства защиты",
-  "Пакеты и пленка": "Пакеты и сумки",
-  Уборка: "Уборочный инвентарь и оборудование",
-  Упаковка: "Упаковочные материалы",
-  "Одноразовая продукция": "Одноразовая посуда",
-  Канцтовары: "Канцелярские товары",
-  "Бытовая химия": "Химия бытовая",
-  Текстиль: "Гигиеническая продукция",
+  Контейнеры: DISPOSABLE,
+  "Гигиеническая продукция": PAPER,
+  "Химия профессиональная": CHEM,
+  "Химия бытовая": CHEM,
+  "Бытовая химия": CHEM,
+  "Бумага офисная": OFFICE,
+  "Лотки и подложки": DISPOSABLE,
+  "Уборочный инвентарь и оборудование": HOUSEHOLD,
+  "Барные аксессуары и товары для сервировки": BAR,
+  "Кухонные принадлежности": HOUSEHOLD,
+  Пленка: HOUSEHOLD,
+  "Пакеты и сумки": BAGS,
+  "Упаковочные материалы": DISPOSABLE,
+  "Товары для гостиниц, отелей и бань": HOUSEHOLD,
+  "Спецодежда, обувь и средства защиты": HOUSEHOLD,
+  Перчатки: HOUSEHOLD,
+  "Принадлежности для касс и торговли": OFFICE,
+  "Оборудование для туалетных комнат": CHEM,
+  "Офисная техника и расходные материалы": OFFICE,
+  "Продукты питания": OTHER,
+  "Бытовая техника и электротовары": OTHER,
+  Мебель: OTHER,
+  "Посуда и столовые приборы": DISPOSABLE,
+  "Одноразовая продукция": DISPOSABLE,
+  Канцтовары: OFFICE,
+  Текстиль: PAPER,
+  "Пакеты и пленка": BAGS,
+  Уборка: HOUSEHOLD,
+  Упаковка: BAGS,
+  "Новые товары": OTHER,
+  "Из 1С": OTHER,
 };
 
 export function canonicalizeProductCategory(name) {
-  const raw = String(name || "").trim() || "Прочее";
+  const raw = String(name || "").trim() || OTHER;
+  if (CLOVER_PRODUCT_GROUPS.includes(raw)) return raw;
   return LEGACY_CATEGORY_TO_CANONICAL[raw] || raw;
 }
 
-/** Короткие описания для страницы группы (витрина). */
+const LEGACY_SUBCATEGORY_TO_CANONICAL = {
+  "Тряпки, МОПы, полотенца": "Тряпки, мопы, полотенца",
+};
+
+export function canonicalizeProductSubcategory(name) {
+  const raw = String(name || "").trim();
+  return LEGACY_SUBCATEGORY_TO_CANONICAL[raw] || raw;
+}
+
+function normTaxonomyText(value) {
+  return String(value || "")
+    .trim()
+    .toLocaleLowerCase("ru-RU")
+    .replaceAll("ё", "е");
+}
+
+/** Правила раскладки: первое совпадение. Подкатегория "" — у группы нет подгрупп. */
+const TAXONOMY_ASSIGN_RULES = [
+  { category: CHEM, subcategory: "Жироудалители", patterns: [/жироудал/u, /шуманит/u, /азелит/u, /grill max/u, /для мытья грил/u] },
+  { category: CHEM, subcategory: "Для посудомоечных машин", patterns: [/посудомо/u, /\bпмм\b/u, /ополаскиватель для пмм/u] },
+  { category: CHEM, subcategory: "Для мытья посуды", patterns: [/для мытья посуды/u, /мойки посуды/u, /для ручной мойки посуды/u, /\bfairy\b/u] },
+  { category: CHEM, subcategory: "Для окон", patterns: [/для окон/u, /для стекол/u, /для стёкол/u, /стекол и зеркал/u, /мистер мускул/u] },
+  { category: HOUSEHOLD, subcategory: "Тряпки, мопы, полотенца", patterns: [/моп/u, /тряпк/u, /полотно/u, /хпп/u, /микрофибр/u, /вафельн/u, /ручной пад/u] },
+  { category: HOUSEHOLD, subcategory: "Швабры, щетки", patterns: [/швабр/u, /щетк/u, /веник/u, /ерш для/u, /вантуз/u, /совок/u] },
+  { category: CHEM, subcategory: "Для полов", patterns: [/для мытья пола/u, /средство.*для пола/u, /для полов/u, /уборки полов/u] },
+  { category: CHEM, subcategory: "Для сантехники", patterns: [/сантехник/u, /адрилан/u, /доместос/u, /санокс/u] },
+  { category: CHEM, subcategory: "Для дезинфекции", patterns: [/дезинф/u, /антисептик/u, /септо/u, /здравдез/u] },
+  { category: CHEM, subcategory: "Порошки", patterns: [/стиральн.*порош/u, /порошок viksan/u, /порошок ять/u, /отбеливатель.*порош/u, /пемолюкс/u] },
+  { category: CHEM, subcategory: "Мыло", patterns: [/жидкое мыло/u, /мыло-пена/u, /хозяйственное мыло/u, /туалетное мыло/u, /\bмыло\b/u] },
+  { category: CHEM, subcategory: "Универсальные", patterns: [/универсальн.*очист/u, /универсальный очиститель/u] },
+  { category: PAPER, subcategory: "Салфетки", patterns: [/салфетк/u] },
+  { category: CHEM, subcategory: "Прочее", patterns: [/освежитель воздуха/u, /белизна/u, /хелп - /u, /чистящ/u, /моющ/u, /химитек/u, /ника-2/u, /средство для/u, /экопрофхим/u, /prosept/u, /очиститель/u, /полироль/u, /отбеливани/u, /dry dez/u] },
+
+  { category: HOUSEHOLD, subcategory: "Мешки для мусора", patterns: [/пакет[ыа]? для мусора/u, /мешк.*для мусора/u, /мешк.*мусор/u] },
+  { category: HOUSEHOLD, subcategory: "Перчатки", patterns: [/перчатк/u, /нитрил/u, /латекс/u, /винилов/u] },
+  { category: HOUSEHOLD, subcategory: "Одноразовая одежда", patterns: [/шапочк/u, /халат однораз/u, /бахил/u, /маска медицин/u, /нарукавник/u, /набородник/u, /балаклав/u, /передник/u, /пилотка/u, /спецодежд/u] },
+  { category: HOUSEHOLD, subcategory: "Пленка под запайку", patterns: [/пленк.*под запай/u, /запаечн.*пленк/u, /пленк.*для запай/u] },
+  { category: HOUSEHOLD, subcategory: "Фольга, пленка, пергамент", patterns: [/фольг/u, /пергамент/u, /подпергамент/u, /стрейч/u, /пленк.*пищев/u, /пленка пищевая/u] },
+  { category: HOUSEHOLD, subcategory: "Прочее", patterns: [/распылител/u, /пульверизатор/u, /опрыскивател/u, /ролик для чистки/u, /ловушка от мух/u, /ведр.*хозяйств/u] },
+  { category: HOUSEHOLD, subcategory: "Губки для посуды", patterns: [/губк/u] },
+
+  { category: PAPER, subcategory: "Туалетная бумага", patterns: [/туалетн.*бумаг/u] },
+  { category: PAPER, subcategory: "Бумажные полотенца", patterns: [/полотенц.*бумаж/u, /бумажн.*полотенц/u, /рулонные полотенца/u, /полотенца в рулоне/u, /z-укл/u, /v-укл/u, /v-сложен/u] },
+  { category: PAPER, subcategory: "Прочее", patterns: [/покрытия для унитаза/u] },
+
+  { category: BAGS, subcategory: "Пакеты-майки", patterns: [/пакет-майк/u, /пакеты-майк/u, /майка/u] },
+  { category: BAGS, subcategory: "Пакеты вакуумные", patterns: [/вакуумн.*пакет/u] },
+  { category: BAGS, subcategory: "Пакеты фасовочные", patterns: [/фасовочн/u] },
+  { category: BAGS, subcategory: "Бумажные пакеты с ручкой", patterns: [/бумажн.*пакет.*с ручк/u, /пакет.*крафт.*с ручк/u] },
+  { category: BAGS, subcategory: "Бумажные пакеты без ручки", patterns: [/бумажн.*пакет/u, /уголок бумажн/u] },
+  { category: BAGS, subcategory: "Прочее", patterns: [/фильтр-пакет/u, /пакет(?!ы? для мусора)/u] },
+
+  { category: DISPOSABLE, subcategory: "Ланч-боксы", patterns: [/ланч-?бокс/u, /\blb[-\s]/u] },
+  { category: DISPOSABLE, subcategory: "Коробки для пиццы", patterns: [/пицц/u] },
+  { category: DISPOSABLE, subcategory: "Соусники", patterns: [/соусник/u] },
+  { category: DISPOSABLE, subcategory: "Стаканы", patterns: [/стакан/u, /шейкер пэт/u] },
+  { category: DISPOSABLE, subcategory: "Тарелки, миски", patterns: [/тарелк/u, /миск/u, /креманк/u] },
+  { category: DISPOSABLE, subcategory: "Для суши и лапши", patterns: [/суши/u, /ролл/u, /вок/u, /noodles/u, /палочки для еды/u] },
+  { category: DISPOSABLE, subcategory: "Столовые приборы", patterns: [/вилк/u, /ложк/u, /набор.*прибор/u, /размешивател/u, /зубочист/u, /шпател/u, /конверт для (столовых )?прибор/u, /нож белый/u, /нож черный/u, /нож для чистки/u] },
+  { category: DISPOSABLE, subcategory: "Бутылки", patterns: [/бутылк/u] },
+  { category: OFFICE, subcategory: "", patterns: [/лоток.*бумаг/u] },
+  { category: DISPOSABLE, subcategory: "Лотки", patterns: [/лоток/u, /подложк/u] },
+  { category: DISPOSABLE, subcategory: "Для кондитерских изделий", patterns: [/кондитер/u, /тарталетк/u] },
+  { category: DISPOSABLE, subcategory: "Контейнеры под запайку", patterns: [/под запай/u, /запайк/u, /спк/u] },
+  { category: DISPOSABLE, subcategory: "Формы алюминиевые", patterns: [/алюмин/u] },
+  { category: DISPOSABLE, subcategory: "Ведра", patterns: [/ведр/u] },
+  { category: DISPOSABLE, subcategory: "Бумажная упаковка", patterns: [/eco tabox/u, /eco sandwich/u, /fast food box/u, /бумажн.*контейнер/u, /контейнер.*бумажн/u, /крафт с окном/u, /упаковка eco/u, /уголок бумажн/u, /коробка для (картофеля|гамбургера|фри)/u, /капкейк/u, /бумага для шаверм/u, /бумага для выпечк/u] },
+  { category: DISPOSABLE, subcategory: "Контейнеры", patterns: [/контейнер/u, /opsalad/u, /ракушк/u, /ип-\d/u, /банка супов/u, /крышк/u, /банк[аиу]/u] },
+
+  { category: BAR, subcategory: "", patterns: [/трубочк/u, /пика /u, /барн/u, /коктейл/u, /мартини/u, /вилочка коктейл/u, /палочки для шашлык/u] },
+  { category: OFFICE, subcategory: "", patterns: [/кассов/u, /этикет/u, /скотч/u, /скрепк/u, /папк/u, /маркер/u, /карандаш/u, /блокнот/u, /линейк/u, /ластик/u, /клей/u, /степлер/u, /канцеляр/u, /файл/u, /штемпел/u, /термоэтикет/u, /калькулятор/u, /стикер для записей/u, /планшет а4/u, /лоток.*бумаг/u, /конверт.*бумажн/u, /ручка шариков/u, /шило/u, /корректирующ/u, /накладная/u, /ресторанный счет/u, /бумага а4/u, /блок бумажн/u] },
+];
+
+/**
+ * Категория и подкатегория по названию товара.
+ * Если у группы есть подгруппы и правило не указало свою — «Прочее».
+ */
+export function assignCloverTaxonomy(name) {
+  const text = normTaxonomyText(name);
+  if (!text) return { category: OTHER, subcategory: "", facet: "" };
+
+  for (const rule of TAXONOMY_ASSIGN_RULES) {
+    if (!rule.patterns.some((pattern) => pattern.test(text))) continue;
+    const children = getGroupChildren(rule.category);
+    let subcategory = String(rule.subcategory || "").trim();
+    if (children.length && !subcategory) subcategory = "Прочее";
+    if (children.length && subcategory) {
+      const exists = children.some(
+        (child) => child.name.toLocaleLowerCase("ru-RU") === subcategory.toLocaleLowerCase("ru-RU")
+      );
+      if (!exists) subcategory = "Прочее";
+    }
+    if (!children.length) subcategory = "";
+    return { category: rule.category, subcategory, facet: "" };
+  }
+
+  return { category: OTHER, subcategory: "", facet: "" };
+}
+
+/** Короткие описания и подгруппы для страницы категории. */
 export const CLOVER_GROUP_META = {
-  Контейнеры: {
-    icon: "box",
-    lead: "Контейнеры для хранения, фасовки и доставки.",
-    children: [
-      {
-        name: "Бумажные контейнеры",
-        children: [
-          { name: "Круглые" },
-          { name: "Прямоугольные" },
-          { name: "С крышкой" },
-        ],
-      },
-      {
-        name: "Пластиковые контейнеры",
-        children: [
-          { name: "Круглые" },
-          { name: "Прямоугольные" },
-          { name: "Ракушки" },
-        ],
-      },
-      { name: "Контейнеры-ракушки" },
-      { name: "Ланч-боксы" },
-      { name: "Контейнеры под запайку" },
-    ],
-  },
-  "Гигиеническая продукция": {
-    icon: "textile",
-    lead: "Салфетки, полотенца и средства гигиены.",
-    children: [],
-  },
   "Одноразовая посуда": {
     icon: "disposable",
-    lead: "Тарелки, стаканы, приборы и расходники для сервиса.",
+    lead: "Стаканы, контейнеры, приборы и упаковка для еды навынос.",
     children: [
-      {
-        name: "Стаканы",
-        children: [
-          { name: "Пластиковые" },
-          { name: "1-слойные" },
-          { name: "2-слойные" },
-          { name: "3-слойные" },
-          { name: "Крышки" },
-        ],
-      },
-      { name: "Эко-посуда" },
+      { name: "Стаканы" },
+      { name: "Контейнеры" },
+      { name: "Бумажная упаковка" },
+      { name: "Ведра" },
+      { name: "Ланч-боксы" },
+      { name: "Коробки для пиццы" },
+      { name: "Соусники" },
       { name: "Тарелки, миски" },
       { name: "Столовые приборы" },
-      { name: "Соусники" },
-      { name: "Бокалы, фужеры, рюмки" },
+      { name: "Для суши и лапши" },
+      { name: "Бутылки" },
+      { name: "Лотки" },
+      { name: "Для кондитерских изделий" },
+      { name: "Контейнеры под запайку" },
       { name: "Формы алюминиевые" },
-      { name: "Упаковка для фастфуда" },
-      { name: "Коробки для пиццы" },
+      { name: "Прочее" },
     ],
   },
-  "Химия профессиональная": {
+  "Хозяйственные товары": {
+    icon: "clean",
+    lead: "Расходники для уборки, защиты и упаковки на кухне.",
+    children: [
+      { name: "Фольга, пленка, пергамент" },
+      { name: "Одноразовая одежда" },
+      { name: "Тряпки, мопы, полотенца" },
+      { name: "Перчатки" },
+      { name: "Мешки для мусора" },
+      { name: "Губки для посуды" },
+      { name: "Швабры, щетки" },
+      { name: "Пленка под запайку" },
+      { name: "Прочее" },
+    ],
+  },
+  "Химия, чистящие средства": {
     icon: "chemistry",
-    lead: "Профессиональные моющие и дезинфицирующие средства.",
+    lead: "Моющие и чистящие средства для кухни, зала и санузла.",
+    children: [
+      { name: "Жироудалители" },
+      { name: "Для мытья посуды" },
+      { name: "Для окон" },
+      { name: "Для полов" },
+      { name: "Для сантехники" },
+      { name: "Универсальные" },
+      { name: "Для дезинфекции" },
+      { name: "Мыло" },
+      { name: "Порошки" },
+      { name: "Для посудомоечных машин" },
+      { name: "Прочее" },
+    ],
+  },
+  "Барные аксессуары": {
+    icon: "disposable",
+    lead: "Трубочки, пики и расходники для бара.",
     children: [],
+  },
+  "Бумажная продукция": {
+    icon: "textile",
+    lead: "Полотенца, туалетная бумага и салфетки.",
+    children: [
+      { name: "Бумажные полотенца" },
+      { name: "Туалетная бумага" },
+      { name: "Салфетки" },
+      { name: "Прочее" },
+    ],
+  },
+  "Пакеты, упаковочные материалы": {
+    icon: "bags",
+    lead: "Пакеты-майки, фасовочные, вакуумные и бумажные пакеты.",
+    children: [
+      { name: "Пакеты-майки" },
+      { name: "Пакеты фасовочные" },
+      { name: "Пакеты вакуумные" },
+      { name: "Бумажные пакеты с ручкой" },
+      { name: "Бумажные пакеты без ручки" },
+      { name: "Прочее" },
+    ],
   },
   "Канцелярские товары": {
     icon: "office",
-    lead: "Канцелярия для офиса, кассы и склада.",
-    children: [],
-  },
-  "Бумага офисная": {
-    icon: "office",
-    lead: "Бумага А4 и офисные расходники.",
-    children: [],
-  },
-  "Лотки и подложки": {
-    icon: "box",
-    lead: "Лотки, подложки и формы для выкладки и упаковки.",
-    children: [],
-  },
-  "Химия бытовая": {
-    icon: "chemistry",
-    lead: "Бытовая химия для кухни, санузлов и уборки.",
-    children: [],
-  },
-  "Уборочный инвентарь и оборудование": {
-    icon: "clean",
-    lead: "Инвентарь и расходники для уборки.",
-    children: [],
-  },
-  "Барные аксессуары и товары для сервировки": {
-    icon: "disposable",
-    lead: "Аксессуары для бара и сервировки стола.",
-    children: [],
-  },
-  "Кухонные принадлежности": {
-    icon: "other",
-    lead: "Принадлежности для кухни и пищеблока.",
-    children: [],
-  },
-  Пленка: {
-    icon: "bags",
-    lead: "Пищевая плёнка, стрейч и упаковочные плёнки.",
-    children: [],
-  },
-  "Пакеты и сумки": {
-    icon: "bags",
-    lead: "Пакеты, мешки и сумки для фасовки и доставки.",
-    children: [],
-  },
-  "Упаковочные материалы": {
-    icon: "box",
-    lead: "Коробки, банки и материалы для упаковки.",
-    children: [],
-  },
-  "Товары для гостиниц, отелей и бань": {
-    icon: "textile",
-    lead: "Расходники и текстиль для гостиничного сервиса.",
-    children: [],
-  },
-  "Спецодежда, обувь и средства защиты": {
-    icon: "gloves",
-    lead: "СИЗ, перчатки, спецодежда и защита.",
-    children: [],
-  },
-  "Принадлежности для касс и торговли": {
-    icon: "office",
-    lead: "Кассовая лента и расходники для торговли.",
-    children: [],
-  },
-  "Оборудование для туалетных комнат": {
-    icon: "clean",
-    lead: "Диспенсеры и расходники для санузлов.",
-    children: [],
-  },
-  "Офисная техника и расходные материалы": {
-    icon: "office",
-    lead: "Расходники для офисной техники.",
-    children: [],
-  },
-  "Продукты питания": {
-    icon: "other",
-    lead: "Продукты и сопутствующие позиции ассортимента.",
-    children: [],
-  },
-  "Бытовая техника и электротовары": {
-    icon: "other",
-    lead: "Техника и электротовары для бизнеса.",
-    children: [],
-  },
-  Мебель: {
-    icon: "other",
-    lead: "Мебель для офиса, склада и точек обслуживания.",
-    children: [],
-  },
-  "Посуда и столовые приборы": {
-    icon: "disposable",
-    lead: "Посуда и приборы для сервировки.",
+    lead: "Канцелярия, кассовая лента и расходники для офиса.",
     children: [],
   },
   Прочее: {
@@ -238,12 +287,12 @@ export function getGroupChildren(category) {
 }
 
 export function findSubgroup(category, subcategory) {
-  const needle = String(subcategory || "").trim();
+  const needle = canonicalizeProductSubcategory(subcategory).toLocaleLowerCase("ru-RU");
   if (!needle) return null;
   return (
     getGroupChildren(category).find(
       (child) =>
-        child.name.toLocaleLowerCase("ru-RU") === needle.toLocaleLowerCase("ru-RU")
+        child.name.toLocaleLowerCase("ru-RU") === needle
     ) || null
   );
 }
@@ -280,7 +329,7 @@ export function sortCloverProductGroups(names) {
 
 /**
  * Дерево групп для навигации витрины.
- * Если categories пуст — показываем полный канонический список (как на Opticom).
+ * Если categories пуст — показываем полный канонический список.
  */
 export function buildGroupNav(categories) {
   const fromApi = (Array.isArray(categories) ? categories : [])
@@ -326,17 +375,17 @@ export function categoryMatchesFilter(productCategory, filterCategory) {
 }
 
 export function subcategoryMatchesFilter(productSubcategory, filterSubcategory) {
-  const filter = String(filterSubcategory || "").trim();
+  const filter = canonicalizeProductSubcategory(filterSubcategory);
   if (!filter) return true;
-  const product = String(productSubcategory || "").trim();
+  const product = canonicalizeProductSubcategory(productSubcategory);
   return (
     product.toLocaleLowerCase("ru-RU") === filter.toLocaleLowerCase("ru-RU")
   );
 }
 
 /**
- * Подгруппа/фасет по названию товара: совпадение с именами children группы
- * или с уже размеченными товарами той же категории.
+ * Подгруппа/фасет по названию товара: сначала правила раскладки,
+ * затем совпадение с именами children группы.
  */
 export function inferSubcategoryFacetFromName(
   productName,
@@ -349,6 +398,11 @@ export function inferSubcategoryFacetFromName(
     .toLocaleLowerCase("ru-RU")
     .replaceAll("ё", "е");
   if (!cat || !query) return { subcategory: "", facet: "" };
+
+  const assigned = assignCloverTaxonomy(productName);
+  if (assigned.category === cat && assigned.subcategory) {
+    return { subcategory: assigned.subcategory, facet: assigned.facet || "" };
+  }
 
   const children = getGroupChildren(cat);
   if (!children.length) return { subcategory: "", facet: "" };
@@ -421,7 +475,12 @@ export function inferSubcategoryFacetFromName(
     }
   }
 
-  if (!bestSub) return { subcategory: "", facet: "" };
+  if (!bestSub) {
+    if (children.some((child) => child.name === "Прочее")) {
+      return { subcategory: "Прочее", facet: "" };
+    }
+    return { subcategory: "", facet: "" };
+  }
 
   let facet = String(bestSub.facet || "").trim();
   if (!facet) {

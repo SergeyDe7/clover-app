@@ -85,7 +85,7 @@ export function ProductEditor({
   const [form, setForm] = useState(
     product || {
       name: "",
-      category: "Новые товары",
+      category: "Прочее",
       code: "",
       oneCId: "",
       oneCCode: "",
@@ -266,6 +266,7 @@ export function ProductEditor({
     const nextName = item.name || form.name || "";
     const keepCategory =
       form.category &&
+      form.category !== "Прочее" &&
       form.category !== "Новые товары" &&
       form.category !== "Из 1С";
     const nextProduct = normalizeProduct({
@@ -371,11 +372,13 @@ export function ProductEditor({
     try {
       const normalized = await normalizeProductPhotoFile(file);
       const result = await api.uploadProductImage(productId, normalized);
+      const editorScroll = document.querySelector(".product-editor-scroll");
+      const editorTop = editorScroll?.scrollTop ?? 0;
+      const pageY = window.scrollY;
       applyLiveProduct({ ...form, ...result.product });
-      await appAlert({
-        title: "Фото сохранено",
-        message: "Фото приведено к единому формату каталога и сохранено.",
-        tone: "success",
+      requestAnimationFrame(() => {
+        if (editorScroll) editorScroll.scrollTop = editorTop;
+        window.scrollTo(0, pageY);
       });
     } catch (error) {
       await appAlert({
@@ -1268,8 +1271,5 @@ export function ProductEditor({
   );
 
   if (typeof document === "undefined") return editor;
-  return createPortal(
-    editor,
-    document.querySelector(".clover-app") || document.body
-  );
+  return createPortal(editor, document.documentElement);
 }

@@ -34,15 +34,23 @@ export function HomePage() {
 
   return (
     <div className="sf-home">
-      <section className="sf-hero sf-hero-compact" aria-label="Clover">
+      <section className="sf-hero sf-hero-compact" aria-label="Компания КЛЕВЕР">
         <div className="sf-hero-copy">
-          <p className="sf-hero-brand">Clover</p>
+          <p className="sf-hero-brand">КЛЕВЕР</p>
           <h1>
             {hero.title || STOREFRONT_HERO_TITLE}
           </h1>
           <p className="sf-hero-lead">
             {hero.lead || STOREFRONT_HERO_LEAD}
           </p>
+        </div>
+        <div className="sf-hero-visual" aria-hidden="true">
+          <img
+            src="/storefront/hero-horeca.png"
+            alt=""
+            width="1280"
+            height="720"
+          />
         </div>
       </section>
 

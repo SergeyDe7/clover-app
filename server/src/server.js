@@ -163,6 +163,10 @@ import {
   unitPriceField,
 } from "./pricing.js";
 import {
+  overlayStorefrontClientLink,
+  resolveStorefrontOneCClient,
+} from "./storefrontCounterparty.js";
+import {
   createStorefrontOrder,
   getPublicCatalog,
   getPublicProductByCode,
@@ -3155,7 +3159,17 @@ async function handleOneCTestOrder(req, res, next) {
     const items = aligned.items.map(({ lineTotal, ...rest }) => rest);
     const lockedOrderTotal = aligned.total;
 
-    const clientLink = normalizeClientLink(clientLinks[realOrder.clientId]);
+    const storefrontCounterpart = resolveStorefrontOneCClient({
+      settings: getStorefrontSettings(
+        getGlobalState("settings", DEFAULT_SETTINGS)
+      ),
+      oneCClients: getGlobalState("oneCClients", []),
+    });
+    const clientLink = overlayStorefrontClientLink(
+      realOrder,
+      normalizeClientLink(clientLinks[realOrder.clientId]),
+      storefrontCounterpart
+    );
 
     if (legacyProtocol) {
       writeAudit({
@@ -3206,6 +3220,7 @@ async function handleOneCTestOrder(req, res, next) {
         total: lockedOrderTotal,
         comment: buildOneCOrderComment(realOrder),
       },
+      items,
     });
   } catch (error) {
     next(error);
@@ -3882,6 +3897,8 @@ app.put(
                 "storefrontShowOnlyLinked",
                 "storefrontHeroTitle",
                 "storefrontHeroLead",
+                "storefrontOneCClientId",
+                "storefrontOneCClientName",
               ].map((key) => [key, current[key]])
             ),
           };
