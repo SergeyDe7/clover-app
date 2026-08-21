@@ -144,6 +144,7 @@ export function AppModalHost() {
     };
     const html = document.documentElement;
     const body = document.body;
+    const scrollY = window.scrollY;
     const previous = {
       htmlOverflow: html.style.overflow,
       bodyOverflow: body.style.overflow,
@@ -159,7 +160,7 @@ export function AppModalHost() {
     body.style.position = "fixed";
     body.style.width = "100%";
     body.style.height = "100%";
-    body.style.top = "0";
+    body.style.top = `-${scrollY}px`;
     window.addEventListener("keydown", onKey);
     return () => {
       html.classList.remove("clover-thankyou-open");
@@ -170,6 +171,7 @@ export function AppModalHost() {
       body.style.width = previous.bodyWidth;
       body.style.height = previous.bodyHeight;
       body.style.top = previous.bodyTop;
+      window.scrollTo(0, scrollY);
       window.removeEventListener("keydown", onKey);
     };
   }, [dialog]);
@@ -297,6 +299,6 @@ export function AppModalHost() {
         </div>
       </div>
     </div>,
-    document.body
+    document.documentElement
   );
 }

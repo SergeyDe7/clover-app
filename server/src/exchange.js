@@ -3,6 +3,11 @@ import {
   normalizeOneCDatabaseName,
   TEST_DATABASE_NAME,
 } from "./oneCPriceSync.js";
+import {
+  isStorefrontOrder,
+  overlayStorefrontClientLink,
+  STOREFRONT_DEFAULT_COUNTERPARTY_NAME,
+} from "./storefrontCounterparty.js";
 
 const UNIT_LABELS = {
   piece: "штука",
@@ -241,10 +246,29 @@ function productMap(products) {
   return new Map((products || []).map((product) => [String(product.id), product]));
 }
 
-export function validateOrderFor1C({ order, products, clientLinks }) {
+function clientLinkFor1C(order, clientLinks, storefrontCounterpart = null) {
+  const raw = clientLinks?.[order?.clientId] || {};
+  if (!isStorefrontOrder(order)) return raw;
+  return overlayStorefrontClientLink(
+    order,
+    raw,
+    storefrontCounterpart || {
+      id: "",
+      code: "",
+      name: STOREFRONT_DEFAULT_COUNTERPARTY_NAME,
+    }
+  );
+}
+
+export function validateOrderFor1C({
+  order,
+  products,
+  clientLinks,
+  storefrontCounterpart = null,
+}) {
   const issues = [];
   const warnings = [];
-  const link = clientLinks?.[order?.clientId] || {};
+  const link = clientLinkFor1C(order, clientLinks, storefrontCounterpart);
   const productsById = productMap(products);
 
   if (!order?.id) issues.push("У заказа отсутствует системный ID.");
@@ -298,9 +322,19 @@ export function validateOrderFor1C({ order, products, clientLinks }) {
   };
 }
 
-export function build1CPayload({ order, products, clientLinks }) {
-  const validation = validateOrderFor1C({ order, products, clientLinks });
-  const link = clientLinks?.[order?.clientId] || {};
+export function build1CPayload({
+  order,
+  products,
+  clientLinks,
+  storefrontCounterpart = null,
+}) {
+  const validation = validateOrderFor1C({
+    order,
+    products,
+    clientLinks,
+    storefrontCounterpart,
+  });
+  const link = clientLinkFor1C(order, clientLinks, storefrontCounterpart);
   const productsById = productMap(products);
   const exchange = normalizeExchangeState(order?.exchange);
 

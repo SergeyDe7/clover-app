@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { GroupIcon } from "./GroupIcon.jsx";
-import { buildGroupNav } from "../productGroups.js";
+import { buildGroupNav, canonicalizeProductSubcategory } from "../productGroups.js";
 import { navigateStorefront } from "./StoreHeader.jsx";
 
 /**
@@ -106,7 +106,8 @@ export function CatalogGroupNav({
                     type="button"
                     className={`sf-group-nav-item is-child${
                       activeCategory === group.name &&
-                      activeSubcategory === child.name
+                      canonicalizeProductSubcategory(activeSubcategory) ===
+                        child.name
                         ? " is-active"
                         : ""
                     }`}

@@ -1,6 +1,8 @@
 // Общие чистые хелперы и константы Clover.
 // Не содержит React-компонентов — только данные и функции без побочных эффектов рендера.
 
+import { assignCloverTaxonomy, canonicalizeProductCategory } from "../screens/storefront/productGroups.js";
+
 export const MANAGER_ACTIVE_TAB_KEY = "clover-manager-active-tab-v1";
 
 export const MANAGER_OPEN_CLIENT_KEY = "clover-manager-open-client-v1";
@@ -9,17 +11,17 @@ export const CLIENT_ACTIVE_TAB_KEY = "clover-client-active-tab-v1";
 
 export const MANAGER_TABS = [
   ["orders", "Заказы"],
-  ["clients", "Клиенты"],
   ["products", "Товары"],
-  ["exchange", "1С"],
+  ["storefront", "Витрина"],
+  ["clients", "Клиенты"],
   ["acts", "Акты сверок"],
+  ["exchange", "1С"],
   ["more", "Ещё"],
 ];
 
 /** Вкладки внутри «Ещё» у менеджера. */
 export const MANAGER_MORE_TABS = [
   ["access", "Доступы"],
-  ["storefront", "Витрина сайта"],
   ["settings", "Настройки"],
   ["backup", "Резервные копии"],
   ["audit", "Журнал"],
@@ -118,12 +120,26 @@ export function markReadyActsSeen(requests = []) {
 export function readManagerActiveTab() {
   try {
     const value = localStorage.getItem(MANAGER_ACTIVE_TAB_KEY) || "orders";
+    const moreValue = localStorage.getItem(MANAGER_MORE_TAB_KEY) || "";
+    if (value === "storefront" || (value === "more" && moreValue === "storefront")) {
+      return "storefront";
+    }
     if (value === "acts") return "acts";
     if (MANAGER_MORE_TABS.some(([id]) => id === value)) return "more";
     return MANAGER_TABS.some(([id]) => id === value) ? value : "orders";
   } catch {
     return "orders";
   }
+}
+
+/** Вернуть прокрутку окна после закрытия модалки/сохранения. */
+export function restoreWindowScroll(scrollY) {
+  if (typeof window === "undefined") return;
+  const y = Number(scrollY);
+  const top = Number.isFinite(y) ? y : 0;
+  const apply = () => window.scrollTo(0, top);
+  apply();
+  requestAnimationFrame(apply);
 }
 
 export function writeManagerActiveTab(value) {
@@ -5233,72 +5249,6 @@ export function getOrCreateClientId() {
 
 const PLACEHOLDER_PRODUCT_CATEGORIES = new Set(["Из 1С", "Новые товары", ""]);
 
-const CATEGORY_KEYWORD_RULES = [
-  {
-    category: "Спецодежда, обувь и средства защиты",
-    patterns: [/перчатк/u, /нитрил/u, /латекс/u, /винилов/u, /спецодежд/u, /\bсиз\b/u],
-  },
-  {
-    category: "Пленка",
-    patterns: [/пленк/u, /плёнк/u, /стрейч/u, /stretch/u, /пергамент/u, /вакуумн/u],
-  },
-  {
-    category: "Пакеты и сумки",
-    patterns: [/пакет/u, /мешк/u, /сумк/u],
-  },
-  {
-    category: "Уборочный инвентарь и оборудование",
-    patterns: [
-      /салфетк/u, /швабр/u, /\bмоп\b/u, /щетк/u, /губк/u, /ведр/u, /пипидастр/u,
-      /совк/u, /распылител/u, /пульверизатор/u, /тряпк/u, /полотер/u, /диспенсер/u,
-    ],
-  },
-  { category: "Контейнеры", patterns: [/контейнер/u] },
-  { category: "Лотки и подложки", patterns: [/лоток/u, /подложк/u] },
-  {
-    category: "Упаковочные материалы",
-    patterns: [/банк[аиуы]/u, /крышк/u, /бутылк/u, /oneclick/u, /стаканчик/u, /коробк/u],
-  },
-  {
-    category: "Одноразовая посуда",
-    patterns: [/трубочк/u, /вилк/u, /ложк/u, /тарелк/u, /зубочист/u, /шпател/u, /стакан/u],
-  },
-  {
-    category: "Принадлежности для касс и торговли",
-    patterns: [/кассов/u, /лент.*кас/u],
-  },
-  {
-    category: "Бумага офисная",
-    patterns: [/\bа4\b/u, /бумаг.*офис/u, /офисн.*бумаг/u],
-  },
-  {
-    category: "Канцелярские товары",
-    patterns: [/лент/u, /бумаг/u, /ручк/u, /степлер/u, /ножниц/u],
-  },
-  {
-    category: "Химия профессиональная",
-    patterns: [/профессионал.*хим/u, /хим.*профессион/u],
-  },
-  {
-    category: "Химия бытовая",
-    patterns: [/белизна/u, /санокс/u, /хелп/u, /моющ/u, /чистящ/u, /дезинф/u, /средство для/u, /химия/u],
-  },
-  {
-    category: "Гигиеническая продукция",
-    patterns: [/полотн/u, /вафельн/u, /текстил/u, /полотенц/u, /тряпк[аи] для пола/u, /гигиен/u],
-  },
-  {
-    category: "Оборудование для туалетных комнат",
-    patterns: [/туалетн/u, /диспенсер.*бумаг/u, /мыльниц/u],
-  },
-  { category: "Посуда и столовые приборы", patterns: [/столов.*прибор/u, /посуд/u] },
-  { category: "Кухонные принадлежности", patterns: [/кухон/u] },
-  {
-    category: "Барные аксессуары и товары для сервировки",
-    patterns: [/барн/u, /сервировк/u],
-  },
-];
-
 function categoryNameTokens(value) {
   return String(value || "")
     .toLocaleLowerCase("ru-RU")
@@ -5307,8 +5257,8 @@ function categoryNameTokens(value) {
     .filter((token) => token.length >= 3);
 }
 
-/** Категория по названию: похожий товар в каталоге → ключевые слова → «Новые товары». */
-export function inferProductCategory(name, products = [], fallback = "Новые товары") {
+/** Категория по названию: похожий товар в каталоге → правила витрины → «Прочее». */
+export function inferProductCategory(name, products = [], fallback = "Прочее") {
   const query = String(name || "").trim();
   if (!query) return fallback;
 
@@ -5326,13 +5276,9 @@ export function inferProductCategory(name, products = [], fallback = "Новые
       best = { category, score };
     }
   }
-  if (best) return best.category;
+  if (best) return canonicalizeProductCategory(best.category);
 
-  const text = query.toLocaleLowerCase("ru-RU").replaceAll("ё", "е");
-  for (const rule of CATEGORY_KEYWORD_RULES) {
-    if (rule.patterns.some((pattern) => pattern.test(text))) return rule.category;
-  }
-  return fallback;
+  return assignCloverTaxonomy(query).category || fallback;
 }
 
 /** Артикул для UI: только код 1С (внутренние CL-… не показываем). */

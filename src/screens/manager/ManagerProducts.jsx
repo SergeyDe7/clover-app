@@ -8,6 +8,7 @@ import {
   firstPositiveCatalogPrice,
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
+  restoreWindowScroll,
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { productImageSrc } from "../../shared/productPhoto";
@@ -299,6 +300,7 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
 
   const save = async (value) => {
     const normalized = normalizeProduct(value);
+    const pageY = window.scrollY;
     try {
       const result = await api.saveProduct(normalized);
       const incoming =
@@ -309,6 +311,7 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
             : [normalized];
       setProducts((current) => mergeProductsFromCatalogResponse(current, incoming));
       setEditorProduct(undefined);
+      restoreWindowScroll(pageY);
     } catch (error) {
       void appAlert({
         title: "Не удалось сохранить",

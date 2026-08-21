@@ -27,6 +27,7 @@ import {
   productArticle,
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
+  restoreWindowScroll,
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { MatrixOneCProductAdd } from "./MatrixOneCProductAdd";
@@ -293,7 +294,7 @@ function createManagerClientForm(client) {
   };
 }
 
-function ManagerClientEditor({ client, onReload, onClose }) {
+function ManagerClientEditor({ client, link, onLinkChange, onReload, onClose }) {
   const [form, setForm] = useState(() => createManagerClientForm(client));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -535,7 +536,9 @@ function ManagerClientEditor({ client, onReload, onClose }) {
         <div>
           <p className="eyebrow">Профиль</p>
           <h3>Данные клиента</h3>
-          <p className="muted small">Телефон, email, адреса и заметка менеджера</p>
+          <p className="muted small">
+            Телефон, email, контрагент 1С, адреса и заметка менеджера
+          </p>
         </div>
         {onClose && (
           <button className="secondary-button" type="button" onClick={onClose}>
@@ -573,6 +576,19 @@ function ManagerClientEditor({ client, onReload, onClose }) {
             onChange={(event) => setProfileField("email", event.target.value)}
           />
         </label>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <strong>Контрагент 1С</strong>
+        <p className="muted small" style={{ marginTop: 4 }}>
+          Нужен, чтобы заказы этого клиента создавались в 1С. Для заказов с сайта
+          без регистрации используется служебный контрагент витрины.
+        </p>
+        <OneCClientPicker
+          client={client}
+          link={link || EMPTY_LINK}
+          onChange={(patch) => onLinkChange?.(patch)}
+        />
       </div>
 
       <div className="profile-contacts-block" style={{ marginTop: 14 }}>
@@ -1132,6 +1148,7 @@ export function ManagerClients({
 
   const saveCatalogProduct = async (value) => {
     const normalized = normalizeProduct(value);
+    const pageY = window.scrollY;
     try {
       const result = await api.saveProduct(normalized);
       const incoming =
@@ -1142,6 +1159,7 @@ export function ManagerClients({
             : [normalized];
       setProducts((current) => mergeProductsFromCatalogResponse(current, incoming));
       setEditorProduct(undefined);
+      restoreWindowScroll(pageY);
     } catch (error) {
       void appAlert({
         title: "Не удалось сохранить",
@@ -1906,6 +1924,17 @@ export function ManagerClients({
                 String(profileOpenId) === String(client.id) ? (
                   <ManagerClientEditor
                     client={client}
+                    link={link}
+                    onLinkChange={(patch) => {
+                      setClientLinks((current) => ({
+                        ...current,
+                        [client.id]: {
+                          ...EMPTY_LINK,
+                          ...(current[client.id] || {}),
+                          ...patch,
+                        },
+                      }));
+                    }}
                     onReload={onReload}
                     onClose={() => setProfileOpenId("")}
                   />
@@ -2016,15 +2045,19 @@ export function ManagerClients({
                   <details className="client-matrix-settings" open={link.matrixMode === "pending"}>
                       <summary>1С и цены</summary>
                       <p className="muted small" style={{ marginTop: 0 }}>
-                        Связь с контрагентом, режим матрицы, вид цен и наценка.
+                        Режим матрицы, вид цен и наценка. Контрагента 1С выбирают
+                        в «Данные клиента».
                         После «Обновить цены» в 1С ЛК клиента подтягивает каталог автоматически.
                       </p>
-
-                      <OneCClientPicker
-                        client={client}
-                        link={link}
-                        onChange={(patch) => updateLink(client.id, patch)}
-                      />
+                      {link.oneCId ? (
+                        <p className="muted small">
+                          Контрагент 1С: {link.oneCName || link.oneCCode || "связан"}
+                        </p>
+                      ) : (
+                        <p className="muted small">
+                          Контрагент 1С не выбран — откройте «Данные клиента».
+                        </p>
+                      )}
 
                       <div className="form-grid" style={{ marginTop: 14 }}>
                         <label className="field">
