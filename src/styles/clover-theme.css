@@ -5685,6 +5685,43 @@ html.clover-cart-open body {
   line-height: 1.45;
 }
 
+.storefront-hero-slide-list {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+
+.storefront-hero-slide-row {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 8px;
+  border: 1px solid rgba(40, 60, 40, 0.12);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.storefront-hero-slide-row img {
+  width: 112px;
+  height: 70px;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #eef4ea;
+}
+
+.storefront-hero-slide-fields {
+  display: grid;
+  gap: 6px;
+}
+
+.storefront-hero-slide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 .storefront-price-field {
   display: grid;
   gap: 6px;

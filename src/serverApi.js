@@ -351,6 +351,24 @@ export const api = {
     });
   },
 
+  uploadStorefrontMapImage(file) {
+    const formData = new FormData();
+    formData.append("image", file);
+    return request("/admin/storefront/map-image", {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  uploadStorefrontHeroImage(file) {
+    const formData = new FormData();
+    formData.append("image", file);
+    return request("/admin/storefront/hero-image", {
+      method: "POST",
+      body: formData,
+    });
+  },
+
   saveClientLinks(clientLinks) {
     return request("/state/client-links", {
       method: "PUT",

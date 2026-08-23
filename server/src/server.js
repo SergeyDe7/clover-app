@@ -170,10 +170,13 @@ import {
   createStorefrontOrder,
   getPublicCatalog,
   getPublicProductByCode,
+  getPublicSite,
   getStorefrontSettings,
   mergeStorefrontSettings,
   stripStorefrontSettings,
+  STOREFRONT_SETTING_KEYS,
   findPurchasePriceTypeId,
+  heroSlideUploadUrls,
 } from "./storefrontPublic.js";
 import {
   buildAllPriceRequirements,
@@ -258,6 +261,60 @@ const imageUpload = multer({
       callback(
         null,
         `product-${String(req.params.productId || "item")}-${Date.now()}-${randomUUID()}${extensionMap[file.mimetype] || ".img"}`
+      );
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter(req, file, callback) {
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.mimetype)) {
+      return callback(
+        new Error("Разрешены только изображения JPG, PNG или WEBP.")
+      );
+    }
+    callback(null, true);
+  },
+});
+
+const mapImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadsDirectory,
+    filename(req, file, callback) {
+      const extensionMap = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+      };
+      callback(
+        null,
+        `storefront-map-${Date.now()}-${randomUUID()}${extensionMap[file.mimetype] || ".img"}`
+      );
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter(req, file, callback) {
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.mimetype)) {
+      return callback(
+        new Error("Разрешены только изображения JPG, PNG или WEBP.")
+      );
+    }
+    callback(null, true);
+  },
+});
+
+const heroImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadsDirectory,
+    filename(req, file, callback) {
+      const extensionMap = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+      };
+      callback(
+        null,
+        `storefront-hero-${Date.now()}-${randomUUID()}${extensionMap[file.mimetype] || ".img"}`
       );
     },
   }),
@@ -1615,6 +1672,16 @@ app.get("/api/health", (req, res) => {
     service: "clover-server", version: "4.0.4",
     time: new Date().toISOString(),
   });
+});
+
+/** Публичные контакты и тексты витрины (без авторизации, без каталога). */
+app.get("/api/public/site", (req, res) => {
+  try {
+    res.json({ site: getPublicSite() });
+  } catch (error) {
+    console.error("public site failed", error);
+    res.status(500).json({ error: "Не удалось загрузить данные сайта." });
+  }
 });
 
 /** Публичные контакты менеджера для экрана входа (без авторизации). */
@@ -3923,17 +3990,7 @@ app.put(
         : {
             ...stripStorefrontSettings(incoming),
             ...Object.fromEntries(
-              [
-                "storefrontPricingMode",
-                "storefrontMarkupPercent",
-                "storefrontPriceTypeId",
-                "storefrontPriceTypeName",
-                "storefrontShowOnlyLinked",
-                "storefrontHeroTitle",
-                "storefrontHeroLead",
-                "storefrontOneCClientId",
-                "storefrontOneCClientName",
-              ].map((key) => [key, current[key]])
+              STOREFRONT_SETTING_KEYS.map((key) => [key, current[key]])
             ),
           };
 
@@ -3977,6 +4034,16 @@ app.put(
       ...getGlobalState("settings", DEFAULT_SETTINGS),
     };
     const next = mergeStorefrontSettings(current, req.body?.settings || {});
+    if (
+      current.storefrontContactMapImageUrl &&
+      current.storefrontContactMapImageUrl !== next.storefrontContactMapImageUrl
+    ) {
+      removeUploadedImage(current.storefrontContactMapImageUrl);
+    }
+    const nextHeroUploads = new Set(heroSlideUploadUrls(next.storefrontHeroSlides));
+    for (const imageUrl of heroSlideUploadUrls(current.storefrontHeroSlides)) {
+      if (!nextHeroUploads.has(imageUrl)) removeUploadedImage(imageUrl);
+    }
     setGlobalState("settings", next);
     auditFromRequest(req, "storefront.settings.save", {
       pricingMode: next.storefrontPricingMode || "price_type",
@@ -3988,6 +4055,36 @@ app.put(
       settings: next,
       storefront: getStorefrontSettings(next),
     });
+  }
+);
+
+app.post(
+  "/api/admin/storefront/map-image",
+  authRequired,
+  roleRequired("admin"),
+  mapImageUpload.single("image"),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Выберите изображение карты." });
+    }
+    const imageUrl = `/uploads/${req.file.filename}`;
+    auditFromRequest(req, "storefront.map-image.upload", { imageUrl });
+    res.status(201).json({ ok: true, imageUrl });
+  }
+);
+
+app.post(
+  "/api/admin/storefront/hero-image",
+  authRequired,
+  roleRequired("admin"),
+  heroImageUpload.single("image"),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Выберите изображение слайда." });
+    }
+    const imageUrl = `/uploads/${req.file.filename}`;
+    auditFromRequest(req, "storefront.hero-image.upload", { imageUrl });
+    res.status(201).json({ ok: true, imageUrl });
   }
 );
 

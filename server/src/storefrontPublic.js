@@ -42,6 +42,12 @@ import {
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
 } from "../../src/shared/appHelpers.js";
+import { normalizeYandexMapsUrl } from "../../src/shared/yandexMaps.js";
+import {
+  STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
+  STOREFRONT_DEFAULT_HERO_SLIDES,
+  STOREFRONT_MAX_HERO_SLIDES,
+} from "../../src/screens/storefront/siteCopy.js";
 
 const STOREFRONT_GUEST_EMAIL = "storefront-guest@clover.local";
 
@@ -62,6 +68,36 @@ export function getStorefrontSettings(settingsInput) {
     storefrontShowOnlyLinked: settings.storefrontShowOnlyLinked !== false,
     storefrontHeroTitle: String(settings.storefrontHeroTitle || "").trim(),
     storefrontHeroLead: String(settings.storefrontHeroLead || "").trim(),
+    storefrontHeroSlides: normalizeStorefrontHeroSlides(
+      settings.storefrontHeroSlides
+    ),
+    storefrontHeroIntervalSec: normalizeStorefrontHeroIntervalSec(
+      settings.storefrontHeroIntervalSec
+    ),
+    storefrontContactPhone: normalizeStorefrontContactPhone(
+      settings.storefrontContactPhone
+    ),
+    storefrontContactEmail: normalizeStorefrontContactEmail(
+      settings.storefrontContactEmail
+    ),
+    storefrontContactAddress: normalizeStorefrontContactText(
+      settings.storefrontContactAddress,
+      500
+    ),
+    storefrontContactHours: normalizeStorefrontContactText(
+      settings.storefrontContactHours,
+      800
+    ),
+    storefrontContactNote: normalizeStorefrontContactText(
+      settings.storefrontContactNote,
+      800
+    ),
+    storefrontContactMapsUrl: normalizeYandexMapsUrl(
+      settings.storefrontContactMapsUrl
+    ),
+    storefrontContactMapImageUrl: normalizeStorefrontMapImageUrl(
+      settings.storefrontContactMapImageUrl
+    ),
     storefrontOneCClientId: String(settings.storefrontOneCClientId || "").trim(),
     storefrontOneCClientName:
       String(settings.storefrontOneCClientName || "").trim() ||
@@ -81,7 +117,105 @@ function normalizeStorefrontMarkupPercent(value) {
   return Math.min(1000, Math.round(num * 100) / 100);
 }
 
-const STOREFRONT_SETTING_KEYS = [
+function normalizeStorefrontContactPhone(value) {
+  return String(value || "").trim();
+}
+
+function normalizeStorefrontContactEmail(value) {
+  return String(value || "").trim().slice(0, 254);
+}
+
+function normalizeStorefrontContactText(value, max) {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .trim()
+    .slice(0, max);
+}
+
+function normalizeStorefrontMapImageUrl(value) {
+  const raw = String(value || "").trim();
+  if (!/^\/uploads\/storefront-map-[A-Za-z0-9._-]+$/.test(raw)) return "";
+  return raw;
+}
+
+const HERO_SLIDE_SRC_RE =
+  /^\/(?:storefront\/hero-[A-Za-z0-9._-]+\.(?:png|jpe?g|webp)|uploads\/storefront-hero-[A-Za-z0-9._-]+)$/;
+
+export function cloneDefaultHeroSlides() {
+  return STOREFRONT_DEFAULT_HERO_SLIDES.map((slide) => ({ ...slide }));
+}
+
+export function normalizeStorefrontHeroSlides(value) {
+  const list = Array.isArray(value) ? value : [];
+  const slides = [];
+  const seen = new Set();
+  for (const item of list) {
+    const src = String(
+      item && typeof item === "object" ? item.src : item || ""
+    ).trim();
+    if (!HERO_SLIDE_SRC_RE.test(src) || seen.has(src)) continue;
+    seen.add(src);
+    slides.push({
+      src,
+      alt: String(item?.alt || "").trim().slice(0, 120),
+      href: normalizeStorefrontHeroHref(item?.href),
+      buttonLabel: normalizeStorefrontHeroButton(item?.buttonLabel),
+    });
+    if (slides.length >= STOREFRONT_MAX_HERO_SLIDES) break;
+  }
+  return slides.length ? slides : cloneDefaultHeroSlides();
+}
+
+export function normalizeStorefrontHeroIntervalSec(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return STOREFRONT_DEFAULT_HERO_INTERVAL_SEC;
+  return Math.min(60, Math.max(2, Math.round(num)));
+}
+
+export function heroSlideUploadUrls(slides) {
+  return (Array.isArray(slides) ? slides : [])
+    .map((slide) => String(slide?.src || ""))
+    .filter((src) => src.startsWith("/uploads/storefront-hero-"));
+}
+
+export function normalizeStorefrontHeroButton(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 40);
+}
+
+export function normalizeStorefrontHeroHref(value) {
+  let raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^(javascript|data|vbscript):/i.test(raw)) return "";
+
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const url = new URL(raw);
+      const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+      if (host !== "clover-spb.ru" && host !== "localhost") return "";
+      raw = `${url.pathname || "/"}${url.search || ""}`;
+    } catch {
+      return "";
+    }
+  }
+
+  raw = raw.replace(/^\/vitrina(?=\/|$)/, "") || "/";
+  if (!raw.startsWith("/")) {
+    const code = raw.slice(0, 80);
+    if (!code || /[/?#\s]/.test(code)) return "";
+    return `/product/${encodeURIComponent(code)}`;
+  }
+
+  if (raw.length > 400) return "";
+  if (raw === "/") return "";
+  if (!/^\/(product|catalog|contacts|cart)(\/|$)/.test(raw)) return "";
+  if (raw.startsWith("/product/") && raw === "/product/") return "";
+  return raw;
+}
+
+export const STOREFRONT_SETTING_KEYS = [
   "storefrontPricingMode",
   "storefrontMarkupPercent",
   "storefrontPriceTypeId",
@@ -89,6 +223,15 @@ const STOREFRONT_SETTING_KEYS = [
   "storefrontShowOnlyLinked",
   "storefrontHeroTitle",
   "storefrontHeroLead",
+  "storefrontHeroSlides",
+  "storefrontHeroIntervalSec",
+  "storefrontContactPhone",
+  "storefrontContactEmail",
+  "storefrontContactAddress",
+  "storefrontContactHours",
+  "storefrontContactNote",
+  "storefrontContactMapsUrl",
+  "storefrontContactMapImageUrl",
   "storefrontOneCClientId",
   "storefrontOneCClientName",
 ];
@@ -132,6 +275,42 @@ export function mergeStorefrontSettings(baseSettings, patch = {}) {
     storefrontHeroLead: String(
       incoming.storefrontHeroLead ?? current.storefrontHeroLead ?? ""
     ).trim(),
+    storefrontHeroSlides: normalizeStorefrontHeroSlides(
+      incoming.storefrontHeroSlides !== undefined
+        ? incoming.storefrontHeroSlides
+        : current.storefrontHeroSlides
+    ),
+    storefrontHeroIntervalSec: normalizeStorefrontHeroIntervalSec(
+      incoming.storefrontHeroIntervalSec !== undefined
+        ? incoming.storefrontHeroIntervalSec
+        : current.storefrontHeroIntervalSec
+    ),
+    storefrontContactPhone: normalizeStorefrontContactPhone(
+      incoming.storefrontContactPhone ?? current.storefrontContactPhone ?? ""
+    ),
+    storefrontContactEmail: normalizeStorefrontContactEmail(
+      incoming.storefrontContactEmail ?? current.storefrontContactEmail ?? ""
+    ),
+    storefrontContactAddress: normalizeStorefrontContactText(
+      incoming.storefrontContactAddress ?? current.storefrontContactAddress ?? "",
+      500
+    ),
+    storefrontContactHours: normalizeStorefrontContactText(
+      incoming.storefrontContactHours ?? current.storefrontContactHours ?? "",
+      800
+    ),
+    storefrontContactNote: normalizeStorefrontContactText(
+      incoming.storefrontContactNote ?? current.storefrontContactNote ?? "",
+      800
+    ),
+    storefrontContactMapsUrl: normalizeYandexMapsUrl(
+      incoming.storefrontContactMapsUrl ?? current.storefrontContactMapsUrl ?? ""
+    ),
+    storefrontContactMapImageUrl: normalizeStorefrontMapImageUrl(
+      incoming.storefrontContactMapImageUrl ??
+        current.storefrontContactMapImageUrl ??
+        ""
+    ),
     storefrontOneCClientId: String(
       incoming.storefrontOneCClientId ?? current.storefrontOneCClientId ?? ""
     ).trim(),
@@ -434,11 +613,29 @@ export function getPublicCatalog({
     categories: buildCategories(listStorefrontProducts(settings)),
     products,
     priceType,
-    site: {
-      heroTitle: settings.storefrontHeroTitle || "",
-      heroLead: settings.storefrontHeroLead || "",
-    },
+    site: buildPublicSite(settings),
   };
+}
+
+export function buildPublicSite(settingsInput) {
+  const settings = getStorefrontSettings(settingsInput);
+  return {
+    heroTitle: settings.storefrontHeroTitle || "",
+    heroLead: settings.storefrontHeroLead || "",
+    heroSlides: settings.storefrontHeroSlides,
+    heroIntervalSec: settings.storefrontHeroIntervalSec,
+    contactPhone: settings.storefrontContactPhone || "",
+    contactEmail: settings.storefrontContactEmail || "",
+    contactAddress: settings.storefrontContactAddress || "",
+    contactHours: settings.storefrontContactHours || "",
+    contactNote: settings.storefrontContactNote || "",
+    contactMapsUrl: settings.storefrontContactMapsUrl || "",
+    contactMapImageUrl: settings.storefrontContactMapImageUrl || "",
+  };
+}
+
+export function getPublicSite() {
+  return buildPublicSite(getGlobalState("settings", DEFAULT_SETTINGS));
 }
 
 export function getPublicProductByCode(code) {
