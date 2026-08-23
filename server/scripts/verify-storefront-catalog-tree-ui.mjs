@@ -209,5 +209,15 @@ assert.match(
   /color-scheme:\s*only light/,
   "Витрина не уходит в тёмную автопалитру телефона."
 );
+assert.doesNotMatch(
+  page,
+  /Выберите категорию/,
+  "На каталоге нет подсказки «Выберите категорию»."
+);
+assert.doesNotMatch(
+  page,
+  /activeMeta\.lead|getGroupMeta\([^)]*\)\.lead/,
+  "Под названием категории не показываем lead-подсказку."
+);
 
 console.log("verify-storefront-catalog-tree-ui: ok");

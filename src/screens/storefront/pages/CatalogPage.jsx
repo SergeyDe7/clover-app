@@ -191,13 +191,11 @@ export function CatalogPage({
                   ) : null}
                 </nav>
                 <h1>{title}</h1>
-                <p>{activeMeta.lead}</p>
               </div>
             </header>
           ) : (
             <div className="sf-section-head">
               <h1>Каталог</h1>
-              <p>Выберите категорию.</p>
             </div>
           )}
 
@@ -284,14 +282,12 @@ export function CatalogPage({
                 <div className="sf-group-head">
                   <div>
                     <h2>{section.name}</h2>
-                    {!atParentOnly ? (
-                      <p className="sf-muted">{getGroupMeta(section.name).lead}</p>
-                    ) : (
+                    {atParentOnly ? (
                       <p className="sf-muted">
                         Товары без выбранной подгруппы — укажите подкатегорию в
                         карточке, чтобы они попали в меню.
                       </p>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               ) : null}
