@@ -76,8 +76,22 @@ assert.ok(STOREFRONT_SETTING_KEYS.includes("storefrontContactMapsUrl"));
 assert.ok(STOREFRONT_SETTING_KEYS.includes("storefrontContactMapImageUrl"));
 
 assert.equal(normalizeYandexMapsUrl("https://evil.example/maps"), "");
+assert.equal(normalizeYandexMapsUrl("javascript:alert(1)"), "");
+assert.ok(
+  normalizeYandexMapsUrl("yandex.ru/maps/-/CHxxxx").includes("yandex.ru/maps")
+);
+assert.ok(
+  normalizeYandexMapsUrl("https://n.maps.yandex.ru/?ll=30.4,59.9").includes(
+    "n.maps.yandex.ru"
+  )
+);
+assert.ok(
+  normalizeYandexMapsUrl(
+    "https://yandex.ru/map-widget/v1/?um=constructor%3Aabc"
+  ).includes("map-widget")
+);
 const point = parseYandexMapsPoint(
-  "https://yandex.ru/maps/?ll=30.3141,59.9386&z=15"
+  "https://n.maps.yandex.ru/?ll=30.3141,59.9386&z=15"
 );
 assert.equal(point.lon, 30.3141);
 assert.equal(point.lat, 59.9386);
@@ -127,6 +141,7 @@ assert.match(page, /Режим работы/);
 assert.match(page, /mailto:/);
 assert.match(page, /javascript/i);
 assert.match(page, /yandexStaticMapSrc/);
+assert.match(page, /yandexEmbedSrc/);
 assert.match(page, /Открыть в Яндекс.Картах/);
 assert.match(admin, /Контакты на витрине/);
 assert.match(admin, /storefrontContactAddress/);

@@ -83,13 +83,18 @@ a.sf-contacts-btn { display: none !important; }
 .sf-contacts-item a:hover { color: var(--clover-green, #5b9d57); }
 .sf-contacts-pre { white-space: pre-wrap; font-size: 1.05rem; font-weight: 700; }
 .sf-contacts-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.sf-contacts-map img {
+.sf-contacts-map img,
+.sf-contacts-map iframe {
   width: 100%;
   height: auto;
   display: block;
   border-radius: 22px;
   border: 1px solid rgba(28, 31, 28, 0.08);
   background: #fff;
+}
+.sf-contacts-map iframe {
+  height: 360px;
+  border: 0;
 }
 a.sf-cart-mobile { display: none !important; }
 a.sf-catalog-mobile { display: none !important; }

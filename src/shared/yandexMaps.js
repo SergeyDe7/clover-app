@@ -1,33 +1,62 @@
 const MAX_MAPS_URL = 2000;
 
-function isYandexMapsHost(hostname) {
-  const host = String(hostname || "")
+function stripWrap(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^<|>$/g, "")
+    .replace(/^["']+|["']+$/g, "")
+    .trim();
+}
+
+function withHttps(raw) {
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `https://${raw}`;
+}
+
+function hostName(hostname) {
+  return String(hostname || "")
     .replace(/^www\./i, "")
     .toLowerCase();
-  return (
-    host === "yandex.ru" ||
-    host === "yandex.com" ||
-    host === "maps.yandex.ru" ||
-    host === "maps.yandex.com"
-  );
+}
+
+function isYandexMapsHost(hostname) {
+  const host = hostName(hostname);
+  if (host === "yandex.ru" || host === "yandex.com") return true;
+  if (host === "maps.yandex.ru" || host === "maps.yandex.com") return true;
+  if (host.endsWith(".maps.yandex.ru") || host.endsWith(".maps.yandex.com")) {
+    return true;
+  }
+  return false;
+}
+
+function looksLikeYandexMaps(url) {
+  if (!isYandexMapsHost(url.hostname)) return false;
+  const host = hostName(url.hostname);
+  const path = String(url.pathname || "").toLowerCase();
+  if (host === "maps.yandex.ru" || host === "maps.yandex.com") return true;
+  if (host.endsWith(".maps.yandex.ru") || host.endsWith(".maps.yandex.com")) {
+    return true;
+  }
+  if (path.includes("/maps") || path.includes("/map-widget")) return true;
+  const um = String(url.searchParams.get("um") || "");
+  if (/constructor/i.test(um)) return true;
+  if (url.searchParams.get("ll") || url.searchParams.get("pt")) return true;
+  return false;
 }
 
 export function normalizeYandexMapsUrl(value) {
-  const raw = String(value || "").trim();
+  const raw = stripWrap(value);
   if (!raw) return "";
   let url;
   try {
-    url = new URL(raw);
+    url = new URL(withHttps(raw));
   } catch {
     return "";
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return "";
-  if (!isYandexMapsHost(url.hostname)) return "";
-  const path = `${url.hostname}${url.pathname}`.toLowerCase();
-  if (!path.includes("maps")) return "";
+  if (!looksLikeYandexMaps(url)) return "";
   url.protocol = "https:";
-  const href = url.toString();
-  return href.slice(0, MAX_MAPS_URL);
+  return url.toString().slice(0, MAX_MAPS_URL);
 }
 
 function parseLonLatPair(raw) {
@@ -95,4 +124,25 @@ export function yandexMapWidgetSrc(point) {
     pt: `${lon},${lat},pm2rdm`,
   });
   return `https://yandex.ru/map-widget/v1/?${params.toString()}`;
+}
+
+export function yandexEmbedSrc(value) {
+  const href = normalizeYandexMapsUrl(value);
+  if (!href) return "";
+  let url;
+  try {
+    url = new URL(href);
+  } catch {
+    return "";
+  }
+  const um = String(url.searchParams.get("um") || "");
+  if (/constructor/i.test(um)) {
+    const widget = new URL("https://yandex.ru/map-widget/v1/");
+    widget.searchParams.set("um", um);
+    widget.searchParams.set("source", "constructor");
+    return widget.toString();
+  }
+  const point = parseYandexMapsPoint(href);
+  if (point) return yandexMapWidgetSrc(point);
+  return "";
 }

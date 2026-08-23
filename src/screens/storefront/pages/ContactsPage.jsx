@@ -5,6 +5,7 @@ import {
 } from "../../../shared/appHelpers";
 import {
   parseYandexMapsPoint,
+  yandexEmbedSrc,
   yandexStaticMapSrc,
 } from "../../../shared/yandexMaps.js";
 import { storefrontApi } from "../publicApi.js";
@@ -63,6 +64,7 @@ export function ContactsPage() {
   const mapsUrl = site.contactMapsUrl || "";
   const point = parseYandexMapsPoint(mapsUrl);
   const staticMap = yandexStaticMapSrc(point);
+  const embedSrc = yandexEmbedSrc(mapsUrl);
   const mapImage = site.contactMapImageUrl || staticMap;
   const hasAny =
     Boolean(phoneLinks.phone) ||
@@ -71,7 +73,8 @@ export function ContactsPage() {
     Boolean(site.contactHours) ||
     Boolean(site.contactNote) ||
     Boolean(mapsUrl) ||
-    Boolean(mapImage);
+    Boolean(mapImage) ||
+    Boolean(embedSrc);
 
   return (
     <div className="sf-contacts-page">
@@ -140,23 +143,35 @@ export function ContactsPage() {
               ) : null}
             </div>
           </div>
-          {mapImage ? (
+          {mapImage || embedSrc ? (
             <div className="sf-contacts-map">
-              {mapsUrl ? (
-                <a href={mapsUrl} target="_blank" rel="noreferrer">
+              {mapImage ? (
+                mapsUrl ? (
+                  <a href={mapsUrl} target="_blank" rel="noreferrer">
+                    <img
+                      src={mapImage}
+                      alt="Точка на карте"
+                      width="650"
+                      height="450"
+                    />
+                  </a>
+                ) : (
                   <img
                     src={mapImage}
                     alt="Точка на карте"
                     width="650"
                     height="450"
                   />
-                </a>
+                )
               ) : (
-                <img
-                  src={mapImage}
-                  alt="Точка на карте"
+                <iframe
+                  title="Яндекс.Карты"
+                  src={embedSrc}
                   width="650"
                   height="450"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  allow="fullscreen"
                 />
               )}
             </div>

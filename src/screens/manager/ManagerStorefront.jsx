@@ -4,6 +4,7 @@ import { appAlert } from "../../shared/AppModal";
 import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber, matchesCatalogPrefixSearch, productCatalogSearchHaystack, formatRussianPhone, getRussianPhoneLocalDigits } from "../../shared/appHelpers";
 import { StorefrontProductAdd } from "./StorefrontProductAdd";
 import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE } from "../storefront/siteCopy.js";
+import { normalizeYandexMapsUrl } from "../../shared/yandexMaps.js";
 
 function formatMarkupDraft(value) {
   if (value === "" || value === null || value === undefined) return "";
@@ -202,6 +203,15 @@ export function ManagerStorefront({
       const next = result.settings || { ...settings, ...payload };
       setSettings(next);
       setSettingsSaved(true);
+      const mapsInput = String(draft.storefrontContactMapsUrl || "").trim();
+      if (mapsInput && !normalizeYandexMapsUrl(mapsInput)) {
+        await appAlert({
+          title: "Ссылка на карту не сохранена",
+          message:
+            "Нужна ссылка Яндекс.Карт: скопируйте адрес из браузера (yandex.ru/maps или n.maps.yandex.ru).",
+          tone: "danger",
+        });
+      }
     } catch (error) {
       await appAlert({
         title: "Не удалось сохранить",
@@ -645,11 +655,18 @@ export function ManagerStorefront({
             Ссылка на Яндекс.Карты
             <input
               value={draft.storefrontContactMapsUrl || ""}
-              placeholder="https://yandex.ru/maps/…"
+              placeholder="https://yandex.ru/maps/… или n.maps.yandex.ru/…"
               onChange={(event) =>
                 setField("storefrontContactMapsUrl", event.target.value)
               }
             />
+            {String(draft.storefrontContactMapsUrl || "").trim() &&
+            !normalizeYandexMapsUrl(draft.storefrontContactMapsUrl) ? (
+              <p className="storefront-settings-hint" style={{ color: "#a14a32" }}>
+                Не похоже на ссылку Яндекс.Карт. Вставьте адрес страницы карты
+                из браузера.
+              </p>
+            ) : null}
           </label>
           <div className="field field-wide">
             Картинка карты с точкой
