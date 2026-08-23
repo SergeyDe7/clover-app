@@ -16,7 +16,7 @@ export function CartPage() {
 
   if (!items.length) {
     return (
-      <div className="sf-cart">
+      <div className="sf-cart sf-empty">
         <h1>Корзина</h1>
         <p className="sf-muted">Пока пусто — добавьте товары из каталога.</p>
         <button

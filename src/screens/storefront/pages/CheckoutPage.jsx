@@ -47,7 +47,7 @@ export function CheckoutPage() {
 
   if (!items.length) {
     return (
-      <div className="sf-checkout">
+      <div className="sf-checkout sf-empty">
         <h1>Оформление</h1>
         <p className="sf-muted">Корзина пуста.</p>
         <button
