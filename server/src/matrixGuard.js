@@ -7,7 +7,7 @@ function cleanId(value) {
   return String(value ?? "").trim();
 }
 
-export function clientMayOrderCatalogProduct(rawLink = {}, productId, products = []) {
+export function clientMayOrderCatalogProduct(rawLink = {}, productId, _products = []) {
   const matrixMode = String(rawLink?.matrixMode || "pending");
   const id = cleanId(productId);
   if (!id) return false;

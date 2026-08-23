@@ -79,7 +79,7 @@ function ClientDashboard({
   fullCatalogProducts = [],
   favorites,
   setFavorites,
-  showFullCatalog,
+  showFullCatalog: _showFullCatalog,
   setShowFullCatalog,
   onSaveOrder,
   onCloseCatalog,
