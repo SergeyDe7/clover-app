@@ -6,6 +6,7 @@ import { CatalogGroupNav } from "../components/CatalogGroupNav.jsx";
 import { GroupIcon } from "../components/GroupIcon.jsx";
 import {
   getGroupMeta,
+  getGroupChildren,
   getSubgroupFacets,
   groupProductsByCloverGroup,
   groupRequiresSubgroup,
@@ -23,6 +24,7 @@ export function CatalogPage({
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [treeOpen, setTreeOpen] = useState(() => !category);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +46,13 @@ export function CatalogPage({
     };
   }, [category, subcategory, facet]);
 
+  useEffect(() => {
+    if (!category) return;
+    if (window.matchMedia("(max-width: 900px)").matches) {
+      setTreeOpen(false);
+    }
+  }, [category, subcategory]);
+
   const products = useMemo(() => {
     const list = data?.products || [];
     return list.filter((product) =>
@@ -52,6 +61,7 @@ export function CatalogPage({
   }, [data, query]);
 
   const activeMeta = category ? getGroupMeta(category) : null;
+  const subgroups = category ? getGroupChildren(category) : [];
   const facets = subcategory ? getSubgroupFacets(category, subcategory) : [];
   const needsSubgroup = category && groupRequiresSubgroup(category);
   const atParentOnly = Boolean(category && !subcategory && needsSubgroup);
@@ -109,14 +119,39 @@ export function CatalogPage({
   return (
     <div className="sf-catalog">
       <div className="sf-catalog-layout">
-        <aside className="sf-catalog-side">
+        <aside className={`sf-catalog-side${treeOpen ? " is-open" : ""}`}>
+          <button
+            type="button"
+            className="sf-catalog-tree-toggle"
+            aria-expanded={treeOpen}
+            onClick={() => setTreeOpen((open) => !open)}
+          >
+            <span>{category || "Категории"}</span>
+            <svg
+              className="sf-catalog-tree-toggle-icon"
+              viewBox="0 0 12 12"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                d="M2.2 4.2 L6 8 L9.8 4.2"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
           <p className="sf-catalog-side-title">Каталог</p>
-          <CatalogGroupNav
-            categories={data?.categories || []}
-            activeCategory={category}
-            activeSubcategory={subcategory}
-            variant="side"
-          />
+          <div className="sf-catalog-tree-body">
+            <CatalogGroupNav
+              categories={data?.categories || []}
+              activeCategory={category}
+              activeSubcategory={subcategory}
+              variant="side"
+            />
+          </div>
         </aside>
 
         <div className="sf-catalog-main">
@@ -162,9 +197,32 @@ export function CatalogPage({
           ) : (
             <div className="sf-section-head">
               <h1>Каталог</h1>
-              <p>Выберите группу в дереве слева.</p>
+              <p>Выберите категорию.</p>
             </div>
           )}
+
+          {subgroups.length > 0 ? (
+            <div className="sf-subcat-chips" aria-label="Подгруппы">
+              {subgroups.map((child) => (
+                <button
+                  key={child.name}
+                  type="button"
+                  className={`sf-chip${
+                    subcategory === child.name ? " is-active" : ""
+                  }`}
+                  onClick={() =>
+                    navigateStorefront({
+                      name: "catalog",
+                      category,
+                      subcategory: child.name,
+                    })
+                  }
+                >
+                  {child.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           {subcategory && facets.length > 0 ? (
             <section className="sf-subgroup-strip" aria-label="Уточнение">
@@ -215,33 +273,6 @@ export function CatalogPage({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-            </div>
-          ) : null}
-
-          {!category ? (
-            <div className="sf-category-chips" aria-label="Быстрый фильтр групп">
-              <button
-                type="button"
-                className="sf-chip is-active"
-                onClick={() => navigateStorefront({ name: "catalog" })}
-              >
-                Все группы
-              </button>
-              {(data?.categories || []).map((item) => (
-                <button
-                  key={item.name}
-                  type="button"
-                  className="sf-chip"
-                  onClick={() =>
-                    navigateStorefront({
-                      name: "catalog",
-                      category: item.name,
-                    })
-                  }
-                >
-                  {item.name}
-                </button>
-              ))}
             </div>
           ) : null}
 

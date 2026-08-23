@@ -48,8 +48,15 @@ export function StoreHeader({ current }) {
         )}
       </nav>
       <div className="sf-header-actions">
-        <a className="sf-btn sf-btn-ghost" href={cabinetLoginUrl("/")}>
-          Войти в ЛК
+        <a
+          className="sf-btn sf-btn-ghost sf-catalog-mobile"
+          href={storefrontHref({ name: "catalog" })}
+          onClick={(e) => {
+            e.preventDefault();
+            go({ name: "catalog" });
+          }}
+        >
+          Каталог
         </a>
         <a
           className="sf-btn sf-btn-primary sf-cart-mobile"
@@ -60,6 +67,9 @@ export function StoreHeader({ current }) {
           }}
         >
           Корзина{count ? ` · ${count}` : ""}
+        </a>
+        <a className="sf-btn sf-btn-ghost sf-login" href={cabinetLoginUrl("/")}>
+          Войти в ЛК
         </a>
       </div>
     </header>
