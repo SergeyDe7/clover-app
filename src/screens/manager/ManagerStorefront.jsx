@@ -35,6 +35,7 @@ export function ManagerStorefront({
   const [storefrontFilter, setStorefrontFilter] = useState("Все");
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [editingId, setEditingId] = useState(null);
+  const [mapBusy, setMapBusy] = useState(false);
   const [editDraft, setEditDraft] = useState({
     description: "",
     composition: "",
@@ -55,6 +56,11 @@ export function ManagerStorefront({
     storefrontHeroLead: settings?.storefrontHeroLead || "",
     storefrontContactPhone: formatRussianPhone(settings?.storefrontContactPhone || ""),
     storefrontContactEmail: settings?.storefrontContactEmail || "",
+    storefrontContactAddress: settings?.storefrontContactAddress || "",
+    storefrontContactHours: settings?.storefrontContactHours || "",
+    storefrontContactNote: settings?.storefrontContactNote || "",
+    storefrontContactMapsUrl: settings?.storefrontContactMapsUrl || "",
+    storefrontContactMapImageUrl: settings?.storefrontContactMapImageUrl || "",
     storefrontOneCClientId: settings?.storefrontOneCClientId || "",
     storefrontOneCClientName:
       settings?.storefrontOneCClientName || "Интернет магазин Clover",
@@ -77,6 +83,11 @@ export function ManagerStorefront({
         storefrontHeroLead: settings?.storefrontHeroLead || "",
         storefrontContactPhone: formatRussianPhone(settings?.storefrontContactPhone || ""),
         storefrontContactEmail: settings?.storefrontContactEmail || "",
+        storefrontContactAddress: settings?.storefrontContactAddress || "",
+        storefrontContactHours: settings?.storefrontContactHours || "",
+        storefrontContactNote: settings?.storefrontContactNote || "",
+        storefrontContactMapsUrl: settings?.storefrontContactMapsUrl || "",
+        storefrontContactMapImageUrl: settings?.storefrontContactMapImageUrl || "",
         storefrontOneCClientId: settings?.storefrontOneCClientId || "",
         storefrontOneCClientName:
           settings?.storefrontOneCClientName || "Интернет магазин Clover",
@@ -91,6 +102,11 @@ export function ManagerStorefront({
         prev.storefrontHeroLead === next.storefrontHeroLead &&
         prev.storefrontContactPhone === next.storefrontContactPhone &&
         prev.storefrontContactEmail === next.storefrontContactEmail &&
+        prev.storefrontContactAddress === next.storefrontContactAddress &&
+        prev.storefrontContactHours === next.storefrontContactHours &&
+        prev.storefrontContactNote === next.storefrontContactNote &&
+        prev.storefrontContactMapsUrl === next.storefrontContactMapsUrl &&
+        prev.storefrontContactMapImageUrl === next.storefrontContactMapImageUrl &&
         prev.storefrontOneCClientId === next.storefrontOneCClientId &&
         prev.storefrontOneCClientName === next.storefrontOneCClientName;
       return same ? prev : next;
@@ -105,6 +121,11 @@ export function ManagerStorefront({
     settings?.storefrontHeroLead,
     settings?.storefrontContactPhone,
     settings?.storefrontContactEmail,
+    settings?.storefrontContactAddress,
+    settings?.storefrontContactHours,
+    settings?.storefrontContactNote,
+    settings?.storefrontContactMapsUrl,
+    settings?.storefrontContactMapImageUrl,
     settings?.storefrontOneCClientId,
     settings?.storefrontOneCClientName,
   ]);
@@ -171,6 +192,11 @@ export function ManagerStorefront({
           ? draft.storefrontContactPhone
           : "",
         storefrontContactEmail: String(draft.storefrontContactEmail || "").trim(),
+        storefrontContactAddress: String(draft.storefrontContactAddress || "").trim(),
+        storefrontContactHours: String(draft.storefrontContactHours || "").trim(),
+        storefrontContactNote: String(draft.storefrontContactNote || "").trim(),
+        storefrontContactMapsUrl: String(draft.storefrontContactMapsUrl || "").trim(),
+        storefrontContactMapImageUrl: String(draft.storefrontContactMapImageUrl || "").trim(),
       };
       const result = await api.saveStorefrontSettings(payload);
       const next = result.settings || { ...settings, ...payload };
@@ -543,8 +569,9 @@ export function ManagerStorefront({
       <div className="manager-contact-settings" style={{ marginTop: 20 }}>
         <h3>Контакты на витрине</h3>
         <p className="storefront-settings-hint">
-          Кнопка «Контакты» в шапке сайта показывает телефон и почту. Пустые
-          поля на витрине скрываются.
+          Кнопка «Контакты» открывает страницу с телефоном, почтой, адресом,
+          режимом работы и картой. На главной номер телефона также показывается
+          в шапке. Пустые поля на сайте скрываются.
         </p>
         <div className="form-grid">
           <label className="field">
@@ -582,6 +609,106 @@ export function ManagerStorefront({
               }
             />
           </label>
+          <label className="field field-wide">
+            Адрес
+            <input
+              value={draft.storefrontContactAddress || ""}
+              placeholder="Санкт-Петербург, …"
+              onChange={(event) =>
+                setField("storefrontContactAddress", event.target.value)
+              }
+            />
+          </label>
+          <label className="field field-wide">
+            Режим работы
+            <textarea
+              rows={3}
+              value={draft.storefrontContactHours || ""}
+              placeholder={"Пн–Пт 9:00–18:00\nСб 10:00–16:00\nВс выходной"}
+              onChange={(event) =>
+                setField("storefrontContactHours", event.target.value)
+              }
+            />
+          </label>
+          <label className="field field-wide">
+            Как проехать — необязательно
+            <textarea
+              rows={2}
+              value={draft.storefrontContactNote || ""}
+              placeholder="Ориентир, подъезд, домофон"
+              onChange={(event) =>
+                setField("storefrontContactNote", event.target.value)
+              }
+            />
+          </label>
+          <label className="field field-wide">
+            Ссылка на Яндекс.Карты
+            <input
+              value={draft.storefrontContactMapsUrl || ""}
+              placeholder="https://yandex.ru/maps/…"
+              onChange={(event) =>
+                setField("storefrontContactMapsUrl", event.target.value)
+              }
+            />
+          </label>
+          <div className="field field-wide">
+            Картинка карты с точкой
+            <p className="storefront-settings-hint" style={{ margin: "6px 0 10px" }}>
+              Можно загрузить свой снимок. Если оставить пустым, сайт сам
+              покажет карту Яндекса с меткой по ссылке выше.
+            </p>
+            {draft.storefrontContactMapImageUrl ? (
+              <p style={{ margin: "0 0 10px" }}>
+                <img
+                  src={draft.storefrontContactMapImageUrl}
+                  alt="Карта"
+                  style={{ maxWidth: 320, borderRadius: 12 }}
+                />
+              </p>
+            ) : null}
+            <div className="form-actions" style={{ marginTop: 0 }}>
+              <label className="secondary-button">
+                {mapBusy ? "Загрузка…" : "Загрузить картинку"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  hidden
+                  disabled={mapBusy}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (!file) return;
+                    setMapBusy(true);
+                    void api
+                      .uploadStorefrontMapImage(file)
+                      .then((result) => {
+                        setField(
+                          "storefrontContactMapImageUrl",
+                          result.imageUrl || ""
+                        );
+                      })
+                      .catch((error) =>
+                        appAlert({
+                          title: "Не удалось загрузить карту",
+                          message: error.message || "Ошибка загрузки.",
+                          tone: "danger",
+                        })
+                      )
+                      .finally(() => setMapBusy(false));
+                  }}
+                />
+              </label>
+              {draft.storefrontContactMapImageUrl ? (
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setField("storefrontContactMapImageUrl", "")}
+                >
+                  Убрать картинку
+                </button>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
 

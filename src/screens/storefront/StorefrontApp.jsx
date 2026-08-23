@@ -6,6 +6,7 @@ import { CatalogPage } from "./pages/CatalogPage.jsx";
 import { ProductPage } from "./pages/ProductPage.jsx";
 import { CartPage } from "./pages/CartPage.jsx";
 import { CheckoutPage } from "./pages/CheckoutPage.jsx";
+import { ContactsPage } from "./pages/ContactsPage.jsx";
 import "./storefront.css";
 
 export default function StorefrontApp() {
@@ -68,6 +69,9 @@ export default function StorefrontApp() {
   } else if (route.name === "checkout") {
     page = <CheckoutPage />;
     current = "cart";
+  } else if (route.name === "contacts") {
+    page = <ContactsPage />;
+    current = "contacts";
   } else {
     page = <HomePage />;
   }

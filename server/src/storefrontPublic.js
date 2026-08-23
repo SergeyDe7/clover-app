@@ -42,6 +42,7 @@ import {
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
 } from "../../src/shared/appHelpers.js";
+import { normalizeYandexMapsUrl } from "../../src/shared/yandexMaps.js";
 
 const STOREFRONT_GUEST_EMAIL = "storefront-guest@clover.local";
 
@@ -67,6 +68,24 @@ export function getStorefrontSettings(settingsInput) {
     ),
     storefrontContactEmail: normalizeStorefrontContactEmail(
       settings.storefrontContactEmail
+    ),
+    storefrontContactAddress: normalizeStorefrontContactText(
+      settings.storefrontContactAddress,
+      500
+    ),
+    storefrontContactHours: normalizeStorefrontContactText(
+      settings.storefrontContactHours,
+      800
+    ),
+    storefrontContactNote: normalizeStorefrontContactText(
+      settings.storefrontContactNote,
+      800
+    ),
+    storefrontContactMapsUrl: normalizeYandexMapsUrl(
+      settings.storefrontContactMapsUrl
+    ),
+    storefrontContactMapImageUrl: normalizeStorefrontMapImageUrl(
+      settings.storefrontContactMapImageUrl
     ),
     storefrontOneCClientId: String(settings.storefrontOneCClientId || "").trim(),
     storefrontOneCClientName:
@@ -95,6 +114,19 @@ function normalizeStorefrontContactEmail(value) {
   return String(value || "").trim().slice(0, 254);
 }
 
+function normalizeStorefrontContactText(value, max) {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .trim()
+    .slice(0, max);
+}
+
+function normalizeStorefrontMapImageUrl(value) {
+  const raw = String(value || "").trim();
+  if (!/^\/uploads\/storefront-map-[A-Za-z0-9._-]+$/.test(raw)) return "";
+  return raw;
+}
+
 export const STOREFRONT_SETTING_KEYS = [
   "storefrontPricingMode",
   "storefrontMarkupPercent",
@@ -105,6 +137,11 @@ export const STOREFRONT_SETTING_KEYS = [
   "storefrontHeroLead",
   "storefrontContactPhone",
   "storefrontContactEmail",
+  "storefrontContactAddress",
+  "storefrontContactHours",
+  "storefrontContactNote",
+  "storefrontContactMapsUrl",
+  "storefrontContactMapImageUrl",
   "storefrontOneCClientId",
   "storefrontOneCClientName",
 ];
@@ -153,6 +190,26 @@ export function mergeStorefrontSettings(baseSettings, patch = {}) {
     ),
     storefrontContactEmail: normalizeStorefrontContactEmail(
       incoming.storefrontContactEmail ?? current.storefrontContactEmail ?? ""
+    ),
+    storefrontContactAddress: normalizeStorefrontContactText(
+      incoming.storefrontContactAddress ?? current.storefrontContactAddress ?? "",
+      500
+    ),
+    storefrontContactHours: normalizeStorefrontContactText(
+      incoming.storefrontContactHours ?? current.storefrontContactHours ?? "",
+      800
+    ),
+    storefrontContactNote: normalizeStorefrontContactText(
+      incoming.storefrontContactNote ?? current.storefrontContactNote ?? "",
+      800
+    ),
+    storefrontContactMapsUrl: normalizeYandexMapsUrl(
+      incoming.storefrontContactMapsUrl ?? current.storefrontContactMapsUrl ?? ""
+    ),
+    storefrontContactMapImageUrl: normalizeStorefrontMapImageUrl(
+      incoming.storefrontContactMapImageUrl ??
+        current.storefrontContactMapImageUrl ??
+        ""
     ),
     storefrontOneCClientId: String(
       incoming.storefrontOneCClientId ?? current.storefrontOneCClientId ?? ""
@@ -467,6 +524,11 @@ export function buildPublicSite(settingsInput) {
     heroLead: settings.storefrontHeroLead || "",
     contactPhone: settings.storefrontContactPhone || "",
     contactEmail: settings.storefrontContactEmail || "",
+    contactAddress: settings.storefrontContactAddress || "",
+    contactHours: settings.storefrontContactHours || "",
+    contactNote: settings.storefrontContactNote || "",
+    contactMapsUrl: settings.storefrontContactMapsUrl || "",
+    contactMapImageUrl: settings.storefrontContactMapImageUrl || "",
   };
 }
 

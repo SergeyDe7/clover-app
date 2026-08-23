@@ -42,38 +42,55 @@ html.sf-catalog-lock .sf-header,
 .sf-nav-link { text-decoration: none; color: #5a5e5a; font-weight: 600; padding: 8px 12px; border-radius: 999px; transition: background .2s, color .2s; }
 .sf-nav-link:hover, .sf-nav-link.is-active { background: rgba(28, 31, 28, 0.06); color: #1c1f1c; }
 .sf-header-actions { display: flex; gap: 8px; align-items: center; }
-.sf-contacts { position: relative; }
-.sf-contacts-panel {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  width: min(320px, 86vw);
-  padding: 16px;
-  border-radius: 16px;
-  background: #fff;
-  border: 1px solid rgba(28, 31, 28, 0.1);
-  box-shadow: 0 16px 40px rgba(28, 31, 28, 0.14);
-  z-index: 50;
-}
-.sf-contacts-kicker {
-  margin: 0 0 8px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  color: #6b6f6b;
-}
-.sf-contacts-line {
-  display: block;
+.sf-header-phone {
   color: #1c1f1c;
-  font-weight: 700;
+  font-weight: 800;
   text-decoration: none;
-  margin: 0 0 8px;
-  word-break: break-word;
+  white-space: nowrap;
+  letter-spacing: -.02em;
 }
-.sf-contacts-line:hover { color: var(--clover-green, #5b9d57); }
-.sf-contacts-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.sf-contacts-empty { margin: 0; color: #6b6f6b; font-size: 0.92rem; line-height: 1.45; }
+.sf-header-phone:hover { color: var(--clover-green, #5b9d57); }
+a.sf-contacts-btn { display: none !important; }
+.sf-contacts-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 1.1fr);
+  gap: 20px;
+  align-items: start;
+}
+.sf-contacts-card {
+  background: #fff;
+  border: 1px solid rgba(28, 31, 28, 0.08);
+  border-radius: 22px;
+  padding: 22px 22px 20px;
+}
+.sf-contacts-item { margin: 0 0 16px; }
+.sf-contacts-item span {
+  display: block;
+  margin-bottom: 4px;
+  color: #6b6f6b;
+  font-size: .82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.sf-contacts-item a,
+.sf-contacts-item strong {
+  color: #1c1f1c;
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+.sf-contacts-item a:hover { color: var(--clover-green, #5b9d57); }
+.sf-contacts-pre { white-space: pre-wrap; font-size: 1.05rem; font-weight: 700; }
+.sf-contacts-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.sf-contacts-map img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 22px;
+  border: 1px solid rgba(28, 31, 28, 0.08);
+  background: #fff;
+}
 a.sf-cart-mobile { display: none !important; }
 a.sf-catalog-mobile { display: none !important; }
 .sf-main { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 64px; flex: 1; }
@@ -447,6 +464,9 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
   .sf-brand img { width: 84px; }
   a.sf-cart-mobile { display: inline-flex !important; }
   a.sf-catalog-mobile { display: inline-flex !important; }
+  a.sf-contacts-btn { display: inline-flex !important; }
+  .sf-header-phone { flex-basis: 100%; order: -1; }
+  .sf-contacts-layout { grid-template-columns: 1fr; }
   .sf-header-actions { flex-wrap: wrap; justify-content: flex-end; }
   .sf-header-actions .sf-btn { padding: 8px 10px; font-size: 0.88rem; }
   .sf-product-layout, .sf-buy-row, .sf-checkout-form, .sf-cart-item { grid-template-columns: 1fr; }

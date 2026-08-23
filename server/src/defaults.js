@@ -75,6 +75,11 @@ export const DEFAULT_SETTINGS = {
   storefrontHeroLead: "",
   storefrontContactPhone: "",
   storefrontContactEmail: "",
+  storefrontContactAddress: "",
+  storefrontContactHours: "",
+  storefrontContactNote: "",
+  storefrontContactMapsUrl: "",
+  storefrontContactMapImageUrl: "",
   storefrontOneCClientId: "",
   storefrontOneCClientName: "Интернет магазин Clover",
 };

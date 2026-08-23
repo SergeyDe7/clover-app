@@ -274,6 +274,33 @@ const imageUpload = multer({
     callback(null, true);
   },
 });
+
+const mapImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadsDirectory,
+    filename(req, file, callback) {
+      const extensionMap = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+      };
+      callback(
+        null,
+        `storefront-map-${Date.now()}-${randomUUID()}${extensionMap[file.mimetype] || ".img"}`
+      );
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter(req, file, callback) {
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.mimetype)) {
+      return callback(
+        new Error("Разрешены только изображения JPG, PNG или WEBP.")
+      );
+    }
+    callback(null, true);
+  },
+});
 const reconciliationDirectory = path.resolve(uploadsDirectory, "reconciliation");
 mkdirSync(reconciliationDirectory, { recursive: true });
 
@@ -3979,6 +4006,12 @@ app.put(
       ...getGlobalState("settings", DEFAULT_SETTINGS),
     };
     const next = mergeStorefrontSettings(current, req.body?.settings || {});
+    if (
+      current.storefrontContactMapImageUrl &&
+      current.storefrontContactMapImageUrl !== next.storefrontContactMapImageUrl
+    ) {
+      removeUploadedImage(current.storefrontContactMapImageUrl);
+    }
     setGlobalState("settings", next);
     auditFromRequest(req, "storefront.settings.save", {
       pricingMode: next.storefrontPricingMode || "price_type",
@@ -3990,6 +4023,21 @@ app.put(
       settings: next,
       storefront: getStorefrontSettings(next),
     });
+  }
+);
+
+app.post(
+  "/api/admin/storefront/map-image",
+  authRequired,
+  roleRequired("admin"),
+  mapImageUpload.single("image"),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Выберите изображение карты." });
+    }
+    const imageUrl = `/uploads/${req.file.filename}`;
+    auditFromRequest(req, "storefront.map-image.upload", { imageUrl });
+    res.status(201).json({ ok: true, imageUrl });
   }
 );
 
