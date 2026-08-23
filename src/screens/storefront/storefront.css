@@ -57,10 +57,6 @@ a.sf-contacts-btn { display: none !important; }
   font-size: clamp(1.6rem, 3vw, 2rem);
 }
 .sf-contacts-page .sf-section-head { margin-bottom: 20px; }
-.sf-contacts-page .sf-section-head p {
-  max-width: 46ch;
-  line-height: 1.45;
-}
 .sf-contacts-sheet {
   display: grid;
   grid-template-columns: minmax(240px, 360px) minmax(0, 1fr);

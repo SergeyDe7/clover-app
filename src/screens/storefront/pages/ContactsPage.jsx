@@ -169,10 +169,6 @@ export function ContactsPage() {
     <div className="sf-contacts-page">
       <header className="sf-section-head">
         <h1>Контакты</h1>
-        <p>
-          Позвоните или напишите. Если едете сами — адрес, режим работы и карта
-          на этой странице.
-        </p>
       </header>
       {error ? <p className="sf-error">{error}</p> : null}
       {!ready && !error ? <p className="sf-muted">Загружаем контакты…</p> : null}

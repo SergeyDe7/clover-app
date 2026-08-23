@@ -165,6 +165,11 @@ assert.doesNotMatch(
   /телефон, почта, адрес и как нас найти/,
   "На странице контактов нет старой поясняющей подсказки под заголовком."
 );
+assert.doesNotMatch(
+  page,
+  /Позвоните или напишите/,
+  "Под заголовком «Контакты» нет абзаца «Позвоните или напишите…»."
+);
 assert.match(page, /mailto:/);
 assert.match(page, /javascript/i);
 assert.match(page, /yandexStaticMapSrc/);
