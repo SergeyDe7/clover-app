@@ -14,7 +14,6 @@ import {
   writeManagerActiveTab,
   writeClientActiveTab,
   writeOpenManagerClientId,
-  DEFAULT_PRODUCTS,
   RUSSIAN_PHONE_PREFIX,
   formatRussianPhone,
   STORAGE,
@@ -558,12 +557,8 @@ function App() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [offlineBannerHidden, setOfflineBannerHidden] = useState(false);
 
-  const [products, setProducts] = useState(
-    DEFAULT_PRODUCTS.map(normalizeProduct)
-  );
-  const [fullCatalogProducts, setFullCatalogProducts] = useState(
-    DEFAULT_PRODUCTS.map(normalizeProduct)
-  );
+  const [products, setProducts] = useState([]);
+  const [fullCatalogProducts, setFullCatalogProducts] = useState([]);
   const [catalogPolicy, setCatalogPolicy] = useState({
     matrixMode: "pending",
     allowFullCatalog: false,
@@ -839,11 +834,8 @@ function App() {
               ? prev
               : next;
           });
-        } else if (data.user?.role === "client" && data.catalogPolicy) {
-          // Если полный каталог больше не отдаётся — не держим устаревшие цены.
-          if (!data.catalogPolicy.allowFullCatalog || data.catalogPolicy.matrixMode === "all") {
-            setFullCatalogProducts([]);
-          }
+        } else if (data.user?.role === "client") {
+          setFullCatalogProducts([]);
         }
         if (data.catalogPolicy) {
           setCatalogPolicy((current) => ({
@@ -1149,18 +1141,10 @@ function App() {
   const profileComplete = isClientProfileComplete(profile);
 
   const catalogProducts = useMemo(() => {
-    const source =
-      showFullCatalog && catalogPolicy.allowFullCatalog
-        ? fullCatalogProducts
-        : products;
-
-    return source.filter((product) => product.active);
-  }, [
-    products,
-    fullCatalogProducts,
-    showFullCatalog,
-    catalogPolicy.allowFullCatalog,
-  ]);
+    return (Array.isArray(products) ? products : []).filter(
+      (product) => product.active
+    );
+  }, [products]);
 
   const clientOrders = orders.filter(
     (order) => order.clientId === clientId
@@ -1209,10 +1193,8 @@ function App() {
     setRole("client");
     setIsLoggedIn(false);
     setHydrated(false);
-    setProducts(DEFAULT_PRODUCTS.map(normalizeProduct));
-    setFullCatalogProducts(
-      DEFAULT_PRODUCTS.map(normalizeProduct)
-    );
+    setProducts([]);
+    setFullCatalogProducts([]);
     setCatalogPolicy({
       matrixMode: "pending",
       allowFullCatalog: false,
@@ -1313,6 +1295,32 @@ function App() {
   const openRepeat = (order) => {
     if (validateNewOrder()) {
       setCatalogSession({ mode: "repeat", order });
+    }
+  };
+
+  const addToMyMatrix = async (productId) => {
+    try {
+      const data = await api.addMyMatrixProduct(productId);
+      if (Array.isArray(data.products)) {
+        setProducts(data.products.map(normalizeProduct));
+      }
+      if (Array.isArray(data.fullCatalogProducts)) {
+        setFullCatalogProducts(data.fullCatalogProducts.map(normalizeProduct));
+      }
+      if (data.catalogPolicy) {
+        setCatalogPolicy((current) => ({
+          ...current,
+          ...data.catalogPolicy,
+        }));
+      }
+      return data;
+    } catch (error) {
+      await appAlert({
+        title: "Не удалось добавить",
+        message: error.message || "Товар не добавлен в матрицу.",
+        tone: "danger",
+      });
+      throw error;
     }
   };
 
@@ -1460,32 +1468,6 @@ function App() {
       await appAlert({ title: "Нельзя удалить", message: gate.error, tone: "warn" });
       return;
     }
-
-    const itemLines = [
-      ...(Array.isArray(order.items) ? order.items : []).map((item) => {
-        const unit = UNIT_CONFIG[item.unit]?.shortLabel || item.unit || "";
-        return `${item.name} — ${item.quantity} ${unit}`.trim();
-      }),
-      ...(Array.isArray(order.customItems) ? order.customItems : []).map((item) => {
-        const unit = item.unit || "";
-        return `${item.name} — ${item.quantity} ${unit}`.trim();
-      }),
-    ].filter(Boolean);
-
-    const ok = await appConfirm({
-      title: `Вы уверены, что хотите удалить Заказ № ${order.number}?`,
-      message: "",
-      confirmLabel: "Удалить",
-      cancelLabel: "Отмена",
-      tone: "danger",
-      expandable: itemLines.length
-        ? {
-            summary: `Состав заказа (${itemLines.length})`,
-            lines: itemLines,
-          }
-        : null,
-    });
-    if (!ok) return;
 
     const orderId = String(order.id);
     pendingDeletedOrderIdsRef.current.add(orderId);
@@ -1691,15 +1673,6 @@ function App() {
       await appAlert({ title: "Нельзя переместить", message: gate.error, tone: "warn" });
       return;
     }
-
-    const ok = await appConfirm({
-      title: `Вы уверены, что хотите перенести Заказ № ${order.number} в корзину?`,
-      message: "Клиент перестанет его видеть. Восстановить можно из корзины.",
-      confirmLabel: "В корзину",
-      cancelLabel: "Отмена",
-      tone: "danger",
-    });
-    if (!ok) return;
 
     const orderId = String(order.id);
     skipNextOrdersSyncRef.current = true;
@@ -1981,12 +1954,14 @@ function App() {
         onLogout={logout}
         catalogSession={catalogSession}
         products={catalogProducts}
+        fullCatalogProducts={fullCatalogProducts}
         favorites={favorites}
         setFavorites={setFavorites}
         showFullCatalog={showFullCatalog}
         setShowFullCatalog={setShowFullCatalog}
         onSaveOrder={saveOrder}
         onCloseCatalog={() => setCatalogSession(null)}
+        onAddToMatrix={addToMyMatrix}
         canCreateOrder={canCreateOrder}
         profileComplete={profileComplete}
       />

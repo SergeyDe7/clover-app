@@ -19,10 +19,20 @@ export default function StorefrontApp() {
     window.addEventListener("popstate", onPop);
     document.body.classList.add("sf-body");
     document.documentElement.classList.add("sf-root");
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    const previousTheme = themeMeta?.getAttribute("content") || "";
+    const previousHtmlBg = document.documentElement.style.backgroundColor;
+    const previousBodyBg = document.body.style.backgroundColor;
+    if (themeMeta) themeMeta.setAttribute("content", "#f3f2ee");
+    document.documentElement.style.backgroundColor = "#f3f2ee";
+    document.body.style.backgroundColor = "#f3f2ee";
     return () => {
       window.removeEventListener("popstate", onPop);
       document.body.classList.remove("sf-body");
       document.documentElement.classList.remove("sf-root");
+      if (themeMeta) themeMeta.setAttribute("content", previousTheme || "#f4f8f2");
+      document.documentElement.style.backgroundColor = previousHtmlBg;
+      document.body.style.backgroundColor = previousBodyBg;
     };
   }, []);
 

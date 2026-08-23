@@ -1,4 +1,4 @@
-import { inferSubcategoryFacetFromName } from "../../src/screens/storefront/productGroups.js";
+import { inferSubcategoryFacetFromName, assignCloverTaxonomy, canonicalizeProductCategory } from "../../src/screens/storefront/productGroups.js";
 
 const ONE_C_PRODUCT_FIELDS = [
   "oneCId",
@@ -613,126 +613,13 @@ function nextCloverProductId(products) {
 /** Плейсхолдеры — не считаются «настоящей» категорией для обучения/копирования. */
 export const PLACEHOLDER_PRODUCT_CATEGORIES = new Set(["Из 1С", "Новые товары", ""]);
 
-const CATEGORY_KEYWORD_RULES = [
-  {
-    category: "Спецодежда, обувь и средства защиты",
-    patterns: [/перчатк/u, /нитрил/u, /латекс/u, /винилов/u, /спецодежд/u, /\bсиз\b/u],
-  },
-  {
-    category: "Пленка",
-    patterns: [/пленк/u, /плёнк/u, /стрейч/u, /stretch/u, /пергамент/u, /вакуумн/u],
-  },
-  {
-    category: "Пакеты и сумки",
-    patterns: [/пакет/u, /мешк/u, /сумк/u],
-  },
-  {
-    category: "Уборочный инвентарь и оборудование",
-    patterns: [
-      /салфетк/u,
-      /швабр/u,
-      /\bмоп\b/u,
-      /щетк/u,
-      /губк/u,
-      /ведр/u,
-      /пипидастр/u,
-      /совк/u,
-      /распылител/u,
-      /пульверизатор/u,
-      /тряпк/u,
-      /полотер/u,
-      /диспенсер/u,
-    ],
-  },
-  {
-    category: "Контейнеры",
-    patterns: [/контейнер/u],
-  },
-  {
-    category: "Лотки и подложки",
-    patterns: [/лоток/u, /подложк/u],
-  },
-  {
-    category: "Упаковочные материалы",
-    patterns: [
-      /банк[аиуы]/u,
-      /крышк/u,
-      /бутылк/u,
-      /oneclick/u,
-      /стаканчик/u,
-      /коробк/u,
-    ],
-  },
-  {
-    category: "Одноразовая посуда",
-    patterns: [/трубочк/u, /вилк/u, /ложк/u, /тарелк/u, /зубочист/u, /шпател/u, /стакан/u],
-  },
-  {
-    category: "Принадлежности для касс и торговли",
-    patterns: [/кассов/u, /лент.*кас/u],
-  },
-  {
-    category: "Бумага офисная",
-    patterns: [/\bа4\b/u, /бумаг.*офис/u, /офисн.*бумаг/u],
-  },
-  {
-    category: "Канцелярские товары",
-    patterns: [/лент/u, /бумаг/u, /ручк/u, /степлер/u, /ножниц/u],
-  },
-  {
-    category: "Химия профессиональная",
-    patterns: [/профессионал.*хим/u, /хим.*профессион/u],
-  },
-  {
-    category: "Химия бытовая",
-    patterns: [
-      /белизна/u,
-      /санокс/u,
-      /хелп/u,
-      /моющ/u,
-      /чистящ/u,
-      /дезинф/u,
-      /средство для/u,
-      /химия/u,
-    ],
-  },
-  {
-    category: "Гигиеническая продукция",
-    patterns: [/полотн/u, /вафельн/u, /текстил/u, /полотенц/u, /тряпк[аи] для пола/u, /гигиен/u],
-  },
-  {
-    category: "Оборудование для туалетных комнат",
-    patterns: [/туалетн/u, /диспенсер.*бумаг/u, /мыльниц/u],
-  },
-  {
-    category: "Посуда и столовые приборы",
-    patterns: [/столов.*прибор/u, /посуд/u],
-  },
-  {
-    category: "Кухонные принадлежности",
-    patterns: [/кухон/u],
-  },
-  {
-    category: "Барные аксессуары и товары для сервировки",
-    patterns: [/барн/u, /сервировк/u],
-  },
-];
-
 function isUsableCategory(category) {
   const value = cleanText(category);
   return Boolean(value) && !PLACEHOLDER_PRODUCT_CATEGORIES.has(value);
 }
 
 function inferCategoryByKeywords(name) {
-  const text = cleanText(name).toLocaleLowerCase("ru-RU").replaceAll("ё", "е");
-  if (!text) return "";
-
-  for (const rule of CATEGORY_KEYWORD_RULES) {
-    if (rule.patterns.some((pattern) => pattern.test(text))) {
-      return rule.category;
-    }
-  }
-  return "";
+  return assignCloverTaxonomy(name).category || "";
 }
 
 /**
@@ -742,10 +629,13 @@ function inferCategoryByKeywords(name) {
 export function inferCloverProductCategory(
   name,
   products = [],
-  { minimumScore = 0.52, fallback = "Новые товары" } = {}
+  { minimumScore = 0.52, fallback = "Прочее" } = {}
 ) {
   const query = cleanText(name);
   if (!query) return fallback;
+
+  const byKeywords = inferCategoryByKeywords(query);
+  if (byKeywords && byKeywords !== "Прочее") return byKeywords;
 
   let best = null;
   for (const product of Array.isArray(products) ? products : []) {
@@ -761,12 +651,9 @@ export function inferCloverProductCategory(
       best = { category: cleanText(product.category), score };
     }
   }
-  if (best) return best.category;
+  if (best) return canonicalizeProductCategory(best.category);
 
-  const byKeywords = inferCategoryByKeywords(query);
-  if (byKeywords) return byKeywords;
-
-  return fallback;
+  return byKeywords || fallback;
 }
 
 /** Переназначает категорию у товаров с плейсхолдером «Из 1С» / пустой. */
@@ -776,10 +663,38 @@ export function applyInferredCategories(products) {
   const next = source.map((product) => {
     const current = cleanText(product?.category);
     if (current && current !== "Из 1С") return product;
-    const inferred = inferCloverProductCategory(product?.name, source);
-    if (inferred === current) return product;
+    const assigned = assignCloverTaxonomy(product?.name);
+    if (assigned.category === current && (product.subcategory || "") === assigned.subcategory) {
+      return product;
+    }
     changed += 1;
-    return { ...product, category: inferred };
+    return {
+      ...product,
+      category: assigned.category,
+      subcategory: assigned.subcategory,
+      facet: "",
+    };
+  });
+  return { products: next, changed };
+}
+
+/** Раскладывает весь каталог Clover по актуальным категориям и подкатегориям. */
+export function reassignAllCloverTaxonomy(products) {
+  const source = Array.isArray(products) ? products : [];
+  let changed = 0;
+  const next = source.map((product) => {
+    const assigned = assignCloverTaxonomy(product?.name);
+    const category = assigned.category;
+    const subcategory = assigned.subcategory || "";
+    if (
+      product.category === category &&
+      String(product.subcategory || "") === subcategory &&
+      !String(product.facet || "").trim()
+    ) {
+      return product;
+    }
+    changed += 1;
+    return { ...product, category, subcategory, facet: "" };
   });
   return { products: next, changed };
 }
@@ -1006,8 +921,9 @@ export function createOrReuseCloverProductFromOneC(
   };
 }
 
-/** Добавляет productId в матрицу клиента; pending → selected. */
-export function addProductIdToClientMatrix(clientLinks, clientId, productId) {
+/** Добавляет productId в матрицу клиента; pending → selected.
+ *  pinAllMode: для самодобавления из каталога «весь каталог» сужаем до явного списка. */
+export function addProductIdToClientMatrix(clientLinks, clientId, productId, options = {}) {
   const links = clientLinks && typeof clientLinks === "object" ? { ...clientLinks } : {};
   const key = String(clientId || "").trim();
   if (!key) throw new Error("Не указан клиент Clover.");
@@ -1022,6 +938,8 @@ export function addProductIdToClientMatrix(clientLinks, clientId, productId) {
 
   let matrixMode = cleanText(current.matrixMode) || "pending";
   if (matrixMode === "pending" || !matrixMode) {
+    matrixMode = "selected";
+  } else if (options.pinAllMode && matrixMode === "all") {
     matrixMode = "selected";
   }
 

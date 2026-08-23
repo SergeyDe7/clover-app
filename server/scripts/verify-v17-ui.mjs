@@ -180,8 +180,36 @@ const checks = [
     "Поиск витрины учитывает подгруппу и фасет, как до смены на prefix search",
   ],
   [
+    '["orders", "Заказы"],\n  ["products", "Товары"],\n  ["storefront", "Витрина"],\n  ["clients", "Клиенты"],\n  ["acts", "Акты сверок"],\n  ["exchange", "1С"],\n  ["more", "Ещё"]',
+    "Главное меню: Заказы, Товары, Витрина, Клиенты, Акты сверок, 1С, Ещё",
+  ],
+  [
+    "restoreWindowScroll",
+    "После сохранения товара страница остаётся на том же месте прокрутки",
+  ],
+  [
+    '"Химия, чистящие средства"',
+    "На витрине категория химии называется «Химия, чистящие средства»",
+  ],
+  [
+    "background: #f3f2ee;",
+    "Фон витрины нейтральный, без зелёной заливки страницы",
+  ],
+  [
+    "Тряпки, мопы, полотенца",
+    "Подгруппа с мопами пишется со строчной буквы",
+  ],
+  [
+    '["matrix", "Моя матрица"],\n  ["catalog", "Добавить товары из каталога"],',
+    "В ЛК клиента есть «Моя матрица» и «Добавить товары из каталога»",
+  ],
+  [
     'className="manager-order-extra"',
     "В ЛК админа номер, телефон, адрес и состав заказа спрятаны за «Подробнее»",
+  ],
+  [
+    "settings.managerCanDeleteOrders ? (",
+    "В карточке заказа кнопка «Удалить» стоит рядом со статусами, не внутри «Подробнее»",
   ],
   [
     "width: auto !important;\n  padding-left: 8px !important;\n  padding-right: 20px !important;",
@@ -204,6 +232,20 @@ const checks = [
 for (const [fragment, description] of checks) {
   if (!source.includes(fragment)) {
     throw new Error(`Проверка не пройдена: ${description}`);
+  }
+}
+
+{
+  const ordersUi = await readFile(
+    path.join(projectRoot, "src/screens/manager/ManagerOrders.jsx"),
+    "utf8"
+  );
+  const deleteAt = ordersUi.indexOf("onClick={() => onDeleteOrder(order)}");
+  const extraAt = ordersUi.indexOf('className="manager-order-extra"');
+  if (deleteAt < 0 || extraAt < 0 || deleteAt > extraAt) {
+    throw new Error(
+      "Кнопка «Удалить» должна быть в шапке карточки заказа, до блока «Подробнее»."
+    );
   }
 }
 
@@ -231,8 +273,27 @@ if (source.includes('"Настройки клиента"') || source.includes("�
   throw new Error("Кнопка «Настройки клиента» снова дублирует «Данные клиента».");
 }
 
+{
+  const pickerAt = source.indexOf("<OneCClientPicker");
+  const lastPickerAt = source.lastIndexOf("<OneCClientPicker");
+  const matrixAt = source.indexOf("<summary>1С и цены");
+  if (pickerAt < 0) {
+    throw new Error("Пропала кнопка выбора контрагента 1С.");
+  }
+  if (matrixAt < 0 || lastPickerAt > matrixAt) {
+    throw new Error("Выбор контрагента 1С снова спрятан в матрице, а не в данных клиента.");
+  }
+  if (!source.includes("Контрагент 1С не выбран — откройте «Данные клиента».")) {
+    throw new Error("В матрице нет подсказки, что контрагента выбирают в данных клиента.");
+  }
+}
+
 if (source.includes("Обновить фото (белый фон)")) {
   throw new Error("В настройках витрины осталась кнопка обновления фото.");
+}
+
+if (source.includes('title: "Фото сохранено"')) {
+  throw new Error("После добавления фото снова показывается анимация «Фото сохранено».");
 }
 
 if (source.includes("<summary>Товарная матрица</summary>")) {

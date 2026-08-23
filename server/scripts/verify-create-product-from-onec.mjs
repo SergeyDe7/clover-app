@@ -20,7 +20,7 @@ const empty = createOrReuseCloverProductFromOneC([], catalogItem, "2026-07-30T12
 assert.equal(empty.created, true);
 assert.equal(empty.product.id, 1);
 assert.equal(empty.product.oneCId, "onec-soup-1");
-assert.equal(empty.product.category, "Новые товары");
+assert.equal(empty.product.category, "Прочее");
 assert.equal(empty.product.oneCLinkMode, "manual-from-catalog");
 assert.equal(empty.products.length, 1);
 
@@ -122,27 +122,27 @@ const seed = [
 
 assert.equal(
   inferCloverProductCategory("Перчатки BEN FATTO нитриловые черные L (100 шт.)", seed),
-  "Перчатки"
+  "Хозяйственные товары"
 );
 assert.equal(
   inferCloverProductCategory("Мешки мусорные ПВД 240л 65мкм 100х140 50шт", seed),
-  "Пакеты и пленка"
+  "Хозяйственные товары"
 );
 assert.equal(
   inferCloverProductCategory("Распылитель ручной черный 500 мл", seed),
-  "Уборка"
+  "Хозяйственные товары"
 );
 assert.equal(
   inferCloverProductCategory("Влажные чистящие салфетки в банке", seed),
-  "Уборочный инвентарь и оборудование"
+  "Бумажная продукция"
 );
 assert.equal(
   inferCloverProductCategory("Банка суповая 500 мл Перинт (50/400)", []),
-  "Упаковочные материалы"
+  "Одноразовая посуда"
 );
 assert.equal(
   inferCloverProductCategory("Салфетки белые PRO 24х24 1-сл. 100 листов", seed),
-  "Уборочный инвентарь и оборудование"
+  "Бумажная продукция"
 );
 
 const gloves = createOrReuseCloverProductFromOneC(
@@ -155,7 +155,7 @@ const gloves = createOrReuseCloverProductFromOneC(
   "2026-07-30T12:02:00.000Z"
 );
 assert.equal(gloves.created, true);
-assert.equal(gloves.product.category, "Перчатки");
+assert.equal(gloves.product.category, "Хозяйственные товары");
 
 const placeholder = {
   id: 99,
@@ -167,7 +167,7 @@ const fixed = applyInferredCategories([...seed, placeholder]);
 assert.equal(fixed.changed, 1);
 assert.equal(
   fixed.products.find((item) => item.id === 99).category,
-  "Контейнеры"
+  "Одноразовая посуда"
 );
 
 const reusePlaceholder = createOrReuseCloverProductFromOneC(
@@ -176,7 +176,7 @@ const reusePlaceholder = createOrReuseCloverProductFromOneC(
   "2026-07-30T12:03:00.000Z"
 );
 assert.equal(reusePlaceholder.created, false);
-assert.equal(reusePlaceholder.product.category, "Контейнеры");
+assert.equal(reusePlaceholder.product.category, "Одноразовая посуда");
 
 // Имя совпало, но oneCId уже другой — не переиспользуем чужую карточку.
 const foreignNameConflict = createOrReuseCloverProductFromOneC(
@@ -184,7 +184,7 @@ const foreignNameConflict = createOrReuseCloverProductFromOneC(
     {
       id: 200,
       name: "Контейнер универсальный 500 мл",
-      category: "Контейнеры",
+      category: "Одноразовая посуда",
       subcategory: "Ланч-боксы",
       oneCId: "onec-other-sku",
       code: "НФ-OTHER",
@@ -216,8 +216,8 @@ const paperBox = createOrReuseCloverProductFromOneC(
   "2026-07-30T12:05:00.000Z"
 );
 assert.equal(paperBox.created, true);
-assert.equal(paperBox.product.category, "Контейнеры");
-assert.equal(paperBox.product.subcategory, "Бумажные контейнеры");
+assert.equal(paperBox.product.category, "Одноразовая посуда");
+assert.equal(paperBox.product.subcategory, "Бумажная упаковка");
 
 const renamed = upsertManagerCatalogProduct(
   [{ id: 7, name: "Старое имя", category: "Химия бытовая", oneCId: "sku-1" }],

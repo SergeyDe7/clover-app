@@ -7,7 +7,7 @@ import {
   insertOrder,
   setGlobalState,
 } from "./db.js";
-import { DEFAULT_PRODUCTS, DEFAULT_SETTINGS } from "./defaults.js";
+import { DEFAULT_PRODUCTS, DEFAULT_SETTINGS, EMPTY_LINK } from "./defaults.js";
 import { normalizeOneCProducts } from "./oneCProducts.js";
 import { normalizeOneCPriceTypes } from "./oneCSalePrices.js";
 import {
@@ -22,6 +22,11 @@ import {
   normalizeStorefrontPricing,
 } from "./pricing.js";
 import { normalizeExchangeState } from "./exchange.js";
+import {
+  overlayStorefrontClientLink,
+  resolveStorefrontOneCClient,
+  STOREFRONT_DEFAULT_COUNTERPARTY_NAME,
+} from "./storefrontCounterparty.js";
 import {
   getEarliestDeliveryDateIso,
   validateDeliveryDate,
@@ -57,6 +62,10 @@ export function getStorefrontSettings(settingsInput) {
     storefrontShowOnlyLinked: settings.storefrontShowOnlyLinked !== false,
     storefrontHeroTitle: String(settings.storefrontHeroTitle || "").trim(),
     storefrontHeroLead: String(settings.storefrontHeroLead || "").trim(),
+    storefrontOneCClientId: String(settings.storefrontOneCClientId || "").trim(),
+    storefrontOneCClientName:
+      String(settings.storefrontOneCClientName || "").trim() ||
+      "Интернет магазин Clover",
   };
 }
 
@@ -80,6 +89,8 @@ const STOREFRONT_SETTING_KEYS = [
   "storefrontShowOnlyLinked",
   "storefrontHeroTitle",
   "storefrontHeroLead",
+  "storefrontOneCClientId",
+  "storefrontOneCClientName",
 ];
 
 /** Менеджер не может менять поля витрины через общий PUT settings. */
@@ -121,6 +132,15 @@ export function mergeStorefrontSettings(baseSettings, patch = {}) {
     storefrontHeroLead: String(
       incoming.storefrontHeroLead ?? current.storefrontHeroLead ?? ""
     ).trim(),
+    storefrontOneCClientId: String(
+      incoming.storefrontOneCClientId ?? current.storefrontOneCClientId ?? ""
+    ).trim(),
+    storefrontOneCClientName:
+      String(
+        incoming.storefrontOneCClientName ??
+          current.storefrontOneCClientName ??
+          ""
+      ).trim() || "Интернет магазин Clover",
   };
 }
 
@@ -453,12 +473,36 @@ export function ensureStorefrontGuestUser() {
     emailVerified: true,
     approvalStatus: "approved",
     profile: {
-      companyName: "Заказы с сайта",
+      companyName: STOREFRONT_DEFAULT_COUNTERPARTY_NAME,
       contactName: "Гость витрины",
       phone: "",
       email: STOREFRONT_GUEST_EMAIL,
     },
   });
+}
+
+function linkStorefrontGuestToOneC(guestId, settings) {
+  const counterpart = resolveStorefrontOneCClient({
+    settings,
+    oneCClients: getGlobalState("oneCClients", []),
+  });
+  const links = { ...(getGlobalState("clientLinks", {}) || {}) };
+  const next = overlayStorefrontClientLink(
+    { source: "storefront", guest: true },
+    { ...EMPTY_LINK, ...(links[guestId] || {}) },
+    counterpart
+  );
+  const prev = links[guestId] || {};
+  const same =
+    String(prev.oneCId || "") === String(next.oneCId || "") &&
+    String(prev.oneCName || "") === String(next.oneCName || "") &&
+    String(prev.oneCCode || "") === String(next.oneCCode || "") &&
+    Boolean(prev.matched1C) === Boolean(next.matched1C);
+  if (!same) {
+    links[guestId] = next;
+    setGlobalState("clientLinks", links);
+  }
+  return next;
 }
 
 function makeOrderNumber() {
@@ -608,6 +652,7 @@ export function createStorefrontOrder(input, { notify } = {}) {
 
   const total = lines.reduce((sum, line) => sum + (Number(line.lineTotal) || 0), 0);
   const guest = ensureStorefrontGuestUser();
+  linkStorefrontGuestToOneC(guest.id, settings);
   const createdAt = new Date().toISOString();
   const orderId = randomUUID();
   const number = makeOrderNumber();

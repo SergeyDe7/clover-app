@@ -163,6 +163,10 @@ import {
   unitPriceField,
 } from "./pricing.js";
 import {
+  overlayStorefrontClientLink,
+  resolveStorefrontOneCClient,
+} from "./storefrontCounterparty.js";
+import {
   createStorefrontOrder,
   getPublicCatalog,
   getPublicProductByCode,
@@ -1158,21 +1162,13 @@ function resolveClientCatalog(products, rawLink, oneCProducts = []) {
   );
 
   let matrixProducts = [];
-
-  if (link.matrixMode === "all") {
-    matrixProducts = activeProducts;
-  } else if (link.matrixMode === "selected") {
+  if (link.matrixMode === "all" || link.matrixMode === "selected") {
     matrixProducts = activeProducts.filter((product) =>
       selectedIds.has(String(product.id))
     );
   }
 
-  const matrixIds = new Set(
-    matrixProducts.map((product) => String(product.id))
-  );
-  const fullCatalog = link.allowFullCatalog
-    ? activeProducts
-    : matrixProducts;
+  const fullCatalog = activeProducts;
 
   const { managerNote: _managerNote, ...publicLink } = link;
 
@@ -1182,12 +1178,7 @@ function resolveClientCatalog(products, rawLink, oneCProducts = []) {
       applyClientPrices(product, link, true, oneCById)
     ),
     fullCatalogProducts: fullCatalog.map((product) =>
-      applyClientPrices(
-        product,
-        link,
-        matrixIds.has(String(product.id)),
-        oneCById
-      )
+      applyClientPrices(product, link, true, oneCById)
     ),
     policy: {
       matrixMode: link.matrixMode,
@@ -2489,18 +2480,65 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     clients: [],
     reconciliationRequests: listReconciliationRequests(req.user.id),
     services: { mail: publicMailStatus(), push: publicPushStatus() },
+    fullCatalogProducts: catalog.fullCatalogProducts,
   };
-
-  // Полный каталог только если матрица узкая и разрешён полный каталог.
-  if (
-    catalog.policy?.allowFullCatalog &&
-    catalog.policy?.matrixMode !== "all"
-  ) {
-    clientPayload.fullCatalogProducts = catalog.fullCatalogProducts;
-  }
 
   return res.json(clientPayload);
 });
+
+app.post(
+  "/api/state/my-matrix/add",
+  authRequired,
+  roleRequired("client"),
+  (req, res) => {
+    const productId = req.body?.productId;
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const product = (Array.isArray(products) ? products : []).find(
+      (item) => String(item.id) === String(productId) && item.active !== false
+    );
+    if (!product) {
+      return res.status(404).json({
+        error: "Товар не найден в каталоге Clover.",
+        code: "PRODUCT_NOT_FOUND",
+      });
+    }
+
+    const storedLinks = getGlobalState("clientLinks", {});
+    const matrixUpdate = addProductIdToClientMatrix(
+      storedLinks,
+      req.user.id,
+      product.id,
+      { pinAllMode: true }
+    );
+    setGlobalState("clientLinks", matrixUpdate.clientLinks);
+    setGlobalState("catalogPricesVersion", new Date().toISOString());
+    auditFromRequest(req, "client.matrix.self-add", {
+      productId: product.id,
+      productName: product.name,
+      added: Boolean(matrixUpdate.addedToMatrix),
+      alreadyInMatrix: Boolean(matrixUpdate.alreadyInMatrix),
+    });
+
+    const oneCProducts = normalizeOneCProducts(
+      getGlobalState("oneCProducts", [])
+    );
+    const catalog = resolveClientCatalog(
+      products,
+      matrixUpdate.clientLink,
+      oneCProducts
+    );
+    res.json({
+      ok: true,
+      added: Boolean(matrixUpdate.addedToMatrix),
+      alreadyInMatrix:
+        Boolean(matrixUpdate.alreadyInMatrix) ||
+        catalog.policy.matrixMode === "all",
+      catalogPolicy: catalog.policy,
+      products: catalog.matrixProducts,
+      fullCatalogProducts: catalog.fullCatalogProducts,
+    });
+  }
+);
 
 app.put("/api/state/orders", authRequired, async (req, res) => {
   const incomingOrders = Array.isArray(req.body?.orders)
@@ -3155,7 +3193,17 @@ async function handleOneCTestOrder(req, res, next) {
     const items = aligned.items.map(({ lineTotal, ...rest }) => rest);
     const lockedOrderTotal = aligned.total;
 
-    const clientLink = normalizeClientLink(clientLinks[realOrder.clientId]);
+    const storefrontCounterpart = resolveStorefrontOneCClient({
+      settings: getStorefrontSettings(
+        getGlobalState("settings", DEFAULT_SETTINGS)
+      ),
+      oneCClients: getGlobalState("oneCClients", []),
+    });
+    const clientLink = overlayStorefrontClientLink(
+      realOrder,
+      normalizeClientLink(clientLinks[realOrder.clientId]),
+      storefrontCounterpart
+    );
 
     if (legacyProtocol) {
       writeAudit({
@@ -3206,6 +3254,7 @@ async function handleOneCTestOrder(req, res, next) {
         total: lockedOrderTotal,
         comment: buildOneCOrderComment(realOrder),
       },
+      items,
     });
   } catch (error) {
     next(error);
@@ -3882,6 +3931,8 @@ app.put(
                 "storefrontShowOnlyLinked",
                 "storefrontHeroTitle",
                 "storefrontHeroLead",
+                "storefrontOneCClientId",
+                "storefrontOneCClientName",
               ].map((key) => [key, current[key]])
             ),
           };

@@ -123,6 +123,16 @@ const missingNoBase = resolveClientProductPricing(
 assert.equal(missingNoBase.prices.piece, 0);
 assert.equal(missingNoBase.priceSources.piece, "purchase_missing");
 
+// Клиентская цена — свой % или вид цен, не витрина закупка+60%.
+const clientFive = resolveClientProductPricing(
+  { ...product, pricePiece: 0, pricePack: 0, priceBundle: 0 },
+  {},
+  oneCItem,
+  { defaultPricingMode: "purchase_markup", defaultMarkupPercent: 5 }
+);
+assert.equal(clientFive.prices.piece, roundPriceUp(83.4 * 1.05));
+assert.notEqual(clientFive.prices.piece, roundPriceUp(83.4 * 1.6));
+
 // Наценка % от вида цен «Закупочная» (когда purchasePrice в номенклатуре пустой).
 const typedPurchaseBase = {
   ...oneCItem,

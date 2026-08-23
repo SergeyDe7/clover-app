@@ -14,16 +14,16 @@ const screenPath = path.join(managerDir, "ManagerScreen.jsx");
 
 const MAIN_TAB_TO_PANEL = {
   orders: "ManagerOrders",
-  clients: "ManagerClients",
   products: "ManagerProducts",
-  exchange: "ManagerExchange",
+  storefront: "ManagerStorefront",
+  clients: "ManagerClients",
   acts: "ManagerReconciliation",
+  exchange: "ManagerExchange",
   more: null,
 };
 
 const MORE_TAB_TO_PANEL = {
   access: "ManagerAccessVault",
-  storefront: "ManagerStorefront",
   settings: "ManagerSettings",
   backup: "ManagerBackup",
   audit: "ManagerAudit",
@@ -92,6 +92,18 @@ assert.ok(
   screenSource.includes("MANAGER_MORE_TABS.filter") ||
     screenSource.includes("MANAGER_MORE_TABS.map"),
   "ManagerScreen не рендерит навигацию MANAGER_MORE_TABS"
+);
+
+assert.deepEqual(
+  mainTabs,
+  ["orders", "products", "storefront", "clients", "acts", "exchange", "more"],
+  "Порядок главного меню: Заказы, Товары, Витрина, Клиенты, Акты сверок, 1С, Ещё"
+);
+
+assert.equal(
+  moreTabs.includes("storefront"),
+  false,
+  "«Витрина» больше не должна быть внутри «Ещё»"
 );
 
 for (const [tabId, panel] of Object.entries(MORE_TAB_TO_PANEL)) {

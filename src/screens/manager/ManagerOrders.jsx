@@ -393,6 +393,53 @@ export function ManagerOrders({
     }
   };
 
+  const runBulkTrash = async () => {
+    if (!selectedIds.length) return;
+    if (!settings.managerCanDeleteOrders) {
+      await appAlert({
+        title: "Корзина отключена",
+        message: "Удаление заказов менеджером сейчас отключено в настройках.",
+        tone: "warn",
+      });
+      return;
+    }
+    const trashable = orders.filter(
+      (order) => selectedIds.includes(order.id) && canTrashOrder(order, "manager").ok
+    );
+    if (!trashable.length) {
+      await appAlert({
+        title: "Нечего удалять",
+        message:
+          "Среди выбранных нет заказов, которые можно убрать в корзину. Принятые и стоящие в очереди 1С не удаляются.",
+        tone: "warn",
+      });
+      return;
+    }
+
+    setBulkBusy(true);
+    const errors = [];
+    try {
+      for (const order of trashable) {
+        try {
+          await api.trashOrder(order.id);
+        } catch (error) {
+          errors.push(`${order.number || order.id}: ${error.message}`);
+        }
+      }
+      await onReload();
+      if (errors.length) {
+        await appAlert({
+          title: "Не все заказы удалены",
+          message: errors.join("\n"),
+          tone: "danger",
+        });
+      }
+      setSelectedIds([]);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const runBulkSendToOneC = async () => {
     if (!selectedIds.length) return;
     const database = await resolveSendDatabase();
@@ -587,6 +634,14 @@ export function ManagerOrders({
             >
               Отменить передачу в 1С
             </button>
+            <button
+              className="danger-button"
+              type="button"
+              disabled={!selectedIds.length || bulkBusy}
+              onClick={() => void runBulkTrash()}
+            >
+              Удалить
+            </button>
             {selectedIds.length > 0 && <button className="secondary-button" type="button" onClick={() => setSelectedIds([])}>Очистить выбор</button>}
             <span className="muted small">Выбрано заказов: {selectedIds.length}</span>
           </div>
@@ -598,6 +653,7 @@ export function ManagerOrders({
           {visible.map((order) => {
         const exchange = normalizeOrderExchange(order.exchange);
         const busy = busyOrderId === order.id;
+        const trashGate = canTrashOrder(order, "manager");
         return (
         <article className="order-card manager-order-card-item" key={order.id}>
           <div className="order-card-header manager-order-card-header">
@@ -688,6 +744,21 @@ export function ManagerOrders({
                     {busy ? "Передача…" : exchangeSendLabel(exchange)}
                   </button>
                 )}
+                {!inTrash && settings.managerCanDeleteOrders ? (
+                  <button
+                    className="danger-button manager-order-inline-action"
+                    type="button"
+                    disabled={!trashGate.ok}
+                    title={
+                      trashGate.ok
+                        ? "Перенести заказ в корзину"
+                        : trashGate.error
+                    }
+                    onClick={() => onDeleteOrder(order)}
+                  >
+                    Удалить
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -751,11 +822,6 @@ export function ManagerOrders({
                       </button>
                     ) : null}
                     <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
-                    {settings.managerCanDeleteOrders && canTrashOrder(order, "manager").ok && (
-                      <button className="danger-button" type="button" onClick={() => onDeleteOrder(order)}>
-                        В корзину
-                      </button>
-                    )}
                   </>
                 )}
               </div>
