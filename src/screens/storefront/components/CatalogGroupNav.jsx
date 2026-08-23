@@ -1,7 +1,27 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { GroupIcon } from "./GroupIcon.jsx";
 import { buildGroupNav, canonicalizeProductSubcategory } from "../productGroups.js";
 import { navigateStorefront } from "./StoreHeader.jsx";
+
+function NavChevron() {
+  return (
+    <svg
+      className="sf-group-nav-chevron"
+      viewBox="0 0 12 12"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M2.2 4.2 L6 8 L9.8 4.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 /**
  * Боковое меню: группы → подгруппы.
@@ -15,15 +35,6 @@ export function CatalogGroupNav({
 }) {
   const groups = buildGroupNav(categories);
   const [openParents, setOpenParents] = useState(() => new Set());
-
-  useEffect(() => {
-    if (!activeCategory) return;
-    setOpenParents((prev) => {
-      const next = new Set(prev);
-      next.add(activeCategory);
-      return next;
-    });
-  }, [activeCategory]);
 
   const toggleParent = (name) => {
     setOpenParents((prev) => {
@@ -69,7 +80,11 @@ export function CatalogGroupNav({
                 onClick={() => {
                   goGroup(group.name);
                   if (hasChildren) {
-                    setOpenParents((prev) => new Set(prev).add(group.name));
+                    setOpenParents((prev) => {
+                      const next = new Set(prev);
+                      next.delete(group.name);
+                      return next;
+                    });
                   }
                 }}
               >
@@ -92,11 +107,14 @@ export function CatalogGroupNav({
                     toggleParent(group.name);
                   }}
                 >
-                  <span className="sf-group-nav-chevron" aria-hidden="true">
-                    ▾
-                  </span>
+                  <NavChevron />
                 </button>
-              ) : null}
+              ) : (
+                <span
+                  className="sf-group-nav-toggle is-placeholder"
+                  aria-hidden="true"
+                />
+              )}
             </div>
             {hasChildren && isOpen ? (
               <div className="sf-group-nav-children">

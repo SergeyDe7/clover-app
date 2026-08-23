@@ -23,6 +23,8 @@ export default function StorefrontApp() {
     const previousTheme = themeMeta?.getAttribute("content") || "";
     const previousHtmlBg = document.documentElement.style.backgroundColor;
     const previousBodyBg = document.body.style.backgroundColor;
+    document.documentElement.style.colorScheme = "light";
+    document.body.style.colorScheme = "light";
     if (themeMeta) themeMeta.setAttribute("content", "#f3f2ee");
     document.documentElement.style.backgroundColor = "#f3f2ee";
     document.body.style.backgroundColor = "#f3f2ee";

@@ -11,6 +11,10 @@ const home = readFileSync(
   path.join(projectRoot, "src/screens/storefront/pages/HomePage.jsx"),
   "utf8"
 );
+const tile = readFileSync(
+  path.join(projectRoot, "src/screens/storefront/components/GroupTile.jsx"),
+  "utf8"
+);
 
 assert.ok(
   home.includes("STOREFRONT_HERO_TITLE") &&
@@ -45,8 +49,23 @@ assert.match(
 
 assert.match(
   css,
-  /\.sf-group-tile-name\s*\{[^}]*overflow-wrap:\s*break-word/,
-  "Название категории должно переноситься, а не вылезать из плитки."
+  /\.sf-group-tile-name\s*\{[^}]*white-space:\s*nowrap/,
+  "На главной название категории в одну строку, без переносов."
+);
+assert.match(
+  tile,
+  /"Пакеты, упаковочные материалы": \["Пакеты,", "упаковочные материалы"\]/,
+  "«Пакеты, упаковочные материалы» на главной — две строки по словам, без разрыва слова."
+);
+assert.match(
+  tile,
+  /"Химия, чистящие средства": \["Химия,", "чистящие средства"\]/,
+  "«Химия, чистящие средства» на главной — две строки по словам, без разрыва слова."
+);
+assert.match(
+  css,
+  /\.sf-group-tile-name\.is-two-line\s*\{[^}]*hyphens:\s*none/,
+  "Двухстрочное имя категории не рвёт слово дефисом."
 );
 
 const mobile = css.split("@media (max-width: 900px)")[1] || "";
@@ -64,7 +83,7 @@ assert.doesNotMatch(
 );
 assert.match(
   mobile,
-  /\.sf-group-tile-name\s*\{[^}]*font-size:\s*0\.78rem/,
+  /\.sf-group-tile-name\s*\{[^}]*font-size:\s*0\.88rem/,
   "На телефоне название категории должно быть компактнее."
 );
 

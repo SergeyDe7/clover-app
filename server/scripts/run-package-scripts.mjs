@@ -78,6 +78,7 @@ const TEST_ONEC = [
   "scripts/verify-onec-prod-contour.mjs",
   "scripts/verify-catalog-prefix-search.mjs",
   "scripts/verify-storefront-group-tiles-ui.mjs",
+  "scripts/verify-storefront-catalog-tree-ui.mjs",
   "scripts/verify-clover-taxonomy.mjs",
   "scripts/verify-storefront-guest-counterparty.mjs",
   "scripts/verify-client-self-matrix.mjs",

@@ -19,9 +19,10 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-const CLOVER_UI_BUILD = "ui-20260823-v242-lk";
+const CLOVER_UI_BUILD = "ui-20260823-v248-sf";
 const BOOT_SPLASH_MS = 450;
 const APP_THEME_COLOR = "#f4f8f2";
+const STOREFRONT_THEME_COLOR = "#f3f2ee";
 const VIEWPORT_BASE = "width=device-width, initial-scale=1.0, viewport-fit=cover";
 
 function setThemeColor(color) {
@@ -66,10 +67,12 @@ function hideBootSplash() {
   if (!splash || splash.dataset.done === "1") return;
   splash.dataset.done = "1";
   splash.classList.add("is-done");
-  // После splash — цвет кабинета, не цвет анимации
-  setThemeColor(APP_THEME_COLOR);
-  document.documentElement.style.backgroundColor = APP_THEME_COLOR;
-  document.body.style.backgroundColor = APP_THEME_COLOR;
+  // После splash: ЛК — зелёный кабинет, витрина — свой бежевый фон.
+  // Иначе телефон заливает витрину цветом ЛК (#f4f8f2), а компьютер остаётся #f3f2ee.
+  const shellColor = storefront ? STOREFRONT_THEME_COLOR : APP_THEME_COLOR;
+  setThemeColor(shellColor);
+  document.documentElement.style.backgroundColor = shellColor;
+  document.body.style.backgroundColor = shellColor;
   window.setTimeout(() => {
     splash.remove();
   }, 280);
