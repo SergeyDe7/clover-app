@@ -77,6 +77,7 @@ a.sf-contacts-btn { display: none !important; }
   background: #fff;
   border: 1px solid rgba(28, 31, 28, 0.08);
   border-radius: 22px;
+  overflow: hidden;
 }
 .sf-contacts-col::before {
   content: "";
@@ -86,7 +87,6 @@ a.sf-contacts-btn { display: none !important; }
   bottom: 0;
   width: 5px;
   background: var(--clover-green, #5b9d57);
-  border-radius: 22px 0 0 22px;
 }
 .sf-contacts-col h2 {
   margin: 0 0 16px;

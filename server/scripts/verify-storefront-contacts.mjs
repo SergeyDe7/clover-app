@@ -198,6 +198,16 @@ const css = readFileSync(
 );
 assert.match(css, /\.sf-contacts-page|\.sf-contacts-sheet/);
 assert.match(css, /\.sf-contacts-map-zoom/);
+assert.match(
+  css,
+  /\.sf-contacts-col \{[\s\S]*?overflow:\s*hidden/,
+  "Зелёная полоса обрезается скруглением карточки."
+);
+assert.doesNotMatch(
+  css,
+  /\.sf-contacts-col::before \{[\s\S]*?border-radius:\s*22px 0 0 22px/,
+  "Радиус 22px на полоске 5px не скругляет ободок по карточке."
+);
 assert.match(css, /\.sf-header-phone/);
 
 console.log("verify-storefront-contacts: ok");
