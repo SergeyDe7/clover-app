@@ -200,8 +200,16 @@ const checks = [
     "Подгруппа с мопами пишется со строчной буквы",
   ],
   [
+    '["matrix", "Моя матрица"],\n  ["catalog", "Добавить товары из каталога"],',
+    "В ЛК клиента есть «Моя матрица» и «Добавить товары из каталога»",
+  ],
+  [
     'className="manager-order-extra"',
     "В ЛК админа номер, телефон, адрес и состав заказа спрятаны за «Подробнее»",
+  ],
+  [
+    "settings.managerCanDeleteOrders ? (",
+    "В карточке заказа кнопка «Удалить» стоит рядом со статусами, не внутри «Подробнее»",
   ],
   [
     "width: auto !important;\n  padding-left: 8px !important;\n  padding-right: 20px !important;",
@@ -224,6 +232,20 @@ const checks = [
 for (const [fragment, description] of checks) {
   if (!source.includes(fragment)) {
     throw new Error(`Проверка не пройдена: ${description}`);
+  }
+}
+
+{
+  const ordersUi = await readFile(
+    path.join(projectRoot, "src/screens/manager/ManagerOrders.jsx"),
+    "utf8"
+  );
+  const deleteAt = ordersUi.indexOf("onClick={() => onDeleteOrder(order)}");
+  const extraAt = ordersUi.indexOf('className="manager-order-extra"');
+  if (deleteAt < 0 || extraAt < 0 || deleteAt > extraAt) {
+    throw new Error(
+      "Кнопка «Удалить» должна быть в шапке карточки заказа, до блока «Подробнее»."
+    );
   }
 }
 

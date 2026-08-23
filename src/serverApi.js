@@ -250,6 +250,13 @@ export const api = {
     });
   },
 
+  addMyMatrixProduct(productId) {
+    return request("/state/my-matrix/add", {
+      method: "POST",
+      body: { productId },
+    });
+  },
+
   trashOrder(orderId) {
     return request(`/state/orders/${encodeURIComponent(orderId)}/trash`, {
       method: "POST",

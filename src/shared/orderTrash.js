@@ -7,12 +7,17 @@ export const ORDER_TRASH_BLOCKED_STATUSES = [
   "Выполнен",
 ];
 
-/** Обмен в очереди или уже в 1С — удаление запрещено. */
+/** Обмен в очереди — удаление запрещено. Уже переданный (`sent`) менеджер может убрать из Clover. */
 export const ORDER_TRASH_BLOCKED_EXCHANGE = [
   "ready",
   "sending",
-  "sent",
   "draft",
+];
+
+/** Клиент не удаляет заказ, который уже ушёл в 1С. */
+const CLIENT_TRASH_BLOCKED_EXCHANGE = [
+  ...ORDER_TRASH_BLOCKED_EXCHANGE,
+  "sent",
 ];
 
 export function isOrderTrashed(order) {
@@ -21,16 +26,20 @@ export function isOrderTrashed(order) {
 
 function exchangeStatusOf(order) {
   const status = String(order?.exchange?.status || "not_sent").trim();
-  return ORDER_TRASH_BLOCKED_EXCHANGE.includes(status) ||
+  if (
+    CLIENT_TRASH_BLOCKED_EXCHANGE.includes(status) ||
     status === "not_sent" ||
     status === "error"
-    ? status
-    : "not_sent";
+  ) {
+    return status;
+  }
+  return "not_sent";
 }
 
 /**
  * Можно ли отправить заказ в корзину.
- * Клиент: только «Новый». Менеджер: не принят в 1С и не в очереди обмена.
+ * Клиент: только «Новый» и ещё не ушедший в 1С.
+ * Менеджер: не принят в 1С и не в очереди обмена (уже переданный `sent` можно убрать из Clover).
  */
 export function canTrashOrder(order, role = "manager") {
   if (!order?.id) {
@@ -51,7 +60,9 @@ export function canTrashOrder(order, role = "manager") {
     };
   }
 
-  if (ORDER_TRASH_BLOCKED_EXCHANGE.includes(exchangeStatus)) {
+  const blockedExchange =
+    role === "client" ? CLIENT_TRASH_BLOCKED_EXCHANGE : ORDER_TRASH_BLOCKED_EXCHANGE;
+  if (blockedExchange.includes(exchangeStatus)) {
     return {
       ok: false,
       code: "EXCHANGE_ACTIVE",

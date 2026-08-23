@@ -9,19 +9,10 @@ function cleanId(value) {
 
 export function clientMayOrderCatalogProduct(rawLink = {}, productId, products = []) {
   const matrixMode = String(rawLink?.matrixMode || "pending");
-  const allowFullCatalog = Boolean(rawLink?.allowFullCatalog);
   const id = cleanId(productId);
   if (!id) return false;
 
-  if (matrixMode === "all") return true;
-
-  if (allowFullCatalog) {
-    return (Array.isArray(products) ? products : []).some(
-      (product) => String(product.id) === id && product.active !== false
-    );
-  }
-
-  if (matrixMode === "selected") {
+  if (matrixMode === "all" || matrixMode === "selected") {
     const ids = Array.isArray(rawLink?.matrixProductIds)
       ? rawLink.matrixProductIds
       : [];

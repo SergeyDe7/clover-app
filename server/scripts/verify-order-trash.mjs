@@ -36,6 +36,7 @@ try {
 
   const sent = { ...active, exchange: { status: "sent" } };
   assert.equal(canTrashOrder(sent, "client").ok, false);
+  assert.equal(canTrashOrder(sent, "manager").ok, true);
 
   const clientOld = { ...active, status: "Отменён" };
   assert.equal(canTrashOrder(clientOld, "client").ok, false);

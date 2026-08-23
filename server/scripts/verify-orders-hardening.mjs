@@ -134,11 +134,20 @@ assert.equal(
     "2",
     products
   ),
-  true,
-  "allowFullCatalog разрешает активный каталог."
+  false,
+  "Заказ только из матрицы: полный каталог не обходит матрицу."
 );
 assert.equal(
   clientMayOrderCatalogProduct({ matrixMode: "all" }, "2", products),
+  false,
+  "Режим all без загруженных id не открывает весь каталог."
+);
+assert.equal(
+  clientMayOrderCatalogProduct(
+    { matrixMode: "all", matrixProductIds: ["2"] },
+    "2",
+    products
+  ),
   true
 );
 

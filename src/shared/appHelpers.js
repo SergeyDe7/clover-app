@@ -59,7 +59,8 @@ export function staffHasFeature(authUser, featureId) {
 export const MANAGER_MORE_TAB_KEY = "clover-manager-more-tab-v1";
 
 export const CLIENT_TABS = [
-  ["home", "Заказ"],
+  ["matrix", "Моя матрица"],
+  ["catalog", "Добавить товары из каталога"],
   ["orders", "Мои заказы"],
   ["reconciliation", "Акт сверки"],
   ["cabinet", "Настройки"],
@@ -169,11 +170,11 @@ export function writeManagerMoreTab(value) {
 
 export function readClientActiveTab() {
   try {
-    let value = localStorage.getItem(CLIENT_ACTIVE_TAB_KEY) || "home";
-    if (value === "matrix") value = "home";
-    return CLIENT_TABS.some(([id]) => id === value) ? value : "home";
+    let value = localStorage.getItem(CLIENT_ACTIVE_TAB_KEY) || "matrix";
+    if (value === "home" || value === "order") value = "matrix";
+    return CLIENT_TABS.some(([id]) => id === value) ? value : "matrix";
   } catch {
-    return "home";
+    return "matrix";
   }
 }
 
@@ -209,8 +210,11 @@ export function clientTabFromSection(section) {
   if (section === "reconciliation" || section === "acts") {
     return "reconciliation";
   }
-  if (section === "matrix" || section === "products") {
-    return "home";
+  if (section === "matrix" || section === "products" || section === "home" || section === "order") {
+    return "matrix";
+  }
+  if (section === "catalog" || section === "catalog-matrix") {
+    return "catalog";
   }
   if (
     section === "addresses" ||
@@ -226,11 +230,9 @@ export function clientTabFromSection(section) {
   if (section === "orders" || section === "history") return "orders";
   if (
     section === "home" ||
-    section === "order" ||
-    section === "catalog" ||
-    section === "catalog-matrix"
+    section === "order"
   ) {
-    return "home";
+    return "matrix";
   }
   return "";
 }
@@ -1805,6 +1807,21 @@ textarea { resize: vertical; }
   gap: 8px;
   margin: 0;
 }
+.manager-order-status-row .manager-send-onec-button,
+.manager-order-status-row .manager-manual-processed-badge,
+.manager-order-inline-action {
+  min-height: 28px;
+  height: 28px;
+}
+.manager-order-inline-action {
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 1;
+}
+.manager-order-inline-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .manager-order-checkbox {
   flex: 0 0 auto;
   width: 18px;
@@ -1992,7 +2009,7 @@ textarea { resize: vertical; }
   padding-left: 8px;
   padding-right: 0;
 }
-.order-lines-name { display: block; color: #394639; font-size: 13px; font-weight: 650; line-height: 1.35; }
+.order-lines-name { display: block; color: #394639; font-size: 13px; font-weight: 650; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
 .order-lines-article { display: block; margin-top: 2px; color: #7a847a; font-size: 11px; font-weight: 500; }
 .order-product { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 16px; padding: 11px 0; border-bottom: 1px solid #edf1eb; }
 .order-product > span { color: #596359; line-height: 1.45; }
@@ -2551,10 +2568,11 @@ textarea { resize: vertical; }
   font-size: 13px;
   line-height: 1.25;
   min-height: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  display: block;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .product-code { margin: 0 0 6px; color: #929a92; font-size: 10px; }
 .product-card:not(.product-card-list) .product-code { display: none; }
@@ -3340,6 +3358,27 @@ html.clover-thankyou-open .app-top-chrome {
 .client-home-gate { margin-bottom: 16px; }
 .client-settings-stack { display: grid; gap: 18px; }
 .client-matrix-toolbar { display: grid; gap: 12px; margin-bottom: 18px; }
+.client-catalog-add-panel .product-card-controls {
+  margin-top: auto;
+}
+.client-catalog-add-panel .product-price,
+.client-catalog-add-panel .client-catalog-add-price {
+  display: block;
+  visibility: visible;
+  opacity: 1;
+  height: auto;
+  min-height: 20px;
+  margin: 4px 0 8px;
+  overflow: visible;
+  color: #2f5f2f;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.3;
+  flex: 0 0 auto;
+}
+.product-card-in-matrix {
+  border-color: #cfe3cc;
+}
 .client-matrix-meta { color: #737d73; font-size: 14px; }
 .client-matrix-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3367,10 +3406,11 @@ html.clover-thankyou-open .app-top-chrome {
   margin: 8px 0 4px;
   font-size: 13px;
   line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  display: block;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .client-matrix-card .product-code {
   margin: 0 0 4px;
@@ -4899,16 +4939,28 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     margin: 2px 0;
     font-size: 12px;
     line-height: 1.25;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    display: block;
+    -webkit-line-clamp: unset;
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
   .product-code { display: none; }
   .product-price {
     flex: 0 0 auto;
     margin: 0 0 4px !important;
     font-size: 12px;
+  }
+  .client-catalog-add-panel .product-price,
+  .client-catalog-add-panel .client-catalog-add-price {
+    display: block !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    min-height: 20px !important;
+    height: auto !important;
+    overflow: visible !important;
+    color: #2f5f2f !important;
   }
   .product-card-controls {
     margin-top: auto;
@@ -5161,6 +5213,19 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   }
   .product-card:not(.product-card-list) h2 { font-size: 12px; }
   .product-price { margin: 0 0 4px !important; }
+  .client-catalog-add-panel .product-price,
+  .client-catalog-add-panel .client-catalog-add-price {
+    display: block !important;
+    visibility: visible !important;
+    margin: 4px 0 8px !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    line-height: 1.3 !important;
+    min-height: 20px !important;
+    height: auto !important;
+    overflow: visible !important;
+    color: #2f5f2f !important;
+  }
   .favorite-button { font-size: 18px; }
 }
 `;

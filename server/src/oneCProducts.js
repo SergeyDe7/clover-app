@@ -921,8 +921,9 @@ export function createOrReuseCloverProductFromOneC(
   };
 }
 
-/** Добавляет productId в матрицу клиента; pending → selected. */
-export function addProductIdToClientMatrix(clientLinks, clientId, productId) {
+/** Добавляет productId в матрицу клиента; pending → selected.
+ *  pinAllMode: для самодобавления из каталога «весь каталог» сужаем до явного списка. */
+export function addProductIdToClientMatrix(clientLinks, clientId, productId, options = {}) {
   const links = clientLinks && typeof clientLinks === "object" ? { ...clientLinks } : {};
   const key = String(clientId || "").trim();
   if (!key) throw new Error("Не указан клиент Clover.");
@@ -937,6 +938,8 @@ export function addProductIdToClientMatrix(clientLinks, clientId, productId) {
 
   let matrixMode = cleanText(current.matrixMode) || "pending";
   if (matrixMode === "pending" || !matrixMode) {
+    matrixMode = "selected";
+  } else if (options.pinAllMode && matrixMode === "all") {
     matrixMode = "selected";
   }
 

@@ -77,10 +77,11 @@ export function OrderEditor({
   profile: _profile,
   orders: _orders,
   catalogPolicy,
-  showFullCatalog,
-  setShowFullCatalog,
+  showFullCatalog: _showFullCatalog,
+  setShowFullCatalog: _setShowFullCatalog,
   onClose,
   onSave,
+  onOpenCatalogAdd: _onOpenCatalogAdd,
   embedded = false,
 }) {
   const initialOrder = session.order || null;
@@ -577,28 +578,9 @@ export function OrderEditor({
 
             {catalogPolicy.matrixMode === "pending" && (
               <div className="matrix-catalog-note pending">
-                Менеджер ещё подготавливает ваш постоянный список
-                товаров и персональные цены. Пока можно добавить товар
-                через форму «Не нашли нужный товар?».
-              </div>
-            )}
-
-            {catalogPolicy.allowFullCatalog && (
-              <div className="catalog-scope-switch">
-                <button
-                  className={!showFullCatalog ? "active" : ""}
-                  type="button"
-                  onClick={() => setShowFullCatalog(false)}
-                >
-                  Мои постоянные позиции
-                </button>
-                <button
-                  className={showFullCatalog ? "active" : ""}
-                  type="button"
-                  onClick={() => setShowFullCatalog(true)}
-                >
-                  Весь каталог
-                </button>
+                В матрице пока нет закреплённых товаров. Добавьте позиции
+                через «Добавить товары из каталога» — они сохранятся
+                автоматически. Заказ оформляется из этой матрицы.
               </div>
             )}
 

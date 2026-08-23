@@ -35,6 +35,7 @@ import { ClientSectionMenu } from "./ClientSectionMenu";
 import { ProfilePanel } from "./ProfilePanel";
 import { AddressesPanel } from "./AddressesPanel";
 import { OrderEditor } from "./OrderEditor";
+import { ClientCatalogAddPanel } from "./ClientCatalogAddPanel";
 import { ReconciliationPanel } from "./ReconciliationPanel";
 
 const NARROW_MQ = CLIENT_NARROW_MQ;
@@ -75,21 +76,24 @@ function ClientDashboard({
   onLogout,
   catalogSession,
   products,
+  fullCatalogProducts = [],
   favorites,
   setFavorites,
   showFullCatalog,
   setShowFullCatalog,
   onSaveOrder,
   onCloseCatalog,
+  onAddToMatrix,
   canCreateOrder,
   profileComplete,
 }) {
   const isNarrow = useIsNarrow();
-  const [tab, setTab] = useState("home");
+  const [tab, setTab] = useState("matrix");
   const [cabinetSection, setCabinetSection] = useState(readClientCabinetSection);
   const [filter, setFilter] = useState("Активные");
   const [thankYouOpen, setThankYouOpen] = useState(false);
   const [seenActsTick, setSeenActsTick] = useState(0);
+  const [matrixAddBusyId, setMatrixAddBusyId] = useState("");
   const active = orders.filter(
     (order) => !["Выполнен", "Отменён"].includes(order.status)
   );
@@ -122,7 +126,7 @@ function ClientDashboard({
   const selectTab = (id) => {
     setTab(id);
     writeClientActiveTab(id);
-    if (id === "home") {
+    if (id === "matrix") {
       onNew?.({ silent: true });
     }
     if (id === "reconciliation") {
@@ -150,8 +154,8 @@ function ClientDashboard({
       catalogSession &&
       (catalogSession.mode === "edit" || catalogSession.mode === "repeat")
     ) {
-      setTab("home");
-      writeClientActiveTab("home");
+      setTab("matrix");
+      writeClientActiveTab("matrix");
     }
   }, [catalogSession]);
 
@@ -194,8 +198,8 @@ function ClientDashboard({
       return () => window.clearTimeout(timer);
     }
 
-    setTab("home");
-    writeClientActiveTab("home");
+    setTab("matrix");
+    writeClientActiveTab("matrix");
     onNew?.({ silent: true });
     return undefined;
   }, []);
@@ -232,7 +236,17 @@ function ClientDashboard({
 
   const openNewOrder = () => {
     onNew({ forceNew: true });
-    selectTab("home");
+    selectTab("matrix");
+  };
+
+  const addProductToMatrix = async (product) => {
+    if (!product?.id || !onAddToMatrix) return;
+    setMatrixAddBusyId(product.id);
+    try {
+      await onAddToMatrix(product.id);
+    } finally {
+      setMatrixAddBusyId("");
+    }
   };
 
   const ordersPanel = (
@@ -518,7 +532,7 @@ function ClientDashboard({
         </Header>
       </StickyCabinetChrome>
       <section className="page-content page-content-client">
-        {tab === "home" && (
+        {(tab === "matrix" || tab === "home") && (
           <>
             {!canCreateOrder && (
               <div className="warning-box client-home-gate">
@@ -570,9 +584,10 @@ function ClientDashboard({
                 profile={profile}
                 orders={orders}
                 catalogPolicy={catalogPolicy}
-                showFullCatalog={showFullCatalog}
+                showFullCatalog={false}
                 setShowFullCatalog={setShowFullCatalog}
                 onClose={onCloseCatalog}
+                onOpenCatalogAdd={() => selectTab("catalog")}
                 onSave={(payload) =>
                   Promise.resolve(onSaveOrder(payload)).then(() => {
                     setThankYouOpen(true);
@@ -598,6 +613,17 @@ function ClientDashboard({
               </div>
             )}
           </>
+        )}
+
+        {tab === "catalog" && (
+          <ClientCatalogAddPanel
+            products={fullCatalogProducts}
+            matrixProductIds={catalogPolicy?.matrixProductIds}
+            matrixMode={catalogPolicy?.matrixMode}
+            settings={settings}
+            busyId={matrixAddBusyId}
+            onAdd={addProductToMatrix}
+          />
         )}
 
         {tab === "orders" && ordersPanel}
