@@ -138,10 +138,17 @@ assert.match(
 );
 assert.match(contacts, /name: "contacts"/);
 assert.match(page, /Режим работы/);
+assert.match(page, /Связаться/);
+assert.match(page, /Как нас найти/);
+assert.match(page, /Позвонить/);
+assert.match(page, /Написать/);
+assert.match(page, /label="Телефон"/);
+assert.match(page, /label="Почта"/);
+assert.match(page, /label="Адрес"/);
 assert.doesNotMatch(
   page,
   /телефон, почта, адрес и как нас найти/,
-  "На странице контактов нет поясняющей подсказки под заголовком."
+  "На странице контактов нет старой поясняющей подсказки под заголовком."
 );
 assert.match(page, /mailto:/);
 assert.match(page, /javascript/i);

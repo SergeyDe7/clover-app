@@ -50,16 +50,6 @@ function ContactsMap({ image, embedSrc, mapsUrl }) {
       <div className="sf-contacts-map-zoom">
         <button
           type="button"
-          aria-label="Уменьшить карту"
-          disabled={zoom <= MAP_ZOOM_MIN}
-          onClick={() =>
-            setZoom((value) => Math.max(MAP_ZOOM_MIN, value - MAP_ZOOM_STEP))
-          }
-        >
-          −
-        </button>
-        <button
-          type="button"
           aria-label="Увеличить карту"
           disabled={zoom >= MAP_ZOOM_MAX}
           onClick={() =>
@@ -68,10 +58,20 @@ function ContactsMap({ image, embedSrc, mapsUrl }) {
         >
           +
         </button>
+        <button
+          type="button"
+          aria-label="Уменьшить карту"
+          disabled={zoom <= MAP_ZOOM_MIN}
+          onClick={() =>
+            setZoom((value) => Math.max(MAP_ZOOM_MIN, value - MAP_ZOOM_STEP))
+          }
+        >
+          −
+        </button>
       </div>
       {mapsUrl ? (
         <a
-          className="sf-contacts-map-link"
+          className="sf-btn sf-btn-ghost sf-btn-sm sf-contacts-map-link"
           href={mapsUrl}
           target="_blank"
           rel="noreferrer"
@@ -79,6 +79,15 @@ function ContactsMap({ image, embedSrc, mapsUrl }) {
           Открыть в Яндекс.Картах
         </a>
       ) : null}
+    </div>
+  );
+}
+
+function Fact({ label, children }) {
+  return (
+    <div className="sf-contacts-fact">
+      <span>{label}</span>
+      {children}
     </div>
   );
 }
@@ -133,18 +142,24 @@ export function ContactsPage() {
   const embedSrc = yandexEmbedSrc(mapsUrl);
   const mapImage = site.contactMapImageUrl || staticMap;
   const hasMap = Boolean(mapImage || embedSrc);
-  const hasAny =
-    Boolean(phoneLinks.phone) ||
-    Boolean(mailHref) ||
+  const hasReach = Boolean(phoneLinks.phone) || Boolean(mailHref);
+  const hasPlace =
     Boolean(site.contactAddress) ||
     Boolean(site.contactHours) ||
     Boolean(site.contactNote) ||
     Boolean(mapsUrl) ||
     hasMap;
+  const hasAny = hasReach || hasPlace;
 
   return (
     <div className="sf-contacts-page">
-      <h1>Контакты</h1>
+      <header className="sf-section-head">
+        <h1>Контакты</h1>
+        <p>
+          Позвоните или напишите. Если едете сами — адрес, режим работы и карта
+          на этой странице.
+        </p>
+      </header>
       {error ? <p className="sf-error">{error}</p> : null}
       {!ready && !error ? <p className="sf-muted">Загружаем контакты…</p> : null}
       {ready && !error && !hasAny ? (
@@ -152,38 +167,54 @@ export function ContactsPage() {
       ) : null}
       {ready && hasAny ? (
         <div className="sf-contacts-sheet">
-          <div className="sf-contacts-facts">
-            {phoneLinks.phone ? (
-              <p className="sf-contacts-fact">
-                <a href={phoneLinks.phone}>{phoneValue}</a>
-              </p>
-            ) : null}
-            {mailHref ? (
-              <p className="sf-contacts-fact">
-                <a href={mailHref}>{site.contactEmail}</a>
-              </p>
-            ) : null}
-            {site.contactHours ? (
-              <p className="sf-contacts-fact">
-                <span>Режим работы</span>
-                <strong className="sf-contacts-pre">{site.contactHours}</strong>
-              </p>
-            ) : null}
-            {site.contactNote ? (
-              <p className="sf-contacts-fact">
-                <span>Как проехать</span>
-                <strong className="sf-contacts-pre">{site.contactNote}</strong>
-              </p>
-            ) : null}
-          </div>
-          <div className="sf-contacts-place">
-            {site.contactAddress ? (
-              <p className="sf-contacts-fact sf-contacts-address">
-                {site.contactAddress}
-              </p>
-            ) : null}
-            <ContactsMap image={mapImage} embedSrc={embedSrc} mapsUrl={mapsUrl} />
-          </div>
+          {hasReach ? (
+            <section
+              className="sf-contacts-col"
+              aria-labelledby="sf-contacts-reach-title"
+            >
+              <h2 id="sf-contacts-reach-title">Связаться</h2>
+              {phoneLinks.phone ? (
+                <Fact label="Телефон">
+                  <a href={phoneLinks.phone}>{phoneValue}</a>
+                  <a className="sf-btn sf-btn-primary sf-btn-sm" href={phoneLinks.phone}>
+                    Позвонить
+                  </a>
+                </Fact>
+              ) : null}
+              {mailHref ? (
+                <Fact label="Почта">
+                  <a href={mailHref}>{site.contactEmail}</a>
+                  <a className="sf-btn sf-btn-ghost sf-btn-sm" href={mailHref}>
+                    Написать
+                  </a>
+                </Fact>
+              ) : null}
+            </section>
+          ) : null}
+          {hasPlace ? (
+            <section
+              className="sf-contacts-col sf-contacts-place"
+              aria-labelledby="sf-contacts-place-title"
+            >
+              <h2 id="sf-contacts-place-title">Как нас найти</h2>
+              {site.contactAddress ? (
+                <Fact label="Адрес">
+                  <strong>{site.contactAddress}</strong>
+                </Fact>
+              ) : null}
+              {site.contactHours ? (
+                <Fact label="Режим работы">
+                  <strong className="sf-contacts-pre">{site.contactHours}</strong>
+                </Fact>
+              ) : null}
+              {site.contactNote ? (
+                <Fact label="Как проехать">
+                  <strong className="sf-contacts-pre">{site.contactNote}</strong>
+                </Fact>
+              ) : null}
+              <ContactsMap image={mapImage} embedSrc={embedSrc} mapsUrl={mapsUrl} />
+            </section>
+          ) : null}
         </div>
       ) : null}
     </div>
