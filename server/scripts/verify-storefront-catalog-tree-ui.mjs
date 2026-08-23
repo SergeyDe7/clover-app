@@ -20,6 +20,10 @@ const header = readFileSync(
   path.join(projectRoot, "src/screens/storefront/components/StoreHeader.jsx"),
   "utf8"
 );
+const pageApp = readFileSync(
+  path.join(projectRoot, "src/screens/storefront/StorefrontApp.jsx"),
+  "utf8"
+);
 
 assert.match(
   css,
@@ -52,15 +56,40 @@ assert.match(
   "Шеврон — SVG с предсказуемой геометрией, не глиф ▾."
 );
 
-assert.match(
+assert.doesNotMatch(
   css,
   /\.sf-catalog-side\s*\{[^}]*position:\s*sticky/,
-  "Дерево каталога плавает при прокрутке товаров."
+  "Дерево не sticky: sticky всё равно едет вместе со страницей."
 );
 assert.match(
   css,
-  /\.sf-catalog-side\s*\{[^}]*max-height:\s*calc\(100dvh/,
-  "Плавающее дерево не выше экрана и крутится внутри панели."
+  /html\.sf-catalog-lock[\s\S]*overflow:\s*hidden/,
+  "На каталоге страница не скроллится — иначе дерево уезжает."
+);
+assert.match(
+  css,
+  /\.sf-catalog-main\s*\{[^}]*overflow:\s*auto/,
+  "Крутятся только товары, дерево стоит на месте."
+);
+assert.match(
+  css,
+  /\.sf-catalog-main\s*\{[^}]*scrollbar-width:\s*none/,
+  "Внутренний скролл товаров без полосы, как у отдельного окна."
+);
+assert.match(
+  css,
+  /\.sf-catalog-main::-webkit-scrollbar[\s\S]*display:\s*none/,
+  "WebKit не рисует полосу прокрутки у колонки товаров."
+);
+assert.match(
+  css,
+  /\.sf-catalog-tree-body\s*\{[^}]*overflow:\s*auto/,
+  "Длинное дерево крутится внутри своей колонки, не со страницей."
+);
+assert.match(
+  pageApp,
+  /sf-catalog-lock/,
+  "Класс sf-catalog-lock вешается только на странице каталога."
 );
 
 const mobile = css.split("@media (max-width: 900px)")[1] || "";

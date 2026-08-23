@@ -38,6 +38,16 @@ export default function StorefrontApp() {
     };
   }, []);
 
+  useEffect(() => {
+    const lock = route.name === "catalog";
+    document.documentElement.classList.toggle("sf-catalog-lock", lock);
+    document.body.classList.toggle("sf-catalog-lock", lock);
+    return () => {
+      document.documentElement.classList.remove("sf-catalog-lock");
+      document.body.classList.remove("sf-catalog-lock");
+    };
+  }, [route.name]);
+
   let page;
   let current = "home";
   if (route.name === "catalog") {
@@ -63,7 +73,7 @@ export default function StorefrontApp() {
   }
 
   return (
-    <div className="sf-app">
+    <div className={`sf-app${route.name === "catalog" ? " is-catalog" : ""}`}>
       <StoreHeader current={current} />
       <main className="sf-main">{page}</main>
     </div>

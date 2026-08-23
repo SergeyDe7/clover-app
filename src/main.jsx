@@ -19,7 +19,7 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-const CLOVER_UI_BUILD = "ui-20260823-v252-sf";
+const CLOVER_UI_BUILD = "ui-20260823-v255-sf";
 const BOOT_SPLASH_MS = 450;
 const APP_THEME_COLOR = "#f4f8f2";
 const STOREFRONT_THEME_COLOR = "#f3f2ee";
