@@ -39,6 +39,9 @@ async function request(path, options = {}) {
 }
 
 export const storefrontApi = {
+  site() {
+    return request("/site");
+  },
   catalog(params = {}) {
     const query = new URLSearchParams();
     if (params.category) query.set("category", params.category);

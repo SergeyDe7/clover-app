@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
-import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber, matchesCatalogPrefixSearch, productCatalogSearchHaystack } from "../../shared/appHelpers";
+import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber, matchesCatalogPrefixSearch, productCatalogSearchHaystack, formatRussianPhone, getRussianPhoneLocalDigits } from "../../shared/appHelpers";
 import { StorefrontProductAdd } from "./StorefrontProductAdd";
 import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE } from "../storefront/siteCopy.js";
 
@@ -53,6 +53,8 @@ export function ManagerStorefront({
     storefrontShowOnlyLinked: settings?.storefrontShowOnlyLinked !== false,
     storefrontHeroTitle: settings?.storefrontHeroTitle || "",
     storefrontHeroLead: settings?.storefrontHeroLead || "",
+    storefrontContactPhone: formatRussianPhone(settings?.storefrontContactPhone || ""),
+    storefrontContactEmail: settings?.storefrontContactEmail || "",
     storefrontOneCClientId: settings?.storefrontOneCClientId || "",
     storefrontOneCClientName:
       settings?.storefrontOneCClientName || "Интернет магазин Clover",
@@ -73,6 +75,8 @@ export function ManagerStorefront({
         storefrontShowOnlyLinked: settings?.storefrontShowOnlyLinked !== false,
         storefrontHeroTitle: settings?.storefrontHeroTitle || "",
         storefrontHeroLead: settings?.storefrontHeroLead || "",
+        storefrontContactPhone: formatRussianPhone(settings?.storefrontContactPhone || ""),
+        storefrontContactEmail: settings?.storefrontContactEmail || "",
         storefrontOneCClientId: settings?.storefrontOneCClientId || "",
         storefrontOneCClientName:
           settings?.storefrontOneCClientName || "Интернет магазин Clover",
@@ -85,6 +89,8 @@ export function ManagerStorefront({
         prev.storefrontShowOnlyLinked === next.storefrontShowOnlyLinked &&
         prev.storefrontHeroTitle === next.storefrontHeroTitle &&
         prev.storefrontHeroLead === next.storefrontHeroLead &&
+        prev.storefrontContactPhone === next.storefrontContactPhone &&
+        prev.storefrontContactEmail === next.storefrontContactEmail &&
         prev.storefrontOneCClientId === next.storefrontOneCClientId &&
         prev.storefrontOneCClientName === next.storefrontOneCClientName;
       return same ? prev : next;
@@ -97,6 +103,8 @@ export function ManagerStorefront({
     settings?.storefrontShowOnlyLinked,
     settings?.storefrontHeroTitle,
     settings?.storefrontHeroLead,
+    settings?.storefrontContactPhone,
+    settings?.storefrontContactEmail,
     settings?.storefrontOneCClientId,
     settings?.storefrontOneCClientName,
   ]);
@@ -159,6 +167,10 @@ export function ManagerStorefront({
       const payload = {
         ...draft,
         storefrontMarkupPercent: parseMarkupPercent(draft.storefrontMarkupPercent),
+        storefrontContactPhone: getRussianPhoneLocalDigits(draft.storefrontContactPhone)
+          ? draft.storefrontContactPhone
+          : "",
+        storefrontContactEmail: String(draft.storefrontContactEmail || "").trim(),
       };
       const result = await api.saveStorefrontSettings(payload);
       const next = result.settings || { ...settings, ...payload };
@@ -522,6 +534,51 @@ export function ManagerStorefront({
               placeholder={STOREFRONT_HERO_LEAD}
               onChange={(event) =>
                 setField("storefrontHeroLead", event.target.value)
+              }
+            />
+          </label>
+        </div>
+      </div>
+
+      <div className="manager-contact-settings" style={{ marginTop: 20 }}>
+        <h3>Контакты на витрине</h3>
+        <p className="storefront-settings-hint">
+          Кнопка «Контакты» в шапке сайта показывает телефон и почту. Пустые
+          поля на витрине скрываются.
+        </p>
+        <div className="form-grid">
+          <label className="field">
+            Телефон
+            <input
+              inputMode="tel"
+              autoComplete="tel"
+              value={draft.storefrontContactPhone || ""}
+              placeholder="+7 (___) ___-__-__"
+              onFocus={(event) => {
+                if (!getRussianPhoneLocalDigits(event.currentTarget.value)) {
+                  requestAnimationFrame(() => {
+                    const end = event.currentTarget.value.length;
+                    event.currentTarget.setSelectionRange(end, end);
+                  });
+                }
+              }}
+              onChange={(event) =>
+                setField(
+                  "storefrontContactPhone",
+                  formatRussianPhone(event.target.value)
+                )
+              }
+            />
+          </label>
+          <label className="field">
+            Почта
+            <input
+              type="email"
+              autoComplete="email"
+              value={draft.storefrontContactEmail || ""}
+              placeholder="hello@clover-spb.ru"
+              onChange={(event) =>
+                setField("storefrontContactEmail", event.target.value)
               }
             />
           </label>

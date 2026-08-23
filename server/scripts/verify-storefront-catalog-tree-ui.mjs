@@ -189,6 +189,11 @@ assert.match(
   /sf-cart-mobile[\s\S]*sf-login/,
   "На телефоне «Корзина» стоит левее «Войти в ЛК»."
 );
+assert.match(
+  header,
+  /StorefrontContacts/,
+  "В шапке витрины есть кнопка «Контакты»."
+);
 assert.doesNotMatch(
   mobile.split("@media")[0],
   /\.sf-login(?:-desktop)?\s*\{[^}]*display:\s*none/,

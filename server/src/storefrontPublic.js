@@ -62,6 +62,12 @@ export function getStorefrontSettings(settingsInput) {
     storefrontShowOnlyLinked: settings.storefrontShowOnlyLinked !== false,
     storefrontHeroTitle: String(settings.storefrontHeroTitle || "").trim(),
     storefrontHeroLead: String(settings.storefrontHeroLead || "").trim(),
+    storefrontContactPhone: normalizeStorefrontContactPhone(
+      settings.storefrontContactPhone
+    ),
+    storefrontContactEmail: normalizeStorefrontContactEmail(
+      settings.storefrontContactEmail
+    ),
     storefrontOneCClientId: String(settings.storefrontOneCClientId || "").trim(),
     storefrontOneCClientName:
       String(settings.storefrontOneCClientName || "").trim() ||
@@ -81,7 +87,15 @@ function normalizeStorefrontMarkupPercent(value) {
   return Math.min(1000, Math.round(num * 100) / 100);
 }
 
-const STOREFRONT_SETTING_KEYS = [
+function normalizeStorefrontContactPhone(value) {
+  return String(value || "").trim();
+}
+
+function normalizeStorefrontContactEmail(value) {
+  return String(value || "").trim().slice(0, 254);
+}
+
+export const STOREFRONT_SETTING_KEYS = [
   "storefrontPricingMode",
   "storefrontMarkupPercent",
   "storefrontPriceTypeId",
@@ -89,6 +103,8 @@ const STOREFRONT_SETTING_KEYS = [
   "storefrontShowOnlyLinked",
   "storefrontHeroTitle",
   "storefrontHeroLead",
+  "storefrontContactPhone",
+  "storefrontContactEmail",
   "storefrontOneCClientId",
   "storefrontOneCClientName",
 ];
@@ -132,6 +148,12 @@ export function mergeStorefrontSettings(baseSettings, patch = {}) {
     storefrontHeroLead: String(
       incoming.storefrontHeroLead ?? current.storefrontHeroLead ?? ""
     ).trim(),
+    storefrontContactPhone: normalizeStorefrontContactPhone(
+      incoming.storefrontContactPhone ?? current.storefrontContactPhone ?? ""
+    ),
+    storefrontContactEmail: normalizeStorefrontContactEmail(
+      incoming.storefrontContactEmail ?? current.storefrontContactEmail ?? ""
+    ),
     storefrontOneCClientId: String(
       incoming.storefrontOneCClientId ?? current.storefrontOneCClientId ?? ""
     ).trim(),
@@ -434,11 +456,22 @@ export function getPublicCatalog({
     categories: buildCategories(listStorefrontProducts(settings)),
     products,
     priceType,
-    site: {
-      heroTitle: settings.storefrontHeroTitle || "",
-      heroLead: settings.storefrontHeroLead || "",
-    },
+    site: buildPublicSite(settings),
   };
+}
+
+export function buildPublicSite(settingsInput) {
+  const settings = getStorefrontSettings(settingsInput);
+  return {
+    heroTitle: settings.storefrontHeroTitle || "",
+    heroLead: settings.storefrontHeroLead || "",
+    contactPhone: settings.storefrontContactPhone || "",
+    contactEmail: settings.storefrontContactEmail || "",
+  };
+}
+
+export function getPublicSite() {
+  return buildPublicSite(getGlobalState("settings", DEFAULT_SETTINGS));
 }
 
 export function getPublicProductByCode(code) {

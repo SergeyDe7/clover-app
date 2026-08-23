@@ -2,10 +2,29 @@ import { useEffect, useState } from "react";
 import { cabinetLoginUrl } from "../../../config/urls.js";
 import { getCartCount, subscribeCart } from "../cartStorage.js";
 import { storefrontHref } from "../mode.js";
+import { storefrontApi } from "../publicApi.js";
+import { StorefrontContacts } from "./StorefrontContacts.jsx";
 
 export function StoreHeader({ current }) {
   const [count, setCount] = useState(getCartCount);
+  const [contacts, setContacts] = useState({ phone: "", email: "" });
   useEffect(() => subscribeCart(() => setCount(getCartCount())), []);
+  useEffect(() => {
+    let cancelled = false;
+    storefrontApi
+      .site()
+      .then((payload) => {
+        if (cancelled) return;
+        setContacts({
+          phone: payload?.site?.contactPhone || "",
+          email: payload?.site?.contactEmail || "",
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function go(route) {
     window.history.pushState({}, "", storefrontHref(route));
@@ -68,6 +87,7 @@ export function StoreHeader({ current }) {
         >
           Корзина{count ? ` · ${count}` : ""}
         </a>
+        <StorefrontContacts phone={contacts.phone} email={contacts.email} />
         <a className="sf-btn sf-btn-ghost sf-login" href={cabinetLoginUrl("/")}>
           Войти в ЛК
         </a>

@@ -73,6 +73,8 @@ export const DEFAULT_SETTINGS = {
   storefrontShowOnlyLinked: true,
   storefrontHeroTitle: "",
   storefrontHeroLead: "",
+  storefrontContactPhone: "",
+  storefrontContactEmail: "",
   storefrontOneCClientId: "",
   storefrontOneCClientName: "Интернет магазин Clover",
 };

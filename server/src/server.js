@@ -170,9 +170,11 @@ import {
   createStorefrontOrder,
   getPublicCatalog,
   getPublicProductByCode,
+  getPublicSite,
   getStorefrontSettings,
   mergeStorefrontSettings,
   stripStorefrontSettings,
+  STOREFRONT_SETTING_KEYS,
   findPurchasePriceTypeId,
 } from "./storefrontPublic.js";
 import {
@@ -1615,6 +1617,16 @@ app.get("/api/health", (req, res) => {
     service: "clover-server", version: "4.0.4",
     time: new Date().toISOString(),
   });
+});
+
+/** Публичные контакты и тексты витрины (без авторизации, без каталога). */
+app.get("/api/public/site", (req, res) => {
+  try {
+    res.json({ site: getPublicSite() });
+  } catch (error) {
+    console.error("public site failed", error);
+    res.status(500).json({ error: "Не удалось загрузить данные сайта." });
+  }
 });
 
 /** Публичные контакты менеджера для экрана входа (без авторизации). */
@@ -3923,17 +3935,7 @@ app.put(
         : {
             ...stripStorefrontSettings(incoming),
             ...Object.fromEntries(
-              [
-                "storefrontPricingMode",
-                "storefrontMarkupPercent",
-                "storefrontPriceTypeId",
-                "storefrontPriceTypeName",
-                "storefrontShowOnlyLinked",
-                "storefrontHeroTitle",
-                "storefrontHeroLead",
-                "storefrontOneCClientId",
-                "storefrontOneCClientName",
-              ].map((key) => [key, current[key]])
+              STOREFRONT_SETTING_KEYS.map((key) => [key, current[key]])
             ),
           };
 
