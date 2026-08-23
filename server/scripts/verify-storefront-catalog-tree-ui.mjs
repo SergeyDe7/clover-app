@@ -102,8 +102,28 @@ assert.match(
 );
 assert.match(
   css,
-  /\.sf-group-nav-item\.is-active::before\s*\{[^}]*background:\s*var\(--clover-green/,
-  "Активная категория отмечается тем же зелёным ободком слева, что и подкатегория."
+  /\.sf-group-nav-item\s*\{[^}]*overflow:\s*hidden/,
+  "Полоска обрезается тем же скруглением 12px, что и кнопка."
+);
+assert.match(
+  css,
+  /\.sf-group-nav-item\.is-active::before\s*\{[^}]*top:\s*0/,
+  "Полоска на всю высоту кнопки, не короткая капсула внутри."
+);
+assert.match(
+  css,
+  /\.sf-group-nav-item\.is-active::before\s*\{[^}]*border-radius:\s*12px\s+0\s+0\s+12px/,
+  "Левые углы полоски как у кнопки, не прямая линия."
+);
+assert.match(
+  css,
+  /\.sf-group-nav-item\.is-active::before\s*\{[^}]*linear-gradient/,
+  "Ободок активной категории с зелёным градиентом."
+);
+assert.match(
+  css,
+  /\.sf-group-nav-item\.is-active::before\s*\{[^}]*--clover-green/,
+  "Градиент ободка из токенов Clover green."
 );
 assert.doesNotMatch(
   css,
