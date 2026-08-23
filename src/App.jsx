@@ -30,7 +30,6 @@ import {
   inferProductCategory,
   makeOrderHistoryEvent,
   appendOrderHistory,
-  UNIT_CONFIG,
 } from "./shared/appHelpers";
 import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
 import { appAlert, appConfirm } from "./shared/AppModal";
