@@ -38,8 +38,14 @@ assert.ok(
   "Подзаголовок витрины должен начинаться с «Компания КЛЕВЕР» и описывать поставки для HoReCa."
 );
 assert.ok(
-  home.includes("/storefront/hero-horeca.png"),
-  "На главной витрины есть фотография для верхнего блока."
+  copy.includes("/storefront/hero-horeca.png") &&
+    copy.includes("/storefront/hero-packaging.webp") &&
+    copy.includes("/storefront/hero-chemistry.webp"),
+  "На главной витрины есть три слайда баннера по тематике КЛЕВЕР."
+);
+assert.ok(
+  home.includes("HeroSlides") && home.includes("heroIntervalSec"),
+  "Главная крутит слайды баннера с интервалом из настроек."
 );
 assert.match(
   css,

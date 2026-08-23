@@ -1,12 +1,23 @@
 import { useEffect, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
 import { GroupTile } from "../components/GroupTile.jsx";
+import { HeroSlides } from "../components/HeroSlides.jsx";
 import { CLOVER_PRODUCT_GROUPS } from "../productGroups.js";
-import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE } from "../siteCopy.js";
+import {
+  STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
+  STOREFRONT_DEFAULT_HERO_SLIDES,
+  STOREFRONT_HERO_LEAD,
+  STOREFRONT_HERO_TITLE,
+} from "../siteCopy.js";
 
 export function HomePage() {
   const [error, setError] = useState("");
-  const [hero, setHero] = useState({ title: "", lead: "" });
+  const [hero, setHero] = useState({
+    title: "",
+    lead: "",
+    slides: STOREFRONT_DEFAULT_HERO_SLIDES,
+    intervalSec: STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
+  });
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -18,6 +29,13 @@ export function HomePage() {
         setHero({
           title: payload?.site?.heroTitle || "",
           lead: payload?.site?.heroLead || "",
+          slides:
+            Array.isArray(payload?.site?.heroSlides) &&
+            payload.site.heroSlides.length
+              ? payload.site.heroSlides
+              : STOREFRONT_DEFAULT_HERO_SLIDES,
+          intervalSec:
+            payload?.site?.heroIntervalSec || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
         });
         setReady(true);
       })
@@ -44,14 +62,7 @@ export function HomePage() {
             {hero.lead || STOREFRONT_HERO_LEAD}
           </p>
         </div>
-        <div className="sf-hero-visual" aria-hidden="true">
-          <img
-            src="/storefront/hero-horeca.png"
-            alt=""
-            width="1280"
-            height="720"
-          />
-        </div>
+        <HeroSlides slides={hero.slides} intervalSec={hero.intervalSec} />
       </section>
 
       <section className="sf-section sf-groups-section">

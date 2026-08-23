@@ -3,7 +3,7 @@ import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
 import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber, matchesCatalogPrefixSearch, productCatalogSearchHaystack, formatRussianPhone, getRussianPhoneLocalDigits } from "../../shared/appHelpers";
 import { StorefrontProductAdd } from "./StorefrontProductAdd";
-import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE } from "../storefront/siteCopy.js";
+import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE, STOREFRONT_DEFAULT_HERO_SLIDES, STOREFRONT_DEFAULT_HERO_INTERVAL_SEC, STOREFRONT_MAX_HERO_SLIDES } from "../storefront/siteCopy.js";
 import { normalizeYandexMapsUrl } from "../../shared/yandexMaps.js";
 
 function formatMarkupDraft(value) {
@@ -17,6 +17,29 @@ function parseMarkupPercent(value) {
   const n = Number(String(value).replace(",", "."));
   if (!Number.isFinite(n)) return 0;
   return Math.min(1000, Math.max(0, n));
+}
+
+function cloneHeroSlides(value) {
+  const list = Array.isArray(value) ? value : [];
+  return list
+    .map((slide) => ({
+      src: String(slide?.src || ""),
+      alt: String(slide?.alt || ""),
+      href: String(slide?.href || ""),
+      buttonLabel: String(slide?.buttonLabel || ""),
+    }))
+    .filter((slide) => slide.src);
+}
+
+function slidesKey(value) {
+  return JSON.stringify(cloneHeroSlides(value));
+}
+
+function heroSlidesDraft(value) {
+  const list = cloneHeroSlides(value);
+  return list.length
+    ? list
+    : STOREFRONT_DEFAULT_HERO_SLIDES.map((slide) => ({ ...slide }));
 }
 
 /**
@@ -37,6 +60,7 @@ export function ManagerStorefront({
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [editingId, setEditingId] = useState(null);
   const [mapBusy, setMapBusy] = useState(false);
+  const [heroBusy, setHeroBusy] = useState(false);
   const [editDraft, setEditDraft] = useState({
     description: "",
     composition: "",
@@ -55,6 +79,9 @@ export function ManagerStorefront({
     storefrontShowOnlyLinked: settings?.storefrontShowOnlyLinked !== false,
     storefrontHeroTitle: settings?.storefrontHeroTitle || "",
     storefrontHeroLead: settings?.storefrontHeroLead || "",
+    storefrontHeroSlides: heroSlidesDraft(settings?.storefrontHeroSlides),
+    storefrontHeroIntervalSec:
+      settings?.storefrontHeroIntervalSec || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
     storefrontContactPhone: formatRussianPhone(settings?.storefrontContactPhone || ""),
     storefrontContactEmail: settings?.storefrontContactEmail || "",
     storefrontContactAddress: settings?.storefrontContactAddress || "",
@@ -82,6 +109,10 @@ export function ManagerStorefront({
         storefrontShowOnlyLinked: settings?.storefrontShowOnlyLinked !== false,
         storefrontHeroTitle: settings?.storefrontHeroTitle || "",
         storefrontHeroLead: settings?.storefrontHeroLead || "",
+        storefrontHeroSlides: heroSlidesDraft(settings?.storefrontHeroSlides),
+        storefrontHeroIntervalSec:
+          settings?.storefrontHeroIntervalSec ||
+          STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
         storefrontContactPhone: formatRussianPhone(settings?.storefrontContactPhone || ""),
         storefrontContactEmail: settings?.storefrontContactEmail || "",
         storefrontContactAddress: settings?.storefrontContactAddress || "",
@@ -101,6 +132,8 @@ export function ManagerStorefront({
         prev.storefrontShowOnlyLinked === next.storefrontShowOnlyLinked &&
         prev.storefrontHeroTitle === next.storefrontHeroTitle &&
         prev.storefrontHeroLead === next.storefrontHeroLead &&
+        slidesKey(prev.storefrontHeroSlides) === slidesKey(next.storefrontHeroSlides) &&
+        Number(prev.storefrontHeroIntervalSec) === Number(next.storefrontHeroIntervalSec) &&
         prev.storefrontContactPhone === next.storefrontContactPhone &&
         prev.storefrontContactEmail === next.storefrontContactEmail &&
         prev.storefrontContactAddress === next.storefrontContactAddress &&
@@ -120,6 +153,8 @@ export function ManagerStorefront({
     settings?.storefrontShowOnlyLinked,
     settings?.storefrontHeroTitle,
     settings?.storefrontHeroLead,
+    settings?.storefrontHeroSlides,
+    settings?.storefrontHeroIntervalSec,
     settings?.storefrontContactPhone,
     settings?.storefrontContactEmail,
     settings?.storefrontContactAddress,
@@ -171,6 +206,25 @@ export function ManagerStorefront({
     setDraft((prev) => ({ ...prev, [key]: value }));
   };
 
+  const updateHeroSlides = (updater) => {
+    setSettingsSaved(false);
+    setDraft((prev) => ({
+      ...prev,
+      storefrontHeroSlides: updater(cloneHeroSlides(prev.storefrontHeroSlides)),
+    }));
+  };
+
+  const moveHeroSlide = (index, direction) => {
+    updateHeroSlides((list) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= list.length) return list;
+      const next = list.slice();
+      const [item] = next.splice(index, 1);
+      next.splice(nextIndex, 0, item);
+      return next;
+    });
+  };
+
   const onPriceTypeChange = (event) => {
     const id = event.target.value;
     const found = types.find((item) => String(item.id) === String(id));
@@ -198,6 +252,8 @@ export function ManagerStorefront({
         storefrontContactNote: String(draft.storefrontContactNote || "").trim(),
         storefrontContactMapsUrl: String(draft.storefrontContactMapsUrl || "").trim(),
         storefrontContactMapImageUrl: String(draft.storefrontContactMapImageUrl || "").trim(),
+        storefrontHeroSlides: cloneHeroSlides(draft.storefrontHeroSlides),
+        storefrontHeroIntervalSec: Number(draft.storefrontHeroIntervalSec) || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
       };
       const result = await api.saveStorefrontSettings(payload);
       const next = result.settings || { ...settings, ...payload };
@@ -550,7 +606,7 @@ export function ManagerStorefront({
       </div>
 
       <div className="manager-contact-settings" style={{ marginTop: 20 }}>
-        <h3>Текст на главной</h3>
+        <h3>Текст и слайды на главной</h3>
         <div className="form-grid">
           <label className="field field-wide">
             Заголовок
@@ -573,6 +629,161 @@ export function ManagerStorefront({
               }
             />
           </label>
+          <label className="field">
+            Смена слайда, секунд
+            <input
+              type="number"
+              min={2}
+              max={60}
+              step={1}
+              value={draft.storefrontHeroIntervalSec || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC}
+              onChange={(event) =>
+                setField(
+                  "storefrontHeroIntervalSec",
+                  event.target.value === ""
+                    ? STOREFRONT_DEFAULT_HERO_INTERVAL_SEC
+                    : Number(event.target.value)
+                )
+              }
+            />
+          </label>
+        </div>
+        <p className="storefront-settings-hint">
+          Картинки в правом окне главной. Можно менять порядок, удалять и
+          загружать свои. Чтобы прорекламировать товар — укажите артикул или
+          ссылку /product/… : по клику на баннер откроется карточка. Пустой
+          список снова покажет три примера.
+        </p>
+        <div className="storefront-hero-slide-list">
+          {cloneHeroSlides(draft.storefrontHeroSlides).map((slide, index) => (
+            <div key={`${slide.src}-${index}`} className="storefront-hero-slide-row">
+              <img src={slide.src} alt="" />
+              <div className="storefront-hero-slide-fields">
+                <input
+                  value={slide.alt || ""}
+                  placeholder="Подпись, необязательно"
+                  onChange={(event) =>
+                    updateHeroSlides((list) =>
+                      list.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? { ...item, alt: event.target.value }
+                          : item
+                      )
+                    )
+                  }
+                />
+                <input
+                  value={slide.href || ""}
+                  placeholder="Артикул или /product/…"
+                  onChange={(event) =>
+                    updateHeroSlides((list) =>
+                      list.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? { ...item, href: event.target.value }
+                          : item
+                      )
+                    )
+                  }
+                />
+                <input
+                  value={slide.buttonLabel || ""}
+                  placeholder="Текст кнопки, например «Смотреть товар»"
+                  onChange={(event) =>
+                    updateHeroSlides((list) =>
+                      list.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? { ...item, buttonLabel: event.target.value }
+                          : item
+                      )
+                    )
+                  }
+                />
+              </div>
+              <div className="storefront-hero-slide-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={index === 0}
+                  onClick={() => moveHeroSlide(index, -1)}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={
+                    index === cloneHeroSlides(draft.storefrontHeroSlides).length - 1
+                  }
+                  onClick={() => moveHeroSlide(index, 1)}
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() =>
+                    updateHeroSlides((list) =>
+                      list.filter((_, itemIndex) => itemIndex !== index)
+                    )
+                  }
+                >
+                  Удалить
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="form-actions" style={{ marginTop: 0 }}>
+          <label className="secondary-button">
+            {heroBusy ? "Загрузка…" : "Добавить картинку"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              hidden
+              disabled={
+                heroBusy ||
+                cloneHeroSlides(draft.storefrontHeroSlides).length >=
+                  STOREFRONT_MAX_HERO_SLIDES
+              }
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                setHeroBusy(true);
+                void api
+                  .uploadStorefrontHeroImage(file)
+                  .then((result) => {
+                    const imageUrl = result.imageUrl || "";
+                    if (!imageUrl) return;
+                    updateHeroSlides((list) => {
+                      if (list.length >= STOREFRONT_MAX_HERO_SLIDES) return list;
+                      if (list.some((item) => item.src === imageUrl)) return list;
+                      return [...list, { src: imageUrl, alt: "", href: "", buttonLabel: "" }];
+                    });
+                  })
+                  .catch((error) =>
+                    appAlert({
+                      title: "Не удалось загрузить слайд",
+                      message: error.message || "Ошибка загрузки.",
+                      tone: "danger",
+                    })
+                  )
+                  .finally(() => setHeroBusy(false));
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() =>
+              setField(
+                "storefrontHeroSlides",
+                STOREFRONT_DEFAULT_HERO_SLIDES.map((slide) => ({ ...slide }))
+              )
+            }
+          >
+            Вернуть примеры
+          </button>
         </div>
       </div>
 

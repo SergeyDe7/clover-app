@@ -360,6 +360,15 @@ export const api = {
     });
   },
 
+  uploadStorefrontHeroImage(file) {
+    const formData = new FormData();
+    formData.append("image", file);
+    return request("/admin/storefront/hero-image", {
+      method: "POST",
+      body: formData,
+    });
+  },
+
   saveClientLinks(clientLinks) {
     return request("/state/client-links", {
       method: "PUT",

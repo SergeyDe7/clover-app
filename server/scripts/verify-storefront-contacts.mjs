@@ -138,11 +138,18 @@ assert.match(
 );
 assert.match(contacts, /name: "contacts"/);
 assert.match(page, /Режим работы/);
+assert.doesNotMatch(
+  page,
+  /телефон, почта, адрес и как нас найти/,
+  "На странице контактов нет поясняющей подсказки под заголовком."
+);
 assert.match(page, /mailto:/);
 assert.match(page, /javascript/i);
 assert.match(page, /yandexStaticMapSrc/);
 assert.match(page, /yandexEmbedSrc/);
 assert.match(page, /Открыть в Яндекс.Картах/);
+assert.match(page, /Увеличить карту/);
+assert.match(page, /Уменьшить карту/);
 assert.match(admin, /Контакты на витрине/);
 assert.match(admin, /storefrontContactAddress/);
 assert.match(admin, /storefrontContactHours/);
@@ -157,7 +164,8 @@ const css = readFileSync(
   path.join(projectRoot, "src/screens/storefront/storefront.css"),
   "utf8"
 );
-assert.match(css, /\.sf-contacts-page|\.sf-contacts-card/);
+assert.match(css, /\.sf-contacts-page|\.sf-contacts-sheet/);
+assert.match(css, /\.sf-contacts-map-zoom/);
 assert.match(css, /\.sf-header-phone/);
 
 console.log("verify-storefront-contacts: ok");

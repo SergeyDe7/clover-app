@@ -176,6 +176,7 @@ import {
   stripStorefrontSettings,
   STOREFRONT_SETTING_KEYS,
   findPurchasePriceTypeId,
+  heroSlideUploadUrls,
 } from "./storefrontPublic.js";
 import {
   buildAllPriceRequirements,
@@ -287,6 +288,33 @@ const mapImageUpload = multer({
       callback(
         null,
         `storefront-map-${Date.now()}-${randomUUID()}${extensionMap[file.mimetype] || ".img"}`
+      );
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter(req, file, callback) {
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.mimetype)) {
+      return callback(
+        new Error("Разрешены только изображения JPG, PNG или WEBP.")
+      );
+    }
+    callback(null, true);
+  },
+});
+
+const heroImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadsDirectory,
+    filename(req, file, callback) {
+      const extensionMap = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+      };
+      callback(
+        null,
+        `storefront-hero-${Date.now()}-${randomUUID()}${extensionMap[file.mimetype] || ".img"}`
       );
     },
   }),
@@ -4012,6 +4040,10 @@ app.put(
     ) {
       removeUploadedImage(current.storefrontContactMapImageUrl);
     }
+    const nextHeroUploads = new Set(heroSlideUploadUrls(next.storefrontHeroSlides));
+    for (const imageUrl of heroSlideUploadUrls(current.storefrontHeroSlides)) {
+      if (!nextHeroUploads.has(imageUrl)) removeUploadedImage(imageUrl);
+    }
     setGlobalState("settings", next);
     auditFromRequest(req, "storefront.settings.save", {
       pricingMode: next.storefrontPricingMode || "price_type",
@@ -4037,6 +4069,21 @@ app.post(
     }
     const imageUrl = `/uploads/${req.file.filename}`;
     auditFromRequest(req, "storefront.map-image.upload", { imageUrl });
+    res.status(201).json({ ok: true, imageUrl });
+  }
+);
+
+app.post(
+  "/api/admin/storefront/hero-image",
+  authRequired,
+  roleRequired("admin"),
+  heroImageUpload.single("image"),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Выберите изображение слайда." });
+    }
+    const imageUrl = `/uploads/${req.file.filename}`;
+    auditFromRequest(req, "storefront.hero-image.upload", { imageUrl });
     res.status(201).json({ ok: true, imageUrl });
   }
 );

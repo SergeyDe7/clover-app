@@ -10,11 +10,77 @@ import {
 } from "../../../shared/yandexMaps.js";
 import { storefrontApi } from "../publicApi.js";
 
+const MAP_ZOOM_MIN = 1;
+const MAP_ZOOM_MAX = 2.5;
+const MAP_ZOOM_STEP = 0.25;
+
 function mailtoHref(email) {
   const value = String(email || "").trim();
   // javascript: and other non-email values never become a mailto link.
   if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value)) return "";
   return `mailto:${value}`;
+}
+
+function ContactsMap({ image, embedSrc, mapsUrl }) {
+  const [zoom, setZoom] = useState(MAP_ZOOM_MIN);
+  if (!image && !embedSrc) return null;
+
+  return (
+    <div className="sf-contacts-map">
+      <div className="sf-contacts-map-view">
+        <div
+          className="sf-contacts-map-inner"
+          style={{ transform: `scale(${zoom})` }}
+        >
+          {image ? (
+            <img src={image} alt="Карта с адресом" width="650" height="450" />
+          ) : (
+            <iframe
+              title="Яндекс.Карты"
+              src={embedSrc}
+              width="650"
+              height="450"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allow="fullscreen"
+            />
+          )}
+        </div>
+      </div>
+      <div className="sf-contacts-map-zoom">
+        <button
+          type="button"
+          aria-label="Уменьшить карту"
+          disabled={zoom <= MAP_ZOOM_MIN}
+          onClick={() =>
+            setZoom((value) => Math.max(MAP_ZOOM_MIN, value - MAP_ZOOM_STEP))
+          }
+        >
+          −
+        </button>
+        <button
+          type="button"
+          aria-label="Увеличить карту"
+          disabled={zoom >= MAP_ZOOM_MAX}
+          onClick={() =>
+            setZoom((value) => Math.min(MAP_ZOOM_MAX, value + MAP_ZOOM_STEP))
+          }
+        >
+          +
+        </button>
+      </div>
+      {mapsUrl ? (
+        <a
+          className="sf-contacts-map-link"
+          href={mapsUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Открыть в Яндекс.Картах
+        </a>
+      ) : null}
+    </div>
+  );
 }
 
 export function ContactsPage() {
@@ -66,6 +132,7 @@ export function ContactsPage() {
   const staticMap = yandexStaticMapSrc(point);
   const embedSrc = yandexEmbedSrc(mapsUrl);
   const mapImage = site.contactMapImageUrl || staticMap;
+  const hasMap = Boolean(mapImage || embedSrc);
   const hasAny =
     Boolean(phoneLinks.phone) ||
     Boolean(mailHref) ||
@@ -73,109 +140,50 @@ export function ContactsPage() {
     Boolean(site.contactHours) ||
     Boolean(site.contactNote) ||
     Boolean(mapsUrl) ||
-    Boolean(mapImage) ||
-    Boolean(embedSrc);
+    hasMap;
 
   return (
     <div className="sf-contacts-page">
-      <div className="sf-section-head">
-        <h1>Контакты</h1>
-        <p>Компания КЛЕВЕР — телефон, почта, адрес и как нас найти.</p>
-      </div>
+      <h1>Контакты</h1>
       {error ? <p className="sf-error">{error}</p> : null}
       {!ready && !error ? <p className="sf-muted">Загружаем контакты…</p> : null}
       {ready && !error && !hasAny ? (
         <p className="sf-muted">Контакты пока не указаны.</p>
       ) : null}
       {ready && hasAny ? (
-        <div className="sf-contacts-layout">
-          <div className="sf-contacts-card">
+        <div className="sf-contacts-sheet">
+          <div className="sf-contacts-facts">
             {phoneLinks.phone ? (
-              <p className="sf-contacts-item">
-                <span>Телефон</span>
+              <p className="sf-contacts-fact">
                 <a href={phoneLinks.phone}>{phoneValue}</a>
               </p>
             ) : null}
             {mailHref ? (
-              <p className="sf-contacts-item">
-                <span>Почта</span>
+              <p className="sf-contacts-fact">
                 <a href={mailHref}>{site.contactEmail}</a>
               </p>
             ) : null}
-            {site.contactAddress ? (
-              <p className="sf-contacts-item">
-                <span>Адрес</span>
-                <strong>{site.contactAddress}</strong>
-              </p>
-            ) : null}
             {site.contactHours ? (
-              <p className="sf-contacts-item">
+              <p className="sf-contacts-fact">
                 <span>Режим работы</span>
                 <strong className="sf-contacts-pre">{site.contactHours}</strong>
               </p>
             ) : null}
             {site.contactNote ? (
-              <p className="sf-contacts-item">
+              <p className="sf-contacts-fact">
                 <span>Как проехать</span>
                 <strong className="sf-contacts-pre">{site.contactNote}</strong>
               </p>
             ) : null}
-            <div className="sf-contacts-actions">
-              {phoneLinks.phone ? (
-                <a className="sf-btn sf-btn-primary" href={phoneLinks.phone}>
-                  Позвонить
-                </a>
-              ) : null}
-              {mailHref ? (
-                <a className="sf-btn sf-btn-ghost" href={mailHref}>
-                  Написать
-                </a>
-              ) : null}
-              {mapsUrl ? (
-                <a
-                  className="sf-btn sf-btn-ghost"
-                  href={mapsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Открыть в Яндекс.Картах
-                </a>
-              ) : null}
-            </div>
           </div>
-          {mapImage || embedSrc ? (
-            <div className="sf-contacts-map">
-              {mapImage ? (
-                mapsUrl ? (
-                  <a href={mapsUrl} target="_blank" rel="noreferrer">
-                    <img
-                      src={mapImage}
-                      alt="Точка на карте"
-                      width="650"
-                      height="450"
-                    />
-                  </a>
-                ) : (
-                  <img
-                    src={mapImage}
-                    alt="Точка на карте"
-                    width="650"
-                    height="450"
-                  />
-                )
-              ) : (
-                <iframe
-                  title="Яндекс.Карты"
-                  src={embedSrc}
-                  width="650"
-                  height="450"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  allow="fullscreen"
-                />
-              )}
-            </div>
-          ) : null}
+          <div className="sf-contacts-place">
+            {site.contactAddress ? (
+              <p className="sf-contacts-fact sf-contacts-address">
+                {site.contactAddress}
+              </p>
+            ) : null}
+            <ContactsMap image={mapImage} embedSrc={embedSrc} mapsUrl={mapsUrl} />
+          </div>
         </div>
       ) : null}
     </div>

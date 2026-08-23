@@ -80,6 +80,7 @@ const TEST_ONEC = [
   "scripts/verify-storefront-group-tiles-ui.mjs",
   "scripts/verify-storefront-catalog-tree-ui.mjs",
   "scripts/verify-storefront-contacts.mjs",
+  "scripts/verify-storefront-hero-slides.mjs",
   "scripts/verify-clover-taxonomy.mjs",
   "scripts/verify-storefront-guest-counterparty.mjs",
   "scripts/verify-client-self-matrix.mjs",

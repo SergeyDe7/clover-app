@@ -73,6 +73,8 @@ export const DEFAULT_SETTINGS = {
   storefrontShowOnlyLinked: true,
   storefrontHeroTitle: "",
   storefrontHeroLead: "",
+  storefrontHeroSlides: [],
+  storefrontHeroIntervalSec: 6,
   storefrontContactPhone: "",
   storefrontContactEmail: "",
   storefrontContactAddress: "",
