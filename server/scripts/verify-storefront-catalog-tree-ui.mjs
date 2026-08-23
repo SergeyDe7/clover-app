@@ -101,6 +101,21 @@ assert.match(
   "На телефоне фото в карточке ниже квадрата, чтобы ряд был компактнее."
 );
 assert.match(
+  css,
+  /\.sf-group-nav-item\.is-active::before\s*\{[^}]*background:\s*var\(--clover-green/,
+  "Активная категория отмечается тем же зелёным ободком слева, что и подкатегория."
+);
+assert.doesNotMatch(
+  css,
+  /\.sf-group-nav-item\.is-child\.is-active/,
+  "Зелёный ободок не ограничивать только подкатегорией."
+);
+assert.doesNotMatch(
+  css,
+  /\.sf-group-nav-item\.is-active\s*\{[^}]*box-shadow/,
+  "Ободок категории — полоска ::before, не inset-тень (её перекрывает иконка)."
+);
+assert.match(
   nav,
   /next\.delete\(group\.name\)/,
   "Клик по названию категории сворачивает её подгруппы."
