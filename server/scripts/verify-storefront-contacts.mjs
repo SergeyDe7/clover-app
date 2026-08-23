@@ -13,6 +13,8 @@ import {
   normalizeYandexMapsUrl,
   parseYandexMapsPoint,
   yandexStaticMapSrc,
+  yandexMapWidgetSrc,
+  clampYandexZoom,
 } from "../../src/shared/yandexMaps.js";
 
 const merged = mergeStorefrontSettings(
@@ -96,8 +98,21 @@ const point = parseYandexMapsPoint(
 assert.equal(point.lon, 30.3141);
 assert.equal(point.lat, 59.9386);
 assert.equal(point.zoom, 15);
+const liveMaps = parseYandexMapsPoint(
+  "https://yandex.ru/maps/2/saint-petersburg/?ll=30.391976%2C59.888748&mode=whatshere&whatshere%5Bpoint%5D=30.391850%2C59.888885&whatshere%5Bzoom%5D=19.31&z=19.31"
+);
+assert.ok(liveMaps);
+assert.equal(liveMaps.zoom, 19);
+assert.ok(liveMaps.zoom > 4);
 assert.match(yandexStaticMapSrc(point), /static-maps\.yandex\.ru/);
 assert.match(yandexStaticMapSrc(point), /pm2rdm/);
+assert.match(yandexStaticMapSrc({ ...point, zoom: 10 }), /(?:\?|&)z=10(?:&|$)/);
+assert.match(yandexStaticMapSrc({ ...point, zoom: 18 }), /(?:\?|&)z=18(?:&|$)/);
+assert.match(yandexMapWidgetSrc({ ...point, zoom: 10 }), /(?:\?|&)z=10(?:&|$)/);
+assert.equal(clampYandexZoom(""), 16);
+assert.equal(clampYandexZoom(3.2), 3);
+assert.equal(clampYandexZoom(-4), 1);
+assert.equal(clampYandexZoom(40), 21);
 
 const header = readFileSync(
   path.join(projectRoot, "src/screens/storefront/components/StoreHeader.jsx"),
@@ -157,6 +172,16 @@ assert.match(page, /yandexEmbedSrc/);
 assert.match(page, /Открыть в Яндекс.Картах/);
 assert.match(page, /Увеличить карту/);
 assert.match(page, /Уменьшить карту/);
+assert.match(page, /yandexMapWidgetSrc/);
+assert.match(page, /MAP_Z_MIN = 4/);
+assert.match(page, /MAP_Z_MAX = 21/);
+assert.match(page, /geoZoom/);
+assert.match(page, /data-map-geo/);
+assert.doesNotMatch(
+  page,
+  /MAP_ZOOM_MIN = 1/,
+  "Минус не заблокирован на стартовом CSS-scale=1: зум идёт через z Яндекса."
+);
 assert.match(admin, /Контакты на витрине/);
 assert.match(admin, /storefrontContactAddress/);
 assert.match(admin, /storefrontContactHours/);

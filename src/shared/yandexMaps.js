@@ -1,4 +1,14 @@
 const MAX_MAPS_URL = 2000;
+export const YANDEX_ZOOM_MIN = 1;
+export const YANDEX_ZOOM_MAX = 21;
+export const YANDEX_ZOOM_DEFAULT = 16;
+
+export function clampYandexZoom(zoom, fallback = YANDEX_ZOOM_DEFAULT) {
+  if (zoom === "" || zoom == null) return fallback;
+  const n = Number(zoom);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(YANDEX_ZOOM_MAX, Math.max(YANDEX_ZOOM_MIN, Math.round(n)));
+}
 
 function stripWrap(value) {
   return String(value || "")
@@ -92,20 +102,16 @@ export function parseYandexMapsPoint(value) {
     parseLonLatPair(ptParam.split(",").slice(0, 2).join(",")) ||
     parseLonLatPair(url.searchParams.get("whatshere[point]"));
   if (!pair) return null;
-  const zoomNum = Number(url.searchParams.get("z"));
-  const zoom =
-    Number.isFinite(zoomNum) && zoomNum >= 1 && zoomNum <= 21
-      ? Math.round(zoomNum)
-      : 16;
+  const zoom = clampYandexZoom(url.searchParams.get("z"));
   return { ...pair, zoom };
 }
 
 export function yandexStaticMapSrc(point) {
   if (!point) return "";
-  const { lon, lat, zoom = 16 } = point;
+  const { lon, lat, zoom = YANDEX_ZOOM_DEFAULT } = point;
   const params = new URLSearchParams({
     ll: `${lon},${lat}`,
-    z: String(zoom),
+    z: String(clampYandexZoom(zoom)),
     size: "650,450",
     l: "map",
     pt: `${lon},${lat},pm2rdm`,
@@ -116,10 +122,10 @@ export function yandexStaticMapSrc(point) {
 
 export function yandexMapWidgetSrc(point) {
   if (!point) return "";
-  const { lon, lat, zoom = 16 } = point;
+  const { lon, lat, zoom = YANDEX_ZOOM_DEFAULT } = point;
   const params = new URLSearchParams({
     ll: `${lon},${lat}`,
-    z: String(zoom),
+    z: String(clampYandexZoom(zoom)),
     l: "map",
     pt: `${lon},${lat},pm2rdm`,
   });

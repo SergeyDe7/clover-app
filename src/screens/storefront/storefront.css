@@ -146,6 +146,7 @@ a.sf-contacts-btn { display: none !important; }
   position: absolute;
   right: 10px;
   top: 10px;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   gap: 4px;

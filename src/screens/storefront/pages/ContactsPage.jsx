@@ -4,15 +4,19 @@ import {
   getManagerPhoneLinks,
 } from "../../../shared/appHelpers";
 import {
+  clampYandexZoom,
   parseYandexMapsPoint,
   yandexEmbedSrc,
+  yandexMapWidgetSrc,
   yandexStaticMapSrc,
 } from "../../../shared/yandexMaps.js";
 import { storefrontApi } from "../publicApi.js";
 
-const MAP_ZOOM_MIN = 1;
-const MAP_ZOOM_MAX = 2.5;
-const MAP_ZOOM_STEP = 0.25;
+const MAP_Z_MIN = 4;
+const MAP_Z_MAX = 21;
+const CSS_ZOOM_MIN = 0.75;
+const CSS_ZOOM_MAX = 2.5;
+const CSS_ZOOM_STEP = 0.25;
 
 function mailtoHref(email) {
   const value = String(email || "").trim();
@@ -21,23 +25,33 @@ function mailtoHref(email) {
   return `mailto:${value}`;
 }
 
-function ContactsMap({ image, embedSrc, mapsUrl }) {
-  const [zoom, setZoom] = useState(MAP_ZOOM_MIN);
-  if (!image && !embedSrc) return null;
+function ContactsMap({ point, customImage, embedSrc, mapsUrl }) {
+  const geoZoom = Boolean(point) && !customImage;
+  const [zoom, setZoom] = useState(() =>
+    geoZoom ? clampYandexZoom(point.zoom) : 1
+  );
+  const min = geoZoom ? MAP_Z_MIN : CSS_ZOOM_MIN;
+  const max = geoZoom ? MAP_Z_MAX : CSS_ZOOM_MAX;
+  const step = geoZoom ? 1 : CSS_ZOOM_STEP;
+  const livePoint = point ? { ...point, zoom } : null;
+  const image =
+    customImage || (livePoint ? yandexStaticMapSrc(livePoint) : "");
+  const frameSrc = livePoint ? yandexMapWidgetSrc(livePoint) : embedSrc;
+  if (!image && !frameSrc) return null;
 
   return (
-    <div className="sf-contacts-map">
+    <div className="sf-contacts-map" data-map-zoom={zoom} data-map-geo={geoZoom ? "1" : "0"}>
       <div className="sf-contacts-map-view">
         <div
           className="sf-contacts-map-inner"
-          style={{ transform: `scale(${zoom})` }}
+          style={geoZoom ? undefined : { transform: `scale(${zoom})` }}
         >
           {image ? (
             <img src={image} alt="Карта с адресом" width="650" height="450" />
           ) : (
             <iframe
               title="Яндекс.Карты"
-              src={embedSrc}
+              src={frameSrc}
               width="650"
               height="450"
               loading="lazy"
@@ -51,9 +65,9 @@ function ContactsMap({ image, embedSrc, mapsUrl }) {
         <button
           type="button"
           aria-label="Увеличить карту"
-          disabled={zoom >= MAP_ZOOM_MAX}
+          disabled={zoom >= max}
           onClick={() =>
-            setZoom((value) => Math.min(MAP_ZOOM_MAX, value + MAP_ZOOM_STEP))
+            setZoom((value) => Math.min(max, value + step))
           }
         >
           +
@@ -61,9 +75,9 @@ function ContactsMap({ image, embedSrc, mapsUrl }) {
         <button
           type="button"
           aria-label="Уменьшить карту"
-          disabled={zoom <= MAP_ZOOM_MIN}
+          disabled={zoom <= min}
           onClick={() =>
-            setZoom((value) => Math.max(MAP_ZOOM_MIN, value - MAP_ZOOM_STEP))
+            setZoom((value) => Math.max(min, value - step))
           }
         >
           −
@@ -212,7 +226,12 @@ export function ContactsPage() {
                   <strong className="sf-contacts-pre">{site.contactNote}</strong>
                 </Fact>
               ) : null}
-              <ContactsMap image={mapImage} embedSrc={embedSrc} mapsUrl={mapsUrl} />
+              <ContactsMap
+                point={point}
+                customImage={site.contactMapImageUrl}
+                embedSrc={embedSrc}
+                mapsUrl={mapsUrl}
+              />
             </section>
           ) : null}
         </div>
