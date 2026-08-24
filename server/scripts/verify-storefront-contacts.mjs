@@ -144,8 +144,11 @@ const mode = readFileSync(
 const server = readFileSync(path.join(projectRoot, "server/src/server.js"), "utf8");
 
 assert.match(header, /StorefrontContacts/);
-assert.match(header, /sf-header-phone/);
-assert.match(header, /current === "home"/);
+assert.doesNotMatch(
+  header,
+  /sf-header-phone|contactPhone|showHomePhone/,
+  "В шапке витрины нет телефона — он только на странице контактов."
+);
 assert.match(
   header,
   /sf-cart-mobile[\s\S]*StorefrontContacts[\s\S]*sf-login/,
@@ -213,6 +216,10 @@ assert.doesNotMatch(
   /\.sf-contacts-col::before \{[\s\S]*?border-radius:\s*22px 0 0 22px/,
   "Радиус 22px на полоске 5px не скругляет ободок по карточке."
 );
-assert.match(css, /\.sf-header-phone/);
+assert.doesNotMatch(
+  css,
+  /\.sf-header-phone/,
+  "Стилей телефона в шапке больше нет."
+);
 
 console.log("verify-storefront-contacts: ok");
