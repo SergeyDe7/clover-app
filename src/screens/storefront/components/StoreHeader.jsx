@@ -1,40 +1,17 @@
 import { useEffect, useState } from "react";
 import { cabinetLoginUrl } from "../../../config/urls.js";
-import {
-  formatRussianPhone,
-  getManagerPhoneLinks,
-} from "../../../shared/appHelpers";
 import { getCartCount, subscribeCart } from "../cartStorage.js";
 import { storefrontHref } from "../mode.js";
-import { storefrontApi } from "../publicApi.js";
 import { StorefrontContacts } from "./StorefrontContacts.jsx";
 
 export function StoreHeader({ current }) {
   const [count, setCount] = useState(getCartCount);
-  const [phone, setPhone] = useState("");
   useEffect(() => subscribeCart(() => setCount(getCartCount())), []);
-  useEffect(() => {
-    let cancelled = false;
-    storefrontApi
-      .site()
-      .then((payload) => {
-        if (cancelled) return;
-        setPhone(payload?.site?.contactPhone || "");
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   function go(route) {
     window.history.pushState({}, "", storefrontHref(route));
     window.dispatchEvent(new PopStateEvent("popstate"));
   }
-
-  const phoneLinks = getManagerPhoneLinks(phone);
-  const phoneValue = formatRussianPhone(phone);
-  const showHomePhone = current === "home" && Boolean(phoneLinks.phone);
 
   const link = (route, label, match) => (
     <a
@@ -73,11 +50,6 @@ export function StoreHeader({ current }) {
         )}
       </nav>
       <div className="sf-header-actions">
-        {showHomePhone ? (
-          <a className="sf-header-phone" href={phoneLinks.phone}>
-            {phoneValue}
-          </a>
-        ) : null}
         <a
           className="sf-btn sf-btn-ghost sf-catalog-mobile"
           href={storefrontHref({ name: "catalog" })}
