@@ -21,6 +21,16 @@ assert.ok(
     home.includes("STOREFRONT_HERO_LEAD"),
   "Главная витрины берёт описание компании из siteCopy."
 );
+assert.doesNotMatch(
+  home,
+  /Выберите категорию/,
+  "Под заголовком категорий на главной нет подсказки «Выберите категорию»."
+);
+assert.doesNotMatch(
+  tile,
+  /\.lead/,
+  "Плитка категории не показывает текстовую подсказку под названием."
+);
 
 const copy = readFileSync(
   path.join(projectRoot, "src/screens/storefront/siteCopy.js"),

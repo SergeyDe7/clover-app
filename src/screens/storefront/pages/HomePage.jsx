@@ -68,7 +68,6 @@ export function HomePage() {
       <section className="sf-section sf-groups-section">
         <div className="sf-section-head">
           <h2>Популярные категории</h2>
-          <p>Выберите категорию — откроется страница с товарами.</p>
         </div>
         {error ? <p className="sf-error">{error}</p> : null}
         <div className="sf-group-grid">
