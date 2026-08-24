@@ -280,15 +280,7 @@ export function CatalogPage({
             <section className="sf-group-block" key={section.name}>
               {!category || atParentOnly ? (
                 <div className="sf-group-head">
-                  <div>
-                    <h2>{section.name}</h2>
-                    {atParentOnly ? (
-                      <p className="sf-muted">
-                        Товары без выбранной подгруппы — укажите подкатегорию в
-                        карточке, чтобы они попали в меню.
-                      </p>
-                    ) : null}
-                  </div>
+                  <h2>{section.name}</h2>
                 </div>
               ) : null}
               <div className="sf-product-grid">

@@ -162,11 +162,10 @@ export function assignCloverTaxonomy(name) {
   return { category: OTHER, subcategory: "", facet: "" };
 }
 
-/** Короткие описания и подгруппы для страницы категории. */
+/** Иконки и подгруппы для страницы категории. */
 export const CLOVER_GROUP_META = {
   "Одноразовая посуда": {
     icon: "disposable",
-    lead: "Стаканы, контейнеры, приборы и упаковка для еды навынос.",
     children: [
       { name: "Стаканы" },
       { name: "Контейнеры" },
@@ -188,7 +187,6 @@ export const CLOVER_GROUP_META = {
   },
   "Хозяйственные товары": {
     icon: "clean",
-    lead: "Расходники для уборки, защиты и упаковки на кухне.",
     children: [
       { name: "Фольга, пленка, пергамент" },
       { name: "Одноразовая одежда" },
@@ -203,7 +201,6 @@ export const CLOVER_GROUP_META = {
   },
   "Химия, чистящие средства": {
     icon: "chemistry",
-    lead: "Моющие и чистящие средства для кухни, зала и санузла.",
     children: [
       { name: "Жироудалители" },
       { name: "Для мытья посуды" },
@@ -220,12 +217,10 @@ export const CLOVER_GROUP_META = {
   },
   "Барные аксессуары": {
     icon: "disposable",
-    lead: "Трубочки, пики и расходники для бара.",
     children: [],
   },
   "Бумажная продукция": {
     icon: "textile",
-    lead: "Полотенца, туалетная бумага и салфетки.",
     children: [
       { name: "Бумажные полотенца" },
       { name: "Туалетная бумага" },
@@ -235,7 +230,6 @@ export const CLOVER_GROUP_META = {
   },
   "Пакеты, упаковочные материалы": {
     icon: "bags",
-    lead: "Пакеты-майки, фасовочные, вакуумные и бумажные пакеты.",
     children: [
       { name: "Пакеты-майки" },
       { name: "Пакеты фасовочные" },
@@ -247,12 +241,10 @@ export const CLOVER_GROUP_META = {
   },
   "Канцелярские товары": {
     icon: "office",
-    lead: "Канцелярия, кассовая лента и расходники для офиса.",
     children: [],
   },
   Прочее: {
     icon: "other",
-    lead: "Товары вне основных групп — уточняйте у менеджера.",
     children: [],
   },
 };
@@ -262,7 +254,6 @@ export function getGroupMeta(name) {
   return (
     CLOVER_GROUP_META[key] || {
       icon: "other",
-      lead: "Товары этой группы из номенклатуры Clover.",
       children: [],
     }
   );
@@ -343,7 +334,6 @@ export function buildGroupNav(categories) {
     return {
       name,
       icon: meta.icon,
-      lead: meta.lead,
       children: getGroupChildren(name),
     };
   });

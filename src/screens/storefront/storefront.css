@@ -215,7 +215,7 @@ html.sf-catalog-lock .sf-main,
 .sf-hero .sf-btn-ghost { background: #fff; border-color: rgba(28, 31, 28, 0.16); color: #1c1f1c; }
 .sf-section { margin-bottom: 40px; animation: sf-rise .55s ease both; }
 .sf-section-head { margin-bottom: 18px; }
-.sf-section-head h1, .sf-section-head h2 { margin: 0 0 6px; letter-spacing: -.02em; }
+.sf-section-head h1, .sf-section-head h2 { margin: 0; letter-spacing: -.02em; }
 .sf-section-head p, .sf-muted { margin: 0; color: #6b6f6b; }
 .sf-section-foot { margin-top: 18px; }
 .sf-groups-section { margin-bottom: 36px; }
@@ -248,7 +248,6 @@ html.sf-catalog-lock .sf-main,
   word-break: keep-all;
 }
 .sf-group-tile-count { font-size: .92rem; color: #6b6f6b; font-weight: 600; line-height: 1.2; }
-.sf-group-tile-hint { font-size: .8rem; color: #6b6f6b; font-weight: 600; }
 .sf-group-tile-chevron { color: #8a8e8a; font-weight: 700; opacity: .7; transition: transform .2s ease, opacity .2s ease; }
 .sf-group-tile:hover .sf-group-tile-chevron { transform: translateX(3px); opacity: 1; }
 .sf-group-tile-compact { min-height: 72px; padding: 12px; border-radius: 16px; }
@@ -494,8 +493,7 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
 }
 .sf-group-landing-icon .sf-group-icon { width: 34px; height: 34px; }
 .sf-group-landing-copy .sf-back { margin-bottom: 8px; }
-.sf-group-landing-copy h1 { margin: 0 0 6px; letter-spacing: -0.02em; font-size: clamp(1.45rem, 2.4vw, 1.85rem); }
-.sf-group-landing-copy p { margin: 0; color: #6b6f6b; max-width: 46ch; line-height: 1.45; }
+.sf-group-landing-copy h1 { margin: 0; letter-spacing: -0.02em; font-size: clamp(1.45rem, 2.4vw, 1.85rem); }
 .sf-subgroup-strip { margin-bottom: 22px; }
 .sf-subgroup-title { margin: 0 0 10px; font-size: 1rem; letter-spacing: -0.01em; }
 .sf-facet-tree {
@@ -649,7 +647,6 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
   }
   .sf-group-landing-icon { width: 40px; height: 40px; border-radius: 12px; }
   .sf-group-landing-copy h1 { font-size: 1.15rem; }
-  .sf-group-landing-copy p { display: none; }
   .sf-product-grid {
     grid-template-columns: 1fr 1fr;
     gap: 8px;

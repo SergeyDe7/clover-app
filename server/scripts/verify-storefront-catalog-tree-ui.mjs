@@ -15,6 +15,10 @@ const page = readFileSync(
   path.join(projectRoot, "src/screens/storefront/pages/CatalogPage.jsx"),
   "utf8"
 );
+const groups = readFileSync(
+  path.join(projectRoot, "src/screens/storefront/productGroups.js"),
+  "utf8"
+);
 const boot = readFileSync(path.join(projectRoot, "src/main.jsx"), "utf8");
 const header = readFileSync(
   path.join(projectRoot, "src/screens/storefront/components/StoreHeader.jsx"),
@@ -218,6 +222,16 @@ assert.doesNotMatch(
   page,
   /activeMeta\.lead|getGroupMeta\([^)]*\)\.lead/,
   "Под названием категории не показываем lead-подсказку."
+);
+assert.doesNotMatch(
+  page,
+  /укажите подкатегорию в карточке|Товары без выбранной подгруппы/,
+  "На витрине нет служебной подсказки про подгруппу в карточке товара."
+);
+assert.doesNotMatch(
+  groups,
+  /\blead:/,
+  "В метаданных групп витрины больше нет lead-текстов."
 );
 
 console.log("verify-storefront-catalog-tree-ui: ok");
