@@ -69,6 +69,9 @@ const helpers = readFileSync(
 );
 assert.ok(helpers.includes('["matrix", "Моя матрица"]'));
 assert.ok(helpers.includes('["catalog", "Добавить товары из каталога"]'));
+assert.ok(helpers.includes("repeat(2, minmax(0, 1fr))"));
+assert.ok(helpers.includes("repeat(5, minmax(0, 1fr))"));
+assert.ok(helpers.includes("aspect-ratio: 1 / 1"));
 
 const server = readFileSync(
   path.join(projectRoot, "server/src/server.js"),
@@ -89,10 +92,8 @@ assert.ok(
   !orderEditor.includes("catalog-scope-switch"),
   "Дубль кнопок матрицы/каталога в верхнем блоке убран."
 );
-assert.ok(
-  orderEditor.includes("cart-sheet-item-controls"),
-  "Корзина: единица измерения должна быть над количеством."
-);
+assert.ok(orderEditor.includes("cart-sheet-item-head"));
+assert.ok(orderEditor.includes("cart-sheet-item-actions"));
 
 const managerOrders = readFileSync(
   path.join(projectRoot, "src/screens/manager/ManagerOrders.jsx"),

@@ -43,4 +43,20 @@ assert.equal(matchesCatalogPrefixSearch(productCatalogSearchHaystack(boxed), "л
 assert.equal(matchesCatalogPrefixSearch(productCatalogSearchHaystack(boxed), "чёрн"), true);
 assert.equal(matchesCatalogPrefixSearch(productCatalogSearchHaystack(boxed), "боксы"), true);
 
+assert.equal(matchesCatalogPrefixSearch(productCatalogSearchHaystack(cup), "0123"), true);
+assert.equal(
+  matchesCatalogPrefixSearch(
+    productCatalogSearchHaystack({ name: "Товар", oneCCode: "00001234" }),
+    "1234"
+  ),
+  true
+);
+assert.equal(
+  matchesCatalogPrefixSearch(
+    productCatalogSearchHaystack({ name: "Товар", oneCCode: "00001234" }),
+    "123"
+  ),
+  false
+);
+
 console.log("verify-catalog-prefix-search: ok");

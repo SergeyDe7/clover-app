@@ -40,10 +40,13 @@ export function CatalogSearchInput({
   return (
     <input
       ref={inputRef}
-      className={className}
-      type="search"
+      className={`catalog-search catalog-search-input${className && className !== "catalog-search" ? ` ${className}` : ""}`}
+      type="text"
       inputMode="search"
       enterKeyHint="search"
+      autoCapitalize="off"
+      autoCorrect="off"
+      spellCheck={false}
       autoFocus={false}
       autoComplete="off"
       readOnly={!armed}

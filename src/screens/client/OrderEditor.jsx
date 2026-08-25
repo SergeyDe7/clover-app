@@ -30,6 +30,7 @@ import { productImageSrc } from "../../shared/productPhoto";
 import { ManagerContact } from "./ManagerContact";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
 import { CatalogSearchInput } from "./CatalogSearchInput";
+import { useMobileFixedChromeHeight } from "./useMobileFixedChromeHeight";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
 
@@ -133,7 +134,14 @@ export function OrderEditor({
   const [missingFields, setMissingFields] = useState({ date: false, address: false });
   const cartDateFieldRef = useRef(null);
   const cartAddressFieldRef = useRef(null);
+  const catalogToolbarRef = useRef(null);
   const earliestDeliveryDate = getEarliestDeliveryDateIso();
+
+  useMobileFixedChromeHeight(
+    catalogToolbarRef,
+    embedded ? ".embedded-catalog" : null,
+    "--catalog-order-mobile-chrome-h"
+  );
 
   // Один адрес в списке — всегда подставляем автоматически.
   useEffect(() => {
@@ -516,7 +524,7 @@ export function OrderEditor({
   };
 
   const catalogBody = (
-      <section className={embedded ? "catalog-content embedded-catalog" : "catalog-content"}>
+      <section className={embedded ? "catalog-content embedded-catalog client-order-catalog" : "catalog-content"}>
         <div className="catalog-layout">
           <aside className="order-summary" id="order-summary">
             <h2>Корзина</h2>
@@ -584,7 +592,7 @@ export function OrderEditor({
               </div>
             )}
 
-            <div className="catalog-toolbar">
+            <div className="catalog-toolbar client-order-catalog-toolbar" ref={catalogToolbarRef}>
               <div className="catalog-filter-row">
                 <CatalogSearchInput
                   value={search}
@@ -639,6 +647,9 @@ export function OrderEditor({
                 {categories.map((item) => <button className={category === item ? "category-button active" : "category-button"} type="button" key={item} onClick={() => setCategory(item)}>{item}</button>)}
               </div>
             </div>
+            {embedded ? (
+              <div className="client-order-catalog-toolbar-spacer" aria-hidden="true" />
+            ) : null}
 
             <section className={catalogView === "list" ? "product-grid product-grid-list" : "product-grid"}>
               {filtered.map((product) => {
@@ -786,86 +797,90 @@ export function OrderEditor({
                 <div className="cart-sheet-list">
                   {selectedItems.map((item) => (
                     <div className="cart-sheet-item" key={item.productId}>
-                      <div className="cart-sheet-item-main">
-                        <strong>{item.name}</strong>
-                        {(item.multiplier > 1 || (settings.showPrices && item.lineTotal > 0)) ? (
-                          <small>
-                            {item.multiplier > 1 ? `${item.quantity * item.multiplier} шт. всего` : ""}
-                            {settings.showPrices && item.lineTotal > 0
-                              ? `${item.multiplier > 1 ? " · " : ""}${formatMoney(item.lineTotal)}`
-                              : ""}
-                          </small>
-                        ) : null}
-                      </div>
-                      <div className="cart-sheet-item-controls">
-                        <div className={`unit-choice cart-sheet-units${(() => {
-                          const product = products.find((row) => String(row.id) === String(item.productId));
-                          return orderedSaleUnits(product).length === 1 ? " unit-choice-single" : "";
-                        })()}`}>
-                          {(() => {
-                            const product = products.find((row) => String(row.id) === String(item.productId));
-                            const unitsList = orderedSaleUnits(product);
-                            const sole = unitsList.length === 1;
-                            return unitsList.map((unitId) => (
-                              <button
-                                className={sole || item.unit === unitId ? "active" : ""}
-                                type="button"
-                                key={unitId}
-                                onClick={() => setProductUnit(item.productId, unitId)}
-                              >
-                                {UNIT_CONFIG[unitId].shortLabel || UNIT_CONFIG[unitId].label}
-                              </button>
-                            ));
-                          })()}
+                      <div className="cart-sheet-item-head">
+                        <div className="cart-sheet-item-main">
+                          <strong>{item.name}</strong>
+                          {(item.multiplier > 1 || (settings.showPrices && item.lineTotal > 0)) ? (
+                            <small>
+                              {item.multiplier > 1 ? `${item.quantity * item.multiplier} шт. всего` : ""}
+                              {settings.showPrices && item.lineTotal > 0
+                                ? `${item.multiplier > 1 ? " · " : ""}${formatMoney(item.lineTotal)}`
+                                : ""}
+                            </small>
+                          ) : null}
                         </div>
-                        <div className="quantity-control cart-sheet-qty">
-                          <button type="button" onClick={() => changeQuantity(item.productId, -1, item.orderStep)} aria-label="Уменьшить">−</button>
-                          <div className="quantity-input-wrap">
-                            <input
-                              className="quantity-input"
-                              type="number"
-                              min="0"
-                              step={quantityInputStep(item.multiplier, item.orderStep)}
-                              inputMode="numeric"
-                              value={quantityFieldValue(item.productId, item.quantity, item.multiplier)}
-                              onChange={(e) => setQtyDrafts((current) => ({ ...current, [item.productId]: e.target.value }))}
-                              onBlur={() => commitQtyDraft(item.productId, item.multiplier, item.orderStep)}
-                            />
-                            <small>{quantityInputUnitLabel(item.unit, item.multiplier)}</small>
+                        <div className="cart-sheet-item-actions">
+                          <div className={`unit-choice cart-sheet-units${(() => {
+                            const product = products.find((row) => String(row.id) === String(item.productId));
+                            return orderedSaleUnits(product).length === 1 ? " unit-choice-single" : "";
+                          })()}`}>
+                            {(() => {
+                              const product = products.find((row) => String(row.id) === String(item.productId));
+                              const unitsList = orderedSaleUnits(product);
+                              const sole = unitsList.length === 1;
+                              return unitsList.map((unitId) => (
+                                <button
+                                  className={sole || item.unit === unitId ? "active" : ""}
+                                  type="button"
+                                  key={unitId}
+                                  onClick={() => setProductUnit(item.productId, unitId)}
+                                >
+                                  {UNIT_CONFIG[unitId].shortLabel || UNIT_CONFIG[unitId].label}
+                                </button>
+                              ));
+                            })()}
                           </div>
-                          <button type="button" onClick={() => changeQuantity(item.productId, 1, item.orderStep)} aria-label="Увеличить">+</button>
+                          <div className="quantity-control cart-sheet-qty">
+                            <button type="button" onClick={() => changeQuantity(item.productId, -1, item.orderStep)} aria-label="Уменьшить">−</button>
+                            <div className="quantity-input-wrap">
+                              <input
+                                className="quantity-input"
+                                type="number"
+                                min="0"
+                                step={quantityInputStep(item.multiplier, item.orderStep)}
+                                inputMode="numeric"
+                                value={quantityFieldValue(item.productId, item.quantity, item.multiplier)}
+                                onChange={(e) => setQtyDrafts((current) => ({ ...current, [item.productId]: e.target.value }))}
+                                onBlur={() => commitQtyDraft(item.productId, item.multiplier, item.orderStep)}
+                              />
+                              <small>{quantityInputUnitLabel(item.unit, item.multiplier)}</small>
+                            </div>
+                            <button type="button" onClick={() => changeQuantity(item.productId, 1, item.orderStep)} aria-label="Увеличить">+</button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   ))}
                   {customItems.map((item) => (
                     <div className="cart-sheet-item" key={item.id}>
-                      <div className="cart-sheet-item-main">
-                        <strong>{item.name}</strong>
-                        <small>Товар вне матрицы · {item.unit || "шт."}</small>
-                      </div>
-                      <div className="cart-sheet-item-controls">
-                        <div className="quantity-control cart-sheet-qty">
-                          <button type="button" onClick={() => changeCustomQuantity(item.id, -1)} aria-label="Уменьшить">−</button>
-                          <div className="quantity-input-wrap">
-                            <input
-                              className="quantity-input"
-                              type="number"
-                              min="0"
-                              inputMode="numeric"
-                              value={item.quantity || ""}
-                              onChange={(e) => {
-                                const quantity = Math.max(0, Number.parseInt(e.target.value, 10) || 0);
-                                setCustomItems((current) =>
-                                  current
-                                    .map((row) => (row.id === item.id ? { ...row, quantity } : row))
-                                    .filter((row) => Number(row.quantity) > 0)
-                                );
-                              }}
-                            />
-                            <small>{item.unit || "шт."}</small>
+                      <div className="cart-sheet-item-head">
+                        <div className="cart-sheet-item-main">
+                          <strong>{item.name}</strong>
+                          <small>Товар вне матрицы · {item.unit || "шт."}</small>
+                        </div>
+                        <div className="cart-sheet-item-actions">
+                          <div className="quantity-control cart-sheet-qty">
+                            <button type="button" onClick={() => changeCustomQuantity(item.id, -1)} aria-label="Уменьшить">−</button>
+                            <div className="quantity-input-wrap">
+                              <input
+                                className="quantity-input"
+                                type="number"
+                                min="0"
+                                inputMode="numeric"
+                                value={item.quantity || ""}
+                                onChange={(e) => {
+                                  const quantity = Math.max(0, Number.parseInt(e.target.value, 10) || 0);
+                                  setCustomItems((current) =>
+                                    current
+                                      .map((row) => (row.id === item.id ? { ...row, quantity } : row))
+                                      .filter((row) => Number(row.quantity) > 0)
+                                  );
+                                }}
+                              />
+                              <small>{item.unit || "шт."}</small>
+                            </div>
+                            <button type="button" onClick={() => changeCustomQuantity(item.id, 1)} aria-label="Увеличить">+</button>
                           </div>
-                          <button type="button" onClick={() => changeCustomQuantity(item.id, 1)} aria-label="Увеличить">+</button>
                         </div>
                       </div>
                     </div>

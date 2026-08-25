@@ -6,6 +6,11 @@ import { startPasskeyRegistration } from "../utils/webauthn";
 import { api, setApiToken } from "../serverApi";
 import { formatDateTime } from "./appHelpers";
 import { appConfirm } from "./AppModal";
+import {
+  installPushSyncListeners,
+  syncPushSubscription,
+  urlBase64ToUint8Array,
+} from "./pushSync";
 
 export class PanelErrorBoundary extends Component {
   constructor(props) {
@@ -452,13 +457,6 @@ export function PasswordSecurityPanel({
   );
 }
 
-function urlBase64ToUint8Array(value) {
-  const padding = "=".repeat((4 - (value.length % 4)) % 4);
-  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = window.atob(base64);
-  return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
-}
-
 export function PushSettings() {
   const [status, setStatus] = useState(null);
   const [currentEndpoint, setCurrentEndpoint] = useState("");
@@ -479,12 +477,39 @@ export function PushSettings() {
       setCurrentEndpoint(endpoint);
       const saved = (result.subscriptions || []).find((item) => item.endpoint === endpoint);
       setPromotions(Boolean(saved?.promotions));
+
+      if (result.enabled && Notification.permission === "granted") {
+        const sync = await syncPushSubscription({ promotions: saved?.promotions });
+        if (sync.reason === "registered") {
+          setMessage("Подписка на уведомления восстановлена после обновления приложения.");
+          const refreshed = await api.getPushStatus();
+          setStatus(refreshed);
+          if ("serviceWorker" in navigator && "PushManager" in window) {
+            const registration = await navigator.serviceWorker.ready;
+            const browserSubscription = await registration.pushManager.getSubscription();
+            endpoint = browserSubscription?.endpoint || "";
+            setCurrentEndpoint(endpoint);
+          }
+        }
+      } else if (
+        result.enabled &&
+        Notification.permission === "granted" &&
+        endpoint &&
+        !(result.subscriptions || []).some((item) => item.endpoint === endpoint)
+      ) {
+        setMessage("Нажмите «Включить уведомления», чтобы восстановить push на этом устройстве.");
+      }
     } catch (error) {
       setMessage(error.message);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    void load();
+    return installPushSyncListeners(() => {
+      void load();
+    });
+  }, []);
 
   const enable = async () => {
     setBusy(true);
@@ -541,7 +566,13 @@ export function PushSettings() {
         {subscribed && <button className="secondary-button" type="button" disabled={busy} onClick={disable}>Отключить на этом устройстве</button>}
       </div>
       {!status?.enabled && <p className="muted small">Техническая часть подготовлена. Фактическая отправка включится после домена, HTTPS и VAPID-ключей (см. docs/deploy/PUSH_ENABLE.md).</p>}
-      {status?.subscriptions?.length > 0 && !subscribed && <p className="muted small">Уведомления уже включены на другом устройстве. На этом телефоне или компьютере их можно включить отдельно.</p>}
+      {status?.enabled && Notification.permission === "granted" && !subscribed && (
+        <p className="muted small">
+          Разрешение есть, но подписка на этом устройстве не активна — нажмите «Включить уведомления».
+          На iPhone push работает только из установленного приложения (Safari → «На экран Домой»).
+        </p>
+      )}
+      {status?.subscriptions?.length > 0 && !subscribed && Notification.permission !== "granted" && <p className="muted small">Уведомления уже включены на другом устройстве. На этом телефоне или компьютере их можно включить отдельно.</p>}
       {message && <div className="request-photo-status">{message}</div>}
     </section>
   );

@@ -55,6 +55,7 @@ export function ManagerStorefront({
   const [busy, setBusy] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [productBusy, setProductBusy] = useState(false);
+  const [productNotice, setProductNotice] = useState("");
   const [productQuery, setProductQuery] = useState("");
   const [storefrontFilter, setStorefrontFilter] = useState("Все");
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -285,11 +286,10 @@ export function ManagerStorefront({
       const result = await api.saveProducts(nextProducts);
       const saved = result.products || nextProducts;
       setProducts?.(saved);
-      await appAlert({
-        title: "Сохранено",
-        message,
-        tone: "success",
-      });
+      if (message) {
+        setProductNotice(message);
+        window.setTimeout(() => setProductNotice(""), 4500);
+      }
       return saved;
     } catch (error) {
       await appAlert({
@@ -334,12 +334,12 @@ export function ManagerStorefront({
       return { ...item, showOnStorefront: checked };
     });
     if (!touched) {
-      await appAlert({
-        title: checked ? "Уже на витрине" : "Не на витрине",
-        message: checked
-          ? "Выбранные позиции уже добавлены на витрину."
-          : "Среди выбранных нет позиций на витрине.",
-      });
+      setProductNotice(
+        checked
+          ? "Выбранные позиции уже на витрине."
+          : "Среди выбранных нет позиций на витрине."
+      );
+      window.setTimeout(() => setProductNotice(""), 4500);
       clearSelection();
       return;
     }
@@ -974,6 +974,10 @@ export function ManagerStorefront({
             setSelectedIds(new Set());
           }}
         />
+        <div className="storefront-pick-shell">
+        {productNotice ? (
+          <div className="matrix-save-message saved storefront-pick-notice">{productNotice}</div>
+        ) : null}
         <div className="form-grid storefront-catalog-filters" style={{ marginBottom: 12 }}>
           <label className="field">
             Поиск по каталогу Clover
@@ -1261,6 +1265,7 @@ export function ManagerStorefront({
               );
             })
           )}
+        </div>
         </div>
       </div>
     </section>

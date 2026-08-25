@@ -117,6 +117,7 @@ async function refreshServiceWorkerIfNeeded() {
     await navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(CLOVER_UI_BUILD)}`).catch((error) => {
       console.error("Не удалось зарегистрировать PWA Clover", error);
     });
+    window.dispatchEvent(new CustomEvent("clover-sw-ready"));
     return;
   }
   if (sessionStorage.getItem("clover-ui-reloading") === CLOVER_UI_BUILD) {
@@ -125,6 +126,7 @@ async function refreshServiceWorkerIfNeeded() {
     await navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(CLOVER_UI_BUILD)}`).catch((error) => {
       console.error("Не удалось зарегистрировать PWA Clover", error);
     });
+    window.dispatchEvent(new CustomEvent("clover-sw-ready"));
     return;
   }
   if (!previous) {
@@ -132,6 +134,7 @@ async function refreshServiceWorkerIfNeeded() {
     await navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(CLOVER_UI_BUILD)}`).catch((error) => {
       console.error("Не удалось зарегистрировать PWA Clover", error);
     });
+    window.dispatchEvent(new CustomEvent("clover-sw-ready"));
     return;
   }
   try {
