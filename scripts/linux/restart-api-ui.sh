@@ -28,7 +28,18 @@ start_manual() {
   nohup /usr/bin/node src/server.js >> /tmp/clover-api.log 2>&1 &
   cd "$ROOT"
   nohup /usr/bin/npm run preview -- --host 0.0.0.0 --port 5273 >> /tmp/clover-ui.log 2>&1 &
-  sleep 3
+}
+
+wait_for_health() {
+  for _ in $(seq 1 30); do
+    if curl -fsS http://127.0.0.1:4100/api/health >/dev/null 2>&1 \
+      && curl -fsS -o /dev/null http://127.0.0.1:5273/ 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "ERROR: API/UI did not become ready in 30s" >&2
+  return 1
 }
 
 if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files clover-api.service 2>/dev/null | grep -q clover-api; then
@@ -36,23 +47,15 @@ if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files clover-api.
     :
   elif sudo systemctl restart clover-api clover-ui 2>/dev/null; then
     :
-  else
+  elif ! systemctl is-active --quiet clover-ui 2>/dev/null; then
     echo "systemd restart unavailable — starting manually"
-    start_manual
-  fi
-  sleep 2
-  if ! systemctl is-active --quiet clover-ui 2>/dev/null; then
-    echo "systemd UI inactive — fallback to manual start"
     start_manual
   fi
 else
   start_manual
 fi
 
-ss -ltn | grep -E '4100|5273' || true
-curl -fsS http://127.0.0.1:4100/api/health
-echo
-curl -fsS -o /dev/null -w "ui:%{http_code}\n" http://127.0.0.1:5273/
+wait_for_health
 
 LIVE_TAG="$(curl -fsS http://127.0.0.1:5273/ | grep -o 'name="clover-ui-build" content="[^"]*"' | sed 's/.*content="//;s/"$//' || true)"
 LIVE_JS="$(curl -fsS http://127.0.0.1:5273/ | grep -o 'src="/assets/index-[^"]*\.js"' | head -1 || true)"
