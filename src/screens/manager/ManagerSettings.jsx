@@ -148,7 +148,8 @@ function ManagerNotificationSettings({ settings, set }) {
   );
 }
 
-export function ManagerSettings({ settings, setSettings, authUser: _authUser }) {
+export function ManagerSettings({ settings, setSettings, authUser }) {
+  const isAdmin = authUser?.role === "admin";
   const set = (key, value) => setSettings((current) => ({ ...current, [key]: value }));
 
   return (
@@ -242,7 +243,14 @@ export function ManagerSettings({ settings, setSettings, authUser: _authUser }) 
         <ToggleSetting title="Автосохранение черновика" description="Незавершённый новый заказ сохраняется в браузере." value={settings.enableDrafts} onChange={(value) => set("enableDrafts", value)} />
       </div>
       <ManagerPromotionPanel />
-      <PasswordSecurityPanel />
+      <PasswordSecurityPanel
+        allowPasswordChange={!isAdmin}
+        passwordChangeHint={
+          isAdmin
+            ? "Смену пароля администратора выполняйте в «Ещё → Доступы → Менеджеры» → ваша карточка → «Управление». Здесь можно добавить Face ID, отпечаток или завершить другие сессии."
+            : ""
+        }
+      />
     </section>
   );
 }

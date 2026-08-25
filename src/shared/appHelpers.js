@@ -2725,13 +2725,18 @@ textarea { resize: vertical; }
 .cart-sheet-list { display: grid; gap: 10px; }
 .cart-sheet-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
   align-items: start;
   padding: 12px;
   border: 1px solid #e1e9de;
   border-radius: 14px;
   background: #f8fbf6;
+}
+.cart-sheet-item-controls {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
 }
 .cart-sheet-item-main { display: grid; gap: 4px; min-width: 0; }
 .cart-sheet-item-main strong {
@@ -2741,8 +2746,73 @@ textarea { resize: vertical; }
   overflow-wrap: anywhere;
 }
 .cart-sheet-item-main small { color: #6f7b6f; font-size: 12px; line-height: 1.35; }
-.cart-sheet-units { margin-top: 6px; }
-.cart-sheet-qty { background: #fff; }
+.cart-sheet-units {
+  margin: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-template-rows: 30px;
+  width: 100%;
+  height: 30px;
+  min-height: 30px;
+  max-height: 30px;
+  gap: 0;
+  border: 1px solid #dfe7dc;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  box-sizing: border-box;
+}
+.cart-sheet-units button {
+  height: 30px;
+  min-height: 30px;
+  max-height: 30px;
+  margin: 0;
+  padding: 0 4px;
+  border: 0;
+  border-right: 1px solid #dfe7dc;
+  border-radius: 0;
+  background: #fff;
+  color: #5f695f;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+.cart-sheet-units button:last-child { border-right: 0; }
+.cart-sheet-units button.active {
+  background: #5b9d57;
+  color: #fff;
+}
+.cart-sheet-qty {
+  width: 100%;
+  height: 30px;
+  min-height: 30px;
+  max-height: 30px;
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
+  gap: 0;
+  border: 1px solid #dfe7dc;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.cart-sheet-qty > button {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  font-size: 16px;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+}
+.cart-sheet-qty .quantity-input {
+  min-height: 30px;
+  max-height: 30px;
+  font-size: 12px;
+}
+.cart-sheet-qty .quantity-input-wrap small {
+  font-size: 10px;
+}
 .cart-sheet-address { margin-top: 0; }
 .cart-sheet-comment { margin-top: 0; }
 .cart-sheet-date {
@@ -3360,6 +3430,44 @@ html.clover-thankyou-open .app-top-chrome {
 .client-matrix-toolbar { display: grid; gap: 12px; margin-bottom: 18px; }
 .client-catalog-add-panel .product-card-controls {
   margin-top: auto;
+}
+.client-catalog-add-panel .client-matrix-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.client-catalog-add-panel .client-matrix-card {
+  min-height: 0;
+  padding: 0 8px 8px;
+  border-radius: 12px;
+}
+.client-catalog-add-panel .client-matrix-card .product-image-wrap {
+  aspect-ratio: 1 / 1;
+  height: auto;
+  margin: 0 0 2px;
+  border-radius: 10px;
+}
+.client-catalog-add-panel .client-matrix-card h2 {
+  margin: 4px 0 2px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+.client-catalog-add-panel .client-matrix-card .product-code {
+  margin: 0 0 2px;
+  font-size: 10px;
+}
+.client-catalog-add-panel .client-matrix-card .product-card-controls .primary-button,
+.client-catalog-add-panel .client-matrix-card .product-card-controls .secondary-button {
+  min-height: 30px;
+  max-height: 30px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+@media (max-width: 1100px) {
+  .client-catalog-add-panel .client-matrix-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 820px) {
+  .client-catalog-add-panel .client-matrix-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .client-catalog-add-panel .client-matrix-card { padding: 8px; }
 }
 .client-catalog-add-panel .product-price,
 .client-catalog-add-panel .client-catalog-add-price {
@@ -4749,11 +4857,16 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   .cart-sheet-list { display: grid; gap: 10px; }
   .cart-sheet-item {
     display: grid;
-    gap: 10px;
+    gap: 8px;
     padding: 12px;
     border: 1px solid #e1e9de;
     border-radius: 14px;
     background: #f8fbf6;
+  }
+  .cart-sheet-item-controls {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
   }
   .cart-sheet-item-main { display: grid; gap: 4px; min-width: 0; }
   .cart-sheet-item-main strong {
@@ -4763,8 +4876,65 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     overflow-wrap: anywhere;
   }
   .cart-sheet-item-main small { color: #6f7b6f; font-size: 12px; line-height: 1.35; }
-  .cart-sheet-units { margin-top: 6px; }
-  .cart-sheet-qty { background: #fff; }
+  .cart-sheet-units {
+    margin: 0;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-template-rows: 30px;
+    width: 100%;
+    height: 30px;
+    min-height: 30px;
+    max-height: 30px;
+    gap: 0;
+    border: 1px solid #dfe7dc;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .cart-sheet-units button {
+    height: 30px;
+    min-height: 30px;
+    max-height: 30px;
+    margin: 0;
+    padding: 0 4px;
+    border: 0;
+    border-right: 1px solid #dfe7dc;
+    border-radius: 0;
+    background: #fff;
+    color: #5f695f;
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .cart-sheet-units button:last-child { border-right: 0; }
+  .cart-sheet-units button.active { background: #5b9d57; color: #fff; }
+  .cart-sheet-qty {
+    width: 100%;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    gap: 0;
+    border: 1px solid #dfe7dc;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .cart-sheet-qty > button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    font-size: 22px;
+    border: 0;
+    border-radius: 0;
+    background: #fff;
+  }
+  .cart-sheet-qty .quantity-input {
+    min-height: 44px;
+    max-height: 44px;
+    font-size: 16px;
+  }
   .cart-sheet .delivery-date-trigger {
     display: grid;
     grid-template-columns: 48px minmax(0, 1fr) auto;

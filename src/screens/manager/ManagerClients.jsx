@@ -512,13 +512,9 @@ function ManagerClientEditor({ client, link, onLinkChange, onReload, onClose }) 
     setPasswordBusy(true);
     try {
       const result = await api.setClientPassword(client.id, password);
+      void result;
       await onReload();
       setPasswordDraft("");
-      await appAlert({
-        title: "Пароль обновлён",
-        message: `Логин: ${result.login || client.email}\nПароль: ${password}\n\nСохранено в «Ещё → Доступы». Передайте клиенту.`,
-        tone: "success",
-      });
     } catch (saveError) {
       await appAlert({
         title: "Не удалось сменить пароль",
@@ -1098,11 +1094,6 @@ export function ManagerClients({
         writeOpenManagerClientId(String(result.client.id));
         setOpenClientId(String(result.client.id));
       }
-      await appAlert({
-        title: "Доступ выдан",
-        message: `Логин: ${result.login || email}\nПароль: ${password}\n\nСохранено в «Ещё → Доступы». Передайте клиенту. Матрицу можно настроить в карточке.`,
-        tone: "success",
-      });
     } catch (error) {
       await appAlert({
         title: "Не удалось создать клиента",

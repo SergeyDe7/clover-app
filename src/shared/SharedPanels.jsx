@@ -241,7 +241,10 @@ export function CustomRequestPhoto({ photo, className = "" }) {
   );
 }
 
-export function PasswordSecurityPanel({ allowPasswordChange = true } = {}) {
+export function PasswordSecurityPanel({
+  allowPasswordChange = true,
+  passwordChangeHint = "",
+} = {}) {
   const [form, setForm] = useState({ currentPassword: "", newPassword: "", repeatPassword: "" });
   const [busy, setBusy] = useState(false);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
@@ -349,7 +352,8 @@ export function PasswordSecurityPanel({ allowPasswordChange = true } = {}) {
           <p>
             {allowPasswordChange
               ? "Можно входить по паролю либо через Face ID, отпечаток или код блокировки телефона."
-              : "Смену пароля выполняет менеджер. Здесь можно добавить Face ID, отпечаток или завершить другие сессии."}
+              : passwordChangeHint ||
+                "Смену пароля выполняет менеджер. Здесь можно добавить Face ID, отпечаток или завершить другие сессии."}
           </p>
         </div>
       </div>

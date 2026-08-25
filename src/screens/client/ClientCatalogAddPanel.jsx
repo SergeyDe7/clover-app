@@ -101,7 +101,7 @@ export function ClientCatalogAddPanel({
         </div>
       </div>
 
-      <section className="product-grid">
+      <section className="product-grid client-matrix-grid">
         {filtered.map((product) => {
           const { price, unit } = catalogAddPrice(product);
           const added = inMatrix(product);
@@ -109,7 +109,11 @@ export function ClientCatalogAddPanel({
           const showPrices = settings?.showPrices !== false;
           return (
             <article
-              className={added ? "product-card product-card-in-matrix" : "product-card"}
+              className={
+                added
+                  ? "product-card client-matrix-card product-card-in-matrix"
+                  : "product-card client-matrix-card"
+              }
               key={product.id}
             >
               <div className="product-image-wrap">

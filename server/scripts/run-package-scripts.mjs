@@ -22,6 +22,7 @@ const CHECK_FILES = [
   "src/orderStatus.js",
   "src/roles.js",
   "src/clientSettings.js",
+  "src/staffAccessVault.js",
   "src/oneCSearchIndex.js",
   "src/matrixGuard.js",
   "src/oneC.js",
@@ -54,6 +55,10 @@ const CHECK_FILES = [
   "scripts/verify-manager-notifications.mjs",
   "scripts/verify-manager-tabs-smoke.mjs",
   "scripts/verify-client-self-matrix.mjs",
+  "scripts/verify-staff-access-vault.mjs",
+  "scripts/verify-staff-access-ui.mjs",
+  "scripts/verify-manager-permissions.mjs",
+  "scripts/verify-ui-build-tag.mjs",
 ];
 
 const TEST_ONEC = [

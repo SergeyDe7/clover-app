@@ -57,6 +57,8 @@ const addPanel = readFileSync(
 );
 assert.ok(addPanel.includes("В матрицу"));
 assert.ok(addPanel.includes("catalogAddPrice"));
+assert.ok(addPanel.includes("client-matrix-grid"));
+assert.ok(addPanel.includes("client-matrix-card"));
 assert.ok(addPanel.includes("client-catalog-add-price"));
 assert.ok(addPanel.includes("Заказ оформляется"));
 assert.ok(!addPanel.includes("setCart"));
@@ -86,6 +88,10 @@ const orderEditor = readFileSync(
 assert.ok(
   !orderEditor.includes("catalog-scope-switch"),
   "Дубль кнопок матрицы/каталога в верхнем блоке убран."
+);
+assert.ok(
+  orderEditor.includes("cart-sheet-item-controls"),
+  "Корзина: единица измерения должна быть над количеством."
 );
 
 const managerOrders = readFileSync(
