@@ -191,6 +191,15 @@ assert.doesNotMatch(
   "Минус не заблокирован на стартовом CSS-scale=1: зум идёт через z Яндекса."
 );
 assert.match(admin, /Контакты на витрине/);
+assert.match(
+  admin,
+  /Кнопка «Контакты» открывает страницу с телефоном, почтой, адресом/
+);
+assert.doesNotMatch(
+  admin,
+  /На главной номер телефона также показывается/,
+  "Подсказка менеджера не обещает телефон в шапке главной."
+);
 assert.match(admin, /storefrontContactAddress/);
 assert.match(admin, /storefrontContactHours/);
 assert.match(admin, /storefrontContactMapsUrl/);
