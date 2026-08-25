@@ -1,5 +1,5 @@
 // Каталог ЛК: только добавление товара в свою матрицу, без корзины.
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   UNIT_CONFIG,
   UNIT_ORDER,
@@ -25,6 +25,15 @@ function catalogAddPrice(product) {
 import { productImageSrc } from "../../shared/productPhoto";
 import { CatalogSearchInput } from "./CatalogSearchInput";
 import { EmptyState } from "../../shared/uxFeedback";
+import { useMobileFixedChromeHeight } from "./useMobileFixedChromeHeight";
+
+function sortCatalogCategories(names) {
+  return [...new Set(names.filter(Boolean))].sort((a, b) => {
+    if (a === "Прочее") return 1;
+    if (b === "Прочее") return -1;
+    return a.localeCompare(b, "ru");
+  });
+}
 
 export function ClientCatalogAddPanel({
   products = [],
@@ -36,6 +45,13 @@ export function ClientCatalogAddPanel({
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Все");
+  const stickyChromeRef = useRef(null);
+
+  useMobileFixedChromeHeight(
+    stickyChromeRef,
+    ".client-catalog-add-panel",
+    "--catalog-add-mobile-chrome-h"
+  );
 
   const matrixIdSet = useMemo(() => {
     const ids = new Set((Array.isArray(matrixProductIds) ? matrixProductIds : []).map(String));
@@ -48,7 +64,7 @@ export function ClientCatalogAddPanel({
   );
 
   const categories = useMemo(
-    () => ["Все", ...new Set(activeProducts.map((item) => item.category).filter(Boolean))],
+    () => ["Все", ...sortCatalogCategories(activeProducts.map((item) => item.category))],
     [activeProducts]
   );
   const activeCategory = categories.includes(category) ? category : "Все";
@@ -68,40 +84,47 @@ export function ClientCatalogAddPanel({
 
   return (
     <section className="panel client-catalog-add-panel">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">Каталог Clover</p>
-          <h2>Добавить товары из каталога</h2>
-          <p>
-            Здесь можно только добавить позицию в свою матрицу. Заказ оформляется
-            во вкладке «Моя матрица». Цена — ваша: наценка или вид цен клиента,
-            не витрина.
-          </p>
-        </div>
-      </div>
+      <div className="client-catalog-add-shell">
+        <div className="client-catalog-add-sticky-chrome" ref={stickyChromeRef}>
+          <div className="client-catalog-add-search">
+            <CatalogSearchInput
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
 
-      <div className="catalog-toolbar">
-        <div className="catalog-filter-row">
-          <CatalogSearchInput
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </div>
-        <div className="category-list">
-          {categories.map((item) => (
-            <button
-              className={activeCategory === item ? "category-button active" : "category-button"}
-              type="button"
-              key={item}
-              onClick={() => setCategory(item)}
+          <aside className="client-catalog-add-side">
+            <nav
+              className="category-list client-catalog-add-categories"
+              aria-label="Категории каталога"
             >
-              {item}
-            </button>
-          ))}
+              {categories.map((item) => (
+                <button
+                  className={activeCategory === item ? "category-button active" : "category-button"}
+                  type="button"
+                  key={item}
+                  onClick={() => setCategory(item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </nav>
+          </aside>
         </div>
-      </div>
 
-      <section className="product-grid">
+        <div className="client-catalog-add-intro panel-heading">
+          <div>
+            <p className="eyebrow">Каталог Clover</p>
+            <h2>Добавить товары из каталога</h2>
+            <p>
+              Здесь можно только добавить позицию в свою матрицу. Заказ оформляется
+              во вкладке «Моя матрица».
+            </p>
+          </div>
+        </div>
+
+        <div className="client-catalog-add-main">
+      <section className="product-grid client-matrix-grid">
         {filtered.map((product) => {
           const { price, unit } = catalogAddPrice(product);
           const added = inMatrix(product);
@@ -109,7 +132,11 @@ export function ClientCatalogAddPanel({
           const showPrices = settings?.showPrices !== false;
           return (
             <article
-              className={added ? "product-card product-card-in-matrix" : "product-card"}
+              className={
+                added
+                  ? "product-card client-matrix-card product-card-in-matrix"
+                  : "product-card client-matrix-card"
+              }
               key={product.id}
             >
               <div className="product-image-wrap">
@@ -161,6 +188,8 @@ export function ClientCatalogAddPanel({
           />
         ) : null}
       </section>
+        </div>
+      </div>
     </section>
   );
 }

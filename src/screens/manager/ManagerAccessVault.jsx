@@ -187,14 +187,10 @@ function ClientAccessPanel() {
     setPasswordBusy(true);
     try {
       const result = await api.setClientPassword(item.clientId, password);
+      void result;
       await load();
       setRevealed((current) => ({ ...current, [item.clientId]: true }));
       cancelPasswordEditor();
-      await appAlert({
-        title: "Пароль сохранён",
-        message: `Логин: ${result.login || item.login || item.email}\nПароль: ${password}\n\nЗапись появилась в журнале доступов.`,
-        tone: "success",
-      });
     } catch (saveError) {
       await appAlert({
         title: "Не удалось сохранить",
@@ -421,7 +417,7 @@ export function ManagerAccessVault({ authUser }) {
           <p className="eyebrow">Ещё</p>
           <h2 id="access-vault-title">Доступы</h2>
           <p className="muted small" style={{ margin: "6px 0 0" }}>
-            Клиенты — логины ЛК. Менеджеры — создание и права (только администратор).
+            Клиенты — логины ЛК. Менеджеры — логины, пароли и права (только администратор).
           </p>
         </div>
       </header>

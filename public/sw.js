@@ -94,6 +94,32 @@ self.addEventListener("push", (event) => {
   );
 });
 
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      const registration = self.registration;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription && event.oldSubscription?.options) {
+        try {
+          subscription = await registration.pushManager.subscribe(event.oldSubscription.options);
+        } catch {
+          subscription = null;
+        }
+      }
+      const clients = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      const payload = subscription
+        ? { type: "clover-push-subscription", subscription: subscription.toJSON() }
+        : { type: "clover-push-resync" };
+      for (const client of clients) {
+        client.postMessage(payload);
+      }
+    })()
+  );
+});
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const target = new URL(event.notification.data?.url || "/lk/", self.location.origin).href;

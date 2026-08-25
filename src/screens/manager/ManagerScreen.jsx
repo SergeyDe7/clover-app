@@ -1,5 +1,5 @@
 // Экран менеджера/администратора: заказы, клиенты, товары, обмен с 1С, настройки.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Header } from "../../shared/SharedPanels";
 import { StickyCabinetChrome } from "../../shared/StickyCabinetChrome";
 import {
@@ -11,6 +11,7 @@ import {
   writeManagerMoreTab,
   normalizeOrderExchange,
   formatDateTime,
+  staffHasFeature,
 } from "../../shared/appHelpers";
 import { ManagerOrders } from "./ManagerOrders";
 import { ManagerExchange } from "./ManagerExchange";
@@ -33,6 +34,42 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
   const [headerSearch, setHeaderSearch] = useState("");
   const [bellOpen, setBellOpen] = useState(false);
   const [ordersView, setOrdersView] = useState("active");
+
+  const allowedMainTabs = useMemo(
+    () => MANAGER_TABS.filter(([id]) => staffHasFeature(authUser, id)),
+    [authUser]
+  );
+  const allowedMoreTabs = useMemo(
+    () => MANAGER_MORE_TABS.filter(([id]) => staffHasFeature(authUser, id)),
+    [authUser]
+  );
+
+  useEffect(() => {
+    if (!authUser) return;
+    if (tab === "more") {
+      if (!staffHasFeature(authUser, "more")) {
+        const fallback = allowedMainTabs[0]?.[0];
+        if (fallback && fallback !== tab) {
+          setTab(fallback);
+          writeManagerActiveTab(fallback);
+        }
+        return;
+      }
+      if (allowedMoreTabs.length && !allowedMoreTabs.some(([id]) => id === moreTab)) {
+        const next = allowedMoreTabs[0][0];
+        setMoreTab(next);
+        writeManagerMoreTab(next);
+      }
+      return;
+    }
+    if (!allowedMainTabs.some(([id]) => id === tab)) {
+      const next = allowedMainTabs[0]?.[0] || "orders";
+      if (next !== tab) {
+        setTab(next);
+        writeManagerActiveTab(next);
+      }
+    }
+  }, [authUser, tab, moreTab, allowedMainTabs, allowedMoreTabs]);
 
   const selectTab = (nextTab) => {
     setTab(nextTab);
@@ -116,7 +153,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
         onLogout={onLogout}
         nav={
           <nav className="manager-nav" aria-label={authUser?.role === "admin" ? "Разделы админа" : "Разделы менеджера"}>
-            {MANAGER_TABS.filter(([id]) => id !== "storefront" || authUser?.role === "admin").map(([id, label]) => (
+            {allowedMainTabs.map(([id, label]) => (
               <button
                 className={tab === id ? "active" : ""}
                 type="button"
@@ -142,7 +179,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
             value={headerSearch}
             onChange={(e) => {
               setHeaderSearch(e.target.value);
-              if (tab !== "orders") selectTab("orders");
+              if (tab !== "orders" && staffHasFeature(authUser, "orders")) selectTab("orders");
             }}
             aria-label="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
           />
@@ -208,7 +245,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
         <article className="stat-card"><span>Ошибки 1С</span><strong>{exchangeErrors}</strong></article>
         <article className="stat-card"><span>Непрочитано</span><strong>{unreadCount}</strong></article>
       </div>
-      {tab === "orders" && (
+      {tab === "orders" && staffHasFeature(authUser, "orders") && (
         <ManagerOrders
           orders={orders}
           trashedOrders={trashedOrders}
@@ -227,9 +264,9 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
           headerSearch={headerSearch}
         />
       )}
-      {tab === "exchange" && <ManagerExchange onReload={onReload} onApplyManagerNotifications={onApplyManagerNotifications} onNavigate={selectTab} />}
-      {tab === "clients" && <ManagerClients clients={clients} orders={orders} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} dirtyClientLinkIdsRef={dirtyClientLinkIdsRef} oneCPriceTypes={oneCPriceTypes} catalogPricesVersion={catalogPricesVersion} onReload={onReload} />}
-      {tab === "products" && (
+      {tab === "exchange" && staffHasFeature(authUser, "exchange") && <ManagerExchange onReload={onReload} onApplyManagerNotifications={onApplyManagerNotifications} onNavigate={selectTab} />}
+      {tab === "clients" && staffHasFeature(authUser, "clients") && <ManagerClients clients={clients} orders={orders} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} dirtyClientLinkIdsRef={dirtyClientLinkIdsRef} oneCPriceTypes={oneCPriceTypes} catalogPricesVersion={catalogPricesVersion} onReload={onReload} />}
+      {tab === "products" && staffHasFeature(authUser, "products") && (
         <ManagerProducts
           products={products}
           setProducts={setProducts}
@@ -237,8 +274,8 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
           oneCPriceTypes={oneCPriceTypes}
         />
       )}
-      {tab === "acts" && <ManagerReconciliation requests={reconciliationRequests} onReload={onReload} />}
-      {tab === "storefront" && authUser?.role === "admin" && (
+      {tab === "acts" && staffHasFeature(authUser, "acts") && <ManagerReconciliation requests={reconciliationRequests} onReload={onReload} />}
+      {tab === "storefront" && staffHasFeature(authUser, "storefront") && (
         <ManagerStorefront
           settings={settings}
           setSettings={setSettings}
@@ -247,10 +284,10 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
           setProducts={setProducts}
         />
       )}
-      {tab === "more" && (
+      {tab === "more" && staffHasFeature(authUser, "more") && (
         <section>
           <nav className="manager-more-nav" aria-label="Дополнительно">
-            {MANAGER_MORE_TABS.map(([id, label]) => (
+            {allowedMoreTabs.map(([id, label]) => (
               <button
                 className={moreTab === id ? "category-button active" : "category-button"}
                 type="button"
@@ -261,10 +298,10 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
               </button>
             ))}
           </nav>
-          {moreTab === "access" && <ManagerAccessVault authUser={authUser} />}
-          {moreTab === "settings" && <ManagerSettings settings={settings} setSettings={setSettings} authUser={authUser} />}
-          {moreTab === "backup" && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} onReload={onReload} />}
-          {moreTab === "audit" && <ManagerAudit />}
+          {moreTab === "access" && staffHasFeature(authUser, "access") && <ManagerAccessVault authUser={authUser} />}
+          {moreTab === "settings" && staffHasFeature(authUser, "settings") && <ManagerSettings settings={settings} setSettings={setSettings} authUser={authUser} />}
+          {moreTab === "backup" && staffHasFeature(authUser, "backup") && <ManagerBackup data={{ orders, products, profile, addresses, settings, clientLinks }} onImport={onImport} onClearOrders={onClearOrders} onResetAll={onResetAll} onReload={onReload} />}
+          {moreTab === "audit" && staffHasFeature(authUser, "audit") && <ManagerAudit />}
         </section>
       )}
     </section>

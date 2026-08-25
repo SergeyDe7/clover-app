@@ -107,6 +107,11 @@ import {
   saveClientAccessCredentials,
   upsertClientAccessEntry,
 } from "./clientAccessVault.js";
+import {
+  attachStaffAccess,
+  removeStaffAccessEntry,
+  saveStaffAccessCredentials,
+} from "./staffAccessVault.js";
 import { searchOneCProductsIndexed } from "./oneCSearchIndex.js";
 import {
   DEFAULT_ONE_C_CONFIG,
@@ -444,6 +449,20 @@ function assertCanManageTargetStaff(req, target) {
   }
 }
 
+function assertCanSetStaffPassword(req, target) {
+  if (!actorCanManageStaff(req)) {
+    const error = new Error("Недостаточно прав для управления менеджерами.");
+    error.status = 403;
+    error.code = "STAFF_MANAGE_FORBIDDEN";
+    throw error;
+  }
+  if (!target || !isStaffRole(target.role)) {
+    const error = new Error("Менеджер не найден.");
+    error.status = 404;
+    throw error;
+  }
+}
+
 function auditFromRequest(req, action, details = {}) {
   try {
     writeAudit({
@@ -456,6 +475,32 @@ function auditFromRequest(req, action, details = {}) {
   } catch (error) {
     console.error("Не удалось записать действие в журнал", error);
   }
+}
+
+function rememberStaffPassword(user, password, actor = {}) {
+  const userId = cleanText(user?.id);
+  const login = cleanText(user?.email);
+  const plainPassword = cleanText(password);
+  if (!userId || !login || !plainPassword || !isStaffRole(user?.role)) {
+    return;
+  }
+  try {
+    saveStaffAccessCredentials(
+      userId,
+      {
+        login,
+        password: plainPassword,
+        role: user.role,
+      },
+      actor
+    );
+  } catch (error) {
+    console.error("Не удалось сохранить пароль менеджера в журнал доступов", error);
+  }
+}
+
+function cleanText(value) {
+  return String(value ?? "").trim();
 }
 
 function removeUploadedImage(imageUrl) {
@@ -2009,6 +2054,7 @@ app.post("/api/auth/change-password", authRequired, async (req, res, next) => {
     }
     const passwordHash = await bcrypt.hash(input.newPassword, 12);
     const updatedUser = updateUserPassword(user.id, passwordHash);
+    rememberStaffPassword(updatedUser, input.newPassword, req.user);
     auditFromRequest(req, "auth.password.change", { otherSessionsEnded: true });
     res.json({
       ok: true,
@@ -2050,12 +2096,13 @@ app.post("/api/admin/managers", authRequired, roleRequired("manager"), async (re
       emailVerified: true,
       approvalStatus: "approved",
     });
+    rememberStaffPassword(user, input.password, req.user);
     auditFromRequest(req, "manager.create", { managerId: user.id });
     res.status(201).json({
       ok: true,
       manager: publicUser(user),
       requiresEmailVerification: false,
-      message: "Менеджер создан. Можно сразу войти по email и паролю.",
+      message: "Менеджер создан. Можно сразу войти по email и паролю. Пароль сохранён в «Ещё → Доступы → Менеджеры».",
     });
   } catch (error) {
     next(error);
@@ -2068,9 +2115,10 @@ app.get("/api/admin/staff", authRequired, roleRequired("manager"), (req, res) =>
     isStaffRole(req.user.role) &&
     (req.user.role === "admin" || adminCount === 0);
   const canManageStaff = actorCanManageStaff(req);
+  const staff = listStaffUsers();
   res.json({
     ok: true,
-    staff: listStaffUsers(),
+    staff: canManageStaff ? attachStaffAccess(staff) : staff,
     adminCount,
     canManageRoles,
     canManageStaff,
@@ -2162,14 +2210,15 @@ app.post(
   async (req, res, next) => {
     try {
       const target = findUserById(String(req.params.userId || "").trim());
-      assertCanManageTargetStaff(req, target);
+      assertCanSetStaffPassword(req, target);
       const input = staffPasswordSchema.parse(req.body);
       const passwordHash = await bcrypt.hash(input.password, 12);
       const updated = updateUserPassword(target.id, passwordHash);
+      rememberStaffPassword(updated, input.password, req.user);
       auditFromRequest(req, "manager.password.set", { managerId: target.id });
       res.json({
         ok: true,
-        message: "Пароль обновлён. Старые сессии менеджера завершены.",
+        message: "Пароль обновлён. Старые сессии менеджера завершены. Новый пароль сохранён в «Ещё → Доступы → Менеджеры».",
         user: publicUser(updated),
       });
     } catch (error) {
@@ -2265,6 +2314,7 @@ app.delete(
       if (!removed) {
         return res.status(404).json({ error: "Менеджер не найден." });
       }
+      removeStaffAccessEntry(target.id);
       auditFromRequest(req, "manager.delete", {
         managerId: target.id,
         email: target.email,

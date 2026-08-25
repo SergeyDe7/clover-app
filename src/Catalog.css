@@ -62,12 +62,22 @@
 
 .catalog-search {
   width: 100%;
-  height: 54px;
-  padding: 0 18px;
+  height: auto;
+  min-height: 42px;
+  padding: 10px 14px;
   border: 1px solid #e6eee3;
-  border-radius: 15px;
+  border-radius: 12px;
   background: #fbfdfb;
   outline: none;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.catalog-search::-webkit-search-decoration,
+.catalog-search::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .catalog-search:focus {

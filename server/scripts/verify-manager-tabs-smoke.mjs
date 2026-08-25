@@ -122,6 +122,14 @@ for (const [tabId, panel] of Object.entries(MORE_TAB_TO_PANEL)) {
 }
 
 assert.ok(
+  screenSource.includes("staffHasFeature"),
+  "ManagerScreen не фильтрует разделы по правам staff"
+);
+assert.ok(
+  screenSource.includes("allowedMainTabs"),
+  "ManagerScreen не строит список доступных вкладок"
+);
+assert.ok(
   screenSource.includes("ManagerNotificationBell"),
   "ManagerScreen не монтирует колокол уведомлений"
 );

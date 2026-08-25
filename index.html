@@ -26,20 +26,51 @@
       <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
     </noscript>
     <title>Clover</title>
+    <meta name="clover-ui-build" content="%CLOVER_UI_BUILD%" />
     <script>
       (function () {
-          var BUILD = "ui-20260825-v269-sf";
+        var meta = document.querySelector('meta[name="clover-ui-build"]');
+        var BUILD = meta && meta.getAttribute("content");
+        if (!BUILD || BUILD.indexOf("%CLOVER_UI_BUILD%") >= 0) BUILD = "ui-dev";
         try {
-          if (localStorage.getItem("clover-ui-build") === BUILD) return;
+          var prev = localStorage.getItem("clover-ui-build");
+          if (prev === BUILD) return;
+          if (sessionStorage.getItem("clover-ui-reloading") === BUILD) {
+            localStorage.setItem("clover-ui-build", BUILD);
+            sessionStorage.removeItem("clover-ui-reloading");
+            return;
+          }
+          if (!prev) {
+            localStorage.setItem("clover-ui-build", BUILD);
+            return;
+          }
+          var finished = false;
+          function finish() {
+            if (finished) return;
+            finished = true;
+            sessionStorage.setItem("clover-ui-reloading", BUILD);
+            location.reload();
+          }
+          var tasks = [];
           if (navigator.serviceWorker) {
-            navigator.serviceWorker.getRegistrations().then(function (regs) {
-              regs.forEach(function (reg) { reg.unregister(); });
-            });
+            tasks.push(
+              navigator.serviceWorker.getRegistrations().then(function (regs) {
+                return Promise.all(regs.map(function (reg) { return reg.unregister(); }));
+              })
+            );
           }
           if (window.caches && caches.keys) {
-            caches.keys().then(function (keys) {
-              keys.forEach(function (key) { caches.delete(key); });
-            });
+            tasks.push(
+              caches.keys().then(function (keys) {
+                return Promise.all(keys.map(function (key) { return caches.delete(key); }));
+              })
+            );
+          }
+          if (tasks.length) {
+            Promise.all(tasks).then(finish, finish);
+            setTimeout(finish, 800);
+          } else {
+            finish();
           }
         } catch (e) {}
       })();

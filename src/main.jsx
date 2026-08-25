@@ -19,7 +19,9 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-const CLOVER_UI_BUILD = "ui-20260825-v269-sf";
+const CLOVER_UI_BUILD =
+  document.querySelector('meta[name="clover-ui-build"]')?.getAttribute("content")?.trim() ||
+  "ui-dev";
 const BOOT_SPLASH_MS = 450;
 const APP_THEME_COLOR = "#f4f8f2";
 const STOREFRONT_THEME_COLOR = "#f3f2ee";
@@ -112,12 +114,29 @@ async function refreshServiceWorkerIfNeeded() {
   if (!("serviceWorker" in navigator)) return;
   const previous = localStorage.getItem("clover-ui-build");
   if (previous === CLOVER_UI_BUILD) {
-    navigator.serviceWorker.register("/sw.js").catch((error) => {
+    await navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(CLOVER_UI_BUILD)}`).catch((error) => {
       console.error("Не удалось зарегистрировать PWA Clover", error);
     });
+    window.dispatchEvent(new CustomEvent("clover-sw-ready"));
     return;
   }
-
+  if (sessionStorage.getItem("clover-ui-reloading") === CLOVER_UI_BUILD) {
+    localStorage.setItem("clover-ui-build", CLOVER_UI_BUILD);
+    sessionStorage.removeItem("clover-ui-reloading");
+    await navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(CLOVER_UI_BUILD)}`).catch((error) => {
+      console.error("Не удалось зарегистрировать PWA Clover", error);
+    });
+    window.dispatchEvent(new CustomEvent("clover-sw-ready"));
+    return;
+  }
+  if (!previous) {
+    localStorage.setItem("clover-ui-build", CLOVER_UI_BUILD);
+    await navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(CLOVER_UI_BUILD)}`).catch((error) => {
+      console.error("Не удалось зарегистрировать PWA Clover", error);
+    });
+    window.dispatchEvent(new CustomEvent("clover-sw-ready"));
+    return;
+  }
   try {
     const registrations = await navigator.serviceWorker.getRegistrations();
     await Promise.all(registrations.map((registration) => registration.unregister()));
@@ -128,16 +147,8 @@ async function refreshServiceWorkerIfNeeded() {
   } catch (error) {
     console.error("Не удалось сбросить кэш PWA Clover", error);
   }
-
-  localStorage.setItem("clover-ui-build", CLOVER_UI_BUILD);
-  await navigator.serviceWorker.register(`/sw.js?v=${CLOVER_UI_BUILD}`).catch((error) => {
-    console.error("Не удалось зарегистрировать PWA Clover", error);
-  });
-
-  // Не silent reload: App показывает SoftBanner «Обновить».
-  if (previous) {
-    window.dispatchEvent(new CustomEvent("clover:update-available"));
-  }
+  sessionStorage.setItem("clover-ui-reloading", CLOVER_UI_BUILD);
+  window.location.reload();
 }
 
 window.addEventListener("load", () => {
