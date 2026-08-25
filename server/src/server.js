@@ -391,7 +391,20 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "24mb" }));
 app.use("/uploads/reconciliation", (req, res) => res.status(404).end());
-app.use("/uploads", express.static(uploadsDirectory, { maxAge: "1h" }));
+app.use(
+  "/uploads",
+  express.static(uploadsDirectory, {
+    etag: true,
+    lastModified: true,
+    setHeaders(res, filePath) {
+      if (path.basename(filePath).startsWith("product-")) {
+        res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+        return;
+      }
+      res.setHeader("Cache-Control", "public, max-age=3600");
+    },
+  })
+);
 
 const loginAttempts = new Map();
 

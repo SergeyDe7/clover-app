@@ -467,6 +467,7 @@ function toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId = "")
     subcategory: String(product.subcategory || "").trim(),
     facet: String(product.facet || "").trim(),
     imageUrl: String(product.imageUrl || "").trim(),
+    imageUpdatedAt: String(product.imageUpdatedAt || "").trim(),
     certificateUrl: String(product.certificateUrl || "").trim(),
     oneCId: String(product.oneCId || "").trim(),
     oneCCode,

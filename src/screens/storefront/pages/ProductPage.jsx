@@ -3,6 +3,7 @@ import { storefrontApi } from "../publicApi.js";
 import { addToCart, snapCartQty } from "../cartStorage.js";
 import { formatMoney, navigateStorefront } from "../components/StoreHeader.jsx";
 import { getUnitOrderStep } from "../../../shared/appHelpers.js";
+import { productImageSrc } from "../../../shared/productPhoto.js";
 
 const UNIT_LABEL = {
   piece: "шт",
@@ -86,7 +87,7 @@ export function ProductPage({ code }) {
       <div className="sf-product-layout">
         <div className="sf-product-gallery">
           {product.imageUrl ? (
-            <img src={product.imageUrl} alt={product.name} />
+            <img src={productImageSrc(product)} alt={product.name} />
           ) : (
             <div className="sf-product-placeholder is-large" />
           )}

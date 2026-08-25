@@ -8,6 +8,7 @@ import {
   subscribeCart,
 } from "../cartStorage.js";
 import { formatMoney, navigateStorefront } from "../components/StoreHeader.jsx";
+import { productImageSrc } from "../../../shared/productPhoto.js";
 
 export function CartPage() {
   const [items, setItems] = useState(getCartItems);
@@ -47,7 +48,7 @@ export function CartPage() {
               }
             >
               {item.imageUrl ? (
-                <img src={item.imageUrl} alt="" />
+                <img src={productImageSrc(item)} alt="" />
               ) : (
                 <div className="sf-product-placeholder" />
               )}

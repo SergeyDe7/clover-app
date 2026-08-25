@@ -1,6 +1,7 @@
 import { formatMoney, navigateStorefront } from "./StoreHeader.jsx";
 import { addToCart } from "../cartStorage.js";
 import { getUnitOrderStep } from "../../../shared/appHelpers.js";
+import { productImageSrc } from "../../../shared/productPhoto.js";
 
 const UNIT_LABEL = {
   piece: "шт",
@@ -28,7 +29,7 @@ export function ProductCard({ product }) {
         }
       >
         {product.imageUrl ? (
-          <img src={product.imageUrl} alt="" loading="lazy" />
+          <img src={productImageSrc(product)} alt="" loading="lazy" />
         ) : (
           <div className="sf-product-placeholder" aria-hidden="true" />
         )}
