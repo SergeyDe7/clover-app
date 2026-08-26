@@ -547,6 +547,9 @@ function mergeOrdersFromServer(previous, incoming, { clientMode = false } = {}) 
 }
 
 function App() {
+  useEffect(() => {
+    document.title = "Личный кабинет | КЛЕВЕР";
+  }, []);
   const [role, setRole] = useState("client");
   const [authUser, setAuthUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getApiToken()));

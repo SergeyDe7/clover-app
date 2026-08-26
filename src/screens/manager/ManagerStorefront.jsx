@@ -657,7 +657,7 @@ export function ManagerStorefront({
         <div className="storefront-hero-slide-list">
           {cloneHeroSlides(draft.storefrontHeroSlides).map((slide, index) => (
             <div key={`${slide.src}-${index}`} className="storefront-hero-slide-row">
-              <img src={slide.src} alt="" />
+              <img src={slide.src} alt="" loading="lazy" />
               <div className="storefront-hero-slide-fields">
                 <input
                   value={slide.alt || ""}
@@ -889,6 +889,7 @@ export function ManagerStorefront({
                 <img
                   src={draft.storefrontContactMapImageUrl}
                   alt="Карта"
+                  loading="lazy"
                   style={{ maxWidth: 320, borderRadius: 12 }}
                 />
               </p>

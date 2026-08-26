@@ -2,6 +2,10 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { StoreHeader } from "./components/StoreHeader.jsx";
 import { parseStorefrontRoute } from "./mode.js";
 import { HomePage } from "./pages/HomePage.jsx";
+import {
+  applyStorefrontDocumentMeta,
+  storefrontRouteDocumentMeta,
+} from "./seo.js";
 import "./storefront.css";
 
 const CatalogPage = lazy(() =>
@@ -59,6 +63,11 @@ export default function StorefrontApp() {
       document.body.classList.remove("sf-catalog-lock");
     };
   }, [route.name]);
+
+  useEffect(() => {
+    if (route.name === "product") return;
+    applyStorefrontDocumentMeta(storefrontRouteDocumentMeta(route));
+  }, [route]);
 
   let page;
   let current = "home";

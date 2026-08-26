@@ -61,12 +61,15 @@ function cloverPreviewCacheHeaders() {
         if (
           url === "/" ||
           url === "/index.html" ||
-          url === "/sw.js" ||
-          url === "/manifest.webmanifest"
+          url === "/sw.js"
         ) {
           res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
           res.setHeader("Pragma", "no-cache");
           res.setHeader("Expires", "0");
+        } else if (url === "/manifest.webmanifest") {
+          res.setHeader("Cache-Control", "public, max-age=3600, must-revalidate");
+        } else if (url === "/robots.txt" || url === "/sitemap.xml") {
+          res.setHeader("Cache-Control", "public, max-age=86400");
         } else if (url.startsWith("/assets/") || url.startsWith("/fonts/")) {
           res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
         }

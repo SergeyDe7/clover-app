@@ -3,6 +3,8 @@ import { storefrontApi } from "../publicApi.js";
 import { addToCart, snapCartQty } from "../cartStorage.js";
 import { formatMoney, navigateStorefront } from "../components/StoreHeader.jsx";
 import { getUnitOrderStep } from "../../../shared/appHelpers.js";
+import { applyStorefrontDocumentMeta } from "../seo.js";
+import { storefrontHref } from "../mode.js";
 
 const UNIT_LABEL = {
   piece: "шт",
@@ -42,6 +44,18 @@ export function ProductPage({ code }) {
       cancelled = true;
     };
   }, [code]);
+
+  useEffect(() => {
+    if (!product) return;
+    const summary = String(product.description || product.shortDescription || "").trim();
+    applyStorefrontDocumentMeta({
+      title: `${product.name} | КЛЕВЕР`,
+      description: summary.slice(0, 160) || `Купить «${product.name}» в каталоге компании КЛЕВЕР.`,
+      path: storefrontHref({ name: "product", code: product.code || code }),
+      image: product.imageUrl || undefined,
+      type: "product",
+    });
+  }, [product, code]);
 
   const units = useMemo(
     () => (Array.isArray(product?.saleUnits) ? product.saleUnits : ["piece"]),
