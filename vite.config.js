@@ -67,7 +67,7 @@ function cloverPreviewCacheHeaders() {
           res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
           res.setHeader("Pragma", "no-cache");
           res.setHeader("Expires", "0");
-        } else if (url.startsWith("/assets/")) {
+        } else if (url.startsWith("/assets/") || url.startsWith("/fonts/")) {
           res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
         }
         next();
@@ -120,6 +120,20 @@ function noAssetSpaFallback() {
 
 export default defineConfig({
   plugins: [react(), cloverUiBuildTag(), noAssetSpaFallback(), cloverPreviewCacheHeaders()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("react-dom") || id.includes("/react/") || id.includes("\\react\\")) {
+            return "vendor-react";
+          }
+          if (id.includes("xlsx")) return "vendor-xlsx";
+          return "vendor";
+        },
+      },
+    },
+  },
   server: {
     host: "0.0.0.0",
     port: 5273,

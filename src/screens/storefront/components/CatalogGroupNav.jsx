@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { GroupIcon } from "./GroupIcon.jsx";
 import { buildGroupNav, canonicalizeProductSubcategory } from "../productGroups.js";
 import { navigateStorefront } from "./StoreHeader.jsx";
 
@@ -24,8 +23,8 @@ function NavChevron() {
 }
 
 /**
- * Боковое меню: группы → подгруппы.
- * Третье древо (facets) показывается на странице после выбора подгруппы.
+ * Боковое меню категорий — как в ЛК «Добавить товары из каталога»:
+ * кнопки category-button + стрелка для подкатегорий.
  */
 export function CatalogGroupNav({
   categories = [],
@@ -46,10 +45,26 @@ export function CatalogGroupNav({
   };
 
   const goAll = () => navigateStorefront({ name: "catalog" });
-  const goGroup = (name) =>
+  const goGroup = (name) => {
     navigateStorefront({ name: "catalog", category: name });
-  const goSub = (category, subcategory) =>
+    if (groups.find((g) => g.name === name)?.children?.length) {
+      setOpenParents((prev) => {
+        const next = new Set(prev);
+        // Клик по названию и раскрывает, и сворачивает.
+        if (next.has(name)) next.delete(name);
+        else next.add(name);
+        return next;
+      });
+    }
+  };
+  const goSub = (category, subcategory) => {
     navigateStorefront({ name: "catalog", category, subcategory });
+    setOpenParents((prev) => {
+      const next = new Set(prev);
+      next.add(category);
+      return next;
+    });
+  };
 
   return (
     <nav
@@ -58,15 +73,14 @@ export function CatalogGroupNav({
     >
       <button
         type="button"
-        className={`sf-group-nav-item${!activeCategory ? " is-active" : ""}`}
+        className={`sf-cat-btn${!activeCategory ? " is-active" : ""}`}
         onClick={goAll}
       >
-        <span className="sf-group-nav-label">Все группы</span>
+        Все
       </button>
 
       {groups.map((group) => {
         const hasChildren = group.children.length > 0;
-        // Только openParents — иначе при активной группе стрелка не сворачивает.
         const isOpen = openParents.has(group.name);
         const isActive =
           activeCategory === group.name && !activeSubcategory;
@@ -76,20 +90,10 @@ export function CatalogGroupNav({
             <div className="sf-group-nav-row">
               <button
                 type="button"
-                className={`sf-group-nav-item${isActive ? " is-active" : ""}`}
-                onClick={() => {
-                  goGroup(group.name);
-                  if (hasChildren) {
-                    setOpenParents((prev) => {
-                      const next = new Set(prev);
-                      next.delete(group.name);
-                      return next;
-                    });
-                  }
-                }}
+                className={`sf-cat-btn${isActive ? " is-active" : ""}`}
+                onClick={() => goGroup(group.name)}
               >
-                <GroupIcon name={group.icon} className="sf-group-nav-icon" />
-                <span className="sf-group-nav-label">{group.name}</span>
+                {group.name}
               </button>
               {hasChildren ? (
                 <button
@@ -98,8 +102,8 @@ export function CatalogGroupNav({
                   aria-expanded={isOpen}
                   aria-label={
                     isOpen
-                      ? `Скрыть подгруппы: ${group.name}`
-                      : `Показать подгруппы: ${group.name}`
+                      ? `Скрыть подкатегории: ${group.name}`
+                      : `Показать подкатегории: ${group.name}`
                   }
                   onClick={(event) => {
                     event.preventDefault();
@@ -109,12 +113,7 @@ export function CatalogGroupNav({
                 >
                   <NavChevron />
                 </button>
-              ) : (
-                <span
-                  className="sf-group-nav-toggle is-placeholder"
-                  aria-hidden="true"
-                />
-              )}
+              ) : null}
             </div>
             {hasChildren && isOpen ? (
               <div className="sf-group-nav-children">
@@ -122,7 +121,7 @@ export function CatalogGroupNav({
                   <button
                     key={child.name}
                     type="button"
-                    className={`sf-group-nav-item is-child${
+                    className={`sf-cat-btn is-child${
                       activeCategory === group.name &&
                       canonicalizeProductSubcategory(activeSubcategory) ===
                         child.name
@@ -131,7 +130,7 @@ export function CatalogGroupNav({
                     }`}
                     onClick={() => goSub(group.name, child.name)}
                   >
-                    <span className="sf-group-nav-label">{child.name}</span>
+                    {child.name}
                   </button>
                 ))}
               </div>

@@ -37,6 +37,7 @@ import {
   categoryMatchesFilter,
   subcategoryMatchesFilter,
   facetMatchesFilter,
+  sortCloverProductGroups,
 } from "../../src/screens/storefront/productGroups.js";
 import {
   matchesCatalogPrefixSearch,
@@ -513,24 +514,6 @@ function listStorefrontProducts(storeSettings) {
 
 /** Группы витрины — как Opticom, канон из productGroups.js. */
 const CLOVER_PRODUCT_GROUPS = STOREFRONT_PRODUCT_GROUPS;
-
-function sortCloverProductGroups(names) {
-  const order = new Map(CLOVER_PRODUCT_GROUPS.map((name, index) => [name, index]));
-  return [
-    ...new Set(
-      names
-        .map((name) => canonicalizeProductCategory(name))
-        .filter(Boolean)
-    ),
-  ].sort((a, b) => {
-    if (a === "Прочее") return 1;
-    if (b === "Прочее") return -1;
-    const ai = order.has(a) ? order.get(a) : 1000;
-    const bi = order.has(b) ? order.get(b) : 1000;
-    if (ai !== bi) return ai - bi;
-    return a.localeCompare(b, "ru");
-  });
-}
 
 function buildCategories(products) {
   const counts = new Map();

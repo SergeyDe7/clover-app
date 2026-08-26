@@ -511,12 +511,25 @@ export function matchesCatalogPrefixSearch(haystack, needle) {
   if (compact) words.push(compact);
   if (!words.length) return false;
   const wordsLat = words.map((word) => translitRuToLat(word)).filter(Boolean);
-  const hayDigits = String(haystack || "").replace(/\D/g, "");
+  // Цифровые «слова» артикула/кода (не склейка всего haystack — иначе 1234 бьёт середины чужих кодов).
+  const digitWords = words.filter((word) => /^\d+$/.test(word));
   return tokens.every((token) => {
-    if (words.some((word) => word.startsWith(token))) return true;
+    // Короткие чисто цифровые запросы не фильтруют: иначе на 3-й цифре
+    // startsWith внезапно сужает сетку и страница «прыгает».
+    if (/^\d+$/.test(token) && token.length < 4) return true;
+    if (!/^\d+$/.test(token) && words.some((word) => word.startsWith(token))) {
+      return true;
+    }
+    if (/^\d+$/.test(token) && words.some((word) => !/^\d+$/.test(word) && word.startsWith(token))) {
+      return true;
+    }
     const tokenLat = translitRuToLat(token);
     if (tokenLat && wordsLat.some((word) => word.startsWith(tokenLat))) return true;
-    if (/^\d{4,}$/.test(token) && hayDigits.includes(token)) return true;
+    if (/^\d{4,}$/.test(token)) {
+      return digitWords.some(
+        (word) => word === token || word.endsWith(token) || word.startsWith(token)
+      );
+    }
     return false;
   });
 }
@@ -3920,22 +3933,25 @@ html.clover-thankyou-open .app-top-chrome {
     --catalog-order-mobile-chrome-h: 112px;
   }
   .embedded-catalog.client-order-catalog .client-order-catalog-toolbar {
-    position: fixed;
+    position: sticky;
     top: var(--clover-chrome-offset, 56px);
-    left: 0;
-    right: 0;
-    z-index: 95;
-    margin: 0;
-    padding: 8px 12px;
+    left: auto;
+    right: auto;
+    width: 100%;
+    max-width: 100%;
+    z-index: 40;
+    margin: 0 0 12px;
+    padding: 8px 12px 12px;
     background: #f4f8f2;
-    border-bottom: 1px solid rgba(40, 60, 40, 0.1);
+    border: none;
+    border-radius: 0;
     box-shadow: 0 4px 14px rgba(40, 60, 40, 0.06);
     box-sizing: border-box;
+    isolation: isolate;
   }
   .embedded-catalog.client-order-catalog .client-order-catalog-toolbar-spacer {
-    display: block;
-    height: var(--catalog-order-mobile-chrome-h, 112px);
-    pointer-events: none;
+    display: none;
+    height: 0;
   }
   .embedded-catalog.client-order-catalog .category-list {
     flex-wrap: nowrap;

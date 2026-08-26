@@ -192,17 +192,16 @@ async function main() {
       hits.some((p) => String(p.subcategory || "").trim()),
       "hits include subcategory products"
     );
-    // UI contract: at parent-only + query → show "Найдено", not hide matches
-    const atParentOnly = true;
-    const hasQuery = true;
-    const sections =
-      atParentOnly && hasQuery && hits.length
-        ? [{ name: "Найдено", products: hits }]
-        : [];
-    assert.equal(sections[0]?.name, "Найдено");
+    // UI: parent category shows all products (including subcategories), no hide-until-subgroup
+    const parentProducts = withoutQ.json.products || [];
+    assert.ok(parentProducts.length > 0, "parent category returns products without subcategory");
+    assert.ok(
+      parentProducts.some((p) => String(p.subcategory || "").trim()),
+      "parent listing includes subcategory SKUs"
+    );
     ok(
       "6/parent search",
-      `${parent} q="${q}" → ${hits.length} (parent without q: ${(withoutQ.json.products || []).length}); Контейнеры hierarchy exists, no SKUs on DC`
+      `${parent} q="${q}" → ${hits.length} (parent without q: ${parentProducts.length}); Контейнеры hierarchy exists, no SKUs on DC`
     );
   }
 

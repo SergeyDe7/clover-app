@@ -13,18 +13,10 @@
     <meta name="apple-mobile-web-app-title" content="Clover" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <!-- Шрифты не блокируют первый кадр: media=print + onload -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap"
-      rel="stylesheet"
-      media="print"
-      onload="this.media='all'"
-    />
-    <noscript>
-      <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
-    </noscript>
+    <!-- Self-hosted Manrope (без Google Fonts) -->
+    <link rel="preload" href="/fonts/manrope-cyrillic-700-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/manrope-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/fonts/manrope.css" />
     <title>Clover</title>
     <meta name="clover-ui-build" content="%CLOVER_UI_BUILD%" />
     <script>

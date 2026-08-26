@@ -545,7 +545,7 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
           </label>
           )}
           <div className="product-manager-thumb">
-            {product.imageUrl ? <img src={productImageSrc(product)} alt={product.name} /> : <span>Нет фото</span>}
+            {product.imageUrl ? <img src={productImageSrc(product)} alt={product.name} loading="lazy" /> : <span>Нет фото</span>}
           </div>
           <div className="product-manager-info">
             <h3>{product.name}</h3>

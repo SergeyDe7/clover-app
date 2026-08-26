@@ -12,15 +12,21 @@ MAIN_JS="$(grep -o 'src="/assets/index-[^"]*\.js"' dist/index.html | head -1 || 
 echo "UI build tag: ${BUILD_TAG:-unknown}"
 echo "UI bundle: ${MAIN_JS:-unknown}"
 
-echo "Stopping listeners on 4100/5273..."
+echo "Stopping API/UI processes (all duplicates, not only port holders)..."
+# Старые npm/vite часто остаются без порта — из‑за них «не применилось».
+pkill -f '/opt/clover/clover-app/server/src/server.js' 2>/dev/null || true
+pkill -f 'vite preview --host 0.0.0.0 --port 5273' 2>/dev/null || true
+pkill -f 'npm run preview -- --host 0.0.0.0 --port 5273' 2>/dev/null || true
+sleep 1
 for port in 4100 5273; do
   pids="$(ss -tlnp "sport = :$port" 2>/dev/null | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u || true)"
   for pid in $pids; do
-    echo "kill $pid (port $port)"
-    kill "$pid" 2>/dev/null || true
+    echo "kill -9 $pid (port $port)"
+    kill -9 "$pid" 2>/dev/null || true
   done
 done
-sleep 2
+sleep 1
+ss -tlnp | grep -E ':4100|:5273' && echo "WARN: ports still busy" >&2 || echo "ports free"
 
 start_manual() {
   echo "Starting API/UI manually..."

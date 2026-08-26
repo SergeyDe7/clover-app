@@ -1,13 +1,24 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { StoreHeader } from "./components/StoreHeader.jsx";
 import { parseStorefrontRoute } from "./mode.js";
 import { HomePage } from "./pages/HomePage.jsx";
-import { CatalogPage } from "./pages/CatalogPage.jsx";
-import { ProductPage } from "./pages/ProductPage.jsx";
-import { CartPage } from "./pages/CartPage.jsx";
-import { CheckoutPage } from "./pages/CheckoutPage.jsx";
-import { ContactsPage } from "./pages/ContactsPage.jsx";
 import "./storefront.css";
+
+const CatalogPage = lazy(() =>
+  import("./pages/CatalogPage.jsx").then((m) => ({ default: m.CatalogPage }))
+);
+const ProductPage = lazy(() =>
+  import("./pages/ProductPage.jsx").then((m) => ({ default: m.ProductPage }))
+);
+const CartPage = lazy(() =>
+  import("./pages/CartPage.jsx").then((m) => ({ default: m.CartPage }))
+);
+const CheckoutPage = lazy(() =>
+  import("./pages/CheckoutPage.jsx").then((m) => ({ default: m.CheckoutPage }))
+);
+const ContactsPage = lazy(() =>
+  import("./pages/ContactsPage.jsx").then((m) => ({ default: m.ContactsPage }))
+);
 
 export default function StorefrontApp() {
   const [route, setRoute] = useState(() =>
@@ -79,7 +90,9 @@ export default function StorefrontApp() {
   return (
     <div className={`sf-app${route.name === "catalog" ? " is-catalog" : ""}`}>
       <StoreHeader current={current} />
-      <main className="sf-main">{page}</main>
+      <main className="sf-main">
+        <Suspense fallback={null}>{page}</Suspense>
+      </main>
     </div>
   );
 }

@@ -86,7 +86,7 @@ export function ProductPage({ code }) {
       <div className="sf-product-layout">
         <div className="sf-product-gallery">
           {product.imageUrl ? (
-            <img src={product.imageUrl} alt={product.name} />
+            <img src={product.imageUrl} alt={product.name} loading="lazy" />
           ) : (
             <div className="sf-product-placeholder is-large" />
           )}

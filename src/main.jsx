@@ -1,23 +1,27 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import './styles/clover-theme.css'
-import App from './App.jsx'
-import { AppModalHost } from './shared/AppModal.jsx'
-import StorefrontApp from './screens/storefront/StorefrontApp.jsx'
-import { shouldRenderStorefront } from './screens/storefront/mode.js'
+import { StrictMode, Suspense, lazy } from "react";
+import { createRoot } from "react-dom/client";
+import "./index.css";
+import "./styles/clover-theme.css";
+import { AppModalHost } from "./shared/AppModal.jsx";
+import { shouldRenderStorefront } from "./screens/storefront/mode.js";
+
+// Витрина и ЛК — разные чанки: на витрине не тянем админку/клиентский кабинет.
+const StorefrontApp = lazy(() => import("./screens/storefront/StorefrontApp.jsx"));
+const App = lazy(() => import("./App.jsx"));
 
 // Витрина: хост витрины (/) или превью /vitrina. ЛК: /lk (и localhost без store-хоста).
-const storefront = shouldRenderStorefront()
+const storefront = shouldRenderStorefront();
 
-createRoot(document.getElementById('root')).render(
+createRoot(document.getElementById("root")).render(
   <StrictMode>
     <>
       {!storefront ? <AppModalHost /> : null}
-      {storefront ? <StorefrontApp /> : <App />}
+      <Suspense fallback={null}>
+        {storefront ? <StorefrontApp /> : <App />}
+      </Suspense>
     </>
-  </StrictMode>,
-)
+  </StrictMode>
+);
 
 const CLOVER_UI_BUILD =
   document.querySelector('meta[name="clover-ui-build"]')?.getAttribute("content")?.trim() ||

@@ -1,5 +1,6 @@
 // Панель персональной матрицы товаров клиента.
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   UNIT_CONFIG,
   formatMoney,
@@ -12,6 +13,7 @@ import {
 } from "../../shared/appHelpers";
 import { productImageSrc } from "../../shared/productPhoto";
 import { CatalogSearchInput } from "./CatalogSearchInput";
+import { useFixedChromeHeight } from "./useMobileFixedChromeHeight";
 
 export function ClientMatrixPanel({
   products = [],
@@ -25,6 +27,19 @@ export function ClientMatrixPanel({
   const [category, setCategory] = useState("Все");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [units, setUnits] = useState({});
+  const panelRef = useRef(null);
+  const stickyChromeRef = useRef(null);
+  const portalHost =
+    typeof document !== "undefined"
+      ? document.querySelector("main.clover-app") || document.body
+      : null;
+
+  useFixedChromeHeight(
+    stickyChromeRef,
+    panelRef,
+    "--matrix-chrome-h",
+    Boolean(portalHost)
+  );
 
   const activeProducts = useMemo(
     () => (Array.isArray(products) ? products : []).filter((item) => item.active !== false),
@@ -50,33 +65,10 @@ export function ClientMatrixPanel({
     });
   }, [activeProducts, search, activeCategory, favoritesOnly, favorites]);
 
-  return (
-    <section className="panel client-matrix-panel">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">Персональный каталог</p>
-          <h2>Матрица товаров</h2>
-          <p>Товары, закреплённые за вами менеджером. Категории — как при оформлении заказа.</p>
-        </div>
-        <button className="primary-button" type="button" onClick={onCreateOrder}>
-          + Новый заказ
-        </button>
-      </div>
+  const showToolbar = catalogPolicy?.matrixMode !== "pending";
 
-      {catalogPolicy?.matrixMode === "pending" ? (
-        <div className="matrix-catalog-note pending">
-          <strong>Матрица ещё готовится</strong>
-          <br />
-          Менеджер закрепит постоянные товары и цены. Пока список может быть пустым.
-        </div>
-      ) : (
-        <p className="client-matrix-meta">
-          В матрице: <strong>{activeProducts.length}</strong> поз.
-          {activeCategory !== "Все" ? ` · категория «${activeCategory}»: ${filtered.length}` : ""}
-        </p>
-      )}
-
-      {catalogPolicy?.matrixMode !== "pending" && (
+  const toolbar = showToolbar ? (
+    <div className="client-matrix-sticky-chrome" ref={stickyChromeRef}>
       <div className="client-matrix-toolbar">
         <div className="catalog-filter-row">
           <CatalogSearchInput
@@ -106,7 +98,41 @@ export function ClientMatrixPanel({
           ))}
         </div>
       </div>
+    </div>
+  ) : null;
+
+  return (
+    <section className="panel client-matrix-panel" ref={panelRef}>
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Персональный каталог</p>
+          <h2>Матрица товаров</h2>
+          <p>Товары, закреплённые за вами менеджером. Категории — как при оформлении заказа.</p>
+        </div>
+        <button className="primary-button" type="button" onClick={onCreateOrder}>
+          + Новый заказ
+        </button>
+      </div>
+
+      {catalogPolicy?.matrixMode === "pending" ? (
+        <div className="matrix-catalog-note pending">
+          <strong>Матрица ещё готовится</strong>
+          <br />
+          Менеджер закрепит постоянные товары и цены. Пока список может быть пустым.
+        </div>
+      ) : (
+        <p className="client-matrix-meta">
+          В матрице: <strong>{activeProducts.length}</strong> поз.
+          {activeCategory !== "Все" ? ` · категория «${activeCategory}»: ${filtered.length}` : ""}
+        </p>
       )}
+
+      {showToolbar ? (
+        <>
+          {portalHost ? createPortal(toolbar, portalHost) : null}
+          <div className="client-matrix-sticky-chrome-spacer" aria-hidden="true" />
+        </>
+      ) : null}
 
       <section className="product-grid client-matrix-grid">
         {filtered.map((product) => {
@@ -150,7 +176,7 @@ export function ClientMatrixPanel({
               </div>
               <div className="product-image-wrap">
                 {product.imageUrl ? (
-                  <img className="product-image" src={productImageSrc(product)} alt={product.name} />
+                  <img className="product-image" src={productImageSrc(product)} alt={product.name} loading="lazy" />
                 ) : (
                   <span className="product-image-placeholder">Нет фото</span>
                 )}

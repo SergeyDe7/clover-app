@@ -30,7 +30,6 @@ import { productImageSrc } from "../../shared/productPhoto";
 import { ManagerContact } from "./ManagerContact";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
 import { CatalogSearchInput } from "./CatalogSearchInput";
-import { useMobileFixedChromeHeight } from "./useMobileFixedChromeHeight";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
 
@@ -134,14 +133,7 @@ export function OrderEditor({
   const [missingFields, setMissingFields] = useState({ date: false, address: false });
   const cartDateFieldRef = useRef(null);
   const cartAddressFieldRef = useRef(null);
-  const catalogToolbarRef = useRef(null);
   const earliestDeliveryDate = getEarliestDeliveryDateIso();
-
-  useMobileFixedChromeHeight(
-    catalogToolbarRef,
-    embedded ? ".embedded-catalog" : null,
-    "--catalog-order-mobile-chrome-h"
-  );
 
   // Один адрес в списке — всегда подставляем автоматически.
   useEffect(() => {
@@ -524,7 +516,9 @@ export function OrderEditor({
   };
 
   const catalogBody = (
-      <section className={embedded ? "catalog-content embedded-catalog client-order-catalog" : "catalog-content"}>
+      <section
+        className={embedded ? "catalog-content embedded-catalog client-order-catalog" : "catalog-content"}
+      >
         <div className="catalog-layout">
           <aside className="order-summary" id="order-summary">
             <h2>Корзина</h2>
@@ -571,28 +565,32 @@ export function OrderEditor({
           </aside>
 
           <div className="catalog-main">
-            <div className="page-title-row">
-              <div>
-                <h1>
-                  {session.mode === "edit"
-                    ? "Редактирование заказа"
-                    : session.mode === "repeat"
-                      ? "Повтор заказа"
-                      : "Новый заказ"}
-                </h1>
+            {/* В embedded заголовок убираем — toolbar sticky занимает верх колонки. */}
+            {!embedded ? (
+              <div className="page-title-row">
+                <div>
+                  <h1>
+                    {session.mode === "edit"
+                      ? "Редактирование заказа"
+                      : session.mode === "repeat"
+                        ? "Повтор заказа"
+                        : "Новый заказ"}
+                  </h1>
+                </div>
+                <div className="mini-card">
+                  <span className="mini-label">Позиций</span>
+                  <strong>{cartCount}</strong>
+                </div>
               </div>
-              <div className="mini-card"><span className="mini-label">Позиций</span><strong>{cartCount}</strong></div>
-            </div>
+            ) : null}
 
-            {catalogPolicy.matrixMode === "pending" && (
-              <div className="matrix-catalog-note pending">
-                В матрице пока нет закреплённых товаров. Добавьте позиции
-                через «Добавить товары из каталога» — они сохранятся
-                автоматически. Заказ оформляется из этой матрицы.
-              </div>
-            )}
-
-            <div className="catalog-toolbar client-order-catalog-toolbar" ref={catalogToolbarRef}>
+            <div
+              className={
+                embedded
+                  ? "catalog-toolbar client-order-catalog-toolbar"
+                  : "catalog-toolbar"
+              }
+            >
               <div className="catalog-filter-row">
                 <CatalogSearchInput
                   value={search}
@@ -641,15 +639,35 @@ export function OrderEditor({
                       <span className="view-toggle-label">Список</span>
                     </button>
                   </div>
+                  {embedded ? (
+                    <div className="mini-card client-order-positions-chip">
+                      <span className="mini-label">Позиций</span>
+                      <strong>{cartCount}</strong>
+                    </div>
+                  ) : null}
                 </div>
               </div>
               <div className="category-list">
-                {categories.map((item) => <button className={category === item ? "category-button active" : "category-button"} type="button" key={item} onClick={() => setCategory(item)}>{item}</button>)}
+                {categories.map((item) => (
+                  <button
+                    className={category === item ? "category-button active" : "category-button"}
+                    type="button"
+                    key={item}
+                    onClick={() => setCategory(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
               </div>
             </div>
-            {embedded ? (
-              <div className="client-order-catalog-toolbar-spacer" aria-hidden="true" />
-            ) : null}
+
+            {catalogPolicy.matrixMode === "pending" && (
+              <div className="matrix-catalog-note pending">
+                В матрице пока нет закреплённых товаров. Добавьте позиции
+                через «Добавить товары из каталога» — они сохранятся
+                автоматически. Заказ оформляется из этой матрицы.
+              </div>
+            )}
 
             <section className={catalogView === "list" ? "product-grid product-grid-list" : "product-grid"}>
               {filtered.map((product) => {
@@ -690,7 +708,7 @@ export function OrderEditor({
                     {!isList && (
                       <div className="product-image-wrap">
                         {product.imageUrl ? (
-                          <img className="product-image" src={productImageSrc(product)} alt={product.name} />
+                          <img className="product-image" src={productImageSrc(product)} alt={product.name} loading="lazy" />
                         ) : (
                           <span className="product-image-placeholder">Фото товара пока не загружено</span>
                         )}
