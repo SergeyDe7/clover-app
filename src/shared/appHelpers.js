@@ -3944,7 +3944,7 @@ html.clover-thankyou-open .app-top-chrome {
     padding: 8px 12px 12px;
     background: #f4f8f2;
     border: none;
-    border-radius: 0;
+    border-radius: 0 0 16px 16px;
     box-shadow: 0 4px 14px rgba(40, 60, 40, 0.06);
     box-sizing: border-box;
     isolation: isolate;
