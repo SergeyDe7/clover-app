@@ -33,6 +33,31 @@ import { CatalogSearchInput } from "./CatalogSearchInput";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
 
+function CatalogViewToggleIcon({ variant }) {
+  if (variant === "list") {
+    return (
+      <span className="view-toggle-icon" aria-hidden="true">
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <rect x="2" y="3.5" width="12" height="1.75" rx="0.875" fill="currentColor" />
+          <rect x="2" y="7.125" width="12" height="1.75" rx="0.875" fill="currentColor" />
+          <rect x="2" y="10.75" width="12" height="1.75" rx="0.875" fill="currentColor" />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <span className="view-toggle-icon" aria-hidden="true">
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <rect x="1.5" y="1.5" width="5.75" height="5.75" rx="1.25" fill="currentColor" />
+        <rect x="8.75" y="1.5" width="5.75" height="5.75" rx="1.25" fill="currentColor" />
+        <rect x="1.5" y="8.75" width="5.75" height="5.75" rx="1.25" fill="currentColor" />
+        <rect x="8.75" y="8.75" width="5.75" height="5.75" rx="1.25" fill="currentColor" />
+      </svg>
+    </span>
+  );
+}
+
 function capitalizeRu(value) {
   if (!value) return "";
   return value.charAt(0).toUpperCase() + value.slice(1);
@@ -621,7 +646,7 @@ export function OrderEditor({
                         safeWrite(STORAGE.catalogView, "cards");
                       }}
                     >
-                      <span className="view-toggle-icon" aria-hidden="true">▦</span>
+                      <CatalogViewToggleIcon variant="cards" />
                       <span className="view-toggle-label">Фото</span>
                     </button>
                     <button
@@ -635,7 +660,7 @@ export function OrderEditor({
                         safeWrite(STORAGE.catalogView, "list");
                       }}
                     >
-                      <span className="view-toggle-icon" aria-hidden="true">☰</span>
+                      <CatalogViewToggleIcon variant="list" />
                       <span className="view-toggle-label">Список</span>
                     </button>
                   </div>

@@ -180,8 +180,7 @@ export function ClientCatalogAddPanel({
               {groups.map((group) => {
                 const hasChildren = group.children.length > 0;
                 const isOpen = openParents.has(group.name);
-                const isActiveParent =
-                  activeCategory === group.name && !activeSubcategory;
+                const isActiveParent = activeCategory === group.name;
 
                 return (
                   <div key={group.name} className="client-catalog-add-cat-block">

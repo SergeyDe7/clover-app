@@ -4,6 +4,8 @@ server {
 #    listen [::]:443 ssl;
     server_name clover-spb.ru www.clover-spb.ru;
 
+    client_max_body_size 16m;
+
     # Пути к SSL-сертификатам (замените заглушки на актуальные пути)
     ssl_certificate /dehydrated/certs/clover-spb.ru/fullchain.pem;
     ssl_certificate_key /dehydrated/certs/clover-spb.ru/privkey.pem;

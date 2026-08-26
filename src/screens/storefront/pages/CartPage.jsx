@@ -4,10 +4,10 @@ import {
   clearCart,
   getCartItems,
   removeFromCart,
-  setCartQty,
   subscribeCart,
 } from "../cartStorage.js";
 import { formatMoney, navigateStorefront } from "../components/StoreHeader.jsx";
+import { StorefrontCartQtyControl } from "../components/StorefrontQtyControl.jsx";
 
 export function CartPage() {
   const [items, setItems] = useState(getCartItems);
@@ -57,34 +57,25 @@ export function CartPage() {
               <p className="sf-muted">
                 Арт. {item.code} · {item.unitLabel || item.unit}
               </p>
-              <p>{formatMoney(item.price)}</p>
             </div>
+            <div className="sf-cart-unit-price">{formatMoney(item.price)}</div>
             <div className="sf-cart-qty">
-              <input
-                className="sf-input"
-                type="number"
-                min={Math.max(1, Number(item.orderStep) || 1)}
-                step={Math.max(1, Number(item.orderStep) || 1)}
-                value={item.qty}
-                onChange={(e) =>
-                  setCartQty(
-                    item.productId,
-                    item.unit,
-                    Math.floor(Number(e.target.value) || 0)
-                  )
-                }
-              />
-              <button
-                type="button"
-                className="sf-btn sf-btn-ghost sf-btn-sm"
-                onClick={() => removeFromCart(item.productId, item.unit)}
-              >
-                Удалить
-              </button>
+              <StorefrontCartQtyControl item={item} />
             </div>
             <strong className="sf-cart-line-total">
               {formatMoney((Number(item.price) || 0) * (Number(item.qty) || 0))}
             </strong>
+            <button
+              type="button"
+              className="sf-cart-remove sf-btn sf-btn-ghost sf-btn-sm"
+              aria-label={`Удалить ${item.name}`}
+              onClick={() => removeFromCart(item.productId, item.unit)}
+            >
+              <span className="sf-cart-remove-label">Удалить</span>
+              <span className="sf-cart-remove-icon" aria-hidden="true">
+                ×
+              </span>
+            </button>
           </li>
         ))}
       </ul>

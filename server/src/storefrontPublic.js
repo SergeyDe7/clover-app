@@ -150,17 +150,29 @@ export function normalizeStorefrontHeroSlides(value) {
   const list = Array.isArray(value) ? value : [];
   const slides = [];
   const seen = new Set();
-  for (const item of list) {
+  const defaultsBySrc = new Map(
+    STOREFRONT_DEFAULT_HERO_SLIDES.map((slide) => [slide.src, slide])
+  );
+  for (const [index, item] of list.entries()) {
     const src = String(
       item && typeof item === "object" ? item.src : item || ""
     ).trim();
     if (!HERO_SLIDE_SRC_RE.test(src) || seen.has(src)) continue;
     seen.add(src);
+    const fallback = defaultsBySrc.get(src);
+    let href =
+      normalizeStorefrontHeroHref(item?.href) ||
+      normalizeStorefrontHeroHref(fallback?.href);
+    if (!href && index === 0) href = "/install-app";
     slides.push({
       src,
-      alt: String(item?.alt || "").trim().slice(0, 120),
-      href: normalizeStorefrontHeroHref(item?.href),
-      buttonLabel: normalizeStorefrontHeroButton(item?.buttonLabel),
+      alt: String(item?.alt || fallback?.alt || "").trim().slice(0, 120),
+      href,
+      buttonLabel: normalizeStorefrontHeroButton(
+        item?.buttonLabel !== undefined && item?.buttonLabel !== null
+          ? item.buttonLabel
+          : fallback?.buttonLabel
+      ),
     });
     if (slides.length >= STOREFRONT_MAX_HERO_SLIDES) break;
   }
@@ -211,7 +223,7 @@ export function normalizeStorefrontHeroHref(value) {
 
   if (raw.length > 400) return "";
   if (raw === "/") return "";
-  if (!/^\/(product|catalog|contacts|cart)(\/|$)/.test(raw)) return "";
+  if (!/^\/(product|catalog|contacts|cart|install-app)(\/|$)/.test(raw)) return "";
   if (raw.startsWith("/product/") && raw === "/product/") return "";
   return raw;
 }

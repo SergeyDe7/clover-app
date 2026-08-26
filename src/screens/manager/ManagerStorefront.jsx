@@ -31,6 +31,9 @@ function cloneHeroSlides(value) {
     .filter((slide) => slide.src);
 }
 
+const HERO_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const HERO_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
 function slidesKey(value) {
   return JSON.stringify(cloneHeroSlides(value));
 }
@@ -224,6 +227,42 @@ export function ManagerStorefront({
       next.splice(nextIndex, 0, item);
       return next;
     });
+  };
+
+  const uploadHeroSlideImage = (file, onUploaded) => {
+    if (!file) return;
+    if (!HERO_IMAGE_TYPES.has(file.type)) {
+      appAlert({
+        title: "Не удалось загрузить слайд",
+        message: "Разрешены только JPG, PNG и WebP.",
+        tone: "danger",
+      });
+      return;
+    }
+    if (file.size > HERO_IMAGE_MAX_BYTES) {
+      appAlert({
+        title: "Не удалось загрузить слайд",
+        message:
+          "Файл слишком большой (максимум 5 МБ). Сожмите изображение или сохраните как WebP.",
+        tone: "danger",
+      });
+      return;
+    }
+    setHeroBusy(true);
+    void api
+      .uploadStorefrontHeroImage(file)
+      .then((result) => {
+        const imageUrl = result.imageUrl || "";
+        if (imageUrl) onUploaded(imageUrl);
+      })
+      .catch((error) =>
+        appAlert({
+          title: "Не удалось загрузить слайд",
+          message: error.message || "Ошибка загрузки.",
+          tone: "danger",
+        })
+      )
+      .finally(() => setHeroBusy(false));
   };
 
   const onPriceTypeChange = (event) => {
@@ -674,7 +713,7 @@ export function ManagerStorefront({
                 />
                 <input
                   value={slide.href || ""}
-                  placeholder="Артикул или /product/…"
+                  placeholder="Ссылка: /install-app, артикул или /product/…"
                   onChange={(event) =>
                     updateHeroSlides((list) =>
                       list.map((item, itemIndex) =>
@@ -700,6 +739,34 @@ export function ManagerStorefront({
                 />
               </div>
               <div className="storefront-hero-slide-actions">
+                <label className="secondary-button">
+                  {heroBusy ? "Загрузка…" : "Заменить"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    hidden
+                    disabled={heroBusy}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      uploadHeroSlideImage(file, (imageUrl) =>
+                        updateHeroSlides((list) =>
+                          list.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? {
+                                  ...item,
+                                  src: imageUrl,
+                                  href:
+                                    item.href ||
+                                    (index === 0 ? "/install-app" : ""),
+                                }
+                              : item
+                          )
+                        )
+                      );
+                    }}
+                  />
+                </label>
                 <button
                   type="button"
                   className="secondary-button"
@@ -748,27 +815,16 @@ export function ManagerStorefront({
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 event.target.value = "";
-                if (!file) return;
-                setHeroBusy(true);
-                void api
-                  .uploadStorefrontHeroImage(file)
-                  .then((result) => {
-                    const imageUrl = result.imageUrl || "";
-                    if (!imageUrl) return;
-                    updateHeroSlides((list) => {
-                      if (list.length >= STOREFRONT_MAX_HERO_SLIDES) return list;
-                      if (list.some((item) => item.src === imageUrl)) return list;
-                      return [...list, { src: imageUrl, alt: "", href: "", buttonLabel: "" }];
-                    });
+                uploadHeroSlideImage(file, (imageUrl) =>
+                  updateHeroSlides((list) => {
+                    if (list.length >= STOREFRONT_MAX_HERO_SLIDES) return list;
+                    if (list.some((item) => item.src === imageUrl)) return list;
+                    return [
+                      ...list,
+                      { src: imageUrl, alt: "", href: "", buttonLabel: "" },
+                    ];
                   })
-                  .catch((error) =>
-                    appAlert({
-                      title: "Не удалось загрузить слайд",
-                      message: error.message || "Ошибка загрузки.",
-                      tone: "danger",
-                    })
-                  )
-                  .finally(() => setHeroBusy(false));
+                );
               }}
             />
           </label>

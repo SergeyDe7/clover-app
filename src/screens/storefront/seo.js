@@ -127,6 +127,14 @@ export function storefrontRouteDocumentMeta(route) {
       path: storefrontHref(route),
     };
   }
+  if (route.name === "install-app") {
+    return {
+      title: `Установка приложения | ${STOREFRONT_SITE_NAME}`,
+      description:
+        "Как установить мобильное приложение Clover на iPhone, Android и компьютер: пошаговая инструкция PWA.",
+      path: storefrontHref(route),
+    };
+  }
   return {
     title: STOREFRONT_DEFAULT_TITLE,
     description: STOREFRONT_DEFAULT_DESCRIPTION,

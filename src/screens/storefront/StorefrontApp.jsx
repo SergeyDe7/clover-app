@@ -23,6 +23,9 @@ const CheckoutPage = lazy(() =>
 const ContactsPage = lazy(() =>
   import("./pages/ContactsPage.jsx").then((m) => ({ default: m.ContactsPage }))
 );
+const InstallAppPage = lazy(() =>
+  import("./pages/InstallAppPage.jsx").then((m) => ({ default: m.InstallAppPage }))
+);
 
 export default function StorefrontApp() {
   const [route, setRoute] = useState(() =>
@@ -92,6 +95,9 @@ export default function StorefrontApp() {
   } else if (route.name === "contacts") {
     page = <ContactsPage />;
     current = "contacts";
+  } else if (route.name === "install-app") {
+    page = <InstallAppPage />;
+    current = "home";
   } else {
     page = <HomePage />;
   }

@@ -53,13 +53,23 @@ async function request(path, options = {}) {
     try {
       payload = JSON.parse(rawText);
     } catch {
-          const gatewayDown = response.status === 502 || response.status === 503 || response.status === 504;
+      const gatewayDown =
+        response.status === 502 ||
+        response.status === 503 ||
+        response.status === 504;
+      const tooLargeMessage = path.includes("/storefront/hero-image")
+        ? "Изображение слайда слишком большое. Максимум — 5 МБ. Сожмите файл или выберите JPG/WebP поменьше."
+        : path.includes("/storefront/map-image")
+          ? "Изображение карты слишком большое. Максимум — 5 МБ."
+          : path.includes("/products") && options.method === "PUT"
+            ? "Запрос слишком большой для сервера. Обновите страницу и сохраните товар ещё раз."
+            : "Запрос слишком большой для сервера. Уменьшите размер файла и попробуйте снова.";
       payload = {
         error: gatewayDown
           ? "Сервер API сейчас недоступен. Обновите страницу через минуту или обратитесь к менеджеру."
           : response.status === 413
-            ? "Запрос слишком большой для сервера. Обновите страницу и сохраните товар ещё раз."
-          : "Не удалось прочитать ответ сервера. Обновите страницу или войдите снова.",
+            ? tooLargeMessage
+            : "Не удалось прочитать ответ сервера. Обновите страницу или войдите снова.",
         raw: rawText.slice(0, 120),
       };
     }

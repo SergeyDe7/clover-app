@@ -1,22 +1,27 @@
+import { useEffect, useMemo, useState } from "react";
 import { formatMoney, navigateStorefront } from "./StoreHeader.jsx";
-import { addToCart } from "../cartStorage.js";
-import { getUnitOrderStep } from "../../../shared/appHelpers.js";
-
-const UNIT_LABEL = {
-  piece: "шт",
-  pair: "пара",
-  meter: "м",
-  roll: "рулон",
-  pack: "уп",
-  bundle: "пачка",
-  box: "кор",
-};
+import {
+  getUnitOrderStep,
+  orderedSaleUnits,
+} from "../../../shared/appHelpers.js";
+import { StorefrontQtyControl } from "./StorefrontQtyControl.jsx";
+import {
+  StorefrontUnitChoice,
+  storefrontUnitLabel,
+} from "./StorefrontUnitChoice.jsx";
 
 export function ProductCard({ product }) {
-  const units = Array.isArray(product.saleUnits) ? product.saleUnits : ["piece"];
-  const unit = units[0] || "piece";
+  const units = useMemo(() => orderedSaleUnits(product), [product]);
+  const [unit, setUnit] = useState(() => units[0] || "piece");
+
+  useEffect(() => {
+    setUnit(units[0] || "piece");
+  }, [product.id, units]);
+
   const price = Number(product.prices?.[unit]) || 0;
   const orderStep = getUnitOrderStep(product, unit);
+  const unitLabel = storefrontUnitLabel(unit);
+  const hasUnitChoice = units.length > 1;
 
   return (
     <article className="sf-product-card">
@@ -33,7 +38,9 @@ export function ProductCard({ product }) {
           <div className="sf-product-placeholder" aria-hidden="true" />
         )}
       </button>
-      <div className="sf-product-body">
+      <div
+        className={`sf-product-body${hasUnitChoice ? " has-units" : ""}`}
+      >
         <p className="sf-product-cat">{product.category}</p>
         <h3>
           <button
@@ -47,34 +54,35 @@ export function ProductCard({ product }) {
           </button>
         </h3>
         <p className="sf-product-code">Арт. {product.code}</p>
-        <div className="sf-product-row">
-          <strong className="sf-product-price">
-            {price > 0 ? formatMoney(price) : "Цена по запросу"}
-            {price > 0 ? (
-              <span className="sf-unit"> / {UNIT_LABEL[unit] || unit}</span>
-            ) : null}
-          </strong>
-          <button
-            type="button"
-            className="sf-btn sf-btn-primary sf-btn-sm"
-            onClick={() =>
-              addToCart(
-                {
-                  productId: product.id,
-                  code: product.code,
-                  name: product.name,
-                  unit,
-                  unitLabel: UNIT_LABEL[unit] || unit,
-                  price,
-                  imageUrl: product.imageUrl,
-                  orderStep,
-                },
-                orderStep
-              )
-            }
-          >
-            В корзину
-          </button>
+        {hasUnitChoice ? (
+          <div className="sf-product-units">
+            <StorefrontUnitChoice
+              compact
+              product={product}
+              unit={unit}
+              onChange={setUnit}
+            />
+          </div>
+        ) : null}
+        <strong className="sf-product-price">
+          {price > 0 ? formatMoney(price) : "Цена по запросу"}
+          {price > 0 ? (
+            <span className="sf-unit"> / {unitLabel}</span>
+          ) : null}
+        </strong>
+        <div className="sf-product-actions">
+          <StorefrontQtyControl
+            key={`${product.id}::${unit}`}
+            compact
+            productId={product.id}
+            code={product.code}
+            name={product.name}
+            unit={unit}
+            unitLabel={unitLabel}
+            price={price}
+            imageUrl={product.imageUrl}
+            orderStep={orderStep}
+          />
         </div>
       </div>
     </article>

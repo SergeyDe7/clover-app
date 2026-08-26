@@ -2108,7 +2108,7 @@ textarea { resize: vertical; }
 .catalog-view-toggle {
   display: inline-flex;
   flex-shrink: 0;
-  align-items: stretch;
+  align-items: center;
   align-self: center;
   gap: 0;
   height: 42px;
@@ -2124,7 +2124,7 @@ textarea { resize: vertical; }
   align-items: center;
   justify-content: center;
   gap: 5px;
-  height: 100%;
+  height: 42px;
   min-height: 42px;
   min-width: 42px;
   padding: 0 12px;
@@ -2147,9 +2147,15 @@ textarea { resize: vertical; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
-  line-height: 1;
-  opacity: .9;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  line-height: 0;
+}
+.catalog-view-toggle .view-toggle-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
 }
 .catalog-view-toggle .view-toggle-label { font-size: 12px; line-height: 1; }
 .catalog-search { width: 100%; padding: 12px 14px; border: 1px solid #e6eee3; border-radius: 12px; background: #fbfdfb; outline: none; box-sizing: border-box; -webkit-appearance: none; appearance: none; }
@@ -5071,11 +5077,13 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   }
   .catalog-view-toggle button {
     flex: 0 0 auto;
-    height: 100%;
+    height: 42px;
     min-height: 42px;
     min-width: 42px;
+    width: 42px;
     font-size: 13px;
     padding: 0;
+    gap: 0;
   }
   .catalog-view-toggle .view-toggle-label {
     display: none;

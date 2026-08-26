@@ -82,7 +82,7 @@ export function CatalogPage({
         <input
           className="sf-input sf-catalog-search"
           type="search"
-          placeholder="Поиск по названию или артикулу"
+          placeholder="Поиск в каталоге"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />

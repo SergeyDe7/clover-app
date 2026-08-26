@@ -3127,7 +3127,7 @@ body:has(.clover-app) {
 .clover-app .catalog-view-toggle {
   display: inline-flex !important;
   flex-shrink: 0 !important;
-  align-items: stretch !important;
+  align-items: center !important;
   align-self: center !important;
   height: 42px !important;
   min-height: 42px !important;
@@ -3143,7 +3143,7 @@ body:has(.clover-app) {
   align-items: center !important;
   justify-content: center !important;
   gap: 5px !important;
-  height: 100% !important;
+  height: 42px !important;
   min-height: 42px !important;
   min-width: 42px !important;
   padding: 0 12px !important;
@@ -3171,8 +3171,16 @@ body:has(.clover-app) {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  font-size: 15px !important;
-  line-height: 1 !important;
+  width: 18px !important;
+  height: 18px !important;
+  flex-shrink: 0 !important;
+  line-height: 0 !important;
+}
+
+.clover-app .catalog-view-toggle .view-toggle-icon svg {
+  display: block !important;
+  width: 16px !important;
+  height: 16px !important;
 }
 
 .clover-app .catalog-view-toggle .view-toggle-label {
@@ -3313,6 +3321,20 @@ body:has(.clover-app) {
   height: 36px !important;
   min-height: 36px !important;
   border-radius: 10px !important;
+}
+
+.client-order-catalog-toolbar .catalog-view-toggle button,
+.clover-app .client-order-catalog-toolbar .catalog-view-toggle button {
+  height: 36px !important;
+  min-height: 36px !important;
+  min-width: 36px !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+.client-order-catalog-toolbar .catalog-view-toggle .view-toggle-label,
+.clover-app .client-order-catalog-toolbar .catalog-view-toggle .view-toggle-label {
+  display: none !important;
 }
 
 .client-order-catalog-toolbar .category-list,
@@ -4645,15 +4667,23 @@ body:has(.clover-app) {
 
   .clover-app .catalog-view-toggle button {
     flex: 0 0 auto !important;
-    height: 100% !important;
+    height: 42px !important;
     min-height: 42px !important;
     min-width: 42px !important;
+    width: 42px !important;
     font-size: 13px !important;
     padding: 0 !important;
+    gap: 0 !important;
   }
 
   .clover-app .catalog-view-toggle .view-toggle-icon {
-    font-size: 16px !important;
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .clover-app .catalog-view-toggle .view-toggle-icon svg {
+    width: 16px !important;
+    height: 16px !important;
   }
 
   .clover-app .catalog-view-toggle .view-toggle-label {
