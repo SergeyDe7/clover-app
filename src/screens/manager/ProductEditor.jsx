@@ -516,7 +516,7 @@ export function ProductEditor({
         <section className="product-editor-photo">
           <div className="product-editor-photo-preview">
             {form.imageUrl ? (
-              <img src={productImageSrc(form)} alt={form.name || "Фото товара"} />
+              <img src={productImageSrc(form)} alt={form.name || "Фото товара"} loading="lazy" />
             ) : (
               <span>Нет фото</span>
             )}

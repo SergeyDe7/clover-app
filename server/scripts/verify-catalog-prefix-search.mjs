@@ -56,7 +56,37 @@ assert.equal(
     productCatalogSearchHaystack({ name: "Товар", oneCCode: "00001234" }),
     "123"
   ),
+  true
+);
+// 1–3 цифры ещё не сужают выдачу (без скачка вёрстки); с 4-й — только по артикулу
+assert.equal(
+  matchesCatalogPrefixSearch(
+    productCatalogSearchHaystack({ name: "Другой", oneCCode: "99999999" }),
+    "123"
+  ),
+  true
+);
+assert.equal(
+  matchesCatalogPrefixSearch(
+    productCatalogSearchHaystack({ name: "Другой", oneCCode: "99999999" }),
+    "1234"
+  ),
   false
+);
+// 4 цифры не должны бить «середину» чужого кода через склейку всех цифр haystack
+assert.equal(
+  matchesCatalogPrefixSearch(
+    productCatalogSearchHaystack({ name: "Товар 99", oneCCode: "НФ-00012345" }),
+    "1234"
+  ),
+  false
+);
+assert.equal(
+  matchesCatalogPrefixSearch(
+    productCatalogSearchHaystack({ name: "Товар", oneCCode: "НФ-00012345" }),
+    "2345"
+  ),
+  true
 );
 
 console.log("verify-catalog-prefix-search: ok");

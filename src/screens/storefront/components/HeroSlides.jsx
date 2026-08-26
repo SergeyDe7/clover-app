@@ -49,6 +49,7 @@ export function HeroSlides({ slides, intervalSec }) {
           alt={slide.alt || ""}
           width="1280"
           height="720"
+          loading={slideIndex === 0 ? "eager" : "lazy"}
           className={slideIndex === index ? "is-active" : ""}
         />
       ))}

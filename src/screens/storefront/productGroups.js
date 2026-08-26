@@ -1,14 +1,15 @@
 /**
  * Категории и подкатегории витрины Clover.
  * children: [] — у группы нет подгрупп, товары показываем сразу.
+ * Порядок: сначала с подкатегориями, затем без; «Прочее» всегда последняя.
  */
 export const CLOVER_PRODUCT_GROUPS = [
   "Одноразовая посуда",
   "Хозяйственные товары",
   "Химия, чистящие средства",
-  "Барные аксессуары",
   "Бумажная продукция",
   "Пакеты, упаковочные материалы",
+  "Барные аксессуары",
   "Канцелярские товары",
   "Прочее",
 ];
@@ -293,7 +294,7 @@ export function getSubgroupFacets(category, subcategory) {
   return sub?.children || [];
 }
 
-/** Есть ли у группы подгруппы — на странице группы товары не показываем, пока не выбрана подгруппа. */
+/** Есть ли у группы подгруппы (для редактора товара: обязательность subcategory). */
 export function groupRequiresSubgroup(category) {
   return getGroupChildren(category).length > 0;
 }
@@ -311,6 +312,9 @@ export function sortCloverProductGroups(names) {
   return unique.sort((a, b) => {
     if (a === "Прочее") return 1;
     if (b === "Прочее") return -1;
+    const aHasSubs = getGroupChildren(a).length > 0 ? 0 : 1;
+    const bHasSubs = getGroupChildren(b).length > 0 ? 0 : 1;
+    if (aHasSubs !== bHasSubs) return aHasSubs - bHasSubs;
     const ai = order.has(a) ? order.get(a) : 1000;
     const bi = order.has(b) ? order.get(b) : 1000;
     if (ai !== bi) return ai - bi;
@@ -356,9 +360,10 @@ export function groupProductsByCloverGroup(products) {
 
 /** Совпадение фильтра каталога с учётом старых имён. */
 export function categoryMatchesFilter(productCategory, filterCategory) {
+  // Пустой фильтр = «Все» (не канонизировать в «Прочее»).
+  if (!String(filterCategory || "").trim()) return true;
   const filter = canonicalizeProductCategory(filterCategory);
   const product = canonicalizeProductCategory(productCategory);
-  if (!filter) return true;
   return (
     product.toLocaleLowerCase("ru-RU") === filter.toLocaleLowerCase("ru-RU")
   );

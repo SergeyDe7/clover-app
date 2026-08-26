@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import cloverLogo from "./assets/clover-logo.png";
 import { startPasskeyAuthentication } from "./utils/webauthn";
@@ -8,8 +8,6 @@ import {
   getApiToken,
   setApiToken,
 } from "./serverApi";
-import { ClientScreen } from "./screens/client/ClientScreen";
-import { ManagerScreen } from "./screens/manager/ManagerScreen";
 import {
   writeManagerActiveTab,
   writeClientActiveTab,
@@ -36,6 +34,13 @@ import { appAlert, appConfirm } from "./shared/AppModal";
 import { canTrashOrder } from "./shared/orderTrash";
 import { SoftBanner, ListSkeleton } from "./shared/uxFeedback";
 import { ManagerContact } from "./screens/client/ManagerContact";
+
+const ClientScreen = lazy(() =>
+  import("./screens/client/ClientScreen").then((m) => ({ default: m.ClientScreen }))
+);
+const ManagerScreen = lazy(() =>
+  import("./screens/manager/ManagerScreen").then((m) => ({ default: m.ManagerScreen }))
+);
 
 function LoginView({ onAuth, authBusy, authError }) {
   const params = new URLSearchParams(window.location.search);
@@ -542,6 +547,9 @@ function mergeOrdersFromServer(previous, incoming, { clientMode = false } = {}) 
 }
 
 function App() {
+  useEffect(() => {
+    document.title = "Личный кабинет | КЛЕВЕР";
+  }, []);
   const [role, setRole] = useState("client");
   const [authUser, setAuthUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getApiToken()));
@@ -1892,41 +1900,43 @@ function App() {
     );
   } else if (authUser?.role === "manager" || authUser?.role === "admin") {
     content = (
-      <ManagerScreen
-        authUser={authUser}
-        orders={orders}
-        trashedOrders={trashedOrders}
-        products={products}
-        setProducts={setProducts}
-        profile={profile}
-        addresses={addresses}
-        serverClients={serverClients}
-        reconciliationRequests={reconciliationRequests}
-        managerNotifications={managerNotifications}
-        settings={settings}
-        setSettings={setSettings}
-        clientLinks={clientLinks}
-        setClientLinks={setClientLinks}
-        dirtyClientLinkIdsRef={dirtyClientLinkIdsRef}
-        oneCPriceTypes={oneCPriceTypes}
-        catalogPricesVersion={catalogPricesVersion}
-        managerNotice={managerNotice}
-        onDismissNotice={dismissManagerNotice}
-        onReadNotification={readManagerNotification}
-        onReadAllNotifications={readAllManagerNotifications}
-        onUpdateOrder={updateOrder}
-        onBulkUpdateOrders={bulkUpdateOrders}
-        onDeleteOrder={deleteManagerOrder}
-        onRestoreOrder={restoreManagerOrder}
-        onPurgeOrder={purgeManagerOrder}
-        onCreateProductFromCustom={createProductFromCustom}
-        onImport={importBackup}
-        onClearOrders={clearOrders}
-        onResetAll={resetAll}
-        onReload={() => loadBootstrap({ silent: true })}
-        onApplyManagerNotifications={applyManagerNotificationList}
-        onLogout={logout}
-      />
+      <Suspense fallback={<ListSkeleton />}>
+        <ManagerScreen
+          authUser={authUser}
+          orders={orders}
+          trashedOrders={trashedOrders}
+          products={products}
+          setProducts={setProducts}
+          profile={profile}
+          addresses={addresses}
+          serverClients={serverClients}
+          reconciliationRequests={reconciliationRequests}
+          managerNotifications={managerNotifications}
+          settings={settings}
+          setSettings={setSettings}
+          clientLinks={clientLinks}
+          setClientLinks={setClientLinks}
+          dirtyClientLinkIdsRef={dirtyClientLinkIdsRef}
+          oneCPriceTypes={oneCPriceTypes}
+          catalogPricesVersion={catalogPricesVersion}
+          managerNotice={managerNotice}
+          onDismissNotice={dismissManagerNotice}
+          onReadNotification={readManagerNotification}
+          onReadAllNotifications={readAllManagerNotifications}
+          onUpdateOrder={updateOrder}
+          onBulkUpdateOrders={bulkUpdateOrders}
+          onDeleteOrder={deleteManagerOrder}
+          onRestoreOrder={restoreManagerOrder}
+          onPurgeOrder={purgeManagerOrder}
+          onCreateProductFromCustom={createProductFromCustom}
+          onImport={importBackup}
+          onClearOrders={clearOrders}
+          onResetAll={resetAll}
+          onReload={() => loadBootstrap({ silent: true })}
+          onApplyManagerNotifications={applyManagerNotificationList}
+          onLogout={logout}
+        />
+      </Suspense>
     );
   } else {
     const canCreateOrder =
@@ -1934,36 +1944,38 @@ function App() {
       !(settings.requireAddress && !addresses.length);
 
     content = (
-      <ClientScreen
-        profile={profile}
-        setProfile={setProfile}
-        addresses={addresses}
-        setAddresses={setAddresses}
-        orders={clientOrders}
-        settings={settings}
-        catalogPolicy={catalogPolicy}
-        matrixProductCount={products.length}
-        fullCatalogCount={fullCatalogProducts.length}
-        reconciliationRequests={reconciliationRequests}
-        onReload={() => loadBootstrap({ silent: true })}
-        onNew={openNew}
-        onEdit={openEdit}
-        onRepeat={openRepeat}
-        onDelete={deleteClientOrder}
-        onLogout={logout}
-        catalogSession={catalogSession}
-        products={catalogProducts}
-        fullCatalogProducts={fullCatalogProducts}
-        favorites={favorites}
-        setFavorites={setFavorites}
-        showFullCatalog={showFullCatalog}
-        setShowFullCatalog={setShowFullCatalog}
-        onSaveOrder={saveOrder}
-        onCloseCatalog={() => setCatalogSession(null)}
-        onAddToMatrix={addToMyMatrix}
-        canCreateOrder={canCreateOrder}
-        profileComplete={profileComplete}
-      />
+      <Suspense fallback={<ListSkeleton />}>
+        <ClientScreen
+          profile={profile}
+          setProfile={setProfile}
+          addresses={addresses}
+          setAddresses={setAddresses}
+          orders={clientOrders}
+          settings={settings}
+          catalogPolicy={catalogPolicy}
+          matrixProductCount={products.length}
+          fullCatalogCount={fullCatalogProducts.length}
+          reconciliationRequests={reconciliationRequests}
+          onReload={() => loadBootstrap({ silent: true })}
+          onNew={openNew}
+          onEdit={openEdit}
+          onRepeat={openRepeat}
+          onDelete={deleteClientOrder}
+          onLogout={logout}
+          catalogSession={catalogSession}
+          products={catalogProducts}
+          fullCatalogProducts={fullCatalogProducts}
+          favorites={favorites}
+          setFavorites={setFavorites}
+          showFullCatalog={showFullCatalog}
+          setShowFullCatalog={setShowFullCatalog}
+          onSaveOrder={saveOrder}
+          onCloseCatalog={() => setCatalogSession(null)}
+          onAddToMatrix={addToMyMatrix}
+          canCreateOrder={canCreateOrder}
+          profileComplete={profileComplete}
+        />
+      </Suspense>
     );
   }
 

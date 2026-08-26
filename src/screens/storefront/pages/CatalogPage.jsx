@@ -9,7 +9,6 @@ import {
   getGroupChildren,
   getSubgroupFacets,
   groupProductsByCloverGroup,
-  groupRequiresSubgroup,
 } from "../productGroups.js";
 import {
   matchesCatalogPrefixSearch,
@@ -63,61 +62,32 @@ export function CatalogPage({
   const activeMeta = category ? getGroupMeta(category) : null;
   const subgroups = category ? getGroupChildren(category) : [];
   const facets = subcategory ? getSubgroupFacets(category, subcategory) : [];
-  const needsSubgroup = category && groupRequiresSubgroup(category);
-  const atParentOnly = Boolean(category && !subcategory && needsSubgroup);
 
+  // Родительская категория: все товары группы (включая подкатегории).
+  // Подкатегория/facet сужают выборку на API.
   const sections = useMemo(() => {
-    if (atParentOnly) {
-      const hasQuery = Boolean(query.trim());
-      if (hasQuery) {
-        return products.length
-          ? [
-              {
-                name: "Найдено",
-                products,
-                count: products.length,
-              },
-            ]
-          : [];
-      }
-      const orphans = products.filter(
-        (product) => !String(product.subcategory || "").trim()
-      );
-      return orphans.length
-        ? [
-            {
-              name: "Без подгруппы",
-              products: orphans,
-              count: orphans.length,
-            },
-          ]
-        : [];
-    }
-    const canShow = Boolean(!category || subcategory || !needsSubgroup);
-    if (!canShow) return [];
     if (category) {
       return products.length
         ? [{ name: subcategory || category, products, count: products.length }]
         : [];
     }
     return groupProductsByCloverGroup(products);
-  }, [
-    atParentOnly,
-    category,
-    subcategory,
-    products,
-    needsSubgroup,
-    query,
-  ]);
-
-  const showProducts = sections.length > 0 || Boolean(
-    !category || subcategory || !needsSubgroup
-  );
+  }, [category, subcategory, products]);
 
   const title = category || "Каталог";
 
   return (
     <div className="sf-catalog">
+      <div className="sf-catalog-toolbar">
+        <input
+          className="sf-input sf-catalog-search"
+          type="search"
+          placeholder="Поиск по названию или артикулу"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
+
       <div className="sf-catalog-layout">
         <aside className={`sf-catalog-side${treeOpen ? " is-open" : ""}`}>
           <button
@@ -262,23 +232,11 @@ export function CatalogPage({
             </section>
           ) : null}
 
-          {showProducts ? (
-            <div className="sf-catalog-toolbar">
-              <input
-                className="sf-input"
-                type="search"
-                placeholder="Поиск по названию или артикулу"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </div>
-          ) : null}
-
           {error ? <p className="sf-error">{error}</p> : null}
 
           {sections.map((section) => (
             <section className="sf-group-block" key={section.name}>
-              {!category || atParentOnly ? (
+              {!category ? (
                 <div className="sf-group-head">
                   <h2>{section.name}</h2>
                 </div>
@@ -291,7 +249,7 @@ export function CatalogPage({
             </section>
           ))}
 
-          {showProducts && !error && data && !products.length ? (
+          {!error && data && !products.length ? (
             <p className="sf-muted">
               {category
                 ? "В этой группе пока нет товаров."

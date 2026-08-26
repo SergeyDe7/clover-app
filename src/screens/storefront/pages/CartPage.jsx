@@ -47,7 +47,7 @@ export function CartPage() {
               }
             >
               {item.imageUrl ? (
-                <img src={item.imageUrl} alt="" />
+                <img src={item.imageUrl} alt="" loading="lazy" />
               ) : (
                 <div className="sf-product-placeholder" />
               )}
