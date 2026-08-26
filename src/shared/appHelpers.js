@@ -1288,14 +1288,14 @@ textarea { resize: vertical; }
 }
 .app-nav-bar .manager-nav,
 .app-nav-bar .client-nav {
-  width: min(1240px, 92%);
+  width: min(var(--clover-page-max-width, 1440px), calc(100% - var(--clover-page-gutter, 32px)));
   max-width: 100%;
   margin: 0 auto;
   background-color: transparent;
 }
 .app-nav-bar-client .client-nav,
 .app-top-chrome-client .app-nav-bar-client .client-nav {
-  width: min(1440px, 90%);
+  width: min(var(--clover-page-max-width, 1440px), calc(100% - var(--clover-page-gutter, 32px)));
 }
 .clover-app > .page-content {
   position: relative;
@@ -1417,9 +1417,13 @@ textarea { resize: vertical; }
 }
 .header-button.primary { background: #5b9d57; color: #fff; }
 
-.page-content { width: min(1240px, 92%); margin: 0 auto; padding: 38px 0 72px; }
+.page-content {
+  width: min(var(--clover-page-max-width, 1440px), calc(100% - var(--clover-page-gutter, 32px)));
+  margin: 0 auto;
+  padding: 38px 0 72px;
+}
 .page-content-client {
-  width: min(1440px, 90%);
+  width: min(var(--clover-page-max-width, 1440px), calc(100% - var(--clover-page-gutter, 32px)));
   max-width: 100%;
   margin-left: auto;
   margin-right: auto;
@@ -2059,7 +2063,12 @@ textarea { resize: vertical; }
 
 .client-order-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 
-.catalog-content { width: min(1440px, 90%); margin: 0 auto; padding: 34px 0 70px; box-sizing: border-box; }
+.catalog-content {
+  width: min(var(--clover-page-max-width, 1440px), calc(100% - var(--clover-page-gutter, 32px)));
+  margin: 0 auto;
+  padding: 34px 0 70px;
+  box-sizing: border-box;
+}
 .catalog-layout {
   display: grid;
   grid-template-columns: minmax(0,1fr) minmax(300px, 370px);

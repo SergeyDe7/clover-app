@@ -16,6 +16,8 @@ html {
   --clover-header-offset: 56px;
   /* Sticky-поиск: верх прямый (под шапкой), низ скруглён */
   --clover-search-chrome-radius: 0 0 16px 16px;
+  --clover-page-max-width: 1440px;
+  --clover-page-gutter: 32px;
 
   /* Button levels: top darker, sub-window lighter */
   --clover-l1-bg: #ffffff;
@@ -2249,7 +2251,7 @@ body:has(.clover-app) {
 }
 
 .clover-app .page-content-client {
-  width: min(1440px, 90%) !important;
+  width: min(var(--clover-page-max-width), calc(100% - var(--clover-page-gutter))) !important;
   max-width: 100% !important;
   margin-left: auto !important;
   margin-right: auto !important;
@@ -2567,6 +2569,14 @@ body:has(.clover-app) {
 .clover-app > .page-content {
   position: relative !important;
   z-index: 1 !important;
+}
+
+.clover-app .page-content {
+  width: min(var(--clover-page-max-width), calc(100% - var(--clover-page-gutter))) !important;
+  max-width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  box-sizing: border-box !important;
 }
 
 .clover-app .client-nav button {
