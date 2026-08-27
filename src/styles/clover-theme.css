@@ -1462,6 +1462,56 @@ body:has(.clover-app) {
   margin: 0 0 14px !important;
 }
 
+.clover-app .manager-orders-filters-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  margin: 0 0 14px !important;
+}
+
+.clover-app .manager-orders-client-filter {
+  display: flex !important;
+  justify-content: center !important;
+  width: 100% !important;
+  max-width: 720px !important;
+  margin: 0 auto !important;
+}
+
+.clover-app .manager-orders-client-filter .field {
+  width: 100% !important;
+  gap: 6px !important;
+  text-align: left !important;
+}
+
+.clover-app .manager-orders-client-filter-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+.clover-app .manager-orders-client-filter .manager-search-input {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 44px !important;
+}
+
+.clover-app .manager-orders-client-filter-clear {
+  flex: 0 0 auto !important;
+  min-height: 44px !important;
+  white-space: nowrap !important;
+}
+
+.clover-app .manager-orders-filters-wrap .manager-orders-filters {
+  width: 100% !important;
+  max-width: 720px !important;
+  margin: 0 auto !important;
+}
+
 .clover-app .manager-orders-seg {
   display: inline-flex !important;
   align-items: center !important;

@@ -2,13 +2,19 @@
 import { useState } from "react";
 import { api } from "../../serverApi";
 import { reconciliationPeriodLabel, RECONCILIATION_STATUS_LABELS, formatDateTime } from "../../shared/appHelpers";
-import { appAlert } from "../../shared/AppModal";
+import { appAlert, appConfirm } from "../../shared/AppModal";
 import { OrderThankYouOverlay } from "../../shared/SharedPanels";
 
-export function ManagerReconciliation({ requests = [], onReload }) {
+export function ManagerReconciliation({
+  requests = [],
+  onReload,
+  staffRole = "manager",
+  onApplyReconciliationRequests,
+}) {
   const [busyId, setBusyId] = useState("");
   const [pendingFiles, setPendingFiles] = useState({});
   const [successOpen, setSuccessOpen] = useState(false);
+  const isAdmin = staffRole === "admin";
 
   const attachFile = (itemId, file) => {
     if (!file) return;
@@ -51,6 +57,38 @@ export function ManagerReconciliation({ requests = [], onReload }) {
     }
   };
 
+  const remove = async (item) => {
+    if (!isAdmin) return;
+    const clientLabel = item.client?.companyName || item.client?.email || "клиента";
+    const ok = await appConfirm({
+      title: "Удалить акт сверки?",
+      message: `Запрос «${reconciliationPeriodLabel(item)}» для ${clientLabel} будет удалён навсегда — и у менеджера, и в ЛК клиента.${item.fileName ? " PDF-файл тоже будет удалён с сервера." : ""}`,
+      confirmLabel: "Удалить",
+      cancelLabel: "Отмена",
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    setBusyId(item.id);
+    try {
+      const result = await api.deleteReconciliation(item.id);
+      clearPending(item.id);
+      if (Array.isArray(result?.reconciliationRequests)) {
+        onApplyReconciliationRequests?.(result.reconciliationRequests);
+      } else {
+        await onReload();
+      }
+    } catch (error) {
+      await appAlert({
+        title: "Не удалось удалить",
+        message: error.message || "Ошибка удаления акта сверки.",
+        tone: "danger",
+      });
+    } finally {
+      setBusyId("");
+    }
+  };
+
   return (
     <>
     <section className="panel" style={{ marginTop: 0 }}>
@@ -58,7 +96,10 @@ export function ManagerReconciliation({ requests = [], onReload }) {
         <div>
           <p className="eyebrow">Документы</p>
           <h2>Акты сверок</h2>
-          <p>Прикрепите PDF акта из 1С и нажмите «Отправить».</p>
+          <p>
+            Прикрепите PDF акта из 1С и нажмите «Отправить».
+            {isAdmin ? " Админ может удалить акт — он исчезнет и у клиента." : ""}
+          </p>
         </div>
       </div>
       <div className="reconciliation-list">
@@ -82,46 +123,59 @@ export function ManagerReconciliation({ requests = [], onReload }) {
                 )}
               </div>
 
-              {!alreadySent && (
-                <div className="manager-reconciliation-actions">
-                  {!pending ? (
-                    <label className="import-label manager-reconciliation-attach">
-                      Прикрепить файл
-                      <input
-                        type="file"
-                        accept="application/pdf"
-                        disabled={busy}
-                        onChange={(event) => {
-                          attachFile(item.id, event.target.files?.[0]);
-                          event.target.value = "";
-                        }}
-                      />
-                    </label>
-                  ) : (
-                    <div className="manager-reconciliation-filechip" title={pending.name}>
-                      <span className="manager-reconciliation-filename">{pending.name}</span>
-                      <button
-                        className="danger-text"
-                        type="button"
-                        disabled={busy}
-                        onClick={() => clearPending(item.id)}
-                        aria-label="Убрать файл"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  )}
+              <div className="manager-reconciliation-actions">
+                {!alreadySent ? (
+                  <>
+                    {!pending ? (
+                      <label className="import-label manager-reconciliation-attach">
+                        Прикрепить файл
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          disabled={busy}
+                          onChange={(event) => {
+                            attachFile(item.id, event.target.files?.[0]);
+                            event.target.value = "";
+                          }}
+                        />
+                      </label>
+                    ) : (
+                      <div className="manager-reconciliation-filechip" title={pending.name}>
+                        <span className="manager-reconciliation-filename">{pending.name}</span>
+                        <button
+                          className="danger-text"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => clearPending(item.id)}
+                          aria-label="Убрать файл"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
 
+                    <button
+                      className="primary-button"
+                      type="button"
+                      disabled={!canSend}
+                      onClick={() => void send(item)}
+                    >
+                      {busy ? "Отправка…" : "Отправить"}
+                    </button>
+                  </>
+                ) : null}
+
+                {isAdmin ? (
                   <button
-                    className="primary-button"
+                    className="danger-button"
                     type="button"
-                    disabled={!canSend}
-                    onClick={() => void send(item)}
+                    disabled={busy}
+                    onClick={() => void remove(item)}
                   >
-                    {busy ? "Отправка…" : "Отправить"}
+                    {busy ? "Удаление…" : "Удалить"}
                   </button>
-                </div>
-              )}
+                ) : null}
+              </div>
             </article>
           );
         }) : (

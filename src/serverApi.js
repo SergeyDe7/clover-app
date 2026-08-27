@@ -702,6 +702,12 @@ export const api = {
     });
   },
 
+  deleteReconciliation(requestId) {
+    return request(`/admin/reconciliation/${encodeURIComponent(requestId)}`, {
+      method: "DELETE",
+    });
+  },
+
   downloadReconciliationFile(requestId) {
     return requestBlob(`/reconciliation/${encodeURIComponent(requestId)}/file`);
   },

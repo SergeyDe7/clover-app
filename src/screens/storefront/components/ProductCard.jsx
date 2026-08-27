@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatMoney, navigateStorefront } from "./StoreHeader.jsx";
 import {
+  getUnitMultiplier,
   getUnitOrderStep,
   orderedSaleUnits,
 } from "../../../shared/appHelpers.js";
@@ -20,6 +21,7 @@ export function ProductCard({ product }) {
 
   const price = Number(product.prices?.[unit]) || 0;
   const orderStep = getUnitOrderStep(product, unit);
+  const unitSize = getUnitMultiplier(product, unit);
   const unitLabel = storefrontUnitLabel(unit);
   const hasUnitChoice = units.length > 1;
 
@@ -82,6 +84,7 @@ export function ProductCard({ product }) {
             price={price}
             imageUrl={product.imageUrl}
             orderStep={orderStep}
+            unitSize={unitSize}
           />
         </div>
       </div>

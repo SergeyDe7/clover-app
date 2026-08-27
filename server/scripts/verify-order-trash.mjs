@@ -29,6 +29,14 @@ try {
   const accepted = { ...active, status: "Принят" };
   assert.equal(canTrashOrder(accepted, "manager").ok, false);
   assert.equal(canTrashOrder(accepted, "manager").code, "ORDER_ACCEPTED");
+  assert.equal(canTrashOrder(accepted, "admin").ok, false);
+
+  const completed = { ...active, status: "Выполнен", exchange: { status: "sent" } };
+  assert.equal(canTrashOrder(completed, "manager").ok, false);
+  assert.equal(canTrashOrder(completed, "manager").code, "ORDER_ACCEPTED");
+  assert.equal(canTrashOrder(completed, "admin").ok, true);
+  assert.equal(canPurgeOrder({ ...completed, deletedAt: "2026-08-01T12:00:00.000Z" }, "manager").ok, false);
+  assert.equal(canPurgeOrder({ ...completed, deletedAt: "2026-08-01T12:00:00.000Z" }, "admin").ok, true);
 
   const queued = { ...active, exchange: { status: "ready" } };
   assert.equal(canTrashOrder(queued, "manager").ok, false);

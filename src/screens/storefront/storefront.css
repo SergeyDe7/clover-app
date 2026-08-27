@@ -442,12 +442,15 @@ html.sf-catalog-lock .sf-main,
 }
 .sf-product-units {
   grid-area: units;
-  min-height: 22px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
 }
 .sf-unit-choice {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 5px;
+  max-width: 100%;
 }
 .sf-unit-choice button {
   appearance: none;
@@ -456,21 +459,33 @@ html.sf-catalog-lock .sf-main,
   background: #fff;
   color: #4a564a;
   font: inherit;
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   font-weight: 700;
   line-height: 1.2;
-  padding: 4px 8px;
+  padding: 8px 12px;
+  min-height: 34px;
   cursor: pointer;
+  box-sizing: border-box;
+  flex: 0 0 auto;
 }
 .sf-unit-choice button.is-active {
   border-color: rgba(91, 157, 87, 0.55);
   background: rgba(91, 157, 87, 0.12);
   color: #2f5a2d;
 }
+.sf-unit-choice.is-compact {
+  gap: 5px;
+  flex-wrap: nowrap;
+  width: 100%;
+}
 .sf-unit-choice.is-compact button {
-  padding: 2px 6px;
-  font-size: 0.66rem;
-  border-radius: 6px;
+  padding: 7px 8px;
+  font-size: 0.9rem;
+  border-radius: 8px;
+  min-height: 34px;
+  min-width: 2.6em;
+  flex: 1 1 0;
+  max-width: 100%;
 }
 .sf-field-units > span {
   display: block;
@@ -537,7 +552,7 @@ html.sf-catalog-lock .sf-main,
 .sf-product-actions {
   grid-area: actions;
   width: 100%;
-  min-height: 30px;
+  min-height: 36px;
   margin-top: 4px;
 }
 .sf-qty-control {
@@ -549,6 +564,52 @@ html.sf-catalog-lock .sf-main,
 }
 .sf-qty-control.is-compact {
   height: 30px;
+}
+/* Каталог витрины: крупные ± и ед.изм., компактное окно количества */
+.sf-product-card .sf-qty-control,
+.sf-product-card .sf-qty-control.is-compact {
+  grid-template-columns: 36px minmax(64px, 1fr) 36px;
+  justify-content: space-between;
+  gap: 6px;
+  height: 36px;
+}
+.sf-product-card .sf-qty-btn {
+  width: 36px;
+  height: 36px;
+  font-size: 1.2rem;
+  border-radius: 10px;
+}
+.sf-product-card .sf-qty-field {
+  height: 34px;
+  width: 100%;
+  max-width: none;
+  justify-self: stretch;
+  border-radius: 8px;
+}
+.sf-product-card .sf-qty-input {
+  font-size: 0.78rem;
+  padding: 0 2px 0 4px;
+}
+.sf-product-card .sf-qty-unit {
+  padding: 0 5px 0 0;
+  font-size: 0.66rem;
+}
+.sf-qty-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  height: 30px;
+  border: 1px solid #e6eee3;
+  border-radius: 8px;
+  background: #fbfdfb;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.sf-qty-field:focus-within {
+  border-color: rgba(91, 157, 87, 0.55);
+  box-shadow: 0 0 0 2px rgba(91, 157, 87, 0.1);
+  background: #fff;
 }
 .sf-qty-btn {
   appearance: none;
@@ -576,11 +637,11 @@ html.sf-catalog-lock .sf-main,
 .sf-qty-input {
   width: 100%;
   min-width: 0;
-  height: 30px;
-  padding: 0 4px;
-  border: 1px solid #e6eee3;
-  border-radius: 8px;
-  background: #fbfdfb;
+  height: 100%;
+  padding: 0 2px 0 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: #1c1f1c;
   font: inherit;
   font-size: 0.78rem;
@@ -592,15 +653,16 @@ html.sf-catalog-lock .sf-main,
 }
 .sf-qty-input:focus {
   outline: none;
-  border-color: rgba(91, 157, 87, 0.55);
-  box-shadow: 0 0 0 2px rgba(91, 157, 87, 0.1);
-  background: #fff;
+  box-shadow: none;
+  background: transparent;
 }
 .sf-qty-unit {
-  grid-column: 1 / -1;
-  font-size: 0.72rem;
-  color: #6b6f6b;
-  text-align: center;
+  padding: 0 6px 0 2px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #5f695f;
+  white-space: nowrap;
+  line-height: 1;
 }
 .sf-unit { font-weight: 500; color: #6b6f6b; font-size: .78rem; }
 @media (min-width: 901px) and (max-width: 1200px) {
@@ -680,7 +742,7 @@ html.sf-catalog-lock .sf-main,
 .sf-cart-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .sf-cart-item {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 88px 132px 96px auto;
+  grid-template-columns: 72px minmax(0, 1fr) 88px 148px 96px auto;
   grid-template-areas: "thumb meta unit-price qty total remove";
   gap: 10px 14px;
   align-items: center;
@@ -721,7 +783,7 @@ html.sf-catalog-lock .sf-main,
   grid-area: qty;
   display: flex;
   justify-content: center;
-  width: 132px;
+  width: 148px;
 }
 .sf-cart-qty .sf-qty-control {
   width: 100%;
@@ -1303,7 +1365,12 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
       "actions";
   }
   .sf-product-units {
-    min-height: 20px;
+    min-height: 34px;
+  }
+  .sf-unit-choice.is-compact button {
+    min-height: 32px;
+    font-size: 0.86rem;
+    padding: 6px 6px;
   }
   .sf-product-body h3 {
     margin: 0;
@@ -1322,8 +1389,21 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
     min-height: calc(0.82rem * 1.25);
   }
   .sf-product-actions {
-    min-height: 30px;
+    min-height: 36px;
     margin-top: 2px;
+  }
+  .sf-product-card .sf-qty-control,
+  .sf-product-card .sf-qty-control.is-compact {
+    height: 34px;
+    grid-template-columns: 34px minmax(56px, 1fr) 34px;
+  }
+  .sf-product-card .sf-qty-btn {
+    width: 34px;
+    height: 34px;
+  }
+  .sf-product-card .sf-qty-field {
+    height: 32px;
+    max-width: none;
   }
   .sf-qty-control.is-compact {
     height: 30px;

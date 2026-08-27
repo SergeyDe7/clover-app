@@ -25,7 +25,7 @@ import { ManagerAudit } from "./ManagerAudit";
 import { managerNotificationTab, ManagerNotificationBell, parseManagerNotification, ManagerOrderSummaryLines } from "./ManagerNotifications";
 import { ManagerAccessVault } from "./ManagerAccessVault";
 
-function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, dirtyClientLinkIdsRef, oneCPriceTypes = [], catalogPricesVersion = "", managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onRestoreOrder, onPurgeOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onLogout }) {
+function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, dirtyClientLinkIdsRef, oneCPriceTypes = [], catalogPricesVersion = "", managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onRestoreOrder, onPurgeOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onApplyReconciliationRequests, onLogout }) {
   const [tab, setTab] = useState(readManagerActiveTab);
   const [moreTab, setMoreTab] = useState(() => {
     const saved = readManagerMoreTab();
@@ -175,7 +175,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
           <input
             className="manager-search-input"
             type="search"
-            placeholder="Поиск заказа"
+            placeholder="Поиск: клиент, заказ, ИНН…"
             value={headerSearch}
             onChange={(e) => {
               setHeaderSearch(e.target.value);
@@ -253,6 +253,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
           onOrdersViewChange={setOrdersView}
           settings={settings}
           clientLinks={clientLinks}
+          staffRole={authUser?.role === "admin" ? "admin" : "manager"}
           onUpdateOrder={onUpdateOrder}
           onBulkUpdateOrders={onBulkUpdateOrders}
           onDeleteOrder={onDeleteOrder}
@@ -274,7 +275,14 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
           oneCPriceTypes={oneCPriceTypes}
         />
       )}
-      {tab === "acts" && staffHasFeature(authUser, "acts") && <ManagerReconciliation requests={reconciliationRequests} onReload={onReload} />}
+      {tab === "acts" && staffHasFeature(authUser, "acts") && (
+        <ManagerReconciliation
+          requests={reconciliationRequests}
+          onReload={onReload}
+          staffRole={authUser?.role === "admin" ? "admin" : "manager"}
+          onApplyReconciliationRequests={onApplyReconciliationRequests}
+        />
+      )}
       {tab === "storefront" && staffHasFeature(authUser, "storefront") && (
         <ManagerStorefront
           settings={settings}

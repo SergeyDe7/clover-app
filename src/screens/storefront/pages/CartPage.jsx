@@ -56,6 +56,9 @@ export function CartPage() {
               <strong>{item.name}</strong>
               <p className="sf-muted">
                 Арт. {item.code} · {item.unitLabel || item.unit}
+                {Number(item.unitSize) > 1
+                  ? ` · по ${Number(item.unitSize)} шт`
+                  : ""}
               </p>
             </div>
             <div className="sf-cart-unit-price">{formatMoney(item.price)}</div>

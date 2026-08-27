@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
-import { addToCart, snapCartQty } from "../cartStorage.js";
+import { addToCart } from "../cartStorage.js";
 import { formatMoney, navigateStorefront } from "../components/StoreHeader.jsx";
-import { getUnitOrderStep, orderedSaleUnits } from "../../../shared/appHelpers.js";
+import {
+  fromQuantityInputValue,
+  getUnitMultiplier,
+  getUnitOrderStep,
+  orderedSaleUnits,
+  quantityInputStep,
+  toQuantityInputValue,
+} from "../../../shared/appHelpers.js";
 import { applyStorefrontDocumentMeta } from "../seo.js";
 import { storefrontHref } from "../mode.js";
 import {
@@ -56,6 +63,15 @@ export function ProductPage({ code }) {
     [product]
   );
   const orderStep = getUnitOrderStep(product, unit);
+  const unitSize = getUnitMultiplier(product, unit);
+  const inputStep = quantityInputStep(unitSize, orderStep);
+  const displayQty = toQuantityInputValue(qty, unitSize);
+  const qtyHint =
+    unitSize > 1
+      ? `В ${storefrontUnitLabel(unit)}: ${unitSize} шт`
+      : orderStep > 1
+        ? `кратно ${orderStep}`
+        : "";
   const price = Number(product?.prices?.[unit]) || 0;
   const details = product?.details || {};
 
@@ -128,19 +144,24 @@ export function ProductPage({ code }) {
             <label className="sf-field">
               <span>
                 Количество
-                {orderStep > 1 ? ` (кратно ${orderStep})` : ""}
+                {qtyHint ? ` (${qtyHint})` : ""}
+                {unitSize > 1 ? `, шт` : ` · ${storefrontUnitLabel(unit)}`}
               </span>
               <input
                 className="sf-input"
                 type="number"
-                min={orderStep}
-                step={orderStep}
-                value={qty}
+                min={inputStep}
+                step={inputStep}
+                value={displayQty}
                 onChange={(e) =>
                   setQty(
-                    snapCartQty(
-                      Math.floor(Number(e.target.value) || orderStep),
-                      orderStep
+                    Math.max(
+                      orderStep,
+                      fromQuantityInputValue(
+                        e.target.value,
+                        unitSize,
+                        orderStep
+                      ) || orderStep
                     )
                   )
                 }
@@ -160,6 +181,7 @@ export function ProductPage({ code }) {
                     price,
                     imageUrl: product.imageUrl,
                     orderStep,
+                    unitSize,
                   },
                   qty
                 );

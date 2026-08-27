@@ -1,4 +1,4 @@
-import { orderedSaleUnits, UNIT_CONFIG } from "../../../shared/appHelpers.js";
+import { orderedSaleUnits, UNIT_CONFIG, getUnitMultiplier } from "../../../shared/appHelpers.js";
 
 export function storefrontUnitLabel(unit) {
   const short = UNIT_CONFIG[unit]?.shortLabel || unit;
@@ -22,19 +22,24 @@ export function StorefrontUnitChoice({
       aria-label="Единица измерения"
       onClick={(event) => event.stopPropagation()}
     >
-      {units.map((item) => (
-        <button
-          key={item}
-          type="button"
-          className={unit === item ? "is-active" : ""}
-          aria-pressed={unit === item}
-          onClick={() => {
-            if (item !== unit) onChange(item);
-          }}
-        >
-          {storefrontUnitLabel(item)}
-        </button>
-      ))}
+      {units.map((item) => {
+        const size = getUnitMultiplier(product, item);
+        const label = storefrontUnitLabel(item);
+        return (
+          <button
+            key={item}
+            type="button"
+            className={unit === item ? "is-active" : ""}
+            aria-pressed={unit === item}
+            title={size > 1 ? `${size} шт в «${label}»` : undefined}
+            onClick={() => {
+              if (item !== unit) onChange(item);
+            }}
+          >
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
