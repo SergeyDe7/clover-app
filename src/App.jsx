@@ -32,6 +32,11 @@ import {
 import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
 import { appAlert, appConfirm } from "./shared/AppModal";
 import { canTrashOrder, isAdminHardDeleteStatus } from "./shared/orderTrash";
+import {
+  canOrderAcceptAddendum,
+  mergeOrderCatalogItems,
+  mergeOrderCustomItems,
+} from "./shared/orderAddendum";
 import { SoftBanner, ListSkeleton } from "./shared/uxFeedback";
 import { ManagerContact } from "./screens/client/ManagerContact";
 
@@ -1344,8 +1349,47 @@ function App() {
     const session = catalogSession || { mode: "new" };
     const previousOrders = orders;
     let nextOrders;
+    const addendumToOrderId = String(payload?.addendumToOrderId || "").trim();
 
-    if (session.mode === "edit") {
+    if (addendumToOrderId) {
+      const target = orders.find((order) => String(order.id) === addendumToOrderId);
+      if (!target || !canOrderAcceptAddendum(target, settings)) {
+        void appAlert({
+          title: "Дозаказ недоступен",
+          message:
+            "Добавить позиции можно только в последний заказ со статусом «Новый», пока менеджер его не принял.",
+          tone: "warn",
+        });
+        return Promise.reject(new Error("addendum_unavailable"));
+      }
+
+      const { addendumToOrderId: _omit, ...addendumPayload } = payload;
+      const updatedAt = new Date().toISOString();
+      const history = appendOrderHistory(
+        target,
+        makeOrderHistoryEvent(
+          "client.addendum",
+          "Клиент добавил позиции (дозаказ)",
+          profile.contactName || "Клиент"
+        )
+      );
+
+      nextOrders = orders.map((order) => {
+        if (String(order.id) !== addendumToOrderId) return order;
+        return {
+          ...order,
+          items: mergeOrderCatalogItems(order.items, addendumPayload.items),
+          customItems: mergeOrderCustomItems(
+            order.customItems,
+            addendumPayload.customItems
+          ),
+          deliveryFee: addendumPayload.deliveryFee,
+          deliveryNote: addendumPayload.deliveryNote,
+          history,
+          updatedAt,
+        };
+      });
+    } else if (session.mode === "edit") {
       nextOrders = orders.map((order) => {
         if (order.id !== session.order.id) return order;
 

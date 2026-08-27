@@ -113,14 +113,11 @@ function ClientDashboard({
     writeClientCabinetSection(id);
   };
 
-  const openOrders = () => {
-    setTab("orders");
-    writeClientActiveTab("orders");
-  };
-
   const finishOrderThankYou = () => {
     setThankYouOpen(false);
-    openOrders();
+    setTab("matrix");
+    writeClientActiveTab("matrix");
+    onNew?.({ silent: true });
   };
 
   const selectTab = (id) => {
@@ -594,6 +591,14 @@ function ClientDashboard({
                 onOpenCatalogAdd={() => selectTab("catalog")}
                 onSave={(payload) =>
                   Promise.resolve(onSaveOrder(payload)).then(() => {
+                    // Дозаказ: уже был confirm — без второго thank-you экрана.
+                    if (payload?.addendumToOrderId) {
+                      setThankYouOpen(false);
+                      setTab("matrix");
+                      writeClientActiveTab("matrix");
+                      onNew?.({ silent: true });
+                      return;
+                    }
                     setThankYouOpen(true);
                   })
                 }
@@ -641,7 +646,11 @@ function ClientDashboard({
 
         {tab === "cabinet" && (isNarrow ? cabinetMobile : cabinetDesktop)}
       </section>
-      <OrderThankYouOverlay open={thankYouOpen} onDone={finishOrderThankYou} />
+      <OrderThankYouOverlay
+        open={thankYouOpen}
+        onDone={finishOrderThankYou}
+        confirmLabel="На главную"
+      />
     </main>
   );
 }
