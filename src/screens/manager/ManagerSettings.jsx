@@ -230,6 +230,40 @@ export function ManagerSettings({ settings, setSettings, authUser }) {
       <ManagerNotificationSettings settings={settings} set={set} />
       <PushSettings />
 
+      <div className="panel-block" style={{ marginTop: 16 }}>
+        <h3>Доставка СПб → 1С</h3>
+        <p className="muted small">
+          При сумме заказа меньше 5 000 ₽ в заказ добавляется позиция «Доставка» 500 ₽
+          и она уходит в 1С. Укажите номенклатуру услуги доставки из 1С.
+        </p>
+        <div className="settings-grid" style={{ marginTop: 10 }}>
+          <label className="field">
+            Название позиции
+            <input
+              value={settings.deliveryOneCName || "Доставка"}
+              onChange={(event) => set("deliveryOneCName", event.target.value)}
+              placeholder="Доставка"
+            />
+          </label>
+          <label className="field">
+            ID номенклатуры 1С (UUID)
+            <input
+              value={settings.deliveryOneCId || ""}
+              onChange={(event) => set("deliveryOneCId", event.target.value.trim())}
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            />
+          </label>
+          <label className="field">
+            Код номенклатуры 1С
+            <input
+              value={settings.deliveryOneCCode || ""}
+              onChange={(event) => set("deliveryOneCCode", event.target.value.trim())}
+              placeholder="НФ-00002361"
+            />
+          </label>
+        </div>
+      </div>
+
       <div className="settings-grid">
         <ToggleSetting title="Показывать цены" description="Клиент увидит цены, заполненные в карточках товаров." value={settings.showPrices} onChange={(value) => set("showPrices", value)} />
         <ToggleSetting title="Товары вне матрицы" description="Разрешить клиенту запрашивать отсутствующие позиции." value={settings.allowCustomItems} onChange={(value) => set("allowCustomItems", value)} />

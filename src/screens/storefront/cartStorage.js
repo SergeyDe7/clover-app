@@ -1,3 +1,9 @@
+import {
+  FREE_DELIVERY_MIN_TOTAL,
+  PAID_DELIVERY_FEE,
+  getSpbDeliveryFee,
+} from "../../config/orderConfig.js";
+
 const CART_KEY = "clover-storefront-cart-v1";
 
 function readRaw() {
@@ -146,6 +152,23 @@ export function cartTotal(items = readRaw()) {
     0
   );
 }
+
+/** Сумма товаров без доставки. */
+export function cartGoodsTotal(items = readRaw()) {
+  return cartTotal(items);
+}
+
+export function cartDeliveryFee(items = readRaw()) {
+  const goods = cartGoodsTotal(items);
+  if (goods <= 0) return 0;
+  return getSpbDeliveryFee(goods);
+}
+
+export function cartGrandTotal(items = readRaw()) {
+  return cartGoodsTotal(items) + cartDeliveryFee(items);
+}
+
+export { FREE_DELIVERY_MIN_TOTAL, PAID_DELIVERY_FEE, getSpbDeliveryFee };
 
 export function subscribeCart(listener) {
   const handler = () => listener(getCartItems());

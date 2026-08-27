@@ -28,6 +28,10 @@ import {
   STOREFRONT_DEFAULT_COUNTERPARTY_NAME,
 } from "./storefrontCounterparty.js";
 import {
+  resolveClientSpbDelivery,
+  syncDeliveryLineFromFee,
+} from "./deliveryFee.js";
+import {
   getEarliestDeliveryDateIso,
   validateDeliveryDate,
 } from "../../src/shared/deliveryDateRules.js";
@@ -881,7 +885,14 @@ export function createStorefrontOrder(input, { notify } = {}) {
     });
   }
 
-  const total = lines.reduce((sum, line) => sum + (Number(line.lineTotal) || 0), 0);
+  const goodsTotal = lines.reduce(
+    (sum, line) => sum + (Number(line.lineTotal) || 0),
+    0
+  );
+  const delivery = resolveClientSpbDelivery(
+    { items: lines, customItems: [] },
+    { showPrices: true }
+  );
   const guest = ensureStorefrontGuestUser();
   linkStorefrontGuestToOneC(guest.id, settings);
   const createdAt = new Date().toISOString();
@@ -896,7 +907,12 @@ export function createStorefrontOrder(input, { notify } = {}) {
     parsed.email ? `Email: ${parsed.email}` : "",
   ].filter(Boolean);
 
-  const order = {
+  const fullSettings = {
+    ...DEFAULT_SETTINGS,
+    ...getGlobalState("settings", DEFAULT_SETTINGS),
+  };
+
+  let order = {
     id: orderId,
     externalId: orderId,
     number,
@@ -926,8 +942,10 @@ export function createStorefrontOrder(input, { notify } = {}) {
     exchange: normalizeExchangeState({ status: "not_sent" }),
     items: lines,
     customItems: [],
-    total,
-    amount: total,
+    deliveryFee: delivery.deliveryFee,
+    deliveryNote: delivery.deliveryNote,
+    total: goodsTotal,
+    amount: goodsTotal,
     createdAt,
     updatedAt: createdAt,
     storefrontPricingMode: settings.storefrontPricingMode,
@@ -935,6 +953,22 @@ export function createStorefrontOrder(input, { notify } = {}) {
     storefrontPriceTypeId: settings.storefrontPriceTypeId,
     storefrontPriceTypeName: settings.storefrontPriceTypeName,
   };
+
+  order = syncDeliveryLineFromFee(
+    order,
+    {
+      deliveryOneCId: fullSettings.deliveryOneCId,
+      deliveryOneCCode: fullSettings.deliveryOneCCode,
+      deliveryOneCName: fullSettings.deliveryOneCName || "Доставка",
+    },
+    getGlobalState("oneCProducts", [])
+  );
+  const grandTotal = (order.items || []).reduce(
+    (sum, line) => sum + (Number(line.lineTotal) || 0),
+    0
+  );
+  order.total = grandTotal;
+  order.amount = grandTotal;
 
   insertOrder(order, guest.id);
 

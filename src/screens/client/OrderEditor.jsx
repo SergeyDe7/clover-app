@@ -30,6 +30,7 @@ import {
   FREE_DELIVERY_MIN_TOTAL,
   PAID_DELIVERY_FEE,
   getSpbDeliveryFee,
+  isCloverDeliveryLine,
 } from "../../config/orderConfig";
 import { productImageSrc } from "../../shared/productPhoto";
 import { ManagerContact } from "./ManagerContact";
@@ -127,14 +128,20 @@ export function OrderEditor({
   });
   const [cart, setCart] = useState(() => {
     const result = {};
-    (initialSource.items || []).forEach((item) => { result[item.productId ?? item.id] = item.quantity; });
+    (initialSource.items || []).forEach((item) => {
+      if (isCloverDeliveryLine(item)) return;
+      result[item.productId ?? item.id] = item.quantity;
+    });
     return result;
   });
   /** Черновик ввода в поле шт (чтобы «100» не сбрасывалось на «1» при наборе). */
   const [qtyDrafts, setQtyDrafts] = useState({});
   const [units, setUnits] = useState(() => {
     const result = {};
-    (initialSource.items || []).forEach((item) => { result[item.productId ?? item.id] = item.unit; });
+    (initialSource.items || []).forEach((item) => {
+      if (isCloverDeliveryLine(item)) return;
+      result[item.productId ?? item.id] = item.unit;
+    });
     return result;
   });
   const [customItems, setCustomItems] = useState(() =>
@@ -573,7 +580,9 @@ export function OrderEditor({
   );
   const deliveryFee =
     settings.showPrices && total > 0 ? getSpbDeliveryFee(total) : 0;
-  const cartCount = selectedItems.length + customItems.length;
+  const grandTotal = roundPriceUp(total + deliveryFee);
+  const cartCount =
+    selectedItems.length + customItems.length + (deliveryFee > 0 ? 1 : 0);
   const selectedAddress = addresses.find((item) => item.id === addressId);
   const deliveryDateParts = getDeliveryDateParts(deliveryDate);
 
@@ -741,7 +750,14 @@ export function OrderEditor({
 
     const deliveryFee =
       settings.showPrices && total > 0 ? getSpbDeliveryFee(total) : 0;
-    if (deliveryFee > 0) {
+    // Confirm только если платная доставка появляется или растёт
+    // (новый заказ / убрали товары ниже порога). При дозаказе с уже
+    // платной доставкой или при переходе на бесплатную — без диалога.
+    const previousFee =
+      session.mode === "edit"
+        ? Math.max(0, Number(session.order?.deliveryFee) || 0)
+        : 0;
+    if (deliveryFee > previousFee) {
       const needMore = Math.max(0, FREE_DELIVERY_MIN_TOTAL - total);
       const ok = await appConfirm({
         title: "Платная доставка",
@@ -1202,15 +1218,15 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button 
                     <div className="summary-total">
                       <span>Итого</span>
                       <strong>
-                        {settings.showPrices && total > 0
-                          ? formatMoney(total)
+                        {settings.showPrices && grandTotal > 0
+                          ? formatMoney(grandTotal)
                           : "уточняется"}
                       </strong>
                     </div>
                     {settings.showPrices && total > 0 ? (
                       <p className={`summary-delivery-note${deliveryFee > 0 ? " is-paid" : " is-free"}`}>
                         {deliveryFee > 0
-                          ? `Доставка по СПб — ${formatMoney(PAID_DELIVERY_FEE)}. До бесплатной ещё ${formatMoney(FREE_DELIVERY_MIN_TOTAL - total)}.`
+                          ? `В заказе позиция «Доставка» — ${formatMoney(PAID_DELIVERY_FEE)}. До бесплатной ещё ${formatMoney(FREE_DELIVERY_MIN_TOTAL - total)}.`
                           : "Доставка по СПб — бесплатно."}
                       </p>
                     ) : null}
@@ -1263,7 +1279,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button 
         <div className="mobile-checkout-bar" aria-label="Корзина">
           <div className="mobile-checkout-bar-info">
             <strong>{cartCount} поз.</strong>
-            <span>{settings.showPrices && total > 0 ? formatMoney(total) : "Сумма уточняется"}</span>
+            <span>{settings.showPrices && grandTotal > 0 ? formatMoney(grandTotal) : "Сумма уточняется"}</span>
           </div>
           <button
             className="mobile-checkout-bar-button"
@@ -1399,6 +1415,19 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button 
                       </div>
                     </div>
                   ))}
+                  {deliveryFee > 0 ? (
+                    <div className="cart-sheet-item cart-sheet-item--delivery" key="clover-delivery-spb">
+                      <div className="cart-sheet-item-head">
+                        <div className="cart-sheet-item-main">
+                          <strong>{settings.deliveryOneCName || "Доставка"}</strong>
+                          <small>Доставка по СПб · 1 шт.</small>
+                        </div>
+                        <div className="cart-sheet-item-actions">
+                          <strong>{formatMoney(deliveryFee)}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               )}
 
@@ -1474,12 +1503,12 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button 
               <div className="cart-sheet-footer">
                 <div className="cart-sheet-total">
                   <span>Итого</span>
-                  <strong>{settings.showPrices && total > 0 ? formatMoney(total) : `${cartCount} поз.`}</strong>
+                  <strong>{settings.showPrices && grandTotal > 0 ? formatMoney(grandTotal) : `${cartCount} поз.`}</strong>
                 </div>
                 {settings.showPrices && total > 0 ? (
                   <p className={`cart-sheet-delivery-note${deliveryFee > 0 ? " is-paid" : " is-free"}`}>
                     {deliveryFee > 0
-                      ? `Доставка по СПб — ${formatMoney(PAID_DELIVERY_FEE)}. Добавьте ещё на ${formatMoney(FREE_DELIVERY_MIN_TOTAL - total)} для бесплатной доставки.`
+                      ? `В заказе позиция «Доставка» — ${formatMoney(PAID_DELIVERY_FEE)}. Добавьте ещё на ${formatMoney(FREE_DELIVERY_MIN_TOTAL - total)} для бесплатной.`
                       : "Доставка по Санкт-Петербургу — бесплатно."}
                   </p>
                 ) : null}

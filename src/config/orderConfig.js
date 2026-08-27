@@ -66,11 +66,21 @@ export function canCancelOneCTransfer(exchange = {}) {
   return status === "ready" || status === "sending";
 }
 
-/** Порог бесплатной доставки по СПб (руб.). */
+/** Порог бесплатной доставки по СПб (руб.). Зеркало: server/src/deliveryFee.js */
 export const FREE_DELIVERY_MIN_TOTAL = 5000;
 
-/** Стоимость доставки по СПб, если заказ ниже порога (руб.). */
+/** Стоимость доставки по СПб, если заказ ниже порога (руб.). Зеркало: server/src/deliveryFee.js */
 export const PAID_DELIVERY_FEE = 500;
+
+/** Служебная позиция доставки в order.items. Зеркало: server/src/deliveryFee.js */
+export const CLOVER_DELIVERY_LINE_ID = "clover-delivery-spb";
+
+export function isCloverDeliveryLine(item) {
+  if (!item || typeof item !== "object") return false;
+  if (item.isDelivery === true) return true;
+  const id = String(item.productId ?? item.id ?? "").trim();
+  return id === CLOVER_DELIVERY_LINE_ID;
+}
 
 /** 0 = бесплатно (сумма ≥ порога), иначе платная доставка. */
 export function getSpbDeliveryFee(orderTotal) {

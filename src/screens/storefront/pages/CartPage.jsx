@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import {
-  cartTotal,
+  FREE_DELIVERY_MIN_TOTAL,
+  PAID_DELIVERY_FEE,
+  cartDeliveryFee,
+  cartGoodsTotal,
+  cartGrandTotal,
   clearCart,
   getCartItems,
   removeFromCart,
@@ -12,7 +16,9 @@ import { StorefrontCartQtyControl } from "../components/StorefrontQtyControl.jsx
 export function CartPage() {
   const [items, setItems] = useState(getCartItems);
   useEffect(() => subscribeCart(() => setItems(getCartItems())), []);
-  const total = cartTotal(items);
+  const goodsTotal = cartGoodsTotal(items);
+  const deliveryFee = cartDeliveryFee(items);
+  const grandTotal = cartGrandTotal(items);
 
   if (!items.length) {
     return (
@@ -81,11 +87,25 @@ export function CartPage() {
             </button>
           </li>
         ))}
+        {deliveryFee > 0 ? (
+          <li className="sf-cart-item sf-cart-item--delivery">
+            <div className="sf-cart-meta">
+              <strong>Доставка</strong>
+              <p className="sf-muted">По СПб · заказ менее {formatMoney(FREE_DELIVERY_MIN_TOTAL)}</p>
+            </div>
+            <strong className="sf-cart-line-total">{formatMoney(PAID_DELIVERY_FEE)}</strong>
+          </li>
+        ) : null}
       </ul>
       <div className="sf-cart-summary">
         <div>
+          <p className={`sf-delivery-note${deliveryFee > 0 ? " is-paid" : " is-free"}`}>
+            {deliveryFee > 0
+              ? `Доставка ${formatMoney(PAID_DELIVERY_FEE)}. До бесплатной ещё ${formatMoney(FREE_DELIVERY_MIN_TOTAL - goodsTotal)}.`
+              : "Доставка по СПб — бесплатно."}
+          </p>
           <p className="sf-muted">Итого</p>
-          <strong className="sf-cart-total">{formatMoney(total)}</strong>
+          <strong className="sf-cart-total">{formatMoney(grandTotal)}</strong>
         </div>
         <div className="sf-cart-actions">
           <button

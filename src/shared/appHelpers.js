@@ -6983,7 +6983,15 @@ export function getOrderTotal(order) {
     (sum, item) => sum + (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0),
     0
   );
-  const deliveryFee = Math.max(0, Number(order?.deliveryFee) || 0);
+  // Если «Доставка» уже в items — не дублируем deliveryFee (старые заказы без линии — через fee).
+  const hasDeliveryLine = (order.items || []).some(
+    (item) =>
+      item?.isDelivery === true ||
+      String(item?.productId ?? item?.id ?? "") === "clover-delivery-spb"
+  );
+  const deliveryFee = hasDeliveryLine
+    ? 0
+    : Math.max(0, Number(order?.deliveryFee) || 0);
   return roundPriceUp(itemsTotal + customTotal + deliveryFee);
 }
 
