@@ -26,6 +26,11 @@ import {
   getEarliestDeliveryDateIso,
   validateDeliveryDate,
 } from "../../shared/deliveryDateRules";
+import {
+  FREE_DELIVERY_MIN_TOTAL,
+  PAID_DELIVERY_FEE,
+  getSpbDeliveryFee,
+} from "../../config/orderConfig";
 import { productImageSrc } from "../../shared/productPhoto";
 import { ManagerContact } from "./ManagerContact";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
@@ -158,7 +163,186 @@ export function OrderEditor({
   const [missingFields, setMissingFields] = useState({ date: false, address: false });
   const cartDateFieldRef = useRef(null);
   const cartAddressFieldRef = useRef(null);
+  const catalogLayoutRef = useRef(null);
+  const catalogHostRef = useRef(null);
+  const catalogToolbarRef = useRef(null);
+  const cartSlotRef = useRef(null);
+  const cartPanelRef = useRef(null);
   const earliestDeliveryDate = getEarliestDeliveryDateIso();
+
+  // Один layout-pass: сначала сетка каталог|корзина, потом fixed-тулбар.
+  // Иначе на первом входе тулбар меряется на всю ширину и «залипает» до F5.
+  useLayoutEffect(() => {
+    if (!embedded || typeof window === "undefined") return undefined;
+
+    const shell = catalogLayoutRef.current;
+    const slot = cartSlotRef.current;
+    const cart = cartPanelRef.current;
+    const catalog = catalogHostRef.current;
+    const toolbar = catalogToolbarRef.current;
+    if (!shell || !catalog) return undefined;
+
+    const clearShell = () => {
+      ["display", "grid-template-columns", "column-gap", "gap", "align-items", "width", "box-sizing"].forEach((n) =>
+        shell.style.removeProperty(n)
+      );
+      ["min-width", "max-width", "overflow", "overflow-x", "width"].forEach((n) =>
+        catalog.style.removeProperty(n)
+      );
+      if (slot) {
+        ["width", "min-width", "max-width", "min-height", "height"].forEach((n) =>
+          slot.style.removeProperty(n)
+        );
+      }
+      if (cart) {
+        [
+          "display",
+          "width",
+          "min-width",
+          "max-width",
+          "position",
+          "top",
+          "left",
+          "right",
+          "inset",
+          "float",
+          "transform",
+          "margin",
+          "z-index",
+          "box-sizing",
+          "padding",
+          "border-radius",
+          "align-self",
+        ].forEach((n) => cart.style.removeProperty(n));
+      }
+    };
+
+    const clearToolbar = () => {
+      catalog.style.removeProperty("--catalog-order-chrome-h");
+      if (!toolbar) return;
+      ["position", "top", "left", "width", "max-width", "right", "z-index", "visibility"].forEach((n) =>
+        toolbar.style.removeProperty(n)
+      );
+    };
+
+    const applyDesktopShell = () => {
+      shell.style.setProperty("display", "grid", "important");
+      shell.style.setProperty("grid-template-columns", "minmax(0, 1fr) 300px", "important");
+      shell.style.setProperty("column-gap", "20px", "important");
+      shell.style.setProperty("align-items", "start", "important");
+      shell.style.setProperty("width", "100%", "important");
+      shell.style.setProperty("box-sizing", "border-box", "important");
+
+      catalog.style.setProperty("min-width", "0", "important");
+      catalog.style.setProperty("max-width", "100%", "important");
+      catalog.style.setProperty("overflow-x", "hidden", "important");
+
+      if (slot) {
+        slot.style.setProperty("width", "300px", "important");
+        slot.style.setProperty("min-width", "300px", "important");
+        slot.style.setProperty("max-width", "300px", "important");
+      }
+
+      if (cart && slot) {
+        const slotRect = slot.getBoundingClientRect();
+        const left = Math.max(0, Math.round(slotRect.left));
+        cart.style.setProperty("display", "block", "important");
+        cart.style.setProperty("position", "fixed", "important");
+        cart.style.setProperty("top", "var(--clover-chrome-offset, 56px)", "important");
+        cart.style.setProperty("left", `${left}px`, "important");
+        cart.style.setProperty("width", "300px", "important");
+        cart.style.setProperty("min-width", "300px", "important");
+        cart.style.setProperty("max-width", "300px", "important");
+        cart.style.setProperty("right", "auto", "important");
+        cart.style.setProperty("inset", "auto", "important");
+        cart.style.setProperty("float", "none", "important");
+        cart.style.setProperty("transform", "none", "important");
+        cart.style.setProperty("margin", "0", "important");
+        cart.style.setProperty("z-index", "90", "important");
+        cart.style.setProperty("box-sizing", "border-box", "important");
+        cart.style.setProperty("padding", "18px 16px", "important");
+        cart.style.setProperty("border-radius", "16px", "important");
+        cart.style.setProperty("align-self", "start", "important");
+        const cartH = Math.ceil(cart.getBoundingClientRect().height);
+        slot.style.setProperty("min-height", `${Math.max(cartH, 1)}px`, "important");
+      }
+    };
+
+    const applyToolbar = () => {
+      if (!toolbar) return;
+
+      const hostBox = catalog.getBoundingClientRect();
+      let left = Math.max(0, Math.round(hostBox.left));
+      let width = Math.max(0, Math.round(hostBox.width));
+
+      // До слота корзины минус gap — страховка, если колонка ещё на всю ширину.
+      if (slot && window.matchMedia("(min-width: 901px)").matches) {
+        const slotBox = slot.getBoundingClientRect();
+        const gap = 20;
+        const untilSlot = Math.round(slotBox.left - gap - hostBox.left);
+        if (untilSlot > 120) width = untilSlot;
+      }
+
+      toolbar.style.setProperty("position", "fixed", "important");
+      toolbar.style.setProperty("top", "var(--clover-chrome-offset, 56px)", "important");
+      toolbar.style.setProperty("left", `${left}px`, "important");
+      toolbar.style.setProperty("width", `${width}px`, "important");
+      toolbar.style.setProperty("max-width", `${width}px`, "important");
+      toolbar.style.setProperty("right", "auto", "important");
+      toolbar.style.setProperty("z-index", "95", "important");
+      toolbar.style.setProperty("visibility", "visible", "important");
+
+      const toolbarRect = toolbar.getBoundingClientRect();
+      const hostTopDoc = catalog.getBoundingClientRect().top + window.scrollY;
+      const alreadyBelow = hostTopDoc - toolbarRect.top;
+      const height = Math.max(
+        0,
+        Math.ceil(toolbarRect.height - Math.max(0, alreadyBelow))
+      );
+      catalog.style.setProperty("--catalog-order-chrome-h", `${height}px`);
+    };
+
+    const apply = () => {
+      if (window.matchMedia("(max-width: 900px)").matches) {
+        clearShell();
+        clearToolbar();
+        return;
+      }
+      applyDesktopShell();
+      applyToolbar();
+    };
+
+    if (toolbar) {
+      toolbar.style.setProperty("visibility", "hidden", "important");
+    }
+
+    apply();
+    const raf1 = window.requestAnimationFrame(() => {
+      apply();
+      window.requestAnimationFrame(apply);
+    });
+
+    const mq = window.matchMedia("(min-width: 901px)");
+    mq.addEventListener("change", apply);
+    window.addEventListener("resize", apply);
+    window.addEventListener("scroll", apply, true);
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(apply) : null;
+    ro?.observe(shell);
+    ro?.observe(catalog);
+    if (slot) ro?.observe(slot);
+    if (cart) ro?.observe(cart);
+    // Не observe(toolbar): смена width/height иначе крутит ResizeObserver.
+
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      mq.removeEventListener("change", apply);
+      window.removeEventListener("resize", apply);
+      window.removeEventListener("scroll", apply, true);
+      ro?.disconnect();
+      clearShell();
+      clearToolbar();
+    };
+  }, [embedded]);
 
   // Один адрес в списке — всегда подставляем автоматически.
   useEffect(() => {
@@ -349,6 +533,8 @@ export function OrderEditor({
         0
       )
   );
+  const deliveryFee =
+    settings.showPrices && total > 0 ? getSpbDeliveryFee(total) : 0;
   const cartCount = selectedItems.length + customItems.length;
   const selectedAddress = addresses.find((item) => item.id === addressId);
   const deliveryDateParts = getDeliveryDateParts(deliveryDate);
@@ -514,6 +700,25 @@ export function OrderEditor({
     }
 
     setMissingFields({ date: false, address: false });
+
+    const deliveryFee =
+      settings.showPrices && total > 0 ? getSpbDeliveryFee(total) : 0;
+    if (deliveryFee > 0) {
+      const needMore = Math.max(0, FREE_DELIVERY_MIN_TOTAL - total);
+      const ok = await appConfirm({
+        title: "Платная доставка",
+        message:
+          `Сумма заказа меньше ${formatMoney(FREE_DELIVERY_MIN_TOTAL)}. ` +
+          `Доставка по Санкт-Петербургу — ${formatMoney(PAID_DELIVERY_FEE)}. ` +
+          `Добавьте товаров ещё на ${formatMoney(needMore)} для бесплатной доставки ` +
+          `либо оформите заказ с платной доставкой.`,
+        confirmLabel: `Оформить (+${formatMoney(PAID_DELIVERY_FEE)})`,
+        cancelLabel: "Вернуться к заказу",
+        tone: "warn",
+      });
+      if (!ok) return;
+    }
+
     draftSaveLockedRef.current = true;
     try {
       localStorage.removeItem(STORAGE.draft);
@@ -529,6 +734,11 @@ export function OrderEditor({
         address: checkoutAddress.address,
         addressLabel: checkoutAddress.label,
         clientComment: clientComment.trim(),
+        deliveryFee,
+        deliveryNote:
+          deliveryFee > 0
+            ? `Доставка по СПб платная: ${PAID_DELIVERY_FEE} ₽ (заказ менее ${FREE_DELIVERY_MIN_TOTAL} ₽)`
+            : "Доставка по СПб бесплатная",
       })
     )
       .then(() => {
@@ -544,53 +754,184 @@ export function OrderEditor({
       <section
         className={embedded ? "catalog-content embedded-catalog client-order-catalog" : "catalog-content"}
       >
-        <div className="catalog-layout">
-          <aside className="order-summary" id="order-summary">
-            <h2>Корзина</h2>
-            {!selectedItems.length && !customItems.length ? (
-              <EmptyState
-                title="Пока пусто"
-                message="Выберите товары в каталоге, затем откройте корзину для оформления."
-              />
-            ) : (
-              <>
-                <div className="summary-total" style={{ marginTop: 0 }}>
-                  <span>Позиций</span>
-                  <strong>{cartCount}</strong>
-                </div>
-                <div className="summary-total">
-                  <span>Итого</span>
-                  <strong>
-                    {settings.showPrices && total > 0
-                      ? formatMoney(total)
-                      : "уточняется"}
-                  </strong>
-                </div>
-                <p className="summary-note">
-                  Дата, адрес и комментарий — в корзине перед оформлением.
-                </p>
-                <div className="order-summary-actions">
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => void clearCart()}
-                  >
-                    Очистить корзину
-                  </button>
-                  <button
-                    className="primary-button open-cart-button"
-                    type="button"
-                    onClick={openCartForCheckout}
-                  >
-                    Перейти в корзину
-                  </button>
-                </div>
-              </>
-            )}
-          </aside>
+        {embedded ? (
+          <style>{`
+/* Shell: каталог | корзина 300px */
+@media (min-width: 901px) {
+  .lk-order-shell[data-lk-shell="v3"] {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 300px !important;
+    column-gap: 20px !important;
+    align-items: start !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .lk-order-shell[data-lk-shell="v3"] > .lk-order-catalog {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+  .lk-order-shell[data-lk-shell="v3"] > .lk-order-cart-slot {
+    width: 300px !important;
+    min-width: 300px !important;
+    max-width: 300px !important;
+    box-sizing: border-box !important;
+  }
+  .lk-order-shell[data-lk-shell="v3"] .lk-order-cart {
+    display: block !important;
+    width: 300px !important;
+    min-width: 300px !important;
+    max-width: 300px !important;
+    position: fixed !important;
+    top: var(--clover-chrome-offset, 56px) !important;
+    z-index: 90 !important;
+    margin: 0 !important;
+    padding: 18px 16px !important;
+    border-radius: 16px !important;
+    box-sizing: border-box !important;
+  }
+}
+@media (max-width: 900px) {
+  .lk-order-shell[data-lk-shell="v3"] > .lk-order-cart-slot,
+  .lk-order-shell[data-lk-shell="v3"] .lk-order-cart { display: none !important; }
+}
 
-          <div className="catalog-main">
-            {/* В embedded заголовок убираем — toolbar sticky занимает верх колонки. */}
+/* Тулбар эталон «Буду поздно» — fixed в колонке каталога (4 карточки) */
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar,
+.client-order-catalog .client-order-catalog-toolbar,
+main.clover-app > .client-order-catalog-toolbar {
+  margin: 0 !important;
+  padding: 8px 10px 10px !important;
+  box-sizing: border-box !important;
+}
+.embedded-catalog.client-order-catalog .client-order-catalog-toolbar,
+.lk-order-catalog > .client-order-catalog-toolbar {
+  position: relative !important;
+  top: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  z-index: 95 !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar::before,
+.client-order-catalog .client-order-catalog-toolbar::before,
+main.clover-app > .client-order-catalog-toolbar::before {
+  left: 0 !important;
+  right: 0 !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar-spacer,
+.client-order-catalog .client-order-catalog-toolbar-spacer {
+  display: block !important;
+  height: var(--catalog-order-chrome-h, 80px) !important;
+  margin: 0 !important;
+  pointer-events: none !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .catalog-search,
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .catalog-search-input,
+.client-order-catalog .client-order-catalog-toolbar .catalog-search,
+.client-order-catalog .client-order-catalog-toolbar .catalog-search-input,
+main.clover-app > .client-order-catalog-toolbar .catalog-search,
+main.clover-app > .client-order-catalog-toolbar .catalog-search-input {
+  min-height: 36px !important;
+  height: 36px !important;
+  max-height: 36px !important;
+  padding: 6px 12px !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+  border-radius: 10px !important;
+  box-sizing: border-box !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .catalog-filter-actions,
+.client-order-catalog .client-order-catalog-toolbar .catalog-filter-actions,
+main.clover-app > .client-order-catalog-toolbar .catalog-filter-actions {
+  gap: 6px !important;
+  align-items: center !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .catalog-view-toggle,
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .catalog-view-toggle button,
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .catalog-filter-actions > .category-button,
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .client-order-positions-chip,
+.client-order-catalog .client-order-catalog-toolbar .catalog-view-toggle,
+.client-order-catalog .client-order-catalog-toolbar .catalog-view-toggle button,
+.client-order-catalog .client-order-catalog-toolbar .catalog-filter-actions > .category-button,
+.client-order-catalog .client-order-catalog-toolbar .client-order-positions-chip,
+main.clover-app > .client-order-catalog-toolbar .catalog-view-toggle,
+main.clover-app > .client-order-catalog-toolbar .catalog-view-toggle button,
+main.clover-app > .client-order-catalog-toolbar .catalog-filter-actions > .category-button,
+main.clover-app > .client-order-catalog-toolbar .client-order-positions-chip {
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  box-sizing: border-box !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .catalog-view-toggle button,
+.client-order-catalog .client-order-catalog-toolbar .catalog-view-toggle button,
+main.clover-app > .client-order-catalog-toolbar .catalog-view-toggle button {
+  min-width: 36px !important;
+  width: 36px !important;
+  padding: 0 !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .category-list,
+.client-order-catalog .client-order-catalog-toolbar .category-list,
+main.clover-app > .client-order-catalog-toolbar .category-list {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  height: auto !important;
+  min-height: 32px !important;
+  max-height: none !important;
+  gap: 6px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  width: 100% !important;
+}
+@media (max-width: 900px) {
+  .lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .category-list,
+  .client-order-catalog .client-order-catalog-toolbar .category-list,
+  main.clover-app > .client-order-catalog-toolbar .category-list {
+    flex-wrap: nowrap !important;
+    height: 32px !important;
+    max-height: 32px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    overscroll-behavior-x: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .category-list::-webkit-scrollbar,
+.client-order-catalog .client-order-catalog-toolbar .category-list::-webkit-scrollbar,
+main.clover-app > .client-order-catalog-toolbar .category-list::-webkit-scrollbar {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .category-list .category-button,
+.client-order-catalog .client-order-catalog-toolbar .category-list .category-button,
+main.clover-app > .client-order-catalog-toolbar .category-list .category-button {
+  flex: 0 0 auto !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  border-radius: 10px !important;
+  box-sizing: border-box !important;
+}
+          `}</style>
+        ) : null}
+        <div
+          className={embedded ? "lk-order-shell" : "catalog-layout"}
+          ref={embedded ? catalogLayoutRef : undefined}
+          data-lk-shell={embedded ? "v3" : undefined}
+        >
+          <div
+            className={embedded ? "lk-order-catalog" : "catalog-main"}
+            ref={embedded ? catalogHostRef : undefined}
+          >
+            {/* В embedded заголовок убираем — toolbar fixed занимает верх колонки. */}
             {!embedded ? (
               <div className="page-title-row">
                 <div>
@@ -609,82 +950,96 @@ export function OrderEditor({
               </div>
             ) : null}
 
-            <div
-              className={
-                embedded
-                  ? "catalog-toolbar client-order-catalog-toolbar"
-                  : "catalog-toolbar"
-              }
-            >
-              <div className="catalog-filter-row">
-                <CatalogSearchInput
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                <div className="catalog-filter-actions">
-                  {settings.showFavorites && (
-                    <button
-                      className={favoritesOnly ? "category-button active" : "category-button"}
-                      type="button"
-                      onClick={() => setFavoritesOnly((value) => !value)}
-                      aria-label="Избранное"
-                      title="Избранное"
-                    >
-                      <span className="fav-label-full">★ Избранное</span>
-                      <span className="fav-label-short">★</span>
-                    </button>
-                  )}
-                  <div className="catalog-view-toggle" role="group" aria-label="Вид каталога">
-                    <button
-                      type="button"
-                      className={catalogView === "cards" ? "active" : ""}
-                      aria-pressed={catalogView === "cards"}
-                      title="С фото"
-                      aria-label="С фото"
-                      onClick={() => {
-                        setCatalogView("cards");
-                        safeWrite(STORAGE.catalogView, "cards");
-                      }}
-                    >
-                      <CatalogViewToggleIcon variant="cards" />
-                      <span className="view-toggle-label">Фото</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={catalogView === "list" ? "active" : ""}
-                      aria-pressed={catalogView === "list"}
-                      title="Список"
-                      aria-label="Список"
-                      onClick={() => {
-                        setCatalogView("list");
-                        safeWrite(STORAGE.catalogView, "list");
-                      }}
-                    >
-                      <CatalogViewToggleIcon variant="list" />
-                      <span className="view-toggle-label">Список</span>
-                    </button>
-                  </div>
-                  {embedded ? (
-                    <div className="mini-card client-order-positions-chip">
-                      <span className="mini-label">Позиций</span>
-                      <strong>{cartCount}</strong>
+            {(() => {
+              const toolbar = (
+                <div
+                  className={
+                    embedded
+                      ? "catalog-toolbar client-order-catalog-toolbar"
+                      : "catalog-toolbar"
+                  }
+                  ref={embedded ? catalogToolbarRef : undefined}
+                >
+                  <div className="catalog-filter-row">
+                    <CatalogSearchInput
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                    <div className="catalog-filter-actions">
+                      {settings.showFavorites && (
+                        <button
+                          className={favoritesOnly ? "category-button active" : "category-button"}
+                          type="button"
+                          onClick={() => setFavoritesOnly((value) => !value)}
+                          aria-label="Избранное"
+                          title="Избранное"
+                        >
+                          <span className="fav-label-full">★ Избранное</span>
+                          <span className="fav-label-short">★</span>
+                        </button>
+                      )}
+                      <div className="catalog-view-toggle" role="group" aria-label="Вид каталога">
+                        <button
+                          type="button"
+                          className={catalogView === "cards" ? "active" : ""}
+                          aria-pressed={catalogView === "cards"}
+                          title="С фото"
+                          aria-label="С фото"
+                          onClick={() => {
+                            setCatalogView("cards");
+                            safeWrite(STORAGE.catalogView, "cards");
+                          }}
+                        >
+                          <CatalogViewToggleIcon variant="cards" />
+                          <span className="view-toggle-label">Фото</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={catalogView === "list" ? "active" : ""}
+                          aria-pressed={catalogView === "list"}
+                          title="Список"
+                          aria-label="Список"
+                          onClick={() => {
+                            setCatalogView("list");
+                            safeWrite(STORAGE.catalogView, "list");
+                          }}
+                        >
+                          <CatalogViewToggleIcon variant="list" />
+                          <span className="view-toggle-label">Список</span>
+                        </button>
+                      </div>
+                      {embedded ? (
+                        <div className="mini-card client-order-positions-chip">
+                          <span className="mini-label">Позиций</span>
+                          <strong>{cartCount}</strong>
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
+                  </div>
+                  <div className="category-list">
+                    {categories.map((item) => (
+                      <button
+                        className={category === item ? "category-button active" : "category-button"}
+                        type="button"
+                        key={item}
+                        onClick={() => setCategory(item)}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div className="category-list">
-                {categories.map((item) => (
-                  <button
-                    className={category === item ? "category-button active" : "category-button"}
-                    type="button"
-                    key={item}
-                    onClick={() => setCategory(item)}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-            </div>
+              );
+
+              if (!embedded) return toolbar;
+
+              return (
+                <>
+                  {toolbar}
+                  <div className="client-order-catalog-toolbar-spacer" aria-hidden="true" />
+                </>
+              );
+            })()}
 
             {catalogPolicy.matrixMode === "pending" && (
               <div className="matrix-catalog-note pending">
@@ -694,6 +1049,7 @@ export function OrderEditor({
               </div>
             )}
 
+            <div className="catalog-products">
             <section className={catalogView === "list" ? "product-grid product-grid-list" : "product-grid"}>
               {filtered.map((product) => {
                 const unit = units[product.id] || orderedSaleUnits(product)[0];
@@ -786,7 +1142,83 @@ export function OrderEditor({
               })}
               {!filtered.length && <div className="empty-box">Товары не найдены.</div>}
             </section>
+            </div>
           </div>
+
+          {(() => {
+            const cartBody = (
+              <>
+                <h2>Корзина</h2>
+                {!selectedItems.length && !customItems.length ? (
+                  <EmptyState
+                    title="Пока пусто"
+                    message="Выберите товары в каталоге, затем откройте корзину для оформления."
+                  />
+                ) : (
+                  <>
+                    <div className="summary-total" style={{ marginTop: 0 }}>
+                      <span>Позиций</span>
+                      <strong>{cartCount}</strong>
+                    </div>
+                    <div className="summary-total">
+                      <span>Итого</span>
+                      <strong>
+                        {settings.showPrices && total > 0
+                          ? formatMoney(total)
+                          : "уточняется"}
+                      </strong>
+                    </div>
+                    {settings.showPrices && total > 0 ? (
+                      <p className={`summary-delivery-note${deliveryFee > 0 ? " is-paid" : " is-free"}`}>
+                        {deliveryFee > 0
+                          ? `Доставка по СПб — ${formatMoney(PAID_DELIVERY_FEE)}. До бесплатной ещё ${formatMoney(FREE_DELIVERY_MIN_TOTAL - total)}.`
+                          : "Доставка по СПб — бесплатно."}
+                      </p>
+                    ) : null}
+                    <p className="summary-note">
+                      Дата, адрес и комментарий — в корзине перед оформлением.
+                    </p>
+                    <div className="order-summary-actions">
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => void clearCart()}
+                      >
+                        Очистить корзину
+                      </button>
+                      <button
+                        className="primary-button open-cart-button"
+                        type="button"
+                        onClick={openCartForCheckout}
+                      >
+                        Перейти в корзину
+                      </button>
+                    </div>
+                  </>
+                )}
+              </>
+            );
+
+            if (embedded) {
+              return (
+                <div className="lk-order-cart-slot" ref={cartSlotRef}>
+                  <aside
+                    className="order-summary lk-order-cart"
+                    id="order-summary"
+                    ref={cartPanelRef}
+                  >
+                    {cartBody}
+                  </aside>
+                </div>
+              );
+            }
+
+            return (
+              <aside className="order-summary" id="order-summary">
+                {cartBody}
+              </aside>
+            );
+          })()}
         </div>
 
         <div className="mobile-checkout-bar" aria-label="Корзина">
@@ -1005,6 +1437,13 @@ export function OrderEditor({
                   <span>Итого</span>
                   <strong>{settings.showPrices && total > 0 ? formatMoney(total) : `${cartCount} поз.`}</strong>
                 </div>
+                {settings.showPrices && total > 0 ? (
+                  <p className={`cart-sheet-delivery-note${deliveryFee > 0 ? " is-paid" : " is-free"}`}>
+                    {deliveryFee > 0
+                      ? `Доставка по СПб — ${formatMoney(PAID_DELIVERY_FEE)}. Добавьте ещё на ${formatMoney(FREE_DELIVERY_MIN_TOTAL - total)} для бесплатной доставки.`
+                      : "Доставка по Санкт-Петербургу — бесплатно."}
+                  </p>
+                ) : null}
                 <button className="secondary-button" type="button" onClick={() => void clearCart()}>
                   Очистить корзину
                 </button>

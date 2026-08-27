@@ -92,8 +92,8 @@ const checks = [
     "Карточка клиента компактная, без лишней пустоты",
   ],
   [
-    "grid-template-columns: 38px minmax(0, 1fr) 38px !important",
-    "На телефоне в ЛК кнопки количества крупнее",
+    "grid-template-columns: 30px minmax(0, 1fr) 30px !important",
+    "На телефоне в ЛК кнопки количества компактные по эталону «Буду поздно»",
   ],
   [
     'Number.isFinite(Number(value))',
@@ -404,6 +404,13 @@ if (source.includes('value !== "" &&\n    hasPurchasePrice(value)')) {
   throw new Error("Обнаружен рекурсивный вызов hasPurchasePrice.");
 }
 
+if (!source.includes('data-lk-shell="v3"') || !source.includes("lk-order-shell")) {
+  throw new Error("OrderEditor embedded должен использовать lk-order-shell v3.");
+}
+if (!source.includes('setProperty("grid-template-columns", "minmax(0, 1fr) 300px"')) {
+  throw new Error("OrderEditor должен жёстко фиксировать grid 1fr + 300px.");
+}
+
 console.log("Clover V17 UI verification passed:");
 for (const [, description] of checks) {
   console.log(`- ${description}`);
@@ -414,3 +421,4 @@ console.log("- Кнопка обновления фото витрины скр�
 console.log("- Высота рядов фото-каталога не считается от 100dvh");
 console.log("- Корзина и дата не порталятся в body");
 console.log("- Слой корзины без left+right+width 100% и без отрицательного margin");
+console.log("- Desktop ЛК: shell v3 grid 1fr + 300px");
