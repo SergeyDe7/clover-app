@@ -25,14 +25,31 @@ import { useMobileFixedChromeHeight } from "./useMobileFixedChromeHeight";
 
 function catalogAddPrice(product) {
   const units = orderedSaleUnits(product);
+  const mode = String(
+    product?.clientPriceMode || product?.defaultPricingMode || "base"
+  );
+  const categoryMode =
+    mode === "one_c_price_type" || mode === "purchase_markup";
   const seen = new Set();
+  const candidates = [];
   for (const unit of [...units, ...UNIT_ORDER]) {
     if (seen.has(unit)) continue;
     seen.add(unit);
     const price = getUnitPrice(product, unit);
-    if (price > 0) return { price, unit };
+    if (!(price > 0)) continue;
+    const source = String(product?.priceSources?.[unit] || "");
+    // При категории цен не показываем «базовый» fallback каталога.
+    if (categoryMode && source === "base_fallback") continue;
+    candidates.push({ price, unit, source });
   }
-  return { price: 0, unit: units[0] || "piece" };
+  if (!candidates.length) {
+    return { price: 0, unit: units[0] || "piece" };
+  }
+  const preferred =
+    candidates.find((item) =>
+      /one_c_price_type|purchase_markup|manual/.test(item.source)
+    ) || candidates[0];
+  return { price: preferred.price, unit: preferred.unit };
 }
 
 function NavChevron() {

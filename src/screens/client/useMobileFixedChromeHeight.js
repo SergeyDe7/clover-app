@@ -96,12 +96,17 @@ export function useFixedChromeHeight(chromeRef, hostRef, cssVarName, active = tr
 
     arm();
     window.addEventListener("resize", apply);
-    window.addEventListener("scroll", apply, true);
+    // scroll на mobile даёт layout thrash у края страницы — не слушаем.
+    const onScroll = () => {
+      if (window.matchMedia("(max-width: 820px)").matches) return;
+      apply();
+    };
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
     return () => {
       window.cancelAnimationFrame(raf);
       ro?.disconnect();
       window.removeEventListener("resize", apply);
-      window.removeEventListener("scroll", apply, true);
+      window.removeEventListener("scroll", onScroll, true);
       const host = hostRef?.current;
       host?.style.removeProperty(cssVarName);
       const el = chromeRef.current;

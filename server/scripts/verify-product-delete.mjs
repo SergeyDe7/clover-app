@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { uniqueMatrixProductIds, growMatrixIdList, toggleMatrixProductId, idsWithout } from "../../src/screens/manager/matrixIds.js";
+import {
+  uniqueMatrixProductIds,
+  growMatrixIdList,
+  toggleMatrixProductId,
+  idsWithout,
+  expandMatrixRemovalByOneCId,
+} from "../../src/screens/manager/matrixIds.js";
 
 const saved = uniqueMatrixProductIds([
   10,
@@ -44,6 +50,21 @@ assert.deepEqual(
   "Удаление из матрицы снимает только отмеченные id"
 );
 
+const expandedByOneC = expandMatrixRemovalByOneCId(
+  [{ id: "10", oneCId: "oc-1", name: "Сок" }],
+  ["10", "20", "30"],
+  [
+    { id: "10", oneCId: "oc-1", name: "Сок" },
+    { id: "20", oneCId: "oc-1", name: "Сок дубль" },
+    { id: "30", oneCId: "oc-2", name: "Сок" },
+  ]
+);
+assert.deepEqual(
+  [...expandedByOneC].sort(),
+  ["10", "20"],
+  "Удаление убирает скрытые дубли с тем же oneCId, но не одноимённые с другим oneCId"
+);
+
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const clientsSource = await readFile(
   path.resolve(scriptDir, "../../src/screens/manager/ManagerClients.jsx"),
@@ -53,6 +74,11 @@ assert.equal(
   clientsSource.includes("expandMatrixRemovalIds"),
   false,
   "Галочка матрицы не должна снимать одноимённые товары пакетом"
+);
+assert.equal(
+  clientsSource.includes("expandMatrixRemovalByOneCId"),
+  true,
+  "Удаление из матрицы должно убирать скрытые дубли по oneCId"
 );
 assert.equal(
   clientsSource.includes("Галочка в списке матрицы — выбор для удаления, а не членство. Снятие не убирает товар из матрицы."),

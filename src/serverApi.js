@@ -361,6 +361,44 @@ export const api = {
     });
   },
 
+  async downloadStorefrontPriceListPdf(markupPercent) {
+    const token = getApiToken();
+    const params = new URLSearchParams();
+    if (
+      markupPercent !== undefined &&
+      markupPercent !== null &&
+      String(markupPercent).trim() !== ""
+    ) {
+      params.set("markupPercent", String(markupPercent));
+    }
+    const query = params.toString();
+    const response = await fetch(
+      `/api/admin/storefront/price-list.pdf${query ? `?${query}` : ""}`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }
+    );
+    if (!response.ok) {
+      let message = `Ошибка ${response.status}`;
+      try {
+        const data = await response.json();
+        if (data?.error) message = data.error;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(message);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const match = /filename\*=UTF-8''([^;]+)|filename="([^"]+)"/i.exec(
+      disposition
+    );
+    const fileName = decodeURIComponent(
+      match?.[1] || match?.[2] || "clover-vitrina-price-list.pdf"
+    );
+    return { blob, fileName };
+  },
+
   uploadStorefrontMapImage(file) {
     const formData = new FormData();
     formData.append("image", file);

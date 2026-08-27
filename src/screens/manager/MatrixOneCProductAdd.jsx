@@ -227,6 +227,20 @@ export function MatrixOneCProductAdd({
       !isOneCItemInClientMatrix(item, membership)
   );
 
+  const selectableItems = items.filter(
+    (item) => !isOneCItemInClientMatrix(item, membership)
+  );
+
+  const selectAllVisible = () => {
+    setSelectedIds(
+      new Set(selectableItems.map((item) => String(item.id)))
+    );
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
   return (
     <div className="matrix-onec-add">
       <button
@@ -341,11 +355,24 @@ export function MatrixOneCProductAdd({
               {notice}
             </div>
           )}
-          <div className="matrix-add-actions">
-            <span className="muted small">
-              1С: {catalogTotal || "—"} · найдено: {total} · к добавлению:{" "}
-              {selectedItems.length}
-            </span>
+          <div className="matrix-add-toolbar" role="toolbar" aria-label="Выбор товаров из 1С">
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={loading || selectableItems.length === 0}
+              onClick={selectAllVisible}
+              title="Отметить все позиции из текущего списка, которых ещё нет в матрице"
+            >
+              Выбрать все
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={loading || selectedIds.size === 0}
+              onClick={clearSelection}
+            >
+              Снять все
+            </button>
             <button
               className="primary-button"
               type="button"
@@ -355,6 +382,9 @@ export function MatrixOneCProductAdd({
               {loading ? "Добавляем..." : `Добавить (${selectedItems.length})`}
             </button>
           </div>
+          <p className="matrix-add-meta muted small">
+            1С: {catalogTotal || "—"} · найдено: {total} · к добавлению: {selectedItems.length}
+          </p>
           <div className="one-c-products-list one-c-picker-list">
             {items.map((item) => {
               const alreadyInMatrix = isOneCItemInClientMatrix(item, membership);
@@ -370,24 +400,13 @@ export function MatrixOneCProductAdd({
                         ? "one-c-picker-row selected"
                         : "one-c-picker-row"
                   }
-                  style={{ cursor: alreadyInMatrix ? "default" : "pointer" }}
                 >
-                  <label
-                    style={{
-                      display: "flex",
-                      gap: 10,
-                      alignItems: "flex-start",
-                      margin: 0,
-                      cursor: alreadyInMatrix ? "default" : "pointer",
-                      flex: 1,
-                    }}
-                  >
+                  <label className="one-c-picker-check-label">
                     <input
                       type="checkbox"
                       checked={checked}
                       disabled={alreadyInMatrix || loading}
                       onChange={() => toggleSelected(item)}
-                      style={{ marginTop: 4 }}
                     />
                     <div>
                       <strong>{item.name}</strong>

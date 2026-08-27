@@ -274,13 +274,19 @@ export function OrderEditor({
       const hostBox = catalog.getBoundingClientRect();
       let left = Math.max(0, Math.round(hostBox.left));
       let width = Math.max(0, Math.round(hostBox.width));
+      const isMobile = window.matchMedia("(max-width: 900px)").matches;
 
       // До слота корзины минус gap — страховка, если колонка ещё на всю ширину.
-      if (slot && window.matchMedia("(min-width: 901px)").matches) {
+      if (slot && !isMobile) {
         const slotBox = slot.getBoundingClientRect();
         const gap = 20;
         const untilSlot = Math.round(slotBox.left - gap - hostBox.left);
         if (untilSlot > 120) width = untilSlot;
+      }
+
+      if (isMobile) {
+        left = 0;
+        width = Math.max(0, Math.round(document.documentElement.clientWidth || window.innerWidth));
       }
 
       toolbar.style.setProperty("position", "fixed", "important");
@@ -291,6 +297,11 @@ export function OrderEditor({
       toolbar.style.setProperty("right", "auto", "important");
       toolbar.style.setProperty("z-index", "95", "important");
       toolbar.style.setProperty("visibility", "visible", "important");
+      if (isMobile) {
+        toolbar.style.setProperty("box-sizing", "border-box", "important");
+        toolbar.style.setProperty("padding-left", "max(8px, env(safe-area-inset-left, 0px))", "important");
+        toolbar.style.setProperty("padding-right", "max(8px, env(safe-area-inset-right, 0px))", "important");
+      }
 
       const toolbarRect = toolbar.getBoundingClientRect();
       const hostTopDoc = catalog.getBoundingClientRect().top + window.scrollY;
@@ -299,13 +310,17 @@ export function OrderEditor({
         0,
         Math.ceil(toolbarRect.height - Math.max(0, alreadyBelow))
       );
-      catalog.style.setProperty("--catalog-order-chrome-h", `${height}px`);
+      const prevH = catalog.style.getPropertyValue("--catalog-order-chrome-h").trim();
+      const nextH = `${height}px`;
+      if (prevH !== nextH) {
+        catalog.style.setProperty("--catalog-order-chrome-h", nextH);
+      }
     };
 
     const apply = () => {
       if (window.matchMedia("(max-width: 900px)").matches) {
         clearShell();
-        clearToolbar();
+        applyToolbar();
         return;
       }
       applyDesktopShell();
@@ -316,6 +331,27 @@ export function OrderEditor({
       toolbar.style.setProperty("visibility", "hidden", "important");
     }
 
+    let lastKey = "";
+    const applyIfChanged = () => {
+      const isMobile = window.matchMedia("(max-width: 900px)").matches;
+      if (isMobile) {
+        const width = Math.max(
+          0,
+          Math.round(document.documentElement.clientWidth || window.innerWidth)
+        );
+        const key = `m:${width}`;
+        if (key === lastKey) return;
+        lastKey = key;
+      }
+      apply();
+    };
+
+    const onScroll = () => {
+      // На телефоне scroll→layout даёт дёрганье у низа (100dvh / address bar).
+      if (window.matchMedia("(max-width: 900px)").matches) return;
+      applyIfChanged();
+    };
+
     apply();
     const raf1 = window.requestAnimationFrame(() => {
       apply();
@@ -323,21 +359,23 @@ export function OrderEditor({
     });
 
     const mq = window.matchMedia("(min-width: 901px)");
-    mq.addEventListener("change", apply);
-    window.addEventListener("resize", apply);
-    window.addEventListener("scroll", apply, true);
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(apply) : null;
+    mq.addEventListener("change", applyIfChanged);
+    window.addEventListener("resize", applyIfChanged);
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", applyIfChanged);
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(applyIfChanged) : null;
     ro?.observe(shell);
     ro?.observe(catalog);
     if (slot) ro?.observe(slot);
     if (cart) ro?.observe(cart);
-    // Не observe(toolbar): смена width/height иначе крутит ResizeObserver.
 
     return () => {
       window.cancelAnimationFrame(raf1);
-      mq.removeEventListener("change", apply);
-      window.removeEventListener("resize", apply);
-      window.removeEventListener("scroll", apply, true);
+      mq.removeEventListener("change", applyIfChanged);
+      window.removeEventListener("resize", applyIfChanged);
+      window.removeEventListener("scroll", onScroll, true);
+      vv?.removeEventListener("resize", applyIfChanged);
       ro?.disconnect();
       clearShell();
       clearToolbar();
@@ -806,8 +844,9 @@ main.clover-app > .client-order-catalog-toolbar {
 }
 .embedded-catalog.client-order-catalog .client-order-catalog-toolbar,
 .lk-order-catalog > .client-order-catalog-toolbar {
-  position: relative !important;
-  top: auto !important;
+  /* JS выставляет fixed; без JS — sticky под шапкой, не relative */
+  position: sticky !important;
+  top: var(--clover-chrome-offset, 56px) !important;
   width: 100% !important;
   max-width: 100% !important;
   z-index: 95 !important;
@@ -821,7 +860,7 @@ main.clover-app > .client-order-catalog-toolbar::before {
 .lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar-spacer,
 .client-order-catalog .client-order-catalog-toolbar-spacer {
   display: block !important;
-  height: var(--catalog-order-chrome-h, 80px) !important;
+  height: calc(var(--catalog-order-chrome-h, 80px) + 10px) !important;
   margin: 0 !important;
   pointer-events: none !important;
 }

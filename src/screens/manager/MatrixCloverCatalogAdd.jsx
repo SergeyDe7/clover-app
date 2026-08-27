@@ -43,17 +43,22 @@ export function MatrixCloverCatalogAdd({
     });
   }, [products, matrixIdKey]);
 
-  const items = useMemo(() => {
-    const filtered = available.filter((product) => {
+  const filtered = useMemo(() => {
+    return available.filter((product) => {
       return matchesCatalogPrefixSearch(
         productCatalogSearchHaystack(product, { includeAdminFields: true }),
         search
       );
     });
-    return filtered.slice(0, CATALOG_LIST_LIMIT);
   }, [available, search]);
 
-  const selectedItems = items.filter((product) =>
+  // В списке показываем лимит; «Выбрать все» берёт весь отфильтрованный каталог.
+  const items = useMemo(
+    () => filtered.slice(0, CATALOG_LIST_LIMIT),
+    [filtered]
+  );
+
+  const selectedItems = filtered.filter((product) =>
     selectedIds.has(String(product.id))
   );
 
@@ -72,6 +77,14 @@ export function MatrixCloverCatalogAdd({
       else next.add(key);
       return next;
     });
+  };
+
+  const selectAllFiltered = () => {
+    setSelectedIds(new Set(filtered.map((product) => String(product.id))));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
   };
 
   const addProducts = (toAdd) => {
@@ -134,12 +147,28 @@ export function MatrixCloverCatalogAdd({
               {notice}
             </div>
           )}
-          <div className="matrix-add-actions">
-            <span className="muted small">
-              В списке: {items.length}
-              {available.length > CATALOG_LIST_LIMIT ? ` из ${available.length}` : ""}
-              {" · "}к добавлению: {selectedItems.length}
-            </span>
+          <div className="matrix-add-toolbar" role="toolbar" aria-label="Выбор товаров для матрицы">
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={filtered.length === 0}
+              onClick={selectAllFiltered}
+              title={
+                filtered.length > CATALOG_LIST_LIMIT
+                  ? `Отметить все ${filtered.length} позиций по текущему фильтру`
+                  : "Отметить все позиции в списке"
+              }
+            >
+              Выбрать все
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={selectedIds.size === 0}
+              onClick={clearSelection}
+            >
+              Снять все
+            </button>
             <button
               className="primary-button"
               type="button"
@@ -149,6 +178,11 @@ export function MatrixCloverCatalogAdd({
               Добавить ({selectedItems.length})
             </button>
           </div>
+          <p className="matrix-add-meta muted small">
+            В списке: {items.length}
+            {filtered.length > CATALOG_LIST_LIMIT ? ` из ${filtered.length}` : ""}
+            {" · "}к добавлению: {selectedItems.length}
+          </p>
           <div className="one-c-products-list one-c-picker-list">
             {items.map((product) => {
               const checked = selectedIds.has(String(product.id));
@@ -156,23 +190,12 @@ export function MatrixCloverCatalogAdd({
                 <article
                   key={product.id}
                   className={checked ? "one-c-picker-row selected" : "one-c-picker-row"}
-                  style={{ cursor: "pointer" }}
                 >
-                  <label
-                    style={{
-                      display: "flex",
-                      gap: 10,
-                      alignItems: "flex-start",
-                      margin: 0,
-                      cursor: "pointer",
-                      flex: 1,
-                    }}
-                  >
+                  <label className="one-c-picker-check-label">
                     <input
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggleSelected(product)}
-                      style={{ marginTop: 4 }}
                     />
                     <div>
                       <strong>{product.name}</strong>

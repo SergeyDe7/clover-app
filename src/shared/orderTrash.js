@@ -107,14 +107,17 @@ export function canRestoreOrder(order) {
 }
 
 /**
- * Удалить навсегда из корзины.
- * Выполненные — только администратор.
+ * Удалить навсегда.
+ * Обычно только из корзины; админ может сразу стереть «Выполнен» без корзины.
  */
 export function canPurgeOrder(order, role = "manager") {
   if (!order?.id) {
     return { ok: false, code: "NOT_FOUND", error: "Заказ не найден." };
   }
-  if (!isOrderTrashed(order)) {
+  const trashed = isOrderTrashed(order);
+  const adminHardDelete =
+    role === "admin" && isAdminHardDeleteStatus(order.status);
+  if (!trashed && !adminHardDelete) {
     return {
       ok: false,
       code: "NOT_TRASHED",

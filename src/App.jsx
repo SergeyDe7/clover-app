@@ -104,7 +104,7 @@ function LoginView({ onAuth, authBusy, authError }) {
       body.classList.remove("login-lock");
       html.style.backgroundColor = "";
       body.style.backgroundColor = "";
-      if (themeMeta) themeMeta.setAttribute("content", prevTheme || "#f4f8f2");
+      if (themeMeta) themeMeta.setAttribute("content", prevTheme || "#ffffff");
       document.removeEventListener("touchmove", blockPageSwipe);
     };
   }, []);
@@ -1703,7 +1703,7 @@ function App() {
 
     void (async () => {
       try {
-        const trashResult = await api.trashOrder(orderId);
+        // «Навсегда» — сразу purge, без trash (иначе всплывает «перемещён в корзину»).
         if (hardDeleteCompleted) {
           const purgeResult = await api.purgeOrder(orderId);
           skipNextOrdersSyncRef.current = true;
@@ -1712,6 +1712,7 @@ function App() {
             setTrashedOrders(purgeResult.trashedOrders);
           }
         } else {
+          const trashResult = await api.trashOrder(orderId);
           skipNextOrdersSyncRef.current = true;
           if (Array.isArray(trashResult?.orders)) setOrders(trashResult.orders);
           if (Array.isArray(trashResult?.trashedOrders)) {

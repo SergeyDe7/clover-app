@@ -141,11 +141,15 @@ function ClientDashboard({
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    const prevTheme = themeMeta?.getAttribute("content") || "";
     html.classList.add("clover-client-lk");
     body.classList.add("clover-client-lk");
+    if (themeMeta) themeMeta.setAttribute("content", "#ffffff");
     return () => {
       html.classList.remove("clover-client-lk");
       body.classList.remove("clover-client-lk");
+      if (themeMeta) themeMeta.setAttribute("content", prevTheme || "#ffffff");
     };
   }, []);
 

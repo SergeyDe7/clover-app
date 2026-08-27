@@ -38,3 +38,43 @@ export function idsWithout(ids, removeIds) {
   );
   return uniqueMatrixProductIds(ids).filter((id) => !remove.has(String(id)));
 }
+
+/**
+ * Список матрицы показывает один товар на oneCId.
+ * При удалении убираем и скрытые дубли с тем же oneCId — иначе позиция
+ * «возвращается» со второго id и кажется, что удаление не сработало с первого раза.
+ * По имени не схлопываем.
+ */
+export function expandMatrixRemovalByOneCId(
+  selectedProducts,
+  matrixProductIds,
+  allProducts
+) {
+  const removeIds = new Set(
+    (Array.isArray(selectedProducts) ? selectedProducts : []).map((product) =>
+      String(product?.id ?? "").trim()
+    ).filter(Boolean)
+  );
+  const removeOneC = new Set();
+  for (const product of Array.isArray(selectedProducts) ? selectedProducts : []) {
+    const oneCId = String(product?.oneCId || "").trim();
+    if (oneCId) removeOneC.add(oneCId);
+  }
+  if (!removeOneC.size) return removeIds;
+
+  const byId = new Map(
+    (Array.isArray(allProducts) ? allProducts : []).map((product) => [
+      String(product.id),
+      product,
+    ])
+  );
+  for (const rawId of Array.isArray(matrixProductIds) ? matrixProductIds : []) {
+    const id = String(rawId);
+    if (removeIds.has(id)) continue;
+    const product = byId.get(id);
+    if (!product) continue;
+    const oneCId = String(product.oneCId || "").trim();
+    if (oneCId && removeOneC.has(oneCId)) removeIds.add(id);
+  }
+  return removeIds;
+}

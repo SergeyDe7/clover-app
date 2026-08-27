@@ -27,7 +27,8 @@ const CLOVER_UI_BUILD =
   document.querySelector('meta[name="clover-ui-build"]')?.getAttribute("content")?.trim() ||
   "ui-dev";
 const BOOT_SPLASH_MS = 450;
-const APP_THEME_COLOR = "#f4f8f2";
+/* Samsung/Android status bar / зона над шапкой ЛК — белый, не зелёный */
+const APP_THEME_COLOR = "#ffffff";
 const STOREFRONT_THEME_COLOR = "#f3f2ee";
 const VIEWPORT_BASE = "width=device-width, initial-scale=1.0, viewport-fit=cover";
 

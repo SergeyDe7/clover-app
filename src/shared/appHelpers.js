@@ -16,6 +16,7 @@ export const MANAGER_TABS = [
   ["clients", "Клиенты"],
   ["acts", "Акты сверок"],
   ["exchange", "1С"],
+  ["price-list", "Прайс"],
   ["more", "Ещё"],
 ];
 
@@ -45,7 +46,7 @@ export const STAFF_FEATURE_IDS = STAFF_FEATURE_OPTIONS.map(([id]) => id);
 export function staffHasFeature(authUser, featureId) {
   if (!authUser) return false;
   const id = String(featureId || "");
-  if (id === "storefront") return authUser.role === "admin";
+  if (id === "storefront" || id === "price-list") return authUser.role === "admin";
   if (authUser.role === "admin") return true;
   const permissions = authUser.permissions;
   if (!permissions || permissions.fullAccess) return true;
@@ -2158,7 +2159,8 @@ textarea { resize: vertical; }
   .embedded-catalog.client-order-catalog .client-order-catalog-toolbar {
     margin: 0 !important;
     padding: 8px 10px 10px !important;
-    position: relative !important;
+    position: sticky !important;
+    top: var(--clover-chrome-offset, 56px) !important;
     width: 100% !important;
     max-width: 100% !important;
     z-index: 95 !important;
@@ -4590,8 +4592,8 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 }
 .matrix-pick-actions {
   display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: stretch;
   gap: 8px;
   margin-top: 8px;
   width: 100%;
@@ -4601,21 +4603,22 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   border-radius: 12px;
   background: #fff;
   box-sizing: border-box;
-  overflow-x: auto;
+  overflow: visible;
 }
 .matrix-pick-actions span {
   display: inline-flex;
   align-items: center;
-  flex: 0 0 auto;
-  min-height: 34px;
-  padding: 0 8px 0 4px;
+  flex: 1 1 100%;
+  min-height: 28px;
+  padding: 0 4px;
   color: #587058;
   font-size: 12px;
   font-weight: 700;
-  white-space: nowrap;
+  white-space: normal;
 }
 .matrix-pick-actions .secondary-button {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: min(100%, 8.5rem);
   white-space: nowrap;
 }
 .catalog-pick-actions {
@@ -4687,21 +4690,29 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   margin-top: 8px;
   padding: 10px;
 }
-.matrix-add-actions {
+.matrix-add-actions,
+.matrix-add-toolbar {
   display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: stretch;
   gap: 8px;
   min-width: 0;
-  overflow-x: auto;
+  width: 100%;
+  overflow: visible;
 }
 .matrix-add-actions .primary-button,
-.matrix-add-actions .secondary-button {
-  flex: 0 0 auto;
+.matrix-add-actions .secondary-button,
+.matrix-add-toolbar .primary-button,
+.matrix-add-toolbar .secondary-button {
+  flex: 1 1 auto;
+  min-width: min(100%, 9.5rem);
   white-space: nowrap;
 }
+.matrix-add-meta {
+  margin: 0 0 8px;
+}
 .matrix-add-compact .one-c-picker-list {
-  max-height: 260px;
+  max-height: min(50vh, 360px);
 }
 
 .product-manager-list { display: grid; gap: 12px; align-content: start; }
