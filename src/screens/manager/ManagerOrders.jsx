@@ -889,6 +889,19 @@ export function ManagerOrders({
                 <span>Адрес</span>
                 <strong>{order.address || "—"}</strong>
               </div>
+              {Number(order.deliveryFee) > 0 || order.deliveryNote ? (
+                <div className="order-meta-wide">
+                  <span>Доставка</span>
+                  <strong>
+                    {Number(order.deliveryFee) > 0
+                      ? formatMoney(Number(order.deliveryFee))
+                      : "—"}
+                    {order.deliveryNote
+                      ? `${Number(order.deliveryFee) > 0 ? " · " : ""}${order.deliveryNote}`
+                      : ""}
+                  </strong>
+                </div>
+              ) : null}
             </div>
             {order.clientComment ? (
               <div className="manager-client-comment">

@@ -974,6 +974,13 @@ export function printOrderDocument(order, settings) {
     </div>
     <table><thead><tr><th>№</th><th>Товар</th><th>Единица</th><th>Количество</th><th>Цена</th><th>Сумма</th></tr></thead><tbody>${itemRows}${customRows}</tbody></table>
     ${settings.showPrices ? `<div class="total">Итого: ${escapeHtml(formatMoney(getOrderTotal(order)))}</div>` : ""}
+    ${settings.showPrices && Number(order.deliveryFee) > 0
+      ? `<div class="note"><strong>Доставка:</strong> ${escapeHtml(formatMoney(Number(order.deliveryFee)))}${
+          order.deliveryNote ? `<br>${escapeHtml(order.deliveryNote)}` : ""
+        }</div>`
+      : order.deliveryNote
+        ? `<div class="note"><strong>Доставка:</strong><br>${escapeHtml(order.deliveryNote)}</div>`
+        : ""}
     ${order.clientComment ? `<div class="note"><strong>Комментарий клиента:</strong><br>${escapeHtml(order.clientComment)}</div>` : ""}
     ${order.managerComment ? `<div class="note"><strong>Комментарий менеджера:</strong><br>${escapeHtml(order.managerComment)}</div>` : ""}
     <div class="footer">Внешний ID: ${escapeHtml(order.externalId || order.id || "")}</div>
@@ -6965,7 +6972,8 @@ export function getOrderTotal(order) {
     (sum, item) => sum + (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0),
     0
   );
-  return roundPriceUp(itemsTotal + customTotal);
+  const deliveryFee = Math.max(0, Number(order?.deliveryFee) || 0);
+  return roundPriceUp(itemsTotal + customTotal + deliveryFee);
 }
 
 export function getPositionCount(order) {
