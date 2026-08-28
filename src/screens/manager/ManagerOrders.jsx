@@ -184,7 +184,7 @@ export function ManagerOrders({
   const [bulkStatus, setBulkStatus] = useState("Принят");
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkPanelOpen, setBulkPanelOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
   const effectiveSearch = headerSearch.trim();
   const effectiveClientSearch = clientQuery.trim();
