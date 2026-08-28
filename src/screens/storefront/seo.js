@@ -1,7 +1,7 @@
 import { PUBLIC_BASE_URL } from "../../config/urls.js";
 import { storefrontHref } from "./mode.js";
 import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE } from "./siteCopy.js";
-import { getCatalogPageSeo } from "./storefrontCatalogSeo.js";
+import { getCatalogPageSeo, isCatalogPageNoindex } from "./storefrontCatalogSeo.js";
 
 export const STOREFRONT_SITE_NAME = "КЛЕВЕР";
 export const STOREFRONT_DEFAULT_TITLE = `${STOREFRONT_HERO_TITLE} | ${STOREFRONT_SITE_NAME}`;
@@ -98,12 +98,14 @@ export function storefrontRouteDocumentMeta(route) {
     };
   }
   if (route.name === "catalog") {
+    const robots = isCatalogPageNoindex(route) ? "noindex, follow" : undefined;
     const override = getCatalogPageSeo(route);
     if (override) {
       return {
         title: override.title,
         description: override.description,
         path: storefrontHref(route),
+        robots,
       };
     }
 
@@ -113,6 +115,7 @@ export function storefrontRouteDocumentMeta(route) {
       title: `${label} | ${STOREFRONT_SITE_NAME}`,
       description: `Каталог «${label}»: хозтовары, упаковка и расходники для HoReCa. Заказ без регистрации на сайте ${STOREFRONT_SITE_NAME}.`,
       path: storefrontHref(route),
+      robots,
     };
   }
   if (route.name === "product") {

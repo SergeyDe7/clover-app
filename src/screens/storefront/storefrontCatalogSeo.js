@@ -1,6 +1,9 @@
 /**
  * SEO meta для страниц каталога (волна 1).
  * Ключи — канонические русские имена category / subcategory из productGroups.js.
+ *
+ * Wave 1b: noindex + исключение из sitemap для catch-all «Прочее» и пустой
+ * «Пленка под запайку». URL остаются живыми (200).
  */
 
 /** @type {Record<string, { title: string, h1: string, description: string }>} */
@@ -73,6 +76,23 @@ function catalogSeoKey(route) {
   if (!category) return "";
   const subcategory = String(route.subcategory || "").trim();
   return subcategory ? `${category}\0${subcategory}` : category;
+}
+
+/**
+ * Страницы каталога, которые не индексируем и не кладём в sitemap.
+ * @param {{ name?: string, category?: string, subcategory?: string, facet?: string } | null | undefined} route
+ */
+export function isCatalogPageNoindex(route) {
+  if (!route || route.name !== "catalog" || route.facet) return false;
+  const category = String(route.category || "").trim();
+  const subcategory = String(route.subcategory || "").trim();
+  if (!category) return false;
+  if (category === "Прочее" && !subcategory) return true;
+  if (subcategory === "Прочее") return true;
+  if (category === "Хозяйственные товары" && subcategory === "Пленка под запайку") {
+    return true;
+  }
+  return false;
 }
 
 /** @returns {{ title: string, h1: string, description: string } | null} */

@@ -10,7 +10,7 @@ import {
   subcategorySlug,
 } from "./storefrontSlugs.js";
 import { buildStorefrontProductDescription, buildStorefrontProductBodyText } from "./storefrontProductSeo.js";
-import { getCatalogPageSeo } from "./storefrontCatalogSeo.js";
+import { getCatalogPageSeo, isCatalogPageNoindex } from "./storefrontCatalogSeo.js";
 
 const ORIGIN = "https://clover-spb.ru";
 const STOREFRONT_SITE_NAME = "КЛЕВЕР";
@@ -53,6 +53,7 @@ export function buildPageMeta(route, { product, productCount } = {}) {
   }
 
   if (route.name === "catalog") {
+    const robots = isCatalogPageNoindex(route) ? "noindex, follow" : null;
     const override = getCatalogPageSeo(route);
     if (override) {
       return {
@@ -61,7 +62,7 @@ export function buildPageMeta(route, { product, productCount } = {}) {
         path,
         canonical,
         h1: override.h1,
-        robots: null,
+        robots,
         type: "website",
       };
     }
@@ -80,7 +81,7 @@ export function buildPageMeta(route, { product, productCount } = {}) {
       path,
       canonical,
       h1: label,
-      robots: null,
+      robots,
       type: "website",
     };
   }
@@ -383,8 +384,17 @@ export function buildSitemapXml({ products } = {}) {
   push("/install-app", "0.4");
 
   for (const entry of listCategorySlugEntries()) {
-    push(`/catalog/${entry.slug}`, "0.8");
+    const catRoute = { name: "catalog", category: entry.name };
+    if (!isCatalogPageNoindex(catRoute)) {
+      push(`/catalog/${entry.slug}`, "0.8");
+    }
     for (const child of entry.children) {
+      const subRoute = {
+        name: "catalog",
+        category: entry.name,
+        subcategory: child.name,
+      };
+      if (isCatalogPageNoindex(subRoute)) continue;
       push(`/catalog/${entry.slug}/${child.slug}`, "0.7");
     }
   }
