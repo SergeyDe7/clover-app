@@ -40,9 +40,7 @@ export function ProductCard({ product }) {
           <div className="sf-product-placeholder" aria-hidden="true" />
         )}
       </button>
-      <div
-        className={`sf-product-body${hasUnitChoice ? " has-units" : ""}`}
-      >
+      <div className="sf-product-body">
         <p className="sf-product-cat">{product.category}</p>
         <h3>
           <button
@@ -56,22 +54,24 @@ export function ProductCard({ product }) {
           </button>
         </h3>
         <p className="sf-product-code">Арт. {product.code}</p>
-        {hasUnitChoice ? (
-          <div className="sf-product-units">
+        <strong className="sf-product-price">
+          {price > 0 ? formatMoney(price) : "Цена по запросу"}
+          {price > 0 && hasUnitChoice ? (
+            <span className="sf-unit"> / {unitLabel}</span>
+          ) : null}
+        </strong>
+        <div className="sf-product-units">
+          {hasUnitChoice ? (
             <StorefrontUnitChoice
               compact
               product={product}
               unit={unit}
               onChange={setUnit}
             />
-          </div>
-        ) : null}
-        <strong className="sf-product-price">
-          {price > 0 ? formatMoney(price) : "Цена по запросу"}
-          {price > 0 ? (
-            <span className="sf-unit"> / {unitLabel}</span>
-          ) : null}
-        </strong>
+          ) : (
+            <span className="sf-unit-single">{unitLabel}</span>
+          )}
+        </div>
         <div className="sf-product-actions">
           <StorefrontQtyControl
             key={`${product.id}::${unit}`}

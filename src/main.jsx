@@ -26,7 +26,15 @@ createRoot(document.getElementById("root")).render(
 const CLOVER_UI_BUILD =
   document.querySelector('meta[name="clover-ui-build"]')?.getAttribute("content")?.trim() ||
   "ui-dev";
-const BOOT_SPLASH_MS = 450;
+const RETURNING_BOOT = (() => {
+  try {
+    return localStorage.getItem("clover-boot-seen") === "1";
+  } catch {
+    return false;
+  }
+})();
+const BOOT_SPLASH_MS = RETURNING_BOOT ? 80 : 280;
+const BOOT_SPLASH_FADE_MS = RETURNING_BOOT ? 120 : 220;
 /* Samsung/Android status bar / зона над шапкой ЛК — белый, не зелёный */
 const APP_THEME_COLOR = "#ffffff";
 const STOREFRONT_THEME_COLOR = "#f3f2ee";
@@ -73,6 +81,11 @@ function hideBootSplash() {
   const splash = document.getElementById("clover-boot-splash");
   if (!splash || splash.dataset.done === "1") return;
   splash.dataset.done = "1";
+  try {
+    localStorage.setItem("clover-boot-seen", "1");
+  } catch {
+    // localStorage недоступен — не критично.
+  }
   splash.classList.add("is-done");
   // После splash: ЛК — зелёный кабинет, витрина — свой бежевый фон.
   // Иначе телефон заливает витрину цветом ЛК (#f4f8f2), а компьютер остаётся #f3f2ee.
@@ -82,7 +95,7 @@ function hideBootSplash() {
   document.body.style.backgroundColor = shellColor;
   window.setTimeout(() => {
     splash.remove();
-  }, 280);
+  }, BOOT_SPLASH_FADE_MS);
 }
 
 function scheduleBootSplashHide(startedAt) {
@@ -108,11 +121,11 @@ if (rootEl) {
     }
   });
   splashObserver.observe(rootEl, { childList: true, subtree: true });
-  // Страховка: не держать splash дольше 2.5с
+  // Страховка: не держать splash дольше 1.8с (повтор) / 2с (первый визит)
   window.setTimeout(() => {
     hideBootSplash();
     splashObserver.disconnect();
-  }, 2500);
+  }, RETURNING_BOOT ? 1800 : 2000);
 }
 
 async function refreshServiceWorkerIfNeeded() {

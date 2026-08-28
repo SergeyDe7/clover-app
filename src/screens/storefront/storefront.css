@@ -350,11 +350,11 @@ html.sf-catalog-lock .sf-main,
   border-radius: 12px;
   overflow: hidden;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
   grid-template-areas:
     "photo"
     "body";
-  align-content: stretch;
+  align-content: start;
   min-height: 0;
   height: 100%;
   transition: transform .2s, box-shadow .2s;
@@ -419,32 +419,45 @@ html.sf-catalog-lock .sf-main,
   grid-area: body;
   padding: 6px 8px 8px;
   display: grid;
-  grid-template-rows: auto auto auto auto auto;
+  grid-template-rows: auto auto auto auto 36px auto;
   grid-template-areas:
     "cat"
     "title"
     "code"
     "price"
+    "units"
     "actions";
   gap: 2px;
   min-height: 0;
-  align-content: stretch;
-}
-.sf-product-body.has-units {
-  grid-template-rows: auto auto auto auto auto auto;
-  grid-template-areas:
-    "cat"
-    "title"
-    "code"
-    "units"
-    "price"
-    "actions";
+  align-content: start;
 }
 .sf-product-units {
   grid-area: units;
   min-height: 36px;
+  height: 36px;
+  width: 100%;
   display: flex;
   align-items: center;
+}
+.sf-unit-single {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 7px 8px;
+  border: 1px solid rgba(91, 157, 87, 0.55);
+  border-radius: 8px;
+  background: rgba(91, 157, 87, 0.12);
+  color: #2f5a2d;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  box-sizing: border-box;
 }
 .sf-unit-choice {
   display: flex;
@@ -542,12 +555,14 @@ html.sf-catalog-lock .sf-main,
 .sf-product-price {
   grid-area: price;
   font-size: 0.88rem;
-  margin: 4px 0 0;
+  margin: 0;
   min-height: calc(0.88rem * 1.25);
   line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--clover-green-deep, #2f5f2f);
+  font-weight: 800;
 }
 .sf-product-actions {
   grid-area: actions;
@@ -735,7 +750,12 @@ html.sf-catalog-lock .sf-main,
 .sf-back { appearance: none; border: 0; background: transparent; color: #3d6b3c; font: inherit; font-weight: 700; cursor: pointer; margin-bottom: 16px; padding: 0; }
 .sf-product-layout { display: grid; grid-template-columns: minmax(240px, 1.05fr) minmax(260px, 1fr); gap: 28px; align-items: start; }
 .sf-product-gallery { border-radius: 22px; overflow: hidden; background: #f3f2ee; min-height: 320px; }
-.sf-price-block { margin: 18px 0; font-size: 1.45rem; }
+.sf-price-block {
+  margin: 18px 0;
+  font-size: 1.45rem;
+  color: var(--clover-green-deep, #2f5f2f);
+  font-weight: 800;
+}
 .sf-buy-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; margin-bottom: 24px; }
 .sf-details { padding-top: 12px; border-top: 1px solid rgba(28, 31, 28, 0.08); }
 .sf-link { color: #3d6b3c; font-weight: 700; }
@@ -1365,22 +1385,23 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
   .sf-product-body {
     padding: 6px 8px 8px;
     gap: 2px;
-    grid-template-rows: auto auto auto;
+    grid-template-rows: auto auto 34px 36px;
     grid-template-areas:
       "title"
       "price"
-      "actions";
-  }
-  .sf-product-body.has-units {
-    grid-template-rows: auto auto auto auto;
-    grid-template-areas:
-      "title"
       "units"
-      "price"
       "actions";
   }
   .sf-product-units {
     min-height: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+  }
+  .sf-unit-single {
+    min-height: 32px;
+    padding: 6px 6px;
+    font-size: 0.86rem;
   }
   .sf-unit-choice.is-compact button {
     min-height: 32px;
@@ -1402,10 +1423,11 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
   .sf-product-price {
     font-size: 0.82rem;
     min-height: calc(0.82rem * 1.25);
+    margin: 0 0 2px;
   }
   .sf-product-actions {
     min-height: 36px;
-    margin-top: 2px;
+    margin-top: 4px;
   }
   .sf-product-card .sf-qty-control,
   .sf-product-card .sf-qty-control.is-compact {
@@ -1589,6 +1611,26 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
   color: #4a564a;
   font-size: .94rem;
   line-height: 1.45;
+}
+.sf-install-step-gap { margin-top: 8px !important; }
+.sf-install-alert {
+  margin-bottom: 14px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: #fff8e8;
+  border: 1px solid rgba(180, 130, 20, 0.28);
+}
+.sf-install-alert h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #6b4f12;
+}
+.sf-install-alert p {
+  margin: 0;
+  color: #4a564a;
+  line-height: 1.45;
+  max-width: 68ch;
 }
 .sf-install-step-body a {
   color: #3d6b3c;

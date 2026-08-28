@@ -22,6 +22,7 @@ import {
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
 } from "../../shared/appHelpers";
+import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import {
   getEarliestDeliveryDateIso,
   validateDeliveryDate,
@@ -536,7 +537,7 @@ export function OrderEditor({
 
   const categories = useMemo(() => ["Все", ...new Set(products.map((item) => item.category))], [products]);
   const filtered = useMemo(() => {
-    return products.filter((item) => {
+    const items = products.filter((item) => {
       const byCategory = category === "Все" || item.category === category;
       const bySearch = matchesCatalogPrefixSearch(
         productCatalogSearchHaystack(item),
@@ -545,6 +546,7 @@ export function OrderEditor({
       const byFavorite = !favoritesOnly || favorites.includes(item.id);
       return byCategory && bySearch && byFavorite;
     });
+    return sortProductsWithLidsGrouped(items);
   }, [products, search, category, favoritesOnly, favorites]);
 
   const selectedItems = useMemo(() => products

@@ -15,9 +15,29 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <!-- Self-hosted Manrope (без Google Fonts) -->
     <link rel="preload" href="/fonts/manrope-cyrillic-700-normal.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/manrope-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <script>
+      (function () {
+        var path = location.pathname || "/";
+        var isCabinet = path === "/lk" || path.indexOf("/lk/") === 0;
+        if (!isCabinet) {
+          var latin = document.createElement("link");
+          latin.rel = "preload";
+          latin.href = "/fonts/manrope-latin-700-normal.woff2";
+          latin.as = "font";
+          latin.type = "font/woff2";
+          latin.crossOrigin = "anonymous";
+          document.head.appendChild(latin);
+        }
+        if (isCabinet) return;
+        var link = document.createElement("link");
+        link.rel = "preload";
+        link.as = "image";
+        link.href = "/storefront/hero-app.webp";
+        link.setAttribute("fetchpriority", "high");
+        document.head.appendChild(link);
+      })();
+    </script>
     <link rel="stylesheet" href="/fonts/manrope.css" />
-    <link rel="preload" as="image" href="/storefront/hero-app.webp" fetchpriority="high" />
     <title>Хозтовары, упаковка и химия для HoReCa | КЛЕВЕР</title>
     <meta
       name="description"
@@ -152,6 +172,12 @@
       @media (max-width: 900px), (display-mode: standalone), (display-mode: fullscreen) {
         #clover-boot-splash { display: grid; }
       }
+      #clover-boot-splash.is-fast {
+        transition-duration: 0.16s;
+      }
+      #clover-boot-splash.is-fast img {
+        animation-duration: 0.2s;
+      }
       @media (prefers-reduced-motion: reduce) {
         #clover-boot-splash img { animation: none; }
         #clover-boot-splash { transition: none; }
@@ -258,6 +284,16 @@
     <div id="clover-boot-splash" aria-hidden="true">
       <img src="/clover-logo.png" alt="" width="220" height="148" />
     </div>
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem("clover-boot-seen") === "1") {
+            var splash = document.getElementById("clover-boot-splash");
+            if (splash) splash.classList.add("is-fast");
+          }
+        } catch (e) {}
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -750,6 +750,9 @@ function App() {
       return;
     }
 
+    // Параллельно с bootstrap подтягиваем экран — не ждём API, потом ещё чанк.
+    void import("./screens/client/ClientScreen");
+    void import("./screens/manager/ManagerScreen");
     loadBootstrap();
   }, []);
 

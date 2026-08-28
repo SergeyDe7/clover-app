@@ -29,6 +29,7 @@ import {
   productCatalogSearchHaystack,
   restoreWindowScroll,
 } from "../../shared/appHelpers";
+import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { MatrixOneCProductAdd } from "./MatrixOneCProductAdd";
 import { MatrixCloverCatalogAdd } from "./MatrixCloverCatalogAdd";
@@ -1613,7 +1614,7 @@ export function ManagerClients({
                 seenId.add(id);
                 result.push(product);
               }
-              return result;
+              return sortProductsWithLidsGrouped(result);
             })();
             const matrixExportProducts = (() => {
               if (link.matrixMode === "all") {

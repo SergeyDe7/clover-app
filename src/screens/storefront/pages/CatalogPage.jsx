@@ -14,6 +14,7 @@ import {
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
 } from "../../../shared/appHelpers.js";
+import { sortProductsWithLidsGrouped } from "../../../shared/productCatalogOrder.js";
 
 export function CatalogPage({
   category = "",
@@ -67,8 +68,9 @@ export function CatalogPage({
   // Подкатегория/facet сужают выборку на API.
   const sections = useMemo(() => {
     if (category) {
-      return products.length
-        ? [{ name: subcategory || category, products, count: products.length }]
+      const sorted = sortProductsWithLidsGrouped(products);
+      return sorted.length
+        ? [{ name: subcategory || category, products: sorted, count: sorted.length }]
         : [];
     }
     return groupProductsByCloverGroup(products);

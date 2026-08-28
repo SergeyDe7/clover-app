@@ -10,6 +10,7 @@ import {
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
 } from "../../shared/appHelpers";
+import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import {
   buildGroupNav,
   canonicalizeProductCategory,
@@ -117,7 +118,7 @@ export function ClientCatalogAddPanel({
   const activeChildren = activeCategory ? getGroupChildren(activeCategory) : [];
 
   const filtered = useMemo(() => {
-    return activeProducts.filter((item) => {
+    const items = activeProducts.filter((item) => {
       const byCategory = categoryMatchesFilter(item.category, activeCategory);
       const bySubcategory =
         !activeSubcategory ||
@@ -128,6 +129,7 @@ export function ClientCatalogAddPanel({
       );
       return byCategory && bySubcategory && bySearch;
     });
+    return sortProductsWithLidsGrouped(items);
   }, [activeProducts, activeCategory, activeSubcategory, search]);
 
   const inMatrix = (product) => matrixIdSet.has(String(product.id));
@@ -330,7 +332,7 @@ export function ClientCatalogAddPanel({
                     )}
                   </div>
                   <h2>{product.name}</h2>
-                  <p className="product-code">Код: {productArticle(product) || "—"}</p>
+                  <p className="product-code">Арт.: {productArticle(product) || "—"}</p>
                   <p className="product-price client-catalog-add-price">
                     {showPrices && price > 0 ? (
                       <>

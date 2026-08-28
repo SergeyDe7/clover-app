@@ -1,4 +1,4 @@
-const CACHE_NAME = "clover-v18-shell-v187-lint";
+const CACHE_NAME = "clover-v19-shell-v188-perf";
 const SHELL = [
   "/offline.html",
   "/manifest.webmanifest",
@@ -6,6 +6,21 @@ const SHELL = [
   "/icon-512.png",
   "/clover-logo.png",
 ];
+
+function isImmutableAssetPath(path) {
+  return path.startsWith("/assets/") || path.startsWith("/fonts/");
+}
+
+async function cacheFirstResponse(request, cacheName = CACHE_NAME) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  const response = await fetch(request);
+  if (response.ok) {
+    cache.put(request, response.clone()).catch(() => undefined);
+  }
+  return response;
+}
 
 async function applyPushBadge(data) {
   if (!self.registration?.setAppBadge) return;
@@ -42,8 +57,19 @@ self.addEventListener("fetch", (event) => {
   const path = new URL(request.url).pathname;
   if (path.startsWith("/api/") || path.startsWith("/uploads/")) return;
 
-  // HTML навигация и hashed assets — только сеть (иначе stale HTML → чужие css/js → голый текст).
-  if (request.mode === "navigate" || path === "/" || path.startsWith("/assets/")) {
+  // Hashed /assets/* и /fonts/* — cache-first: имена меняются при каждом билде, stale HTML не подтянет старые чанки.
+  if (isImmutableAssetPath(path)) {
+    event.respondWith(
+      cacheFirstResponse(request).catch(async () => {
+        const cached = await caches.match(request);
+        return cached || Response.error();
+      })
+    );
+    return;
+  }
+
+  // HTML навигация — только сеть (иначе stale HTML → чужие css/js → голый текст).
+  if (request.mode === "navigate" || path === "/") {
     event.respondWith(
       fetch(request).catch(async () => {
         if (request.mode === "navigate") {

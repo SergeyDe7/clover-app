@@ -11,6 +11,7 @@ import {
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
 } from "../../shared/appHelpers";
+import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import { productImageSrc } from "../../shared/productPhoto";
 import { CatalogSearchInput } from "./CatalogSearchInput";
 import { useFixedChromeHeight } from "./useMobileFixedChromeHeight";
@@ -54,7 +55,7 @@ export function ClientMatrixPanel({
   const activeCategory = categories.includes(category) ? category : "Все";
 
   const filtered = useMemo(() => {
-    return activeProducts.filter((item) => {
+    const items = activeProducts.filter((item) => {
       const byCategory = activeCategory === "Все" || item.category === activeCategory;
       const bySearch = matchesCatalogPrefixSearch(
         productCatalogSearchHaystack(item),
@@ -63,6 +64,7 @@ export function ClientMatrixPanel({
       const byFavorite = !favoritesOnly || favorites.includes(item.id);
       return byCategory && bySearch && byFavorite;
     });
+    return sortProductsWithLidsGrouped(items);
   }, [activeProducts, search, activeCategory, favoritesOnly, favorites]);
 
   const showToolbar = catalogPolicy?.matrixMode !== "pending";

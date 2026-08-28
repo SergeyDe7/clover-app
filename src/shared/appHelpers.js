@@ -2805,6 +2805,7 @@ textarea { resize: vertical; }
 }
 .product-code { margin: 0 0 6px; color: #929a92; font-size: 10px; }
 .product-card:not(.product-card-list) .product-code { display: none; }
+.client-catalog-add-panel .client-matrix-card .product-code { display: block; }
 .product-price { margin: 0 0 6px; color: #386f37; font-weight: 800; font-size: 13px; }
 .product-price small { color: #6f7b6f; font-size: 10px; font-weight: 700; }
 .product-card-controls {
@@ -3871,15 +3872,26 @@ html.clover-thankyou-open .app-top-chrome {
   gap: 6px;
   align-items: stretch;
 }
-.client-catalog-add-panel .client-matrix-card,
+.client-catalog-add-panel .client-matrix-card {
+  grid-template-rows: auto auto auto auto auto;
+  grid-template-areas:
+    "photo"
+    "title"
+    "code"
+    "price"
+    "actions";
+}
 .client-matrix-panel .client-matrix-card {
-  display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
   grid-template-areas:
     "photo"
     "title"
     "price"
     "actions";
+}
+.client-catalog-add-panel .client-matrix-card,
+.client-matrix-panel .client-matrix-card {
+  display: grid;
   align-content: start;
   min-height: 0;
   height: auto;
@@ -3908,7 +3920,15 @@ html.clover-thankyou-open .app-top-chrome {
   margin-top: 0;
 }
 .client-catalog-add-panel .client-matrix-card .product-code {
-  display: none;
+  grid-area: code;
+  display: block;
+  margin: 0 0 2px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #6f7b6f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .client-catalog-add-panel .client-matrix-card .product-image-wrap,
 .client-matrix-panel .client-matrix-card .product-image-wrap {
@@ -5984,6 +6004,14 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     display: none !important;
   }
   .product-code { display: none; }
+  .client-catalog-add-panel .client-matrix-card .product-code {
+    display: block !important;
+    grid-area: code;
+    margin: 0 0 2px;
+    font-size: 11px;
+    line-height: 1.2;
+    color: #6f7b6f;
+  }
   .product-price {
     flex: 0 0 auto;
     margin: 0 0 4px !important;

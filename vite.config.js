@@ -44,7 +44,38 @@ function cloverUiBuildTag() {
       const buildTag = `ui-${date}-${hash}`;
       const indexPath = path.join(options.dir, "index.html");
       if (!fs.existsSync(indexPath)) return;
-      const html = fs.readFileSync(indexPath, "utf8").replaceAll(UI_BUILD_PLACEHOLDER, buildTag);
+
+      const appChunk = Object.values(bundle).find(
+        (item) => item.type === "chunk" && /^assets\/App-/.test(String(item.fileName || ""))
+      );
+      const helpersChunk = Object.values(bundle).find(
+        (item) =>
+          item.type === "chunk" && /^assets\/appHelpers-/.test(String(item.fileName || ""))
+      );
+      const clientChunk = Object.values(bundle).find(
+        (item) =>
+          item.type === "chunk" && /^assets\/ClientScreen-/.test(String(item.fileName || ""))
+      );
+      const lkChunks = [appChunk, helpersChunk, clientChunk]
+        .filter(Boolean)
+        .map((item) => `/${String(item.fileName).replace(/\\/g, "/")}`);
+      const lkPreloadScript =
+        lkChunks.length > 0
+          ? `<script>(function(){var p=location.pathname||"/";if(p!=="/lk"&&p.indexOf("/lk/")!==0)return;${lkChunks
+              .map(
+                (href) =>
+                  `var l=document.createElement("link");l.rel="modulepreload";l.href="${href}";l.crossOrigin="anonymous";document.head.appendChild(l);`
+              )
+              .join("")}})();</script>`
+          : "";
+
+      let html = fs.readFileSync(indexPath, "utf8").replaceAll(UI_BUILD_PLACEHOLDER, buildTag);
+      if (lkPreloadScript && !html.includes("clover-lk-preload")) {
+        html = html.replace(
+          '<script type="module"',
+          `${lkPreloadScript}\n    <!-- clover-lk-preload -->\n    <script type="module"`
+        );
+      }
       fs.writeFileSync(indexPath, html);
       console.log(`[clover-ui-build] ${buildTag}`);
     },

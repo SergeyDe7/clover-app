@@ -68,8 +68,12 @@ export function InstallAppPage() {
         <PlatformCard title="Android" badge="Android">
           <Step n="1" title="Откройте Chrome">
             <p>
-              Зайдите на сайт в Google Chrome или Samsung Internet — так проще всего
-              установить приложение.
+              Зайдите на{" "}
+              <a href="/" onClick={(e) => { e.preventDefault(); navigateStorefront("home"); }}>
+                clover-spb.ru
+              </a>{" "}
+              в Google Chrome (желательно последняя версия из Play Store). Samsung Internet
+              тоже подойдёт: меню → «Добавить на главный экран».
             </p>
           </Step>
           <Step n="2" title="Меню браузера">
@@ -78,8 +82,19 @@ export function InstallAppPage() {
               «Добавить на главный экран» или «Установить сайт как приложение».
             </p>
           </Step>
-          <Step n="3" title="Подтвердите">
-            <p>Нажмите «Установить» или «Добавить» — ярлык появится среди приложений.</p>
+          <Step n="3" title="Подтвердите установку">
+            <p>Нажмите «Установить» или «Добавить» — ярлык Clover появится среди приложений.</p>
+          </Step>
+          <Step n="4" title="Если появилось «Google Play Защита»">
+            <p>
+              На Samsung и других телефонах при установке может всплыть окно «Подозрительное
+              приложение заблокировано». Это <strong>не вирус</strong> — так Android проверяет
+              сайты, установленные не из Play Store.
+            </p>
+            <p className="sf-install-step-gap">
+              Нажмите <strong>«Подробнее»</strong> → <strong>«Всё равно установить»</strong>.
+              Если видите только «OK» — обновите Chrome и повторите шаг 2.
+            </p>
           </Step>
         </PlatformCard>
 
@@ -102,11 +117,22 @@ export function InstallAppPage() {
         </PlatformCard>
       </div>
 
+      <aside className="sf-install-alert" role="note">
+        <h2>Безопасность установки</h2>
+        <p>
+          Clover — это ваш личный кабинет на сайте <strong>clover-spb.ru</strong>, а не
+          приложение из Google Play. Предупреждение Play Protect означает лишь то, что
+          установка идёт через браузер. Официальный адрес — только clover-spb.ru; не
+          ставьте копии с других сайтов.
+        </p>
+      </aside>
+
       <aside className="sf-install-note">
         <h2>После установки</h2>
         <p>
           Войдите в личный кабинет — заказы, матрица товаров и статусы доставки будут под
-          рукой. Уведомления о заказах работают в установленном приложении.
+          рукой. Уведомления о заказах работают в установленном приложении. Первое открытие
+          может занять несколько секунд — дальше приложение загружается быстрее.
         </p>
         <div className="sf-install-actions">
           <a className="sf-btn sf-btn-primary" href={cabinetLoginUrl("/")}>
