@@ -11,6 +11,7 @@ import {
 } from "./storefrontSlugs.js";
 import { buildStorefrontProductDescription, buildStorefrontProductBodyText } from "./storefrontProductSeo.js";
 import { getCatalogPageSeo, isCatalogPageNoindex } from "./storefrontCatalogSeo.js";
+import { getCatalogPageContent } from "./storefrontCatalogContent.js";
 
 const ORIGIN = "https://clover-spb.ru";
 const STOREFRONT_SITE_NAME = "КЛЕВЕР";
@@ -184,6 +185,49 @@ function productListHtml(products, limit = 80) {
   return `<ul>\n${items}\n</ul>\n${more}`;
 }
 
+function catalogContentHtml(route) {
+  const content = getCatalogPageContent(route);
+  if (!content) return { intro: "", below: "" };
+  const intro = content.intro
+    ? `<p data-seo-content="intro">${escapeHtml(content.intro)}</p>`
+    : "";
+  const assortment = content.assortment?.length
+    ? `<section data-seo-content="assortment">
+  <h2>Что входит в ассортимент</h2>
+  <ul>
+${content.assortment.map((line) => `    <li>${escapeHtml(line)}</li>`).join("\n")}
+  </ul>
+</section>`
+    : "";
+  const links = content.links?.length
+    ? `<section data-seo-content="links">
+  <h2>Смотрите также</h2>
+  <ul>
+${content.links
+  .map(
+    (link) =>
+      `    <li><a href="${escapeHtml(link.path)}">${escapeHtml(link.label)}</a></li>`
+  )
+  .join("\n")}
+  </ul>
+</section>`
+    : "";
+  const faq = content.faq?.length
+    ? `<section data-seo-content="faq">
+  <h2>Частые вопросы</h2>
+${content.faq
+  .map(
+    (item) => `  <details>
+    <summary>${escapeHtml(item.q)}</summary>
+    <p>${escapeHtml(item.a)}</p>
+  </details>`
+  )
+  .join("\n")}
+</section>`
+    : "";
+  return { intro, below: `${assortment}\n${links}\n${faq}` };
+}
+
 export function buildPrerenderBody(route, { product, products, categories } = {}) {
   const meta = buildPageMeta(route, {
     product,
@@ -231,14 +275,16 @@ ${groups}
         return `<li><a href="/catalog/${slug}">${escapeHtml(name)}</a></li>`;
       }
     );
+    const contentBlocks = catalogContentHtml(route);
     return {
       meta,
       html: `<main id="clover-ssr">
   <nav aria-label="Хлебные крошки">${crumbs.join(" / ")}</nav>
   <h1>${escapeHtml(meta.h1)}</h1>
-  <p>${escapeHtml(meta.description)}</p>
+  ${contentBlocks.intro}
   <h2>Товары</h2>
   ${productListHtml(products)}
+  ${contentBlocks.below}
   <h2>Категории</h2>
   <ul>
 ${navCats.join("\n")}
