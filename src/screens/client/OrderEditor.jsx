@@ -1,5 +1,5 @@
 // Редактор заказа клиента: каталог, корзина и оформление.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Header } from "../../shared/SharedPanels";
 import {
@@ -139,6 +139,13 @@ export function OrderEditor({
     });
     return result;
   });
+  /** Порядок позиций как клиент добавлял в корзину — так же уходит в 1С. */
+  const [cartOrder, setCartOrder] = useState(() =>
+    (initialSource.items || [])
+      .filter((item) => !isCloverDeliveryLine(item))
+      .map((item) => String(item.productId ?? item.id))
+      .filter(Boolean)
+  );
   /** Черновик ввода в поле шт (чтобы «100» не сбрасывалось на «1» при наборе). */
   const [qtyDrafts, setQtyDrafts] = useState({});
   const [units, setUnits] = useState(() => {
@@ -536,24 +543,62 @@ export function OrderEditor({
   };
 
   const categories = useMemo(() => ["Все", ...new Set(products.map((item) => item.category))], [products]);
+  // Группировка крышек O(n²) — только при смене матрицы, не на каждый символ поиска.
+  const sortedProducts = useMemo(
+    () => sortProductsWithLidsGrouped(Array.isArray(products) ? products : []),
+    [products]
+  );
+  const searchEntries = useMemo(
+    () =>
+      sortedProducts.map((product) => ({
+        product,
+        haystack: productCatalogSearchHaystack(product),
+      })),
+    [sortedProducts]
+  );
+  const deferredSearch = useDeferredValue(search);
   const filtered = useMemo(() => {
-    const items = products.filter((item) => {
-      const byCategory = category === "Все" || item.category === category;
-      const bySearch = matchesCatalogPrefixSearch(
-        productCatalogSearchHaystack(item),
-        search
-      );
-      const byFavorite = !favoritesOnly || favorites.includes(item.id);
-      return byCategory && bySearch && byFavorite;
-    });
-    return sortProductsWithLidsGrouped(items);
-  }, [products, search, category, favoritesOnly, favorites]);
+    return searchEntries
+      .filter(({ product, haystack }) => {
+        const byCategory = category === "Все" || product.category === category;
+        const bySearch = matchesCatalogPrefixSearch(haystack, deferredSearch);
+        const byFavorite = !favoritesOnly || favorites.includes(product.id);
+        return byCategory && bySearch && byFavorite;
+      })
+      .map(({ product }) => product);
+  }, [searchEntries, deferredSearch, category, favoritesOnly, favorites]);
 
-  const selectedItems = useMemo(() => products
-    .filter((product) => Number(cart[product.id]) > 0)
-    .map((product) => {
+  const selectedItems = useMemo(() => {
+    const productById = new Map(
+      (Array.isArray(products) ? products : []).map((product) => [
+        String(product.id),
+        product,
+      ])
+    );
+    const qtyOf = (id) => {
+      const product = productById.get(String(id));
+      if (!product) return 0;
+      return Number(cart[product.id] ?? cart[String(product.id)]) || 0;
+    };
+    const seen = new Set();
+    const orderedProducts = [];
+    for (const id of cartOrder) {
+      const sid = String(id);
+      if (seen.has(sid) || qtyOf(sid) <= 0) continue;
+      const product = productById.get(sid);
+      if (!product) continue;
+      seen.add(sid);
+      orderedProducts.push(product);
+    }
+    for (const product of products) {
+      const sid = String(product.id);
+      if (seen.has(sid) || qtyOf(sid) <= 0) continue;
+      seen.add(sid);
+      orderedProducts.push(product);
+    }
+    return orderedProducts.map((product) => {
       const unit = units[product.id] || orderedSaleUnits(product)[0];
-      const quantity = Number(cart[product.id]) || 0;
+      const quantity = qtyOf(product.id);
       const unitPrice = getUnitPrice(product, unit);
       return {
         id: product.id,
@@ -574,7 +619,8 @@ export function OrderEditor({
         packSize: product.packSize,
         bundleSize: product.bundleSize,
       };
-    }), [products, cart, units]);
+    });
+  }, [products, cart, cartOrder, units]);
 
   const total = roundPriceUp(
     selectedItems.reduce((sum, item) => sum + item.lineTotal, 0) +
@@ -621,6 +667,17 @@ export function OrderEditor({
     });
   }, [session.mode, settings.enableDrafts, selectedItems, customItems, deliveryDate, addressId, selectedAddress, clientComment]);
 
+  const syncCartOrder = (id, nextQty) => {
+    const sid = String(id);
+    setCartOrder((current) => {
+      const has = current.some((item) => String(item) === sid);
+      if (nextQty > 0) {
+        return has ? current : [...current, sid];
+      }
+      return has ? current.filter((item) => String(item) !== sid) : current;
+    });
+  };
+
   const clearQtyDraft = (id) => {
     setQtyDrafts((current) => {
       if (current[id] === undefined) return current;
@@ -633,11 +690,9 @@ export function OrderEditor({
   const changeQuantity = (id, delta, step = 1) => {
     const orderStep = Math.max(1, Number(step) || 1);
     clearQtyDraft(id);
+    const nextValue = Math.max(0, (Number(cart[id]) || 0) + delta * orderStep);
+    syncCartOrder(id, nextValue);
     setCart((current) => {
-      const nextValue = Math.max(
-        0,
-        (Number(current[id]) || 0) + delta * orderStep
-      );
       const next = { ...current };
       if (nextValue) next[id] = nextValue;
       else delete next[id];
@@ -647,6 +702,7 @@ export function OrderEditor({
 
   const setItemQuantity = (id, value, multiplier = 1, orderStep = 1) => {
     const nextValue = fromQuantityInputValue(value, multiplier, orderStep);
+    syncCartOrder(id, nextValue);
     setCart((current) => {
       const next = { ...current };
       if (nextValue) next[id] = nextValue;
@@ -674,12 +730,15 @@ export function OrderEditor({
 
     clearQtyDraft(productId);
     setUnits((current) => ({ ...current, [productId]: nextUnit }));
-    setCart((current) => {
-      if (!(productId in current)) return current;
-      const next = { ...current };
-      delete next[productId];
-      return next;
-    });
+    if (productId in cart || String(productId) in cart) {
+      syncCartOrder(productId, 0);
+      setCart((current) => {
+        if (!(productId in current)) return current;
+        const next = { ...current };
+        delete next[productId];
+        return next;
+      });
+    }
   };
 
   const changeCustomQuantity = (id, delta) => {
@@ -705,6 +764,7 @@ export function OrderEditor({
     });
     if (!ok) return;
     setCart({});
+    setCartOrder([]);
     setCustomItems([]);
     setQtyDrafts({});
   };
@@ -890,6 +950,7 @@ export function OrderEditor({
       .then(() => {
         setCartSheetOpen(false);
         setCart({});
+        setCartOrder([]);
         setCustomItems([]);
         setQtyDrafts({});
       })

@@ -1002,14 +1002,26 @@ body:has(.clover-app) {
   align-self: center !important;
 }
 
+.clover-app .product-manager-info > h3 {
+  margin: 0 !important;
+  min-width: 0 !important;
+}
+
 .clover-app .product-manager-badges {
-  display: inline-flex !important;
+  display: flex !important;
   flex-wrap: wrap !important;
   align-items: center !important;
   justify-content: flex-end !important;
   gap: 6px !important;
   width: auto !important;
+  max-width: 100% !important;
   white-space: normal !important;
+}
+
+.clover-app .product-manager-badges .badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  flex: 0 0 auto !important;
 }
 
 .clover-app .product-manager-side {
@@ -7958,7 +7970,7 @@ html.clover-storefront-add-open body {
   border-bottom: 0;
 }
 
-.storefront-product-row span {
+.storefront-product-row > span {
   display: grid;
   gap: 2px;
 }
@@ -7966,6 +7978,12 @@ html.clover-storefront-add-open body {
 .storefront-product-meta {
   font-size: 0.85rem;
   color: var(--muted, #5b675c);
+}
+
+.storefront-product-meta .badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  vertical-align: middle;
 }
 
 /* Управление менеджерами: карточка и переключатель роли */

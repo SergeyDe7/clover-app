@@ -1,5 +1,5 @@
 // Каталог ЛК: только добавление товара в свою матрицу, без корзины.
-import { useMemo, useRef, useState } from "react";
+import { useDeferredValue, useMemo, useRef, useState } from "react";
 import {
   UNIT_CONFIG,
   UNIT_ORDER,
@@ -118,20 +118,35 @@ export function ClientCatalogAddPanel({
   const activeSubcategory = canonicalizeProductSubcategory(subcategory);
   const activeChildren = activeCategory ? getGroupChildren(activeCategory) : [];
 
+  const sortedProducts = useMemo(
+    () => sortProductsWithLidsGrouped(activeProducts),
+    [activeProducts]
+  );
+  const searchEntries = useMemo(
+    () =>
+      sortedProducts.map((product) => ({
+        product,
+        haystack: productCatalogSearchHaystack(product),
+      })),
+    [sortedProducts]
+  );
+  const deferredSearch = useDeferredValue(search);
   const filtered = useMemo(() => {
-    const items = activeProducts.filter((item) => {
-      const byCategory = categoryMatchesFilter(item.category, activeCategory);
-      const bySubcategory =
-        !activeSubcategory ||
-        subcategoryMatchesFilter(item.subcategory, activeSubcategory);
-      const bySearch = matchesCatalogPrefixSearch(
-        productCatalogSearchHaystack(item),
-        search
-      );
-      return byCategory && bySubcategory && bySearch;
-    });
-    return sortProductsWithLidsGrouped(items);
-  }, [activeProducts, activeCategory, activeSubcategory, search]);
+    const filterCategory = String(category || "").trim()
+      ? canonicalizeProductCategory(category)
+      : "";
+    const filterSubcategory = canonicalizeProductSubcategory(subcategory);
+    return searchEntries
+      .filter(({ product, haystack }) => {
+        const byCategory = categoryMatchesFilter(product.category, filterCategory);
+        const bySubcategory =
+          !filterSubcategory ||
+          subcategoryMatchesFilter(product.subcategory, filterSubcategory);
+        const bySearch = matchesCatalogPrefixSearch(haystack, deferredSearch);
+        return byCategory && bySubcategory && bySearch;
+      })
+      .map(({ product }) => product);
+  }, [searchEntries, category, subcategory, deferredSearch]);
 
   const inMatrix = (product) =>
     matrixMode === "all" || matrixIdSet.has(String(product.id));

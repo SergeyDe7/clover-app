@@ -507,6 +507,12 @@ function splitCatalogSearchTokens(value) {
 export function matchesCatalogPrefixSearch(haystack, needle) {
   const tokens = splitCatalogSearchTokens(needle);
   if (!tokens.length) return true;
+  // Короткие чисто цифровые запросы не фильтруют: иначе на 3-й цифре
+  // startsWith внезапно сужает сетку и страница «прыгает».
+  // Не разбираем haystack — иначе набор 1→12→123 тормозит всю матрицу.
+  if (tokens.every((token) => /^\d+$/.test(token) && token.length < 4)) {
+    return true;
+  }
   const words = splitCatalogSearchTokens(haystack);
   const compact = normalizeCatalogSearchText(haystack).replace(/[^\p{L}\p{N}]+/gu, "");
   if (compact) words.push(compact);
@@ -515,8 +521,6 @@ export function matchesCatalogPrefixSearch(haystack, needle) {
   // Цифровые «слова» артикула/кода (не склейка всего haystack — иначе 1234 бьёт середины чужих кодов).
   const digitWords = words.filter((word) => /^\d+$/.test(word));
   return tokens.every((token) => {
-    // Короткие чисто цифровые запросы не фильтруют: иначе на 3-й цифре
-    // startsWith внезапно сужает сетку и страница «прыгает».
     if (/^\d+$/.test(token) && token.length < 4) return true;
     if (!/^\d+$/.test(token) && words.some((word) => word.startsWith(token))) {
       return true;
@@ -4834,7 +4838,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   text-align: left;
 }
 .product-manager-badges {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;

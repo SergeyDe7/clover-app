@@ -233,7 +233,7 @@ export function ManagerSettings({ settings, setSettings, authUser }) {
       <div className="panel-block" style={{ marginTop: 16 }}>
         <h3>Доставка СПб → 1С</h3>
         <p className="muted small">
-          При сумме заказа меньше 5 000 ₽ в заказ добавляется позиция «Доставка» 500 ₽
+          При сумме заказа меньше 5000 ₽ в заказ добавляется позиция «Доставка» 500 ₽
           и она уходит в 1С. Укажите номенклатуру услуги доставки из 1С.
         </p>
         <div className="settings-grid" style={{ marginTop: 10 }}>

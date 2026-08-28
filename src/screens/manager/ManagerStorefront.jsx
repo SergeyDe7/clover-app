@@ -1151,7 +1151,7 @@ export function ManagerStorefront({
                         <strong>{item.name}</strong>
                         <span className="storefront-product-meta">
                           {onStorefront ? (
-                            <span className="badge green" style={{ marginRight: 6 }}>
+                            <span className="badge blue" style={{ marginRight: 6 }}>
                               На витрине
                             </span>
                           ) : (

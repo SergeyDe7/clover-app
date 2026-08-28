@@ -277,7 +277,8 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
   const [selectedIds, setSelectedIds] = useState([]);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const categories = ["Все", ...new Set(products.map((item) => item.category))];
-  const visible = products.filter((product) => {
+  const visible = products
+    .filter((product) => {
     const bySearch = matchesCatalogPrefixSearch(
       productCatalogSearchHaystack(product, { includeAdminFields: true }),
       search
@@ -296,7 +297,15 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
       (visibility === "Без связи с 1С" && !hasOneCLink) ||
       (visibility === "Есть варианты" && hasVariants);
     return bySearch && byCategory && byVisibility;
-  });
+  })
+    .slice()
+    .sort((left, right) => {
+      // Сначала позиции на витрине — бейдж виден без прокрутки мимо «свежих» без флага.
+      const leftOn = left.showOnStorefront ? 0 : 1;
+      const rightOn = right.showOnStorefront ? 0 : 1;
+      if (leftOn !== rightOn) return leftOn - rightOn;
+      return Number(right.id) - Number(left.id);
+    });
 
   const save = async (value) => {
     const normalized = normalizeProduct(value);
@@ -574,8 +583,10 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
             ) : null}
           </div>
           <div className="product-manager-side">
-            <div className="product-manager-badges">
-              <span className={product.active ? "badge green" : "badge gray"}>{product.active ? "Активен" : "Скрыт"}</span>
+            <div className="product-manager-badges" aria-label="Статус товара">
+              <span className={product.active ? "badge green" : "badge gray"}>
+                {product.active ? "Активен" : "Скрыт"}
+              </span>
               {product.showOnStorefront ? (
                 <span className="badge green">На витрине</span>
               ) : null}

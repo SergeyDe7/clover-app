@@ -170,7 +170,7 @@ import {
   unitLabel,
   unitPriceField,
 } from "./pricing.js";
-import { applyClientSpbDeliveryFees, applyDeliveryLineSync, ensureSpbDeliveryOnOrder, isCloverDeliveryLine, resolveDeliveryOneCRefs, syncDeliveryLineFromFee } from "./deliveryFee.js";
+import { applyClientSpbDeliveryFees, applyDeliveryLineSync, ensureSpbDeliveryOnOrder, isCloverDeliveryLine, resolveDeliveryOneCRefs } from "./deliveryFee.js";
 import {
   overlayStorefrontClientLink,
   resolveStorefrontOneCClient,

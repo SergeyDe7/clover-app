@@ -46,8 +46,20 @@ assert.equal(payload.items[0].oneCId, products[0].oneCId);
 assert.equal(payload.items[1].oneCId, products[1].oneCId);
 assert.equal(payload.items[0].name, products[0].oneCName);
 assert.equal(payload.items[0].displayName, products[0].name);
+assert.equal(payload.items[0].line, 1);
+assert.equal(payload.items[1].line, 2);
 assert.equal(payload.totals.amount, 275);
 assert.equal(payload.validation.ready, true);
+
+const reverseOrder = {
+  ...order,
+  items: [order.items[1], order.items[0]],
+};
+const reversePayload = build1CPayload({ order: reverseOrder, products, clientLinks: {} });
+assert.equal(reversePayload.items[0].oneCId, products[1].oneCId);
+assert.equal(reversePayload.items[1].oneCId, products[0].oneCId);
+assert.equal(reversePayload.items[0].line, 1);
+assert.equal(reversePayload.items[1].line, 2);
 
 
 const hintedPayload = build1CPayload({
