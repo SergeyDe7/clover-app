@@ -1,0 +1,27 @@
+{
+  "categoryMappings": {
+    "total": 187,
+    "ok": 187,
+    "error": 0,
+    "warn": 0
+  },
+  "map": {
+    "total": 326,
+    "byType": {
+      "exact_product": 89,
+      "category": 187,
+      "folder": 50
+    },
+    "genericCatalog": 0,
+    "badOrigin": 0,
+    "cycles": 0,
+    "chains": 0,
+    "notFound": 0,
+    "otherErrors": 0
+  },
+  "samples": {
+    "categoryErrors": [],
+    "notFound": [],
+    "chains": []
+  }
+}
