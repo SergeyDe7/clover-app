@@ -56,6 +56,8 @@ export const SUBCATEGORY_SLUG_BY_NAME = {
   Мыло: "mylo",
   Порошки: "poroshki",
   "Для посудомоечных машин": "dlya-posudomoechnyh-mashin",
+  "Освежители воздуха": "osvezhiteli-vozduha",
+  Отбеливатели: "otbelivateli",
   "Бумажные полотенца": "bumazhnye-polotenca",
   "Туалетная бумага": "tualetnaya-bumaga",
   Салфетки: "salfetki",
@@ -64,6 +66,7 @@ export const SUBCATEGORY_SLUG_BY_NAME = {
   "Пакеты вакуумные": "pakety-vakuumnye",
   "Бумажные пакеты с ручкой": "bumazhnye-pakety-s-ruchkoj",
   "Бумажные пакеты без ручки": "bumazhnye-pakety-bez-ruchki",
+  "Пакеты zip-lock": "pakety-zip-lock",
   Прочее: "prochee",
 };
 

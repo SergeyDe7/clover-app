@@ -1,0 +1,135 @@
+{
+  "id": "seo-wave1c-three-subcats",
+  "generatedAt": "2026-08-28T21:34:10.106831Z",
+  "backupPath": "server/data/backups/seo-wave1c-subcats-20260828T213410Z",
+  "note": "Create 3 subcategories: Освежители воздуха, Отбеливатели, Пакеты zip-lock. Move 13 SKU. Leave remaining Prochee noindex.",
+  "stats": {
+    "moved": 13
+  },
+  "newSubcategories": [
+    {
+      "name": "Освежители воздуха",
+      "slug": "osvezhiteli-vozduha",
+      "parent": "Химия, чистящие средства",
+      "index": true
+    },
+    {
+      "name": "Отбеливатели",
+      "slug": "otbelivateli",
+      "parent": "Химия, чистящие средства",
+      "index": true
+    },
+    {
+      "name": "Пакеты zip-lock",
+      "slug": "pakety-zip-lock",
+      "parent": "Пакеты, упаковочные материалы",
+      "index": true
+    }
+  ],
+  "moves": [
+    {
+      "code": "НФ-00000402",
+      "name": "Освежитель воздуха ДОРЕМИ клубника со сливками 330мл",
+      "fromCategory": "Химия, чистящие средства",
+      "fromSubcategory": "Прочее",
+      "toCategory": "Химия, чистящие средства",
+      "toSubcategory": "Освежители воздуха"
+    },
+    {
+      "code": "НФ-00000549",
+      "name": "Освежитель воздуха ДОРЕМИ зеленое яблоко 330мл",
+      "fromCategory": "Химия, чистящие средства",
+      "fromSubcategory": "Прочее",
+      "toCategory": "Химия, чистящие средства",
+      "toSubcategory": "Освежители воздуха"
+    },
+    {
+      "code": "НФ-00000860",
+      "name": "Освежитель воздуха ДОРЕМИ ванильный коктейль 330мл",
+      "fromCategory": "Химия, чистящие средства",
+      "fromSubcategory": "Прочее",
+      "toCategory": "Химия, чистящие средства",
+      "toSubcategory": "Освежители воздуха"
+    },
+    {
+      "code": "НФ-00000091",
+      "name": "Освежитель воздуха Alpen в ассортименте 300мл",
+      "fromCategory": "Химия, чистящие средства",
+      "fromSubcategory": "Прочее",
+      "toCategory": "Химия, чистящие средства",
+      "toSubcategory": "Освежители воздуха"
+    },
+    {
+      "code": "НФ-00000092",
+      "name": "Освежитель воздуха Airwick запасной блок в ассортименте 250мл",
+      "fromCategory": "Химия, чистящие средства",
+      "fromSubcategory": "Прочее",
+      "toCategory": "Химия, чистящие средства",
+      "toSubcategory": "Освежители воздуха"
+    },
+    {
+      "code": "НФ-00000471",
+      "name": "Белизна  ГЕЛЬ  5 л",
+      "fromCategory": "Химия, чистящие средства",
+      "fromSubcategory": "Прочее",
+      "toCategory": "Химия, чистящие средства",
+      "toSubcategory": "Отбеливатели"
+    },
+    {
+      "code": "НФ-00000238",
+      "name": "Белизна ГЕЛЬ  1 л",
+      "fromCategory": "Химия, чистящие средства",
+      "fromSubcategory": "Прочее",
+      "toCategory": "Химия, чистящие средства",
+      "toSubcategory": "Отбеливатели"
+    },
+    {
+      "code": "НФ-00000070",
+      "name": "Белизна - жидкий отбеливатель 1 л",
+      "fromCategory": "Химия, чистящие средства",
+      "fromSubcategory": "Прочее",
+      "toCategory": "Химия, чистящие средства",
+      "toSubcategory": "Отбеливатели"
+    },
+    {
+      "code": "НФ-00000728",
+      "name": "Долфин Имнова Вайтен - для замачивания и отбеливания посуды 5 л",
+      "fromCategory": "Химия, чистящие средства",
+      "fromSubcategory": "Прочее",
+      "toCategory": "Химия, чистящие средства",
+      "toSubcategory": "Отбеливатели"
+    },
+    {
+      "code": "НФ-00000732",
+      "name": "Пакет с замком зиплок 12 см х 17 см",
+      "fromCategory": "Пакеты, упаковочные материалы",
+      "fromSubcategory": "Прочее",
+      "toCategory": "Пакеты, упаковочные материалы",
+      "toSubcategory": "Пакеты zip-lock"
+    },
+    {
+      "code": "НФ-00001276",
+      "name": "Пакет с замком зиплок 15 см х 22 см",
+      "fromCategory": "Пакеты, упаковочные материалы",
+      "fromSubcategory": "Прочее",
+      "toCategory": "Пакеты, упаковочные материалы",
+      "toSubcategory": "Пакеты zip-lock"
+    },
+    {
+      "code": "НФ-00003598",
+      "name": "Пакет с замком зиплок 18 см х 25 см",
+      "fromCategory": "Пакеты, упаковочные материалы",
+      "fromSubcategory": "Прочее",
+      "toCategory": "Пакеты, упаковочные материалы",
+      "toSubcategory": "Пакеты zip-lock"
+    },
+    {
+      "code": "НФ-00001202",
+      "name": "Пакет с замком зиплок 25 см х 35 см",
+      "fromCategory": "Пакеты, упаковочные материалы",
+      "fromSubcategory": "Прочее",
+      "toCategory": "Пакеты, упаковочные материалы",
+      "toSubcategory": "Пакеты zip-lock"
+    }
+  ]
+}

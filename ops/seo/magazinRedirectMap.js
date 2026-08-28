@@ -54,7 +54,8 @@ export const MAGAZIN_FOLDER_TO_PATH = {
   "dlya-posudomoechnyh-mashin":
     "/catalog/himiya-chistyashchie-sredstva/dlya-posudomoechnyh-mashin",
   "dlya-mebeli": "/catalog/himiya-chistyashchie-sredstva/universalnye",
-  "osvezhiteli-vozduha": "/catalog/himiya-chistyashchie-sredstva/prochee",
+  "osvezhiteli-vozduha":
+    "/catalog/himiya-chistyashchie-sredstva/osvezhiteli-vozduha",
   "sredstva-ot-zasorov": "/catalog/himiya-chistyashchie-sredstva/prochee",
 
   "pakety-majka": "/catalog/pakety-upakovochnye-materialy/pakety-majki",
