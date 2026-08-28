@@ -84,6 +84,7 @@ function ClientDashboard({
   onSaveOrder,
   onCloseCatalog,
   onAddToMatrix,
+  onRemoveFromMatrix,
   canCreateOrder,
   profileComplete,
 }) {
@@ -245,6 +246,16 @@ function ClientDashboard({
     setMatrixAddBusyId(product.id);
     try {
       await onAddToMatrix(product.id);
+    } finally {
+      setMatrixAddBusyId("");
+    }
+  };
+
+  const removeProductFromMatrix = async (product) => {
+    if (!product?.id || !onRemoveFromMatrix) return;
+    setMatrixAddBusyId(product.id);
+    try {
+      await onRemoveFromMatrix(product.id);
     } finally {
       setMatrixAddBusyId("");
     }
@@ -632,6 +643,7 @@ function ClientDashboard({
             settings={settings}
             busyId={matrixAddBusyId}
             onAdd={addProductToMatrix}
+            onRemove={removeProductFromMatrix}
           />
         )}
 

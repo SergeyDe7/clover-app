@@ -125,6 +125,7 @@ import {
 } from "./oneC.js";
 import {
   addProductIdToClientMatrix,
+  removeProductIdFromClientMatrix,
   applyInferredCategories,
   applyOneCArticles,
   autoLinkCloverProducts,
@@ -2660,6 +2661,63 @@ app.post(
       alreadyInMatrix:
         Boolean(matrixUpdate.alreadyInMatrix) ||
         catalog.policy.matrixMode === "all",
+      catalogPolicy: catalog.policy,
+      products: catalog.matrixProducts,
+      fullCatalogProducts: catalog.fullCatalogProducts,
+    });
+  }
+);
+
+app.post(
+  "/api/state/my-matrix/remove",
+  authRequired,
+  roleRequired("client"),
+  (req, res) => {
+    const productId = req.body?.productId;
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const activeProducts = (Array.isArray(products) ? products : []).filter(
+      (item) => item.active !== false
+    );
+    const product = activeProducts.find(
+      (item) => String(item.id) === String(productId)
+    );
+    if (!product) {
+      return res.status(404).json({
+        error: "Товар не найден в каталоге Clover.",
+        code: "PRODUCT_NOT_FOUND",
+      });
+    }
+
+    const storedLinks = getGlobalState("clientLinks", {});
+    const matrixUpdate = removeProductIdFromClientMatrix(
+      storedLinks,
+      req.user.id,
+      product.id,
+      {
+        activeProductIds: activeProducts.map((item) => item.id),
+      }
+    );
+    setGlobalState("clientLinks", matrixUpdate.clientLinks);
+    setGlobalState("catalogPricesVersion", new Date().toISOString());
+    auditFromRequest(req, "client.matrix.self-remove", {
+      productId: product.id,
+      productName: product.name,
+      removed: Boolean(matrixUpdate.removedFromMatrix),
+      notInMatrix: Boolean(matrixUpdate.notInMatrix),
+    });
+
+    const oneCProducts = normalizeOneCProducts(
+      getGlobalState("oneCProducts", [])
+    );
+    const catalog = resolveClientCatalog(
+      products,
+      matrixUpdate.clientLink,
+      oneCProducts
+    );
+    res.json({
+      ok: true,
+      removed: Boolean(matrixUpdate.removedFromMatrix),
+      notInMatrix: Boolean(matrixUpdate.notInMatrix),
       catalogPolicy: catalog.policy,
       products: catalog.matrixProducts,
       fullCatalogProducts: catalog.fullCatalogProducts,

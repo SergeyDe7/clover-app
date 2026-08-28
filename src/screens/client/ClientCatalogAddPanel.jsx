@@ -76,10 +76,11 @@ function NavChevron() {
 export function ClientCatalogAddPanel({
   products = [],
   matrixProductIds = [],
-  matrixMode: _matrixMode = "pending",
+  matrixMode = "pending",
   settings,
   busyId = "",
   onAdd,
+  onRemove,
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
@@ -132,7 +133,8 @@ export function ClientCatalogAddPanel({
     return sortProductsWithLidsGrouped(items);
   }, [activeProducts, activeCategory, activeSubcategory, search]);
 
-  const inMatrix = (product) => matrixIdSet.has(String(product.id));
+  const inMatrix = (product) =>
+    matrixMode === "all" || matrixIdSet.has(String(product.id));
 
   const selectAll = () => {
     setCategory("");
@@ -297,7 +299,7 @@ export function ClientCatalogAddPanel({
             <p className="eyebrow">Каталог Clover</p>
             <h2>Добавить товары из каталога</h2>
             <p>
-              Здесь можно только добавить позицию в свою матрицу. Заказ оформляется
+              Добавляйте позиции в матрицу или убирайте лишние. Заказ оформляется
               во вкладке «Моя матрица».
             </p>
           </div>
@@ -345,8 +347,13 @@ export function ClientCatalogAddPanel({
                   </p>
                   <div className="product-card-controls">
                     {added ? (
-                      <button className="secondary-button" type="button" disabled>
-                        В матрице
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        disabled={busy || !onRemove}
+                        onClick={() => onRemove?.(product)}
+                      >
+                        {busy ? "Убираем…" : "Убрать из матрицы"}
                       </button>
                     ) : (
                       <button

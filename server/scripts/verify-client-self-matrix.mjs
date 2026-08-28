@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { addProductIdToClientMatrix } from "../src/oneCProducts.js";
+import { addProductIdToClientMatrix, removeProductIdFromClientMatrix } from "../src/oneCProducts.js";
 import { clientMayOrderCatalogProduct } from "../src/matrixGuard.js";
 import { projectRoot } from "./readFrontendUiSource.mjs";
 
@@ -44,6 +44,27 @@ assert.equal(pinAll.addedToMatrix, true);
 assert.equal(pinAll.clientLink.matrixMode, "selected");
 assert.deepEqual(pinAll.clientLink.matrixProductIds, [10]);
 
+const removed = removeProductIdFromClientMatrix(
+  pending.clientLinks,
+  "client-1",
+  682
+);
+assert.equal(removed.removedFromMatrix, true);
+assert.deepEqual(removed.clientLink.matrixProductIds, []);
+assert.equal(
+  clientMayOrderCatalogProduct(removed.clientLink, 682, [{ id: 682, active: true }]),
+  false
+);
+
+const removeAllMode = removeProductIdFromClientMatrix(
+  { "client-1": { matrixMode: "all", matrixProductIds: [] } },
+  "client-1",
+  10,
+  { activeProductIds: [10, 20, 30] }
+);
+assert.equal(removeAllMode.clientLink.matrixMode, "selected");
+assert.deepEqual(removeAllMode.clientLink.matrixProductIds, [20, 30]);
+
 const clientScreen = readFileSync(
   path.join(projectRoot, "src/screens/client/ClientScreen.jsx"),
   "utf8"
@@ -56,6 +77,7 @@ const addPanel = readFileSync(
   "utf8"
 );
 assert.ok(addPanel.includes("В матрицу"));
+assert.ok(addPanel.includes("Убрать из матрицы"));
 assert.ok(addPanel.includes("catalogAddPrice"));
 assert.ok(addPanel.includes("client-matrix-grid"));
 assert.ok(addPanel.includes("client-matrix-card"));
@@ -78,7 +100,9 @@ const server = readFileSync(
   "utf8"
 );
 assert.ok(server.includes('"/api/state/my-matrix/add"'));
+assert.ok(server.includes('"/api/state/my-matrix/remove"'));
 assert.ok(server.includes("client.matrix.self-add"));
+assert.ok(server.includes("client.matrix.self-remove"));
 assert.ok(
   !server.includes("matrixProducts = activeProducts;"),
   "Матрица клиента не должна подменять пустой список всем каталогом."

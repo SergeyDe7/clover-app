@@ -267,6 +267,13 @@ export const api = {
     });
   },
 
+  removeMyMatrixProduct(productId) {
+    return request("/state/my-matrix/remove", {
+      method: "POST",
+      body: { productId },
+    });
+  },
+
   trashOrder(orderId) {
     return request(`/state/orders/${encodeURIComponent(orderId)}/trash`, {
       method: "POST",

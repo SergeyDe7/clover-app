@@ -1385,7 +1385,11 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
   .sf-product-body {
     padding: 6px 8px 8px;
     gap: 2px;
-    grid-template-rows: auto auto 34px 36px;
+    grid-template-rows:
+      calc(0.78rem * 1.2 * 2)
+      calc(0.82rem * 1.25)
+      34px
+      34px;
     grid-template-areas:
       "title"
       "price"
@@ -1411,23 +1415,31 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
   .sf-product-body h3 {
     margin: 0;
     font-size: 0.78rem;
+    height: calc(0.78rem * 1.2 * 2);
     min-height: calc(0.78rem * 1.2 * 2);
+    max-height: calc(0.78rem * 1.2 * 2);
+    overflow: hidden;
   }
   .sf-product-title {
     font-size: 0.78rem;
     line-height: 1.2;
+    max-height: calc(0.78rem * 1.2 * 2);
     -webkit-line-clamp: 2;
   }
   .sf-product-cat,
   .sf-product-code { display: none; }
   .sf-product-price {
     font-size: 0.82rem;
+    height: calc(0.82rem * 1.25);
     min-height: calc(0.82rem * 1.25);
-    margin: 0 0 2px;
+    max-height: calc(0.82rem * 1.25);
+    margin: 0;
+    align-self: center;
   }
   .sf-product-actions {
-    min-height: 36px;
-    margin-top: 4px;
+    min-height: 34px;
+    height: 34px;
+    margin-top: 0;
   }
   .sf-product-card .sf-qty-control,
   .sf-product-card .sf-qty-control.is-compact {

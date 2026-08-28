@@ -1339,6 +1339,32 @@ function App() {
     }
   };
 
+  const removeFromMyMatrix = async (productId) => {
+    try {
+      const data = await api.removeMyMatrixProduct(productId);
+      if (Array.isArray(data.products)) {
+        setProducts(data.products.map(normalizeProduct));
+      }
+      if (Array.isArray(data.fullCatalogProducts)) {
+        setFullCatalogProducts(data.fullCatalogProducts.map(normalizeProduct));
+      }
+      if (data.catalogPolicy) {
+        setCatalogPolicy((current) => ({
+          ...current,
+          ...data.catalogPolicy,
+        }));
+      }
+      return data;
+    } catch (error) {
+      await appAlert({
+        title: "Не удалось убрать",
+        message: error.message || "Товар не удалён из матрицы.",
+        tone: "danger",
+      });
+      throw error;
+    }
+  };
+
   const saveOrder = (payload) => {
     if (!hydrated || !authUser) {
       void appAlert({
@@ -2067,6 +2093,7 @@ function App() {
           onSaveOrder={saveOrder}
           onCloseCatalog={() => setCatalogSession(null)}
           onAddToMatrix={addToMyMatrix}
+          onRemoveFromMatrix={removeFromMyMatrix}
           canCreateOrder={canCreateOrder}
           profileComplete={profileComplete}
         />
