@@ -10,6 +10,7 @@ import {
   subcategorySlug,
 } from "./storefrontSlugs.js";
 import { buildStorefrontProductDescription, buildStorefrontProductBodyText } from "./storefrontProductSeo.js";
+import { getCatalogPageSeo } from "./storefrontCatalogSeo.js";
 
 const ORIGIN = "https://clover-spb.ru";
 const STOREFRONT_SITE_NAME = "КЛЕВЕР";
@@ -52,6 +53,19 @@ export function buildPageMeta(route, { product, productCount } = {}) {
   }
 
   if (route.name === "catalog") {
+    const override = getCatalogPageSeo(route);
+    if (override) {
+      return {
+        title: override.title,
+        description: truncate(override.description),
+        path,
+        canonical,
+        h1: override.h1,
+        robots: null,
+        type: "website",
+      };
+    }
+
     const parts = [route.category, route.subcategory, route.facet].filter(Boolean);
     const label = parts.length ? parts.join(" — ") : "Каталог";
     const countSuffix =

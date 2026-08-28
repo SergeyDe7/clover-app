@@ -15,6 +15,7 @@ import {
   productCatalogSearchHaystack,
 } from "../../../shared/appHelpers.js";
 import { sortProductsWithLidsGrouped } from "../../../shared/productCatalogOrder.js";
+import { getCatalogPageH1 } from "../storefrontCatalogSeo.js";
 
 export function CatalogPage({
   category = "",
@@ -76,7 +77,10 @@ export function CatalogPage({
     return groupProductsByCloverGroup(products);
   }, [category, subcategory, products]);
 
-  const title = category || "Каталог";
+  const pageH1 =
+    getCatalogPageH1({ name: "catalog", category, subcategory, facet }) ||
+    (subcategory ? `${category} — ${subcategory}` : category) ||
+    "Каталог";
 
   return (
     <div className="sf-catalog">
@@ -162,7 +166,7 @@ export function CatalogPage({
                     </>
                   ) : null}
                 </nav>
-                <h1>{title}</h1>
+                <h1>{pageH1}</h1>
               </div>
             </header>
           ) : (

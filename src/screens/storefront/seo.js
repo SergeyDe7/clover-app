@@ -1,6 +1,7 @@
 import { PUBLIC_BASE_URL } from "../../config/urls.js";
 import { storefrontHref } from "./mode.js";
 import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE } from "./siteCopy.js";
+import { getCatalogPageSeo } from "./storefrontCatalogSeo.js";
 
 export const STOREFRONT_SITE_NAME = "КЛЕВЕР";
 export const STOREFRONT_DEFAULT_TITLE = `${STOREFRONT_HERO_TITLE} | ${STOREFRONT_SITE_NAME}`;
@@ -97,6 +98,15 @@ export function storefrontRouteDocumentMeta(route) {
     };
   }
   if (route.name === "catalog") {
+    const override = getCatalogPageSeo(route);
+    if (override) {
+      return {
+        title: override.title,
+        description: override.description,
+        path: storefrontHref(route),
+      };
+    }
+
     const parts = [route.category, route.subcategory, route.facet].filter(Boolean);
     const label = parts.length ? parts.join(" — ") : "Каталог";
     return {
