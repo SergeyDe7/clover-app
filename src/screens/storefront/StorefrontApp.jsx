@@ -1,11 +1,12 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { StoreHeader } from "./components/StoreHeader.jsx";
-import { parseStorefrontRoute } from "./mode.js";
+import { normalizeStorefrontPath, parseStorefrontRoute, storefrontHref } from "./mode.js";
 import { HomePage } from "./pages/HomePage.jsx";
 import {
   applyStorefrontDocumentMeta,
   storefrontRouteDocumentMeta,
 } from "./seo.js";
+import { legacyCatalogPathRedirect } from "./storefrontSlugs.js";
 import "./storefront.css";
 
 const CatalogPage = lazy(() =>
@@ -56,6 +57,26 @@ export default function StorefrontApp() {
       document.body.style.backgroundColor = previousBodyBg;
     };
   }, []);
+
+  // Старые кириллические /catalog/... → латинские slug (клиентский fallback к 301).
+  useEffect(() => {
+    const redirectTo = legacyCatalogPathRedirect(window.location.pathname);
+    if (!redirectTo || redirectTo === window.location.pathname) return;
+    window.location.replace(redirectTo);
+  }, []);
+
+  // Поддерживаем канонический path после разбора slug (без лишнего reload).
+  useEffect(() => {
+    if (route.name !== "catalog") return;
+    const canonicalPath = storefrontHref(route);
+    const current = window.location.pathname;
+    if (current === canonicalPath) return;
+    if (legacyCatalogPathRedirect(current)) return;
+    const logical = normalizeStorefrontPath(current);
+    const want = normalizeStorefrontPath(canonicalPath);
+    if (logical === want) return;
+    window.history.replaceState(window.history.state, "", canonicalPath);
+  }, [route]);
 
   useEffect(() => {
     const lock = route.name === "catalog";

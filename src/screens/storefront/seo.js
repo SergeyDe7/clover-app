@@ -54,6 +54,7 @@ export function applyStorefrontDocumentMeta({
   path,
   image,
   type = "website",
+  robots,
 } = {}) {
   const origin = storefrontSiteOrigin();
   const pageTitle = title || STOREFRONT_DEFAULT_TITLE;
@@ -66,6 +67,12 @@ export function applyStorefrontDocumentMeta({
   document.title = pageTitle;
   upsertMetaByName("description", pageDescription);
   upsertLink("canonical", canonical);
+  if (robots) {
+    upsertMetaByName("robots", robots);
+  } else {
+    const robotsEl = document.querySelector('meta[name="robots"]');
+    if (robotsEl) robotsEl.remove();
+  }
 
   upsertMetaByProperty("og:type", type);
   upsertMetaByProperty("og:site_name", STOREFRONT_SITE_NAME);
@@ -111,6 +118,7 @@ export function storefrontRouteDocumentMeta(route) {
       title: `Корзина | ${STOREFRONT_SITE_NAME}`,
       description: "Корзина заказа на сайте компании КЛЕВЕР.",
       path: storefrontHref(route),
+      robots: "noindex, follow",
     };
   }
   if (route.name === "checkout") {
@@ -118,6 +126,7 @@ export function storefrontRouteDocumentMeta(route) {
       title: `Оформление заказа | ${STOREFRONT_SITE_NAME}`,
       description: "Оформление заказа хозтоваров и упаковки для HoReCa.",
       path: storefrontHref(route),
+      robots: "noindex, follow",
     };
   }
   if (route.name === "contacts") {

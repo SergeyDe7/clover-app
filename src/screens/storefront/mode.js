@@ -1,4 +1,12 @@
 import { STORE_HOSTS, CABINET_PATH, isCabinetPath } from "../../config/urls.js";
+import {
+  categorySlug,
+  facetSlug,
+  resolveCategoryFromSegment,
+  resolveFacetFromSegment,
+  resolveSubcategoryFromSegment,
+  subcategorySlug,
+} from "./storefrontSlugs.js";
 
 const PREVIEW_PREFIX = "/vitrina";
 
@@ -44,11 +52,18 @@ export function parseStorefrontRoute(pathname = window.location.pathname) {
 
   if (parts.length === 0) return { name: "home" };
   if (parts[0] === "catalog") {
+    const category = parts[1] ? resolveCategoryFromSegment(decodeURIComponent(parts[1])) : "";
+    const subcategory = parts[2]
+      ? resolveSubcategoryFromSegment(decodeURIComponent(parts[2]), category)
+      : "";
+    const facet = parts[3]
+      ? resolveFacetFromSegment(decodeURIComponent(parts[3]))
+      : "";
     return {
       name: "catalog",
-      category: parts[1] ? decodeURIComponent(parts[1]) : "",
-      subcategory: parts[2] ? decodeURIComponent(parts[2]) : "",
-      facet: parts[3] ? decodeURIComponent(parts[3]) : "",
+      category,
+      subcategory,
+      facet,
     };
   }
   if (parts[0] === "product" && parts[1]) {
@@ -73,10 +88,10 @@ export function storefrontHref(route) {
   }
   if (route.name === "catalog") {
     if (!route.category) return `${prefix}/catalog`;
-    let path = `${prefix}/catalog/${encodeURIComponent(route.category)}`;
+    let path = `${prefix}/catalog/${categorySlug(route.category)}`;
     if (route.subcategory) {
-      path += `/${encodeURIComponent(route.subcategory)}`;
-      if (route.facet) path += `/${encodeURIComponent(route.facet)}`;
+      path += `/${subcategorySlug(route.subcategory)}`;
+      if (route.facet) path += `/${facetSlug(route.facet)}`;
     }
     return path;
   }
@@ -90,4 +105,4 @@ export function storefrontHref(route) {
   return prefix || "/";
 }
 
-export { CABINET_PATH, isCabinetPath };
+export { CABINET_PATH, isCabinetPath, PREVIEW_PREFIX };

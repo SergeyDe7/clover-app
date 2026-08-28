@@ -1,0 +1,251 @@
+/**
+ * Vite preview/dev middleware:
+ * - 301 кириллических /catalog/... → латинские slug
+ * - динамический sitemap.xml
+ * - пререндер HTML витрины (title/description/canonical/H1/контент) для ботов и первого ответа
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+const API_BASE = process.env.CLOVER_API_BASE || "http://127.0.0.1:4100";
+const ORIGIN = "https://clover-spb.ru";
+
+let catalogCache = { at: 0, products: null };
+const CATALOG_TTL_MS = 60_000;
+
+async function loadSeoModules(root) {
+  const slugsUrl = pathToFileURL(
+    path.join(root, "src/screens/storefront/storefrontSlugs.js")
+  ).href;
+  const prerenderUrl = pathToFileURL(
+    path.join(root, "src/screens/storefront/seoPrerender.js")
+  ).href;
+  const [slugs, prerender] = await Promise.all([
+    import(slugsUrl),
+    import(prerenderUrl),
+  ]);
+  return { slugs, prerender };
+}
+
+async function fetchJson(url) {
+  const res = await fetch(url, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status} for ${url}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
+
+async function getAllStorefrontProducts() {
+  const now = Date.now();
+  if (catalogCache.products && now - catalogCache.at < CATALOG_TTL_MS) {
+    return catalogCache.products;
+  }
+  const data = await fetchJson(`${API_BASE}/api/public/catalog`);
+  const products = Array.isArray(data?.products) ? data.products : [];
+  catalogCache = { at: now, products };
+  return products;
+}
+
+function readIndexHtml(root, isPreview) {
+  const candidates = isPreview
+    ? [path.join(root, "dist/index.html"), path.join(root, "index.html")]
+    : [path.join(root, "index.html"), path.join(root, "dist/index.html")];
+  for (const file of candidates) {
+    if (fs.existsSync(file)) return fs.readFileSync(file, "utf8");
+  }
+  return null;
+}
+
+function isStorefrontRequest(req, urlPath) {
+  if (
+    !urlPath ||
+    urlPath.startsWith("/api/") ||
+    urlPath.startsWith("/assets/") ||
+    urlPath.startsWith("/fonts/") ||
+    urlPath.startsWith("/uploads/") ||
+    urlPath.startsWith("/storefront/") ||
+    urlPath === "/sw.js" ||
+    urlPath === "/manifest.webmanifest" ||
+    urlPath === "/robots.txt" ||
+    urlPath === "/lk" ||
+    urlPath.startsWith("/lk/")
+  ) {
+    return false;
+  }
+  // Статика с расширением (иконки и т.п.)
+  if (/\.\w{2,5}$/.test(urlPath) && urlPath !== "/sitemap.xml") {
+    return false;
+  }
+
+  const host = String(req.headers.host || "")
+    .split(":")[0]
+    .replace(/^www\./i, "")
+    .toLowerCase();
+  if (host === "clover-spb.ru") return true;
+  if (urlPath === "/vitrina" || urlPath.startsWith("/vitrina/")) return true;
+  if (
+    urlPath === "/catalog" ||
+    urlPath.startsWith("/catalog/") ||
+    urlPath.startsWith("/product/") ||
+    urlPath === "/cart" ||
+    urlPath === "/checkout" ||
+    urlPath === "/contacts" ||
+    urlPath === "/install-app"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+
+function stripPreview(urlPath) {
+  if (urlPath === "/vitrina" || urlPath === "/vitrina/") return "/";
+  if (urlPath.startsWith("/vitrina/")) return urlPath.slice("/vitrina".length) || "/";
+  return urlPath;
+}
+
+export function cloverStorefrontSeo() {
+  return {
+    name: "clover-storefront-seo",
+    configureServer(server) {
+      attach(server, false);
+    },
+    configurePreviewServer(server) {
+      attach(server, true);
+    },
+  };
+
+  function attach(server, isPreview) {
+    server.middlewares.use(async (req, res, next) => {
+      try {
+        const rawUrl = String(req.url || "/");
+        const urlPath = rawUrl.split("?")[0];
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          next();
+          return;
+        }
+
+        if (urlPath === "/robots.txt") {
+          next();
+          return;
+        }
+
+        const root = server.config.root;
+        const { slugs, prerender } = await loadSeoModules(root);
+
+        if (urlPath === "/sitemap.xml") {
+          const products = await getAllStorefrontProducts();
+          const { xml } = prerender.buildSitemapXml({ products });
+          res.statusCode = 200;
+          res.setHeader("Content-Type", "application/xml; charset=utf-8");
+          res.setHeader("Cache-Control", "public, max-age=300");
+          res.end(xml);
+          return;
+        }
+
+        if (!isStorefrontRequest(req, urlPath)) {
+          next();
+          return;
+        }
+
+        if (urlPath === "/lk" || urlPath.startsWith("/lk/")) {
+          next();
+          return;
+        }
+
+        if (/\.\w{2,5}$/.test(urlPath)) {
+          next();
+          return;
+        }
+
+        const redirectTo = slugs.legacyCatalogPathRedirect(urlPath);
+        if (redirectTo && redirectTo !== urlPath) {
+          res.statusCode = 301;
+          res.setHeader("Location", redirectTo);
+          res.setHeader("Cache-Control", "public, max-age=86400");
+          res.end();
+          return;
+        }
+
+        const logicalPath = stripPreview(urlPath);
+        const route = slugs.parseStorefrontPathname(logicalPath);
+        const indexHtml = readIndexHtml(root, isPreview);
+        if (!indexHtml) {
+          next();
+          return;
+        }
+
+        let products = [];
+        let product = null;
+        let categories = [];
+        let status = 200;
+
+        if (route.name === "catalog" || route.name === "home") {
+          try {
+            const qs = new URLSearchParams();
+            if (route.category) qs.set("category", route.category);
+            if (route.subcategory) qs.set("subcategory", route.subcategory);
+            if (route.facet) qs.set("facet", route.facet);
+            const data = await fetchJson(
+              `${API_BASE}/api/public/catalog${qs.toString() ? `?${qs}` : ""}`
+            );
+            products = Array.isArray(data?.products) ? data.products : [];
+            categories = Array.isArray(data?.categories) ? data.categories : [];
+          } catch {
+            products = [];
+          }
+        } else if (route.name === "product") {
+          try {
+            const data = await fetchJson(
+              `${API_BASE}/api/public/catalog/${encodeURIComponent(route.code)}`
+            );
+            product = data?.product || null;
+            if (!product) status = 404;
+          } catch (err) {
+            status = err.status === 404 ? 404 : 200;
+            product = null;
+          }
+        }
+
+        const built = prerender.buildPrerenderBody(route, {
+          product,
+          products,
+          categories,
+        });
+        if (built.status) status = built.status;
+
+        // Канонический path должен совпадать с URL (не /vitrina)
+        if (built.meta) {
+          const pathForCanon =
+            route.name === "home" ? "/" : buildCanonicalPath(route, slugs);
+          built.meta.path = pathForCanon;
+          built.meta.canonical = `${ORIGIN}${pathForCanon === "/" ? "/" : pathForCanon}`;
+        }
+
+        const injected = prerender.injectPrerenderIntoHtml(indexHtml, {
+          meta: built.meta,
+          html: built.html,
+          status,
+        });
+
+        res.statusCode = injected.status || status;
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.end(injected.html);
+      } catch (error) {
+        console.error("[clover-storefront-seo]", error);
+        next();
+      }
+    });
+  }
+}
+
+function buildCanonicalPath(route, slugs) {
+  return slugs.buildStorefrontPath(route);
+}

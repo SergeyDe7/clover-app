@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { cloverStorefrontSeo } from "./vite-plugins/storefrontSeo.js";
 
 const proxy = {
   "/api": {
@@ -153,7 +154,13 @@ function noAssetSpaFallback() {
 }
 
 export default defineConfig({
-  plugins: [react(), cloverUiBuildTag(), noAssetSpaFallback(), cloverPreviewCacheHeaders()],
+  plugins: [
+    react(),
+    cloverUiBuildTag(),
+    noAssetSpaFallback(),
+    cloverPreviewCacheHeaders(),
+    cloverStorefrontSeo(),
+  ],
   build: {
     rollupOptions: {
       output: {
