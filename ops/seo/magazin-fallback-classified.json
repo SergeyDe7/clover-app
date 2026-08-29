@@ -78,11 +78,13 @@
         "group": "confident_category",
         "oldUrl": "/magazin/product/akvalon-5l",
         "oldSlug": "akvalon-5l",
-        "target": "https://clover-spb.ru/catalog/himiya-chistyashchie-sredstva/prochee",
-        "categoryPath": "/catalog/himiya-chistyashchie-sredstva/prochee",
+        "target": "https://clover-spb.ru/catalog/himiya-chistyashchie-sredstva/dlya-mytya-posudy",
+        "categoryPath": "/catalog/himiya-chistyashchie-sredstva/dlya-mytya-posudy",
         "score": 85,
         "reason": "keyword:/sredstvo-dlya|help-sredstvo|akvalon|prosept|himitek|nika-2/i",
-        "productHint": null
+        "productHint": null,
+        "fixNote": "Old page «Аквалон 5л» — dish soap; no live Аквалон SKU; indexable subcategory Для мытья посуды (sibling Аквалon→HELP already mapped).",
+        "kind": "confident_category"
       },
       {
         "group": "confident_category",
@@ -1166,11 +1168,13 @@
         "group": "confident_category",
         "oldUrl": "/magazin/product/paket-pvd-s-zamkom-15-10",
         "oldSlug": "paket-pvd-s-zamkom-15-10",
-        "target": "https://clover-spb.ru/catalog/pakety-upakovochnye-materialy/pakety-fasovochnye",
-        "categoryPath": "/catalog/pakety-upakovochnye-materialy/pakety-fasovochnye",
+        "target": "https://clover-spb.ru/catalog/pakety-upakovochnye-materialy/pakety-zip-lock",
+        "categoryPath": "/catalog/pakety-upakovochnye-materialy/pakety-zip-lock",
         "score": 85,
         "reason": "keyword:/paket-pvd|pvd-s-zamkom|zip-lock/i",
-        "productHint": null
+        "productHint": null,
+        "fixNote": "Old title «Пакет ПВД с замком 15*10» — zipper/lock bag; matches zip-lock subcategory (no exact 15×10 size).",
+        "kind": "confident_category"
       },
       {
         "group": "confident_category",

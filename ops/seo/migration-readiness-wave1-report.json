@@ -1,0 +1,37 @@
+{
+  "pass": true,
+  "totals": {
+    "TOTAL_OLD_URLS": 326,
+    "classified": 326,
+    "map_301_entries": 326,
+    "exact_product": 89,
+    "exact_subcategory": 220,
+    "exact_category": 17,
+    "gone_410": 0,
+    "generic_fallback": 0,
+    "unmapped": 0,
+    "target_200": 120,
+    "target_404": 0,
+    "target_noindex_unique": 0,
+    "target_redirect": 0,
+    "noindex_mapped_entries": 0,
+    "chains": 0,
+    "loops": 0,
+    "conflicts": 0
+  },
+  "percentages": {
+    "exact_product": 27.3,
+    "exact_subcategory": 67.48,
+    "exact_category": 5.21,
+    "gone_410": 0,
+    "generic_fallback": 0
+  },
+  "unmapped": [],
+  "conflicts": [],
+  "overlap_map_and_gone": [],
+  "generics": [],
+  "noindexMapped": [],
+  "goneEntries": [],
+  "goneMissingReason": [],
+  "problemTargets": []
+}
