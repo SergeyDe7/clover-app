@@ -1,17 +1,38 @@
 /**
- * SEO Structured Data Wave 1 — JSON-LD builders (Organization, Product+Offer, BreadcrumbList).
- * Только фактические публичные поля. Без FAQPage / LocalBusiness / ItemList / brand / availability.
+ * SEO Structured Data — JSON-LD builders (Organization, Product+Offer, BreadcrumbList, WebSite).
+ * Только фактические публичные поля. Без FAQPage / LocalBusiness / SearchAction / brand / availability.
  */
 import { buildStorefrontPath, categorySlug, subcategorySlug } from "./storefrontSlugs.js";
 import { buildStorefrontProductDescription } from "./storefrontProductSeo.js";
 
 export const STOREFRONT_ORIGIN = "https://clover-spb.ru";
 export const ORGANIZATION_ID = `${STOREFRONT_ORIGIN}/#organization`;
+export const WEBSITE_ID = `${STOREFRONT_ORIGIN}/#website`;
 
 const ORG_NAME = "КЛЕВЕР";
 const ORG_DESCRIPTION =
   "Поставки хозтоваров, упаковки и химии для HoReCa в Санкт-Петербурге и регионах.";
 const ORG_LOGO = `${STOREFRONT_ORIGIN}/apple-touch-icon.png`;
+
+const DAY_NAME_TO_SCHEMA = {
+  понедельник: "Monday",
+  вторник: "Tuesday",
+  среда: "Wednesday",
+  четверг: "Thursday",
+  пятница: "Friday",
+  суббота: "Saturday",
+  воскресенье: "Sunday",
+};
+
+const WEEKDAY_ORDER = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 function absUrl(pathOrUrl) {
   const raw = String(pathOrUrl || "").trim();
@@ -24,6 +45,107 @@ function absUrl(pathOrUrl) {
 function productUnitPrice(product) {
   const n = Number(product?.prices?.piece) || 0;
   return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeTimeToken(raw) {
+  const m = String(raw || "")
+    .trim()
+    .match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  if (!Number.isInteger(hh) || !Number.isInteger(mm)) return null;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+function daysBetweenInclusive(fromSchema, toSchema) {
+  const a = WEEKDAY_ORDER.indexOf(fromSchema);
+  const b = WEEKDAY_ORDER.indexOf(toSchema);
+  if (a < 0 || b < 0 || a > b) return null;
+  return WEEKDAY_ORDER.slice(a, b + 1);
+}
+
+/**
+ * Строгий разбор contactHours → OpeningHoursSpecification[].
+ * Поддерживает фактический формат site API:
+ *   "Понедельник - Суббота с 8:00--18:00ч\\nВоскресенье - выходной"
+ * @returns {{ ok: true, specs: object[] } | { ok: false, reason: string }}
+ */
+export function parseContactHoursToOpeningHoursSpec(contactHours) {
+  const raw = String(contactHours || "").replace(/\r\n/g, "\n").trim();
+  if (!raw) return { ok: false, reason: "empty contactHours" };
+
+  const lines = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length !== 2) {
+    return {
+      ok: false,
+      reason: `expected exactly 2 lines, got ${lines.length}: ${JSON.stringify(raw)}`,
+    };
+  }
+
+  // Line 1: "Понедельник - Суббота с 8:00--18:00ч" (en-dash/em-dash/hyphen, optional spaces)
+  const openRe =
+    /^([А-Яа-яЁё]+)\s*[-–—]\s*([А-Яа-яЁё]+)\s+с\s+(\d{1,2}:\d{2})\s*[-–—]+\s*(\d{1,2}:\d{2})\s*ч?\.?$/i;
+  const openMatch = lines[0].match(openRe);
+  if (!openMatch) {
+    return { ok: false, reason: `unrecognized open line: ${JSON.stringify(lines[0])}` };
+  }
+
+  const fromDay = DAY_NAME_TO_SCHEMA[openMatch[1].toLowerCase()];
+  const toDay = DAY_NAME_TO_SCHEMA[openMatch[2].toLowerCase()];
+  if (!fromDay || !toDay) {
+    return {
+      ok: false,
+      reason: `unknown weekday names: ${openMatch[1]} / ${openMatch[2]}`,
+    };
+  }
+  const openDays = daysBetweenInclusive(fromDay, toDay);
+  if (!openDays || openDays.length === 0) {
+    return { ok: false, reason: `invalid day range ${fromDay}–${toDay}` };
+  }
+
+  const opens = normalizeTimeToken(openMatch[3]);
+  const closes = normalizeTimeToken(openMatch[4]);
+  if (!opens || !closes) {
+    return { ok: false, reason: `invalid time tokens in ${JSON.stringify(lines[0])}` };
+  }
+  if (opens >= closes) {
+    return { ok: false, reason: `opens>=closes: ${opens} / ${closes}` };
+  }
+
+  // Line 2: closed day(s) — "Воскресенье - выходной"
+  const closedRe = /^([А-Яа-яЁё]+)\s*[-–—]\s*выходной\.?$/i;
+  const closedMatch = lines[1].match(closedRe);
+  if (!closedMatch) {
+    return { ok: false, reason: `unrecognized closed line: ${JSON.stringify(lines[1])}` };
+  }
+  const closedDay = DAY_NAME_TO_SCHEMA[closedMatch[1].toLowerCase()];
+  if (!closedDay) {
+    return { ok: false, reason: `unknown closed weekday: ${closedMatch[1]}` };
+  }
+  if (openDays.includes(closedDay)) {
+    return {
+      ok: false,
+      reason: `closed day ${closedDay} overlaps open range`,
+    };
+  }
+
+  // Выходной не объявляем рабочим: только открытые дни.
+  return {
+    ok: true,
+    specs: [
+      {
+        "@type": "OpeningHoursSpecification",
+        dayOfWeek: openDays.map((d) => `https://schema.org/${d}`),
+        opens,
+        closes,
+      },
+    ],
+  };
 }
 
 /** Organization из публичных полей /api/public/site (+ стабильные name/url/logo/description). */
@@ -48,7 +170,33 @@ export function buildOrganizationJsonLd(site = {}) {
       streetAddress: address,
     };
   }
+
+  const hoursRaw = String(site?.contactHours || "").trim();
+  if (hoursRaw) {
+    const parsed = parseContactHoursToOpeningHoursSpec(hoursRaw);
+    if (!parsed.ok) {
+      const err = new Error(
+        `[storefrontJsonLd] cannot parse contactHours: ${parsed.reason}`
+      );
+      err.code = "CONTACT_HOURS_PARSE";
+      err.contactHours = hoursRaw;
+      throw err;
+    }
+    org.openingHoursSpecification = parsed.specs;
+  }
   return org;
+}
+
+/** WebSite только для главной; без SearchAction. */
+export function buildWebSiteJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": WEBSITE_ID,
+    url: `${STOREFRONT_ORIGIN}/`,
+    name: ORG_NAME,
+    publisher: { "@id": ORGANIZATION_ID },
+  };
 }
 
 /**
@@ -169,7 +317,7 @@ export function buildBreadcrumbListJsonLd(route, { product } = {}) {
 
 /**
  * Набор JSON-LD графов для SSR страницы.
- * Organization всегда одна; Product/Breadcrumb — только на валидных страницах.
+ * Organization всегда одна; WebSite — только home; Product/Breadcrumb — только на валидных страницах.
  */
 export function buildPageJsonLdGraphs(route, { product, site, status } = {}) {
   const graphs = [];
@@ -182,6 +330,11 @@ export function buildPageJsonLdGraphs(route, { product, site, status } = {}) {
     return graphs;
   }
   if (route?.name === "cart" || route?.name === "checkout") {
+    return graphs;
+  }
+
+  if (route?.name === "home") {
+    graphs.push(buildWebSiteJsonLd());
     return graphs;
   }
 
