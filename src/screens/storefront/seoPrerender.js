@@ -13,6 +13,8 @@ import { buildStorefrontProductDescription, buildStorefrontProductBodyText } fro
 import { getCatalogPageSeo, isCatalogPageNoindex } from "./storefrontCatalogSeo.js";
 import { getCatalogPageContent } from "./storefrontCatalogContent.js";
 
+export { buildPageJsonLdGraphs } from "./storefrontJsonLd.js";
+
 const ORIGIN = "https://clover-spb.ru";
 const STOREFRONT_SITE_NAME = "КЛЕВЕР";
 const STOREFRONT_DEFAULT_TITLE = `${STOREFRONT_HERO_TITLE} | ${STOREFRONT_SITE_NAME}`;
@@ -415,9 +417,32 @@ function replaceTitle(html, title) {
   return html.replace(/<\/head>/i, `    <title>${escapeHtml(title)}</title>\n  </head>`);
 }
 
-export function injectPrerenderIntoHtml(indexHtml, { meta, html, status } = {}) {
+/** Удалить все ld+json и вставить графы Wave 1 (ровно один Organization и т.д.). */
+export function injectJsonLdIntoHtml(html, graphs) {
+  let out = String(html || "").replace(
+    /<script\s+type=["']application\/ld\+json["'][\s\S]*?<\/script>\s*/gi,
+    ""
+  );
+  const list = Array.isArray(graphs) ? graphs.filter(Boolean) : [];
+  if (!list.length) return out;
+  const scripts = list
+    .map(
+      (graph) =>
+        `    <script type="application/ld+json">\n${JSON.stringify(graph, null, 2)}\n    </script>`
+    )
+    .join("\n");
+  return out.replace(/<\/head>/i, `${scripts}\n  </head>`);
+}
+
+export function injectPrerenderIntoHtml(
+  indexHtml,
+  { meta, html, status, jsonLd } = {}
+) {
   let out = String(indexHtml || "");
-  if (!meta) return { html: out, status: status || 200 };
+  if (!meta) {
+    if (jsonLd) out = injectJsonLdIntoHtml(out, jsonLd);
+    return { html: out, status: status || 200 };
+  }
 
   out = replaceTitle(out, meta.title);
   out = replaceOrInsertMetaName(out, "description", meta.description);
@@ -438,6 +463,10 @@ export function injectPrerenderIntoHtml(indexHtml, { meta, html, status } = {}) 
       ? meta.image
       : `${ORIGIN}${meta.image}`;
     out = replaceOrInsertMetaProperty(out, "og:image", image);
+  }
+
+  if (jsonLd) {
+    out = injectJsonLdIntoHtml(out, jsonLd);
   }
 
   const rootRe = /<div id="root"><\/div>/i;

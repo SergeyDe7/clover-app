@@ -12,7 +12,9 @@ const API_BASE = process.env.CLOVER_API_BASE || "http://127.0.0.1:4100";
 const ORIGIN = "https://clover-spb.ru";
 
 let catalogCache = { at: 0, products: null };
+let siteCache = { at: 0, site: null };
 const CATALOG_TTL_MS = 60_000;
+const SITE_TTL_MS = 60_000;
 
 async function loadSeoModules(root) {
   const slugsUrl = pathToFileURL(
@@ -50,6 +52,21 @@ async function getAllStorefrontProducts() {
   const products = Array.isArray(data?.products) ? data.products : [];
   catalogCache = { at: now, products };
   return products;
+}
+
+async function getPublicSite() {
+  const now = Date.now();
+  if (siteCache.site && now - siteCache.at < SITE_TTL_MS) {
+    return siteCache.site;
+  }
+  try {
+    const data = await fetchJson(`${API_BASE}/api/public/site`);
+    const site = data?.site && typeof data.site === "object" ? data.site : data || {};
+    siteCache = { at: now, site };
+    return site;
+  } catch {
+    return siteCache.site || {};
+  }
 }
 
 function readIndexHtml(root, isPreview) {
@@ -266,10 +283,18 @@ export function cloverStorefrontSeo() {
           built.meta.robots = built.meta.robots || "noindex, follow";
         }
 
+        const site = await getPublicSite();
+        const jsonLd = prerender.buildPageJsonLdGraphs(route, {
+          product,
+          site,
+          status,
+        });
+
         const injected = prerender.injectPrerenderIntoHtml(indexHtml, {
           meta: built.meta,
           html: built.html,
           status,
+          jsonLd,
         });
 
         res.statusCode = injected.status || status;
