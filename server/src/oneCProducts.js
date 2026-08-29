@@ -968,6 +968,56 @@ export function addProductIdToClientMatrix(clientLinks, clientId, productId, opt
   };
 }
 
+/** Убирает productId из матрицы клиента; all → selected со списком без позиции. */
+export function removeProductIdFromClientMatrix(
+  clientLinks,
+  clientId,
+  productId,
+  options = {}
+) {
+  const links = clientLinks && typeof clientLinks === "object" ? { ...clientLinks } : {};
+  const key = String(clientId || "").trim();
+  if (!key) throw new Error("Не указан клиент Clover.");
+
+  const current = links[key] && typeof links[key] === "object" ? links[key] : {};
+  let matrixMode = cleanText(current.matrixMode) || "pending";
+  const id = String(productId);
+  let sourceIds = Array.isArray(current.matrixProductIds)
+    ? current.matrixProductIds.map(String)
+    : [];
+
+  if (matrixMode === "all") {
+    sourceIds = (Array.isArray(options.activeProductIds) ? options.activeProductIds : [])
+      .map(String)
+      .filter(Boolean);
+    matrixMode = "selected";
+  } else if (matrixMode === "pending" || !matrixMode) {
+    matrixMode = "selected";
+  }
+
+  const wasInMatrix = sourceIds.includes(id);
+  const nextIds = sourceIds.filter((value) => String(value) !== id);
+
+  const nextLink = {
+    ...current,
+    matrixMode,
+    matrixProductIds: nextIds.map((value) => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) && String(numeric) === String(value)
+        ? numeric
+        : value;
+    }),
+  };
+
+  links[key] = nextLink;
+  return {
+    clientLinks: links,
+    clientLink: nextLink,
+    removedFromMatrix: wasInMatrix,
+    notInMatrix: !wasInMatrix,
+  };
+}
+
 export function mergeProductsPreservingOneCLinks(incomingProducts, storedProducts) {
   const storedList = Array.isArray(storedProducts) ? storedProducts : [];
   const storedById = new Map(

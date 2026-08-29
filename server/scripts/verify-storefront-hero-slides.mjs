@@ -20,6 +20,11 @@ assert.equal(
   normalizeStorefrontHeroSlides(null)[0].src,
   STOREFRONT_DEFAULT_HERO_SLIDES[0].src
 );
+assert.equal(normalizeStorefrontHeroHref("/install-app"), "/install-app");
+assert.equal(
+  normalizeStorefrontHeroSlides(null)[0].href,
+  "/install-app"
+);
 assert.equal(
   normalizeStorefrontHeroSlides([
     { src: "javascript:alert(1)", alt: "x" },
@@ -27,6 +32,12 @@ assert.equal(
     { src: "https://evil.example/x.png" },
   ]).length,
   1
+);
+assert.equal(
+  normalizeStorefrontHeroSlides([
+    { src: "/uploads/storefront-hero-1.webp", alt: "App" },
+  ])[0].href,
+  "/install-app"
 );
 assert.equal(
   normalizeStorefrontHeroSlides([

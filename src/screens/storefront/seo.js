@@ -1,6 +1,7 @@
 import { PUBLIC_BASE_URL } from "../../config/urls.js";
 import { storefrontHref } from "./mode.js";
 import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE } from "./siteCopy.js";
+import { getCatalogPageSeo, isCatalogPageNoindex } from "./storefrontCatalogSeo.js";
 
 export const STOREFRONT_SITE_NAME = "КЛЕВЕР";
 export const STOREFRONT_DEFAULT_TITLE = `${STOREFRONT_HERO_TITLE} | ${STOREFRONT_SITE_NAME}`;
@@ -54,6 +55,7 @@ export function applyStorefrontDocumentMeta({
   path,
   image,
   type = "website",
+  robots,
 } = {}) {
   const origin = storefrontSiteOrigin();
   const pageTitle = title || STOREFRONT_DEFAULT_TITLE;
@@ -66,6 +68,12 @@ export function applyStorefrontDocumentMeta({
   document.title = pageTitle;
   upsertMetaByName("description", pageDescription);
   upsertLink("canonical", canonical);
+  if (robots) {
+    upsertMetaByName("robots", robots);
+  } else {
+    const robotsEl = document.querySelector('meta[name="robots"]');
+    if (robotsEl) robotsEl.remove();
+  }
 
   upsertMetaByProperty("og:type", type);
   upsertMetaByProperty("og:site_name", STOREFRONT_SITE_NAME);
@@ -90,12 +98,24 @@ export function storefrontRouteDocumentMeta(route) {
     };
   }
   if (route.name === "catalog") {
+    const robots = isCatalogPageNoindex(route) ? "noindex, follow" : undefined;
+    const override = getCatalogPageSeo(route);
+    if (override) {
+      return {
+        title: override.title,
+        description: override.description,
+        path: storefrontHref(route),
+        robots,
+      };
+    }
+
     const parts = [route.category, route.subcategory, route.facet].filter(Boolean);
     const label = parts.length ? parts.join(" — ") : "Каталог";
     return {
       title: `${label} | ${STOREFRONT_SITE_NAME}`,
       description: `Каталог «${label}»: хозтовары, упаковка и расходники для HoReCa. Заказ без регистрации на сайте ${STOREFRONT_SITE_NAME}.`,
       path: storefrontHref(route),
+      robots,
     };
   }
   if (route.name === "product") {
@@ -111,6 +131,7 @@ export function storefrontRouteDocumentMeta(route) {
       title: `Корзина | ${STOREFRONT_SITE_NAME}`,
       description: "Корзина заказа на сайте компании КЛЕВЕР.",
       path: storefrontHref(route),
+      robots: "noindex, follow",
     };
   }
   if (route.name === "checkout") {
@@ -118,6 +139,7 @@ export function storefrontRouteDocumentMeta(route) {
       title: `Оформление заказа | ${STOREFRONT_SITE_NAME}`,
       description: "Оформление заказа хозтоваров и упаковки для HoReCa.",
       path: storefrontHref(route),
+      robots: "noindex, follow",
     };
   }
   if (route.name === "contacts") {
@@ -125,6 +147,22 @@ export function storefrontRouteDocumentMeta(route) {
       title: `Контакты | ${STOREFRONT_SITE_NAME}`,
       description: "Контакты компании КЛЕВЕР: адрес, телефон и карта проезда.",
       path: storefrontHref(route),
+    };
+  }
+  if (route.name === "install-app") {
+    return {
+      title: `Установка приложения | ${STOREFRONT_SITE_NAME}`,
+      description:
+        "Как установить мобильное приложение Clover на iPhone, Android и компьютер: пошаговая инструкция PWA.",
+      path: storefrontHref(route),
+    };
+  }
+  if (route.name === "not-found") {
+    return {
+      title: `Страница не найдена | ${STOREFRONT_SITE_NAME}`,
+      description: "Запрашиваемая страница не найдена.",
+      path: "/",
+      robots: "noindex, follow",
     };
   }
   return {

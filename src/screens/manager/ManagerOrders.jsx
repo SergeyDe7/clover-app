@@ -19,9 +19,10 @@ import {
   statusClass,
   matchesTextSearch,
   buildOrderSearchHaystack,
+  buildClientSearchHaystack,
   productArticle,
 } from "../../shared/appHelpers";
-import { canTrashOrder } from "../../shared/orderTrash";
+import { canPurgeOrder, canTrashOrder, isAdminHardDeleteStatus } from "../../shared/orderTrash";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
 
@@ -133,6 +134,7 @@ export function ManagerOrders({
   onApplyManagerNotifications,
   headerSearch = "",
   clientLinks = {},
+  staffRole = "manager",
 }) {
   const [status, setStatus] = useState("Все");
   const [exchangeFilter, setExchangeFilter] = useState("all");
@@ -183,9 +185,28 @@ export function ManagerOrders({
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkPanelOpen, setBulkPanelOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [clientQuery, setClientQuery] = useState("");
   const effectiveSearch = headerSearch.trim();
+  const effectiveClientSearch = clientQuery.trim();
   const inTrash = ordersView === "trash";
   const sourceOrders = inTrash ? trashedOrders : orders;
+
+  const clientSuggestions = useMemo(() => {
+    const names = new Set();
+    for (const order of sourceOrders) {
+      const link = clientLinks[order.clientId] || {};
+      for (const value of [
+        order.customerName,
+        link.companyName,
+        link.oneCName,
+        link.oneCMatchName,
+      ]) {
+        const label = String(value || "").trim();
+        if (label) names.add(label);
+      }
+    }
+    return [...names].sort((a, b) => a.localeCompare(b, "ru"));
+  }, [sourceOrders, clientLinks]);
 
   const waitingOneCCount = useMemo(
     () => orders.filter((order) => {
@@ -205,11 +226,23 @@ export function ManagerOrders({
 
   const visible = useMemo(() => {
     const needle = effectiveSearch.trim();
+    const clientNeedle = effectiveClientSearch.trim();
     return [...sourceOrders].filter((order) => {
       const exchange = normalizeOrderExchange(order.exchange);
       const link = clientLinks[order.clientId] || {};
       const haystack = buildOrderSearchHaystack(order, link);
+      const clientHaystack = buildClientSearchHaystack(
+        {
+          companyName: order.customerName,
+          contactName: order.customerContact,
+          phone: order.customerPhone,
+          email: order.customerEmail,
+          inn: link.inn || link.oneCInn,
+        },
+        link
+      );
       return (!needle || matchesTextSearch(haystack, needle))
+        && (!clientNeedle || matchesTextSearch(clientHaystack, clientNeedle))
         && (inTrash || status === "Все" || order.status === status)
         && (inTrash || exchangeFilter === "all"
           || (exchangeFilter === "waiting" && (exchange.status === "not_sent" || exchange.status === "error"))
@@ -220,7 +253,16 @@ export function ManagerOrders({
       if (sort === "oldest") return String(a.createdAt).localeCompare(String(b.createdAt));
       return String(b.createdAt || b.deletedAt || "").localeCompare(String(a.createdAt || a.deletedAt || ""));
     });
-  }, [sourceOrders, effectiveSearch, status, exchangeFilter, sort, clientLinks, inTrash]);
+  }, [
+    sourceOrders,
+    effectiveSearch,
+    effectiveClientSearch,
+    status,
+    exchangeFilter,
+    sort,
+    clientLinks,
+    inTrash,
+  ]);
 
   const runExchangeAction = async (order, action) => {
     const exchange = normalizeOrderExchange(order.exchange);
@@ -403,6 +445,7 @@ export function ManagerOrders({
       });
       return;
     }
+    // Массово — только как менеджер (выполненные админ удаляет по одному).
     const trashable = orders.filter(
       (order) => selectedIds.includes(order.id) && canTrashOrder(order, "manager").ok
     );
@@ -554,6 +597,56 @@ export function ManagerOrders({
         </button>
       </div>
 
+      <div className="manager-orders-filters-wrap">
+          <div className="manager-orders-client-filter">
+            <label className="field" style={{ margin: 0 }}>
+              <span className="muted small">Поиск клиента</span>
+              <div className="manager-orders-client-filter-row">
+                <input
+                  className="manager-search-input"
+                  type="search"
+                  list="manager-orders-client-suggestions"
+                  placeholder="Название, ИНН, телефон, email…"
+                  value={clientQuery}
+                  onChange={(event) => setClientQuery(event.target.value)}
+                  aria-label="Фильтр заказов по клиенту"
+                />
+                {clientQuery.trim() ? (
+                  <button
+                    className="secondary-button manager-orders-client-filter-clear"
+                    type="button"
+                    onClick={() => setClientQuery("")}
+                  >
+                    Сбросить
+                  </button>
+                ) : null}
+              </div>
+            </label>
+            <datalist id="manager-orders-client-suggestions">
+              {clientSuggestions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          </div>
+
+          {!inTrash && filtersOpen ? (
+            <div className="toolbar three manager-orders-filters">
+              <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Фильтр статуса заказа"><option>Все</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
+              <select
+                value={exchangeFilter}
+                onChange={(e) => setExchangeFilter(e.target.value)}
+                aria-label="Фильтр статуса 1С"
+              >
+                <option value="all">Все статусы 1С</option>
+                <option value="waiting">Ждут передачи в 1С</option>
+                <option value="queued">В очереди</option>
+                {Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}
+              </select>
+              <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Сортировка заказов"><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="delivery">По дате доставки</option></select>
+            </div>
+          ) : null}
+        </div>
+
       {!inTrash && exchangeContour.prodEnabled && (exchangeContour.allowedDatabases || []).length > 1 ? (
         <label className="field manager-orders-contour" style={{ marginTop: 12, maxWidth: 320 }}>
           Контур передачи в 1С
@@ -569,23 +662,6 @@ export function ManagerOrders({
           </select>
         </label>
       ) : null}
-
-      {!inTrash && filtersOpen && (
-        <div className="toolbar three manager-orders-filters">
-          <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Фильтр статуса заказа"><option>Все</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
-          <select
-            value={exchangeFilter}
-            onChange={(e) => setExchangeFilter(e.target.value)}
-            aria-label="Фильтр статуса 1С"
-          >
-            <option value="all">Все статусы 1С</option>
-            <option value="waiting">Ждут передачи в 1С</option>
-            <option value="queued">В очереди</option>
-            {Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}
-          </select>
-          <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Сортировка заказов"><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="delivery">По дате доставки</option></select>
-        </div>
-      )}
 
       {!inTrash && bulkPanelOpen && (
         <div className="panel manager-bulk-panel">
@@ -653,7 +729,12 @@ export function ManagerOrders({
           {visible.map((order) => {
         const exchange = normalizeOrderExchange(order.exchange);
         const busy = busyOrderId === order.id;
-        const trashGate = canTrashOrder(order, "manager");
+        const trashGate = canTrashOrder(order, staffRole);
+        const hardDeleteCompleted =
+          staffRole === "admin" && isAdminHardDeleteStatus(order.status);
+        const canShowDelete =
+          !inTrash &&
+          (settings.managerCanDeleteOrders || hardDeleteCompleted);
         return (
         <article className="order-card manager-order-card-item" key={order.id}>
           <div className="order-card-header manager-order-card-header">
@@ -702,9 +783,20 @@ export function ManagerOrders({
                     <button className="primary-button manager-order-inline-action" type="button" onClick={() => onRestoreOrder?.(order)}>
                       Восстановить
                     </button>
-                    <button className="danger-button manager-order-inline-action" type="button" onClick={() => onPurgeOrder?.(order)}>
-                      Удалить навсегда
-                    </button>
+                    {(() => {
+                      const purgeGate = canPurgeOrder(order, staffRole);
+                      return (
+                        <button
+                          className="danger-button manager-order-inline-action"
+                          type="button"
+                          disabled={!purgeGate.ok}
+                          title={purgeGate.ok ? "Удалить навсегда" : purgeGate.error}
+                          onClick={() => onPurgeOrder?.(order)}
+                        >
+                          Удалить навсегда
+                        </button>
+                      );
+                    })()}
                   </>
                 ) : order.status === "Обработан вручную" ? (
                   <span
@@ -744,19 +836,21 @@ export function ManagerOrders({
                     {busy ? "Передача…" : exchangeSendLabel(exchange)}
                   </button>
                 )}
-                {!inTrash && settings.managerCanDeleteOrders ? (
+                {!inTrash && canShowDelete ? (
                   <button
                     className="danger-button manager-order-inline-action"
                     type="button"
                     disabled={!trashGate.ok}
                     title={
                       trashGate.ok
-                        ? "Перенести заказ в корзину"
+                        ? hardDeleteCompleted
+                          ? "Удалить из Clover навсегда. Документ в 1С не меняется."
+                          : "Перенести заказ в корзину"
                         : trashGate.error
                     }
                     onClick={() => onDeleteOrder(order)}
                   >
-                    Удалить
+                    {hardDeleteCompleted ? "Удалить навсегда" : "Удалить"}
                   </button>
                 ) : null}
               </div>
@@ -795,6 +889,19 @@ export function ManagerOrders({
                 <span>Адрес</span>
                 <strong>{order.address || "—"}</strong>
               </div>
+              {Number(order.deliveryFee) > 0 || order.deliveryNote ? (
+                <div className="order-meta-wide">
+                  <span>Доставка</span>
+                  <strong>
+                    {Number(order.deliveryFee) > 0
+                      ? formatMoney(Number(order.deliveryFee))
+                      : "—"}
+                    {order.deliveryNote
+                      ? `${Number(order.deliveryFee) > 0 ? " · " : ""}${order.deliveryNote}`
+                      : ""}
+                  </strong>
+                </div>
+              ) : null}
             </div>
             {order.clientComment ? (
               <div className="manager-client-comment">

@@ -1,5 +1,5 @@
 // Панель персональной матрицы товаров клиента.
-import { useMemo, useRef, useState } from "react";
+import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   UNIT_CONFIG,
@@ -11,6 +11,7 @@ import {
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
 } from "../../shared/appHelpers";
+import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import { productImageSrc } from "../../shared/productPhoto";
 import { CatalogSearchInput } from "./CatalogSearchInput";
 import { useFixedChromeHeight } from "./useMobileFixedChromeHeight";
@@ -53,17 +54,29 @@ export function ClientMatrixPanel({
 
   const activeCategory = categories.includes(category) ? category : "Все";
 
+  const sortedProducts = useMemo(
+    () => sortProductsWithLidsGrouped(activeProducts),
+    [activeProducts]
+  );
+  const searchEntries = useMemo(
+    () =>
+      sortedProducts.map((product) => ({
+        product,
+        haystack: productCatalogSearchHaystack(product),
+      })),
+    [sortedProducts]
+  );
+  const deferredSearch = useDeferredValue(search);
   const filtered = useMemo(() => {
-    return activeProducts.filter((item) => {
-      const byCategory = activeCategory === "Все" || item.category === activeCategory;
-      const bySearch = matchesCatalogPrefixSearch(
-        productCatalogSearchHaystack(item),
-        search
-      );
-      const byFavorite = !favoritesOnly || favorites.includes(item.id);
-      return byCategory && bySearch && byFavorite;
-    });
-  }, [activeProducts, search, activeCategory, favoritesOnly, favorites]);
+    return searchEntries
+      .filter(({ product, haystack }) => {
+        const byCategory = activeCategory === "Все" || product.category === activeCategory;
+        const bySearch = matchesCatalogPrefixSearch(haystack, deferredSearch);
+        const byFavorite = !favoritesOnly || favorites.includes(product.id);
+        return byCategory && bySearch && byFavorite;
+      })
+      .map(({ product }) => product);
+  }, [searchEntries, deferredSearch, activeCategory, favoritesOnly, favorites]);
 
   const showToolbar = catalogPolicy?.matrixMode !== "pending";
 

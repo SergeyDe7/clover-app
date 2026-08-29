@@ -53,13 +53,23 @@ async function request(path, options = {}) {
     try {
       payload = JSON.parse(rawText);
     } catch {
-          const gatewayDown = response.status === 502 || response.status === 503 || response.status === 504;
+      const gatewayDown =
+        response.status === 502 ||
+        response.status === 503 ||
+        response.status === 504;
+      const tooLargeMessage = path.includes("/storefront/hero-image")
+        ? "Изображение слайда слишком большое. Максимум — 5 МБ. Сожмите файл или выберите JPG/WebP поменьше."
+        : path.includes("/storefront/map-image")
+          ? "Изображение карты слишком большое. Максимум — 5 МБ."
+          : path.includes("/products") && options.method === "PUT"
+            ? "Запрос слишком большой для сервера. Обновите страницу и сохраните товар ещё раз."
+            : "Запрос слишком большой для сервера. Уменьшите размер файла и попробуйте снова.";
       payload = {
         error: gatewayDown
           ? "Сервер API сейчас недоступен. Обновите страницу через минуту или обратитесь к менеджеру."
           : response.status === 413
-            ? "Запрос слишком большой для сервера. Обновите страницу и сохраните товар ещё раз."
-          : "Не удалось прочитать ответ сервера. Обновите страницу или войдите снова.",
+            ? tooLargeMessage
+            : "Не удалось прочитать ответ сервера. Обновите страницу или войдите снова.",
         raw: rawText.slice(0, 120),
       };
     }
@@ -257,6 +267,13 @@ export const api = {
     });
   },
 
+  removeMyMatrixProduct(productId) {
+    return request("/state/my-matrix/remove", {
+      method: "POST",
+      body: { productId },
+    });
+  },
+
   trashOrder(orderId) {
     return request(`/state/orders/${encodeURIComponent(orderId)}/trash`, {
       method: "POST",
@@ -349,6 +366,44 @@ export const api = {
       method: "PUT",
       body: { settings },
     });
+  },
+
+  async downloadStorefrontPriceListPdf(markupPercent) {
+    const token = getApiToken();
+    const params = new URLSearchParams();
+    if (
+      markupPercent !== undefined &&
+      markupPercent !== null &&
+      String(markupPercent).trim() !== ""
+    ) {
+      params.set("markupPercent", String(markupPercent));
+    }
+    const query = params.toString();
+    const response = await fetch(
+      `/api/admin/storefront/price-list.pdf${query ? `?${query}` : ""}`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }
+    );
+    if (!response.ok) {
+      let message = `Ошибка ${response.status}`;
+      try {
+        const data = await response.json();
+        if (data?.error) message = data.error;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(message);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const match = /filename\*=UTF-8''([^;]+)|filename="([^"]+)"/i.exec(
+      disposition
+    );
+    const fileName = decodeURIComponent(
+      match?.[1] || match?.[2] || "clover-vitrina-price-list.pdf"
+    );
+    return { blob, fileName };
   },
 
   uploadStorefrontMapImage(file) {
@@ -689,6 +744,12 @@ export const api = {
     body.append("managerComment", managerComment);
     return request(`/admin/reconciliation/${encodeURIComponent(requestId)}/file`, {
       method: "POST", body,
+    });
+  },
+
+  deleteReconciliation(requestId) {
+    return request(`/admin/reconciliation/${encodeURIComponent(requestId)}`, {
+      method: "DELETE",
     });
   },
 

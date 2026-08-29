@@ -1,5 +1,5 @@
 // Каталог ЛК: только добавление товара в свою матрицу, без корзины.
-import { useMemo, useRef, useState } from "react";
+import { useDeferredValue, useMemo, useRef, useState } from "react";
 import {
   UNIT_CONFIG,
   UNIT_ORDER,
@@ -10,6 +10,7 @@ import {
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
 } from "../../shared/appHelpers";
+import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import {
   buildGroupNav,
   canonicalizeProductCategory,
@@ -25,14 +26,31 @@ import { useMobileFixedChromeHeight } from "./useMobileFixedChromeHeight";
 
 function catalogAddPrice(product) {
   const units = orderedSaleUnits(product);
+  const mode = String(
+    product?.clientPriceMode || product?.defaultPricingMode || "base"
+  );
+  const categoryMode =
+    mode === "one_c_price_type" || mode === "purchase_markup";
   const seen = new Set();
+  const candidates = [];
   for (const unit of [...units, ...UNIT_ORDER]) {
     if (seen.has(unit)) continue;
     seen.add(unit);
     const price = getUnitPrice(product, unit);
-    if (price > 0) return { price, unit };
+    if (!(price > 0)) continue;
+    const source = String(product?.priceSources?.[unit] || "");
+    // При категории цен не показываем «базовый» fallback каталога.
+    if (categoryMode && source === "base_fallback") continue;
+    candidates.push({ price, unit, source });
   }
-  return { price: 0, unit: units[0] || "piece" };
+  if (!candidates.length) {
+    return { price: 0, unit: units[0] || "piece" };
+  }
+  const preferred =
+    candidates.find((item) =>
+      /one_c_price_type|purchase_markup|manual/.test(item.source)
+    ) || candidates[0];
+  return { price: preferred.price, unit: preferred.unit };
 }
 
 function NavChevron() {
@@ -58,10 +76,11 @@ function NavChevron() {
 export function ClientCatalogAddPanel({
   products = [],
   matrixProductIds = [],
-  matrixMode: _matrixMode = "pending",
+  matrixMode = "pending",
   settings,
   busyId = "",
   onAdd,
+  onRemove,
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
@@ -99,21 +118,38 @@ export function ClientCatalogAddPanel({
   const activeSubcategory = canonicalizeProductSubcategory(subcategory);
   const activeChildren = activeCategory ? getGroupChildren(activeCategory) : [];
 
+  const sortedProducts = useMemo(
+    () => sortProductsWithLidsGrouped(activeProducts),
+    [activeProducts]
+  );
+  const searchEntries = useMemo(
+    () =>
+      sortedProducts.map((product) => ({
+        product,
+        haystack: productCatalogSearchHaystack(product),
+      })),
+    [sortedProducts]
+  );
+  const deferredSearch = useDeferredValue(search);
   const filtered = useMemo(() => {
-    return activeProducts.filter((item) => {
-      const byCategory = categoryMatchesFilter(item.category, activeCategory);
-      const bySubcategory =
-        !activeSubcategory ||
-        subcategoryMatchesFilter(item.subcategory, activeSubcategory);
-      const bySearch = matchesCatalogPrefixSearch(
-        productCatalogSearchHaystack(item),
-        search
-      );
-      return byCategory && bySubcategory && bySearch;
-    });
-  }, [activeProducts, activeCategory, activeSubcategory, search]);
+    const filterCategory = String(category || "").trim()
+      ? canonicalizeProductCategory(category)
+      : "";
+    const filterSubcategory = canonicalizeProductSubcategory(subcategory);
+    return searchEntries
+      .filter(({ product, haystack }) => {
+        const byCategory = categoryMatchesFilter(product.category, filterCategory);
+        const bySubcategory =
+          !filterSubcategory ||
+          subcategoryMatchesFilter(product.subcategory, filterSubcategory);
+        const bySearch = matchesCatalogPrefixSearch(haystack, deferredSearch);
+        return byCategory && bySubcategory && bySearch;
+      })
+      .map(({ product }) => product);
+  }, [searchEntries, category, subcategory, deferredSearch]);
 
-  const inMatrix = (product) => matrixIdSet.has(String(product.id));
+  const inMatrix = (product) =>
+    matrixMode === "all" || matrixIdSet.has(String(product.id));
 
   const selectAll = () => {
     setCategory("");
@@ -180,8 +216,7 @@ export function ClientCatalogAddPanel({
               {groups.map((group) => {
                 const hasChildren = group.children.length > 0;
                 const isOpen = openParents.has(group.name);
-                const isActiveParent =
-                  activeCategory === group.name && !activeSubcategory;
+                const isActiveParent = activeCategory === group.name;
 
                 return (
                   <div key={group.name} className="client-catalog-add-cat-block">
@@ -279,7 +314,7 @@ export function ClientCatalogAddPanel({
             <p className="eyebrow">Каталог Clover</p>
             <h2>Добавить товары из каталога</h2>
             <p>
-              Здесь можно только добавить позицию в свою матрицу. Заказ оформляется
+              Добавляйте позиции в матрицу или убирайте лишние. Заказ оформляется
               во вкладке «Моя матрица».
             </p>
           </div>
@@ -314,7 +349,7 @@ export function ClientCatalogAddPanel({
                     )}
                   </div>
                   <h2>{product.name}</h2>
-                  <p className="product-code">Код: {productArticle(product) || "—"}</p>
+                  <p className="product-code">Арт.: {productArticle(product) || "—"}</p>
                   <p className="product-price client-catalog-add-price">
                     {showPrices && price > 0 ? (
                       <>
@@ -327,8 +362,13 @@ export function ClientCatalogAddPanel({
                   </p>
                   <div className="product-card-controls">
                     {added ? (
-                      <button className="secondary-button" type="button" disabled>
-                        В матрице
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        disabled={busy || !onRemove}
+                        onClick={() => onRemove?.(product)}
+                      >
+                        {busy ? "Убираем…" : "Убрать из матрицы"}
                       </button>
                     ) : (
                       <button

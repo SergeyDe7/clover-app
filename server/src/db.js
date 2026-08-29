@@ -1212,6 +1212,17 @@ export function updateReconciliationRequest(id, patch = {}) {
   return getReconciliationRequest(id);
 }
 
+/** Hard-delete акт сверки. Возвращает внутреннюю строку (для удаления файла) или null. */
+export function deleteReconciliationRequest(id) {
+  const current = getReconciliationRequestInternal(id);
+  if (!current) return null;
+  const result = db
+    .prepare(`DELETE FROM reconciliation_requests WHERE id = ?`)
+    .run(String(id));
+  if (!result.changes) return null;
+  return current;
+}
+
 export function upsertPushSubscription({ userId, subscription, preferences = {} }) {
   const endpoint = String(subscription?.endpoint || "");
   if (!endpoint) throw new Error("В push-подписке отсутствует endpoint.");

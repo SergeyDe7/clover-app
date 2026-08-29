@@ -48,7 +48,7 @@ assert.ok(
   "Подзаголовок витрины должен начинаться с «Компания КЛЕВЕР» и описывать поставки для HoReCa."
 );
 assert.ok(
-  copy.includes("/storefront/hero-horeca.png") &&
+  copy.includes("/storefront/hero-app.webp") &&
     copy.includes("/storefront/hero-packaging.webp") &&
     copy.includes("/storefront/hero-chemistry.webp"),
   "На главной витрины есть три слайда баннера по тематике КЛЕВЕР."

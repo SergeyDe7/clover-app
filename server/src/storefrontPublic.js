@@ -28,6 +28,10 @@ import {
   STOREFRONT_DEFAULT_COUNTERPARTY_NAME,
 } from "./storefrontCounterparty.js";
 import {
+  resolveClientSpbDelivery,
+  syncDeliveryLineFromFee,
+} from "./deliveryFee.js";
+import {
   getEarliestDeliveryDateIso,
   validateDeliveryDate,
 } from "../../src/shared/deliveryDateRules.js";
@@ -150,17 +154,29 @@ export function normalizeStorefrontHeroSlides(value) {
   const list = Array.isArray(value) ? value : [];
   const slides = [];
   const seen = new Set();
-  for (const item of list) {
+  const defaultsBySrc = new Map(
+    STOREFRONT_DEFAULT_HERO_SLIDES.map((slide) => [slide.src, slide])
+  );
+  for (const [index, item] of list.entries()) {
     const src = String(
       item && typeof item === "object" ? item.src : item || ""
     ).trim();
     if (!HERO_SLIDE_SRC_RE.test(src) || seen.has(src)) continue;
     seen.add(src);
+    const fallback = defaultsBySrc.get(src);
+    let href =
+      normalizeStorefrontHeroHref(item?.href) ||
+      normalizeStorefrontHeroHref(fallback?.href);
+    if (!href && index === 0) href = "/install-app";
     slides.push({
       src,
-      alt: String(item?.alt || "").trim().slice(0, 120),
-      href: normalizeStorefrontHeroHref(item?.href),
-      buttonLabel: normalizeStorefrontHeroButton(item?.buttonLabel),
+      alt: String(item?.alt || fallback?.alt || "").trim().slice(0, 120),
+      href,
+      buttonLabel: normalizeStorefrontHeroButton(
+        item?.buttonLabel !== undefined && item?.buttonLabel !== null
+          ? item.buttonLabel
+          : fallback?.buttonLabel
+      ),
     });
     if (slides.length >= STOREFRONT_MAX_HERO_SLIDES) break;
   }
@@ -211,7 +227,7 @@ export function normalizeStorefrontHeroHref(value) {
 
   if (raw.length > 400) return "";
   if (raw === "/") return "";
-  if (!/^\/(product|catalog|contacts|cart)(\/|$)/.test(raw)) return "";
+  if (!/^\/(product|catalog|contacts|cart|install-app)(\/|$)/.test(raw)) return "";
   if (raw.startsWith("/product/") && raw === "/product/") return "";
   return raw;
 }
@@ -510,6 +526,45 @@ function listStorefrontProducts(storeSettings) {
       return toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId);
     })
     .filter((product) => product.name);
+}
+
+/**
+ * Товары витрины для прайс-листа.
+ * markupPercent — накрутка % от закупки (режим purchase_markup).
+ * Если не передан — берётся текущая настройка витрины и её режим цен.
+ */
+export function getStorefrontPriceListProducts({ markupPercent } = {}) {
+  const base = getStorefrontSettings(
+    getGlobalState("settings", DEFAULT_SETTINGS)
+  );
+  const hasMarkupOverride =
+    markupPercent !== undefined &&
+    markupPercent !== null &&
+    String(markupPercent).trim() !== "";
+  const markup = hasMarkupOverride
+    ? normalizeStorefrontMarkupPercent(markupPercent)
+    : base.storefrontMarkupPercent;
+  const storeSettings = hasMarkupOverride
+    ? {
+        ...base,
+        storefrontPricingMode: "purchase_markup",
+        storefrontMarkupPercent: markup,
+      }
+    : base;
+  const products = listStorefrontProducts(storeSettings).sort((a, b) => {
+    const cat = String(a.category || "").localeCompare(
+      String(b.category || ""),
+      "ru"
+    );
+    if (cat !== 0) return cat;
+    return String(a.name || "").localeCompare(String(b.name || ""), "ru");
+  });
+  return {
+    settings: storeSettings,
+    markupPercent: storeSettings.storefrontMarkupPercent,
+    pricingMode: storeSettings.storefrontPricingMode,
+    products,
+  };
 }
 
 /** Группы витрины — как Opticom, канон из productGroups.js. */
@@ -830,7 +885,14 @@ export function createStorefrontOrder(input, { notify } = {}) {
     });
   }
 
-  const total = lines.reduce((sum, line) => sum + (Number(line.lineTotal) || 0), 0);
+  const goodsTotal = lines.reduce(
+    (sum, line) => sum + (Number(line.lineTotal) || 0),
+    0
+  );
+  const delivery = resolveClientSpbDelivery(
+    { items: lines, customItems: [] },
+    { showPrices: true }
+  );
   const guest = ensureStorefrontGuestUser();
   linkStorefrontGuestToOneC(guest.id, settings);
   const createdAt = new Date().toISOString();
@@ -845,7 +907,12 @@ export function createStorefrontOrder(input, { notify } = {}) {
     parsed.email ? `Email: ${parsed.email}` : "",
   ].filter(Boolean);
 
-  const order = {
+  const fullSettings = {
+    ...DEFAULT_SETTINGS,
+    ...getGlobalState("settings", DEFAULT_SETTINGS),
+  };
+
+  let order = {
     id: orderId,
     externalId: orderId,
     number,
@@ -875,8 +942,10 @@ export function createStorefrontOrder(input, { notify } = {}) {
     exchange: normalizeExchangeState({ status: "not_sent" }),
     items: lines,
     customItems: [],
-    total,
-    amount: total,
+    deliveryFee: delivery.deliveryFee,
+    deliveryNote: delivery.deliveryNote,
+    total: goodsTotal,
+    amount: goodsTotal,
     createdAt,
     updatedAt: createdAt,
     storefrontPricingMode: settings.storefrontPricingMode,
@@ -884,6 +953,22 @@ export function createStorefrontOrder(input, { notify } = {}) {
     storefrontPriceTypeId: settings.storefrontPriceTypeId,
     storefrontPriceTypeName: settings.storefrontPriceTypeName,
   };
+
+  order = syncDeliveryLineFromFee(
+    order,
+    {
+      deliveryOneCId: fullSettings.deliveryOneCId,
+      deliveryOneCCode: fullSettings.deliveryOneCCode,
+      deliveryOneCName: fullSettings.deliveryOneCName || "Доставка",
+    },
+    getGlobalState("oneCProducts", [])
+  );
+  const grandTotal = (order.items || []).reduce(
+    (sum, line) => sum + (Number(line.lineTotal) || 0),
+    0
+  );
+  order.total = grandTotal;
+  order.amount = grandTotal;
 
   insertOrder(order, guest.id);
 

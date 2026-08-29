@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
   STOREFRONT_DEFAULT_HERO_SLIDES,
+  resolveStorefrontHeroSlideHref,
 } from "../siteCopy.js";
 import { storefrontHref } from "../mode.js";
 import { navigateStorefront } from "./StoreHeader.jsx";
@@ -9,6 +10,27 @@ import { navigateStorefront } from "./StoreHeader.jsx";
 function prefersReducedMotion() {
   if (typeof window === "undefined" || !window.matchMedia) return false;
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function heroRouteFromHref(href) {
+  const path = String(href || "").trim();
+  if (!path) return null;
+  if (path === "/install-app") return { name: "install-app" };
+  if (path === "/cart") return { name: "cart" };
+  if (path === "/contacts") return { name: "contacts" };
+  if (path === "/catalog" || path.startsWith("/catalog/")) {
+    const parts = path.slice("/catalog".length).split("/").filter(Boolean);
+    return {
+      name: "catalog",
+      category: parts[0] ? decodeURIComponent(parts[0]) : "",
+      subcategory: parts[1] ? decodeURIComponent(parts[1]) : "",
+      facet: parts[2] ? decodeURIComponent(parts[2]) : "",
+    };
+  }
+  if (path.startsWith("/product/")) {
+    return { name: "product", code: decodeURIComponent(path.slice("/product/".length)) };
+  }
+  return path;
 }
 
 export function HeroSlides({ slides, intervalSec }) {
@@ -20,7 +42,9 @@ export function HeroSlides({ slides, intervalSec }) {
   const [paused, setPaused] = useState(false);
   const seconds = Number(intervalSec) || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC;
   const current = list[index] || list[0];
-  const href = current?.href || "";
+  const href = resolveStorefrontHeroSlideHref(current, index);
+  const linkLabel =
+    current?.buttonLabel || current?.alt || "Инструкция по установке приложения";
 
   useEffect(() => {
     setIndex((currentIndex) => (currentIndex < list.length ? currentIndex : 0));
@@ -34,9 +58,15 @@ export function HeroSlides({ slides, intervalSec }) {
     return () => window.clearInterval(timer);
   }, [list.length, paused, seconds]);
 
+  const openSlideLink = () => {
+    if (!href) return;
+    const route = heroRouteFromHref(href);
+    if (route) navigateStorefront(route);
+  };
+
   return (
     <div
-      className="sf-hero-visual"
+      className={`sf-hero-visual${href ? " has-slide-link" : ""}`}
       aria-roledescription="carousel"
       aria-label="Слайды на главной"
       onMouseEnter={() => setPaused(true)}
@@ -47,24 +77,32 @@ export function HeroSlides({ slides, intervalSec }) {
           key={slide.src}
           src={slide.src}
           alt={slide.alt || ""}
-          width="1280"
-          height="720"
+          width="1400"
+          height="746"
           loading={slideIndex === 0 ? "eager" : "lazy"}
-          className={slideIndex === index ? "is-active" : ""}
+          className={[
+            slideIndex === index ? "is-active" : "",
+            slide.src.includes("hero-app") ? "is-app-slide" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         />
       ))}
       {href ? (
         <a
-          className="sf-hero-slide-link"
-          href={storefrontHref(href)}
+          className={`sf-hero-slide-link${current?.buttonLabel ? "" : " is-cover-only"}`}
+          href={storefrontHref(heroRouteFromHref(href) || href)}
+          aria-label={linkLabel}
           onClick={(event) => {
             event.preventDefault();
-            navigateStorefront(href);
+            openSlideLink();
           }}
         >
-          <span className="sf-hero-slide-btn">
-            {current.buttonLabel || "Смотреть товар"}
-          </span>
+          {current?.buttonLabel ? (
+            <span className="sf-hero-slide-btn">
+              {current.buttonLabel}
+            </span>
+          ) : null}
         </a>
       ) : null}
       {list.length > 1 ? (

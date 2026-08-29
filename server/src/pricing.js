@@ -219,10 +219,10 @@ export function resolveClientProductPricing(
         result.prices[unit] = typed.price;
         result.priceSources[unit] = typed.source;
       } else {
-        const fallback = Math.max(0, Number(product[baseField]) || 0);
-        result.prices[unit] = fallback;
-        result.priceSources[unit] =
-          fallback > 0 ? "base_fallback" : "one_c_price_missing";
+        // Не подменяем базовой ценой каталога — клиент должен видеть
+        // только свою категорию цен (иначе в «Добавить из каталога» чужие цены).
+        result.prices[unit] = 0;
+        result.priceSources[unit] = "one_c_price_missing";
       }
       continue;
     }

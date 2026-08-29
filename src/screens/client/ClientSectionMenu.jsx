@@ -13,8 +13,16 @@ export function ClientSectionMenu({
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
+  const SHORT_LABELS = {
+    matrix: "Матрица",
+    catalog: "Каталог",
+    orders: "Заказы",
+    reconciliation: "Сверка",
+    cabinet: "Настройки",
+  };
   const active = tabs.find(([id]) => id === activeId) || tabs[0];
-  const activeLabel = active?.[1] || "Меню";
+  const activeLabel =
+    SHORT_LABELS[active?.[0]] || active?.[1] || "Меню";
   const totalBadge = Number(ordersBadge) + Number(actsBadge);
 
   useEffect(() => {

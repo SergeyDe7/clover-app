@@ -19,6 +19,7 @@ const MAIN_TAB_TO_PANEL = {
   clients: "ManagerClients",
   acts: "ManagerReconciliation",
   exchange: "ManagerExchange",
+  "price-list": "ManagerPriceList",
   more: null,
 };
 
@@ -37,6 +38,7 @@ const PANEL_FILES = {
   ManagerReconciliation: "ManagerReconciliation.jsx",
   ManagerAccessVault: "ManagerAccessVault.jsx",
   ManagerStorefront: "ManagerStorefront.jsx",
+  ManagerPriceList: "ManagerPriceList.jsx",
   ManagerSettings: "ManagerSettings.jsx",
   ManagerBackup: "ManagerBackup.jsx",
   ManagerAudit: "ManagerAudit.jsx",
@@ -96,8 +98,8 @@ assert.ok(
 
 assert.deepEqual(
   mainTabs,
-  ["orders", "products", "storefront", "clients", "acts", "exchange", "more"],
-  "Порядок главного меню: Заказы, Товары, Витрина, Клиенты, Акты сверок, 1С, Ещё"
+  ["orders", "products", "storefront", "clients", "acts", "exchange", "price-list", "more"],
+  "Порядок главного меню: Заказы, Товары, Витрина, Клиенты, Акты сверок, 1С, Прайс, Ещё"
 );
 
 assert.equal(
@@ -179,7 +181,8 @@ assert.ok(
 const appSource = readFileSync(path.join(root, "src/App.jsx"), "utf8");
 assert.ok(
   appSource.includes('from "./screens/manager/ManagerScreen"') ||
-    appSource.includes('from "./screens/manager"'),
+    appSource.includes('from "./screens/manager"') ||
+    appSource.includes('import("./screens/manager/ManagerScreen")'),
   "App.jsx не подключает ManagerScreen"
 );
 

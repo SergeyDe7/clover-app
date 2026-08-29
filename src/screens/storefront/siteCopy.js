@@ -8,8 +8,10 @@ export const STOREFRONT_HERO_LEAD =
 /** Примеры слайдов баннера. Админ может заменить их своими картинками. */
 export const STOREFRONT_DEFAULT_HERO_SLIDES = [
   {
-    src: "/storefront/hero-horeca.png",
-    alt: "Расходники для кафе и ресторанов",
+    src: "/storefront/hero-app.webp",
+    alt: "Мобильное приложение Clover — заказывайте в любое время с телефона",
+    href: "/install-app",
+    buttonLabel: "",
   },
   {
     src: "/storefront/hero-packaging.webp",
@@ -23,3 +25,11 @@ export const STOREFRONT_DEFAULT_HERO_SLIDES = [
 
 export const STOREFRONT_DEFAULT_HERO_INTERVAL_SEC = 6;
 export const STOREFRONT_MAX_HERO_SLIDES = 8;
+
+/** Ссылка слайда: первый баннер по умолчанию ведёт на установку приложения. */
+export function resolveStorefrontHeroSlideHref(slide, index = 0) {
+  const href = String(slide?.href || "").trim();
+  if (href) return href;
+  if (index === 0) return "/install-app";
+  return "";
+}

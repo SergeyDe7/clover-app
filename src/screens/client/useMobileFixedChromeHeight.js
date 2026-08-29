@@ -1,11 +1,21 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 
 /**
  * Правый край колонки товаров: сетка или самая правая карточка.
- * Не опираемся на колонку корзины — только на то, что реально рисует товары.
+ * Для shell ЛК (.lk-order-catalog) — ширина всей колонки (4 карточки).
  */
 function measureProductsBox(host) {
   const hostBox = host.getBoundingClientRect();
+  if (
+    host.classList?.contains("lk-order-catalog") ||
+    host.classList?.contains("catalog-main")
+  ) {
+    return {
+      left: Math.max(0, Math.round(hostBox.left)),
+      width: Math.max(0, Math.round(hostBox.width)),
+    };
+  }
+
   let left = hostBox.left;
   let right = hostBox.right;
 
@@ -33,7 +43,7 @@ function measureProductsBox(host) {
  * chromeRef — сам fixed-блок (может быть в portal вне host).
  */
 export function useFixedChromeHeight(chromeRef, hostRef, cssVarName, active = true) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active || typeof window === "undefined") return undefined;
 
     let raf = 0;
@@ -55,8 +65,15 @@ export function useFixedChromeHeight(chromeRef, hostRef, cssVarName, active = tr
       el.style.setProperty("right", "auto", "important");
       el.style.setProperty("z-index", "40", "important");
 
-      // +12px запас, чтобы тень/паддинг не наезжали на первые карточки.
-      const height = Math.ceil(el.getBoundingClientRect().height) + 12;
+      // Spacer только на зону перекрытия: колонка уже ниже шапки, полная высота
+      // тулбара давала лишнюю пустоту над карточками.
+      const toolbarRect = el.getBoundingClientRect();
+      const hostTopDoc = host.getBoundingClientRect().top + window.scrollY;
+      const alreadyBelow = hostTopDoc - toolbarRect.top;
+      const height = Math.max(
+        0,
+        Math.ceil(toolbarRect.height - Math.max(0, alreadyBelow))
+      );
       host.style.setProperty(cssVarName, `${height}px`);
       return true;
     };
@@ -79,12 +96,17 @@ export function useFixedChromeHeight(chromeRef, hostRef, cssVarName, active = tr
 
     arm();
     window.addEventListener("resize", apply);
-    window.addEventListener("scroll", apply, true);
+    // scroll на mobile даёт layout thrash у края страницы — не слушаем.
+    const onScroll = () => {
+      if (window.matchMedia("(max-width: 820px)").matches) return;
+      apply();
+    };
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
     return () => {
       window.cancelAnimationFrame(raf);
       ro?.disconnect();
       window.removeEventListener("resize", apply);
-      window.removeEventListener("scroll", apply, true);
+      window.removeEventListener("scroll", onScroll, true);
       const host = hostRef?.current;
       host?.style.removeProperty(cssVarName);
       const el = chromeRef.current;

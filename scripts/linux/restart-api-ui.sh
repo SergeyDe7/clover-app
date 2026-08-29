@@ -13,11 +13,7 @@ echo "UI build tag: ${BUILD_TAG:-unknown}"
 echo "UI bundle: ${MAIN_JS:-unknown}"
 
 echo "Stopping API/UI processes (all duplicates, not only port holders)..."
-# Старые npm/vite часто остаются без порта — из‑за них «не применилось».
-pkill -f '/opt/clover/clover-app/server/src/server.js' 2>/dev/null || true
-pkill -f 'vite preview --host 0.0.0.0 --port 5273' 2>/dev/null || true
-pkill -f 'npm run preview -- --host 0.0.0.0 --port 5273' 2>/dev/null || true
-sleep 1
+# Не используем pkill -f 'node src/server.js' — паттерн матчит сам shell-скрипт.
 for port in 4100 5273; do
   pids="$(ss -tlnp "sport = :$port" 2>/dev/null | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u || true)"
   for pid in $pids; do
@@ -25,6 +21,22 @@ for port in 4100 5273; do
     kill -9 "$pid" 2>/dev/null || true
   done
 done
+# Добиваем node без порта: только cwd = clover-app/server и cmdline содержит server.js
+for pid in $(pgrep -x node 2>/dev/null || true); do
+  cwd="$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)"
+  cmd="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+  if [[ "$cwd" == "$ROOT/server" && "$cmd" == *server.js* ]]; then
+    echo "kill leftover API pid=$pid"
+    kill -9 "$pid" 2>/dev/null || true
+  fi
+  if [[ "$cwd" == "$ROOT" && "$cmd" == *vite*preview*5273* ]]; then
+    echo "kill leftover UI pid=$pid"
+    kill -9 "$pid" 2>/dev/null || true
+  fi
+done
+# vite/npm preview без привязки cwd
+pkill -f 'vite preview --host 0.0.0.0 --port 5273' 2>/dev/null || true
+pkill -f 'npm run preview -- --host 0.0.0.0 --port 5273' 2>/dev/null || true
 sleep 1
 ss -tlnp | grep -E ':4100|:5273' && echo "WARN: ports still busy" >&2 || echo "ports free"
 

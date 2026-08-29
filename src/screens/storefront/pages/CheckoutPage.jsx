@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import {
-  cartTotal,
+  FREE_DELIVERY_MIN_TOTAL,
+  PAID_DELIVERY_FEE,
+  cartDeliveryFee,
+  cartGoodsTotal,
+  cartGrandTotal,
   clearCart,
   getCartItems,
   subscribeCart,
@@ -61,7 +65,9 @@ export function CheckoutPage() {
     );
   }
 
-  const total = cartTotal(items);
+  const goodsTotal = cartGoodsTotal(items);
+  const deliveryFee = cartDeliveryFee(items);
+  const grandTotal = cartGrandTotal(items);
 
   async function onSubmit(event) {
     event.preventDefault();
@@ -153,13 +159,19 @@ export function CheckoutPage() {
           />
         </label>
         <div className="sf-checkout-summary sf-field-wide">
-          <p>
-            Позиций: {items.length} · ориентир:{" "}
-            <strong>{formatMoney(total)}</strong>
-          </p>
-          <p className="sf-muted">
-            Заказ уйдёт менеджеру и может быть передан в 1С из ЛК.
-          </p>
+          <div>
+            <p>
+              Товары: {items.length} поз. · {formatMoney(goodsTotal)}
+            </p>
+            <p className={`sf-delivery-note${deliveryFee > 0 ? " is-paid" : " is-free"}`}>
+              {deliveryFee > 0
+                ? `Доставка по СПб — ${formatMoney(PAID_DELIVERY_FEE)} (заказ менее ${formatMoney(FREE_DELIVERY_MIN_TOTAL)})`
+                : "Доставка по СПб — бесплатно"}
+            </p>
+            <p>
+              Итого: <strong>{formatMoney(grandTotal)}</strong>
+            </p>
+          </div>
         </div>
         {error ? <p className="sf-error sf-field-wide">{error}</p> : null}
         <div className="sf-checkout-actions sf-field-wide">

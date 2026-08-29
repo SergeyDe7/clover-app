@@ -29,11 +29,13 @@ import {
   productCatalogSearchHaystack,
   restoreWindowScroll,
 } from "../../shared/appHelpers";
+import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { MatrixOneCProductAdd } from "./MatrixOneCProductAdd";
 import { MatrixCloverCatalogAdd } from "./MatrixCloverCatalogAdd";
 import { ProductEditor } from "./ProductEditor";
 import {
+  expandMatrixRemovalByOneCId,
   growMatrixIdList,
   idsWithout,
   toggleMatrixProductId,
@@ -1612,7 +1614,7 @@ export function ManagerClients({
                 seenId.add(id);
                 result.push(product);
               }
-              return result;
+              return sortProductsWithLidsGrouped(result);
             })();
             const matrixExportProducts = (() => {
               if (link.matrixMode === "all") {
@@ -2416,28 +2418,45 @@ export function ManagerClients({
                           <button
                             className="secondary-button"
                             type="button"
-                            disabled={pickedIds.length === 0}
+                            disabled={
+                              pickedIds.length === 0 ||
+                              matrixSaveState[client.id]?.status === "saving"
+                            }
                             onClick={() => {
                               if (!pickedIds.length) return;
+                              const selectedProducts = matrixProducts.filter(
+                                (product) => pickedSet.has(String(product.id))
+                              );
+                              const removeIds = expandMatrixRemovalByOneCId(
+                                selectedProducts,
+                                matrixProductIds,
+                                products
+                              );
                               const nextIds = idsWithout(
                                 matrixProductIds,
-                                pickedIds
+                                [...removeIds]
                               );
                               setMatrixListSnapshot((current) => ({
                                 ...current,
                                 [client.id]: idsWithout(
                                   current[client.id] || snapshotIds,
-                                  pickedIds
+                                  [...removeIds]
                                 ),
                               }));
                               setMatrixPickIds((current) => ({
                                 ...current,
                                 [client.id]: [],
                               }));
+                              const nextLink = {
+                                ...link,
+                                matrixMode: "selected",
+                                matrixProductIds: nextIds,
+                              };
                               updateLink(client.id, {
                                 matrixMode: "selected",
                                 matrixProductIds: nextIds,
                               });
+                              void saveClientMatrix(client.id, nextLink);
                             }}
                           >
                             Удалить выбранные из матрицы

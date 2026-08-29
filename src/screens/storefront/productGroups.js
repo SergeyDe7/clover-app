@@ -3,6 +3,8 @@
  * children: [] — у группы нет подгрупп, товары показываем сразу.
  * Порядок: сначала с подкатегориями, затем без; «Прочее» всегда последняя.
  */
+import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
+
 export const CLOVER_PRODUCT_GROUPS = [
   "Одноразовая посуда",
   "Хозяйственные товары",
@@ -94,8 +96,10 @@ const TAXONOMY_ASSIGN_RULES = [
   { category: CHEM, subcategory: "Порошки", patterns: [/стиральн.*порош/u, /порошок viksan/u, /порошок ять/u, /отбеливатель.*порош/u, /пемолюкс/u] },
   { category: CHEM, subcategory: "Мыло", patterns: [/жидкое мыло/u, /мыло-пена/u, /хозяйственное мыло/u, /туалетное мыло/u, /\bмыло\b/u] },
   { category: CHEM, subcategory: "Универсальные", patterns: [/универсальн.*очист/u, /универсальный очиститель/u] },
+  { category: CHEM, subcategory: "Освежители воздуха", patterns: [/освежитель воздуха/u, /airwick/u, /\bдореми\b/u, /\balpen\b/u] },
+  { category: CHEM, subcategory: "Отбеливатели", patterns: [/\bбелизна\b/u, /отбеливател/u, /отбеливани/u, /имнова вайтен/u] },
   { category: PAPER, subcategory: "Салфетки", patterns: [/салфетк/u] },
-  { category: CHEM, subcategory: "Прочее", patterns: [/освежитель воздуха/u, /белизна/u, /хелп - /u, /чистящ/u, /моющ/u, /химитек/u, /ника-2/u, /средство для/u, /экопрофхим/u, /prosept/u, /очиститель/u, /полироль/u, /отбеливани/u, /dry dez/u] },
+  { category: CHEM, subcategory: "Прочее", patterns: [/хелп - /u, /чистящ/u, /моющ/u, /химитек/u, /ника-2/u, /средство для/u, /экопрофхим/u, /prosept/u, /очиститель/u, /полироль/u, /dry dez/u] },
 
   { category: HOUSEHOLD, subcategory: "Мешки для мусора", patterns: [/пакет[ыа]? для мусора/u, /мешк.*для мусора/u, /мешк.*мусор/u] },
   { category: HOUSEHOLD, subcategory: "Перчатки", patterns: [/перчатк/u, /нитрил/u, /латекс/u, /винилов/u] },
@@ -114,6 +118,7 @@ const TAXONOMY_ASSIGN_RULES = [
   { category: BAGS, subcategory: "Пакеты фасовочные", patterns: [/фасовочн/u] },
   { category: BAGS, subcategory: "Бумажные пакеты с ручкой", patterns: [/бумажн.*пакет.*с ручк/u, /пакет.*крафт.*с ручк/u] },
   { category: BAGS, subcategory: "Бумажные пакеты без ручки", patterns: [/бумажн.*пакет/u, /уголок бумажн/u] },
+  { category: BAGS, subcategory: "Пакеты zip-lock", patterns: [/зиплок/u, /zip-?lock/u, /с замком зип/u, /пакет с замком/u] },
   { category: BAGS, subcategory: "Прочее", patterns: [/фильтр-пакет/u, /пакет(?!ы? для мусора)/u] },
 
   { category: DISPOSABLE, subcategory: "Ланч-боксы", patterns: [/ланч-?бокс/u, /\blb[-\s]/u] },
@@ -213,6 +218,8 @@ export const CLOVER_GROUP_META = {
       { name: "Мыло" },
       { name: "Порошки" },
       { name: "Для посудомоечных машин" },
+      { name: "Освежители воздуха" },
+      { name: "Отбеливатели" },
       { name: "Прочее" },
     ],
   },
@@ -237,6 +244,7 @@ export const CLOVER_GROUP_META = {
       { name: "Пакеты вакуумные" },
       { name: "Бумажные пакеты с ручкой" },
       { name: "Бумажные пакеты без ручки" },
+      { name: "Пакеты zip-lock" },
       { name: "Прочее" },
     ],
   },
@@ -352,7 +360,7 @@ export function groupProductsByCloverGroup(products) {
   }
   return sortCloverProductGroups([...map.keys()]).map((name) => ({
     name,
-    products: map.get(name) || [],
+    products: sortProductsWithLidsGrouped(map.get(name) || []),
     count: (map.get(name) || []).length,
     ...getGroupMeta(name),
   }));

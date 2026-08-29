@@ -51,6 +51,7 @@ import {
   getReconciliationRequestInternal,
   listReconciliationRequests,
   updateReconciliationRequest,
+  deleteReconciliationRequest,
   upsertPushSubscription,
   listPushSubscriptions,
   deletePushSubscription,
@@ -99,6 +100,7 @@ import {
   applyOrderStatusPolicy,
   buildStatusUpdatedOrder,
 } from "./orderStatus.js";
+import { assertClientMayEditExistingOrder } from "./orderClientEdit.js";
 import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
 import { publicClientSettings } from "./clientSettings.js";
 import {
@@ -123,6 +125,7 @@ import {
 } from "./oneC.js";
 import {
   addProductIdToClientMatrix,
+  removeProductIdFromClientMatrix,
   applyInferredCategories,
   applyOneCArticles,
   autoLinkCloverProducts,
@@ -167,6 +170,7 @@ import {
   unitLabel,
   unitPriceField,
 } from "./pricing.js";
+import { applyClientSpbDeliveryFees, applyDeliveryLineSync, ensureSpbDeliveryOnOrder, isCloverDeliveryLine, resolveDeliveryOneCRefs } from "./deliveryFee.js";
 import {
   overlayStorefrontClientLink,
   resolveStorefrontOneCClient,
@@ -183,6 +187,7 @@ import {
   findPurchasePriceTypeId,
   heroSlideUploadUrls,
 } from "./storefrontPublic.js";
+import { buildStorefrontPriceListPdf } from "./storefrontPriceListPdf.js";
 import {
   buildAllPriceRequirements,
   buildOrderPriceRequirements,
@@ -1280,7 +1285,12 @@ function resolveClientCatalog(products, rawLink, oneCProducts = []) {
       applyClientPrices(product, link, true, oneCById)
     ),
     fullCatalogProducts: fullCatalog.map((product) =>
-      applyClientPrices(product, link, true, oneCById)
+      applyClientPrices(
+        product,
+        link,
+        selectedIds.has(String(product.id)),
+        oneCById
+      )
     ),
     policy: {
       matrixMode: link.matrixMode,
@@ -1390,6 +1400,7 @@ function repriceOrderWithCurrentOneC(order, products, rawLink, oneCProducts = []
   const issues = [];
 
   const items = (Array.isArray(order?.items) ? order.items : []).map((item) => {
+    if (isCloverDeliveryLine(item)) return item;
     const product = productsById.get(String(item.productId ?? item.id));
     if (!product) return item;
 
@@ -2657,6 +2668,63 @@ app.post(
   }
 );
 
+app.post(
+  "/api/state/my-matrix/remove",
+  authRequired,
+  roleRequired("client"),
+  (req, res) => {
+    const productId = req.body?.productId;
+    const products = getGlobalState("products", DEFAULT_PRODUCTS);
+    const activeProducts = (Array.isArray(products) ? products : []).filter(
+      (item) => item.active !== false
+    );
+    const product = activeProducts.find(
+      (item) => String(item.id) === String(productId)
+    );
+    if (!product) {
+      return res.status(404).json({
+        error: "Товар не найден в каталоге Clover.",
+        code: "PRODUCT_NOT_FOUND",
+      });
+    }
+
+    const storedLinks = getGlobalState("clientLinks", {});
+    const matrixUpdate = removeProductIdFromClientMatrix(
+      storedLinks,
+      req.user.id,
+      product.id,
+      {
+        activeProductIds: activeProducts.map((item) => item.id),
+      }
+    );
+    setGlobalState("clientLinks", matrixUpdate.clientLinks);
+    setGlobalState("catalogPricesVersion", new Date().toISOString());
+    auditFromRequest(req, "client.matrix.self-remove", {
+      productId: product.id,
+      productName: product.name,
+      removed: Boolean(matrixUpdate.removedFromMatrix),
+      notInMatrix: Boolean(matrixUpdate.notInMatrix),
+    });
+
+    const oneCProducts = normalizeOneCProducts(
+      getGlobalState("oneCProducts", [])
+    );
+    const catalog = resolveClientCatalog(
+      products,
+      matrixUpdate.clientLink,
+      oneCProducts
+    );
+    res.json({
+      ok: true,
+      removed: Boolean(matrixUpdate.removedFromMatrix),
+      notInMatrix: Boolean(matrixUpdate.notInMatrix),
+      catalogPolicy: catalog.policy,
+      products: catalog.matrixProducts,
+      fullCatalogProducts: catalog.fullCatalogProducts,
+    });
+  }
+);
+
 app.put("/api/state/orders", authRequired, async (req, res) => {
   const incomingOrders = Array.isArray(req.body?.orders)
     ? req.body.orders
@@ -2700,6 +2768,32 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     });
   }
   orders = statusPolicy.orders;
+
+  if (isClientRole(req.user.role)) {
+    const clientEditSettings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    for (const order of orders) {
+      const previous = previousById.get(String(order?.id || ""));
+      if (!previous) continue;
+      const compositionChanged =
+        clientOrderSignature(previous) !== clientOrderSignature(order);
+      const editGate = assertClientMayEditExistingOrder({
+        previous,
+        incoming: order,
+        settings: clientEditSettings,
+        compositionChanged,
+      });
+      if (!editGate.ok) {
+        return res.status(editGate.statusCode || 409).json({
+          error: editGate.error,
+          code: editGate.code,
+          orderId: String(order?.id || ""),
+        });
+      }
+    }
+  }
 
   if (isClientRole(req.user.role)) {
     for (const order of orders) {
@@ -2758,6 +2852,37 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
         issues: repriced.issues.slice(0, 20),
       });
     }
+
+    // Доставка СПб: клиентский deliveryFee игнорируем, пересчёт по сумме позиций
+    // и позиция «Доставка» в items (для UI и 1С).
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    const deliveryMeta = {
+      deliveryOneCId: settings.deliveryOneCId,
+      deliveryOneCCode: settings.deliveryOneCCode,
+      deliveryOneCName: settings.deliveryOneCName || "Доставка",
+    };
+    orders = applyClientSpbDeliveryFees(orders, {
+      showPrices: Boolean(settings.showPrices),
+      oneCProducts: getGlobalState("oneCProducts", []),
+      ...deliveryMeta,
+    });
+  } else if (isStaffRole(req.user.role)) {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    orders = applyDeliveryLineSync(
+      orders,
+      {
+        deliveryOneCId: settings.deliveryOneCId,
+        deliveryOneCCode: settings.deliveryOneCCode,
+        deliveryOneCName: settings.deliveryOneCName || "Доставка",
+      },
+      getGlobalState("oneCProducts", [])
+    );
   }
 
   replaceOrders({
@@ -2895,10 +3020,15 @@ app.post("/api/state/orders/:orderId/trash", authRequired, (req, res) => {
   }
 
   if (isStaff && settings.managerCanDeleteOrders === false) {
-    return res.status(403).json({
-      error: "Удаление заказов менеджером отключено в настройках.",
-      code: "DELETE_DISABLED",
-    });
+    const adminCompleted =
+      req.user.role === "admin" &&
+      ["Выполнен"].includes(String(order.status || ""));
+    if (!adminCompleted) {
+      return res.status(403).json({
+        error: "Удаление заказов менеджером отключено в настройках.",
+        code: "DELETE_DISABLED",
+      });
+    }
   }
 
   if (isOwner && settings.allowClientDelete === false) {
@@ -2908,7 +3038,7 @@ app.post("/api/state/orders/:orderId/trash", authRequired, (req, res) => {
     });
   }
 
-  const role = isStaff ? "manager" : "client";
+  const role = isOwner ? "client" : req.user.role;
   const gate = canTrashOrder(order, role);
   if (!gate.ok) {
     return res.status(409).json({ error: gate.error, code: gate.code });
@@ -3000,19 +3130,25 @@ app.delete(
       ...DEFAULT_SETTINGS,
       ...getGlobalState("settings", DEFAULT_SETTINGS),
     };
-    if (settings.managerCanDeleteOrders === false) {
-      return res.status(403).json({
-        error: "Удаление заказов менеджером отключено в настройках.",
-        code: "DELETE_DISABLED",
-      });
-    }
 
     const stored = getOrderById(req.params.orderId);
     if (!stored) {
       return res.status(404).json({ error: "Заказ не найден.", code: "ORDER_NOT_FOUND" });
     }
 
-    const gate = canPurgeOrder(stored.payload);
+    if (settings.managerCanDeleteOrders === false) {
+      const adminCompleted =
+        req.user.role === "admin" &&
+        ["Выполнен"].includes(String(stored.payload?.status || ""));
+      if (!adminCompleted) {
+        return res.status(403).json({
+          error: "Удаление заказов менеджером отключено в настройках.",
+          code: "DELETE_DISABLED",
+        });
+      }
+    }
+
+    const gate = canPurgeOrder(stored.payload, req.user.role);
     if (!gate.ok) {
       return res.status(409).json({ error: gate.error, code: gate.code });
     }
@@ -3225,14 +3361,46 @@ async function handleOneCTestOrder(req, res, next) {
         break;
       }
 
-      const draftItems = (candidate.items || []).map((item) => {
+      const deliverySettings = {
+        ...DEFAULT_SETTINGS,
+        ...getGlobalState("settings", DEFAULT_SETTINGS),
+      };
+      const oneCProducts = getGlobalState("oneCProducts", []);
+      const deliveryRefs = resolveDeliveryOneCRefs(deliverySettings, oneCProducts);
+      const candidateForLinkCheck = ensureSpbDeliveryOnOrder(
+        candidate,
+        {
+          deliveryOneCId: deliverySettings.deliveryOneCId,
+          deliveryOneCCode: deliverySettings.deliveryOneCCode,
+          deliveryOneCName: deliverySettings.deliveryOneCName || "Доставка",
+        },
+        oneCProducts
+      );
+      const draftItems = (candidateForLinkCheck.items || []).map((item) => {
         const product = productsById.get(String(item.productId ?? item.id));
+        const isDelivery = isCloverDeliveryLine(item);
+        const id = String(
+          item.oneCId ||
+            (isDelivery ? deliveryRefs.oneCId : "") ||
+            product?.oneCId ||
+            ""
+        ).trim();
+        const code = String(
+          item.oneCCode ||
+            item.code ||
+            (isDelivery ? deliveryRefs.oneCCode : "") ||
+            product?.oneCCode ||
+            product?.code ||
+            ""
+        ).trim();
         return {
-          id: String(item.oneCId || product?.oneCId || "").trim(),
+          id,
+          code,
+          linked: Boolean(id || code),
           displayName: item.name || product?.name || "",
         };
       });
-      const missingItems = draftItems.filter((item) => !item.id);
+      const missingItems = draftItems.filter((item) => !item.linked);
       if (missingItems.length) {
         claimBlockedReason = {
           status: 409,
@@ -3273,9 +3441,63 @@ async function handleOneCTestOrder(req, res, next) {
     // Цена уже согласована клиентом в заказе и фиксируется при постановке
     // в очередь. Свежая закупочная цена из 1С обязательна для контроля и
     // расчёта следующих заказов, но не меняет сумму уже созданного заказа.
-    const rawClaimItems = (realOrder.items || []).map((item) => {
+    const deliverySettings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    const oneCProductsCatalog = getGlobalState("oneCProducts", []);
+    // Старые заказы могли иметь только deliveryFee без строки в items —
+    // перед claim материализуем позицию «Доставка» и подтягиваем UUID по коду.
+    const orderForClaim = ensureSpbDeliveryOnOrder(
+      realOrder,
+      {
+        deliveryOneCId: deliverySettings.deliveryOneCId,
+        deliveryOneCCode: deliverySettings.deliveryOneCCode,
+        deliveryOneCName: deliverySettings.deliveryOneCName || "Доставка",
+      },
+      oneCProductsCatalog
+    );
+    // Итого с доставкой (для lockedOrderTotal дальше считается по items)
+    const claimGrand = (orderForClaim.items || []).reduce(
+      (sum, line) => sum + (Number(line.lineTotal) || 0),
+      0
+    );
+    orderForClaim.total = claimGrand;
+    orderForClaim.amount = claimGrand;
+    if (
+      JSON.stringify(orderForClaim.items || []) !==
+      JSON.stringify(realOrder.items || [])
+    ) {
+      updateOrderPayload(realOrder.id, {
+        ...orderForClaim,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    // Если нашли UUID по коду — сохраним в настройки для следующих заказов.
+    const deliveryRefs = resolveDeliveryOneCRefs(
+      deliverySettings,
+      oneCProductsCatalog
+    );
+    if (
+      deliveryRefs.oneCId &&
+      deliveryRefs.oneCId !== String(deliverySettings.deliveryOneCId || "").trim()
+    ) {
+      setGlobalState("settings", {
+        ...deliverySettings,
+        deliveryOneCId: deliveryRefs.oneCId,
+        deliveryOneCCode:
+          deliveryRefs.oneCCode || deliverySettings.deliveryOneCCode || "",
+      });
+    }
+    const rawClaimItems = (orderForClaim.items || []).map((item) => {
       const product = productsById.get(String(item.productId ?? item.id));
-      const oneCId = String(item.oneCId || product?.oneCId || "").trim();
+      const isDelivery = isCloverDeliveryLine(item);
+      const oneCId = String(
+        item.oneCId ||
+          (isDelivery ? deliveryRefs.oneCId : "") ||
+          product?.oneCId ||
+          ""
+      ).trim();
       const quantity = Number(item.quantity) || 1;
       const price =
         Number(item.unitPrice) ||
@@ -3285,22 +3507,34 @@ async function handleOneCTestOrder(req, res, next) {
         ? item.unit
         : "piece";
       const multiplier = Math.max(1, Number(item.multiplier) || 1);
-      const totalPieces = quantity * multiplier;
+      const totalPieces = isDelivery ? 1 : quantity * multiplier;
       const lineTotal = Number(item.lineTotal) || quantity * price;
 
       return {
         id: oneCId,
-        code: item.oneCCode || product?.oneCCode || item.code || product?.code || "",
-        name: item.oneCName || product?.oneCName || item.name || product?.name || "",
-        displayName: item.name || product?.name || "",
+        code:
+          item.oneCCode ||
+          item.code ||
+          (isDelivery ? deliveryRefs.oneCCode : "") ||
+          product?.oneCCode ||
+          product?.code ||
+          "",
+        name:
+          item.oneCName ||
+          (isDelivery ? deliveryRefs.name : "") ||
+          product?.oneCName ||
+          item.name ||
+          product?.name ||
+          "",
+        displayName: item.name || product?.name || (isDelivery ? deliveryRefs.name : ""),
         saleUnit,
         saleUnitName: unitLabel(saleUnit),
         // 1С: всегда количество в шт (totalPieces), единица «шт»
         unit: "piece",
         unitName: "шт",
-        multiplier,
+        multiplier: isDelivery ? 1 : multiplier,
         totalPieces,
-        quantity,
+        quantity: isDelivery ? 1 : quantity,
         price,
         lineTotal,
       };
@@ -4105,6 +4339,51 @@ app.put(
       settings: next,
       storefront: getStorefrontSettings(next),
     });
+  }
+);
+
+/** PDF прайс витрины: все товары с фото и накруткой % от закупки. */
+app.get(
+  "/api/admin/storefront/price-list.pdf",
+  authRequired,
+  roleRequired("admin"),
+  async (req, res, next) => {
+    try {
+      const markupRaw = req.query?.markupPercent;
+      const markupPercent =
+        markupRaw === undefined || markupRaw === null || String(markupRaw).trim() === ""
+          ? undefined
+          : Number(String(markupRaw).replace(",", "."));
+      if (
+        markupPercent !== undefined &&
+        (!Number.isFinite(markupPercent) || markupPercent < 0 || markupPercent > 1000)
+      ) {
+        return res.status(400).json({
+          error: "Укажите накрутку от 0 до 1000 %.",
+        });
+      }
+
+      const pdf = await buildStorefrontPriceListPdf({
+        markupPercent,
+        uploadsDirectory,
+      });
+      const stamp = new Date().toISOString().slice(0, 10);
+      const fileName = `clover-vitrina-price-list-${stamp}.pdf`;
+      auditFromRequest(req, "storefront.price-list.pdf", {
+        markupPercent:
+          markupPercent === undefined ? "settings" : markupPercent,
+        bytes: pdf.length,
+      });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${fileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`
+      );
+      res.setHeader("Content-Length", String(pdf.length));
+      res.send(pdf);
+    } catch (error) {
+      next(error);
+    }
   }
 );
 
@@ -5923,10 +6202,15 @@ app.post(
 
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const clientLinks = getGlobalState("clientLinks", {});
+    const deliverySettings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
     const validation = validateOrderFor1C({
       order: stored.payload,
       products,
       clientLinks,
+      deliverySettings,
     });
 
     if (!validation.ready) {
@@ -5941,6 +6225,10 @@ app.post(
       order: stored.payload,
       products,
       clientLinks,
+      deliverySettings: {
+        ...DEFAULT_SETTINGS,
+        ...getGlobalState("settings", DEFAULT_SETTINGS),
+      },
     });
 
     try {
@@ -6098,10 +6386,15 @@ app.post(
 
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const clientLinks = getGlobalState("clientLinks", {});
+    const deliverySettings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
     const validation = validateOrderFor1C({
       order: stored.payload,
       products,
       clientLinks,
+      deliverySettings,
     });
     const previous = normalizeExchangeState(stored.payload.exchange);
     const checkedAt = new Date().toISOString();
@@ -6167,10 +6460,32 @@ app.post(
 
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const clientLinks = getGlobalState("clientLinks", {});
+    const deliverySettings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    const oneCProducts = getGlobalState("oneCProducts", []);
+    const orderWithDelivery = ensureSpbDeliveryOnOrder(
+      stored.payload,
+      {
+        deliveryOneCId: deliverySettings.deliveryOneCId,
+        deliveryOneCCode: deliverySettings.deliveryOneCCode,
+        deliveryOneCName: deliverySettings.deliveryOneCName || "Доставка",
+      },
+      oneCProducts
+    );
+    const sendGrand = (orderWithDelivery.items || []).reduce(
+      (sum, line) => sum + (Number(line.lineTotal) || 0),
+      0
+    );
+    orderWithDelivery.total = sendGrand;
+    orderWithDelivery.amount = sendGrand;
     const validation = validateOrderFor1C({
-      order: stored.payload,
+      order: orderWithDelivery,
       products,
       clientLinks,
+      deliverySettings,
+      oneCProducts,
     });
     const attemptedAt = new Date().toISOString();
     const exchange = {
@@ -6193,7 +6508,7 @@ app.post(
         : validation.issues.join(" "),
     };
     const order = updateOrderPayload(stored.id, {
-      ...stored.payload,
+      ...orderWithDelivery,
       exchange,
       updatedAt: attemptedAt,
     });
@@ -6319,6 +6634,10 @@ app.get(
       order: stored.payload,
       products,
       clientLinks,
+      deliverySettings: {
+        ...DEFAULT_SETTINGS,
+        ...getGlobalState("settings", DEFAULT_SETTINGS),
+      },
     });
     const safeNumber = String(stored.payload.number || stored.id).replace(/[^a-zA-Z0-9а-яА-Я_-]/g, "-");
     const format = String(req.query.format || "json").toLowerCase();
@@ -6355,7 +6674,15 @@ app.get(
       if (requestedStatus === "all") return true;
       return normalizeExchangeState(order.exchange).status === requestedStatus;
     });
-    const payloads = orders.map((order) => build1CPayload({ order, products, clientLinks }));
+    const payloads = orders.map((order) => build1CPayload({
+      order,
+      products,
+      clientLinks,
+      deliverySettings: {
+        ...DEFAULT_SETTINGS,
+        ...getGlobalState("settings", DEFAULT_SETTINGS),
+      },
+    }));
     const stamp = new Date().toISOString().slice(0, 10);
 
     auditFromRequest(req, "exchange.download.batch", {
@@ -6478,6 +6805,44 @@ app.patch("/api/admin/reconciliation/:requestId", authRequired, roleRequired("ma
     res.json({ ok: true, request });
   } catch (error) { next(error); }
 });
+
+app.delete(
+  "/api/admin/reconciliation/:requestId",
+  authRequired,
+  roleRequired("admin"),
+  (req, res) => {
+    const current = getReconciliationRequestInternal(req.params.requestId);
+    if (!current) {
+      return res.status(404).json({ error: "Запрос акта сверки не найден." });
+    }
+
+    const deleted = deleteReconciliationRequest(current.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Запрос акта сверки не найден." });
+    }
+
+    if (deleted.file_path && existsSync(deleted.file_path)) {
+      try {
+        unlinkSync(deleted.file_path);
+      } catch (error) {
+        console.error("Reconciliation file cleanup error", error);
+      }
+    }
+
+    deleteManagerNotificationsBySource(deleted.id);
+    auditFromRequest(req, "reconciliation.delete", {
+      requestId: deleted.id,
+      userId: deleted.user_id,
+      status: deleted.status,
+      fileName: deleted.file_name || "",
+    });
+
+    res.json({
+      ok: true,
+      reconciliationRequests: listReconciliationRequests(),
+    });
+  }
+);
 
 app.post(
   "/api/admin/reconciliation/:requestId/file",

@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 1280px;
+      height: 800px;
+      overflow: hidden;
+      font-family: "Manrope", system-ui, sans-serif;
+      background: linear-gradient(135deg, #eef7eb 0%, #f4f8f2 45%, #e8f2e4 100%);
+      color: #1c1f1c;
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+    }
+    .promo {
+      padding: 52px 36px 52px 56px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 18px;
+      position: relative;
+    }
+    .promo::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 6px;
+      background: #5b9d57;
+    }
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand-row img { width: 52px; height: 52px; }
+    .brand-row strong { font-size: 28px; letter-spacing: -0.03em; }
+    .brand-row span { display: block; font-size: 13px; color: #5d695d; font-weight: 700; margin-top: 2px; }
+    h1 {
+      font-size: 46px;
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+      max-width: 11ch;
+    }
+    h1 em { color: #5b9d57; font-style: normal; }
+    .lead {
+      font-size: 20px;
+      line-height: 1.45;
+      color: #3f4a3f;
+      max-width: 28ch;
+    }
+    .badges { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 14px;
+      background: #fff;
+      border: 1px solid #d7e1d4;
+      font-weight: 800;
+      font-size: 14px;
+      color: #386f37;
+      box-shadow: 0 8px 24px rgba(40, 64, 40, 0.06);
+    }
+    .phone-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 36px 48px 36px 12px;
+    }
+    .phone {
+      width: 320px;
+      height: 652px;
+      border-radius: 36px;
+      background: #111;
+      padding: 12px;
+      box-shadow: 0 28px 60px rgba(28, 31, 28, 0.22);
+      position: relative;
+    }
+    .phone-notch {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 96px;
+      height: 24px;
+      background: #111;
+      border-radius: 0 0 16px 16px;
+      z-index: 3;
+    }
+    .screen {
+      width: 100%;
+      height: 100%;
+      border-radius: 28px;
+      overflow: hidden;
+      background: #f4f8f2;
+      display: flex;
+      flex-direction: column;
+    }
+    .chrome {
+      background: #fff;
+      border-bottom: 1px solid #e1e9de;
+      padding: 34px 12px 10px;
+      box-shadow: 0 4px 14px rgba(40, 64, 40, 0.06);
+    }
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .header-row img { width: 72px; height: auto; }
+    .header-row button {
+      border: 1px solid #d7e1d4;
+      background: #fff;
+      color: #5d695d;
+      border-radius: 11px;
+      padding: 8px 12px;
+      font: 700 12px/1 Manrope, system-ui, sans-serif;
+    }
+    .greeting {
+      font-size: 15px;
+      font-weight: 800;
+      color: #1c1f1c;
+      margin-bottom: 2px;
+    }
+    .company {
+      font-size: 11px;
+      color: #7a847a;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .section-menu {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      border: 1px solid #d7e1d4;
+      background: #458542;
+      border-color: #458542;
+      color: #fff;
+      border-radius: 11px;
+      padding: 10px 12px;
+      font: 800 13px/1 Manrope, system-ui, sans-serif;
+    }
+    .section-menu span:last-child { opacity: 0.85; font-size: 11px; }
+    .sticky {
+      background: #f4f8f2;
+      padding: 8px 10px 12px;
+      border-radius: 0 0 16px 16px;
+      box-shadow: 0 8px 16px -6px rgba(40, 60, 40, 0.16);
+    }
+    .search {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e6eee3;
+      border-radius: 12px;
+      background: #fbfdfb;
+      font: 600 12px/1.2 Manrope, system-ui, sans-serif;
+      color: #7a847a;
+      margin-bottom: 8px;
+    }
+    .cats {
+      display: flex;
+      gap: 6px;
+      overflow: hidden;
+    }
+    .cat {
+      flex: 0 0 auto;
+      padding: 7px 10px;
+      border-radius: 12px;
+      border: 1px solid #d7e1d4;
+      background: #fff;
+      color: #5d695d;
+      font: 800 11px/1 Manrope, system-ui, sans-serif;
+      white-space: nowrap;
+    }
+    .cat.active {
+      background: #5b9d57;
+      border-color: #5b9d57;
+      color: #fff;
+    }
+    .content {
+      flex: 1;
+      padding: 10px;
+      overflow: hidden;
+    }
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .eyebrow {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #6b6f6b;
+    }
+    .panel-head h2 {
+      font-size: 16px;
+      letter-spacing: -0.02em;
+      margin-top: 2px;
+    }
+    .new-order {
+      background: #5b9d57;
+      color: #fff;
+      border: 0;
+      border-radius: 12px;
+      padding: 8px 10px;
+      font: 800 11px/1 Manrope, system-ui, sans-serif;
+      white-space: nowrap;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid rgba(28, 31, 28, 0.08);
+      border-radius: 12px;
+      overflow: hidden;
+      padding-bottom: 8px;
+    }
+    .thumb {
+      aspect-ratio: 1;
+      background: linear-gradient(145deg, #eceae4, #f7f6f2);
+      margin: 4px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-size: 28px;
+    }
+    .card h3 {
+      font-size: 10px;
+      line-height: 1.25;
+      padding: 0 8px;
+      font-weight: 800;
+      min-height: 26px;
+    }
+    .code {
+      font-size: 9px;
+      color: #7a847a;
+      padding: 0 8px;
+      margin: 2px 0 4px;
+    }
+    .price {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 0 8px;
+      color: #1c1f1c;
+    }
+    .price small { font-weight: 600; color: #7a847a; font-size: 9px; }
+    .qty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin: 6px 8px 0;
+    }
+    .qty button {
+      width: 24px;
+      height: 24px;
+      border-radius: 8px;
+      border: 1px solid #d7e1d4;
+      background: #fff;
+      color: #5d695d;
+      font-weight: 800;
+      font-size: 14px;
+    }
+    .qty span {
+      font-size: 12px;
+      font-weight: 800;
+      min-width: 16px;
+      text-align: center;
+    }
+    .order-bar {
+      margin-top: 8px;
+      background: #fff;
+      border: 1px solid #e1e9de;
+      border-radius: 12px;
+      padding: 8px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .order-bar strong { font-size: 11px; }
+    .order-bar span { font-size: 10px; color: #5b9d57; font-weight: 800; }
+    .order-bar button {
+      background: #5b9d57;
+      color: #fff;
+      border: 0;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font: 800 10px/1 Manrope, system-ui, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="promo">
+    <div class="brand-row">
+      <img src="../../public/apple-touch-icon.png" alt="" />
+      <div>
+        <strong>КЛЕВЕР</strong>
+        <span>Снабжение HoReCa</span>
+      </div>
+    </div>
+    <h1>Мобильное приложение <em>КЛЕВЕР</em></h1>
+    <p class="lead">Заказы, статусы и личный кабинет — на телефоне</p>
+    <div class="badges">
+      <span class="badge">📲 Установить на экран</span>
+      <span class="badge">PWA</span>
+    </div>
+  </div>
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="screen">
+        <div class="chrome">
+          <div class="header-row">
+            <img src="../../public/clover-logo.png" alt="Clover" />
+            <button type="button">Выйти</button>
+          </div>
+          <div class="greeting">Здравствуйте, Алексей!</div>
+          <div class="company">ООО «Кафе на Невском»</div>
+          <div class="section-menu">
+            <span>Моя матрица</span>
+            <span>▾</span>
+          </div>
+        </div>
+        <div class="sticky">
+          <div class="search">Поиск по названию или артикулу</div>
+          <div class="cats">
+            <span class="cat active">Все</span>
+            <span class="cat">Одноразовая посуда</span>
+            <span class="cat">Упаковка</span>
+          </div>
+        </div>
+        <div class="content">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">Персональный каталог</div>
+              <h2>Матрица товаров</h2>
+            </div>
+            <button class="new-order" type="button">+ Новый заказ</button>
+          </div>
+          <div class="grid">
+            <article class="card">
+              <div class="thumb">🥤</div>
+              <h3>Стакан бумажный 250 мл</h3>
+              <div class="code">Арт. ST-250</div>
+              <div class="price">89,00 ₽ <small>/ шт</small></div>
+              <div class="qty"><button>−</button><span>24</span><button>+</button></div>
+            </article>
+            <article class="card">
+              <div class="thumb">📦</div>
+              <h3>Контейнер PP 500 мл</h3>
+              <div class="code">Арт. CN-500</div>
+              <div class="price">12,50 ₽ <small>/ шт</small></div>
+              <div class="qty"><button>−</button><span>6</span><button>+</button></div>
+            </article>
+            <article class="card">
+              <div class="thumb">🧴</div>
+              <h3>Моющее средство 1 л</h3>
+              <div class="code">Арт. CH-01</div>
+              <div class="price">186,00 ₽ <small>/ шт</small></div>
+              <div class="qty"><button>−</button><span>2</span><button>+</button></div>
+            </article>
+            <article class="card">
+              <div class="thumb">🧻</div>
+              <h3>Салфетки 24×24</h3>
+              <div class="code">Арт. NV-24</div>
+              <div class="price">54,00 ₽ <small>/ уп</small></div>
+              <div class="qty"><button>−</button><span>3</span><button>+</button></div>
+            </article>
+          </div>
+          <div class="order-bar">
+            <div>
+              <strong>Корзина · 4 поз.</strong><br />
+              <span>12 480 ₽</span>
+            </div>
+            <button type="button">Оформить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

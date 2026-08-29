@@ -14,6 +14,12 @@ import {
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
 } from "../../../shared/appHelpers.js";
+import { sortProductsWithLidsGrouped } from "../../../shared/productCatalogOrder.js";
+import { getCatalogPageH1 } from "../storefrontCatalogSeo.js";
+import {
+  CatalogSeoBelowFold,
+  CatalogSeoIntro,
+} from "../components/CatalogSeoContent.jsx";
 
 export function CatalogPage({
   category = "",
@@ -67,14 +73,18 @@ export function CatalogPage({
   // Подкатегория/facet сужают выборку на API.
   const sections = useMemo(() => {
     if (category) {
-      return products.length
-        ? [{ name: subcategory || category, products, count: products.length }]
+      const sorted = sortProductsWithLidsGrouped(products);
+      return sorted.length
+        ? [{ name: subcategory || category, products: sorted, count: sorted.length }]
         : [];
     }
     return groupProductsByCloverGroup(products);
   }, [category, subcategory, products]);
 
-  const title = category || "Каталог";
+  const pageH1 =
+    getCatalogPageH1({ name: "catalog", category, subcategory, facet }) ||
+    (subcategory ? `${category} — ${subcategory}` : category) ||
+    "Каталог";
 
   return (
     <div className="sf-catalog">
@@ -82,7 +92,7 @@ export function CatalogPage({
         <input
           className="sf-input sf-catalog-search"
           type="search"
-          placeholder="Поиск по названию или артикулу"
+          placeholder="Поиск в каталоге"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -160,7 +170,12 @@ export function CatalogPage({
                     </>
                   ) : null}
                 </nav>
-                <h1>{title}</h1>
+                <h1>{pageH1}</h1>
+                <CatalogSeoIntro
+                  category={category}
+                  subcategory={subcategory}
+                  facet={facet}
+                />
               </div>
             </header>
           ) : (
@@ -256,6 +271,12 @@ export function CatalogPage({
                 : "В каталоге пока нет товаров."}
             </p>
           ) : null}
+
+          <CatalogSeoBelowFold
+            category={category}
+            subcategory={subcategory}
+            facet={facet}
+          />
         </div>
       </div>
     </div>

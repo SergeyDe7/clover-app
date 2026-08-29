@@ -1,4 +1,4 @@
-/** Обмен в очереди или уже в 1С — удаление запрещено. */
+/** Статусы, которые обычный менеджер не удаляет (принят / в работе / выполнен). */
 export const ORDER_TRASH_BLOCKED_STATUSES = [
   "Принят",
   "Обработан вручную",
@@ -6,6 +6,9 @@ export const ORDER_TRASH_BLOCKED_STATUSES = [
   "Готов к доставке",
   "Выполнен",
 ];
+
+/** Выполненные: только админ может убрать из Clover (1С не трогаем). */
+export const ORDER_ADMIN_HARD_DELETE_STATUSES = ["Выполнен"];
 
 /** Обмен в очереди — удаление запрещено. Уже переданный (`sent`) менеджер может убрать из Clover. */
 export const ORDER_TRASH_BLOCKED_EXCHANGE = [
@@ -24,6 +27,10 @@ export function isOrderTrashed(order) {
   return Boolean(String(order?.deletedAt || "").trim());
 }
 
+export function isAdminHardDeleteStatus(status) {
+  return ORDER_ADMIN_HARD_DELETE_STATUSES.includes(String(status || "").trim());
+}
+
 function exchangeStatusOf(order) {
   const status = String(order?.exchange?.status || "not_sent").trim();
   if (
@@ -39,7 +46,9 @@ function exchangeStatusOf(order) {
 /**
  * Можно ли отправить заказ в корзину.
  * Клиент: только «Новый» и ещё не ушедший в 1С.
- * Менеджер: не принят в 1С и не в очереди обмена (уже переданный `sent` можно убрать из Clover).
+ * Менеджер: не принят / не в работе / не выполнен и не в очереди обмена
+ *   (уже переданный `sent` можно убрать из Clover).
+ * Админ: дополнительно может убрать «Выполнен» (документ в 1С не меняется).
  */
 export function canTrashOrder(order, role = "manager") {
   if (!order?.id) {
@@ -53,11 +62,17 @@ export function canTrashOrder(order, role = "manager") {
   const exchangeStatus = exchangeStatusOf(order);
 
   if (ORDER_TRASH_BLOCKED_STATUSES.includes(status)) {
-    return {
-      ok: false,
-      code: "ORDER_ACCEPTED",
-      error: `Заказ со статусом «${status}» удалить нельзя (принят или обработан в 1С).`,
-    };
+    const adminCompleted =
+      role === "admin" && isAdminHardDeleteStatus(status);
+    if (!adminCompleted) {
+      return {
+        ok: false,
+        code: "ORDER_ACCEPTED",
+        error: isAdminHardDeleteStatus(status)
+          ? "Выполненный заказ может удалить только администратор."
+          : `Заказ со статусом «${status}» удалить нельзя (принят или обработан в 1С).`,
+      };
+    }
   }
 
   const blockedExchange =
@@ -91,15 +106,29 @@ export function canRestoreOrder(order) {
   return { ok: true };
 }
 
-export function canPurgeOrder(order) {
+/**
+ * Удалить навсегда.
+ * Обычно только из корзины; админ может сразу стереть «Выполнен» без корзины.
+ */
+export function canPurgeOrder(order, role = "manager") {
   if (!order?.id) {
     return { ok: false, code: "NOT_FOUND", error: "Заказ не найден." };
   }
-  if (!isOrderTrashed(order)) {
+  const trashed = isOrderTrashed(order);
+  const adminHardDelete =
+    role === "admin" && isAdminHardDeleteStatus(order.status);
+  if (!trashed && !adminHardDelete) {
     return {
       ok: false,
       code: "NOT_TRASHED",
       error: "Удалить навсегда можно только заказ из корзины.",
+    };
+  }
+  if (isAdminHardDeleteStatus(order.status) && role !== "admin") {
+    return {
+      ok: false,
+      code: "ADMIN_ONLY",
+      error: "Удалить выполненный заказ навсегда может только администратор.",
     };
   }
   return { ok: true };

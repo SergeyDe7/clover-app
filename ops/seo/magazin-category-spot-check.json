@@ -1,0 +1,1132 @@
+{
+  "summary": {
+    "checked": 187,
+    "ok": 187,
+    "warn": 0,
+    "error": 0
+  },
+  "results": [
+    {
+      "oldSlug": "adriel-dlya-plit-850ml",
+      "target": "/catalog/himiya-chistyashchie-sredstva/zhiroudaliteli",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "adriel-dlya-udaleniya-zhira-5l",
+      "target": "/catalog/himiya-chistyashchie-sredstva/zhiroudaliteli",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "akvalon-5l",
+      "target": "/catalog/himiya-chistyashchie-sredstva/prochee",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "bumaga-a4-80g-m2-500l-upak",
+      "target": "/catalog/kancelyarskie-tovary",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "bumazhnoe-polotence-myagkij-znak",
+      "target": "/catalog/bumazhnaya-produkciya/bumazhnye-polotenca",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "bumazhnye-polotenca-focus-z-ukladka-2-slojnye-200-listov",
+      "target": "/catalog/bumazhnaya-produkciya/bumazhnye-polotenca",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "bumazhnye-polotenca-pro-c-192-v-ukladka-1-slojnye-250-listov",
+      "target": "/catalog/bumazhnaya-produkciya/bumazhnye-polotenca",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "butylka-pet-0-5l-gaz-prozrachnaya-s-chernoj-probkoj-100sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/butylki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "butylka-pet-1l-gaz-prozrachnaya-s-chernoj-probkoj",
+      "target": "/catalog/odnorazovaya-posuda/butylki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "fasovochnyj-paket-25-sm-h-45-sm-v-rulone",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-fasovochnye",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "folga-30-sm-100-metrov",
+      "target": "/catalog/hozyajstvennye-tovary/folga-plenka-pergament",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "folga-45-sm-100-metrov",
+      "target": "/catalog/hozyajstvennye-tovary/folga-plenka-pergament",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "forma-alyum-r28l-430ml-144h119hh40mm",
+      "target": "/catalog/odnorazovaya-posuda/formy-alyuminievye",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "forma-alyum-r44-r14l-900ml-220h115hh55mm",
+      "target": "/catalog/odnorazovaya-posuda/formy-alyuminievye",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "gubka-dlya-posudy-5-sht-mega-10h6-5h4-sm-15up-kor",
+      "target": "/catalog/hozyajstvennye-tovary/gubki-dlya-posudy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "halat-laboratornyj-belyj",
+      "target": "/catalog/hozyajstvennye-tovary/odnorazovaya-odezhda",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "konditerskij-meshok-sinij-53-sm-75-mkm-100sht",
+      "target": "/catalog/odnorazovaya-posuda/bumazhnaya-upakovka",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-500ml-d112-kruglyj-prochnyj-prozrachnyj-perint",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-500ml-d112-kruglyj-prozrachnyj-pp-60sht-s-kryshkoj",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-530-ml-kruglyj-chernyj-s-prozrachnoj-kryshkoj",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-950-ml-kruglyj-chernyj-s-prozrachnoj-kryshkoj",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-bumazhnyj-eco-opsalad-1000-ml-chernyj-s-kryshkoj",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-bumazhnyj-eco-opsalad-1000-ml-kraft-s-kryshkoj",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-bumazhnyj-eco-opsalad-400-ml-chernyj-s-kryshkoj",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-bumazhnyj-eco-opsalad-800-black-edition-chernyj-s-prozr-krysh",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-bumazhnyj-eco-opsalad-900-kraft-s-prozr-krysh",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-dlya-pirozhnyh-pr-t-85-chernoe-dno-prozrachnaya-kupolnaya-kryshka",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-dlya-pirozhnyh-pr-t-85-zolotoe-dno-prozrachnaya-kupolnaya-kryshka",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-kartonnyj-eco-opsalad-350ml-chernyj-s-prozrachnoj-kryshkoj-121-106-55mm-osq-50-350",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-kartonnyj-eco-opsalad-350ml-s-prozrachnoj-kryshkoj-121-106-55mm-osq-50-350",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pr-ms-350ml-kruglyj-chernyj-pp",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pr-ms-500ml-kruglyj-chernyj-pp",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-prozr-kruglyj-360ml-rr-bk-50-500-bez-kryshki",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pryam-1000ml-179-132-chernyj-pp-polier",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pryam-1000ml-179-132-prozr-pp-polier",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pryam-350ml-prozr-139-102-39ml-bez-kryshki-pp-polier-50-50",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pryamoug-125ml-108-82-25mm-b-kryshki-prozr-pp-polier-100-100",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pryamoug-1500ml-179-130-98-mm-prozr-pp-polier-500-500",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pryamoug-2000ml-179-130-123mm-prozr-pp-polier-500-500",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pryamoug-250ml-108-82-48mm-bez-kryshki100-1000",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pryamoug-500ml-179-130-35mm-prozr-pp-polier-500-500",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pryamoug-500ml-179-130-52mm-chernyj-pp-polier-500-500",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pryamoug-500ml-prozr-139-102-56-bez-kryshki-pp-polier-50-500",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pryamoug-750ml-139-102-86mm-prozr-pp-polier-500-500",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pryamoug-750ml-179-130-52mm-chernyj-pp-polier-500-500",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pryamoug-750ml-179-130-52mm-prozr-pp-polier-500-500",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-pryamoug-bez-kryshki-500ml-108-82-100mm-pp-100-100",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-rakushka-dlya-pirozhnyh-4-sekcii-kr-15-4",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-rakushka-rk-10-121-mm-h-119-mm-h-60-mm-prozrachnyj",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-rakushka-rk-31-220-mm-h-155-mm-h-89-mm-prozrachnyj",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kontejner-spk-190d-750ml-kruglyj-chernyj-pet",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "korobka-dlya-piccy-25sm-h-25sm-belyj-gofrokarton",
+      "target": "/catalog/odnorazovaya-posuda/korobki-dlya-piccy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "korobka-dlya-piccy-40-5sm-h-40-5sm-belyj-gofrokarton",
+      "target": "/catalog/odnorazovaya-posuda/korobki-dlya-piccy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "korobka-eco-cake-1900-230-mm-h-140-mm-h-60-mm-dlya-pirozhnyh-kraft",
+      "target": "/catalog/odnorazovaya-posuda/dlya-konditerskih-izdelij",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "korob-kartonnyj-pod-12-kapkejkov-bez-okna-330-mm-h-250-mm-h-100-mm",
+      "target": "/catalog/odnorazovaya-posuda/dlya-konditerskih-izdelij",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "korobki-dlya-piccy-33-33sm-45mm-belyj-gofrokarton-50",
+      "target": "/catalog/odnorazovaya-posuda/korobki-dlya-piccy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kryshka-alyum-kart-cr14l-r15l-62-217x112mm-k-forme-r14l-62l",
+      "target": "/catalog/odnorazovaya-posuda/formy-alyuminievye",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kryshka-alyum-kart-cr28l-140x155mm-k-forme-alyum-rn28l",
+      "target": "/catalog/odnorazovaya-posuda/formy-alyuminievye",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kryshka-belaya-plastikovaya-s-otverstiem-dlya-kofejnogo-stakanchika-72mm-100sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kryshka-belaya-plastikovaya-s-otverstiem-dlya-kofejnogo-stakanchika-80mm-100sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kryshka-belaya-plastikovaya-s-otverstiem-dlya-kofejnogo-stakanchika-90mm-100sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kryshka-k-kont-360-500-600ml-d112-200sht-up-perint",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kryshka-k-kont-pr-ms-350-500ml-prozrachnaya-pp",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kryshka-k-kont-spk-190k-750ml-kruglaya-prozrachnaya-pet",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kryshka-kupolnaya-s-otverstiem-k-pet-stakanu-d95mm-50sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kryshka-ploskaya-k-pet-stakanu-d95mm-s-krest-otverstiem-50sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "kryshka-spk-257k-3-257h202h35mm",
+      "target": "/catalog/odnorazovaya-posuda/kontejnery-pod-zapajku",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "lanchboks-2-sekcii-246h196h70-mm-belyj-vsp-50-200",
+      "target": "/catalog/odnorazovaya-posuda/lanch-boksy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "lanchboks-3-sekcii-246h196h70-mm-belyj-vsp-50-200",
+      "target": "/catalog/odnorazovaya-posuda/lanch-boksy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "lanchboks-bez-sekcij-246h196h70-belyj-vsp-50-200",
+      "target": "/catalog/odnorazovaya-posuda/lanch-boksy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "lanch-boks-pps-1-sekc-chernyj-100",
+      "target": "/catalog/odnorazovaya-posuda/lanch-boksy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "lanch-boks-pps-2-sekc-chernyj-100",
+      "target": "/catalog/odnorazovaya-posuda/lanch-boksy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "lanch-boks-pps-3-sekc-chernyj-100",
+      "target": "/catalog/odnorazovaya-posuda/lanch-boksy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "lanch-boks-spk-257-3-257h202h37mm-chernyj",
+      "target": "/catalog/odnorazovaya-posuda/lanch-boksy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "lenta-kassovaya-57-12mm-17m",
+      "target": "/catalog/kancelyarskie-tovary",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "lenta-kassovaya-57-12mm-40m",
+      "target": "/catalog/kancelyarskie-tovary",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "lenta-kassovaya-80-12mm-70m",
+      "target": "/catalog/kancelyarskie-tovary",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "lotok-279-223-35-5-sekcij-chernyj-110-110-0055_00200",
+      "target": "/catalog/odnorazovaya-posuda/lotki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "lotok-kryshka-280-225-25mm-pet-110-110-0055_00201",
+      "target": "/catalog/odnorazovaya-posuda/lotki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "lozhka-chajnaya-odn-125-mm-bel-ps-rts-100-4000",
+      "target": "/catalog/odnorazovaya-posuda/stolovye-pribory",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "lozhka-stolovaya-odn-165mm-bel-ps-rts-100-2000",
+      "target": "/catalog/odnorazovaya-posuda/stolovye-pribory",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "manzhet-iz-kraft-kartona-dlya-kofejnyh-stakanchikov-eco-cup-keeper-50sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "marker-chernyj",
+      "target": "/catalog/kancelyarskie-tovary",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "maska-medicinskaya-odnorazovaya-trehslojnaya",
+      "target": "/catalog/hozyajstvennye-tovary/odnorazovaya-odezhda",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "mister-proper-univ-moyushchee-sr-vo-5l",
+      "target": "/catalog/himiya-chistyashchie-sredstva/universalnye",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "mochalka-dlya-posudy-metall-pletenaya-v-setke-140-gr-10-sht",
+      "target": "/catalog/hozyajstvennye-tovary/gubki-dlya-posudy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "mochalka-metallicheskaya-3-sht-v-setke",
+      "target": "/catalog/hozyajstvennye-tovary/gubki-dlya-posudy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "mochalka-metallicheskaya-maksi-40-gr-v-setke-30sht-kor",
+      "target": "/catalog/hozyajstvennye-tovary/gubki-dlya-posudy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "mylo-hozyajstvennoe-aist-150gr",
+      "target": "/catalog/himiya-chistyashchie-sredstva/mylo",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "mylo-krem-s-perlamutrom-5-l",
+      "target": "/catalog/himiya-chistyashchie-sredstva/mylo",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "nozh-odn-165-mm-belyj-ps-200-5000",
+      "target": "/catalog/odnorazovaya-posuda/stolovye-pribory",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "nozh-plastikovyj-prozrachnyj-premium",
+      "target": "/catalog/odnorazovaya-posuda/stolovye-pribory",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-dlya-musora-pvd-rulon-30-l-50-sht",
+      "target": "/catalog/hozyajstvennye-tovary/meshki-dlya-musora",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-dlya-musora-pvd-rulon-60-l-50-sht",
+      "target": "/catalog/hozyajstvennye-tovary/meshki-dlya-musora",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-fasovochnyj-15-20sm-1000sht-upak",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-fasovochnye",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-fasovochnyj-25-sm-h-35-sm",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-fasovochnye",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-fasovochnyj-30-40sm-1000sht-upak",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-fasovochnye",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-fasovochnyj-30-sm-h-40-sm",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-fasovochnye",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-majka-fa-chernyj-100sht",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-majki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-majka-fa-krasnyj-100sht",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-majki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-majka-fa-sinij-100sht",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-majki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-majka-fa-zelenyj-100sht",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-majki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-majka-fa-zheltyj-100sht",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-majki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-majka-pnd-24-44sm-100sht-upak",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-majki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-majka-pnd-belyj-30-60sm-100sht-upak",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-majki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-majka-pnd-chernyj-30-60sm-100sht-upak",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-majki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-pvd-s-zamkom-15-10",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-fasovochnye",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-s-kr-ruch-b-p-240h140h280-kraft",
+      "target": "/catalog/pakety-upakovochnye-materialy/bumazhnye-pakety-s-ruchkoj",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-s-kr-ruch-b-p-320h200h370-kraft",
+      "target": "/catalog/pakety-upakovochnye-materialy/bumazhnye-pakety-s-ruchkoj",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-vakuumnyj-11-16sm-60mkm-100sht-upak",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-vakuumnye",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-vakuumnyj-16-25sm-60mkm-100sht-upak",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-vakuumnye",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "paket-vakuumnyj-20-30sm-60mkm-100sht-upak",
+      "target": "/catalog/pakety-upakovochnye-materialy/pakety-vakuumnye",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "pasticciere-korob-kartonnyj-belyj-hrom-erzac-280h280h140mm-100sht-kor",
+      "target": "/catalog/odnorazovaya-posuda/dlya-konditerskih-izdelij",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perchatki-odnorazovye-lateks-opudr-medic-hl-100sht-upak",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perchatki-odnorazovye-lateks-opudr-medic-l-100sht-upak",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perchatki-odnorazovye-lateks-opudr-medic-m-100sht-upak",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perchatki-odnorazovye-lateks-opudr-medic-s-100sht-upak",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perchatki-pnd-razmery-v-assortimente",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perchatki-rezinovye-sine-zheltye-bicolor-l",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perchatki-rezinovye-sine-zheltye-bicolor-m",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perchatki-rezinovye-sine-zheltye-bicolor-xl",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perchatki-rezinovye-sine-zheltye-s",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perchatki-rezinovye-sverhprochnye-krasno-belye-s",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perchatki-vinilovye-neopudr-hl-100sht-upak",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perchatki-vinilovye-neopudr-l-100sht-upak",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perchatki-vinilovye-neopudr-m-100sht-upak",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perchatki-vinilovye-neopudr-s-100sht-upak",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "perednik-pnd-100sht-upak",
+      "target": "/catalog/hozyajstvennye-tovary/odnorazovaya-odezhda",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "pishchevaya-plenka-30-sm-250-metrov",
+      "target": "/catalog/hozyajstvennye-tovary/folga-plenka-pergament",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "pishchevaya-plenka-45-sm-250-metrov",
+      "target": "/catalog/hozyajstvennye-tovary/folga-plenka-pergament",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "plenka-strejch-500-h-17-mkm-ves-netto-2-0-kg",
+      "target": "/catalog/hozyajstvennye-tovary/folga-plenka-pergament",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "polotenca-focus-v-ukladka-1-slojnye-250-listov",
+      "target": "/catalog/bumazhnaya-produkciya/bumazhnye-polotenca",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "polotenca-focus-z-ukladka-1-slojnye-200-listov",
+      "target": "/catalog/bumazhnaya-produkciya/bumazhnye-polotenca",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "polotenca-n3-tork-120108",
+      "target": "/catalog/bumazhnaya-produkciya/bumazhnye-polotenca",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "polotenca-s-centralnoj-vytyazhkoj-lime-120-metrov-20-120",
+      "target": "/catalog/bumazhnaya-produkciya/bumazhnye-polotenca",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "polotenca-s-centralnoj-vytyazhkoj-lime-300-metrov-20-300",
+      "target": "/catalog/bumazhnaya-produkciya/bumazhnye-polotenca",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "polotenca-tork-h1-120067",
+      "target": "/catalog/bumazhnaya-produkciya/bumazhnye-polotenca",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "raduga-dlya-posudy-5l",
+      "target": "/catalog/himiya-chistyashchie-sredstva/dlya-mytya-posudy",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "restorannyj-schet",
+      "target": "/catalog/kancelyarskie-tovary",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "salatnik-s-prozrachnoj-kryshkoj-black-edition",
+      "target": "/catalog/odnorazovaya-posuda/tarelki-miski",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "salfetka-cellyuloznaya-14h16-sm-3-sht-50sht-kor",
+      "target": "/catalog/bumazhnaya-produkciya/salfetki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "salfetki-bumazhnye-23-5-sm-h-23-5-sm-1-slojnye",
+      "target": "/catalog/bumazhnaya-produkciya/salfetki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "sanoks-chistyashchaya-zhidkost-5l",
+      "target": "/catalog/himiya-chistyashchie-sredstva/dlya-santehniki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "sanoks-chistyashchaya-zhidkost-750ml",
+      "target": "/catalog/himiya-chistyashchie-sredstva/dlya-santehniki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "shumanit-antizhir-bagi-3-l",
+      "target": "/catalog/himiya-chistyashchie-sredstva/zhiroudaliteli",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "sousnik-30ml-80sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/sousniki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "sousnik-50ml-80sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/sousniki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "sousnik-80ml-80sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/sousniki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "sousnik-s-kryshkoj-30-ml-pokrov-chernyj",
+      "target": "/catalog/odnorazovaya-posuda/sousniki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "sousnik-s-kryshkoj-50-ml-pokrov-chernyj",
+      "target": "/catalog/odnorazovaya-posuda/sousniki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "stakan-bumazhnyj-180-ml",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "stakan-bumazhnyj-250ml-1-sl-d80mm",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "stakan-bumazhnyj-300ml-1-sl-d90mm",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "stakan-bumazhnyj-chernyj-400-ml",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "stakan-bumazhnyj-pod-kofe-belyj-250-280ml-50sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "stakan-bumazhnyj-pod-kofe-belyj-300-430ml-50sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "stakan-pet-prozrachnyj-200ml-50sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "stakan-pet-prozrachnyj-500ml-50sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "stakan-pivnoj-plastikovyj-500ml",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "stakan-plastikovyj-100ml-100sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "stakan-plastikovyj-330ml-100sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "stakan-plastikovyj-prozrachnyj-200ml-100sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "stakan-shejker-400-ml",
+      "target": "/catalog/odnorazovaya-posuda/stakany",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "stroitelnye-perchatki-s-pvh",
+      "target": "/catalog/hozyajstvennye-tovary/perchatki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "tarelka-odnorazovaya-175-mm-belaya-kartonnaya-pavlovsk-1000-1000",
+      "target": "/catalog/odnorazovaya-posuda/tarelki-miski",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "tarelka-odnorazovaya-205mm-3-h-sekcionnaya-belaya-ps-polier-100-1800",
+      "target": "/catalog/odnorazovaya-posuda/tarelki-miski",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "trubochki-chernye-5-125mm",
+      "target": "/catalog/barnye-aksessuary",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "trubochki-cvetnye-gofra-5-210mm-1000sht-upak",
+      "target": "/catalog/barnye-aksessuary",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "tryapka-netkol-hlopkovaya-50-80sm-2-sl",
+      "target": "/catalog/hozyajstvennye-tovary/tryapki-mopy-polotenca",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "tryapka-netkol-hlopkovaya-60-80sm-3-sl",
+      "target": "/catalog/hozyajstvennye-tovary/tryapki-mopy-polotenca",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "unicum-gold-zhiroudalitel-3l",
+      "target": "/catalog/himiya-chistyashchie-sredstva/zhiroudaliteli",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "unicum-gold-zhiroudalitel-s-triggerom-500ml",
+      "target": "/catalog/himiya-chistyashchie-sredstva/zhiroudaliteli",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "vafelnoe-polotno-40-sm-otbelennoe-plotn-110-50-m",
+      "target": "/catalog/hozyajstvennye-tovary/tryapki-mopy-polotenca",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "vafelnoe-polotno-45-sm-otbelennoe-plotn-125-50-m",
+      "target": "/catalog/hozyajstvennye-tovary/tryapki-mopy-polotenca",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "vafelnoe-polotno-metrovoe",
+      "target": "/catalog/hozyajstvennye-tovary/tryapki-mopy-polotenca",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "vedro-1000-ml-s-kryshkoj",
+      "target": "/catalog/odnorazovaya-posuda/vedra",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "vedro-1500-ml-s-kryshkoj",
+      "target": "/catalog/odnorazovaya-posuda/vedra",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "vedro-2000-ml-s-kryshkoj",
+      "target": "/catalog/odnorazovaya-posuda/vedra",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "vedro-2250-ml-s-kryshkoj",
+      "target": "/catalog/odnorazovaya-posuda/vedra",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "vedro-3300-ml-s-kryshkoj",
+      "target": "/catalog/odnorazovaya-posuda/vedra",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "vedro-5000-ml-s-kryshkoj",
+      "target": "/catalog/odnorazovaya-posuda/vedra",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "vedro-800-ml-s-kryshkoj",
+      "target": "/catalog/odnorazovaya-posuda/vedra",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "vilka-odn-165-mm-belaya-ps-rts-100-2000",
+      "target": "/catalog/odnorazovaya-posuda/stolovye-pribory",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "vilka-odn-180-mm-prozr-ps-pokrov-50-2000",
+      "target": "/catalog/odnorazovaya-posuda/stolovye-pribory",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "yat-400-g-stiralnyj-poroshok",
+      "target": "/catalog/himiya-chistyashchie-sredstva/poroshki",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "zhidkoe-mylo-tork-s4",
+      "target": "/catalog/himiya-chistyashchie-sredstva/mylo",
+      "status": "ok",
+      "notes": []
+    },
+    {
+      "oldSlug": "zubochistki-v-individ-p-e-upakovke-mentol-500sht-upak",
+      "target": "/catalog/odnorazovaya-posuda/stolovye-pribory",
+      "status": "ok",
+      "notes": []
+    }
+  ]
+}

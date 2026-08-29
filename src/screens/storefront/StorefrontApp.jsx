@@ -1,6 +1,11 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { StoreHeader } from "./components/StoreHeader.jsx";
-import { parseStorefrontRoute } from "./mode.js";
+import {
+  clientLegacyRedirectTarget,
+  normalizeStorefrontPath,
+  parseStorefrontRoute,
+  storefrontHref,
+} from "./mode.js";
 import { HomePage } from "./pages/HomePage.jsx";
 import {
   applyStorefrontDocumentMeta,
@@ -22,6 +27,9 @@ const CheckoutPage = lazy(() =>
 );
 const ContactsPage = lazy(() =>
   import("./pages/ContactsPage.jsx").then((m) => ({ default: m.ContactsPage }))
+);
+const InstallAppPage = lazy(() =>
+  import("./pages/InstallAppPage.jsx").then((m) => ({ default: m.InstallAppPage }))
 );
 
 export default function StorefrontApp() {
@@ -53,6 +61,26 @@ export default function StorefrontApp() {
       document.body.style.backgroundColor = previousBodyBg;
     };
   }, []);
+
+  // Legacy / кириллические URL → канон (клиентский fallback к 301).
+  useEffect(() => {
+    const redirectTo = clientLegacyRedirectTarget(window.location.pathname);
+    if (!redirectTo || redirectTo === window.location.pathname) return;
+    window.location.replace(redirectTo);
+  }, []);
+
+  // Поддерживаем канонический path после разбора slug (без лишнего reload).
+  useEffect(() => {
+    if (route.name !== "catalog") return;
+    const canonicalPath = storefrontHref(route);
+    const current = window.location.pathname;
+    if (current === canonicalPath) return;
+    if (clientLegacyRedirectTarget(current)) return;
+    const logical = normalizeStorefrontPath(current);
+    const want = normalizeStorefrontPath(canonicalPath);
+    if (logical === want) return;
+    window.history.replaceState(window.history.state, "", canonicalPath);
+  }, [route]);
 
   useEffect(() => {
     const lock = route.name === "catalog";
@@ -92,6 +120,22 @@ export default function StorefrontApp() {
   } else if (route.name === "contacts") {
     page = <ContactsPage />;
     current = "contacts";
+  } else if (route.name === "install-app") {
+    page = <InstallAppPage />;
+    current = "home";
+  } else if (route.name === "not-found") {
+    page = (
+      <div className="sf-not-found">
+        <h1>Страница не найдена</h1>
+        <p>Запрашиваемая страница не существует.</p>
+        <p>
+          <a href="/catalog">В каталог</a>
+          {" · "}
+          <a href="/">На главную</a>
+        </p>
+      </div>
+    );
+    current = "home";
   } else {
     page = <HomePage />;
   }
