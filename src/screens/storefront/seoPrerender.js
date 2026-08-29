@@ -88,18 +88,39 @@ export function buildPageMeta(route, { product, productCount } = {}) {
   }
 
   if (route.name === "product") {
-    const name = product?.name || `Товар ${route.code}`;
+    if (!product) {
+      return {
+        title: `Страница не найдена | ${STOREFRONT_SITE_NAME}`,
+        description: "Запрашиваемая страница не найдена.",
+        path: route.code ? `/product/${encodeURIComponent(route.code)}` : "/product",
+        canonical: null,
+        h1: "Страница не найдена",
+        robots: "noindex, follow",
+        type: "website",
+      };
+    }
+    const name = product.name;
     return {
       title: `${name} | ${STOREFRONT_SITE_NAME}`,
-      description: product
-        ? buildStorefrontProductDescription(product)
-        : truncate(`Товар ${route.code} в каталоге компании ${STOREFRONT_SITE_NAME}.`),
+      description: buildStorefrontProductDescription(product),
       path,
       canonical,
       h1: name,
       robots: null,
       type: "product",
       image: product?.imageUrl || undefined,
+    };
+  }
+
+  if (route.name === "not-found") {
+    return {
+      title: `Страница не найдена | ${STOREFRONT_SITE_NAME}`,
+      description: "Запрашиваемая страница не найдена.",
+      path: "/",
+      canonical: null,
+      h1: "Страница не найдена",
+      robots: "noindex, follow",
+      type: "website",
     };
   }
 
@@ -298,7 +319,7 @@ ${navCats.join("\n")}
       return {
         meta,
         html: `<main id="clover-ssr">
-  <h1>${escapeHtml(meta.h1)}</h1>
+  <h1>Страница не найдена</h1>
   <p>Товар не найден.</p>
   <p><a href="/catalog">В каталог</a></p>
 </main>`,
@@ -323,6 +344,18 @@ ${navCats.join("\n")}
   ${priceHtml}
   <p>${desc}</p>
 </main>`,
+    };
+  }
+
+  if (route.name === "not-found") {
+    return {
+      meta,
+      html: `<main id="clover-ssr">
+  <h1>Страница не найдена</h1>
+  <p>Запрашиваемая страница не существует.</p>
+  <p><a href="/catalog">В каталог</a> · <a href="/">На главную</a></p>
+</main>`,
+      status: 404,
     };
   }
 
@@ -367,6 +400,9 @@ function replaceOrInsertMetaProperty(html, property, content) {
 
 function replaceOrInsertCanonical(html, href) {
   const re = /<link\s+[^>]*rel=["']canonical["'][^>]*>/i;
+  if (!href) {
+    return html.replace(re, "");
+  }
   const tag = `<link rel="canonical" href="${escapeHtml(href)}" />`;
   if (re.test(html)) return html.replace(re, tag);
   return html.replace(/<\/head>/i, `    ${tag}\n  </head>`);
@@ -385,7 +421,7 @@ export function injectPrerenderIntoHtml(indexHtml, { meta, html, status } = {}) 
 
   out = replaceTitle(out, meta.title);
   out = replaceOrInsertMetaName(out, "description", meta.description);
-  out = replaceOrInsertCanonical(out, meta.canonical);
+  out = replaceOrInsertCanonical(out, meta.canonical || "");
   if (meta.robots) {
     out = replaceOrInsertMetaName(out, "robots", meta.robots);
   } else {
@@ -393,7 +429,9 @@ export function injectPrerenderIntoHtml(indexHtml, { meta, html, status } = {}) 
   }
   out = replaceOrInsertMetaProperty(out, "og:title", meta.title);
   out = replaceOrInsertMetaProperty(out, "og:description", meta.description);
-  out = replaceOrInsertMetaProperty(out, "og:url", meta.canonical);
+  if (meta.canonical) {
+    out = replaceOrInsertMetaProperty(out, "og:url", meta.canonical);
+  }
   out = replaceOrInsertMetaProperty(out, "og:type", meta.type || "website");
   if (meta.image) {
     const image = meta.image.startsWith("http")

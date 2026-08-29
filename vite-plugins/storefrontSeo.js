@@ -78,8 +78,13 @@ function isStorefrontRequest(req, urlPath) {
   ) {
     return false;
   }
-  // Статика с расширением (иконки и т.п.)
-  if (/\.\w{2,5}$/.test(urlPath) && urlPath !== "/sitemap.xml") {
+  // Реальная статика с расширением — не пререндерим. .php/.asp и т.п. → 404 ниже.
+  if (
+    /\.(?:png|jpe?g|gif|webp|svg|ico|css|js|map|woff2?|ttf|txt|xml|webmanifest)$/i.test(
+      urlPath
+    ) &&
+    urlPath !== "/sitemap.xml"
+  ) {
     return false;
   }
 
@@ -92,6 +97,7 @@ function isStorefrontRequest(req, urlPath) {
   if (
     urlPath === "/catalog" ||
     urlPath.startsWith("/catalog/") ||
+    urlPath === "/product" ||
     urlPath.startsWith("/product/") ||
     urlPath === "/cart" ||
     urlPath === "/checkout" ||
@@ -99,6 +105,10 @@ function isStorefrontRequest(req, urlPath) {
     urlPath === "/install-app"
   ) {
     return true;
+  }
+  // Unknown HTML paths still go through SEO middleware (for 404 / legacy redirects)
+  if (!urlPath.startsWith("/api") && !urlPath.startsWith("/uploads")) {
+    return host === "clover-spb.ru";
   }
   return false;
 }
@@ -131,6 +141,19 @@ export function cloverStorefrontSeo() {
           return;
         }
 
+        // www → apex (один 301), на случай если nginx ещё не разделён
+        const reqHost = String(req.headers.host || "")
+          .split(":")[0]
+          .toLowerCase();
+        if (reqHost === "www.clover-spb.ru") {
+          const query = rawUrl.includes("?") ? rawUrl.slice(rawUrl.indexOf("?")) : "";
+          res.statusCode = 301;
+          res.setHeader("Location", `${ORIGIN}${urlPath}${query}`);
+          res.setHeader("Cache-Control", "public, max-age=86400");
+          res.end();
+          return;
+        }
+
         if (urlPath === "/robots.txt") {
           next();
           return;
@@ -159,15 +182,25 @@ export function cloverStorefrontSeo() {
           return;
         }
 
-        if (/\.\w{2,5}$/.test(urlPath)) {
+        if (/\.(?:png|jpe?g|gif|webp|svg|ico|css|js|map|woff2?|ttf|txt|xml|webmanifest)$/i.test(urlPath)) {
           next();
           return;
         }
 
-        const redirectTo = slugs.legacyCatalogPathRedirect(urlPath);
-        if (redirectTo && redirectTo !== urlPath) {
+        const query = rawUrl.includes("?") ? rawUrl.slice(rawUrl.indexOf("?")) : "";
+
+        // Legacy exact + /vitrina/* → канон; кириллический catalog → slug (один hop)
+        const legacyExact = slugs.legacyPathRedirect(urlPath);
+        let redirectCandidate = legacyExact || urlPath;
+        const cyrillicTarget = slugs.legacyCatalogPathRedirect(redirectCandidate);
+        if (cyrillicTarget) redirectCandidate = cyrillicTarget;
+        if (!legacyExact) {
+          const cyrillicOnly = slugs.legacyCatalogPathRedirect(urlPath);
+          if (cyrillicOnly) redirectCandidate = cyrillicOnly;
+        }
+        if (redirectCandidate && redirectCandidate !== urlPath) {
           res.statusCode = 301;
-          res.setHeader("Location", redirectTo);
+          res.setHeader("Location", `${redirectCandidate}${query}`);
           res.setHeader("Cache-Control", "public, max-age=86400");
           res.end();
           return;
@@ -186,7 +219,9 @@ export function cloverStorefrontSeo() {
         let categories = [];
         let status = 200;
 
-        if (route.name === "catalog" || route.name === "home") {
+        if (route.name === "not-found") {
+          status = 404;
+        } else if (route.name === "catalog" || route.name === "home") {
           try {
             const qs = new URLSearchParams();
             if (route.category) qs.set("category", route.category);
@@ -220,12 +255,15 @@ export function cloverStorefrontSeo() {
         });
         if (built.status) status = built.status;
 
-        // Канонический path должен совпадать с URL (не /vitrina)
-        if (built.meta) {
+        if (built.meta && status !== 404) {
           const pathForCanon =
             route.name === "home" ? "/" : buildCanonicalPath(route, slugs);
           built.meta.path = pathForCanon;
           built.meta.canonical = `${ORIGIN}${pathForCanon === "/" ? "/" : pathForCanon}`;
+        }
+        if (built.meta && status === 404) {
+          built.meta.canonical = null;
+          built.meta.robots = built.meta.robots || "noindex, follow";
         }
 
         const injected = prerender.injectPrerenderIntoHtml(indexHtml, {

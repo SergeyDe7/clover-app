@@ -152,39 +152,41 @@ export function facetSlug(name) {
   return slugifyStorefrontLabel(name);
 }
 
+/** Известна ли каноническая категория (из карты slug). */
+export function isKnownCategoryName(name) {
+  const canon = canonicalizeProductCategory(name);
+  return Boolean(canon && CATEGORY_SLUG_BY_NAME[canon]);
+}
+
 /** Сегмент URL → каноническое имя категории (slug или кириллица). */
 export function resolveCategoryFromSegment(segment) {
   const raw = String(segment || "").trim();
   if (!raw) return "";
+  const lower = raw.toLowerCase();
   if (CATEGORY_BY_SLUG[raw]) return CATEGORY_BY_SLUG[raw];
+  if (CATEGORY_BY_SLUG[lower]) return CATEGORY_BY_SLUG[lower];
   const canon = canonicalizeProductCategory(raw);
   if (CATEGORY_SLUG_BY_NAME[canon]) return canon;
-  // неизвестный латинский slug — как есть (не ломаем URL)
-  if (!hasCyrillic(raw) && CATEGORY_BY_SLUG[raw.toLowerCase()]) {
-    return CATEGORY_BY_SLUG[raw.toLowerCase()];
-  }
-  return canon;
+  return "";
 }
 
-/** Сегмент URL → имя подкатегории. */
+/** Сегмент URL → имя подкатегории (только известные slug / канон). */
 export function resolveSubcategoryFromSegment(segment, categoryName = "") {
   const raw = String(segment || "").trim();
   if (!raw) return "";
-  if (SUBCATEGORY_BY_SLUG[raw]) {
-    const name = SUBCATEGORY_BY_SLUG[raw];
-    if (!categoryName) return name;
-    const children = getGroupChildren(categoryName);
-    if (!children.length) return name;
-    const hit = children.find((child) => child.name === name);
-    return hit ? name : name;
+  let name = "";
+  if (SUBCATEGORY_BY_SLUG[raw]) name = SUBCATEGORY_BY_SLUG[raw];
+  else if (SUBCATEGORY_BY_SLUG[raw.toLowerCase()]) name = SUBCATEGORY_BY_SLUG[raw.toLowerCase()];
+  else {
+    const canon = canonicalizeProductSubcategory(raw);
+    if (SUBCATEGORY_SLUG_BY_NAME[canon]) name = canon;
   }
-  const canon = canonicalizeProductSubcategory(raw);
-  if (SUBCATEGORY_SLUG_BY_NAME[canon]) return canon;
-  if (!hasCyrillic(raw)) {
-    const bySlug = SUBCATEGORY_BY_SLUG[raw.toLowerCase()];
-    if (bySlug) return bySlug;
-  }
-  return canon;
+  if (!name) return "";
+  if (!categoryName) return name;
+  const children = getGroupChildren(categoryName);
+  if (!children.length) return "";
+  const hit = children.find((child) => child.name === name);
+  return hit ? name : "";
 }
 
 export function resolveFacetFromSegment(segment) {
@@ -196,7 +198,7 @@ export function resolveFacetFromSegment(segment) {
 
 /**
  * Если в пути каталога есть кириллица (старые URL) — вернуть канонический path со slug.
- * Иначе null.
+ * Только для известных категорий/подкатегорий. Иначе null (далее 404).
  */
 export function legacyCatalogPathRedirect(pathname) {
   const path = String(pathname || "/");
@@ -217,8 +219,12 @@ export function legacyCatalogPathRedirect(pathname) {
   if (!needsRedirect) return null;
 
   const category = resolveCategoryFromSegment(catSeg);
+  if (catSeg && !category) return null;
   const subcategory = resolveSubcategoryFromSegment(subSeg, category);
-  const facet = resolveFacetFromSegment(facetSeg);
+  if (subSeg && !subcategory) return null;
+  const facet = facetSeg ? resolveFacetFromSegment(facetSeg) : "";
+  if (facetSeg && !facet) return null;
+
   let next = `${prefix}/catalog`;
   if (category) {
     next += `/${categorySlug(category)}`;
@@ -228,6 +234,72 @@ export function legacyCatalogPathRedirect(pathname) {
     }
   }
   return next;
+}
+
+/**
+ * Точные legacy path нового домена clover-spb.ru → канонический URL (один 301).
+ * Без массового redirect неизвестных URL на главную.
+ */
+const LEGACY_EXACT_REDIRECTS = new Map([
+  ["/каталог", "/catalog"],
+  ["/vitrina", "/"],
+  ["/vitrina/", "/"],
+  ["/vitrina/catalog", "/catalog"],
+  ["/vitrina/cart", "/cart"],
+  ["/vitrina/checkout", "/checkout"],
+  ["/vitrina/contacts", "/contacts"],
+  ["/vitrina/install-app", "/install-app"],
+  ["/vitrina/lk", "/lk"],
+]);
+
+/**
+ * @returns {string | null} target path for 301, or null if no exact legacy match
+ */
+export function legacyPathRedirect(pathname) {
+  const raw = String(pathname || "/");
+  const pathOnly = raw.split("?")[0] || "/";
+  let decoded = pathOnly;
+  try {
+    decoded = decodeURIComponent(pathOnly);
+  } catch {
+    decoded = pathOnly;
+  }
+
+  for (const candidate of [pathOnly, decoded]) {
+    const hit = LEGACY_EXACT_REDIRECTS.get(candidate);
+    if (hit) return hit;
+  }
+
+  // /vitrina/<rest> → /<rest> (если rest не пустой); пустой уже в EXACT
+  const vitrinaMatch = decoded.match(/^\/vitrina(\/.*)?$/i);
+  if (vitrinaMatch) {
+    const rest = vitrinaMatch[1] || "/";
+    if (rest === "/" || rest === "") return "/";
+    return rest;
+  }
+
+  return null;
+}
+
+/** Маршрут каталога существует в утверждённой taxonomy. */
+export function isValidCatalogRoute(route) {
+  if (!route || route.name !== "catalog") return false;
+  if (!route.category) return true;
+  if (!isKnownCategoryName(route.category)) return false;
+  if (!route.subcategory) return !route.facet;
+  const children = getGroupChildren(route.category);
+  if (!children.length) return false;
+  if (!children.some((child) => child.name === route.subcategory)) return false;
+  if (!route.facet) return true;
+  // facet: допускаем только если есть в дереве подкатегории
+  const facets = children.find((c) => c.name === route.subcategory)?.children || [];
+  if (!Array.isArray(facets) || !facets.length) return false;
+  const facetName = String(route.facet || "").trim();
+  return facets.some(
+    (f) =>
+      String(f?.name || f || "").trim() === facetName ||
+      facetSlug(f?.name || f) === facetSlug(facetName)
+  );
 }
 
 /** Полный список известных slug категорий (для отчёта/тестов). */
@@ -245,6 +317,7 @@ export function listCategorySlugEntries() {
 /** Абсолютный path витрины без /vitrina (для canonical/sitemap/SSR). */
 export function buildStorefrontPath(route) {
   if (!route || route === "home" || route.name === "home") return "/";
+  if (route.name === "not-found") return "/";
   if (typeof route === "string") {
     return route.startsWith("/") ? route : `/${route}`;
   }
@@ -258,6 +331,7 @@ export function buildStorefrontPath(route) {
     return path;
   }
   if (route.name === "product") {
+    if (!route.code) return "/product";
     return `/product/${encodeURIComponent(route.code)}`;
   }
   if (route.name === "cart") return "/cart";
@@ -278,23 +352,41 @@ export function parseStorefrontPathname(pathname = "/") {
   const parts = withoutPreview.split("/").filter(Boolean);
   if (parts.length === 0) return { name: "home" };
   if (parts[0] === "catalog") {
-    const category = parts[1]
-      ? resolveCategoryFromSegment(decodeURIComponent(parts[1]))
+    if (parts.length > 4) return { name: "not-found" };
+    const catSeg = parts[1] ? decodeURIComponent(parts[1]) : "";
+    const subSeg = parts[2] ? decodeURIComponent(parts[2]) : "";
+    const facetSeg = parts[3] ? decodeURIComponent(parts[3]) : "";
+    if (parts[1] && !catSeg) return { name: "not-found" };
+    const category = catSeg ? resolveCategoryFromSegment(catSeg) : "";
+    if (catSeg && !category) return { name: "not-found" };
+    const subcategory = subSeg
+      ? resolveSubcategoryFromSegment(subSeg, category)
       : "";
-    const subcategory = parts[2]
-      ? resolveSubcategoryFromSegment(decodeURIComponent(parts[2]), category)
-      : "";
-    const facet = parts[3]
-      ? resolveFacetFromSegment(decodeURIComponent(parts[3]))
-      : "";
-    return { name: "catalog", category, subcategory, facet };
+    if (subSeg && !subcategory) return { name: "not-found" };
+    const facet = facetSeg ? resolveFacetFromSegment(facetSeg) : "";
+    if (facetSeg && !facet) return { name: "not-found" };
+    const route = { name: "catalog", category, subcategory, facet };
+    if (!isValidCatalogRoute(route)) return { name: "not-found" };
+    // сегменты должны совпасть с каноническими slug (кроме кириллицы — её ловит 301)
+    if (catSeg && !hasCyrillic(catSeg) && catSeg.toLowerCase() !== categorySlug(category)) {
+      return { name: "not-found" };
+    }
+    if (
+      subSeg &&
+      !hasCyrillic(subSeg) &&
+      subSeg.toLowerCase() !== subcategorySlug(subcategory)
+    ) {
+      return { name: "not-found" };
+    }
+    return route;
   }
-  if (parts[0] === "product" && parts[1]) {
+  if (parts[0] === "product") {
+    if (!parts[1]) return { name: "not-found", reason: "empty-product" };
     return { name: "product", code: decodeURIComponent(parts[1]) };
   }
   if (parts[0] === "cart") return { name: "cart" };
   if (parts[0] === "checkout") return { name: "checkout" };
   if (parts[0] === "contacts") return { name: "contacts" };
   if (parts[0] === "install-app") return { name: "install-app" };
-  return { name: "home" };
+  return { name: "not-found" };
 }

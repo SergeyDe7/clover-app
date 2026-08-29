@@ -2,9 +2,9 @@ import { STORE_HOSTS, CABINET_PATH, isCabinetPath } from "../../config/urls.js";
 import {
   categorySlug,
   facetSlug,
-  resolveCategoryFromSegment,
-  resolveFacetFromSegment,
-  resolveSubcategoryFromSegment,
+  legacyCatalogPathRedirect,
+  legacyPathRedirect,
+  parseStorefrontPathname,
   subcategorySlug,
 } from "./storefrontSlugs.js";
 
@@ -47,39 +47,16 @@ export function normalizeStorefrontPath(pathname = window.location.pathname) {
 }
 
 export function parseStorefrontRoute(pathname = window.location.pathname) {
-  const path = normalizeStorefrontPath(pathname);
-  const parts = path.split("/").filter(Boolean);
-
-  if (parts.length === 0) return { name: "home" };
-  if (parts[0] === "catalog") {
-    const category = parts[1] ? resolveCategoryFromSegment(decodeURIComponent(parts[1])) : "";
-    const subcategory = parts[2]
-      ? resolveSubcategoryFromSegment(decodeURIComponent(parts[2]), category)
-      : "";
-    const facet = parts[3]
-      ? resolveFacetFromSegment(decodeURIComponent(parts[3]))
-      : "";
-    return {
-      name: "catalog",
-      category,
-      subcategory,
-      facet,
-    };
-  }
-  if (parts[0] === "product" && parts[1]) {
-    return { name: "product", code: decodeURIComponent(parts[1]) };
-  }
-  if (parts[0] === "cart") return { name: "cart" };
-  if (parts[0] === "checkout") return { name: "checkout" };
-  if (parts[0] === "contacts") return { name: "contacts" };
-  if (parts[0] === "install-app") return { name: "install-app" };
-  return { name: "home" };
+  return parseStorefrontPathname(normalizeStorefrontPath(pathname));
 }
 
 export function storefrontHref(route) {
   const prefix = isStoreHost() ? "" : PREVIEW_PREFIX;
 
   if (!route || route === "home" || route.name === "home") {
+    return prefix || "/";
+  }
+  if (route.name === "not-found") {
     return prefix || "/";
   }
   if (typeof route === "string") {
@@ -96,6 +73,7 @@ export function storefrontHref(route) {
     return path;
   }
   if (route.name === "product") {
+    if (!route.code) return `${prefix}/product`;
     return `${prefix}/product/${encodeURIComponent(route.code)}`;
   }
   if (route.name === "cart") return `${prefix}/cart`;
@@ -103,6 +81,17 @@ export function storefrontHref(route) {
   if (route.name === "contacts") return `${prefix}/contacts`;
   if (route.name === "install-app") return `${prefix}/install-app`;
   return prefix || "/";
+}
+
+/** Клиентский fallback к серверным 301 (legacy / кириллица). */
+export function clientLegacyRedirectTarget(pathname = window.location.pathname) {
+  const path = String(pathname || "/");
+  const legacy = legacyPathRedirect(path);
+  let candidate = legacy || path;
+  const cyr = legacyCatalogPathRedirect(candidate);
+  if (cyr) candidate = cyr;
+  if (candidate && candidate !== path) return candidate;
+  return null;
 }
 
 export { CABINET_PATH, isCabinetPath, PREVIEW_PREFIX };

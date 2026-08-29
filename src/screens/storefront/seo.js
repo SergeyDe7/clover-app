@@ -157,6 +157,14 @@ export function storefrontRouteDocumentMeta(route) {
       path: storefrontHref(route),
     };
   }
+  if (route.name === "not-found") {
+    return {
+      title: `Страница не найдена | ${STOREFRONT_SITE_NAME}`,
+      description: "Запрашиваемая страница не найдена.",
+      path: "/",
+      robots: "noindex, follow",
+    };
+  }
   return {
     title: STOREFRONT_DEFAULT_TITLE,
     description: STOREFRONT_DEFAULT_DESCRIPTION,

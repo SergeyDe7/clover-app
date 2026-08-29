@@ -1,12 +1,16 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { StoreHeader } from "./components/StoreHeader.jsx";
-import { normalizeStorefrontPath, parseStorefrontRoute, storefrontHref } from "./mode.js";
+import {
+  clientLegacyRedirectTarget,
+  normalizeStorefrontPath,
+  parseStorefrontRoute,
+  storefrontHref,
+} from "./mode.js";
 import { HomePage } from "./pages/HomePage.jsx";
 import {
   applyStorefrontDocumentMeta,
   storefrontRouteDocumentMeta,
 } from "./seo.js";
-import { legacyCatalogPathRedirect } from "./storefrontSlugs.js";
 import "./storefront.css";
 
 const CatalogPage = lazy(() =>
@@ -58,9 +62,9 @@ export default function StorefrontApp() {
     };
   }, []);
 
-  // Старые кириллические /catalog/... → латинские slug (клиентский fallback к 301).
+  // Legacy / кириллические URL → канон (клиентский fallback к 301).
   useEffect(() => {
-    const redirectTo = legacyCatalogPathRedirect(window.location.pathname);
+    const redirectTo = clientLegacyRedirectTarget(window.location.pathname);
     if (!redirectTo || redirectTo === window.location.pathname) return;
     window.location.replace(redirectTo);
   }, []);
@@ -71,7 +75,7 @@ export default function StorefrontApp() {
     const canonicalPath = storefrontHref(route);
     const current = window.location.pathname;
     if (current === canonicalPath) return;
-    if (legacyCatalogPathRedirect(current)) return;
+    if (clientLegacyRedirectTarget(current)) return;
     const logical = normalizeStorefrontPath(current);
     const want = normalizeStorefrontPath(canonicalPath);
     if (logical === want) return;
@@ -118,6 +122,19 @@ export default function StorefrontApp() {
     current = "contacts";
   } else if (route.name === "install-app") {
     page = <InstallAppPage />;
+    current = "home";
+  } else if (route.name === "not-found") {
+    page = (
+      <div className="sf-not-found">
+        <h1>Страница не найдена</h1>
+        <p>Запрашиваемая страница не существует.</p>
+        <p>
+          <a href="/catalog">В каталог</a>
+          {" · "}
+          <a href="/">На главную</a>
+        </p>
+      </div>
+    );
     current = "home";
   } else {
     page = <HomePage />;

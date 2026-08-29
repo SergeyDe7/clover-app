@@ -615,7 +615,7 @@ const CONTENT = {
       { label: "Перчатки", path: "/catalog/hozyajstvennye-tovary/perchatki" },
       { label: "Хозяйственные товары", path: "/catalog/hozyajstvennye-tovary" },
       { label: "Мешки для мусора", path: "/catalog/hozyajstvennye-tovary/meshki-dlya-musora" },
-      { label: "Губки, тряпки", path: "/catalog/hozyajstvennye-tovary/gubki-tryapki" },
+      { label: "Губки, тряпки", path: "/catalog/hozyajstvennye-tovary/gubki-dlya-posudy" },
     ],
     faq: [
       {
@@ -646,7 +646,7 @@ const CONTENT = {
       { label: "Хозяйственные товары", path: "/catalog/hozyajstvennye-tovary" },
       { label: "Швабры и щётки", path: "/catalog/hozyajstvennye-tovary/shvabry-schetki" },
       { label: "Профессиональная химия", path: "/catalog/himiya-chistyashchie-sredstva" },
-      { label: "Губки, тряпки", path: "/catalog/hozyajstvennye-tovary/gubki-tryapki" },
+      { label: "Губки, тряпки", path: "/catalog/hozyajstvennye-tovary/gubki-dlya-posudy" },
     ],
     faq: [
       {
@@ -735,7 +735,7 @@ const CONTENT = {
       { label: "Средства для полов", path: "/catalog/himiya-chistyashchie-sredstva/dlya-polov" },
       { label: "Хозяйственные товары", path: "/catalog/hozyajstvennye-tovary" },
       { label: "Перчатки", path: "/catalog/hozyajstvennye-tovary/perchatki" },
-      { label: "Губки, тряпки", path: "/catalog/hozyajstvennye-tovary/gubki-tryapki" },
+      { label: "Губки, тряпки", path: "/catalog/hozyajstvennye-tovary/gubki-dlya-posudy" },
       { label: "Мешки для мусора", path: "/catalog/hozyajstvennye-tovary/meshki-dlya-musora" },
     ],
     faq: [
