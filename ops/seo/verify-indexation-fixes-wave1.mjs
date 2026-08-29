@@ -8,7 +8,6 @@ import { spawnSync } from "node:child_process";
 import { getCatalogPageContent } from "../../src/screens/storefront/storefrontCatalogContent.js";
 import {
   getCatalogPageSeo,
-  isCatalogPageNoindex,
 } from "../../src/screens/storefront/storefrontCatalogSeo.js";
 import { buildStorefrontPath } from "../../src/screens/storefront/storefrontSlugs.js";
 
@@ -176,8 +175,11 @@ function followOnce(url) {
 // --- Sitemap ---
 const sm = curl("/sitemap.xml");
 const locs = [...(sm.body.matchAll(/<loc>([^<]+)<\/loc>/g) || [])].map((m) => m[1]);
+const uniqueLocs = new Set(locs);
 const sitemapStats = {
   count: locs.length,
+  unique: uniqueLocs.size,
+  duplicates: locs.length - uniqueLocs.size,
   http200: 0,
   redirects: 0,
   errors: 0,
@@ -185,8 +187,37 @@ const sitemapStats = {
   noindexConflicts: 0,
 };
 const sitemapFails = [];
+if (sm.code !== "200") {
+  sitemapFails.push({ path: "/sitemap.xml", code: sm.code, kind: "sitemap-fetch" });
+}
+if (sitemapStats.duplicates > 0) {
+  const seen = new Set();
+  for (const loc of locs) {
+    if (seen.has(loc)) {
+      sitemapFails.push({ path: loc.replace(ORIGIN, "") || "/", code: "dup", kind: "duplicate" });
+    }
+    seen.add(loc);
+  }
+}
 for (const loc of locs) {
   const path = loc.replace(ORIGIN, "") || "/";
+  if (!loc.startsWith(`${ORIGIN}/`) && loc !== `${ORIGIN}/` && loc !== ORIGIN) {
+    sitemapStats.errors++;
+    sitemapFails.push({ path, code: "host", kind: "foreign-host", loc });
+    continue;
+  }
+  // Non-indexable storefront surfaces must not appear in sitemap
+  if (
+    path === "/cart" ||
+    path === "/checkout" ||
+    path === "/lk" ||
+    path.startsWith("/lk/") ||
+    path === "/product" ||
+    path === "/product/"
+  ) {
+    sitemapStats.noindexConflicts++;
+    sitemapFails.push({ path, code: "200", kind: "non-indexable-path" });
+  }
   const { code, body } = curl(path);
   if (code === "200") sitemapStats.http200++;
   else if (String(code).startsWith("3")) {
@@ -204,15 +235,10 @@ for (const loc of locs) {
       sitemapStats.canonicalProblems++;
       sitemapFails.push({ path, code, kind: "canonical", can });
     }
-    if (!robotsIndexable(body) || (path.includes("/catalog/") && isCatalogPageNoindex({
-      name: "catalog",
-      // best-effort; noindex pages should not be in sitemap
-    }))) {
-      // only flag explicit noindex meta in sitemap pages
-      if (!robotsIndexable(body)) {
-        sitemapStats.noindexConflicts++;
-        sitemapFails.push({ path, code, kind: "noindex" });
-      }
+    // only flag explicit noindex meta in sitemap pages
+    if (!robotsIndexable(body)) {
+      sitemapStats.noindexConflicts++;
+      sitemapFails.push({ path, code, kind: "noindex" });
     }
   }
 }
@@ -378,13 +404,19 @@ const httpWwwOk =
   (httpWww.chain[0].location === `${ORIGIN}/catalog` ||
     httpWww.chain[0].location === "https://clover-spb.ru/catalog");
 
-const pass =
-  sitemapStats.count === 714 &&
-  sitemapStats.http200 === 714 &&
+const sitemapOk =
+  sm.code === "200" &&
+  sitemapStats.count > 0 &&
+  sitemapStats.unique === sitemapStats.count &&
+  sitemapStats.duplicates === 0 &&
+  sitemapStats.http200 === sitemapStats.count &&
   sitemapStats.redirects === 0 &&
   sitemapStats.errors === 0 &&
   sitemapStats.canonicalProblems === 0 &&
-  sitemapStats.noindexConflicts === 0 &&
+  sitemapStats.noindexConflicts === 0;
+
+const pass =
+  sitemapOk &&
   wave1.every((x) => x.ok) &&
   wave2.every((x) => x.ok) &&
   wave1c.every((x) => x.ok) &&
