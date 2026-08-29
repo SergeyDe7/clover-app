@@ -3729,10 +3729,12 @@ body:has(.clover-app) {
   .client-order-catalog-toolbar .category-list,
   .clover-app .client-order-catalog-toolbar .category-list {
     flex-wrap: nowrap !important;
-    height: 32px !important;
-    max-height: 32px !important;
+    align-items: center !important;
+    height: auto !important;
+    min-height: 36px !important;
+    max-height: none !important;
     overflow-x: auto !important;
-    overflow-y: hidden !important;
+    overflow-y: visible !important;
     overscroll-behavior-x: contain !important;
     -webkit-overflow-scrolling: touch !important;
     scrollbar-width: none !important;
@@ -3743,15 +3745,25 @@ body:has(.clover-app) {
 .clover-app .client-order-catalog-toolbar .category-list .category-button {
   flex: 0 0 auto !important;
   width: auto !important;
-  min-height: 32px !important;
-  height: 32px !important;
-  max-height: 32px !important;
+  min-height: 36px !important;
+  height: 36px !important;
+  max-height: 36px !important;
   padding: 0 10px !important;
   font-size: 12px !important;
-  line-height: 1 !important;
+  line-height: 1.2 !important;
+  color: #5d695d !important;
+  background: #fff !important;
   white-space: nowrap !important;
   border-radius: 10px !important;
   box-sizing: border-box !important;
+  overflow: visible !important;
+}
+
+.client-order-catalog-toolbar .category-list .category-button.active,
+.clover-app .client-order-catalog-toolbar .category-list .category-button.active {
+  color: #fff !important;
+  background: #5b9d57 !important;
+  border-color: #5b9d57 !important;
 }
 
 .clover-app .embedded-catalog.client-order-catalog .product-grid {
@@ -4369,13 +4381,23 @@ body:has(.clover-app) {
   }
 
   .clover-app .client-catalog-add-panel .client-catalog-add-search {
-    position: static;
+    /* static — иначе срабатывает top от sticky-правил и поиск наезжает на категории */
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+    isolation: auto;
     margin: 0;
     padding: 0 0 8px;
     background: transparent;
     border: none;
     border-radius: 0;
     box-shadow: none;
+  }
+
+  /* Фон уже у sticky-chrome; ::before с inset:0 перекрывал подписи категорий */
+  .clover-app .client-catalog-add-panel .client-catalog-add-search::before {
+    content: none !important;
+    display: none !important;
   }
 
   .clover-app .client-catalog-add-panel .client-catalog-add-search .catalog-search,
@@ -4484,11 +4506,14 @@ body:has(.clover-app) {
   .clover-app .client-catalog-add-categories {
     flex-direction: row;
     flex-wrap: nowrap;
+    align-items: center;
     gap: 8px;
     max-height: none;
+    min-height: 42px;
+    margin-top: 0 !important;
     padding: 0 0 2px;
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: visible;
     overscroll-behavior-x: contain;
     touch-action: pan-x;
     -webkit-overflow-scrolling: touch;
@@ -4502,12 +4527,26 @@ body:has(.clover-app) {
   .clover-app .client-catalog-add-categories .category-button {
     flex: 0 0 auto;
     width: auto;
-    min-height: 38px;
-    padding: 8px 12px;
-    font-size: 13px;
+    min-height: 38px !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+    font-weight: 700 !important;
+    color: #5d695d !important;
+    background: #fff !important;
+    border: 1px solid #d7e1d4 !important;
     white-space: nowrap;
     text-align: center;
     justify-content: center;
+    overflow: visible !important;
+  }
+
+  .clover-app .client-catalog-add-categories .category-button.active {
+    color: #fff !important;
+    background: #5b9d57 !important;
+    border-color: #5b9d57 !important;
   }
 
   /* На телефоне дерево сворачиваем: родители в ряд, подкатегории — отдельной полосой */
@@ -4523,11 +4562,12 @@ body:has(.clover-app) {
   .clover-app .client-catalog-add-subcats-mobile {
     display: flex;
     flex-wrap: nowrap;
+    align-items: center;
     gap: 8px;
     margin-top: 8px;
     padding: 0 0 2px;
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: visible;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
@@ -4540,10 +4580,21 @@ body:has(.clover-app) {
   .clover-app .client-catalog-add-subcats-mobile .category-button {
     flex: 0 0 auto;
     width: auto;
-    min-height: 34px;
-    padding: 6px 10px;
-    font-size: 12px;
+    min-height: 34px !important;
+    height: auto !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    color: #5d695d !important;
+    background: #fff !important;
+    border: 1px solid #d7e1d4 !important;
     white-space: nowrap;
+  }
+
+  .clover-app .client-catalog-add-subcats-mobile .category-button.active {
+    color: #fff !important;
+    background: #5b9d57 !important;
+    border-color: #5b9d57 !important;
   }
 
   .clover-app .embedded-catalog.client-order-catalog {

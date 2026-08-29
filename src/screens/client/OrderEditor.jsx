@@ -1115,10 +1115,12 @@ main.clover-app > .client-order-catalog-toolbar .category-list {
   .client-order-catalog .client-order-catalog-toolbar .category-list,
   main.clover-app > .client-order-catalog-toolbar .category-list {
     flex-wrap: nowrap !important;
-    height: 32px !important;
-    max-height: 32px !important;
+    align-items: center !important;
+    height: auto !important;
+    min-height: 36px !important;
+    max-height: none !important;
     overflow-x: auto !important;
-    overflow-y: hidden !important;
+    overflow-y: visible !important;
     overscroll-behavior-x: contain !important;
     -webkit-overflow-scrolling: touch !important;
     scrollbar-width: none !important;
@@ -1135,15 +1137,25 @@ main.clover-app > .client-order-catalog-toolbar .category-list::-webkit-scrollba
 .client-order-catalog .client-order-catalog-toolbar .category-list .category-button,
 main.clover-app > .client-order-catalog-toolbar .category-list .category-button {
   flex: 0 0 auto !important;
-  height: 32px !important;
-  min-height: 32px !important;
-  max-height: 32px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
   padding: 0 10px !important;
   font-size: 12px !important;
-  line-height: 1 !important;
+  line-height: 1.2 !important;
+  color: #5d695d !important;
+  background: #fff !important;
   white-space: nowrap !important;
   border-radius: 10px !important;
   box-sizing: border-box !important;
+  overflow: visible !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .category-list .category-button.active,
+.client-order-catalog .client-order-catalog-toolbar .category-list .category-button.active,
+main.clover-app > .client-order-catalog-toolbar .category-list .category-button.active {
+  color: #fff !important;
+  background: #5b9d57 !important;
+  border-color: #5b9d57 !important;
 }
           `}</style>
         ) : null}
