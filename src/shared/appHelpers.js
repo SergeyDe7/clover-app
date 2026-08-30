@@ -2442,6 +2442,31 @@ textarea { resize: vertical; }
 .product-card-list .product-code {
   display: none;
 }
+/* Client LK list: article under title; units/qty stay on the right */
+.page-content-client .product-card-list .product-code,
+.page-content-client .embedded-catalog .product-card-list .product-code {
+  display: block;
+  grid-column: 1;
+  grid-row: 3;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #6b6f6b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.page-content-client .product-card-list .product-price,
+.page-content-client .embedded-catalog .product-card-list .product-price {
+  grid-column: 1;
+  grid-row: 4;
+}
+.page-content-client .product-card-list .product-card-controls,
+.page-content-client .embedded-catalog .product-card-list .product-card-controls {
+  grid-column: 2;
+  grid-row: 1 / span 4;
+}
 .product-card-list .product-price {
   grid-column: 1;
   grid-row: 3;
@@ -6015,8 +6040,8 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     display: none !important;
   }
   .product-code { display: none; }
-  .page-content-client .product-card .product-code,
-  .page-content-client .embedded-catalog .product-code,
+  .page-content-client .product-card:not(.product-card-list) .product-code,
+  .page-content-client .embedded-catalog .product-card:not(.product-card-list) .product-code,
   .client-catalog-add-panel .client-matrix-card .product-code,
   .client-matrix-panel .client-matrix-card .product-code {
     display: block !important;
@@ -6025,6 +6050,29 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     font-size: 11px;
     line-height: 1.2;
     color: #6f7b6f;
+  }
+  .page-content-client .product-card-list .product-code,
+  .page-content-client .embedded-catalog .product-card-list .product-code {
+    display: block !important;
+    grid-column: 1;
+    grid-row: 2;
+    margin: 1px 0 0;
+    font-size: 11px;
+    line-height: 1.2;
+    color: #6f7b6f;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .page-content-client .product-card-list .product-price,
+  .page-content-client .embedded-catalog .product-card-list .product-price {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .page-content-client .product-card-list .product-card-controls,
+  .page-content-client .embedded-catalog .product-card-list .product-card-controls {
+    grid-column: 2;
+    grid-row: 1 / span 3;
   }
   .product-price {
     flex: 0 0 auto;
