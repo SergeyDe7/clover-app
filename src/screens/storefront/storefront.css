@@ -901,6 +901,7 @@ html.sf-catalog-lock .sf-main,
   }
   .sf-product-units {
     flex: 0 0 auto;
+    margin-top: auto; /* pin UOM baseline across stretched row */
     min-height: 34px;
     height: auto;
     max-height: none;
@@ -941,7 +942,6 @@ html.sf-catalog-lock .sf-main,
   }
   .sf-product-actions {
     flex: 0 0 auto;
-    margin-top: auto;
     min-height: 44px;
     height: 44px;
     max-height: none;
@@ -1634,43 +1634,9 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
     white-space: nowrap;
   }
   .sf-group-tile-chevron { display: none; }
-  /* Mobile: drop Catalog/category/badge card — keep back + title on one compact row. */
+  /* Mobile: category already shown in tree toggle — hide duplicate landing title. */
   .sf-group-landing {
-    margin: 0 0 4px;
-    padding: 0;
-    gap: 0;
-    background: transparent;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-  }
-  .sf-group-landing-icon { display: none; }
-  .sf-group-landing-crumb { display: none; }
-  .sf-group-landing-copy {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 8px 10px;
-    min-width: 0;
-  }
-  .sf-group-landing-moback {
-    display: inline-flex;
-    align-items: center;
-    flex: 0 0 auto;
-    margin: 0;
-    padding: 0;
-    min-height: 44px;
-    font-size: 0.92rem;
-  }
-  .sf-group-landing-copy h1 {
-    flex: 1 1 auto;
-    min-width: 0;
-    margin: 0;
-    font-size: 1.05rem;
-    line-height: 1.2;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: none;
   }
   .sf-catalog-layout { gap: 8px; }
   .sf-catalog-side {
@@ -1774,6 +1740,7 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
   }
   .sf-product-units {
     flex: 0 0 auto;
+    margin-top: auto; /* pin UOM baseline across stretched row */
     min-height: 34px;
     height: auto;
     max-height: none;
@@ -1846,7 +1813,6 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
     min-height: 44px;
     height: 44px;
     max-height: 44px;
-    margin-top: auto; /* pin qty to shared baseline within stretched row */
     min-width: 0;
     max-width: 100%;
     width: 100%;

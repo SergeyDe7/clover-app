@@ -181,13 +181,6 @@ export function CatalogPage({
                     </>
                   ) : null}
                 </nav>
-                <button
-                  type="button"
-                  className="sf-back sf-group-landing-moback"
-                  onClick={() => navigateStorefront({ name: "catalog" })}
-                >
-                  ← Каталог
-                </button>
                 <h1>{title}</h1>
               </div>
             </header>

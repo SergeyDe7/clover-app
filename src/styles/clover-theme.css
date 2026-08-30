@@ -4527,7 +4527,15 @@ body:has(.clover-app) {
   text-overflow: ellipsis !important;
   color: #2f5f2f !important;
 }
-.clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls,
+.clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls {
+  grid-area: actions !important;
+  align-self: end !important;
+  flex: unset !important;
+  margin: 4px 0 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
 .clover-app .client-matrix-panel .client-matrix-card .product-card-controls {
   grid-area: actions !important;
   align-self: end !important;
@@ -4536,19 +4544,74 @@ body:has(.clover-app) {
   width: auto !important;
   max-width: calc(100% - 16px) !important;
 }
+/* «В матрицу» / «Убрать» = UOM button shape (storefront .sf-unit-choice) */
 .clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls .primary-button,
 .clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls .secondary-button {
+  appearance: none !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   width: 100% !important;
-  min-height: 30px !important;
-  max-height: 30px !important;
-  height: 30px !important;
-  padding: 0 8px !important;
-  font-size: 11px !important;
-  font-weight: 800 !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  max-height: 34px !important;
+  padding: 7px 10px !important;
+  margin: 0 !important;
+  border: 1px solid var(--clover-border, #dde5dc) !important;
+  border-radius: 8px !important;
+  font-size: 0.86rem !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
   box-sizing: border-box !important;
+  cursor: pointer !important;
+}
+.clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls .primary-button:not(:disabled) {
+  border-color: var(--clover-uom-active-border, #4f9a52) !important;
+  background: var(--clover-uom-active-bg, #4f9a52) !important;
+  color: var(--clover-uom-active-text, #fff) !important;
+}
+.clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls .primary-button:hover:not(:disabled) {
+  border-color: var(--clover-uom-active-hover-border, #438647) !important;
+  background: var(--clover-uom-active-hover-bg, #438647) !important;
+  color: #fff !important;
+}
+.clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls .primary-button:active:not(:disabled) {
+  border-color: var(--clover-green-pressed, #39753d) !important;
+  background: var(--clover-green-pressed, #39753d) !important;
+  color: #fff !important;
+}
+.clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls .secondary-button:not(:disabled) {
+  border-color: var(--clover-border, #dde5dc) !important;
+  background: var(--clover-card-bg, #fff) !important;
+  color: var(--clover-text, #283329) !important;
+}
+.clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls .secondary-button:hover:not(:disabled) {
+  border-color: var(--clover-green-border, #bdd9bb) !important;
+  background: var(--clover-green-soft, #eaf4e8) !important;
+  color: var(--clover-selected-text, #356f3a) !important;
+}
+.clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls .primary-button:focus-visible,
+.clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls .secondary-button:focus-visible {
+  outline: 2px solid rgba(91, 157, 87, 0.45) !important;
+  outline-offset: 1px !important;
+}
+.clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls .primary-button:disabled,
+.clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls .secondary-button:disabled {
+  opacity: 0.45 !important;
+  cursor: default !important;
+}
+@media (max-width: 900px) {
+  .clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls .primary-button,
+  .clover-app .client-catalog-add-panel .client-matrix-card .product-card-controls .secondary-button {
+    height: 32px !important;
+    min-height: 32px !important;
+    max-height: 32px !important;
+    padding: 6px 8px !important;
+    font-size: 0.84rem !important;
+  }
 }
 .clover-app .client-matrix-panel .client-matrix-card {
   padding: 0 !important;
