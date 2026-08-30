@@ -1059,7 +1059,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
     border: 1px solid rgba(28, 31, 28, 0.08) !important;
     border-radius: 12px !important;
     background: #fff !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     box-shadow: none !important;
   }
   .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-image-wrap {
@@ -1107,52 +1107,63 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
     margin-top: auto !important;
   }
   .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) {
-    overflow: visible !important;
+    overflow: hidden !important;
   }
   .embedded-catalog.client-order-catalog .product-card .unit-choice,
   .embedded-catalog.client-order-catalog .product-card .unit-choice.unit-choice-single {
-    height: auto !important;
-    min-height: 40px !important;
-    max-height: none !important;
-    gap: 6px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+    gap: 4px !important;
     border: 0 !important;
     background: transparent !important;
-    overflow: visible !important;
-    grid-auto-columns: minmax(max-content, 1fr) !important;
+    overflow: hidden !important;
+    grid-auto-columns: minmax(0, 1fr) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
   }
   .embedded-catalog.client-order-catalog .product-card .unit-choice button {
-    height: auto !important;
-    min-height: 40px !important;
-    max-height: none !important;
-    font-size: 13px !important;
-    line-height: 1.2 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+    font-size: 11px !important;
+    line-height: 1.1 !important;
     border: 1px solid #d5dfd2 !important;
     border-radius: 8px !important;
-    padding: 8px 10px !important;
-    overflow: visible !important;
-    text-overflow: unset !important;
+    padding: 0 4px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
     white-space: nowrap !important;
+    box-sizing: border-box !important;
   }
   .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .quantity-control {
-    height: 56px !important;
-    min-height: 56px !important;
-    max-height: 56px !important;
-    grid-template-columns: 56px minmax(7ch, 1fr) 56px !important;
-    overflow: visible !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    grid-template-columns: 44px minmax(7ch, 1fr) 44px !important;
+    overflow: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
   }
   .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .quantity-control > button {
-    width: 56px !important;
-    height: 56px !important;
-    min-width: 56px !important;
+    width: 44px !important;
+    height: 48px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
     max-height: none !important;
-    font-size: 1.65rem !important;
+    font-size: 1.5rem !important;
   }
   .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .quantity-input-wrap {
-    height: 56px !important;
-    min-height: 56px !important;
-    max-height: 56px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
     min-width: 7ch !important;
-    overflow: visible !important;
+    overflow: hidden !important;
   }
   .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .quantity-input {
     min-width: 4.5ch !important;
