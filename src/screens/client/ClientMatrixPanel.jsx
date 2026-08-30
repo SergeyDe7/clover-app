@@ -1,5 +1,5 @@
 // Панель персональной матрицы товаров клиента.
-import { useDeferredValue, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   UNIT_CONFIG,
@@ -15,6 +15,9 @@ import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js
 import { productImageSrc } from "../../shared/productPhoto";
 import { CatalogSearchInput } from "./CatalogSearchInput";
 import { useFixedChromeHeight } from "./useMobileFixedChromeHeight";
+import { MATRIX_STOREFRONT_CARD_STYLES } from "./matrixStorefrontCardStyles";
+
+const MATRIX_STYLE_ID = "clover-matrix-storefront-cards";
 
 export function ClientMatrixPanel({
   products = [],
@@ -34,6 +37,21 @@ export function ClientMatrixPanel({
     typeof document !== "undefined"
       ? document.querySelector("main.clover-app") || document.body
       : null;
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    let el = document.getElementById(MATRIX_STYLE_ID);
+    if (!el) {
+      el = document.createElement("style");
+      el.id = MATRIX_STYLE_ID;
+      el.setAttribute("data-clover", "matrix-storefront-cards");
+      document.head.appendChild(el);
+    }
+    el.textContent = MATRIX_STOREFRONT_CARD_STYLES;
+    return () => {
+      /* keep styles while SPA stays on client; remove only if node gone */
+    };
+  }, []);
 
   useFixedChromeHeight(
     stickyChromeRef,

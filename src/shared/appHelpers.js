@@ -6462,7 +6462,8 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
 }
 
 /* Matrix LK ↔ storefront parity (injected last; beats earlier APP_STYLES) */
-.page-content-client .client-matrix-panel .client-matrix-card {
+.clover-app.clover-app-client .page-content-client .client-matrix-panel .client-matrix-card,
+.clover-app.clover-app-client .client-matrix-panel .client-matrix-card {
   position: relative !important;
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) !important;
@@ -6481,22 +6482,22 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   overflow: hidden !important;
   box-shadow: none !important;
 }
-.page-content-client .client-matrix-panel .client-matrix-card .product-card-top {
+.clover-app.clover-app-client .client-matrix-panel .client-matrix-card .product-card-top {
   position: absolute !important;
   top: 4px !important;
   left: 4px !important;
   right: 4px !important;
   z-index: 2 !important;
-  grid-area: unset !important;
+  grid-area: auto !important;
   height: 24px !important;
   margin: 0 !important;
   padding: 0 !important;
   pointer-events: none !important;
 }
-.page-content-client .client-matrix-panel .client-matrix-card .product-card-top > * {
+.clover-app.clover-app-client .client-matrix-panel .client-matrix-card .product-card-top > * {
   pointer-events: auto !important;
 }
-.page-content-client .client-matrix-panel .client-matrix-card .product-image-wrap {
+.clover-app.clover-app-client .client-matrix-panel .client-matrix-card .product-image-wrap {
   grid-area: photo !important;
   margin: 0 !important;
   border: 0 !important;
@@ -6504,7 +6505,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   aspect-ratio: 1 / 1 !important;
   max-height: none !important;
 }
-.page-content-client .client-matrix-panel .client-matrix-card h2 {
+.clover-app.clover-app-client .client-matrix-panel .client-matrix-card h2 {
   grid-area: title !important;
   margin: 6px 8px 0 !important;
   font-size: 0.82rem !important;
@@ -6516,19 +6517,19 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   -webkit-line-clamp: unset !important;
   overflow: visible !important;
 }
-.page-content-client .client-matrix-panel .client-matrix-card .product-code {
+.clover-app.clover-app-client .client-matrix-panel .client-matrix-card .product-code {
   grid-area: code !important;
   margin: 2px 8px 0 !important;
   font-size: 0.72rem !important;
 }
-.page-content-client .client-matrix-panel .client-matrix-card .product-price {
+.clover-app.clover-app-client .client-matrix-panel .client-matrix-card .product-price {
   grid-area: price !important;
   margin: 4px 8px 0 !important;
   font-size: 0.88rem !important;
   height: auto !important;
   min-height: calc(0.88rem * 1.25) !important;
 }
-.page-content-client .client-matrix-panel .client-matrix-card .product-card-controls {
+.clover-app.clover-app-client .client-matrix-panel .client-matrix-card .product-card-controls {
   grid-area: actions !important;
   margin: 4px 8px 8px !important;
 }

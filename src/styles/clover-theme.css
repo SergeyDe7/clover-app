@@ -2745,7 +2745,7 @@ body:has(.clover-app) {
   gap: 8px !important;
 }
 
-.clover-app .product-card {
+.clover-app .product-card:not(.client-matrix-card) {
   height: 100% !important;
   min-height: 0 !important;
   min-width: 0 !important;
@@ -2757,7 +2757,7 @@ body:has(.clover-app) {
   transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease !important;
 }
 
-.clover-app .product-card:not(.product-card-list) {
+.clover-app .product-card:not(.product-card-list):not(.client-matrix-card) {
   display: flex !important;
   flex-direction: column !important;
 }
@@ -2772,7 +2772,7 @@ body:has(.clover-app) {
   background: #eef7eb !important;
 }
 
-.clover-app .product-card:not(.product-card-list) .product-card-top {
+.clover-app .product-card:not(.product-card-list):not(.client-matrix-card) .product-card-top {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -3466,7 +3466,7 @@ body:has(.clover-app) {
   padding: 0 10px !important;
 }
 
-.clover-app .product-image-wrap {
+.clover-app .product-card:not(.client-matrix-card) .product-image-wrap {
   flex: 0 0 auto !important;
   align-self: stretch !important;
   width: 100% !important;
@@ -5527,7 +5527,7 @@ body:has(.clover-app) {
     color: var(--clover-uom-active-text, #fff) !important;
   }
 
-  .clover-app .product-image-wrap {
+  .clover-app .product-card:not(.client-matrix-card) .product-image-wrap {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
