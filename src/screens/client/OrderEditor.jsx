@@ -21,6 +21,7 @@ import {
   productArticle,
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
+  glueProductNameUnits,
 } from "../../shared/appHelpers";
 import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import {
@@ -1221,7 +1222,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                         )}
                       </div>
                     )}
-                    <h2>{product.name}</h2>
+                    <h2>{isList ? glueProductNameUnits(product.name) : product.name}</h2>
                     <p className="product-code">Арт. {productArticle(product)}</p>
                     <p className="product-price">
                       {settings.showPrices && price > 0

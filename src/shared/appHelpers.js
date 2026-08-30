@@ -5834,10 +5834,10 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     display: block;
     overflow: visible;
     white-space: normal;
-    word-break: normal;
-    overflow-wrap: break-word;
-    hyphens: manual;
-    -webkit-hyphens: manual;
+    word-break: keep-all;
+    overflow-wrap: normal;
+    hyphens: none;
+    -webkit-hyphens: none;
     -webkit-line-clamp: unset;
     margin: 0;
   }
@@ -6773,6 +6773,17 @@ export function formatDateTime(value) {
   } catch {
     return value;
   }
+}
+
+/**
+ * Не даёт оторвать единицу измерения от числа в названии («5л» → не «5» / «л»).
+ * Word joiner / NBSP — перенос только вместе с числом.
+ */
+export function glueProductNameUnits(name) {
+  return String(name || "").replace(
+    /(\d+(?:[.,]\d+)?)(\s*)(мл|кг|мм|см|шт|л|г)(?=$|[\s,.;:!?…)\]\}])/gi,
+    (_, num, space, unit) => (space ? `${num}\u00A0${unit}` : `${num}\u2060${unit}`)
+  );
 }
 
 export function formatMoney(value) {
