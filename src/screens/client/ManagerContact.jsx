@@ -1,5 +1,6 @@
 // Виджет контакта менеджера в шапке кабинета клиента и на экране входа.
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   formatRussianPhone,
   getManagerPhoneLinks,
@@ -43,8 +44,15 @@ function ContactBody({ fullName, phoneLinks, phoneValue, hasAnyContact, maxLink,
   );
 }
 
+const SHEET_MQ = "(max-width: 700px)";
+
 export function ManagerContact({ settings, variant = "popover" }) {
   const [open, setOpen] = useState(false);
+  const [sheetMode, setSheetMode] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia
+      ? window.matchMedia(SHEET_MQ).matches
+      : false
+  );
   const rootRef = useRef(null);
   const scrollRef = useRef(null);
   const fullName = String(settings.managerFullName || "").trim();
@@ -56,6 +64,19 @@ export function ManagerContact({ settings, variant = "popover" }) {
   const inline = variant === "inline";
 
   useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const mq = window.matchMedia(SHEET_MQ);
+    const sync = () => setSheetMode(mq.matches);
+    sync();
+    if (mq.addEventListener) {
+      mq.addEventListener("change", sync);
+      return () => mq.removeEventListener("change", sync);
+    }
+    mq.addListener(sync);
+    return () => mq.removeListener(sync);
+  }, []);
+
+  useEffect(() => {
     if (!open || !inline) return;
     const onPointerDown = (event) => {
       if (!rootRef.current?.contains(event.target)) setOpen(false);
@@ -64,7 +85,7 @@ export function ManagerContact({ settings, variant = "popover" }) {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open, inline]);
 
-  // Prevent body from eating touch while sheet is open (keeps pan-y on scroll body).
+  // Lock page scroll while the mobile sheet (or desktop popover) is open.
   useEffect(() => {
     if (!open || inline) return;
     const prevHtml = document.documentElement.style.overflow;
@@ -116,6 +137,47 @@ export function ManagerContact({ settings, variant = "popover" }) {
     window.matchMedia &&
     window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
+  const sheet = (
+    <>
+      {open ? (
+        <button
+          type="button"
+          className="manager-contact-backdrop"
+          aria-label="Закрыть"
+          onClick={() => setOpen(false)}
+        />
+      ) : null}
+      <div
+        className={
+          open && sheetMode
+            ? "manager-contact-popover manager-contact-popover--portal-open"
+            : "manager-contact-popover"
+        }
+        role="dialog"
+        aria-label="Связаться с менеджером"
+        aria-hidden={!open}
+      >
+        <div className="manager-contact-popover-head">
+          <button
+            type="button"
+            className="manager-contact-close"
+            aria-label="Закрыть"
+            onClick={() => setOpen(false)}
+          >
+            ×
+          </button>
+        </div>
+        <div
+          className="manager-contact-popover-scroll"
+          data-manager-contact-scroll="1"
+          ref={scrollRef}
+        >
+          {body}
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <div
       ref={rootRef}
@@ -139,38 +201,14 @@ export function ManagerContact({ settings, variant = "popover" }) {
         <span className="manager-contact-label-full">Связаться с менеджером</span>
         <span className="manager-contact-label-short">Менеджер</span>
       </button>
-      {open ? (
-        <button
-          type="button"
-          className="manager-contact-backdrop"
-          aria-label="Закрыть"
-          onClick={() => setOpen(false)}
-        />
-      ) : null}
-      <div
-        className="manager-contact-popover"
-        role="dialog"
-        aria-label="Связаться с менеджером"
-        aria-hidden={!open}
-      >
-        <div className="manager-contact-popover-head">
-          <button
-            type="button"
-            className="manager-contact-close"
-            aria-label="Закрыть"
-            onClick={() => setOpen(false)}
-          >
-            ×
-          </button>
-        </div>
-        <div
-          className="manager-contact-popover-scroll"
-          data-manager-contact-scroll="1"
-          ref={scrollRef}
-        >
-          {body}
-        </div>
-      </div>
+      {/*
+        Mobile sheet must portal to body: .app-top-chrome has container-type:inline-size,
+        which makes position:fixed children use the chrome (~header height) as containing
+        block — Telegram CTA gets clipped and the sheet cannot scroll.
+      */}
+      {sheetMode && open && typeof document !== "undefined"
+        ? createPortal(sheet, document.body)
+        : sheet}
     </div>
   );
 }

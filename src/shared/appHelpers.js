@@ -6226,21 +6226,25 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     cursor: pointer;
   }
   .manager-contact.open .manager-contact-popover,
-  .manager-contact:focus-within .manager-contact-popover {
+  .manager-contact:focus-within .manager-contact-popover,
+  .manager-contact-popover.manager-contact-popover--portal-open {
     display: flex;
   }
   .manager-contact-popover {
     position: fixed;
-    /* Pin top+bottom so height is viewport-bounded (max-height alone does not create a scrollport). */
+    /* Viewport-relative: sheet is portaled to body (chrome container-type would clip fixed). */
     top: max(12px, calc(env(safe-area-inset-top, 0px) + 8px));
-    bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 8px));
+    bottom: auto;
     right: 4%;
     left: 4%;
     width: auto;
     max-width: min(340px, 92vw);
     margin-left: auto;
+    margin-right: auto;
     height: auto;
-    max-height: none;
+    max-height: calc(
+      100dvh - max(24px, env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px) + 16px)
+    );
     min-height: 0;
     display: none;
     flex-direction: column;
