@@ -3592,30 +3592,98 @@ body:has(.clover-app) {
     max-width: 100% !important;
   }
 
-  .clover-app .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-image-wrap {
-    aspect-ratio: 1 / 1 !important;
-    max-height: 140px !important;
-  }
-
-  .clover-app .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) {
-    padding: 0 6px 6px !important;
+  /* Desktop LK matrix/order cards — same storefront look as phone (edge photo, overlay ★) */
+  .clover-app .page-content-client .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-card:not(.product-card-list),
+  .clover-app .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-card:not(.product-card-list) {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-self: stretch !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    border: 1px solid rgba(28, 31, 28, 0.08) !important;
     border-radius: 12px !important;
+    background: #fff !important;
+    overflow: hidden !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
   }
 
-  .clover-app .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .product-card-top {
+  .clover-app .page-content-client .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-image-wrap,
+  .clover-app .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-image-wrap {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    aspect-ratio: 1 / 1 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    overflow: hidden !important;
+    background: #fff !important;
+    position: relative !important;
+  }
+
+  .clover-app .page-content-client .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-image,
+  .clover-app .page-content-client .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-image-placeholder,
+  .clover-app .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-image,
+  .clover-app .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-image-placeholder {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    object-position: center !important;
+    margin: 0 !important;
+    padding: 4px !important;
+    box-sizing: border-box !important;
+    background: #fff !important;
+  }
+
+  .clover-app .page-content-client .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-card-top,
+  .clover-app .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-card-top {
+    position: absolute !important;
+    top: 4px !important;
+    left: 4px !important;
+    right: 4px !important;
+    z-index: 2 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
     height: 24px !important;
     min-height: 24px !important;
+    max-height: 24px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    pointer-events: none !important;
   }
 
+  .clover-app .page-content-client .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-card-top > *,
+  .clover-app .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-card-top > * {
+    pointer-events: auto !important;
+  }
+
+  .clover-app .page-content-client .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .favorite-button,
   .clover-app .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .favorite-button {
     width: 24px !important;
     height: 24px !important;
     min-width: 24px !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    box-shadow: 0 1px 3px rgba(28, 31, 28, 0.12) !important;
   }
 
+  .clover-app .page-content-client .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) h2,
   .clover-app .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) h2 {
-    font-size: 12px !important;
-    line-height: 1.2 !important;
+    flex: 0 0 auto !important;
+    margin: 6px 8px 0 !important;
+    padding: 0 !important;
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
     display: block !important;
     -webkit-line-clamp: unset !important;
     -webkit-box-orient: unset !important;
@@ -3625,40 +3693,78 @@ body:has(.clover-app) {
     height: auto !important;
     max-height: none !important;
     min-height: 0 !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
   }
 
-  .clover-app .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .product-price {
-    font-size: 12px !important;
+  .clover-app .page-content-client .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .product-code,
+  .clover-app .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .product-code {
+    display: block !important;
+    margin: 2px 8px 0 !important;
+    padding: 0 !important;
+    font-size: 0.72rem !important;
     line-height: 1.2 !important;
+    color: #6b6f6b !important;
+  }
+
+  .clover-app .page-content-client .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .product-price,
+  .clover-app .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .product-price {
+    flex: 0 0 auto !important;
+    margin: 4px 8px 0 !important;
+    padding: 0 !important;
+    font-size: 0.88rem !important;
+    font-weight: 800 !important;
+    line-height: 1.25 !important;
+    color: #2f5f2f !important;
+  }
+
+  .clover-app .page-content-client .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .product-card-controls,
+  .clover-app .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .product-card-controls {
+    flex: 0 0 auto !important;
+    margin: 4px 8px 8px !important;
+    margin-top: auto !important;
+    gap: 6px !important;
   }
 
   .clover-app .embedded-catalog.client-order-catalog .product-card .unit-choice,
   .clover-app .embedded-catalog.client-order-catalog .product-card .unit-choice.unit-choice-single {
-    height: 26px !important;
-    min-height: 26px !important;
-    max-height: 26px !important;
-    grid-template-rows: 26px !important;
+    display: grid !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(0, 1fr) !important;
+    height: auto !important;
+    min-height: 34px !important;
+    max-height: none !important;
+    grid-template-rows: none !important;
+    gap: 6px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
   }
 
   .clover-app .embedded-catalog.client-order-catalog .product-card .unit-choice button,
   .clover-app .embedded-catalog.client-order-catalog .product-card .unit-choice.unit-choice-single button {
-    height: 26px !important;
-    min-height: 26px !important;
-    max-height: 26px !important;
-    font-size: 10px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+    font-size: 0.84rem !important;
+    border-radius: 8px !important;
+    padding: 6px 8px !important;
   }
 
   .clover-app .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .quantity-control {
-    height: 28px !important;
-    min-height: 28px !important;
-    max-height: 28px !important;
-    grid-template-columns: 28px minmax(0, 1fr) 28px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    grid-template-columns: 42px minmax(0, 1fr) 42px !important;
+    gap: 6px !important;
   }
 
   .clover-app .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .quantity-control > button {
-    width: 28px !important;
-    height: 28px !important;
-    min-width: 28px !important;
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    border-radius: 10px !important;
   }
 
   .clover-app .embedded-catalog.client-order-catalog .order-summary h2 {
