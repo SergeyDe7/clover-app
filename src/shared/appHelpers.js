@@ -3873,24 +3873,20 @@ html.clover-thankyou-open .app-top-chrome {
     "actions";
 }
 .client-matrix-panel .client-matrix-card {
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
   grid-template-areas:
-    "top"
     "photo"
     "title"
     "code"
     "price"
     "actions";
 }
-.client-matrix-panel .client-matrix-card .product-card-top {
-  grid-area: top;
-}
 .client-catalog-add-panel .client-matrix-card,
 .client-matrix-panel .client-matrix-card {
   display: grid;
-  align-content: start;
+  align-content: stretch;
   min-height: 0;
-  height: auto;
+  height: 100%;
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -3898,12 +3894,13 @@ html.clover-thankyou-open .app-top-chrome {
 .client-matrix-panel .client-matrix-card h2 {
   grid-area: title;
   align-self: start;
-  margin: 0 0 4px;
-  font-size: 14px;
+  margin: 6px 8px 0;
+  font-size: 0.82rem;
   line-height: 1.25;
   font-weight: 700;
   min-height: 0;
   max-height: none;
+  height: auto;
   display: block;
   overflow: visible;
   white-space: normal;
@@ -3913,17 +3910,17 @@ html.clover-thankyou-open .app-top-chrome {
 .client-catalog-add-panel .client-matrix-card .product-card-controls,
 .client-matrix-panel .client-matrix-card .product-card-controls {
   grid-area: actions;
-  margin-top: 0;
+  margin: 4px 8px 8px;
 }
 .client-catalog-add-panel .client-matrix-card .product-code,
 .client-matrix-panel .client-matrix-card .product-code {
   grid-area: code;
   display: block;
-  margin: 0 0 2px;
+  margin: 2px 8px 0;
   padding: 0;
-  font-size: 11px;
+  font-size: 0.72rem;
   line-height: 1.2;
-  color: #6f7b6f;
+  color: #6b6f6b;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3931,16 +3928,14 @@ html.clover-thankyou-open .app-top-chrome {
 .client-catalog-add-panel .client-matrix-card .product-image-wrap,
 .client-matrix-panel .client-matrix-card .product-image-wrap {
   grid-area: photo;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 100%;
   height: auto;
   aspect-ratio: 1 / 1;
-  margin: 0 0 4px;
-  border-radius: 10px;
+  margin: 0;
+  border-radius: 0;
   overflow: hidden;
-  border: 1px solid #e8eee6;
+  border: 0;
   background: #fff;
   position: relative;
   box-sizing: border-box;
@@ -3974,8 +3969,11 @@ html.clover-thankyou-open .app-top-chrome {
   border-radius: 12px;
 }
 .client-matrix-panel .client-matrix-card {
-  padding: 0 6px 6px;
-  border-radius: 14px;
+  position: relative;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(28, 31, 28, 0.08);
+  background: #fff;
 }
 .client-catalog-add-panel .client-matrix-card .product-card-controls .primary-button,
 .client-catalog-add-panel .client-matrix-card .product-card-controls .secondary-button {
@@ -3989,18 +3987,18 @@ html.clover-thankyou-open .app-top-chrome {
 .client-catalog-add-panel .client-catalog-add-price,
 .client-matrix-panel .client-matrix-card .product-price {
   grid-area: price;
-  align-self: end;
+  align-self: start;
   display: block;
   visibility: visible;
   opacity: 1;
-  height: calc(13px * 1.25);
-  min-height: calc(13px * 1.25);
-  margin: 0 0 6px;
+  height: auto;
+  min-height: calc(0.88rem * 1.25);
+  margin: 4px 8px 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   color: #2f5f2f;
-  font-size: 13px;
+  font-size: 0.88rem;
   font-weight: 800;
   line-height: 1.25;
 }
@@ -4014,16 +4012,16 @@ html.clover-thankyou-open .app-top-chrome {
 }
 .client-matrix-card {
   min-height: 0;
-  padding: 0 8px 8px;
-  border-radius: 14px;
-  box-shadow: 0 4px 12px rgba(56, 97, 52, 0.04);
+  padding: 0;
+  border-radius: 12px;
+  box-shadow: none;
 }
 .client-matrix-card .product-image-wrap {
   aspect-ratio: 1 / 1;
   height: auto;
-  margin: 0 0 2px;
-  border-radius: 10px;
-  border: 1px solid #e8eee6;
+  margin: 0;
+  border-radius: 0;
+  border: 0;
 }
 .client-matrix-card .product-image-placeholder {
   font-size: 11px;
@@ -4031,9 +4029,9 @@ html.clover-thankyou-open .app-top-chrome {
   text-align: center;
 }
 .client-matrix-card h2 {
-  margin: 8px 0 4px;
-  font-size: 13px;
-  line-height: 1.3;
+  margin: 6px 8px 0;
+  font-size: 0.82rem;
+  line-height: 1.25;
   display: block;
   overflow: visible;
   white-space: normal;
@@ -4041,8 +4039,8 @@ html.clover-thankyou-open .app-top-chrome {
   word-break: break-word;
 }
 .client-matrix-card .product-code {
-  margin: 0 0 4px;
-  font-size: 11px;
+  margin: 2px 8px 0;
+  font-size: 0.72rem;
 }
 .client-matrix-card .product-price {
   margin: 0 0 8px;
@@ -6012,29 +6010,29 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   .page-content-client .client-matrix-panel .client-matrix-card h2 {
     grid-area: title;
     align-self: start;
-    min-height: calc(12px * 1.25 * 2) !important;
-    max-height: calc(12px * 1.25 * 2) !important;
-    height: calc(12px * 1.25 * 2) !important;
-    display: -webkit-box !important;
-    -webkit-box-orient: vertical !important;
-    -webkit-line-clamp: 2 !important;
-    overflow: hidden !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    -webkit-box-orient: unset !important;
+    overflow: visible !important;
     white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: break-word !important;
-    margin: 2px 0 !important;
+    margin: 6px 8px 0 !important;
     padding: 0 !important;
-    font-size: 12px !important;
-    line-height: 1.25 !important;
+    font-size: 0.78rem !important;
+    line-height: 1.2 !important;
   }
   .page-content-client .client-matrix-panel .client-matrix-card .product-code {
     grid-area: code !important;
-    margin: 0 0 2px !important;
+    margin: 2px 8px 0 !important;
     padding: 0 !important;
   }
   .page-content-client .client-matrix-panel .client-matrix-card .product-price {
     grid-area: price !important;
-    margin: 0 0 4px !important;
+    margin: 4px 8px 0 !important;
     padding: 0 !important;
   }
   .page-content-client input.catalog-search,
@@ -6461,6 +6459,78 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     color: #2f5f2f !important;
   }
   .favorite-button { font-size: 18px; }
+}
+
+/* Matrix LK ↔ storefront parity (injected last; beats earlier APP_STYLES) */
+.page-content-client .client-matrix-panel .client-matrix-card {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto !important;
+  grid-template-areas:
+    "photo"
+    "title"
+    "code"
+    "price"
+    "actions" !important;
+  height: 100% !important;
+  padding: 0 !important;
+  border: 1px solid rgba(28, 31, 28, 0.08) !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  overflow: hidden !important;
+  box-shadow: none !important;
+}
+.page-content-client .client-matrix-panel .client-matrix-card .product-card-top {
+  position: absolute !important;
+  top: 4px !important;
+  left: 4px !important;
+  right: 4px !important;
+  z-index: 2 !important;
+  grid-area: unset !important;
+  height: 24px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+}
+.page-content-client .client-matrix-panel .client-matrix-card .product-card-top > * {
+  pointer-events: auto !important;
+}
+.page-content-client .client-matrix-panel .client-matrix-card .product-image-wrap {
+  grid-area: photo !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  aspect-ratio: 1 / 1 !important;
+  max-height: none !important;
+}
+.page-content-client .client-matrix-panel .client-matrix-card h2 {
+  grid-area: title !important;
+  margin: 6px 8px 0 !important;
+  font-size: 0.82rem !important;
+  line-height: 1.25 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  overflow: visible !important;
+}
+.page-content-client .client-matrix-panel .client-matrix-card .product-code {
+  grid-area: code !important;
+  margin: 2px 8px 0 !important;
+  font-size: 0.72rem !important;
+}
+.page-content-client .client-matrix-panel .client-matrix-card .product-price {
+  grid-area: price !important;
+  margin: 4px 8px 0 !important;
+  font-size: 0.88rem !important;
+  height: auto !important;
+  min-height: calc(0.88rem * 1.25) !important;
+}
+.page-content-client .client-matrix-panel .client-matrix-card .product-card-controls {
+  grid-area: actions !important;
+  margin: 4px 8px 8px !important;
 }
 `;
 
