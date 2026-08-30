@@ -424,7 +424,9 @@ export function OrderEditor({
     let startY = 0;
     const scrollRoot = (event) =>
       event.target instanceof Element
-        ? event.target.closest(".cart-sheet-scroll, .delivery-date-sheet-panel")
+        ? event.target.closest(
+            ".cart-sheet-scroll, .delivery-date-sheet-panel, [data-manager-contact-scroll], .manager-contact-popover"
+          )
         : null;
     const onTouchStart = (event) => {
       startX = event.touches[0]?.clientX ?? 0;

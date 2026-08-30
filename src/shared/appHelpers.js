@@ -6285,7 +6285,6 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     display: block;
     flex: 1 1 auto;
     min-height: 0;
-    height: 100%;
     max-height: none;
     overflow-x: hidden;
     overflow-y: auto;

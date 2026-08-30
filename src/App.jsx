@@ -93,14 +93,20 @@ function LoginView({ onAuth, authBusy, authError }) {
     body.style.backgroundColor = LOGIN_BG;
     if (themeMeta) themeMeta.setAttribute("content", LOGIN_BG);
 
-    // iOS rubber-band: блокируем свайп страницы (поля ввода не трогаем)
+    // iOS rubber-band: блокируем свайп страницы (поля ввода и scroll manager-contact не трогаем)
     const blockPageSwipe = (event) => {
       const target = event.target;
       if (!(target instanceof Element)) {
         event.preventDefault();
         return;
       }
-      if (target.closest("input, textarea, select, button, a, [contenteditable='true']")) return;
+      if (
+        target.closest(
+          "input, textarea, select, button, a, [contenteditable='true'], [data-manager-contact-scroll], .manager-contact-panel, .manager-contact-popover"
+        )
+      ) {
+        return;
+      }
       event.preventDefault();
     };
     document.addEventListener("touchmove", blockPageSwipe, { passive: false });

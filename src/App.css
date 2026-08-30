@@ -53,13 +53,20 @@ button{cursor:pointer}
 }
 .login-manager-cta .manager-contact-panel{
   margin-top:10px;
-  padding:14px 14px 12px;
+  padding:14px 14px max(12px, env(safe-area-inset-bottom, 0px));
   border:1px solid #d7e3d4;
   border-radius:14px;
   background:#f7fbf5;
   box-shadow:none;
   text-align:left;
   animation:login-contact-in .18s ease-out;
+  max-height:min(52dvh, 420px);
+  min-height:0;
+  overflow-x:hidden;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  touch-action:pan-y;
 }
 .login-manager-cta .manager-contact-panel .eyebrow{
   margin:0 0 4px;
@@ -105,7 +112,8 @@ html.login-lock #root {
   overscroll-behavior: none !important;
   background: #f4f8f2 !important;
   background-color: #f4f8f2 !important;
-  touch-action: none;
+  /* pan-y: allow nested manager-contact panel scroll; page itself stays overflow:hidden */
+  touch-action: pan-y;
 }
 
 html.login-lock body {
@@ -126,7 +134,7 @@ html.login-lock body {
   justify-content: center !important;
   overflow: hidden !important;
   overscroll-behavior: none !important;
-  touch-action: none;
+  touch-action: pan-y;
   padding-top: 24px !important;
   padding-top: calc(env(safe-area-inset-top, 0px) + 20px) !important;
   padding-right: 16px !important;
