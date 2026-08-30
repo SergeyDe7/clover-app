@@ -191,4 +191,78 @@ export const MATRIX_STOREFRONT_CARD_STYLES = `
     font-size: 0.82rem !important;
   }
 }
+
+/* Desktop ≥901: mobile composition, no crop, fewer cols if narrow */
+@media (min-width: 901px) {
+  .clover-app.clover-app-client .page-content-client .client-matrix-panel .client-matrix-grid,
+  .clover-app.clover-app-client .client-matrix-panel .client-matrix-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+    gap: 10px !important;
+    align-items: stretch !important;
+  }
+  .clover-app.clover-app-client .page-content-client .client-matrix-panel .client-matrix-card,
+  .clover-app.clover-app-client .client-matrix-panel .client-matrix-card {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-rows: none !important;
+    grid-template-areas: none !important;
+    height: 100% !important;
+    overflow: visible !important;
+  }
+  .clover-app.clover-app-client .client-matrix-panel .client-matrix-card .product-image-wrap {
+    flex: 0 0 auto !important;
+    grid-area: unset !important;
+  }
+  .clover-app.clover-app-client .client-matrix-panel .client-matrix-card h2 {
+    flex: 0 1 auto !important;
+    grid-area: unset !important;
+    overflow: visible !important;
+  }
+  .clover-app.clover-app-client .client-matrix-panel .client-matrix-card .product-code {
+    flex: 0 0 auto !important;
+    grid-area: unset !important;
+    display: block !important;
+  }
+  .clover-app.clover-app-client .client-matrix-panel .client-matrix-card .product-price {
+    flex: 0 0 auto !important;
+    grid-area: unset !important;
+    color: #4F9A52 !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+  }
+  .clover-app.clover-app-client .client-matrix-panel .client-matrix-card .product-card-controls {
+    flex: 0 0 auto !important;
+    margin-top: auto !important;
+    grid-area: unset !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 0 8px 8px !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    overflow: visible !important;
+  }
+  .clover-app.clover-app-client .client-matrix-panel .client-matrix-card .unit-choice,
+  .clover-app.clover-app-client .client-matrix-panel .client-matrix-card .unit-choice.unit-choice-single {
+    overflow: visible !important;
+    min-height: 34px !important;
+    height: 34px !important;
+  }
+  .clover-app.clover-app-client .client-matrix-panel .client-matrix-card .quantity-control {
+    display: grid !important;
+    grid-template-columns: 44px 1fr 44px !important;
+    gap: 4px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+  .clover-app.clover-app-client .client-matrix-panel .client-matrix-card .quantity-control > button {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 48px !important;
+  }
+}
 `;

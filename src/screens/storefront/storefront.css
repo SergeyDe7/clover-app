@@ -424,11 +424,11 @@ html.sf-catalog-lock .sf-main,
 .sf-category-tile:hover { transform: translateY(-2px); border-color: rgba(28, 31, 28, 0.16); box-shadow: 0 10px 28px rgba(28, 31, 28, 0.06); }
 .sf-category-tile span { font-weight: 700; }
 .sf-category-tile strong { color: #1c1f1c; font-size: 1.2rem; }
-/* Как каталог ЛК: 5 колонок; фото — жёсткий квадрат (img absolute, не раздувает рамку) */
+/* Desktop default: 4 cols ≥~240px. Mobile overrides @≤900. */
 .sf-product-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(4, minmax(240px, 1fr));
+  gap: 10px;
   align-items: stretch;
 }
 .sf-product-card {
@@ -847,9 +847,136 @@ html.sf-catalog-lock .sf-main,
   line-height: 1;
 }
 .sf-unit { font-weight: 500; color: #6b6f6b; font-size: .78rem; }
-@media (min-width: 901px) and (max-width: 1200px) {
+/* Desktop ≥901: 4 cols, storefront↔LK parity, no crop. */
+@media (min-width: 901px) {
   .sf-product-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(240px, 1fr));
+    gap: 10px;
+    align-items: stretch;
+  }
+  .sf-product-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    align-self: stretch;
+    overflow: visible;
+    border-radius: 12px;
+    grid-template-rows: none;
+    grid-template-areas: none;
+  }
+  .sf-product-media {
+    flex: 0 0 auto;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+  }
+  .sf-product-media img,
+  .sf-product-media .sf-product-placeholder {
+    object-fit: contain;
+    object-position: center;
+  }
+  .sf-product-body,
+  .sf-product-body.has-units {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    flex: 1 1 auto;
+    padding: 6px 8px 8px;
+    gap: 2px;
+    min-height: 0;
+    height: 100%;
+    box-sizing: border-box;
+    grid-template-rows: none;
+    grid-template-areas: none;
+    align-content: stretch;
+  }
+  .sf-product-cat {
+    flex: 0 0 auto;
+  }
+  .sf-product-code {
+    display: block;
+    flex: 0 0 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sf-product-units {
+    flex: 0 0 auto;
+    min-height: 34px;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .sf-product-units .sf-unit-choice,
+  .sf-product-units .sf-unit-choice.is-compact {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  }
+  .sf-unit-choice button,
+  .sf-unit-choice.is-compact button {
+    min-height: 34px;
+    overflow: visible;
+  }
+  .sf-product-body h3 {
+    flex: 0 1 auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .sf-product-title {
+    display: block;
+    -webkit-line-clamp: unset;
+    max-height: none;
+    overflow: visible;
+    white-space: normal;
+    word-break: break-word;
+  }
+  .sf-product-price {
+    flex: 0 0 auto;
+    overflow: visible;
+    color: #4F9A52;
+  }
+  .sf-product-price-value {
+    color: #4F9A52;
+  }
+  .sf-product-actions {
+    flex: 0 0 auto;
+    margin-top: auto;
+    min-height: 44px;
+    height: 44px;
+    max-height: none;
+    overflow: visible;
+    width: 100%;
+    max-width: 100%;
+  }
+  .sf-product-card .sf-qty-control,
+  .sf-product-card .sf-qty-control.is-compact {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    gap: 6px;
+    height: 44px;
+    min-height: 44px;
+    max-height: none;
+    overflow: visible;
+    width: 100%;
+    max-width: 100%;
+  }
+  .sf-product-card .sf-qty-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    max-width: 44px;
+  }
+  .sf-product-card .sf-qty-field {
+    grid-template-columns: minmax(5ch, 1fr) auto;
+    overflow: visible;
+    max-width: none;
+    width: 100%;
+    min-width: 0;
+  }
+  .sf-product-card .sf-qty-input {
+    width: auto;
+    max-width: none;
+    min-width: 0;
   }
 }
 .sf-catalog-toolbar {
