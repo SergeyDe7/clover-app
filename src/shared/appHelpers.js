@@ -6233,7 +6233,7 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   .manager-contact-popover {
     position: fixed;
     /* Viewport-relative: sheet is portaled to body (chrome container-type would clip fixed). */
-    top: max(12px, calc(env(safe-area-inset-top, 0px) + 8px));
+    top: 50%;
     bottom: auto;
     right: 4%;
     left: 4%;
@@ -6253,8 +6253,8 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     box-sizing: border-box;
     padding: 0;
     z-index: 220;
-    -webkit-transform: translateZ(0);
-    transform: translateZ(0);
+    -webkit-transform: translateY(-50%) translateZ(0);
+    transform: translateY(-50%) translateZ(0);
   }
   .manager-contact-popover::before { display: none; }
   .manager-contact-popover-head {
