@@ -901,7 +901,6 @@ html.sf-catalog-lock .sf-main,
   }
   .sf-product-units {
     flex: 0 0 auto;
-    margin-top: auto; /* pin UOM baseline across stretched row */
     min-height: 34px;
     height: auto;
     max-height: none;
@@ -934,6 +933,7 @@ html.sf-catalog-lock .sf-main,
   }
   .sf-product-price {
     flex: 0 0 auto;
+    margin-top: auto; /* pin price baseline across stretched row */
     overflow: visible;
     color: #4F9A52;
   }
@@ -1740,7 +1740,6 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
   }
   .sf-product-units {
     flex: 0 0 auto;
-    margin-top: auto; /* pin UOM baseline across stretched row */
     min-height: 34px;
     height: auto;
     max-height: none;
@@ -1805,8 +1804,10 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
     min-height: calc(0.82rem * 1.25);
     max-height: calc(0.82rem * 1.25);
     margin: 0;
+    margin-top: auto; /* pin price baseline across stretched row */
     align-self: stretch;
     overflow: hidden;
+    color: #4F9A52;
   }
   .sf-product-actions {
     flex: 0 0 auto;

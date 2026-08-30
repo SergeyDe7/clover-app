@@ -2883,13 +2883,13 @@ body:has(.clover-app) {
 .clover-app .product-card:not(.product-card-list) .product-price {
   flex: 0 0 auto !important;
   margin: 0 0 4px !important;
+  margin-top: auto !important;
   font-size: 12px !important;
   line-height: 1.2 !important;
   min-height: calc(12px * 1.2) !important;
 }
 
 .clover-app .product-card:not(.product-card-list) .product-card-controls {
-  margin-top: auto !important;
   gap: 4px !important;
   flex: 0 0 auto !important;
 }
@@ -3134,6 +3134,7 @@ body:has(.clover-app) {
   .clover-app .product-grid:not(.product-grid-list):not(.client-matrix-grid) .product-price {
     flex: 0 0 auto !important;
     margin: 0 0 3px !important;
+    margin-top: auto !important;
     font-size: 13px !important;
     font-weight: 800 !important;
     line-height: 1.25 !important;
@@ -3147,7 +3148,6 @@ body:has(.clover-app) {
 
   .clover-app .product-grid:not(.product-grid-list):not(.client-matrix-grid) .product-card-controls {
     flex: 0 0 auto !important;
-    margin-top: auto !important;
     gap: 3px !important;
   }
 
@@ -3711,6 +3711,7 @@ body:has(.clover-app) {
   .clover-app .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .product-price {
     flex: 0 0 auto !important;
     margin: 4px 8px 0 !important;
+    margin-top: auto !important;
     padding: 0 !important;
     font-size: 0.88rem !important;
     font-weight: 800 !important;
@@ -3722,7 +3723,6 @@ body:has(.clover-app) {
   .clover-app .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .product-card-controls {
     flex: 0 0 auto !important;
     margin: 4px 8px 8px !important;
-    margin-top: auto !important;
     gap: 6px !important;
   }
 
@@ -6021,6 +6021,7 @@ body:has(.clover-app) {
     align-items: baseline !important;
     gap: 0 !important;
     margin: 2px 8px 0 !important;
+    margin-top: auto !important;
     padding: 0 !important;
     font-size: 0.82rem !important;
     font-weight: 800 !important;
@@ -6031,7 +6032,7 @@ body:has(.clover-app) {
     overflow: hidden !important;
     white-space: nowrap !important;
     text-overflow: ellipsis !important;
-    color: #2f5f2f !important;
+    color: #4F9A52 !important;
   }
 
   .clover-app .page-content-client .product-grid:not(.product-grid-list) .product-price small,
@@ -6062,7 +6063,6 @@ body:has(.clover-app) {
     display: flex !important;
     flex-direction: column !important;
     margin: 2px 8px 8px !important;
-    margin-top: auto !important;
     gap: 2px !important;
     min-width: 0 !important;
     width: auto !important;
@@ -9463,6 +9463,7 @@ html.clover-storefront-add-open body {
   .clover-app .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .product-price {
     flex: 0 0 auto !important;
     margin: 4px 8px 0 !important;
+    margin-top: auto !important;
     font-size: 0.88rem !important;
     font-weight: 800 !important;
     line-height: 1.25 !important;
@@ -9476,7 +9477,6 @@ html.clover-storefront-add-open body {
     flex-direction: column !important;
     flex: 0 0 auto !important;
     margin: 4px 8px 8px !important;
-    margin-top: auto !important;
     gap: 6px !important;
     width: auto !important;
     max-width: calc(100% - 16px) !important;
@@ -9728,6 +9728,7 @@ html.clover-storefront-add-open body {
   .clover-app .client-matrix-panel .client-matrix-card .product-price {
     flex: 0 0 auto !important;
     margin: 4px 8px 0 !important;
+    margin-top: auto !important;
     font-size: 0.88rem !important;
     font-weight: 800 !important;
     color: #4F9A52 !important;
@@ -9744,7 +9745,6 @@ html.clover-storefront-add-open body {
     flex-direction: column !important;
     gap: 6px !important;
     margin: 4px 0 0 !important;
-    margin-top: auto !important;
     padding: 0 8px 8px !important;
     width: 100% !important;
     max-width: 100% !important;
