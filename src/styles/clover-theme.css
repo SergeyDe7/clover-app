@@ -4399,8 +4399,18 @@ body:has(.clover-app) {
     grid-template-rows: auto auto auto auto auto !important;
   }
 
+  /* Keep 6-row matrix card on phone — earlier "5×auto" wiped code row and broke price align */
   .clover-app .client-matrix-panel .client-matrix-card {
-    grid-template-rows: auto auto auto auto auto !important;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto auto !important;
+    grid-template-areas:
+      "top"
+      "photo"
+      "title"
+      "code"
+      "price"
+      "actions" !important;
+    height: 100% !important;
+    overflow: hidden !important;
   }
 
   .clover-app .client-catalog-add-panel .client-matrix-card .product-image-wrap {
@@ -4772,17 +4782,31 @@ body:has(.clover-app) {
     aspect-ratio: 1 / 1 !important;
   }
   .clover-app .client-matrix-panel .client-matrix-card h2 {
-    font-size: 13px !important;
+    grid-area: title !important;
+    font-size: 12px !important;
     line-height: 1.25 !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    height: auto !important;
-    display: block !important;
-    -webkit-line-clamp: unset !important;
-    overflow: visible !important;
+    min-height: calc(12px * 1.25 * 2) !important;
+    max-height: calc(12px * 1.25 * 2) !important;
+    height: calc(12px * 1.25 * 2) !important;
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 2 !important;
+    overflow: hidden !important;
     white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: break-word !important;
+    margin: 2px 0 !important;
+    padding: 0 !important;
+  }
+  .clover-app .client-matrix-panel .client-matrix-card .product-code {
+    grid-area: code !important;
+    margin: 0 0 2px !important;
+    padding: 0 !important;
+  }
+  .clover-app .client-matrix-panel .client-matrix-card .product-price {
+    grid-area: price !important;
+    margin: 0 0 4px !important;
+    padding: 0 !important;
   }
 }
 
@@ -5657,7 +5681,7 @@ body:has(.clover-app) {
     padding: 0 !important;
   }
 
-  .clover-app .page-content-client .product-grid:not(.product-grid-list) h2,
+  .clover-app .page-content-client .product-grid:not(.product-grid-list):not(.client-matrix-grid) h2,
   .clover-app .page-content-client .embedded-catalog .product-grid:not(.product-grid-list) h2 {
     flex: 0 0 auto !important;
     margin: 6px 8px 0 !important;
@@ -5678,7 +5702,7 @@ body:has(.clover-app) {
     color: #1c1f1c !important;
   }
 
-  .clover-app .page-content-client .product-grid:not(.product-grid-list) .product-price,
+  .clover-app .page-content-client .product-grid:not(.product-grid-list):not(.client-matrix-grid) .product-price,
   .clover-app .page-content-client .embedded-catalog .product-grid:not(.product-grid-list) .product-price {
     flex: 0 0 auto !important;
     display: flex !important;
@@ -8860,5 +8884,70 @@ html.clover-storefront-add-open body {
   .clover-app-client .page-content-client .order-summary .primary-button {
     width: auto !important;
     min-width: 180px !important;
+  }
+}
+
+/* —— Matrix phone: last-win align prices + flush article (beats earlier overrides) —— */
+@media (max-width: 900px) {
+  .clover-app .page-content-client .client-matrix-panel .client-matrix-grid {
+    align-items: stretch !important;
+  }
+  .clover-app .page-content-client .client-matrix-panel .client-matrix-card {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto auto !important;
+    grid-template-areas:
+      "top"
+      "photo"
+      "title"
+      "code"
+      "price"
+      "actions" !important;
+    height: 100% !important;
+    align-self: stretch !important;
+    overflow: hidden !important;
+    padding: 0 6px 6px !important;
+    box-sizing: border-box !important;
+  }
+  .clover-app .page-content-client .client-matrix-panel .client-matrix-card .product-card-top {
+    grid-area: top !important;
+  }
+  .clover-app .page-content-client .client-matrix-panel .client-matrix-card .product-image-wrap {
+    grid-area: photo !important;
+  }
+  .clover-app .page-content-client .client-matrix-panel .client-matrix-card h2 {
+    grid-area: title !important;
+    align-self: start !important;
+    margin: 2px 0 !important;
+    padding: 0 !important;
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+    min-height: calc(12px * 1.25 * 2) !important;
+    max-height: calc(12px * 1.25 * 2) !important;
+    height: calc(12px * 1.25 * 2) !important;
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 2 !important;
+    overflow: hidden !important;
+  }
+  .clover-app .page-content-client .client-matrix-panel .client-matrix-card .product-code {
+    grid-area: code !important;
+    display: block !important;
+    margin: 0 0 2px !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  .clover-app .page-content-client .client-matrix-panel .client-matrix-card .product-price {
+    grid-area: price !important;
+    display: block !important;
+    margin: 0 0 4px !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  .clover-app .page-content-client .client-matrix-panel .client-matrix-card .product-card-controls {
+    grid-area: actions !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
   }
 }

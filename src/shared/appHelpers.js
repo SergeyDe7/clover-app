@@ -6012,16 +6012,30 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   .page-content-client .client-matrix-panel .client-matrix-card h2 {
     grid-area: title;
     align-self: start;
-    min-height: 0 !important;
-    max-height: none !important;
-    height: auto !important;
-    display: block !important;
-    -webkit-line-clamp: unset !important;
-    -webkit-box-orient: unset !important;
-    overflow: visible !important;
+    min-height: calc(12px * 1.25 * 2) !important;
+    max-height: calc(12px * 1.25 * 2) !important;
+    height: calc(12px * 1.25 * 2) !important;
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 2 !important;
+    overflow: hidden !important;
     white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: break-word !important;
+    margin: 2px 0 !important;
+    padding: 0 !important;
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+  }
+  .page-content-client .client-matrix-panel .client-matrix-card .product-code {
+    grid-area: code !important;
+    margin: 0 0 2px !important;
+    padding: 0 !important;
+  }
+  .page-content-client .client-matrix-panel .client-matrix-card .product-price {
+    grid-area: price !important;
+    margin: 0 0 4px !important;
+    padding: 0 !important;
   }
   .page-content-client input.catalog-search,
   .page-content-client input[type="search"].catalog-search {
