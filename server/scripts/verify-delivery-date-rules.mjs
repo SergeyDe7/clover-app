@@ -64,6 +64,24 @@ assert.equal(
   assert.equal(formatLocalIsoDate(getEarliestDeliveryDate(now)), "2026-08-03");
 }
 
+// Sunday any time until 23:59 → Monday delivery (18:00 cutoff does not apply)
+{
+  const morning = atLocal(2026, 8, 2, 10, 0); // Sunday
+  assert.equal(isAfterDeliveryCutoff(morning), false);
+  assert.equal(getEarliestDeliveryDateIso(morning), "2026-08-03"); // Mon
+  assert.equal(validateDeliveryDate("2026-08-03", morning).ok, true);
+  assert.equal(validateDeliveryDate("2026-08-02", morning).code, "sunday");
+
+  const evening = atLocal(2026, 8, 2, 18, 30);
+  assert.equal(isAfterDeliveryCutoff(evening), false);
+  assert.equal(getEarliestDeliveryDateIso(evening), "2026-08-03");
+
+  const late = atLocal(2026, 8, 2, 23, 59);
+  assert.equal(isAfterDeliveryCutoff(late), false);
+  assert.equal(getEarliestDeliveryDateIso(late), "2026-08-03");
+  assert.equal(validateDeliveryDate("2026-08-03", late).ok, true);
+}
+
 assert.equal(validateDeliveryDate("", atLocal(2026, 8, 3)).ok, false);
 assert.equal(validateDeliveryDate("not-a-date", atLocal(2026, 8, 3)).code, "invalid");
 
