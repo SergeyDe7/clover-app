@@ -4382,7 +4382,21 @@ body:has(.clover-app) {
   border: 1px solid rgba(28, 31, 28, 0.08) !important;
   background: #fff !important;
 }
-.clover-app .client-catalog-add-panel .client-matrix-card .product-code,
+.clover-app .client-catalog-add-panel .client-matrix-card .product-code {
+  grid-area: code !important;
+  display: block !important;
+  /* Same left edge as title (title uses margin-left:0; card padding provides inset). */
+  margin: 2px 0 0 !important;
+  padding: 0 !important;
+  font-size: 0.72rem !important;
+  line-height: 1.2 !important;
+  color: #6b6f6b !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
 .clover-app .client-matrix-panel .client-matrix-card .product-code {
   grid-area: code !important;
   display: block !important;
@@ -4482,7 +4496,22 @@ body:has(.clover-app) {
   word-break: break-word !important;
 }
 .clover-app .client-catalog-add-panel .client-matrix-card .product-price,
-.clover-app .client-catalog-add-panel .client-matrix-card .client-catalog-add-price,
+.clover-app .client-catalog-add-panel .client-matrix-card .client-catalog-add-price {
+  grid-area: price !important;
+  align-self: start !important;
+  flex: unset !important;
+  /* Same left edge as title/SKU — no extra 8px indent. */
+  margin: 4px 0 0 !important;
+  font-size: 0.88rem !important;
+  font-weight: 800 !important;
+  line-height: 1.25 !important;
+  min-height: calc(0.88rem * 1.25) !important;
+  height: auto !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  color: #2f5f2f !important;
+}
 .clover-app .client-matrix-panel .client-matrix-card .product-price {
   grid-area: price !important;
   align-self: start !important;
@@ -4731,7 +4760,25 @@ body:has(.clover-app) {
     appearance: none !important;
   }
 
-  .clover-app .page-content-client .client-catalog-add-panel .client-matrix-card h2,
+  .clover-app .page-content-client .client-catalog-add-panel .client-matrix-card h2 {
+    grid-area: title !important;
+    align-self: start !important;
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    -webkit-box-orient: unset !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    /* Keep title flush with SKU/price (no 8px side margin). */
+    margin: 6px 0 0 !important;
+    font-size: 0.78rem !important;
+    line-height: 1.2 !important;
+  }
+
   .clover-app .page-content-client .client-matrix-panel .client-matrix-card h2 {
     grid-area: title !important;
     align-self: start !important;
