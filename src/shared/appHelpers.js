@@ -2435,8 +2435,10 @@ textarea { resize: vertical; }
   display: block;
   overflow: visible;
   white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  word-break: normal;
+  overflow-wrap: break-word;
+  hyphens: manual;
+  -webkit-hyphens: manual;
   -webkit-line-clamp: unset;
 }
 .product-card-list .product-code {
@@ -5454,8 +5456,10 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     display: block;
     overflow: visible;
     white-space: normal;
-    word-break: break-word;
-    overflow-wrap: anywhere;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: manual;
+    -webkit-hyphens: manual;
     -webkit-line-clamp: unset;
   }
   .product-card-list .product-category {
@@ -5830,8 +5834,10 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     display: block;
     overflow: visible;
     white-space: normal;
-    word-break: break-word;
-    overflow-wrap: anywhere;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: manual;
+    -webkit-hyphens: manual;
     -webkit-line-clamp: unset;
     margin: 0;
   }
