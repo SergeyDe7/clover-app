@@ -1109,29 +1109,49 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
   .embedded-catalog.client-order-catalog .product-card .unit-choice,
   .embedded-catalog.client-order-catalog .product-card .unit-choice.unit-choice-single {
     height: auto !important;
-    min-height: 34px !important;
+    min-height: 36px !important;
     max-height: none !important;
     gap: 6px !important;
     border: 0 !important;
     background: transparent !important;
+    overflow: visible !important;
   }
   .embedded-catalog.client-order-catalog .product-card .unit-choice button {
-    height: 34px !important;
-    min-height: 34px !important;
-    max-height: 34px !important;
-    font-size: 0.84rem !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    max-height: none !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    border: 1px solid #d5dfd2 !important;
     border-radius: 8px !important;
+    padding: 6px 8px !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    white-space: nowrap !important;
   }
   .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .quantity-control {
-    height: 42px !important;
-    min-height: 42px !important;
-    max-height: 42px !important;
-    grid-template-columns: 42px minmax(0, 1fr) 42px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    grid-template-columns: 48px minmax(7ch, 1fr) 48px !important;
+    overflow: visible !important;
   }
   .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .quantity-control > button {
-    width: 42px !important;
-    height: 42px !important;
-    min-width: 42px !important;
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    font-size: 1.45rem !important;
+  }
+  .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .quantity-input-wrap {
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    min-width: 7ch !important;
+    overflow: visible !important;
+  }
+  .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .quantity-input {
+    min-width: 4.5ch !important;
+    font-variant-numeric: tabular-nums !important;
   }
 }
           `}</style>
