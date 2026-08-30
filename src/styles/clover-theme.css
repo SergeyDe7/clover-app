@@ -4146,10 +4146,11 @@ body:has(.clover-app) {
 .clover-app .client-matrix-panel .client-matrix-card {
   display: grid !important;
   /* title растягивается — кнопка всегда внизу, не «прыгает» между карточками */
-  grid-template-rows: auto minmax(0, 1fr) auto auto !important;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto !important;
   grid-template-areas:
     "photo"
     "title"
+    "code"
     "price"
     "actions" !important;
   align-content: stretch !important;
@@ -4161,12 +4162,6 @@ body:has(.clover-app) {
 }
 .clover-app .client-catalog-add-panel .client-matrix-card {
   grid-template-rows: auto auto auto auto auto !important;
-  grid-template-areas:
-    "photo"
-    "title"
-    "code"
-    "price"
-    "actions" !important;
   height: auto !important;
   overflow: visible !important;
 }
@@ -4174,16 +4169,19 @@ body:has(.clover-app) {
   height: 100% !important;
   overflow: hidden !important;
 }
-.clover-app .client-catalog-add-panel .client-matrix-card .product-code {
+.clover-app .client-catalog-add-panel .client-matrix-card .product-code,
+.clover-app .client-matrix-panel .client-matrix-card .product-code {
   grid-area: code !important;
   display: block !important;
   margin: 0 0 2px !important;
   font-size: 11px !important;
   line-height: 1.2 !important;
-  color: #6f7b6f !important;
+  color: #6b6f6b !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
 }
 .clover-app .client-catalog-add-panel .client-matrix-card .product-image-wrap,
 .clover-app .client-matrix-panel .client-matrix-card .product-image-wrap {
@@ -4322,7 +4320,7 @@ body:has(.clover-app) {
   grid-area: top !important;
 }
 .clover-app .client-matrix-panel .client-matrix-card .product-code {
-  display: none !important;
+  display: block !important;
 }
 .clover-app .client-matrix-panel .client-matrix-card .product-image-wrap {
   aspect-ratio: 1 / 1 !important;

@@ -381,7 +381,7 @@ export function ClientCatalogAddPanel({
                     )}
                   </div>
                   <h2>{product.name}</h2>
-                  <p className="product-code">Арт.: {productArticle(product) || "—"}</p>
+                  <p className="product-code">Арт. {productArticle(product) || "—"}</p>
                   <p className="product-price client-catalog-add-price">
                     {showPrices && price > 0 ? (
                       <>

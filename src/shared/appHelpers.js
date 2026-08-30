@@ -3871,10 +3871,11 @@ html.clover-thankyou-open .app-top-chrome {
     "actions";
 }
 .client-matrix-panel .client-matrix-card {
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
   grid-template-areas:
     "photo"
     "title"
+    "code"
     "price"
     "actions";
 }
@@ -3908,7 +3909,8 @@ html.clover-thankyou-open .app-top-chrome {
   grid-area: actions;
   margin-top: 0;
 }
-.client-catalog-add-panel .client-matrix-card .product-code {
+.client-catalog-add-panel .client-matrix-card .product-code,
+.client-matrix-panel .client-matrix-card .product-code {
   grid-area: code;
   display: block;
   margin: 0 0 2px;
@@ -6015,7 +6017,8 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   .product-code { display: none; }
   .page-content-client .product-card .product-code,
   .page-content-client .embedded-catalog .product-code,
-  .client-catalog-add-panel .client-matrix-card .product-code {
+  .client-catalog-add-panel .client-matrix-card .product-code,
+  .client-matrix-panel .client-matrix-card .product-code {
     display: block !important;
     grid-area: code;
     margin: 0 0 2px;

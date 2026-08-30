@@ -197,7 +197,7 @@ export function ClientMatrixPanel({
                 )}
               </div>
               <h2>{product.name}</h2>
-              <p className="product-code">Код: {productArticle(product) || "—"}</p>
+              <p className="product-code">Арт. {productArticle(product) || "—"}</p>
               <p className="product-price">
                 {settings?.showPrices && price > 0 ? (
                   <>
