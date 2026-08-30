@@ -6295,8 +6295,16 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     touch-action: pan-y;
-    padding: 4px 18px 18px;
+    padding: 4px 18px 20px;
+    padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
     box-sizing: border-box;
+  }
+  /* Portaled sheet sits above login-lock / chrome */
+  .manager-contact-popover.manager-contact-popover--portal-open {
+    z-index: 1200;
+  }
+  .manager-contact-backdrop {
+    z-index: 1190;
   }
   .page-content, .catalog-content {
     width: 100%;

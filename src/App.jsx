@@ -95,6 +95,9 @@ function LoginView({ onAuth, authBusy, authError }) {
 
     // iOS rubber-band: блокируем свайп страницы (поля ввода и scroll manager-contact не трогаем)
     const blockPageSwipe = (event) => {
+      if (document.documentElement.classList.contains("manager-contact-sheet-open")) {
+        return;
+      }
       const target = event.target;
       if (!(target instanceof Element)) {
         event.preventDefault();
@@ -102,7 +105,7 @@ function LoginView({ onAuth, authBusy, authError }) {
       }
       if (
         target.closest(
-          "input, textarea, select, button, a, [contenteditable='true'], [data-manager-contact-scroll], .manager-contact-panel, .manager-contact-popover"
+          "input, textarea, select, button, a, [contenteditable='true'], [data-manager-contact-scroll], .manager-contact-panel, .manager-contact-popover, .manager-contact-backdrop"
         )
       ) {
         return;
@@ -293,6 +296,8 @@ function LoginView({ onAuth, authBusy, authError }) {
         : "Личный кабинет";
 
   return (
+    <>
+    <style>{APP_STYLES}</style>
     <main className="page login-page" ref={pageRef}>
       <section className="login-card">
         <img className="logo" src={cloverLogo} alt="Логотип Clover" width="280" height="189" />
@@ -435,6 +440,7 @@ function LoginView({ onAuth, authBusy, authError }) {
         </div>
       </section>
     </main>
+    </>
   );
 }
 

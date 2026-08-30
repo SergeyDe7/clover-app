@@ -68,6 +68,102 @@ button{cursor:pointer}
   overscroll-behavior:contain;
   touch-action:pan-y;
 }
+/* Mobile login uses portaled sheet — keep trigger compact, no in-card panel. */
+@media (max-width: 700px){
+  .login-manager-cta .manager-contact-panel{display:none!important}
+  /* Sheet styles also live in APP_STYLES; duplicate here so login never misses them. */
+  .manager-contact-backdrop{
+    display:block!important;
+    appearance:none;
+    border:0;
+    padding:0;
+    margin:0;
+    position:fixed;
+    inset:0;
+    z-index:1190;
+    background:rgba(28,31,28,.42);
+    touch-action:none;
+    cursor:pointer;
+  }
+  .manager-contact-popover.manager-contact-popover--portal-open{
+    display:flex!important;
+    position:fixed;
+    top:max(12px, calc(env(safe-area-inset-top, 0px) + 8px));
+    bottom:auto;
+    left:4%;
+    right:4%;
+    width:auto;
+    max-width:min(340px, 92vw);
+    margin:0 auto;
+    height:auto;
+    max-height:calc(100dvh - max(24px, env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px) + 16px));
+    min-height:0;
+    flex-direction:column;
+    align-items:stretch;
+    overflow:hidden;
+    box-sizing:border-box;
+    padding:0;
+    z-index:1200;
+    border:1px solid #dbe6d8;
+    border-radius:16px;
+    background:#fff;
+    box-shadow:0 18px 44px rgba(43,72,40,.18);
+    text-align:left;
+    -webkit-transform:translateZ(0);
+    transform:translateZ(0);
+  }
+  .manager-contact-popover--portal-open .manager-contact-popover-head{
+    display:flex;
+    flex:0 0 auto;
+    justify-content:flex-end;
+    align-items:center;
+    min-height:44px;
+    padding:8px 10px 0;
+  }
+  .manager-contact-popover--portal-open .manager-contact-close{
+    appearance:none;
+    display:grid;
+    place-items:center;
+    width:36px;
+    height:36px;
+    border:0;
+    border-radius:10px;
+    background:#f3f6f2;
+    color:#394639;
+    font-size:22px;
+    font-weight:700;
+    line-height:1;
+    cursor:pointer;
+  }
+  .manager-contact-popover--portal-open .manager-contact-popover-scroll{
+    display:block;
+    flex:1 1 auto;
+    min-height:0;
+    overflow-x:hidden;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
+    touch-action:pan-y;
+    padding:4px 18px max(20px, env(safe-area-inset-bottom, 0px));
+    box-sizing:border-box;
+  }
+  .manager-contact-popover--portal-open .eyebrow{margin:0 0 7px}
+  .manager-contact-popover--portal-open h3{margin:0 0 8px;color:#394639;font-size:18px}
+  .manager-contact-popover--portal-open .manager-contact-phone{
+    display:block;margin-bottom:13px;color:#596359;font-size:14px;font-weight:700;text-decoration:none
+  }
+  .manager-contact-popover--portal-open .manager-contact-actions{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px
+  }
+  .manager-contact-popover--portal-open .manager-contact-actions a{
+    display:grid;min-height:40px;padding:9px 10px;border:1px solid #d7e3d4;border-radius:11px;
+    background:#fff;color:#4f8d4b;font-size:12px;font-weight:800;place-items:center;text-decoration:none
+  }
+  .manager-contact-popover--portal-open .manager-contact-actions a.primary{
+    border-color:#5b9d57;background:#5b9d57;color:#fff
+  }
+  .manager-contact-popover--portal-open .manager-contact-actions a.wide{grid-column:1/-1}
+}
 .login-manager-cta .manager-contact-panel .eyebrow{
   margin:0 0 4px;
   color:#5b9d57;

@@ -62,6 +62,8 @@ export function ManagerContact({ settings, variant = "popover" }) {
   const telegramLink = getTelegramLink(settings.managerTelegram);
   const hasAnyContact = Boolean(fullName || phoneLinks.phone || maxLink || telegramLink);
   const inline = variant === "inline";
+  // Mobile: always a viewport sheet (login inline panel was clipped by login-lock overflow).
+  const usePortalSheet = sheetMode;
 
   useEffect(() => {
     if (!window.matchMedia) return undefined;
@@ -77,26 +79,32 @@ export function ManagerContact({ settings, variant = "popover" }) {
   }, []);
 
   useEffect(() => {
-    if (!open || !inline) return;
+    if (!open || usePortalSheet) return;
+    if (!inline) return;
     const onPointerDown = (event) => {
       if (!rootRef.current?.contains(event.target)) setOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open, inline]);
+  }, [open, inline, usePortalSheet]);
 
-  // Lock page scroll while the mobile sheet (or desktop popover) is open.
+  // Lock background scroll while any mobile sheet / desktop popover is open.
   useEffect(() => {
-    if (!open || inline) return;
-    const prevHtml = document.documentElement.style.overflow;
-    const prevBody = document.body.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
+    if (!open) return;
+    if (inline && !usePortalSheet) return;
+    const html = document.documentElement;
+    const body = document.body;
+    html.classList.add("manager-contact-sheet-open");
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
     return () => {
-      document.documentElement.style.overflow = prevHtml;
-      document.body.style.overflow = prevBody;
+      html.classList.remove("manager-contact-sheet-open");
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
     };
-  }, [open, inline]);
+  }, [open, inline, usePortalSheet]);
 
   const body = (
     <ContactBody
@@ -109,11 +117,54 @@ export function ManagerContact({ settings, variant = "popover" }) {
     />
   );
 
+  const portalSheet =
+    open && usePortalSheet && typeof document !== "undefined"
+      ? createPortal(
+          <>
+            <button
+              type="button"
+              className="manager-contact-backdrop"
+              aria-label="Закрыть"
+              onClick={() => setOpen(false)}
+            />
+            <div
+              className="manager-contact-popover manager-contact-popover--portal-open"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Связаться с менеджером"
+            >
+              <div className="manager-contact-popover-head">
+                <button
+                  type="button"
+                  className="manager-contact-close"
+                  aria-label="Закрыть"
+                  onClick={() => setOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <div
+                className="manager-contact-popover-scroll"
+                data-manager-contact-scroll="1"
+                ref={scrollRef}
+              >
+                {body}
+              </div>
+            </div>
+          </>,
+          document.body
+        )
+      : null;
+
   if (inline) {
     return (
       <div
         ref={rootRef}
-        className={open ? "manager-contact manager-contact--inline open" : "manager-contact manager-contact--inline"}
+        className={
+          open
+            ? "manager-contact manager-contact--inline open"
+            : "manager-contact manager-contact--inline"
+        }
         onKeyDown={(event) => {
           if (event.key === "Escape") setOpen(false);
         }}
@@ -127,7 +178,13 @@ export function ManagerContact({ settings, variant = "popover" }) {
           <span className="manager-contact-label-full">Связаться с менеджером</span>
           <span className="manager-contact-label-short">Менеджер</span>
         </button>
-        {open ? <div className="manager-contact-panel">{body}</div> : null}
+        {/* Desktop inline: expand in place. Mobile: portaled sheet above. */}
+        {!usePortalSheet && open ? (
+          <div className="manager-contact-panel" data-manager-contact-scroll="1">
+            {body}
+          </div>
+        ) : null}
+        {portalSheet}
       </div>
     );
   }
@@ -137,7 +194,7 @@ export function ManagerContact({ settings, variant = "popover" }) {
     window.matchMedia &&
     window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
-  const sheet = (
+  const desktopPopover = !usePortalSheet ? (
     <>
       {open ? (
         <button
@@ -148,11 +205,7 @@ export function ManagerContact({ settings, variant = "popover" }) {
         />
       ) : null}
       <div
-        className={
-          open && sheetMode
-            ? "manager-contact-popover manager-contact-popover--portal-open"
-            : "manager-contact-popover"
-        }
+        className="manager-contact-popover"
         role="dialog"
         aria-label="Связаться с менеджером"
         aria-hidden={!open}
@@ -176,7 +229,7 @@ export function ManagerContact({ settings, variant = "popover" }) {
         </div>
       </div>
     </>
-  );
+  ) : null;
 
   return (
     <div
@@ -201,14 +254,8 @@ export function ManagerContact({ settings, variant = "popover" }) {
         <span className="manager-contact-label-full">Связаться с менеджером</span>
         <span className="manager-contact-label-short">Менеджер</span>
       </button>
-      {/*
-        Mobile sheet must portal to body: .app-top-chrome has container-type:inline-size,
-        which makes position:fixed children use the chrome (~header height) as containing
-        block — Telegram CTA gets clipped and the sheet cannot scroll.
-      */}
-      {sheetMode && open && typeof document !== "undefined"
-        ? createPortal(sheet, document.body)
-        : sheet}
+      {desktopPopover}
+      {portalSheet}
     </div>
   );
 }
