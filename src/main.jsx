@@ -133,7 +133,34 @@ async function registerCloverServiceWorker() {
     const registration = await navigator.serviceWorker.register("/sw.js", {
       updateViaCache: "none",
     });
-    registration.update().catch(() => undefined);
+    await registration.update().catch(() => undefined);
+
+    const promoteWaiting = (reg) => {
+      if (reg?.waiting) {
+        reg.waiting.postMessage({ type: "SKIP_WAITING" });
+      }
+    };
+    promoteWaiting(registration);
+    registration.addEventListener("updatefound", () => {
+      const worker = registration.installing;
+      if (!worker) return;
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "installed" && navigator.serviceWorker.controller) {
+          promoteWaiting(registration);
+        }
+      });
+    });
+
+    // Drop stale clover-shell-* caches only (keep current build cache; never touch localStorage/token).
+    if (window.caches?.keys) {
+      const keep = `clover-shell-${CLOVER_UI_BUILD}`;
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((key) => key.startsWith("clover-shell-") && key !== keep)
+          .map((key) => caches.delete(key))
+      );
+    }
 
     // Reload once when a new SW takes control (after skipWaiting), not on first install.
     if (!window.__cloverSwControllerHooked) {
@@ -202,6 +229,10 @@ window.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible") return;
   if (!("serviceWorker" in navigator)) return;
   navigator.serviceWorker.getRegistration().then((registration) => {
-    registration?.update?.().catch(() => undefined);
+    if (!registration) return;
+    registration.update?.().catch(() => undefined);
+    if (registration.waiting) {
+      registration.waiting.postMessage({ type: "SKIP_WAITING" });
+    }
   });
 });

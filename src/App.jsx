@@ -34,6 +34,7 @@ import { appAlert, appConfirm } from "./shared/AppModal";
 import { canTrashOrder } from "./shared/orderTrash";
 import { SoftBanner, ListSkeleton } from "./shared/uxFeedback";
 import { ManagerContact } from "./screens/client/ManagerContact";
+import { getCloverUiBuildShort } from "./shared/uiBuildLabel";
 
 const ClientScreen = lazy(() =>
   import("./screens/client/ClientScreen").then((m) => ({ default: m.ClientScreen }))
@@ -52,6 +53,7 @@ function LoginView({ onAuth, authBusy, authError }) {
   const params = new URLSearchParams(window.location.search);
   const verifyToken = params.get("verify") || "";
   const resetToken = params.get("reset") || "";
+  const uiBuildShort = useMemo(() => getCloverUiBuildShort(), []);
   const [mode, setMode] = useState(resetToken ? "reset" : "login");
   const [form, setForm] = useState({
     companyName: "",
@@ -93,8 +95,12 @@ function LoginView({ onAuth, authBusy, authError }) {
     body.style.backgroundColor = LOGIN_BG;
     if (themeMeta) themeMeta.setAttribute("content", LOGIN_BG);
 
-    // iOS rubber-band: блокируем свайп страницы (поля ввода и scroll manager-contact не трогаем)
+    // iOS rubber-band: block page swipe, but NEVER while manager-contact sheet is open
+    // (touch-action:none / preventDefault on ancestors kills modal scroll on real devices).
     const blockPageSwipe = (event) => {
+      if (document.documentElement.classList.contains("manager-contact-sheet-open")) {
+        return;
+      }
       const target = event.target;
       if (!(target instanceof Element)) {
         event.preventDefault();
@@ -433,6 +439,9 @@ function LoginView({ onAuth, authBusy, authError }) {
             <button type="button" onClick={() => switchMode("login")}>Вернуться ко входу</button>
           )}
         </div>
+        <p className="clover-build-id" aria-label="Версия интерфейса">
+          Версия: {uiBuildShort}
+        </p>
       </section>
     </main>
   );

@@ -4,6 +4,7 @@ import {
 } from "../../../config/urls.js";
 import { storefrontHref } from "../mode.js";
 import { navigateStorefront } from "../components/StoreHeader.jsx";
+import { getCloverUiBuildShort } from "../../../shared/uiBuildLabel.js";
 
 function Step({ n, title, children }) {
   return (
@@ -32,6 +33,7 @@ function PlatformCard({ title, badge, children }) {
 }
 
 export function InstallAppPage() {
+  const uiBuildShort = getCloverUiBuildShort();
   return (
     <div className="sf-install-page">
       <header className="sf-section-head">
@@ -40,6 +42,9 @@ export function InstallAppPage() {
         <p className="sf-muted sf-install-lead">
           Clover работает как PWA: не нужен App Store или Google Play. Добавьте сайт на
           экран — и откройте личный кабинет одним касанием.
+        </p>
+        <p className="sf-install-build-id" aria-label="Версия интерфейса">
+          Версия: {uiBuildShort}
         </p>
       </header>
 
