@@ -1222,25 +1222,12 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                       </div>
                     )}
                     <h2>{product.name}</h2>
-                    {isList ? (
-                      <p className="product-list-meta">
-                        <span className="product-code">Арт. {productArticle(product)}</span>
-                        <span className="product-price">
-                          {settings.showPrices && price > 0
-                            ? <>{formatMoney(price)} <small>/ {UNIT_CONFIG[unit].shortLabel}</small></>
-                            : "Цена уточняется"}
-                        </span>
-                      </p>
-                    ) : (
-                      <>
-                        <p className="product-code">Арт. {productArticle(product)}</p>
-                        <p className="product-price">
-                          {settings.showPrices && price > 0
-                            ? <>{formatMoney(price)} <small>/ {UNIT_CONFIG[unit].shortLabel}</small></>
-                            : "Цена уточняется"}
-                        </p>
-                      </>
-                    )}
+                    <p className="product-code">Арт. {productArticle(product)}</p>
+                    <p className="product-price">
+                      {settings.showPrices && price > 0
+                        ? <>{formatMoney(price)} <small>/ {UNIT_CONFIG[unit].shortLabel}</small></>
+                        : "Цена уточняется"}
+                    </p>
                     <div className="product-card-controls">
                       <div className={`unit-choice${orderedSaleUnits(product).length === 1 ? " unit-choice-single" : ""}`}>
                         {orderedSaleUnits(product).map((item) => {

@@ -2442,40 +2442,6 @@ textarea { resize: vertical; }
 .product-card-list .product-code {
   display: none;
 }
-/* Client LK list: art + price share one row under the title */
-.page-content-client .product-card-list .product-list-meta,
-.page-content-client .embedded-catalog .product-card-list .product-list-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 10px;
-  grid-column: 1;
-  grid-row: 3;
-  margin: 0;
-  min-width: 0;
-}
-.page-content-client .product-card-list .product-list-meta .product-code,
-.page-content-client .embedded-catalog .product-card-list .product-list-meta .product-code {
-  display: inline;
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.2;
-  color: #6b6f6b;
-  white-space: nowrap;
-}
-.page-content-client .product-card-list .product-list-meta .product-price,
-.page-content-client .embedded-catalog .product-card-list .product-list-meta .product-price {
-  display: inline;
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-.page-content-client .product-card-list .product-card-controls,
-.page-content-client .embedded-catalog .product-card-list .product-card-controls {
-  grid-column: 2;
-  grid-row: 1 / span 3;
-}
 .product-card-list .product-price {
   grid-column: 1;
   grid-row: 3;
@@ -5833,28 +5799,30 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
   }
   .product-grid.product-grid-list {
     grid-template-columns: 1fr !important;
-    gap: 1px !important;
-    align-items: start !important;
+    gap: 2px !important;
+    align-items: stretch !important;
   }
   .product-card.product-card-list {
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0 8px;
-    padding: 2px 6px;
+    gap: 0 6px;
+    padding: 3px 6px;
     height: auto !important;
     min-height: 0 !important;
-    align-items: start;
   }
   .product-card-list .product-card-top {
     display: none;
   }
+  .product-card-list .product-code {
+    display: none !important;
+  }
   .product-card-list .product-card-controls {
     min-width: 0 !important;
-    width: 124px !important;
-    min-width: 124px !important;
-    max-width: 124px !important;
-    gap: 2px;
-    align-self: start;
+    width: 132px !important;
+    min-width: 132px !important;
+    max-width: 132px !important;
+    gap: 4px;
     grid-row: 1 / span 2;
+    align-self: center;
   }
   .product-card-list h2 {
     font-size: 12px;
@@ -5867,32 +5835,12 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     -webkit-line-clamp: unset;
     margin: 0;
   }
-  .page-content-client .product-card-list .product-list-meta,
-  .page-content-client .embedded-catalog .product-card-list .product-list-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0 8px;
+  .product-card-list .product-price {
+    display: block;
+    font-size: 11px;
     grid-column: 1;
     grid-row: 2;
     margin: 0;
-  }
-  .page-content-client .product-card-list .product-list-meta .product-code,
-  .page-content-client .embedded-catalog .product-card-list .product-list-meta .product-code {
-    display: inline;
-    margin: 0;
-    font-size: 11px;
-    line-height: 1.15;
-    color: #6f7b6f;
-  }
-  .page-content-client .product-card-list .product-list-meta .product-price,
-  .page-content-client .embedded-catalog .product-card-list .product-list-meta .product-price,
-  .product-card-list .product-price {
-    display: inline;
-    margin: 0;
-    font-size: 11px;
-    line-height: 1.15;
-    font-weight: 700;
   }
   .page-content-client .product-card:not(.product-card-list) .product-code,
   .page-content-client .embedded-catalog .product-card:not(.product-card-list) .product-code,
@@ -6096,21 +6044,8 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     line-height: 1.2;
     color: #6f7b6f;
   }
-  .page-content-client .product-card-list .product-list-meta .product-code,
-  .page-content-client .embedded-catalog .product-card-list .product-list-meta .product-code {
-    display: inline !important;
-    grid-column: auto;
-    grid-row: auto;
-    margin: 0;
-    font-size: 11px;
-    line-height: 1.15;
-    color: #6f7b6f;
-  }
-  .page-content-client .product-card-list .product-card-controls,
-  .page-content-client .embedded-catalog .product-card-list .product-card-controls {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    align-self: start;
+  .product-card-list .product-code {
+    display: none !important;
   }
   .product-price {
     flex: 0 0 auto;
