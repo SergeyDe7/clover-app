@@ -1059,7 +1059,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
     border: 1px solid rgba(28, 31, 28, 0.08) !important;
     border-radius: 12px !important;
     background: #fff !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     box-shadow: none !important;
   }
   .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) .product-image-wrap {
@@ -1106,46 +1106,51 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
     margin: 4px 8px 8px !important;
     margin-top: auto !important;
   }
+  .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) {
+    overflow: visible !important;
+  }
   .embedded-catalog.client-order-catalog .product-card .unit-choice,
   .embedded-catalog.client-order-catalog .product-card .unit-choice.unit-choice-single {
     height: auto !important;
-    min-height: 36px !important;
+    min-height: 40px !important;
     max-height: none !important;
     gap: 6px !important;
     border: 0 !important;
     background: transparent !important;
     overflow: visible !important;
+    grid-auto-columns: minmax(max-content, 1fr) !important;
   }
   .embedded-catalog.client-order-catalog .product-card .unit-choice button {
-    height: 36px !important;
-    min-height: 36px !important;
+    height: auto !important;
+    min-height: 40px !important;
     max-height: none !important;
-    font-size: 12px !important;
+    font-size: 13px !important;
     line-height: 1.2 !important;
     border: 1px solid #d5dfd2 !important;
     border-radius: 8px !important;
-    padding: 6px 8px !important;
+    padding: 8px 10px !important;
     overflow: visible !important;
     text-overflow: unset !important;
     white-space: nowrap !important;
   }
   .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .quantity-control {
-    height: 48px !important;
-    min-height: 48px !important;
-    max-height: 48px !important;
-    grid-template-columns: 48px minmax(7ch, 1fr) 48px !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
+    grid-template-columns: 56px minmax(7ch, 1fr) 56px !important;
     overflow: visible !important;
   }
   .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .quantity-control > button {
-    width: 48px !important;
-    height: 48px !important;
-    min-width: 48px !important;
-    font-size: 1.45rem !important;
+    width: 56px !important;
+    height: 56px !important;
+    min-width: 56px !important;
+    max-height: none !important;
+    font-size: 1.65rem !important;
   }
   .embedded-catalog.client-order-catalog .product-card:not(.product-card-list) .quantity-input-wrap {
-    height: 48px !important;
-    min-height: 48px !important;
-    max-height: 48px !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
     min-width: 7ch !important;
     overflow: visible !important;
   }
