@@ -1222,7 +1222,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                       </div>
                     )}
                     <h2>{product.name}</h2>
-                    <p className="product-code">Код: {productArticle(product)}</p>
+                    <p className="product-code">Арт. {productArticle(product)}</p>
                     <p className="product-price">
                       {settings.showPrices && price > 0
                         ? <>{formatMoney(price)} <small>/ {UNIT_CONFIG[unit].shortLabel}</small></>

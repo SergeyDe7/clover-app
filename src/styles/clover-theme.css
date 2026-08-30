@@ -2844,6 +2844,22 @@ body:has(.clover-app) {
 .clover-app .product-card:not(.product-card-list) .product-code {
   display: none !important;
 }
+/* Client LK catalog: show article on grid cards (parity with storefront). */
+.clover-app .page-content-client .product-card:not(.product-card-list) .product-code,
+.clover-app .page-content-client .embedded-catalog .product-card:not(.product-card-list) .product-code {
+  display: block !important;
+  flex: 0 0 auto !important;
+  margin: 0 8px 4px !important;
+  padding: 0 !important;
+  font-size: 0.68rem !important;
+  line-height: 1.2 !important;
+  color: #6b6f6b !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
 .clover-app .client-catalog-add-panel .client-matrix-card .product-code {
   display: block !important;
 }
@@ -5593,7 +5609,18 @@ body:has(.clover-app) {
 
   .clover-app .page-content-client .product-grid:not(.product-grid-list) .product-code,
   .clover-app .page-content-client .embedded-catalog .product-grid:not(.product-grid-list) .product-code {
-    display: none !important;
+    display: block !important;
+    flex: 0 0 auto !important;
+    margin: 2px 8px 0 !important;
+    padding: 0 !important;
+    font-size: 0.68rem !important;
+    line-height: 1.2 !important;
+    color: #6b6f6b !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 
   .clover-app .page-content-client .product-grid:not(.product-grid-list) h2,
