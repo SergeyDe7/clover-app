@@ -3873,13 +3873,17 @@ html.clover-thankyou-open .app-top-chrome {
     "actions";
 }
 .client-matrix-panel .client-matrix-card {
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
   grid-template-areas:
+    "top"
     "photo"
     "title"
     "code"
     "price"
     "actions";
+}
+.client-matrix-panel .client-matrix-card .product-card-top {
+  grid-area: top;
 }
 .client-catalog-add-panel .client-matrix-card,
 .client-matrix-panel .client-matrix-card {
@@ -3916,6 +3920,7 @@ html.clover-thankyou-open .app-top-chrome {
   grid-area: code;
   display: block;
   margin: 0 0 2px;
+  padding: 0;
   font-size: 11px;
   line-height: 1.2;
   color: #6f7b6f;
@@ -3969,7 +3974,7 @@ html.clover-thankyou-open .app-top-chrome {
   border-radius: 12px;
 }
 .client-matrix-panel .client-matrix-card {
-  padding: 0 8px 8px;
+  padding: 0 6px 6px;
   border-radius: 14px;
 }
 .client-catalog-add-panel .client-matrix-card .product-card-controls .primary-button,
