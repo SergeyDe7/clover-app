@@ -84,6 +84,7 @@ function ClientDashboard({
   onSaveOrder,
   onCloseCatalog,
   onAddToMatrix,
+  onRemoveFromMatrix,
   canCreateOrder,
   profileComplete,
 }) {
@@ -113,14 +114,11 @@ function ClientDashboard({
     writeClientCabinetSection(id);
   };
 
-  const openOrders = () => {
-    setTab("orders");
-    writeClientActiveTab("orders");
-  };
-
   const finishOrderThankYou = () => {
     setThankYouOpen(false);
-    openOrders();
+    setTab("matrix");
+    writeClientActiveTab("matrix");
+    onNew?.({ silent: true });
   };
 
   const selectTab = (id) => {
@@ -141,11 +139,15 @@ function ClientDashboard({
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    const prevTheme = themeMeta?.getAttribute("content") || "";
     html.classList.add("clover-client-lk");
     body.classList.add("clover-client-lk");
+    if (themeMeta) themeMeta.setAttribute("content", "#ffffff");
     return () => {
       html.classList.remove("clover-client-lk");
       body.classList.remove("clover-client-lk");
+      if (themeMeta) themeMeta.setAttribute("content", prevTheme || "#ffffff");
     };
   }, []);
 
@@ -244,6 +246,16 @@ function ClientDashboard({
     setMatrixAddBusyId(product.id);
     try {
       await onAddToMatrix(product.id);
+    } finally {
+      setMatrixAddBusyId("");
+    }
+  };
+
+  const removeProductFromMatrix = async (product) => {
+    if (!product?.id || !onRemoveFromMatrix) return;
+    setMatrixAddBusyId(product.id);
+    try {
+      await onRemoveFromMatrix(product.id);
     } finally {
       setMatrixAddBusyId("");
     }
@@ -623,6 +635,7 @@ function ClientDashboard({
             settings={settings}
             busyId={matrixAddBusyId}
             onAdd={addProductToMatrix}
+            onRemove={removeProductFromMatrix}
           />
         )}
 
@@ -637,7 +650,11 @@ function ClientDashboard({
 
         {tab === "cabinet" && (isNarrow ? cabinetMobile : cabinetDesktop)}
       </section>
-      <OrderThankYouOverlay open={thankYouOpen} onDone={finishOrderThankYou} />
+      <OrderThankYouOverlay
+        open={thankYouOpen}
+        onDone={finishOrderThankYou}
+        confirmLabel="На главную"
+      />
     </main>
   );
 }

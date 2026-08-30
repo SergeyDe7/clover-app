@@ -13,11 +13,21 @@
     <meta name="apple-mobile-web-app-title" content="Clover" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <script>
+      /* Soft storefront→LK navigation may still full-reload cross-origin; skip splash once. */
+      (function () {
+        try {
+          if (sessionStorage.getItem("clover-skip-boot-splash") === "1") {
+            sessionStorage.removeItem("clover-skip-boot-splash");
+            document.documentElement.classList.add("clover-skip-boot-splash");
+          }
+        } catch (e) {}
+      })();
+    </script>
     <!-- Self-hosted Manrope (без Google Fonts) -->
     <link rel="preload" href="/fonts/manrope-cyrillic-700-normal.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/manrope-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/fonts/manrope.css" />
-    <link rel="preload" as="image" href="/storefront/hero-horeca.png" fetchpriority="high" />
     <title>Хозтовары, упаковка и химия для HoReCa | КЛЕВЕР</title>
     <meta
       name="description"
@@ -52,54 +62,7 @@
       }
     </script>
     <meta name="clover-ui-build" content="%CLOVER_UI_BUILD%" />
-    <script>
-      (function () {
-        var meta = document.querySelector('meta[name="clover-ui-build"]');
-        var BUILD = meta && meta.getAttribute("content");
-        if (!BUILD || BUILD.indexOf("%CLOVER_UI_BUILD%") >= 0) BUILD = "ui-dev";
-        try {
-          var prev = localStorage.getItem("clover-ui-build");
-          if (prev === BUILD) return;
-          if (sessionStorage.getItem("clover-ui-reloading") === BUILD) {
-            localStorage.setItem("clover-ui-build", BUILD);
-            sessionStorage.removeItem("clover-ui-reloading");
-            return;
-          }
-          if (!prev) {
-            localStorage.setItem("clover-ui-build", BUILD);
-            return;
-          }
-          var finished = false;
-          function finish() {
-            if (finished) return;
-            finished = true;
-            sessionStorage.setItem("clover-ui-reloading", BUILD);
-            location.reload();
-          }
-          var tasks = [];
-          if (navigator.serviceWorker) {
-            tasks.push(
-              navigator.serviceWorker.getRegistrations().then(function (regs) {
-                return Promise.all(regs.map(function (reg) { return reg.unregister(); }));
-              })
-            );
-          }
-          if (window.caches && caches.keys) {
-            tasks.push(
-              caches.keys().then(function (keys) {
-                return Promise.all(keys.map(function (key) { return caches.delete(key); }));
-              })
-            );
-          }
-          if (tasks.length) {
-            Promise.all(tasks).then(finish, finish);
-            setTimeout(finish, 800);
-          } else {
-            finish();
-          }
-        } catch (e) {}
-      })();
-    </script>
+    <!-- Build/SW update: single source in main.jsx (max one reload on version change). -->
     <style>
       html, body {
         margin: 0;
@@ -151,6 +114,9 @@
       }
       @media (max-width: 900px), (display-mode: standalone), (display-mode: fullscreen) {
         #clover-boot-splash { display: grid; }
+      }
+      html.clover-skip-boot-splash #clover-boot-splash {
+        display: none !important;
       }
       @media (prefers-reduced-motion: reduce) {
         #clover-boot-splash img { animation: none; }

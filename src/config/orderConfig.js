@@ -65,3 +65,16 @@ export function canCancelOneCTransfer(exchange = {}) {
   const status = String(exchange?.status || "not_sent").trim();
   return status === "ready" || status === "sending";
 }
+
+/** Порог бесплатной доставки по СПб (руб.) — только для UI-условий в ЛК. */
+export const FREE_DELIVERY_MIN_TOTAL = 5000;
+
+/** Справочная стоимость доставки по СПб ниже порога (руб.) — только UI. */
+export const PAID_DELIVERY_FEE = 500;
+
+/** 0 = бесплатно (сумма ≥ порога), иначе платная. Не материализует линию заказа на baseline. */
+export function getSpbDeliveryFee(orderTotal) {
+  const amount = Number(orderTotal) || 0;
+  if (amount <= 0) return PAID_DELIVERY_FEE;
+  return amount >= FREE_DELIVERY_MIN_TOTAL ? 0 : PAID_DELIVERY_FEE;
+}

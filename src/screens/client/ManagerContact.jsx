@@ -46,6 +46,7 @@ function ContactBody({ fullName, phoneLinks, phoneValue, hasAnyContact, maxLink,
 export function ManagerContact({ settings, variant = "popover" }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
+  const scrollRef = useRef(null);
   const fullName = String(settings.managerFullName || "").trim();
   const phoneValue = formatRussianPhone(settings.managerPhone || "");
   const phoneLinks = getManagerPhoneLinks(settings.managerPhone);
@@ -61,6 +62,19 @@ export function ManagerContact({ settings, variant = "popover" }) {
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open, inline]);
+
+  // Prevent body from eating touch while sheet is open (keeps pan-y on scroll body).
+  useEffect(() => {
+    if (!open || inline) return;
+    const prevHtml = document.documentElement.style.overflow;
+    const prevBody = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+    };
   }, [open, inline]);
 
   const body = (
@@ -97,12 +111,21 @@ export function ManagerContact({ settings, variant = "popover" }) {
     );
   }
 
+  const canHover =
+    typeof window !== "undefined" &&
+    window.matchMedia &&
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
   return (
     <div
       ref={rootRef}
       className={open ? "manager-contact open" : "manager-contact"}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={() => {
+        if (canHover) setOpen(true);
+      }}
+      onMouseLeave={() => {
+        if (canHover) setOpen(false);
+      }}
       onKeyDown={(event) => {
         if (event.key === "Escape") setOpen(false);
       }}
@@ -116,7 +139,38 @@ export function ManagerContact({ settings, variant = "popover" }) {
         <span className="manager-contact-label-full">Связаться с менеджером</span>
         <span className="manager-contact-label-short">Менеджер</span>
       </button>
-      <div className="manager-contact-popover">{body}</div>
+      {open ? (
+        <button
+          type="button"
+          className="manager-contact-backdrop"
+          aria-label="Закрыть"
+          onClick={() => setOpen(false)}
+        />
+      ) : null}
+      <div
+        className="manager-contact-popover"
+        role="dialog"
+        aria-label="Связаться с менеджером"
+        aria-hidden={!open}
+      >
+        <div className="manager-contact-popover-head">
+          <button
+            type="button"
+            className="manager-contact-close"
+            aria-label="Закрыть"
+            onClick={() => setOpen(false)}
+          >
+            ×
+          </button>
+        </div>
+        <div
+          className="manager-contact-popover-scroll"
+          data-manager-contact-scroll="1"
+          ref={scrollRef}
+        >
+          {body}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { StoreHeader } from "./components/StoreHeader.jsx";
 import { parseStorefrontRoute } from "./mode.js";
+import { isCabinetPath } from "../../config/urls.js";
 import { HomePage } from "./pages/HomePage.jsx";
 import {
   applyStorefrontDocumentMeta,
@@ -22,6 +23,11 @@ const CheckoutPage = lazy(() =>
 );
 const ContactsPage = lazy(() =>
   import("./pages/ContactsPage.jsx").then((m) => ({ default: m.ContactsPage }))
+);
+const InstallAppPage = lazy(() =>
+  import("./pages/InstallAppPage.jsx").then((m) => ({
+    default: m.InstallAppPage,
+  }))
 );
 
 export default function StorefrontApp() {
@@ -48,6 +54,13 @@ export default function StorefrontApp() {
       window.removeEventListener("popstate", onPop);
       document.body.classList.remove("sf-body");
       document.documentElement.classList.remove("sf-root");
+      // Leaving to /lk via SPA: keep LK shell color (do not restore storefront beige).
+      if (isCabinetPath(window.location.pathname)) {
+        if (themeMeta) themeMeta.setAttribute("content", "#f4f8f2");
+        document.documentElement.style.backgroundColor = "#f4f8f2";
+        document.body.style.backgroundColor = "#f4f8f2";
+        return;
+      }
       if (themeMeta) themeMeta.setAttribute("content", previousTheme || "#f4f8f2");
       document.documentElement.style.backgroundColor = previousHtmlBg;
       document.body.style.backgroundColor = previousBodyBg;
@@ -92,6 +105,9 @@ export default function StorefrontApp() {
   } else if (route.name === "contacts") {
     page = <ContactsPage />;
     current = "contacts";
+  } else if (route.name === "install-app") {
+    page = <InstallAppPage />;
+    current = "home";
   } else {
     page = <HomePage />;
   }

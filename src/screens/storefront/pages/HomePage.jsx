@@ -15,33 +15,39 @@ export function HomePage() {
   const [hero, setHero] = useState({
     title: "",
     lead: "",
-    slides: STOREFRONT_DEFAULT_HERO_SLIDES,
+    // null until API: avoid starting 2.2MB default PNG before real first slide.
+    slides: null,
     intervalSec: STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
   });
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    // Lightweight /api/public/site (hero settings) — not full catalog (~1.5MB).
     storefrontApi
-      .catalog()
+      .site()
       .then((payload) => {
         if (cancelled) return;
+        const site = payload?.site || {};
         setHero({
-          title: payload?.site?.heroTitle || "",
-          lead: payload?.site?.heroLead || "",
+          title: site.heroTitle || "",
+          lead: site.heroLead || "",
           slides:
-            Array.isArray(payload?.site?.heroSlides) &&
-            payload.site.heroSlides.length
-              ? payload.site.heroSlides
+            Array.isArray(site.heroSlides) && site.heroSlides.length
+              ? site.heroSlides
               : STOREFRONT_DEFAULT_HERO_SLIDES,
           intervalSec:
-            payload?.site?.heroIntervalSec || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
+            site.heroIntervalSec || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
         });
         setReady(true);
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err.message || "Не удалось загрузить каталог.");
+          setError(err.message || "Не удалось загрузить витрину.");
+          setHero((prev) => ({
+            ...prev,
+            slides: STOREFRONT_DEFAULT_HERO_SLIDES,
+          }));
           setReady(true);
         }
       });
@@ -62,7 +68,11 @@ export function HomePage() {
             {hero.lead || STOREFRONT_HERO_LEAD}
           </p>
         </div>
-        <HeroSlides slides={hero.slides} intervalSec={hero.intervalSec} />
+        {Array.isArray(hero.slides) ? (
+          <HeroSlides slides={hero.slides} intervalSec={hero.intervalSec} />
+        ) : (
+          <div className="sf-hero-visual" aria-hidden="true" />
+        )}
       </section>
 
       <section className="sf-section sf-groups-section">

@@ -13,8 +13,10 @@ echo "UI build tag: ${BUILD_TAG:-unknown}"
 echo "UI bundle: ${MAIN_JS:-unknown}"
 
 echo "Stopping API/UI processes (all duplicates, not only port holders)..."
-# Старые npm/vite часто остаются без порта — из‑за них «не применилось».
+# Процессы стартуют как `node src/server.js` (cwd=server) — полный путь в cmdline часто нет.
 pkill -f '/opt/clover/clover-app/server/src/server.js' 2>/dev/null || true
+pkill -f '/usr/bin/node src/server.js' 2>/dev/null || true
+pkill -f 'node src/server.js' 2>/dev/null || true
 pkill -f 'vite preview --host 0.0.0.0 --port 5273' 2>/dev/null || true
 pkill -f 'npm run preview -- --host 0.0.0.0 --port 5273' 2>/dev/null || true
 sleep 1
@@ -25,6 +27,14 @@ for port in 4100 5273; do
     kill -9 "$pid" 2>/dev/null || true
   done
 done
+# Добиваем осиротевшие API без listen (иначе копятся десятки node src/server.js).
+sleep 1
+leftover="$(pgrep -f 'node src/server.js' || true)"
+if [[ -n "${leftover:-}" ]]; then
+  echo "kill leftover API pids: $leftover"
+  # shellcheck disable=SC2086
+  kill -9 $leftover 2>/dev/null || true
+fi
 sleep 1
 ss -tlnp | grep -E ':4100|:5273' && echo "WARN: ports still busy" >&2 || echo "ports free"
 

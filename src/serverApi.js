@@ -1,6 +1,9 @@
 import { stripProductForSave } from "./shared/appHelpers";
 
 const TOKEN_KEY = "clover-api-token";
+const DEFAULT_TIMEOUT_MS = 20000;
+const AUTH_TIMEOUT_MS = 12000;
+const BOOTSTRAP_TIMEOUT_MS = 25000;
 
 export function getApiToken() {
   return localStorage.getItem(TOKEN_KEY) || "";
@@ -14,11 +17,39 @@ export function clearApiToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+function withTimeoutSignal(timeoutMs, userSignal) {
+  const controller = new AbortController();
+  const ms = Number(timeoutMs);
+  const timer =
+    Number.isFinite(ms) && ms > 0
+      ? setTimeout(() => controller.abort(), ms)
+      : null;
+  if (userSignal) {
+    if (userSignal.aborted) controller.abort();
+    else {
+      userSignal.addEventListener("abort", () => controller.abort(), {
+        once: true,
+      });
+    }
+  }
+  return {
+    signal: controller.signal,
+    clear: () => {
+      if (timer) clearTimeout(timer);
+    },
+  };
+}
+
 async function request(path, options = {}) {
   const token = getApiToken();
   const headers = new Headers(options.headers || {});
+  const {
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    signal: userSignal,
+    ...fetchOptions
+  } = options;
 
-  if (options.body && !(options.body instanceof FormData)) {
+  if (fetchOptions.body && !(fetchOptions.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -26,25 +57,35 @@ async function request(path, options = {}) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
+  const timed = withTimeoutSignal(timeoutMs, userSignal);
   let response;
 
   try {
     response = await fetch(`/api${path}`, {
-      ...options,
+      ...fetchOptions,
       headers,
+      signal: timed.signal,
       body:
-        options.body &&
-        !(options.body instanceof FormData) &&
-        typeof options.body !== "string"
-          ? JSON.stringify(options.body)
-          : options.body,
+        fetchOptions.body &&
+        !(fetchOptions.body instanceof FormData) &&
+        typeof fetchOptions.body !== "string"
+          ? JSON.stringify(fetchOptions.body)
+          : fetchOptions.body,
     });
-  } catch {
+  } catch (err) {
+    const aborted =
+      err?.name === "AbortError" ||
+      (typeof DOMException !== "undefined" && err instanceof DOMException && err.name === "AbortError");
     const error = new Error(
-      "Не удалось связаться с сервером. Проверьте интернет и попробуйте снова."
+      aborted
+        ? "Сервер временно недоступен. Попробуйте ещё раз."
+        : "Не удалось связаться с сервером. Проверьте интернет и попробуйте снова."
     );
     error.status = 0;
+    error.code = aborted ? "TIMEOUT" : "NETWORK";
     throw error;
+  } finally {
+    timed.clear();
   }
 
   let payload = {};
@@ -121,6 +162,7 @@ export const api = {
     return request("/auth/register", {
       method: "POST",
       body: data,
+      timeoutMs: AUTH_TIMEOUT_MS,
     });
   },
 
@@ -128,6 +170,7 @@ export const api = {
     return request("/auth/login", {
       method: "POST",
       body: data,
+      timeoutMs: AUTH_TIMEOUT_MS,
     });
   },
 
@@ -240,7 +283,7 @@ export const api = {
   },
 
   bootstrap() {
-    return request("/bootstrap");
+    return request("/bootstrap", { timeoutMs: BOOTSTRAP_TIMEOUT_MS });
   },
 
   saveOrders(orders) {

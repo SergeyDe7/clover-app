@@ -5,7 +5,7 @@
   "start_url": "/lk/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#d2e8cb",
+  "background_color": "#f4f8f2",
   "theme_color": "#f4f8f2",
   "lang": "ru",
   "icons": [

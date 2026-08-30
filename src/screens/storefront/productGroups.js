@@ -3,6 +3,8 @@
  * children: [] — у группы нет подгрупп, товары показываем сразу.
  * Порядок: сначала с подкатегориями, затем без; «Прочее» всегда последняя.
  */
+import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
+
 export const CLOVER_PRODUCT_GROUPS = [
   "Одноразовая посуда",
   "Хозяйственные товары",
@@ -352,7 +354,7 @@ export function groupProductsByCloverGroup(products) {
   }
   return sortCloverProductGroups([...map.keys()]).map((name) => ({
     name,
-    products: map.get(name) || [],
+    products: sortProductsWithLidsGrouped(map.get(name) || []),
     count: (map.get(name) || []).length,
     ...getGroupMeta(name),
   }));

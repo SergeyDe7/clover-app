@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
-import { addToCart, snapCartQty } from "../cartStorage.js";
+import { addToCart } from "../cartStorage.js";
 import { formatMoney, navigateStorefront } from "../components/StoreHeader.jsx";
-import { getUnitOrderStep } from "../../../shared/appHelpers.js";
+import {
+  fromQuantityInputValue,
+  getUnitMultiplier,
+  getUnitOrderStep,
+  orderedSaleUnits,
+  quantityInputStep,
+  toQuantityInputValue,
+} from "../../../shared/appHelpers.js";
 import { applyStorefrontDocumentMeta } from "../seo.js";
 import { storefrontHref } from "../mode.js";
-
-const UNIT_LABEL = {
-  piece: "шт",
-  pair: "пара",
-  meter: "м",
-  roll: "рулон",
-  pack: "уп",
-  bundle: "пачка",
-  box: "кор",
-};
+import {
+  StorefrontUnitChoice,
+  storefrontUnitLabel,
+} from "../components/StorefrontUnitChoice.jsx";
 
 export function ProductPage({ code }) {
   const [product, setProduct] = useState(null);
@@ -32,7 +33,7 @@ export function ProductPage({ code }) {
         if (cancelled) return;
         const next = payload.product;
         setProduct(next);
-        const units = Array.isArray(next?.saleUnits) ? next.saleUnits : ["piece"];
+        const units = orderedSaleUnits(next);
         const nextUnit = units[0] || "piece";
         setUnit(nextUnit);
         setQty(getUnitOrderStep(next, nextUnit));
@@ -58,10 +59,19 @@ export function ProductPage({ code }) {
   }, [product, code]);
 
   const units = useMemo(
-    () => (Array.isArray(product?.saleUnits) ? product.saleUnits : ["piece"]),
+    () => (product ? orderedSaleUnits(product) : ["piece"]),
     [product]
   );
   const orderStep = getUnitOrderStep(product, unit);
+  const unitSize = getUnitMultiplier(product, unit);
+  const inputStep = quantityInputStep(unitSize, orderStep);
+  const displayQty = toQuantityInputValue(qty, unitSize);
+  const qtyHint =
+    unitSize > 1
+      ? `В ${storefrontUnitLabel(unit)}: ${unitSize} шт`
+      : orderStep > 1
+        ? `кратно ${orderStep}`
+        : "";
   const price = Number(product?.prices?.[unit]) || 0;
   const details = product?.details || {};
 
@@ -112,46 +122,44 @@ export function ProductPage({ code }) {
 
           <div className="sf-price-block">
             <strong>{price > 0 ? formatMoney(price) : "Цена по запросу"}</strong>
-            {price > 0 ? (
-              <span className="sf-unit"> / {UNIT_LABEL[unit] || unit}</span>
-            ) : null}
+            <span className="sf-unit"> / {storefrontUnitLabel(unit)}</span>
           </div>
 
           <div className="sf-buy-row">
-            <label className="sf-field">
-              <span>Единица</span>
-              <select
-                className="sf-input"
-                value={unit}
-                onChange={(e) => {
-                  const nextUnit = e.target.value;
-                  setUnit(nextUnit);
-                  setQty(getUnitOrderStep(product, nextUnit));
-                }}
-              >
-                {units.map((item) => (
-                  <option key={item} value={item}>
-                    {UNIT_LABEL[item] || item}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {units.length > 1 ? (
+              <div className="sf-field sf-field-units">
+                <span>Единица</span>
+                <StorefrontUnitChoice
+                  product={product}
+                  unit={unit}
+                  onChange={(nextUnit) => {
+                    setUnit(nextUnit);
+                    setQty(getUnitOrderStep(product, nextUnit));
+                  }}
+                />
+              </div>
+            ) : null}
             <label className="sf-field">
               <span>
                 Количество
-                {orderStep > 1 ? ` (кратно ${orderStep})` : ""}
+                {qtyHint ? ` (${qtyHint})` : ""}
+                {unitSize > 1 ? `, шт` : ` · ${storefrontUnitLabel(unit)}`}
               </span>
               <input
                 className="sf-input"
                 type="number"
-                min={orderStep}
-                step={orderStep}
-                value={qty}
+                min={inputStep}
+                step={inputStep}
+                value={displayQty}
                 onChange={(e) =>
                   setQty(
-                    snapCartQty(
-                      Math.floor(Number(e.target.value) || orderStep),
-                      orderStep
+                    Math.max(
+                      orderStep,
+                      fromQuantityInputValue(
+                        e.target.value,
+                        unitSize,
+                        orderStep
+                      ) || orderStep
                     )
                   )
                 }
@@ -167,10 +175,11 @@ export function ProductPage({ code }) {
                     code: product.code,
                     name: product.name,
                     unit,
-                    unitLabel: UNIT_LABEL[unit] || unit,
+                    unitLabel: storefrontUnitLabel(unit),
                     price,
                     imageUrl: product.imageUrl,
                     orderStep,
+                    unitSize,
                   },
                   qty
                 );

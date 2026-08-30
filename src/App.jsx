@@ -42,6 +42,12 @@ const ManagerScreen = lazy(() =>
   import("./screens/manager/ManagerScreen").then((m) => ({ default: m.ManagerScreen }))
 );
 
+/** Prefetch cabinet chunks so login → LK is not blocked on JS download. */
+function prefetchCabinetScreens() {
+  void import("./screens/client/ClientScreen");
+  void import("./screens/manager/ManagerScreen");
+}
+
 function LoginView({ onAuth, authBusy, authError }) {
   const params = new URLSearchParams(window.location.search);
   const verifyToken = params.get("verify") || "";
@@ -125,6 +131,10 @@ function LoginView({ onAuth, authBusy, authError }) {
       />
     </svg>
   );
+
+  useEffect(() => {
+    prefetchCabinetScreens();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1045,6 +1055,8 @@ function App() {
   const handleAuth = async (form) => {
     setAuthBusy(true);
     setAuthError("");
+    // Overlap cabinet JS download with login + bootstrap (was sequential after hydrate).
+    prefetchCabinetScreens();
 
     try {
       const result =
@@ -1076,61 +1088,67 @@ function App() {
       setIsLoggedIn(true);
       setLoading(true);
 
-      const oldProfile = safeRead(STORAGE.profile, EMPTY_PROFILE);
-      const oldAddresses = safeRead(STORAGE.addresses, []);
-      const oldFavorites = safeRead(STORAGE.favorites, []);
-      const oldOrders = safeRead(STORAGE.orders, []);
-      const oldProducts = safeRead(STORAGE.products, []);
-      const oldSettings = safeRead(STORAGE.settings, null);
-      const oldClientLinks = safeRead(STORAGE.clientLinks, null);
-
-      if (
-        result.user.role === "client" &&
-        !localStorage.getItem(
-          `clover-server-migrated-client-${result.user.id}`
-        ) &&
-        (
-          Object.values(oldProfile).some(Boolean) ||
-          oldAddresses.length ||
-          oldOrders.length
-        )
-      ) {
-        // Пустые адреса из localStorage не отправляем — сервер сохранит свои.
-        await api.migrateClient({
-          profile: oldProfile,
-          addresses: oldAddresses.length ? oldAddresses : undefined,
-          favorites: oldFavorites,
-          orders: oldOrders,
-        });
-
-        localStorage.setItem(
-          `clover-server-migrated-client-${result.user.id}`,
-          "1"
-        );
-      }
-
-      if (
-        (result.user.role === "manager" || result.user.role === "admin") &&
-        !localStorage.getItem("clover-server-migrated-manager") &&
-        (
-          oldProducts.length ||
-          oldSettings ||
-          oldClientLinks
-        )
-      ) {
-        await api.migrateManager({
-          products: oldProducts,
-          settings: oldSettings,
-          clientLinks: oldClientLinks,
-        });
-
-        localStorage.setItem(
-          "clover-server-migrated-manager",
-          "1"
-        );
-      }
+      // Critical path: bootstrap then show LK.
+      // One-time local→server migrate is non-critical — run after first cabinet paint.
+      const pendingMigrate = {
+        user: result.user,
+        profile: safeRead(STORAGE.profile, EMPTY_PROFILE),
+        addresses: safeRead(STORAGE.addresses, []),
+        favorites: safeRead(STORAGE.favorites, []),
+        orders: safeRead(STORAGE.orders, []),
+        products: safeRead(STORAGE.products, []),
+        settings: safeRead(STORAGE.settings, null),
+        clientLinks: safeRead(STORAGE.clientLinks, null),
+      };
 
       await loadBootstrap();
+
+      void (async () => {
+        try {
+          const user = pendingMigrate.user;
+          if (
+            user.role === "client" &&
+            !localStorage.getItem(`clover-server-migrated-client-${user.id}`) &&
+            (
+              Object.values(pendingMigrate.profile).some(Boolean) ||
+              pendingMigrate.addresses.length ||
+              pendingMigrate.orders.length
+            )
+          ) {
+            await api.migrateClient({
+              profile: pendingMigrate.profile,
+              addresses: pendingMigrate.addresses.length
+                ? pendingMigrate.addresses
+                : undefined,
+              favorites: pendingMigrate.favorites,
+              orders: pendingMigrate.orders,
+            });
+            localStorage.setItem(`clover-server-migrated-client-${user.id}`, "1");
+            await loadBootstrap({ silent: true });
+          }
+
+          if (
+            (user.role === "manager" || user.role === "admin") &&
+            !localStorage.getItem("clover-server-migrated-manager") &&
+            (
+              pendingMigrate.products.length ||
+              pendingMigrate.settings ||
+              pendingMigrate.clientLinks
+            )
+          ) {
+            await api.migrateManager({
+              products: pendingMigrate.products,
+              settings: pendingMigrate.settings,
+              clientLinks: pendingMigrate.clientLinks,
+            });
+            localStorage.setItem("clover-server-migrated-manager", "1");
+            await loadBootstrap({ silent: true });
+          }
+        } catch {
+          // Migration is best-effort; login already succeeded.
+        }
+      })();
+
       return result;
     } catch (error) {
       clearApiToken();

@@ -1,18 +1,24 @@
 import { useEffect, useState } from "react";
 import {
-  cartTotal,
+  cartDeliveryFee,
+  cartGoodsTotal,
+  cartGrandTotal,
   clearCart,
+  FREE_DELIVERY_MIN_TOTAL,
   getCartItems,
+  PAID_DELIVERY_FEE,
   removeFromCart,
-  setCartQty,
   subscribeCart,
 } from "../cartStorage.js";
 import { formatMoney, navigateStorefront } from "../components/StoreHeader.jsx";
+import { StorefrontCartQtyControl } from "../components/StorefrontQtyControl.jsx";
 
 export function CartPage() {
   const [items, setItems] = useState(getCartItems);
   useEffect(() => subscribeCart(() => setItems(getCartItems())), []);
-  const total = cartTotal(items);
+  const goodsTotal = cartGoodsTotal(items);
+  const deliveryFee = cartDeliveryFee(items);
+  const grandTotal = cartGrandTotal(items);
 
   if (!items.length) {
     return (
@@ -56,42 +62,60 @@ export function CartPage() {
               <strong>{item.name}</strong>
               <p className="sf-muted">
                 Арт. {item.code} · {item.unitLabel || item.unit}
+                {Number(item.unitSize) > 1
+                  ? ` · по ${Number(item.unitSize)} шт`
+                  : ""}
               </p>
-              <p>{formatMoney(item.price)}</p>
             </div>
+            <div className="sf-cart-unit-price">{formatMoney(item.price)}</div>
             <div className="sf-cart-qty">
-              <input
-                className="sf-input"
-                type="number"
-                min={Math.max(1, Number(item.orderStep) || 1)}
-                step={Math.max(1, Number(item.orderStep) || 1)}
-                value={item.qty}
-                onChange={(e) =>
-                  setCartQty(
-                    item.productId,
-                    item.unit,
-                    Math.floor(Number(e.target.value) || 0)
-                  )
-                }
-              />
-              <button
-                type="button"
-                className="sf-btn sf-btn-ghost sf-btn-sm"
-                onClick={() => removeFromCart(item.productId, item.unit)}
-              >
-                Удалить
-              </button>
+              <StorefrontCartQtyControl item={item} />
             </div>
             <strong className="sf-cart-line-total">
               {formatMoney((Number(item.price) || 0) * (Number(item.qty) || 0))}
             </strong>
+            <button
+              type="button"
+              className="sf-cart-remove sf-btn sf-btn-ghost sf-btn-sm"
+              aria-label={`Удалить ${item.name}`}
+              onClick={() => removeFromCart(item.productId, item.unit)}
+            >
+              <span className="sf-cart-remove-label">Удалить</span>
+              <span className="sf-cart-remove-icon" aria-hidden="true">
+                ×
+              </span>
+            </button>
           </li>
         ))}
+        {deliveryFee > 0 ? (
+          <li className="sf-cart-item sf-cart-item--delivery">
+            <div className="sf-cart-meta">
+              <strong>Доставка</strong>
+              <p className="sf-muted">
+                По СПб · заказ менее {formatMoney(FREE_DELIVERY_MIN_TOTAL)}
+              </p>
+            </div>
+            <strong className="sf-cart-line-total">
+              {formatMoney(PAID_DELIVERY_FEE)}
+            </strong>
+          </li>
+        ) : null}
       </ul>
       <div className="sf-cart-summary">
         <div>
+          {goodsTotal > 0 ? (
+            <p
+              className={`sf-delivery-note${
+                deliveryFee > 0 ? " is-paid" : " is-free"
+              }`}
+            >
+              {deliveryFee > 0
+                ? `Доставка ${formatMoney(PAID_DELIVERY_FEE)}. До бесплатной ещё ${formatMoney(FREE_DELIVERY_MIN_TOTAL - goodsTotal)}.`
+                : "Доставка по Санкт-Петербургу — бесплатно (заказ от 5000 ₽)."}
+            </p>
+          ) : null}
           <p className="sf-muted">Итого</p>
-          <strong className="sf-cart-total">{formatMoney(total)}</strong>
+          <strong className="sf-cart-total">{formatMoney(grandTotal)}</strong>
         </div>
         <div className="sf-cart-actions">
           <button

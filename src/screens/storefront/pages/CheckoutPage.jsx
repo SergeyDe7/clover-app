@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import {
-  cartTotal,
+  cartDeliveryFee,
+  cartGoodsTotal,
+  cartGrandTotal,
   clearCart,
+  FREE_DELIVERY_MIN_TOTAL,
   getCartItems,
+  PAID_DELIVERY_FEE,
   subscribeCart,
 } from "../cartStorage.js";
 import { storefrontApi } from "../publicApi.js";
@@ -61,7 +65,9 @@ export function CheckoutPage() {
     );
   }
 
-  const total = cartTotal(items);
+  const goodsTotal = cartGoodsTotal(items);
+  const deliveryFee = cartDeliveryFee(items);
+  const grandTotal = cartGrandTotal(items);
 
   async function onSubmit(event) {
     event.preventDefault();
@@ -154,8 +160,19 @@ export function CheckoutPage() {
         </label>
         <div className="sf-checkout-summary sf-field-wide">
           <p>
-            Позиций: {items.length} · ориентир:{" "}
-            <strong>{formatMoney(total)}</strong>
+            Товары: {items.length} поз. · {formatMoney(goodsTotal)}
+          </p>
+          <p
+            className={`sf-delivery-note${
+              deliveryFee > 0 ? " is-paid" : " is-free"
+            }`}
+          >
+            {deliveryFee > 0
+              ? `Доставка по СПб — ${formatMoney(PAID_DELIVERY_FEE)} (заказ менее ${formatMoney(FREE_DELIVERY_MIN_TOTAL)})`
+              : "Доставка по СПб — бесплатно"}
+          </p>
+          <p>
+            Итого: <strong>{formatMoney(grandTotal)}</strong>
           </p>
           <p className="sf-muted">
             Заказ уйдёт менеджеру и может быть передан в 1С из ЛК.

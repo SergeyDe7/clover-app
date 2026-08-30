@@ -57,6 +57,7 @@ export function parseStorefrontRoute(pathname = window.location.pathname) {
   if (parts[0] === "cart") return { name: "cart" };
   if (parts[0] === "checkout") return { name: "checkout" };
   if (parts[0] === "contacts") return { name: "contacts" };
+  if (parts[0] === "install-app") return { name: "install-app" };
   return { name: "home" };
 }
 
@@ -85,6 +86,7 @@ export function storefrontHref(route) {
   if (route.name === "cart") return `${prefix}/cart`;
   if (route.name === "checkout") return `${prefix}/checkout`;
   if (route.name === "contacts") return `${prefix}/contacts`;
+  if (route.name === "install-app") return `${prefix}/install-app`;
   return prefix || "/";
 }
 

@@ -14,6 +14,7 @@ import {
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
 } from "../../../shared/appHelpers.js";
+import { sortProductsWithLidsGrouped } from "../../../shared/productCatalogOrder.js";
 
 export function CatalogPage({
   category = "",
@@ -23,7 +24,10 @@ export function CatalogPage({
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [treeOpen, setTreeOpen] = useState(() => !category);
+  // Mobile: каталог открывается со свёрнутыми категориями; раскрытие — только тапом «Категории».
+  const [treeOpen, setTreeOpen] = useState(false);
+  // Mobile + category: search after chips so products start higher; desktop keeps top search.
+  const [inlineSearch, setInlineSearch] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,11 +50,23 @@ export function CatalogPage({
   }, [category, subcategory, facet]);
 
   useEffect(() => {
-    if (!category) return;
+    if (typeof window === "undefined") return;
     if (window.matchMedia("(max-width: 900px)").matches) {
       setTreeOpen(false);
     }
   }, [category, subcategory]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const mq = window.matchMedia("(max-width: 900px)");
+    const syncMobileChrome = () => {
+      if (mq.matches) setTreeOpen(false);
+      setInlineSearch(mq.matches && Boolean(category));
+    };
+    syncMobileChrome();
+    mq.addEventListener?.("change", syncMobileChrome);
+    return () => mq.removeEventListener?.("change", syncMobileChrome);
+  }, [category]);
 
   const products = useMemo(() => {
     const list = data?.products || [];
@@ -67,8 +83,9 @@ export function CatalogPage({
   // Подкатегория/facet сужают выборку на API.
   const sections = useMemo(() => {
     if (category) {
-      return products.length
-        ? [{ name: subcategory || category, products, count: products.length }]
+      const sorted = sortProductsWithLidsGrouped(products);
+      return sorted.length
+        ? [{ name: subcategory || category, products: sorted, count: sorted.length }]
         : [];
     }
     return groupProductsByCloverGroup(products);
@@ -76,17 +93,21 @@ export function CatalogPage({
 
   const title = category || "Каталог";
 
+  const searchToolbar = (
+    <div className="sf-catalog-toolbar">
+      <input
+        className="sf-input sf-catalog-search"
+        type="search"
+        placeholder="Поиск по названию или артикулу"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+    </div>
+  );
+
   return (
-    <div className="sf-catalog">
-      <div className="sf-catalog-toolbar">
-        <input
-          className="sf-input sf-catalog-search"
-          type="search"
-          placeholder="Поиск по названию или артикулу"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </div>
+    <div className={`sf-catalog${category ? " has-category" : ""}`}>
+      {!inlineSearch ? searchToolbar : null}
 
       <div className="sf-catalog-layout">
         <aside className={`sf-catalog-side${treeOpen ? " is-open" : ""}`}>
@@ -131,7 +152,7 @@ export function CatalogPage({
                 <GroupIcon name={activeMeta.icon} />
               </div>
               <div className="sf-group-landing-copy">
-                <nav className="sf-crumb" aria-label="Навигация">
+                <nav className="sf-crumb sf-group-landing-crumb" aria-label="Навигация">
                   <button
                     type="button"
                     className="sf-back"
@@ -160,6 +181,13 @@ export function CatalogPage({
                     </>
                   ) : null}
                 </nav>
+                <button
+                  type="button"
+                  className="sf-back sf-group-landing-moback"
+                  onClick={() => navigateStorefront({ name: "catalog" })}
+                >
+                  ← Каталог
+                </button>
                 <h1>{title}</h1>
               </div>
             </header>
@@ -231,6 +259,8 @@ export function CatalogPage({
               </div>
             </section>
           ) : null}
+
+          {inlineSearch ? searchToolbar : null}
 
           {error ? <p className="sf-error">{error}</p> : null}
 

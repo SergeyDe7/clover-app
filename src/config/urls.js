@@ -43,3 +43,43 @@ export function isCabinetPath(pathname = "") {
   const prefix = CABINET_PATH || "/lk";
   return path === prefix || path.startsWith(`${prefix}/`);
 }
+
+const LK_SHELL_COLOR = "#f4f8f2";
+
+/**
+ * Storefront → ЛК: same-origin SPA switch (no document reload / no boot splash).
+ * Cross-origin: full navigation with skip-splash flag for the next load.
+ */
+export function navigateToCabinetLogin(event) {
+  const href = cabinetLoginUrl("/");
+  let url;
+  try {
+    url = new URL(href, window.location.href);
+  } catch {
+    window.location.assign(href);
+    return;
+  }
+
+  if (url.origin !== window.location.origin) {
+    try {
+      sessionStorage.setItem("clover-skip-boot-splash", "1");
+    } catch {
+      /* ignore */
+    }
+    if (event?.type === "click" && !event.defaultPrevented) {
+      // allow <a href> default
+      return;
+    }
+    window.location.assign(url.href);
+    return;
+  }
+
+  if (event) event.preventDefault();
+  const next = `${url.pathname}${url.search}${url.hash}` || `${CABINET_PATH || "/lk"}/`;
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) themeMeta.setAttribute("content", LK_SHELL_COLOR);
+  document.documentElement.style.backgroundColor = LK_SHELL_COLOR;
+  document.body.style.backgroundColor = LK_SHELL_COLOR;
+  window.history.pushState({}, "", next);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}

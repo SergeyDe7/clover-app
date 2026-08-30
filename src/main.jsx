@@ -1,4 +1,4 @@
-import { StrictMode, Suspense, lazy } from "react";
+import { StrictMode, Suspense, lazy, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import "./styles/clover-theme.css";
@@ -9,17 +9,27 @@ import { shouldRenderStorefront } from "./screens/storefront/mode.js";
 const StorefrontApp = lazy(() => import("./screens/storefront/StorefrontApp.jsx"));
 const App = lazy(() => import("./App.jsx"));
 
-// Витрина: хост витрины (/) или превью /vitrina. ЛК: /lk (и localhost без store-хоста).
-const storefront = shouldRenderStorefront();
-
-createRoot(document.getElementById("root")).render(
-  <StrictMode>
+/** Reactive shell: storefront ↔ /lk without full document reload (no re-boot splash). */
+function RootShell() {
+  const [storefront, setStorefront] = useState(() => shouldRenderStorefront());
+  useEffect(() => {
+    const sync = () => setStorefront(shouldRenderStorefront());
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
+  return (
     <>
       {!storefront ? <AppModalHost /> : null}
       <Suspense fallback={null}>
         {storefront ? <StorefrontApp /> : <App />}
       </Suspense>
     </>
+  );
+}
+
+createRoot(document.getElementById("root")).render(
+  <StrictMode>
+    <RootShell />
   </StrictMode>
 );
 
@@ -75,7 +85,9 @@ function hideBootSplash() {
   splash.classList.add("is-done");
   // После splash: ЛК — зелёный кабинет, витрина — свой бежевый фон.
   // Иначе телефон заливает витрину цветом ЛК (#f4f8f2), а компьютер остаётся #f3f2ee.
-  const shellColor = storefront ? STOREFRONT_THEME_COLOR : APP_THEME_COLOR;
+  const shellColor = shouldRenderStorefront()
+    ? STOREFRONT_THEME_COLOR
+    : APP_THEME_COLOR;
   setThemeColor(shellColor);
   document.documentElement.style.backgroundColor = shellColor;
   document.body.style.backgroundColor = shellColor;
@@ -114,36 +126,63 @@ if (rootEl) {
   }, 2500);
 }
 
-async function refreshServiceWorkerIfNeeded() {
+async function registerCloverServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
-  const previous = localStorage.getItem("clover-ui-build");
-  if (previous === CLOVER_UI_BUILD) {
-    await navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(CLOVER_UI_BUILD)}`).catch((error) => {
-      console.error("Не удалось зарегистрировать PWA Clover", error);
+  try {
+    // updateViaCache:'none' — не брать sw.js из HTTP-кэша браузера (критично для установленной PWA).
+    const registration = await navigator.serviceWorker.register("/sw.js", {
+      updateViaCache: "none",
     });
+    registration.update().catch(() => undefined);
+
+    // Reload once when a new SW takes control (after skipWaiting), not on first install.
+    if (!window.__cloverSwControllerHooked) {
+      window.__cloverSwControllerHooked = true;
+      window.__cloverHadSwControllerAtStart = Boolean(navigator.serviceWorker.controller);
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!window.__cloverHadSwControllerAtStart) return;
+        if (sessionStorage.getItem("clover-sw-controller-reload") === "1") return;
+        sessionStorage.setItem("clover-sw-controller-reload", "1");
+        window.location.reload();
+      });
+    }
+
     window.dispatchEvent(new CustomEvent("clover-sw-ready"));
-    return;
+  } catch (error) {
+    console.error("Не удалось зарегистрировать PWA Clover", error);
   }
-  if (sessionStorage.getItem("clover-ui-reloading") === CLOVER_UI_BUILD) {
+}
+
+/**
+ * Single build-guard (not duplicated in index.html):
+ * - first visit / same build: register + update check
+ * - new build: clear SW+caches once, one reload, then persist hash
+ * - reloading flag prevents loops
+ */
+async function refreshServiceWorkerIfNeeded() {
+  const previous = localStorage.getItem("clover-ui-build");
+  const reloading = sessionStorage.getItem("clover-ui-reloading");
+
+  if (reloading === CLOVER_UI_BUILD) {
     localStorage.setItem("clover-ui-build", CLOVER_UI_BUILD);
     sessionStorage.removeItem("clover-ui-reloading");
-    await navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(CLOVER_UI_BUILD)}`).catch((error) => {
-      console.error("Не удалось зарегистрировать PWA Clover", error);
-    });
-    window.dispatchEvent(new CustomEvent("clover-sw-ready"));
+    sessionStorage.removeItem("clover-sw-controller-reload");
+    await registerCloverServiceWorker();
     return;
   }
-  if (!previous) {
-    localStorage.setItem("clover-ui-build", CLOVER_UI_BUILD);
-    await navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(CLOVER_UI_BUILD)}`).catch((error) => {
-      console.error("Не удалось зарегистрировать PWA Clover", error);
-    });
-    window.dispatchEvent(new CustomEvent("clover-sw-ready"));
+
+  if (!previous || previous === CLOVER_UI_BUILD) {
+    if (!previous) localStorage.setItem("clover-ui-build", CLOVER_UI_BUILD);
+    await registerCloverServiceWorker();
     return;
   }
+
+  // New UI build: one controlled reload after cache drop.
   try {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(registrations.map((registration) => registration.unregister()));
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
     if (window.caches?.keys) {
       const keys = await caches.keys();
       await Promise.all(keys.map((key) => caches.delete(key)));
@@ -157,4 +196,12 @@ async function refreshServiceWorkerIfNeeded() {
 
 window.addEventListener("load", () => {
   void refreshServiceWorkerIfNeeded();
+});
+// Also re-check SW when a standalone PWA returns to foreground.
+window.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.getRegistration().then((registration) => {
+    registration?.update?.().catch(() => undefined);
+  });
 });

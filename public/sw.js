@@ -1,4 +1,5 @@
-const CACHE_NAME = "clover-v18-shell-v187-lint";
+/* Build stamps CACHE_NAME via vite (clover-ui-build-tag). Do not hardcode forever. */
+const CACHE_NAME = "clover-shell-%CLOVER_UI_BUILD%";
 const SHELL = [
   "/offline.html",
   "/manifest.webmanifest",
@@ -23,16 +24,43 @@ async function applyPushBadge(data) {
   }
 }
 
+function isApiOrUpload(path) {
+  return path.startsWith("/api/") || path.startsWith("/uploads/");
+}
+
+function isNavigationRequest(request, path) {
+  return (
+    request.mode === "navigate" ||
+    path === "/" ||
+    path === "/index.html" ||
+    request.destination === "document"
+  );
+}
+
+function isHashedAsset(path) {
+  return path.startsWith("/assets/");
+}
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)).catch(() => undefined));
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)).catch(() => undefined)
+  );
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+    )
   );
   self.clients.claim();
+});
+
+self.addEventListener("message", (event) => {
+  if (event?.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("fetch", (event) => {
@@ -40,24 +68,48 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
 
   const path = new URL(request.url).pathname;
-  if (path.startsWith("/api/") || path.startsWith("/uploads/")) return;
 
-  // HTML навигация и hashed assets — только сеть (иначе stale HTML → чужие css/js → голый текст).
-  if (request.mode === "navigate" || path === "/" || path.startsWith("/assets/")) {
+  // Never cache API / uploads (login, bootstrap, etc.).
+  if (isApiOrUpload(path)) return;
+
+  // SW script itself: always network, never HTTP-cache.
+  if (path === "/sw.js") {
+    event.respondWith(fetch(request, { cache: "no-store" }));
+    return;
+  }
+
+  // HTML shell / SPA navigations: network-first with no-store so PWA cannot stick on old index.html.
+  if (isNavigationRequest(request, path)) {
     event.respondWith(
-      fetch(request).catch(async () => {
-        if (request.mode === "navigate") {
-          return (
-            (await caches.match("/offline.html"))
-            || Response.error()
-          );
-        }
-        return Response.error();
-      })
+      fetch(request, { cache: "no-store" })
+        .then((response) => response)
+        .catch(async () => (await caches.match("/offline.html")) || Response.error())
     );
     return;
   }
 
+  // Hashed build assets: cache-first (filename changes every build).
+  if (isHashedAsset(path)) {
+    event.respondWith(
+      (async () => {
+        const cache = await caches.open(CACHE_NAME);
+        const cached = await cache.match(request);
+        if (cached) return cached;
+        try {
+          const response = await fetch(request);
+          if (response.ok) {
+            cache.put(request, response.clone()).catch(() => undefined);
+          }
+          return response;
+        } catch {
+          return Response.error();
+        }
+      })()
+    );
+    return;
+  }
+
+  // Other same-origin static (icons, fonts, manifest): network, refresh SHELL entries in cache.
   event.respondWith(
     fetch(request)
       .then((response) => {
@@ -77,7 +129,11 @@ self.addEventListener("fetch", (event) => {
 
 self.addEventListener("push", (event) => {
   let data;
-  try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data?.text() || "" }; }
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data?.text() || "" };
+  }
   const title = data.title || "Clover";
   const options = {
     body: data.body || "Новое уведомление",
@@ -87,10 +143,7 @@ self.addEventListener("push", (event) => {
     data: { url: data.url || "/lk/", badgeCount: data.badgeCount },
   };
   event.waitUntil(
-    Promise.all([
-      self.registration.showNotification(title, options),
-      applyPushBadge(data),
-    ])
+    Promise.all([self.registration.showNotification(title, options), applyPushBadge(data)])
   );
 });
 
@@ -106,14 +159,14 @@ self.addEventListener("pushsubscriptionchange", (event) => {
           subscription = null;
         }
       }
-      const clients = await self.clients.matchAll({
+      const windows = await self.clients.matchAll({
         type: "window",
         includeUncontrolled: true,
       });
       const payload = subscription
         ? { type: "clover-push-subscription", subscription: subscription.toJSON() }
         : { type: "clover-push-resync" };
-      for (const client of clients) {
+      for (const client of windows) {
         client.postMessage(payload);
       }
     })()

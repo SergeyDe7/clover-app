@@ -2499,12 +2499,26 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     "products",
     DEFAULT_PRODUCTS
   );
-  const reclassified = applyInferredCategories(storedProducts);
-  const articled = applyOneCArticles(reclassified.products);
-  const products = articled.products;
-  if (reclassified.changed || articled.changed) {
-    setGlobalState("products", products);
+  // Avoid re-running category/article inference on every bootstrap when catalog unchanged.
+  const pricesVersionHint = String(
+    getGlobalState("catalogPricesVersion", "") || ""
+  );
+  const catalogSig = Array.isArray(storedProducts)
+    ? `${pricesVersionHint}|${storedProducts.length}|${storedProducts[0]?.id || ""}|${storedProducts[storedProducts.length - 1]?.id || ""}|${storedProducts[0]?.name || ""}`
+    : pricesVersionHint;
+  if (
+    !globalThis.__cloverPreparedCatalog ||
+    globalThis.__cloverPreparedCatalog.sig !== catalogSig
+  ) {
+    const reclassified = applyInferredCategories(storedProducts);
+    const articled = applyOneCArticles(reclassified.products);
+    const prepared = articled.products;
+    if (reclassified.changed || articled.changed) {
+      setGlobalState("products", prepared);
+    }
+    globalThis.__cloverPreparedCatalog = { sig: catalogSig, products: prepared };
   }
+  const products = globalThis.__cloverPreparedCatalog.products;
   const settings = getGlobalState(
     "settings",
     DEFAULT_SETTINGS

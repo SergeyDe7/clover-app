@@ -1,5 +1,5 @@
 // Редактор заказа клиента: каталог, корзина и оформление.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Header } from "../../shared/SharedPanels";
 import {
@@ -22,16 +22,47 @@ import {
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
 } from "../../shared/appHelpers";
+import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import {
   getEarliestDeliveryDateIso,
   validateDeliveryDate,
 } from "../../shared/deliveryDateRules";
+import {
+  FREE_DELIVERY_MIN_TOTAL,
+  PAID_DELIVERY_FEE,
+  getSpbDeliveryFee,
+} from "../../config/orderConfig";
 import { productImageSrc } from "../../shared/productPhoto";
 import { ManagerContact } from "./ManagerContact";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
 import { CatalogSearchInput } from "./CatalogSearchInput";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
+
+function CatalogViewToggleIcon({ variant }) {
+  if (variant === "list") {
+    return (
+      <span className="view-toggle-icon" aria-hidden="true">
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <rect x="2" y="3.5" width="12" height="1.75" rx="0.875" fill="currentColor" />
+          <rect x="2" y="7.125" width="12" height="1.75" rx="0.875" fill="currentColor" />
+          <rect x="2" y="10.75" width="12" height="1.75" rx="0.875" fill="currentColor" />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <span className="view-toggle-icon" aria-hidden="true">
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <rect x="1.5" y="1.5" width="5.75" height="5.75" rx="1.25" fill="currentColor" />
+        <rect x="8.75" y="1.5" width="5.75" height="5.75" rx="1.25" fill="currentColor" />
+        <rect x="1.5" y="8.75" width="5.75" height="5.75" rx="1.25" fill="currentColor" />
+        <rect x="8.75" y="8.75" width="5.75" height="5.75" rx="1.25" fill="currentColor" />
+      </svg>
+    </span>
+  );
+}
 
 function capitalizeRu(value) {
   if (!value) return "";
@@ -75,7 +106,7 @@ export function OrderEditor({
   setFavorites,
   settings,
   profile: _profile,
-  orders: _orders,
+  orders = [],
   catalogPolicy,
   showFullCatalog: _showFullCatalog,
   setShowFullCatalog: _setShowFullCatalog,
@@ -97,14 +128,24 @@ export function OrderEditor({
   });
   const [cart, setCart] = useState(() => {
     const result = {};
-    (initialSource.items || []).forEach((item) => { result[item.productId ?? item.id] = item.quantity; });
+    (initialSource.items || []).forEach((item) => {
+      result[item.productId ?? item.id] = item.quantity;
+    });
     return result;
   });
+  /** Порядок позиций как клиент добавлял в корзину — так же уходит в 1С. */
+  const [cartOrder, setCartOrder] = useState(() =>
+    (initialSource.items || [])
+      .map((item) => String(item.productId ?? item.id))
+      .filter(Boolean)
+  );
   /** Черновик ввода в поле шт (чтобы «100» не сбрасывалось на «1» при наборе). */
   const [qtyDrafts, setQtyDrafts] = useState({});
   const [units, setUnits] = useState(() => {
     const result = {};
-    (initialSource.items || []).forEach((item) => { result[item.productId ?? item.id] = item.unit; });
+    (initialSource.items || []).forEach((item) => {
+      result[item.productId ?? item.id] = item.unit;
+    });
     return result;
   });
   const [customItems, setCustomItems] = useState(() =>
@@ -133,7 +174,224 @@ export function OrderEditor({
   const [missingFields, setMissingFields] = useState({ date: false, address: false });
   const cartDateFieldRef = useRef(null);
   const cartAddressFieldRef = useRef(null);
+  const catalogLayoutRef = useRef(null);
+  const catalogHostRef = useRef(null);
+  const catalogToolbarRef = useRef(null);
+  const cartSlotRef = useRef(null);
+  const cartPanelRef = useRef(null);
   const earliestDeliveryDate = getEarliestDeliveryDateIso();
+
+  // Один layout-pass: сначала сетка каталог|корзина, потом fixed-тулбар.
+  // Иначе на первом входе тулбар меряется на всю ширину и «залипает» до F5.
+  useLayoutEffect(() => {
+    if (!embedded || typeof window === "undefined") return undefined;
+
+    const shell = catalogLayoutRef.current;
+    const slot = cartSlotRef.current;
+    const cart = cartPanelRef.current;
+    const catalog = catalogHostRef.current;
+    const toolbar = catalogToolbarRef.current;
+    if (!shell || !catalog) return undefined;
+
+    const clearShell = () => {
+      ["display", "grid-template-columns", "column-gap", "gap", "align-items", "width", "box-sizing"].forEach((n) =>
+        shell.style.removeProperty(n)
+      );
+      ["min-width", "max-width", "overflow", "overflow-x", "width"].forEach((n) =>
+        catalog.style.removeProperty(n)
+      );
+      if (slot) {
+        ["width", "min-width", "max-width", "min-height", "height"].forEach((n) =>
+          slot.style.removeProperty(n)
+        );
+      }
+      if (cart) {
+        [
+          "display",
+          "width",
+          "min-width",
+          "max-width",
+          "position",
+          "top",
+          "left",
+          "right",
+          "inset",
+          "float",
+          "transform",
+          "margin",
+          "z-index",
+          "box-sizing",
+          "padding",
+          "border-radius",
+          "align-self",
+        ].forEach((n) => cart.style.removeProperty(n));
+      }
+    };
+
+    const clearToolbar = () => {
+      catalog.style.removeProperty("--catalog-order-chrome-h");
+      if (!toolbar) return;
+      ["position", "top", "left", "width", "max-width", "right", "z-index", "visibility"].forEach((n) =>
+        toolbar.style.removeProperty(n)
+      );
+    };
+
+    const applyDesktopShell = () => {
+      shell.style.setProperty("display", "grid", "important");
+      shell.style.setProperty("grid-template-columns", "minmax(0, 1fr) 300px", "important");
+      shell.style.setProperty("column-gap", "20px", "important");
+      shell.style.setProperty("align-items", "start", "important");
+      shell.style.setProperty("width", "100%", "important");
+      shell.style.setProperty("box-sizing", "border-box", "important");
+
+      catalog.style.setProperty("min-width", "0", "important");
+      catalog.style.setProperty("max-width", "100%", "important");
+      catalog.style.setProperty("overflow-x", "hidden", "important");
+
+      if (slot) {
+        slot.style.setProperty("width", "300px", "important");
+        slot.style.setProperty("min-width", "300px", "important");
+        slot.style.setProperty("max-width", "300px", "important");
+      }
+
+      if (cart && slot) {
+        const slotRect = slot.getBoundingClientRect();
+        const left = Math.max(0, Math.round(slotRect.left));
+        cart.style.setProperty("display", "block", "important");
+        cart.style.setProperty("position", "fixed", "important");
+        cart.style.setProperty("top", "var(--clover-chrome-offset, 56px)", "important");
+        cart.style.setProperty("left", `${left}px`, "important");
+        cart.style.setProperty("width", "300px", "important");
+        cart.style.setProperty("min-width", "300px", "important");
+        cart.style.setProperty("max-width", "300px", "important");
+        cart.style.setProperty("right", "auto", "important");
+        cart.style.setProperty("inset", "auto", "important");
+        cart.style.setProperty("float", "none", "important");
+        cart.style.setProperty("transform", "none", "important");
+        cart.style.setProperty("margin", "0", "important");
+        cart.style.setProperty("z-index", "90", "important");
+        cart.style.setProperty("box-sizing", "border-box", "important");
+        cart.style.setProperty("padding", "18px 16px", "important");
+        cart.style.setProperty("border-radius", "16px", "important");
+        cart.style.setProperty("align-self", "start", "important");
+        const cartH = Math.ceil(cart.getBoundingClientRect().height);
+        slot.style.setProperty("min-height", `${Math.max(cartH, 1)}px`, "important");
+      }
+    };
+
+    const applyToolbar = () => {
+      if (!toolbar) return;
+
+      const hostBox = catalog.getBoundingClientRect();
+      let left = Math.max(0, Math.round(hostBox.left));
+      let width = Math.max(0, Math.round(hostBox.width));
+      const isMobile = window.matchMedia("(max-width: 900px)").matches;
+
+      // До слота корзины минус gap — страховка, если колонка ещё на всю ширину.
+      if (slot && !isMobile) {
+        const slotBox = slot.getBoundingClientRect();
+        const gap = 20;
+        const untilSlot = Math.round(slotBox.left - gap - hostBox.left);
+        if (untilSlot > 120) width = untilSlot;
+      }
+
+      if (isMobile) {
+        left = 0;
+        width = Math.max(0, Math.round(document.documentElement.clientWidth || window.innerWidth));
+      }
+
+      toolbar.style.setProperty("position", "fixed", "important");
+      toolbar.style.setProperty("top", "var(--clover-chrome-offset, 56px)", "important");
+      toolbar.style.setProperty("left", `${left}px`, "important");
+      toolbar.style.setProperty("width", `${width}px`, "important");
+      toolbar.style.setProperty("max-width", `${width}px`, "important");
+      toolbar.style.setProperty("right", "auto", "important");
+      toolbar.style.setProperty("z-index", "95", "important");
+      toolbar.style.setProperty("visibility", "visible", "important");
+      if (isMobile) {
+        toolbar.style.setProperty("box-sizing", "border-box", "important");
+        toolbar.style.setProperty("padding-left", "max(8px, env(safe-area-inset-left, 0px))", "important");
+        toolbar.style.setProperty("padding-right", "max(8px, env(safe-area-inset-right, 0px))", "important");
+      }
+
+      const toolbarRect = toolbar.getBoundingClientRect();
+      const hostTopDoc = catalog.getBoundingClientRect().top + window.scrollY;
+      const alreadyBelow = hostTopDoc - toolbarRect.top;
+      const height = Math.max(
+        0,
+        Math.ceil(toolbarRect.height - Math.max(0, alreadyBelow))
+      );
+      const prevH = catalog.style.getPropertyValue("--catalog-order-chrome-h").trim();
+      const nextH = `${height}px`;
+      if (prevH !== nextH) {
+        catalog.style.setProperty("--catalog-order-chrome-h", nextH);
+      }
+    };
+
+    const apply = () => {
+      if (window.matchMedia("(max-width: 900px)").matches) {
+        clearShell();
+        applyToolbar();
+        return;
+      }
+      applyDesktopShell();
+      applyToolbar();
+    };
+
+    if (toolbar) {
+      toolbar.style.setProperty("visibility", "hidden", "important");
+    }
+
+    let lastKey = "";
+    const applyIfChanged = () => {
+      const isMobile = window.matchMedia("(max-width: 900px)").matches;
+      if (isMobile) {
+        const width = Math.max(
+          0,
+          Math.round(document.documentElement.clientWidth || window.innerWidth)
+        );
+        const key = `m:${width}`;
+        if (key === lastKey) return;
+        lastKey = key;
+      }
+      apply();
+    };
+
+    const onScroll = () => {
+      // На телефоне scroll→layout даёт дёрганье у низа (100dvh / address bar).
+      if (window.matchMedia("(max-width: 900px)").matches) return;
+      applyIfChanged();
+    };
+
+    apply();
+    const raf1 = window.requestAnimationFrame(() => {
+      apply();
+      window.requestAnimationFrame(apply);
+    });
+
+    const mq = window.matchMedia("(min-width: 901px)");
+    mq.addEventListener("change", applyIfChanged);
+    window.addEventListener("resize", applyIfChanged);
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", applyIfChanged);
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(applyIfChanged) : null;
+    ro?.observe(shell);
+    ro?.observe(catalog);
+    if (slot) ro?.observe(slot);
+    if (cart) ro?.observe(cart);
+
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      mq.removeEventListener("change", applyIfChanged);
+      window.removeEventListener("resize", applyIfChanged);
+      window.removeEventListener("scroll", onScroll, true);
+      vv?.removeEventListener("resize", applyIfChanged);
+      ro?.disconnect();
+      clearShell();
+      clearToolbar();
+    };
+  }, [embedded]);
 
   // Один адрес в списке — всегда подставляем автоматически.
   useEffect(() => {
@@ -277,23 +535,63 @@ export function OrderEditor({
   };
 
   const categories = useMemo(() => ["Все", ...new Set(products.map((item) => item.category))], [products]);
+  const sortedProducts = useMemo(
+    () => (Array.isArray(products) ? products : []),
+    [products]
+  );
+  const searchEntries = useMemo(
+    () =>
+      sortedProducts.map((product) => ({
+        product,
+        haystack: productCatalogSearchHaystack(product),
+      })),
+    [sortedProducts]
+  );
+  const deferredSearch = useDeferredValue(search);
   const filtered = useMemo(() => {
-    return products.filter((item) => {
-      const byCategory = category === "Все" || item.category === category;
-      const bySearch = matchesCatalogPrefixSearch(
-        productCatalogSearchHaystack(item),
-        search
-      );
-      const byFavorite = !favoritesOnly || favorites.includes(item.id);
-      return byCategory && bySearch && byFavorite;
-    });
-  }, [products, search, category, favoritesOnly, favorites]);
+    return sortProductsWithLidsGrouped(
+      searchEntries
+        .filter(({ product, haystack }) => {
+          const byCategory = category === "Все" || product.category === category;
+          const bySearch = matchesCatalogPrefixSearch(haystack, deferredSearch);
+          const byFavorite = !favoritesOnly || favorites.includes(product.id);
+          return byCategory && bySearch && byFavorite;
+        })
+        .map(({ product }) => product)
+    );
+  }, [searchEntries, deferredSearch, category, favoritesOnly, favorites]);
 
-  const selectedItems = useMemo(() => products
-    .filter((product) => Number(cart[product.id]) > 0)
-    .map((product) => {
+  const selectedItems = useMemo(() => {
+    const productById = new Map(
+      (Array.isArray(products) ? products : []).map((product) => [
+        String(product.id),
+        product,
+      ])
+    );
+    const qtyOf = (id) => {
+      const product = productById.get(String(id));
+      if (!product) return 0;
+      return Number(cart[product.id] ?? cart[String(product.id)]) || 0;
+    };
+    const seen = new Set();
+    const orderedProducts = [];
+    for (const id of cartOrder) {
+      const sid = String(id);
+      if (seen.has(sid) || qtyOf(sid) <= 0) continue;
+      const product = productById.get(sid);
+      if (!product) continue;
+      seen.add(sid);
+      orderedProducts.push(product);
+    }
+    for (const product of products) {
+      const sid = String(product.id);
+      if (seen.has(sid) || qtyOf(sid) <= 0) continue;
+      seen.add(sid);
+      orderedProducts.push(product);
+    }
+    return orderedProducts.map((product) => {
       const unit = units[product.id] || orderedSaleUnits(product)[0];
-      const quantity = Number(cart[product.id]) || 0;
+      const quantity = qtyOf(product.id);
       const unitPrice = getUnitPrice(product, unit);
       return {
         id: product.id,
@@ -314,7 +612,8 @@ export function OrderEditor({
         packSize: product.packSize,
         bundleSize: product.bundleSize,
       };
-    }), [products, cart, units]);
+    });
+  }, [products, cart, cartOrder, units]);
 
   const total = roundPriceUp(
     selectedItems.reduce((sum, item) => sum + item.lineTotal, 0) +
@@ -324,7 +623,12 @@ export function OrderEditor({
         0
       )
   );
-  const cartCount = selectedItems.length + customItems.length;
+  // СПб: <5000 → 500 ₽ в итоге; ≥5000 → 0. Серверный deliveryFee.js на baseline нет (1С не трогаем).
+  const deliveryFee =
+    settings.showPrices && total > 0 ? getSpbDeliveryFee(total) : 0;
+  const grandTotal = roundPriceUp(total + deliveryFee);
+  const cartCount =
+    selectedItems.length + customItems.length + (deliveryFee > 0 ? 1 : 0);
   const selectedAddress = addresses.find((item) => item.id === addressId);
   const deliveryDateParts = getDeliveryDateParts(deliveryDate);
 
@@ -343,6 +647,17 @@ export function OrderEditor({
     });
   }, [session.mode, settings.enableDrafts, selectedItems, customItems, deliveryDate, addressId, selectedAddress, clientComment]);
 
+  const syncCartOrder = (id, nextQty) => {
+    const sid = String(id);
+    setCartOrder((current) => {
+      const has = current.some((item) => String(item) === sid);
+      if (nextQty > 0) {
+        return has ? current : [...current, sid];
+      }
+      return has ? current.filter((item) => String(item) !== sid) : current;
+    });
+  };
+
   const clearQtyDraft = (id) => {
     setQtyDrafts((current) => {
       if (current[id] === undefined) return current;
@@ -355,11 +670,9 @@ export function OrderEditor({
   const changeQuantity = (id, delta, step = 1) => {
     const orderStep = Math.max(1, Number(step) || 1);
     clearQtyDraft(id);
+    const nextValue = Math.max(0, (Number(cart[id]) || 0) + delta * orderStep);
+    syncCartOrder(id, nextValue);
     setCart((current) => {
-      const nextValue = Math.max(
-        0,
-        (Number(current[id]) || 0) + delta * orderStep
-      );
       const next = { ...current };
       if (nextValue) next[id] = nextValue;
       else delete next[id];
@@ -369,6 +682,7 @@ export function OrderEditor({
 
   const setItemQuantity = (id, value, multiplier = 1, orderStep = 1) => {
     const nextValue = fromQuantityInputValue(value, multiplier, orderStep);
+    syncCartOrder(id, nextValue);
     setCart((current) => {
       const next = { ...current };
       if (nextValue) next[id] = nextValue;
@@ -396,12 +710,15 @@ export function OrderEditor({
 
     clearQtyDraft(productId);
     setUnits((current) => ({ ...current, [productId]: nextUnit }));
-    setCart((current) => {
-      if (!(productId in current)) return current;
-      const next = { ...current };
-      delete next[productId];
-      return next;
-    });
+    if (productId in cart || String(productId) in cart) {
+      syncCartOrder(productId, 0);
+      setCart((current) => {
+        if (!(productId in current)) return current;
+        const next = { ...current };
+        delete next[productId];
+        return next;
+      });
+    }
   };
 
   const changeCustomQuantity = (id, delta) => {
@@ -427,6 +744,7 @@ export function OrderEditor({
     });
     if (!ok) return;
     setCart({});
+    setCartOrder([]);
     setCustomItems([]);
     setQtyDrafts({});
   };
@@ -489,6 +807,29 @@ export function OrderEditor({
     }
 
     setMissingFields({ date: false, address: false });
+
+    const submitDeliveryFee =
+      settings.showPrices && total > 0 ? getSpbDeliveryFee(total) : 0;
+    const previousFee =
+      session.mode === "edit"
+        ? Math.max(0, Number(session.order?.deliveryFee) || 0)
+        : 0;
+    if (submitDeliveryFee > previousFee) {
+      const needMore = Math.max(0, FREE_DELIVERY_MIN_TOTAL - total);
+      const ok = await appConfirm({
+        title: "Платная доставка",
+        message:
+          `Сумма заказа меньше ${formatMoney(FREE_DELIVERY_MIN_TOTAL)}. ` +
+          `Доставка по Санкт-Петербургу — ${formatMoney(PAID_DELIVERY_FEE)}. ` +
+          `Добавьте товаров ещё на ${formatMoney(needMore)} для бесплатной доставки ` +
+          `либо оформите заказ с платной доставкой.`,
+        confirmLabel: `Оформить (+${formatMoney(PAID_DELIVERY_FEE)})`,
+        cancelLabel: "Вернуться к заказу",
+        tone: "warn",
+      });
+      if (!ok) return;
+    }
+
     draftSaveLockedRef.current = true;
     try {
       localStorage.removeItem(STORAGE.draft);
@@ -504,6 +845,11 @@ export function OrderEditor({
         address: checkoutAddress.address,
         addressLabel: checkoutAddress.label,
         clientComment: clientComment.trim(),
+        deliveryFee: submitDeliveryFee,
+        deliveryNote:
+          submitDeliveryFee > 0
+            ? `Доставка по СПб платная: ${PAID_DELIVERY_FEE} ₽ (заказ менее ${FREE_DELIVERY_MIN_TOTAL} ₽)`
+            : "Доставка по СПб бесплатная",
       })
     )
       .then(() => {
@@ -519,53 +865,197 @@ export function OrderEditor({
       <section
         className={embedded ? "catalog-content embedded-catalog client-order-catalog" : "catalog-content"}
       >
-        <div className="catalog-layout">
-          <aside className="order-summary" id="order-summary">
-            <h2>Корзина</h2>
-            {!selectedItems.length && !customItems.length ? (
-              <EmptyState
-                title="Пока пусто"
-                message="Выберите товары в каталоге, затем откройте корзину для оформления."
-              />
-            ) : (
-              <>
-                <div className="summary-total" style={{ marginTop: 0 }}>
-                  <span>Позиций</span>
-                  <strong>{cartCount}</strong>
-                </div>
-                <div className="summary-total">
-                  <span>Итого</span>
-                  <strong>
-                    {settings.showPrices && total > 0
-                      ? formatMoney(total)
-                      : "уточняется"}
-                  </strong>
-                </div>
-                <p className="summary-note">
-                  Дата, адрес и комментарий — в корзине перед оформлением.
-                </p>
-                <div className="order-summary-actions">
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => void clearCart()}
-                  >
-                    Очистить корзину
-                  </button>
-                  <button
-                    className="primary-button open-cart-button"
-                    type="button"
-                    onClick={openCartForCheckout}
-                  >
-                    Перейти в корзину
-                  </button>
-                </div>
-              </>
-            )}
-          </aside>
+        {embedded ? (
+          <style>{`
+/* Shell: каталог | корзина 300px */
+@media (min-width: 901px) {
+  .lk-order-shell[data-lk-shell="v3"] {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 300px !important;
+    column-gap: 20px !important;
+    align-items: start !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .lk-order-shell[data-lk-shell="v3"] > .lk-order-catalog {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+  .lk-order-shell[data-lk-shell="v3"] > .lk-order-cart-slot {
+    width: 300px !important;
+    min-width: 300px !important;
+    max-width: 300px !important;
+    box-sizing: border-box !important;
+  }
+  .lk-order-shell[data-lk-shell="v3"] .lk-order-cart {
+    display: block !important;
+    width: 300px !important;
+    min-width: 300px !important;
+    max-width: 300px !important;
+    position: fixed !important;
+    top: var(--clover-chrome-offset, 56px) !important;
+    z-index: 90 !important;
+    margin: 0 !important;
+    padding: 18px 16px !important;
+    border-radius: 16px !important;
+    box-sizing: border-box !important;
+  }
+}
+@media (max-width: 900px) {
+  .lk-order-shell[data-lk-shell="v3"] > .lk-order-cart-slot,
+  .lk-order-shell[data-lk-shell="v3"] .lk-order-cart { display: none !important; }
+}
 
-          <div className="catalog-main">
-            {/* В embedded заголовок убираем — toolbar sticky занимает верх колонки. */}
+/* Тулбар эталон «Буду поздно» — fixed в колонке каталога (4 карточки) */
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar,
+.client-order-catalog .client-order-catalog-toolbar,
+main.clover-app > .client-order-catalog-toolbar {
+  margin: 0 !important;
+  padding: 8px 10px 10px !important;
+  box-sizing: border-box !important;
+}
+.embedded-catalog.client-order-catalog .client-order-catalog-toolbar,
+.lk-order-catalog > .client-order-catalog-toolbar {
+  /* JS выставляет fixed; без JS — sticky под шапкой, не relative */
+  position: sticky !important;
+  top: var(--clover-chrome-offset, 56px) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  z-index: 95 !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar::before,
+.client-order-catalog .client-order-catalog-toolbar::before,
+main.clover-app > .client-order-catalog-toolbar::before {
+  left: 0 !important;
+  right: 0 !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar-spacer,
+.client-order-catalog .client-order-catalog-toolbar-spacer {
+  display: block !important;
+  height: calc(var(--catalog-order-chrome-h, 80px) + 10px) !important;
+  margin: 0 !important;
+  pointer-events: none !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .catalog-search,
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .catalog-search-input,
+.client-order-catalog .client-order-catalog-toolbar .catalog-search,
+.client-order-catalog .client-order-catalog-toolbar .catalog-search-input,
+main.clover-app > .client-order-catalog-toolbar .catalog-search,
+main.clover-app > .client-order-catalog-toolbar .catalog-search-input {
+  min-height: 36px !important;
+  height: 36px !important;
+  max-height: 36px !important;
+  padding: 6px 12px !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+  border-radius: 10px !important;
+  box-sizing: border-box !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .catalog-filter-actions,
+.client-order-catalog .client-order-catalog-toolbar .catalog-filter-actions,
+main.clover-app > .client-order-catalog-toolbar .catalog-filter-actions {
+  gap: 6px !important;
+  align-items: center !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .catalog-view-toggle,
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .catalog-view-toggle button,
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .catalog-filter-actions > .category-button,
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .client-order-positions-chip,
+.client-order-catalog .client-order-catalog-toolbar .catalog-view-toggle,
+.client-order-catalog .client-order-catalog-toolbar .catalog-view-toggle button,
+.client-order-catalog .client-order-catalog-toolbar .catalog-filter-actions > .category-button,
+.client-order-catalog .client-order-catalog-toolbar .client-order-positions-chip,
+main.clover-app > .client-order-catalog-toolbar .catalog-view-toggle,
+main.clover-app > .client-order-catalog-toolbar .catalog-view-toggle button,
+main.clover-app > .client-order-catalog-toolbar .catalog-filter-actions > .category-button,
+main.clover-app > .client-order-catalog-toolbar .client-order-positions-chip {
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  box-sizing: border-box !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .catalog-view-toggle button,
+.client-order-catalog .client-order-catalog-toolbar .catalog-view-toggle button,
+main.clover-app > .client-order-catalog-toolbar .catalog-view-toggle button {
+  min-width: 36px !important;
+  width: 36px !important;
+  padding: 0 !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .category-list,
+.client-order-catalog .client-order-catalog-toolbar .category-list,
+main.clover-app > .client-order-catalog-toolbar .category-list {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  height: auto !important;
+  min-height: 32px !important;
+  max-height: none !important;
+  gap: 6px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  width: 100% !important;
+}
+@media (max-width: 900px) {
+  .lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .category-list,
+  .client-order-catalog .client-order-catalog-toolbar .category-list,
+  main.clover-app > .client-order-catalog-toolbar .category-list {
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    height: auto !important;
+    min-height: 36px !important;
+    max-height: none !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    overscroll-behavior-x: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .category-list::-webkit-scrollbar,
+.client-order-catalog .client-order-catalog-toolbar .category-list::-webkit-scrollbar,
+main.clover-app > .client-order-catalog-toolbar .category-list::-webkit-scrollbar {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .category-list .category-button,
+.client-order-catalog .client-order-catalog-toolbar .category-list .category-button,
+main.clover-app > .client-order-catalog-toolbar .category-list .category-button {
+  flex: 0 0 auto !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+  color: #5d695d !important;
+  background: #fff !important;
+  white-space: nowrap !important;
+  border-radius: 10px !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+.lk-order-shell[data-lk-shell="v3"] .client-order-catalog-toolbar .category-list .category-button.active,
+.client-order-catalog .client-order-catalog-toolbar .category-list .category-button.active,
+main.clover-app > .client-order-catalog-toolbar .category-list .category-button.active {
+  color: #fff !important;
+  background: #5b9d57 !important;
+  border-color: #5b9d57 !important;
+}
+          `}</style>
+        ) : null}
+        <div
+          className={embedded ? "lk-order-shell" : "catalog-layout"}
+          ref={embedded ? catalogLayoutRef : undefined}
+          data-lk-shell={embedded ? "v3" : undefined}
+        >
+          <div
+            className={embedded ? "lk-order-catalog" : "catalog-main"}
+            ref={embedded ? catalogHostRef : undefined}
+          >
+            {/* В embedded заголовок убираем — toolbar fixed занимает верх колонки. */}
             {!embedded ? (
               <div className="page-title-row">
                 <div>
@@ -584,82 +1074,96 @@ export function OrderEditor({
               </div>
             ) : null}
 
-            <div
-              className={
-                embedded
-                  ? "catalog-toolbar client-order-catalog-toolbar"
-                  : "catalog-toolbar"
-              }
-            >
-              <div className="catalog-filter-row">
-                <CatalogSearchInput
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                <div className="catalog-filter-actions">
-                  {settings.showFavorites && (
-                    <button
-                      className={favoritesOnly ? "category-button active" : "category-button"}
-                      type="button"
-                      onClick={() => setFavoritesOnly((value) => !value)}
-                      aria-label="Избранное"
-                      title="Избранное"
-                    >
-                      <span className="fav-label-full">★ Избранное</span>
-                      <span className="fav-label-short">★</span>
-                    </button>
-                  )}
-                  <div className="catalog-view-toggle" role="group" aria-label="Вид каталога">
-                    <button
-                      type="button"
-                      className={catalogView === "cards" ? "active" : ""}
-                      aria-pressed={catalogView === "cards"}
-                      title="С фото"
-                      aria-label="С фото"
-                      onClick={() => {
-                        setCatalogView("cards");
-                        safeWrite(STORAGE.catalogView, "cards");
-                      }}
-                    >
-                      <span className="view-toggle-icon" aria-hidden="true">▦</span>
-                      <span className="view-toggle-label">Фото</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={catalogView === "list" ? "active" : ""}
-                      aria-pressed={catalogView === "list"}
-                      title="Список"
-                      aria-label="Список"
-                      onClick={() => {
-                        setCatalogView("list");
-                        safeWrite(STORAGE.catalogView, "list");
-                      }}
-                    >
-                      <span className="view-toggle-icon" aria-hidden="true">☰</span>
-                      <span className="view-toggle-label">Список</span>
-                    </button>
-                  </div>
-                  {embedded ? (
-                    <div className="mini-card client-order-positions-chip">
-                      <span className="mini-label">Позиций</span>
-                      <strong>{cartCount}</strong>
+            {(() => {
+              const toolbar = (
+                <div
+                  className={
+                    embedded
+                      ? "catalog-toolbar client-order-catalog-toolbar"
+                      : "catalog-toolbar"
+                  }
+                  ref={embedded ? catalogToolbarRef : undefined}
+                >
+                  <div className="catalog-filter-row">
+                    <CatalogSearchInput
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                    <div className="catalog-filter-actions">
+                      {settings.showFavorites && (
+                        <button
+                          className={favoritesOnly ? "category-button active" : "category-button"}
+                          type="button"
+                          onClick={() => setFavoritesOnly((value) => !value)}
+                          aria-label="Избранное"
+                          title="Избранное"
+                        >
+                          <span className="fav-label-full">★ Избранное</span>
+                          <span className="fav-label-short">★</span>
+                        </button>
+                      )}
+                      <div className="catalog-view-toggle" role="group" aria-label="Вид каталога">
+                        <button
+                          type="button"
+                          className={catalogView === "cards" ? "active" : ""}
+                          aria-pressed={catalogView === "cards"}
+                          title="С фото"
+                          aria-label="С фото"
+                          onClick={() => {
+                            setCatalogView("cards");
+                            safeWrite(STORAGE.catalogView, "cards");
+                          }}
+                        >
+                          <CatalogViewToggleIcon variant="cards" />
+                          <span className="view-toggle-label">Фото</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={catalogView === "list" ? "active" : ""}
+                          aria-pressed={catalogView === "list"}
+                          title="Список"
+                          aria-label="Список"
+                          onClick={() => {
+                            setCatalogView("list");
+                            safeWrite(STORAGE.catalogView, "list");
+                          }}
+                        >
+                          <CatalogViewToggleIcon variant="list" />
+                          <span className="view-toggle-label">Список</span>
+                        </button>
+                      </div>
+                      {embedded ? (
+                        <div className="mini-card client-order-positions-chip">
+                          <span className="mini-label">Позиций</span>
+                          <strong>{cartCount}</strong>
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
+                  </div>
+                  <div className="category-list">
+                    {categories.map((item) => (
+                      <button
+                        className={category === item ? "category-button active" : "category-button"}
+                        type="button"
+                        key={item}
+                        onClick={() => setCategory(item)}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div className="category-list">
-                {categories.map((item) => (
-                  <button
-                    className={category === item ? "category-button active" : "category-button"}
-                    type="button"
-                    key={item}
-                    onClick={() => setCategory(item)}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-            </div>
+              );
+
+              if (!embedded) return toolbar;
+
+              return (
+                <>
+                  {toolbar}
+                  <div className="client-order-catalog-toolbar-spacer" aria-hidden="true" />
+                </>
+              );
+            })()}
 
             {catalogPolicy.matrixMode === "pending" && (
               <div className="matrix-catalog-note pending">
@@ -669,6 +1173,7 @@ export function OrderEditor({
               </div>
             )}
 
+            <div className="catalog-products">
             <section className={catalogView === "list" ? "product-grid product-grid-list" : "product-grid"}>
               {filtered.map((product) => {
                 const unit = units[product.id] || orderedSaleUnits(product)[0];
@@ -761,13 +1266,93 @@ export function OrderEditor({
               })}
               {!filtered.length && <div className="empty-box">Товары не найдены.</div>}
             </section>
+            </div>
           </div>
+
+          {(() => {
+            const cartBody = (
+              <>
+                <h2>Корзина</h2>
+                {!selectedItems.length && !customItems.length ? (
+                  <EmptyState
+                    title="Пока пусто"
+                    message="Выберите товары в каталоге, затем откройте корзину для оформления."
+                  />
+                ) : (
+                  <>
+                    <div className="summary-total" style={{ marginTop: 0 }}>
+                      <span>Позиций</span>
+                      <strong>{cartCount}</strong>
+                    </div>
+                    <div className="summary-total">
+                      <span>Итого</span>
+                      <strong>
+                        {settings.showPrices && grandTotal > 0
+                          ? formatMoney(grandTotal)
+                          : "уточняется"}
+                      </strong>
+                    </div>
+                    {settings.showPrices && total > 0 ? (
+                      <p
+                        className={`summary-delivery-note${
+                          deliveryFee > 0 ? " is-paid" : " is-free"
+                        }`}
+                      >
+                        {deliveryFee > 0
+                          ? `В заказе позиция «Доставка» — ${formatMoney(PAID_DELIVERY_FEE)}. До бесплатной ещё ${formatMoney(FREE_DELIVERY_MIN_TOTAL - total)}.`
+                          : "Доставка по СПб — бесплатно."}
+                      </p>
+                    ) : null}
+                    <p className="summary-note">
+                      Дата, адрес и комментарий — в корзине перед оформлением.
+                    </p>
+                    <div className="order-summary-actions">
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => void clearCart()}
+                      >
+                        Очистить корзину
+                      </button>
+                      <button
+                        className="primary-button open-cart-button"
+                        type="button"
+                        onClick={openCartForCheckout}
+                      >
+                        Перейти в корзину
+                      </button>
+                    </div>
+                  </>
+                )}
+              </>
+            );
+
+            if (embedded) {
+              return (
+                <div className="lk-order-cart-slot" ref={cartSlotRef}>
+                  <aside
+                    className="order-summary lk-order-cart"
+                    id="order-summary"
+                    ref={cartPanelRef}
+                  >
+                    {cartBody}
+                  </aside>
+                </div>
+              );
+            }
+
+            return (
+              <aside className="order-summary" id="order-summary">
+                {cartBody}
+              </aside>
+            );
+          })()}
         </div>
 
         <div className="mobile-checkout-bar" aria-label="Корзина">
           <div className="mobile-checkout-bar-info">
             <strong>{cartCount} поз.</strong>
-            <span>{settings.showPrices && total > 0 ? formatMoney(total) : "Сумма уточняется"}</span>
+            <span>{settings.showPrices && grandTotal > 0 ? formatMoney(grandTotal) : "Сумма уточняется"}</span>
           </div>
           <button
             className="mobile-checkout-bar-button"
@@ -903,6 +1488,19 @@ export function OrderEditor({
                       </div>
                     </div>
                   ))}
+                  {deliveryFee > 0 ? (
+                    <div className="cart-sheet-item cart-sheet-item--delivery" key="clover-delivery-spb">
+                      <div className="cart-sheet-item-head">
+                        <div className="cart-sheet-item-main">
+                          <strong>{settings.deliveryOneCName || "Доставка"}</strong>
+                          <small>Доставка по СПб · 1 шт.</small>
+                        </div>
+                        <div className="cart-sheet-item-actions">
+                          <strong>{formatMoney(deliveryFee)}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               )}
 
@@ -978,8 +1576,19 @@ export function OrderEditor({
               <div className="cart-sheet-footer">
                 <div className="cart-sheet-total">
                   <span>Итого</span>
-                  <strong>{settings.showPrices && total > 0 ? formatMoney(total) : `${cartCount} поз.`}</strong>
+                  <strong>{settings.showPrices && grandTotal > 0 ? formatMoney(grandTotal) : `${cartCount} поз.`}</strong>
                 </div>
+                {settings.showPrices && total > 0 ? (
+                  <p
+                    className={`cart-sheet-delivery-note${
+                      deliveryFee > 0 ? " is-paid" : " is-free"
+                    }`}
+                  >
+                    {deliveryFee > 0
+                      ? `В заказе позиция «Доставка» — ${formatMoney(PAID_DELIVERY_FEE)}. Добавьте ещё на ${formatMoney(FREE_DELIVERY_MIN_TOTAL - total)} для бесплатной.`
+                      : "Доставка по Санкт-Петербургу — бесплатно."}
+                  </p>
+                ) : null}
                 <button className="secondary-button" type="button" onClick={() => void clearCart()}>
                   Очистить корзину
                 </button>

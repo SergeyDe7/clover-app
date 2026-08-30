@@ -23,3 +23,14 @@ export const STOREFRONT_DEFAULT_HERO_SLIDES = [
 
 export const STOREFRONT_DEFAULT_HERO_INTERVAL_SEC = 6;
 export const STOREFRONT_MAX_HERO_SLIDES = 8;
+
+/** Normalize slide href for hero navigation. First slide defaults to /install-app. */
+export function resolveStorefrontHeroSlideHref(slide, index = 0) {
+  const raw = String(slide?.href || "").trim();
+  if (raw) {
+    if (/^https?:\/\//i.test(raw) || raw.startsWith("//")) return raw;
+    return raw.startsWith("/") ? raw : `/${raw}`;
+  }
+  if (Number(index) === 0) return "/install-app";
+  return "";
+}

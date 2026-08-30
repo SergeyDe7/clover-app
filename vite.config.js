@@ -43,9 +43,18 @@ function cloverUiBuildTag() {
       const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
       const buildTag = `ui-${date}-${hash}`;
       const indexPath = path.join(options.dir, "index.html");
-      if (!fs.existsSync(indexPath)) return;
-      const html = fs.readFileSync(indexPath, "utf8").replaceAll(UI_BUILD_PLACEHOLDER, buildTag);
-      fs.writeFileSync(indexPath, html);
+      if (fs.existsSync(indexPath)) {
+        const html = fs.readFileSync(indexPath, "utf8").replaceAll(UI_BUILD_PLACEHOLDER, buildTag);
+        fs.writeFileSync(indexPath, html);
+      }
+      // Stamp SW so installed PWAs detect a new worker every deploy (byte change → install/activate).
+      const swPath = path.join(options.dir, "sw.js");
+      if (fs.existsSync(swPath)) {
+        const sw = fs
+          .readFileSync(swPath, "utf8")
+          .replaceAll(UI_BUILD_PLACEHOLDER, buildTag);
+        fs.writeFileSync(swPath, sw);
+      }
       console.log(`[clover-ui-build] ${buildTag}`);
     },
   };
