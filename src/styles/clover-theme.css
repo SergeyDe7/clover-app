@@ -3138,20 +3138,20 @@ body:has(.clover-app) {
   /* ~8 строк списком на экран: одна колонка, очень плотные ряды */
   .clover-app .product-grid.product-grid-list {
     grid-template-columns: 1fr !important;
-    gap: 2px !important;
-    align-items: stretch !important;
+    gap: 1px !important;
+    align-items: start !important;
   }
 
   .clover-app .product-card.product-card-list {
     display: grid !important;
     height: auto !important;
     min-height: 0 !important;
-    padding: 3px 6px !important;
-    gap: 0 6px !important;
+    padding: 2px 6px !important;
+    gap: 0 8px !important;
     grid-template-columns: minmax(0, 1fr) auto !important;
     grid-template-rows: auto auto !important;
-    align-items: center !important;
-    border-radius: 8px !important;
+    align-items: start !important;
+    border-radius: 6px !important;
     box-shadow: none !important;
   }
 
@@ -3159,7 +3159,7 @@ body:has(.clover-app) {
     display: none !important;
   }
 
-  /* Список без фото: название целиком; артикул под названием; ед/кол-во справа */
+  /* Список без фото: название; арт+цена одной строкой; ед/кол-во справа */
   .clover-app .product-card-list h2 {
     grid-column: 1 !important;
     grid-row: 1 !important;
@@ -3172,43 +3172,67 @@ body:has(.clover-app) {
     overflow-wrap: anywhere !important;
     -webkit-line-clamp: unset !important;
     margin: 0 !important;
+    padding: 0 !important;
   }
 
-  .clover-app .page-content-client .product-card-list .product-code,
-  .clover-app .page-content-client .embedded-catalog .product-card-list .product-code {
+  .clover-app .page-content-client .product-card-list .product-list-meta,
+  .clover-app .page-content-client .embedded-catalog .product-card-list .product-list-meta {
     grid-column: 1 !important;
     grid-row: 2 !important;
-    display: block !important;
-    margin: 1px 0 0 !important;
-    font-size: 0.68rem !important;
-  }
-
-  .clover-app .product-card-list .product-price {
-    grid-column: 1 !important;
-    grid-row: 2 !important;
-    font-size: 11px !important;
-    line-height: 1.1 !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: baseline !important;
+    gap: 0 8px !important;
     margin: 0 !important;
+    padding: 0 !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 
-  .clover-app .page-content-client .product-card-list .product-price,
-  .clover-app .page-content-client .embedded-catalog .product-card-list .product-price {
-    grid-row: 3 !important;
+  .clover-app .page-content-client .product-card-list .product-list-meta .product-code,
+  .clover-app .page-content-client .embedded-catalog .product-card-list .product-list-meta .product-code {
+    display: inline !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 0.68rem !important;
+    line-height: 1.15 !important;
+    color: #6b6f6b !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+  }
+
+  .clover-app .page-content-client .product-card-list .product-list-meta .product-price,
+  .clover-app .page-content-client .embedded-catalog .product-card-list .product-list-meta .product-price,
+  .clover-app .product-card-list .product-price {
+    grid-column: auto !important;
+    grid-row: auto !important;
+    display: inline !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 11px !important;
+    line-height: 1.15 !important;
+    font-weight: 700 !important;
   }
 
   .clover-app .product-card-list .product-card-controls {
     grid-column: 2 !important;
     grid-row: 1 / span 2 !important;
-    width: 132px !important;
-    min-width: 132px !important;
-    max-width: 132px !important;
-    gap: 4px !important;
-    align-self: center !important;
+    width: 124px !important;
+    min-width: 124px !important;
+    max-width: 124px !important;
+    gap: 2px !important;
+    align-self: start !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   .clover-app .page-content-client .product-card-list .product-card-controls,
   .clover-app .page-content-client .embedded-catalog .product-card-list .product-card-controls {
-    grid-row: 1 / span 3 !important;
+    grid-row: 1 / span 2 !important;
   }
 
   .clover-app .product-card-list .unit-choice,
@@ -3216,42 +3240,42 @@ body:has(.clover-app) {
     display: grid !important;
     grid-auto-flow: column !important;
     grid-auto-columns: minmax(0, 1fr) !important;
-    grid-template-rows: 24px !important;
+    grid-template-rows: 22px !important;
     width: 100% !important;
-    height: 24px !important;
-    min-height: 24px !important;
-    max-height: 24px !important;
-    border-radius: 7px !important;
+    height: 22px !important;
+    min-height: 22px !important;
+    max-height: 22px !important;
+    border-radius: 6px !important;
   }
 
   .clover-app .product-card-list .unit-choice button,
   .clover-app .product-card-list .unit-choice.unit-choice-single button {
     width: auto !important;
     min-width: 0 !important;
-    height: 24px !important;
-    min-height: 24px !important;
-    max-height: 24px !important;
+    height: 22px !important;
+    min-height: 22px !important;
+    max-height: 22px !important;
     font-size: 10px !important;
   }
 
   .clover-app .product-card-list .quantity-control {
     gap: 0 !important;
     width: 100% !important;
-    grid-template-columns: 24px minmax(0, 1fr) 24px !important;
-    border-radius: 7px !important;
+    grid-template-columns: 22px minmax(0, 1fr) 22px !important;
+    border-radius: 6px !important;
   }
 
   .clover-app .product-card-list .quantity-control > button {
-    width: 24px !important;
-    height: 24px !important;
-    min-width: 24px !important;
-    font-size: 14px !important;
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;
+    font-size: 13px !important;
   }
 
   .clover-app .product-card-list .quantity-input-wrap {
     display: flex !important;
     align-items: center !important;
-    min-height: 24px !important;
+    min-height: 22px !important;
     min-width: 0 !important;
     width: 100% !important;
     max-width: none !important;
@@ -3383,32 +3407,46 @@ body:has(.clover-app) {
   display: none !important;
 }
 
-/* Client LK list: article under title; units/qty stay on the right column */
-.clover-app .page-content-client .product-card-list .product-code,
-.clover-app .page-content-client .embedded-catalog .product-card-list .product-code {
-  display: block !important;
+/* Client LK list: art + price on one meta row; units/qty on the right */
+.clover-app .page-content-client .product-card-list .product-list-meta,
+.clover-app .page-content-client .embedded-catalog .product-card-list .product-list-meta {
   grid-column: 1 !important;
   grid-row: 3 !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: baseline !important;
+  gap: 0 10px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-width: 0 !important;
+}
+.clover-app .page-content-client .product-card-list .product-list-meta .product-code,
+.clover-app .page-content-client .embedded-catalog .product-card-list .product-list-meta .product-code {
+  display: inline !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
   margin: 0 !important;
   padding: 0 !important;
   font-size: 11px !important;
   line-height: 1.2 !important;
   color: #6b6f6b !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
   white-space: nowrap !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
 }
-.clover-app .page-content-client .product-card-list .product-price,
-.clover-app .page-content-client .embedded-catalog .product-card-list .product-price {
-  grid-column: 1 !important;
-  grid-row: 4 !important;
+.clover-app .page-content-client .product-card-list .product-list-meta .product-price,
+.clover-app .page-content-client .embedded-catalog .product-card-list .product-list-meta .product-price {
+  display: inline !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  margin: 0 !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
 }
 .clover-app .page-content-client .product-card-list .product-card-controls,
 .clover-app .page-content-client .embedded-catalog .product-card-list .product-card-controls {
   grid-column: 2 !important;
-  grid-row: 1 / span 4 !important;
+  grid-row: 1 / span 3 !important;
+  align-self: center !important;
 }
 
 .clover-app .catalog-view-toggle {
