@@ -64,23 +64,18 @@ export function ManagerContact({ settings, variant = "popover" }) {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open, inline]);
 
-  // Background lock via overflow only (never touch-action:none on ancestors).
-  // Class disables login page-swipe preventDefault while sheet/panel is open.
+  // Prevent body from eating touch while sheet is open (keeps pan-y on scroll body).
   useEffect(() => {
-    if (!open) return;
-    const html = document.documentElement;
-    const body = document.body;
-    html.classList.add("manager-contact-sheet-open");
-    const prevHtmlOverflow = html.style.overflow;
-    const prevBodyOverflow = body.style.overflow;
-    html.style.overflow = "hidden";
-    body.style.overflow = "hidden";
+    if (!open || inline) return;
+    const prevHtml = document.documentElement.style.overflow;
+    const prevBody = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
     return () => {
-      html.classList.remove("manager-contact-sheet-open");
-      html.style.overflow = prevHtmlOverflow;
-      body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
     };
-  }, [open]);
+  }, [open, inline]);
 
   const body = (
     <ContactBody
@@ -111,15 +106,7 @@ export function ManagerContact({ settings, variant = "popover" }) {
           <span className="manager-contact-label-full">Связаться с менеджером</span>
           <span className="manager-contact-label-short">Менеджер</span>
         </button>
-        {open ? (
-          <div
-            className="manager-contact-panel"
-            data-manager-contact-scroll="1"
-            ref={scrollRef}
-          >
-            {body}
-          </div>
-        ) : null}
+        {open ? <div className="manager-contact-panel">{body}</div> : null}
       </div>
     );
   }

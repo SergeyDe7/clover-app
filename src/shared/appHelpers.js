@@ -6251,7 +6251,6 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     z-index: 220;
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
-    touch-action: auto;
   }
   .manager-contact-popover::before { display: none; }
   .manager-contact-popover-head {
@@ -6288,10 +6287,10 @@ button.linkish { border: 0; background: transparent; color: #2f6b3a; font-weight
     min-height: 0;
     max-height: none;
     overflow-x: hidden;
-    overflow-y: scroll;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    touch-action: auto;
+    touch-action: pan-y;
     padding: 4px 18px 18px;
     box-sizing: border-box;
   }
