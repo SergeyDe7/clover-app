@@ -1865,10 +1865,34 @@ app.get("/api/public/manager-contact", (req, res) => {
   });
 });
 
+/**
+ * Каталог отдаётся без аутентификации и весит порядка полутора мегабайт.
+ * Express 5 сам на If-None-Match не отвечает, поэтому условный запрос
+ * обрабатывается здесь: повторный обход витрины превращается в цепочку
+ * 304 вместо полной перекачки.
+ */
+function sendPublicCatalogJson(req, res, payload) {
+  const body = JSON.stringify(payload);
+  const etag = `W/"${createHash("sha1").update(body).digest("base64")}"`;
+
+  res.setHeader("ETag", etag);
+  res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+  res.setHeader("Vary", "Accept-Encoding");
+
+  const requested = String(req.headers["if-none-match"] || "");
+  if (requested && requested.split(",").some((value) => value.trim() === etag)) {
+    return res.status(304).end();
+  }
+
+  return res.type("application/json").send(body);
+}
+
 /** Публичный каталог витрины clover-spb.ru (цены сайта, без матрицы ЛК). */
 app.get("/api/public/catalog", (req, res) => {
   try {
-    res.json(
+    sendPublicCatalogJson(
+      req,
+      res,
       getPublicCatalog({
         category: String(req.query.category || ""),
         subcategory: String(req.query.subcategory || ""),
@@ -1888,7 +1912,7 @@ app.get("/api/public/catalog/:code", (req, res) => {
     if (!product) {
       return res.status(404).json({ error: "Товар не найден." });
     }
-    res.json({ product });
+    sendPublicCatalogJson(req, res, { product });
   } catch (error) {
     console.error("public product failed", error);
     res.status(500).json({ error: "Не удалось загрузить товар." });
