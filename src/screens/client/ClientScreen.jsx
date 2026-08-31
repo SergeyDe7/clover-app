@@ -602,6 +602,14 @@ function ClientDashboard({
                 onOpenCatalogAdd={() => selectTab("catalog")}
                 onSave={(payload) =>
                   Promise.resolve(onSaveOrder(payload)).then(() => {
+                    // Дозаказ: уже был confirm — без второго thank-you экрана.
+                    if (payload?.addendumToOrderId) {
+                      setThankYouOpen(false);
+                      setTab("matrix");
+                      writeClientActiveTab("matrix");
+                      onNew?.({ silent: true });
+                      return;
+                    }
                     setThankYouOpen(true);
                   })
                 }
