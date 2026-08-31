@@ -101,6 +101,7 @@ import {
 } from "./orderStatus.js";
 import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffHasFeature, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
 import { safeLinkUrl } from "./safeUrl.js";
+import { logError } from "./logRedaction.js";
 import { publicClientSettings } from "./clientSettings.js";
 import { clientAddress, consumeRateLimit, rateLimit, resetRateLimit } from "./rateLimit.js";
 import { freezeLockedClientOrders } from "./clientOrderGuard.js";
@@ -564,7 +565,7 @@ function auditFromRequest(req, action, details = {}) {
       details,
     });
   } catch (error) {
-    console.error("Не удалось записать действие в журнал", error);
+    logError("Не удалось записать действие в журнал", error);
   }
 }
 
@@ -1082,7 +1083,7 @@ function reconciliationPeriodText(request) {
 
 function queueManagerNotification(event) {
   notifyManagers(event).catch((error) => {
-    console.error("Manager notification error", error?.message || error);
+    logError("Manager notification error", error);
   });
 }
 
@@ -1641,7 +1642,7 @@ function startOneCClaimRequeueTimer() {
     try {
       releaseExpiredOneCClaims();
     } catch (error) {
-      console.error("one-c claim auto-requeue failed", error);
+      logError("one-c claim auto-requeue failed", error);
     }
   }, intervalMs);
   if (typeof timer.unref === "function") timer.unref();
@@ -1904,7 +1905,7 @@ app.get("/api/public/site", (req, res) => {
   try {
     res.json({ site: getPublicSite() });
   } catch (error) {
-    console.error("public site failed", error);
+    logError("public site failed", error);
     res.status(500).json({ error: "Не удалось загрузить данные сайта." });
   }
 });
@@ -1959,7 +1960,7 @@ app.get("/api/public/catalog", (req, res) => {
       })
     );
   } catch (error) {
-    console.error("public catalog failed", error);
+    logError("public catalog failed", error);
     res.status(500).json({ error: "Не удалось загрузить каталог." });
   }
 });
@@ -1972,7 +1973,7 @@ app.get("/api/public/catalog/:code", (req, res) => {
     }
     sendPublicCatalogJson(req, res, { product });
   } catch (error) {
-    console.error("public product failed", error);
+    logError("public product failed", error);
     res.status(500).json({ error: "Не удалось загрузить товар." });
   }
 });
@@ -2046,7 +2047,7 @@ app.post("/api/auth/register", authRateLimits.register, async (req, res, next) =
     try {
       mail = await sendCloverMail({ to: email, ...message });
     } catch (mailError) {
-      console.error("Не удалось отправить письмо подтверждения", mailError);
+      logError("Не удалось отправить письмо подтверждения", mailError);
       mail = { sent: false, reason: "send_failed" };
     }
 
@@ -2126,7 +2127,7 @@ app.post("/api/auth/resend-verification", authRateLimits.resendVerification, asy
         ? getClientState(user.id).profile?.companyName
         : "Менеджер Clover";
       const message = verificationEmail({ companyName, verifyUrl });
-      try { await sendCloverMail({ to: email, ...message }); } catch (error) { console.error(error); }
+      try { await sendCloverMail({ to: email, ...message }); } catch (error) { logError("Не удалось отправить письмо", error); }
       if (allowDevelopmentAuthLinks(req)) developmentLink = verifyUrl;
     }
     res.json({
@@ -2155,7 +2156,7 @@ app.post("/api/auth/forgot-password", authRateLimits.forgotPassword, async (req,
       });
       const resetUrl = `${publicCabinetUrl(req)}/?reset=${encodeURIComponent(plainToken)}`;
       const message = resetPasswordEmail({ resetUrl });
-      try { await sendCloverMail({ to: email, ...message }); } catch (error) { console.error(error); }
+      try { await sendCloverMail({ to: email, ...message }); } catch (error) { logError("Не удалось отправить письмо", error); }
       if (allowDevelopmentAuthLinks(req)) developmentLink = resetUrl;
       writeAudit({
         userId: user.id, userEmail: user.email, userRole: user.role,
@@ -3110,7 +3111,7 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
           : changes.join("; "),
         url: `/?order=${encodeURIComponent(order.id)}`,
         tag: `order-${order.id}`,
-      }).catch((error) => console.error("Push order update error", error));
+      }).catch((error) => logError("Push order update error", error));
     }
   }
 
@@ -3289,7 +3290,7 @@ function notifyClientOrderStatusChanged(order, _previousStatus) {
     body: `статус: ${order.status}`,
     url: `/?order=${encodeURIComponent(order.id)}`,
     tag: `order-${order.id}`,
-  }).catch((error) => console.error("Push order status error", error));
+  }).catch((error) => logError("Push order status error", error));
 }
 
 app.patch(
@@ -6734,7 +6735,7 @@ app.post("/api/one-c/reconciliation/:requestId/result", (req, res, next) => {
       body: "PDF получен из 1С и доступен в Clover.",
       url: "/?section=reconciliation",
       tag: `reconciliation-${request.id}`,
-    }).catch((error) => console.error(error));
+    }).catch((error) => logError("Не удалось отправить push", error));
     res.json({ ok: true, requestId: request.id, status: request.status });
   } catch (error) {
     next(error);
@@ -6793,7 +6794,7 @@ app.patch("/api/admin/reconciliation/:requestId", authRequired, roleRequired("ma
       body: request.status === "ready" ? "Акт сверки готов к скачиванию." : `Статус запроса: ${request.status}`,
       url: "/?section=reconciliation",
       tag: `reconciliation-${request.id}`,
-    }).catch((error) => console.error(error));
+    }).catch((error) => logError("Не удалось отправить push", error));
     res.json({ ok: true, request });
   } catch (error) { next(error); }
 });
@@ -6827,7 +6828,7 @@ app.post(
       sendOrderPush(request.userId, {
         title: "Акт сверки готов", body: "Откройте Clover, чтобы скачать PDF.",
         url: "/?section=reconciliation", tag: `reconciliation-${request.id}`,
-      }).catch((error) => console.error(error));
+      }).catch((error) => logError("Не удалось отправить push", error));
 
       const clientUser = findUserById(request.userId);
       let mail = { sent: false, reason: "account_not_found" };
@@ -6853,7 +6854,7 @@ app.post(
             }],
           });
         } catch (mailError) {
-          console.error("Reconciliation email error", mailError);
+          logError("Reconciliation email error", mailError);
           mail = { sent: false, reason: "send_failed" };
         }
       }
@@ -6904,7 +6905,7 @@ app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("m
         ...approvalEmail({ approved: status === "approved" }),
       });
     } catch (mailError) {
-      console.error("Approval email error", mailError);
+      logError("Approval email error", mailError);
     }
   }
   res.json({
@@ -7230,7 +7231,7 @@ app.post(
 );
 
 app.use((error, req, res, _next) => {
-  console.error(error);
+  logError(`Ошибка запроса ${req.method} ${req.path}`, error);
 
   if (error?.type === "entity.too.large") {
     return res.status(413).json({
@@ -7292,7 +7293,7 @@ try {
     );
   }
 } catch (error) {
-  console.error("Не удалось создать автоматическую резервную копию", error);
+  logError("Не удалось создать автоматическую резервную копию", error);
 }
 
 app.listen(port, host, () => {
