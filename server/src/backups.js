@@ -1,4 +1,5 @@
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -19,10 +20,31 @@ import {
 const currentFile = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFile);
 const serverDirectory = path.resolve(currentDirectory, "..");
-export const backupDirectory = path.resolve(serverDirectory, "backups");
-export const uploadsDirectory = path.resolve(serverDirectory, "uploads");
 
-mkdirSync(backupDirectory, { recursive: true });
+/**
+ * Каталоги переопределяются переменными окружения, чтобы тесты и разовые
+ * проверки восстановления не писали в рабочие бэкапы. По умолчанию пути
+ * прежние, поведение продакшена не меняется.
+ */
+export const backupDirectory = path.resolve(
+  serverDirectory,
+  process.env.BACKUP_DIR || "backups"
+);
+export const uploadsDirectory = path.resolve(
+  serverDirectory,
+  process.env.UPLOADS_DIR || "uploads"
+);
+
+/**
+ * Архив содержит выгрузку БД и все загруженные файлы, то есть персональные
+ * данные клиентов целиком. Новые каталоги создаются без доступа для группы
+ * и остальных; права уже существующих каталогов правятся отдельно, вручную —
+ * см. docs/security/BACKUP_REMEDIATION_RUNBOOK.md.
+ */
+const BACKUP_DIR_MODE = 0o700;
+const BACKUP_FILE_MODE = 0o600;
+
+mkdirSync(backupDirectory, { recursive: true, mode: BACKUP_DIR_MODE });
 mkdirSync(uploadsDirectory, { recursive: true });
 
 function cleanLabel(value) {
@@ -72,6 +94,21 @@ function listUploadFiles(directory = uploadsDirectory, prefix = "") {
     }
   }
   return files.sort();
+}
+
+/**
+ * Свежесозданный архив читается только владельцем.
+ * Ошибка chmod не должна ронять создание бэкапа: на части файловых систем
+ * (например, смонтированных сетевых) смена прав не поддерживается.
+ */
+function restrictBackupFile(filePath) {
+  try {
+    chmodSync(filePath, BACKUP_FILE_MODE);
+  } catch (error) {
+    console.warn(
+      `Не удалось ограничить права резервной копии ${path.basename(filePath)}: ${error.message}`
+    );
+  }
 }
 
 function readZipMetadata(filePath) {
@@ -128,6 +165,7 @@ export function createServerBackup({
   }
 
   zip.writeZip(filePath);
+  restrictBackupFile(filePath);
 
   const result = {
     fileName,

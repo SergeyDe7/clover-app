@@ -18,7 +18,8 @@
     "test:manager-notifications": "node scripts/verify-manager-notifications.mjs",
     "test:manager-tabs": "node scripts/verify-manager-tabs-smoke.mjs",
     "test:order-trash": "node scripts/verify-order-trash.mjs",
-    "test:push-badge": "node scripts/verify-push-badge.mjs"
+    "test:push-badge": "node scripts/verify-push-badge.mjs",
+    "test:security": "node --test tests/security/"
   },
   "dependencies": {
     "@simplewebauthn/server": "13.0.0",
