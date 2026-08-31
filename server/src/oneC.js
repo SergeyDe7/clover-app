@@ -23,7 +23,41 @@ function normalizePath(value, fallback) {
   return raw.startsWith("/") ? raw : `/${raw}`;
 }
 
-function normalizeBaseUrl(value) {
+/**
+ * Origin'ы, на которые серверу разрешено ходить за данными 1С.
+ *
+ * Список берётся из ONEC_ALLOWED_ORIGINS, а если он не задан — из origin'а
+ * ONEC_BASE_URL. В продакшене ONEC_BASE_URL всегда перекрывает адрес из
+ * настроек (см. resolveOneCRuntimeConfig), поэтому такое умолчание ничего
+ * не ломает, но закрывает возможность увести исходящий запрос сервера на
+ * произвольный внутренний адрес через форму настроек.
+ *
+ * Пустой список означает «ограничение не настроено» — так ведёт себя
+ * локальная разработка, где адрес 1С задаётся только через интерфейс.
+ */
+export function allowedOneCOrigins() {
+  const origins = new Set();
+
+  const addOrigin = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return;
+    try {
+      origins.add(new URL(raw).origin);
+    } catch {
+      // Некорректная запись в конфигурации просто игнорируется:
+      // подниматься из-за неё при старте сервера незачем.
+    }
+  };
+
+  for (const item of String(process.env.ONEC_ALLOWED_ORIGINS || "").split(/[,;\s]+/)) {
+    addOrigin(item);
+  }
+  if (origins.size === 0) addOrigin(process.env.ONEC_BASE_URL);
+
+  return [...origins];
+}
+
+function normalizeBaseUrl(value, { enforceAllowlist = false } = {}) {
   const raw = String(value || "").trim();
   if (!raw) return "";
 
@@ -42,12 +76,29 @@ function normalizeBaseUrl(value) {
     throw new Error("Не указывайте логин и пароль внутри адреса 1С.");
   }
 
+  if (enforceAllowlist) {
+    const allowed = allowedOneCOrigins();
+    if (allowed.length && !allowed.includes(url.origin)) {
+      throw new Error(
+        `Адрес 1С разрешён только для: ${allowed.join(", ")}. Изменить список можно через ONEC_ALLOWED_ORIGINS.`
+      );
+    }
+  }
+
   return trimSlash(url.toString());
 }
 
-export function sanitizeOneCConfig(value = {}) {
+/**
+ * @param {object} value
+ * @param {object} [options]
+ * @param {boolean} [options.enforceAllowlist] проверять origin по списку
+ *   разрешённых. Включается при записи настроек; при чтении уже сохранённой
+ *   конфигурации — нет, иначе неподходящее старое значение роняло бы
+ *   страницу настроек вместо того, чтобы дать её исправить.
+ */
+export function sanitizeOneCConfig(value = {}, { enforceAllowlist = false } = {}) {
   const mode = value?.mode === "real" ? "real" : "simulation";
-  const baseUrl = value?.baseUrl ? normalizeBaseUrl(value.baseUrl) : "";
+  const baseUrl = value?.baseUrl ? normalizeBaseUrl(value.baseUrl, { enforceAllowlist }) : "";
   const timeoutMs = Math.min(
     30000,
     Math.max(3000, Number(value?.timeoutMs) || 10000)
@@ -171,6 +222,9 @@ async function requestJson(config, endpointPath, options = {}) {
         },
         body: options.body ? JSON.stringify(options.body) : undefined,
         signal: controller.signal,
+        // Перенаправление увело бы запрос за пределы разрешённого origin'а,
+        // сохранив заголовок авторизации.
+        redirect: "error",
       }
     );
 
@@ -179,7 +233,9 @@ async function requestJson(config, endpointPath, options = {}) {
     try {
       payload = text ? JSON.parse(text) : {};
     } catch {
-      payload = { raw: text };
+      // Не-JSON ответ показываем обрезанным: полное тело чужого сервиса
+      // не должно уезжать в интерфейс целиком.
+      payload = { raw: text.slice(0, 500) };
     }
 
     if (!response.ok) {

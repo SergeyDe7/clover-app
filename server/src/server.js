@@ -837,15 +837,43 @@ function localMachineAddresses() {
 
 const oneCLocalAddresses = localMachineAddresses();
 
+/**
+ * Ключи обмена с 1С.
+ *
+ * ONEC_API_KEY — общий ключ, работает со всеми разрешёнными базами; это
+ * текущее поведение, менять его нельзя, иначе рабочий обмен встанет.
+ * ONEC_API_KEY_TEST и ONEC_API_KEY_PROD — необязательные ключи, привязанные
+ * к контуру: с TEST-ключом нельзя писать в боевую базу. Пока они не заданы,
+ * ничего не меняется.
+ */
+function configuredOneCKeys() {
+  return [
+    { contour: null, value: String(process.env.ONEC_API_KEY || "").trim() },
+    { contour: "TEST", value: String(process.env.ONEC_API_KEY_TEST || "").trim() },
+    { contour: "PROD", value: String(process.env.ONEC_API_KEY_PROD || "").trim() },
+  ].filter((item) => item.value.length >= 24 && !isPlaceholderSecret(item.value));
+}
+
 function oneCAuthRequired(req, res, next) {
-  const configuredKey = String(process.env.ONEC_API_KEY || "").trim();
+  const keys = configuredOneCKeys();
   const bearer = String(req.headers.authorization || "").startsWith("Bearer ")
     ? String(req.headers.authorization).slice(7)
     : "";
   const supplied = String(req.headers["x-clover-key"] || bearer || "").trim();
 
-  if (configuredKey.length >= 24 && !isPlaceholderSecret(configuredKey)) {
-    if (secureEqual(supplied, configuredKey)) return next();
+  if (keys.length) {
+    // Сравниваются все ключи, а не до первого совпадения: так время ответа
+    // не зависит от того, какой именно ключ подошёл.
+    let matched = null;
+    for (const key of keys) {
+      if (secureEqual(supplied, key.value)) matched = key;
+    }
+
+    if (matched) {
+      req.oneCKeyContour = matched.contour;
+      return next();
+    }
+
     writeAudit({ action: "one-c.auth.denied", details: { ip: req.ip || "", mode: "api-key" } });
     return res.status(401).json({ error: "Неверный ключ обмена Clover." });
   }
@@ -882,6 +910,20 @@ function requireOneCTestDatabase(req, res) {
 /** Pull/ACK/цены: TEST всегда; другие базы — только при ONEC_PROD_EXCHANGE_ENABLED=true. */
 function requireOneCAllowedDatabase(req, res) {
   const database = extractOneCDatabase(req);
+
+  // Ключ, выданный на тестовый контур, не должен доставать до боевой базы.
+  if (req.oneCKeyContour === "TEST" && !isTestDatabase(database)) {
+    writeAudit({
+      action: "one-c.contour.denied",
+      details: { database, keyContour: "TEST" },
+    });
+    res.status(403).json({
+      error: "Этот ключ обмена выдан для контура TEST.",
+      code: "ONEC_KEY_CONTOUR_MISMATCH",
+    });
+    return null;
+  }
+
   if (!isAllowedOneCDatabase(database)) {
     const allowed = parseAllowedOneCDatabases().join(", ");
     res.status(403).json({
@@ -5091,7 +5133,9 @@ app.put(
   featureRequired("exchange"),
   (req, res, next) => {
     try {
-      const config = sanitizeOneCConfig(req.body?.config || req.body || {});
+      const config = sanitizeOneCConfig(req.body?.config || req.body || {}, {
+        enforceAllowlist: true,
+      });
       setGlobalState(ONE_C_STATE_KEY, config);
       auditFromRequest(req, "exchange.config.save", {
         mode: config.mode,
