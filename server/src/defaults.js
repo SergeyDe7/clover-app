@@ -113,4 +113,6 @@ export const EMPTY_LINK = {
   oneCPriceTypeId: "",
   oneCPriceTypeName: "",
   personalPrices: {},
+  /** ID пользователя role=manager — личный менеджер клиента. */
+  personalManagerId: "",
 };
