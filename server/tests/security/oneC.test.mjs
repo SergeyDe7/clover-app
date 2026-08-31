@@ -155,7 +155,7 @@ test("адрес 1С не принимает посторонние схемы �
       assert.throws(() => sanitizeOneCConfig({ mode: "real", baseUrl: bad }));
     }
     assert.throws(
-      () => sanitizeOneCConfig({ mode: "real", baseUrl: "http://user:secret@10.0.0.20" }),
+      () => sanitizeOneCConfig({ mode: "real", baseUrl: "http://user:secret@10.0.0.20" }), // secret-scan:allow — вымышленный адрес
       /логин и пароль/
     );
   } finally {

@@ -9,7 +9,7 @@ import { REDACTED, redactError, redactSecrets, redactString } from "../../src/lo
 import { startTestServer } from "../helpers/testServer.mjs";
 
 const SAMPLE_JWT =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIn0.s3cr3tS1gnatur3";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIn0.s3cr3tS1gnatur3"; // secret-scan:allow — образец для проверки затирания
 
 test("токен в свободном тексте затирается", () => {
   const text = redactString(`не удалось проверить ${SAMPLE_JWT} для запроса`);
@@ -26,7 +26,7 @@ test("заголовок авторизации затирается", () => {
 });
 
 test("логин и пароль внутри URL затираются", () => {
-  const text = redactString("http://exchange:s3cret@10.0.0.20/hs");
+  const text = redactString("http://exchange:s3cret@10.0.0.20/hs"); // secret-scan:allow — вымышленный адрес
   assert.equal(text.includes("s3cret"), false);
   assert.equal(text.startsWith("http://"), true);
 });
