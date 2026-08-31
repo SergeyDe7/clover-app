@@ -8,6 +8,7 @@ import {
   setGlobalState,
 } from "./db.js";
 import { DEFAULT_PRODUCTS, DEFAULT_SETTINGS, EMPTY_LINK } from "./defaults.js";
+import { safeLinkUrl } from "./safeUrl.js";
 import { normalizeOneCProducts } from "./oneCProducts.js";
 import { normalizeOneCPriceTypes } from "./oneCSalePrices.js";
 import {
@@ -467,8 +468,8 @@ function toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId = "")
     ),
     subcategory: String(product.subcategory || "").trim(),
     facet: String(product.facet || "").trim(),
-    imageUrl: String(product.imageUrl || "").trim(),
-    certificateUrl: String(product.certificateUrl || "").trim(),
+    imageUrl: safeLinkUrl(product.imageUrl),
+    certificateUrl: safeLinkUrl(product.certificateUrl),
     oneCId: String(product.oneCId || "").trim(),
     oneCCode,
     saleUnits: publicSaleUnits(product),

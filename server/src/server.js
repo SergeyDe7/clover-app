@@ -100,6 +100,7 @@ import {
   buildStatusUpdatedOrder,
 } from "./orderStatus.js";
 import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffHasFeature, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
+import { safeLinkUrl } from "./safeUrl.js";
 import { publicClientSettings } from "./clientSettings.js";
 import { clientAddress, consumeRateLimit, rateLimit, resetRateLimit } from "./rateLimit.js";
 import { freezeLockedClientOrders } from "./clientOrderGuard.js";
@@ -1491,6 +1492,12 @@ function stripRuntimeProductPricing(product = {}) {
     isMatrixProduct,
     ...stored
   } = product;
+
+  // Ссылки карточки уходят в href на витрине и в кабинете, поэтому схема
+  // проверяется на входе, а не только при отдаче.
+  if ("certificateUrl" in stored) stored.certificateUrl = safeLinkUrl(stored.certificateUrl);
+  if ("imageUrl" in stored) stored.imageUrl = safeLinkUrl(stored.imageUrl);
+
   return stored;
 }
 
