@@ -1184,6 +1184,14 @@ function normalizeManagerClientAddresses(addresses) {
   }));
 }
 
+/** Поля анкеты клиента, которые разрешено переносить из localStorage. */
+const MIGRATABLE_PROFILE_FIELDS = Object.freeze([
+  "companyName",
+  "contactName",
+  "phone",
+  "contacts",
+]);
+
 function normalizeClientProfileContacts(profile = {}, accountEmail = "") {
   const source = profile && typeof profile === "object" ? profile : {};
   const companyName = String(source.companyName || "").trim();
@@ -4538,16 +4546,27 @@ app.post(
   authRequired,
   roleRequired("client"),
   (req, res) => {
-    const importedProfile = req.body?.profile || {};
+    const importedProfile =
+      req.body?.profile && typeof req.body.profile === "object" && !Array.isArray(req.body.profile)
+        ? req.body.profile
+        : {};
     const currentState = getClientState(req.user.id);
-    const profile = {
-      ...currentState.profile,
-      ...Object.fromEntries(
-        Object.entries(importedProfile).filter(
-          ([, value]) => String(value || "").trim()
-        )
-      ),
-    };
+    // Только поля анкеты. Без списка ключей сюда переносилось произвольное
+    // содержимое localStorage, включая email — а он определяет логин
+    // и подставляется в customerEmail заказа.
+    const merged = { ...currentState.profile };
+    for (const field of MIGRATABLE_PROFILE_FIELDS) {
+      const value = importedProfile[field];
+      if (field === "contacts") {
+        if (Array.isArray(value) && value.length) merged.contacts = value;
+        continue;
+      }
+      if (String(value || "").trim()) merged[field] = value;
+    }
+    const profile = normalizeClientProfileContacts(
+      merged,
+      normalizeEmail(req.user.email) || currentState.profile?.email || ""
+    );
     const addressesIncoming = Array.isArray(req.body?.addresses)
       ? req.body.addresses
       : [];
@@ -4558,10 +4577,7 @@ app.post(
       ? req.body.orders
       : [];
 
-    setClientStateField(req.user.id, "profile", {
-      ...profile,
-      email: profile.email || req.user.email,
-    });
+    setClientStateField(req.user.id, "profile", profile);
     // Не затираем серверные адреса пустым localStorage при migrate после смены пароля.
     const addresses =
       addressesIncoming.length > 0
@@ -4649,9 +4665,26 @@ app.post(
     }
 
     if (req.body?.settings) {
-      setGlobalState("settings", {
+      const current = {
+        ...DEFAULT_SETTINGS,
         ...getGlobalState("settings", DEFAULT_SETTINGS),
-        ...req.body.settings,
+      };
+      // То же правило, что и в PUT /api/state/settings: поля витрины меняет
+      // только admin. Через миграцию оно раньше не действовало, и менеджер
+      // мог переписать режим ценообразования и наценку.
+      const incoming =
+        req.user.role === "admin"
+          ? req.body.settings
+          : {
+              ...stripStorefrontSettings(req.body.settings),
+              ...Object.fromEntries(
+                STOREFRONT_SETTING_KEYS.map((key) => [key, current[key]])
+              ),
+            };
+
+      setGlobalState("settings", {
+        ...current,
+        ...incoming,
       });
     }
 
