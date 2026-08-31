@@ -100,6 +100,10 @@ import {
   applyOrderStatusPolicy,
   buildStatusUpdatedOrder,
 } from "./orderStatus.js";
+import {
+  assertClientMayEditExistingOrder,
+  assertClientOrderOwnership,
+} from "./orderClientEdit.js";
 import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
 import { publicClientSettings } from "./clientSettings.js";
 import {
@@ -2971,6 +2975,51 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     });
   }
   orders = statusPolicy.orders;
+
+  if (isClientRole(req.user.role)) {
+    for (const order of orders) {
+      const id = String(order?.id || "").trim();
+      if (!id) continue;
+      const stored = getOrderById(id);
+      if (!stored) continue;
+      const ownership = assertClientOrderOwnership({
+        orderId: id,
+        storedUserId: stored.userId,
+        clientUserId: req.user.id,
+      });
+      if (!ownership.ok) {
+        return res.status(ownership.statusCode || 403).json({
+          error: ownership.error,
+          code: ownership.code,
+          orderId: id,
+        });
+      }
+    }
+
+    const clientEditSettings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    for (const order of orders) {
+      const previous = previousById.get(String(order?.id || ""));
+      if (!previous) continue;
+      const compositionChanged =
+        clientOrderSignature(previous) !== clientOrderSignature(order);
+      const editGate = assertClientMayEditExistingOrder({
+        previous,
+        incoming: order,
+        settings: clientEditSettings,
+        compositionChanged,
+      });
+      if (!editGate.ok) {
+        return res.status(editGate.statusCode || 409).json({
+          error: editGate.error,
+          code: editGate.code,
+          orderId: String(order?.id || ""),
+        });
+      }
+    }
+  }
 
   if (isClientRole(req.user.role)) {
     for (const order of orders) {

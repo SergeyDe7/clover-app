@@ -3310,6 +3310,32 @@ textarea { resize: vertical; }
   border: 1px solid #c9dfc4;
 }
 .save-order-button { width: 100%; min-height: 48px; border: none; border-radius: 13px; background: #5b9d57; color: #fff; font-weight: 800; }
+.addendum-order-button {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  gap: 2px;
+  place-items: center;
+  border: 1.5px solid #5b9d57;
+  border-radius: 13px;
+  background: #f4faf3;
+  color: #386f37;
+  font-weight: 800;
+  cursor: pointer;
+}
+.addendum-order-button small {
+  font-size: 11px;
+  font-weight: 600;
+  color: #5f7a5c;
+}
+.addendum-order-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: #b7c6b5;
+  background: #f3f5f2;
+  color: #7a847a;
+}
+.addendum-order-button:disabled small { color: #9aa39a; }
 .custom-product-box { grid-column: 1 / -1; padding: 20px; border: 1px dashed #87ae82; border-radius: 18px; background: #f8fbf6; }
 .custom-product-box h3 { margin: 7px 0; color: #394639; }
 .custom-product-form { display: grid; gap: 12px; margin-top: 15px; }

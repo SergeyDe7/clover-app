@@ -34,6 +34,7 @@ import {
   getSpbDeliveryFee,
   isCloverDeliveryLine,
 } from "../../config/orderConfig";
+import { findLatestAddendumOrder } from "../../shared/orderAddendum";
 import { productImageSrc } from "../../shared/productPhoto";
 import { ManagerContact } from "./ManagerContact";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
@@ -639,6 +640,20 @@ export function OrderEditor({
   const selectedAddress = addresses.find((item) => item.id === addressId);
   const deliveryDateParts = getDeliveryDateParts(deliveryDate);
 
+  // Дозаказ только из нового/повтора: в edit уже «Сохранить изменения».
+  const addendumTarget = useMemo(
+    () =>
+      session.mode === "edit" ? null : findLatestAddendumOrder(orders, settings),
+    [session.mode, orders, settings]
+  );
+  const cartHasLines = selectedItems.length > 0 || customItems.length > 0;
+  const canSubmitAddendum = Boolean(addendumTarget) && cartHasLines;
+  const addendumDisabledReason = !addendumTarget
+    ? "Нет заказа со статусом «Новый» — дозаказ доступен до принятия менеджером."
+    : !cartHasLines
+      ? "Добавьте товары в корзину."
+      : "";
+
   const draftSaveLockedRef = useRef(false);
 
   useEffect(() => {
@@ -867,6 +882,67 @@ export function OrderEditor({
         draftSaveLockedRef.current = false;
       });
   };
+
+  const submitAddendum = async () => {
+    if (!canSubmitAddendum || !addendumTarget) {
+      await appAlert({
+        title: "Дозаказ недоступен",
+        message: addendumDisabledReason || "Нельзя добавить позиции в текущий заказ.",
+        tone: "warn",
+      });
+      return;
+    }
+
+    const orderLabel = addendumTarget.number
+      ? `№${addendumTarget.number}`
+      : "текущий";
+    const confirmed = await appConfirm({
+      title: "Дозаказ",
+      message: `Добавить ${cartHasLines ? `${selectedItems.length + customItems.length} поз.` : "позиции"} в заказ ${orderLabel}? Дата, адрес и комментарий заказа не изменятся.`,
+      confirmLabel: "Добавить в заказ",
+      cancelLabel: "Отмена",
+      tone: "info",
+    });
+    if (!confirmed) return;
+
+    draftSaveLockedRef.current = true;
+    try {
+      localStorage.removeItem(STORAGE.draft);
+    } catch {
+      // ignore
+    }
+    Promise.resolve(
+      onSave({
+        items: selectedItems,
+        customItems,
+        addendumToOrderId: addendumTarget.id,
+      })
+    )
+      .then(() => {
+        setCartSheetOpen(false);
+        setCart({});
+        setCustomItems([]);
+        setQtyDrafts({});
+      })
+      .catch(() => {
+        draftSaveLockedRef.current = false;
+      });
+  };
+
+  const addendumButton = (
+    <button
+      className="addendum-order-button"
+      type="button"
+      disabled={!canSubmitAddendum}
+      title={addendumDisabledReason || `Добавить в заказ №${addendumTarget?.number || ""}`}
+      onClick={() => void submitAddendum()}
+    >
+      Дозаказ
+      {addendumTarget?.number ? (
+        <small>в №{addendumTarget.number}</small>
+      ) : null}
+    </button>
+  );
 
   const catalogBody = (
       <section
@@ -1524,9 +1600,15 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                       >
                         Перейти в корзину
                       </button>
+                      {session.mode !== "edit" ? addendumButton : null}
                     </div>
                   </>
                 )}
+                {!selectedItems.length && !customItems.length && session.mode !== "edit" ? (
+                  <div className="order-summary-actions" style={{ marginTop: 12 }}>
+                    {addendumButton}
+                  </div>
+                ) : null}
               </>
             );
 
@@ -1798,6 +1880,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                 <button className="save-order-button" type="button" onClick={submitOrder}>
                   {session.mode === "edit" ? "Сохранить изменения" : "Оформить заказ"}
                 </button>
+                {session.mode !== "edit" ? addendumButton : null}
               </div>
             </div>
           </div>,
