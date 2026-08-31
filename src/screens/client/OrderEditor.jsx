@@ -32,6 +32,7 @@ import {
   FREE_DELIVERY_MIN_TOTAL,
   PAID_DELIVERY_FEE,
   getSpbDeliveryFee,
+  isCloverDeliveryLine,
 } from "../../config/orderConfig";
 import { productImageSrc } from "../../shared/productPhoto";
 import { ManagerContact } from "./ManagerContact";
@@ -130,6 +131,7 @@ export function OrderEditor({
   const [cart, setCart] = useState(() => {
     const result = {};
     (initialSource.items || []).forEach((item) => {
+      if (isCloverDeliveryLine(item)) return;
       result[item.productId ?? item.id] = item.quantity;
     });
     return result;
@@ -137,6 +139,7 @@ export function OrderEditor({
   /** Порядок позиций как клиент добавлял в корзину — так же уходит в 1С. */
   const [cartOrder, setCartOrder] = useState(() =>
     (initialSource.items || [])
+      .filter((item) => !isCloverDeliveryLine(item))
       .map((item) => String(item.productId ?? item.id))
       .filter(Boolean)
   );
@@ -145,6 +148,7 @@ export function OrderEditor({
   const [units, setUnits] = useState(() => {
     const result = {};
     (initialSource.items || []).forEach((item) => {
+      if (isCloverDeliveryLine(item)) return;
       result[item.productId ?? item.id] = item.unit;
     });
     return result;
@@ -626,7 +630,7 @@ export function OrderEditor({
         0
       )
   );
-  // СПб: <5000 → 500 ₽ в итоге; ≥5000 → 0. Серверный deliveryFee.js на baseline нет (1С не трогаем).
+  // СПб: <5000 → 500 ₽ в итоге; ≥5000 → 0. Строка «Доставка» материализуется на сервере.
   const deliveryFee =
     settings.showPrices && total > 0 ? getSpbDeliveryFee(total) : 0;
   const grandTotal = roundPriceUp(total + deliveryFee);

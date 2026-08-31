@@ -8,6 +8,7 @@ import {
   overlayStorefrontClientLink,
   STOREFRONT_DEFAULT_COUNTERPARTY_NAME,
 } from "./storefrontCounterparty.js";
+import { isCloverDeliveryLine, resolveDeliveryOneCRefs } from "./deliveryFee.js";
 
 const UNIT_LABELS = {
   piece: "штука",
@@ -265,11 +266,18 @@ export function validateOrderFor1C({
   products,
   clientLinks,
   storefrontCounterpart = null,
+  deliverySettings = null,
+  oneCProducts = null,
 }) {
   const issues = [];
   const warnings = [];
   const link = clientLinkFor1C(order, clientLinks, storefrontCounterpart);
   const productsById = productMap(products);
+  const deliveryRefs = resolveDeliveryOneCRefs(
+    deliverySettings || {},
+    oneCProducts
+  );
+  const deliveryOneCName = deliveryRefs.name;
 
   if (!order?.id) issues.push("У заказа отсутствует системный ID.");
   if (!order?.number) issues.push("У заказа отсутствует номер.");
@@ -293,10 +301,28 @@ export function validateOrderFor1C({
 
   for (const item of items) {
     const product = productsById.get(String(item.productId ?? item.id));
-    const oneCId = String(item.oneCId || product?.oneCId || "").trim();
+    const isDelivery = isCloverDeliveryLine(item);
+    const oneCId = String(
+      item.oneCId ||
+        (isDelivery ? deliveryRefs.oneCId : "") ||
+        product?.oneCId ||
+        ""
+    ).trim();
+    const oneCCode = String(
+      item.oneCCode ||
+        item.code ||
+        (isDelivery ? deliveryRefs.oneCCode : "") ||
+        product?.oneCCode ||
+        product?.code ||
+        ""
+    ).trim();
 
-    if (!oneCId) {
-      issues.push(`У товара «${item.name || item.code || "Без названия"}» не заполнен ID номенклатуры 1С.`);
+    if (!oneCId && !oneCCode) {
+      issues.push(
+        isDelivery
+          ? `У позиции «${deliveryOneCName}» не заполнен ID/код номенклатуры 1С. Укажите UUID или код НФ-… в настройках (Доставка → 1С).`
+          : `У товара «${item.name || item.code || "Без названия"}» не заполнен ID номенклатуры 1С.`
+      );
     }
     if (!(Number(item.quantity) > 0)) {
       issues.push(`У товара «${item.name || item.code || "Без названия"}» указано неверное количество.`);
@@ -327,16 +353,27 @@ export function build1CPayload({
   products,
   clientLinks,
   storefrontCounterpart = null,
+  deliverySettings = null,
+  oneCProducts = null,
 }) {
   const validation = validateOrderFor1C({
     order,
     products,
     clientLinks,
     storefrontCounterpart,
+    deliverySettings,
+    oneCProducts,
   });
   const link = clientLinkFor1C(order, clientLinks, storefrontCounterpart);
   const productsById = productMap(products);
   const exchange = normalizeExchangeState(order?.exchange);
+  const deliveryRefs = resolveDeliveryOneCRefs(
+    deliverySettings || {},
+    oneCProducts
+  );
+  const deliveryOneCId = deliveryRefs.oneCId;
+  const deliveryOneCCode = deliveryRefs.oneCCode;
+  const deliveryOneCName = deliveryRefs.name;
 
   return {
     schema: "clover.order.1c",
@@ -378,25 +415,43 @@ export function build1CPayload({
     items: (() => {
       const rawItems = (order?.items || []).map((item, index) => {
         const product = productsById.get(String(item.productId ?? item.id));
+        const isDelivery = isCloverDeliveryLine(item);
         const saleUnit = item.unit || "piece";
         const quantity = Number(item.quantity) || 0;
         const multiplier = Number(item.multiplier) || 1;
-        const totalPieces = quantity * multiplier;
+        const totalPieces = isDelivery ? 1 : quantity * multiplier;
         const unitPrice = Number(item.unitPrice) || 0;
         const lineTotal = Number(item.lineTotal) || quantity * unitPrice;
         return {
           line: index + 1,
           cloverProductId: String(item.productId ?? item.id ?? ""),
-          oneCId: String(item.oneCId || product?.oneCId || ""),
-          code: item.oneCCode || product?.oneCCode || item.code || product?.code || "",
-          name: item.oneCName || product?.oneCName || item.name || product?.name || "",
-          displayName: item.name || product?.name || "",
+          oneCId: String(
+            item.oneCId ||
+              (isDelivery ? deliveryOneCId : "") ||
+              product?.oneCId ||
+              ""
+          ),
+          code:
+            item.oneCCode ||
+            (isDelivery ? deliveryOneCCode : "") ||
+            product?.oneCCode ||
+            item.code ||
+            product?.code ||
+            "",
+          name:
+            item.oneCName ||
+            (isDelivery ? deliveryOneCName : "") ||
+            product?.oneCName ||
+            item.name ||
+            product?.name ||
+            "",
+          displayName: item.name || product?.name || (isDelivery ? deliveryOneCName : ""),
           saleUnit,
           saleUnitName: UNIT_LABELS[saleUnit] || saleUnit || "",
           unit: ONEC_PIECE_UNIT,
           unitName: ONEC_PIECE_UNIT_NAME,
-          quantity,
-          multiplier,
+          quantity: isDelivery ? 1 : quantity,
+          multiplier: isDelivery ? 1 : multiplier,
           totalPieces,
           unitPrice,
           lineTotal,

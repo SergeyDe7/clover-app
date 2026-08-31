@@ -1,7 +1,10 @@
 /**
  * Server-side guard: client may only save catalog line items allowed by matrix policy.
  * customItems are intentionally out-of-matrix and are not checked here.
+ * Служебная позиция доставки (clover-delivery-spb) тоже вне матрицы.
  */
+
+import { isCloverDeliveryLine } from "./deliveryFee.js";
 
 function cleanId(value) {
   return String(value ?? "").trim();
@@ -26,6 +29,7 @@ export function findClientOrderMatrixViolations(orders, rawLink = {}, products =
   const violations = [];
   for (const order of Array.isArray(orders) ? orders : []) {
     for (const item of Array.isArray(order?.items) ? order.items : []) {
+      if (isCloverDeliveryLine(item)) continue;
       const productId = item?.productId ?? item?.id;
       if (!clientMayOrderCatalogProduct(rawLink, productId, products)) {
         violations.push({
