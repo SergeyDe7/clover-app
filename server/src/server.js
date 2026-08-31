@@ -99,7 +99,7 @@ import {
   applyOrderStatusPolicy,
   buildStatusUpdatedOrder,
 } from "./orderStatus.js";
-import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
+import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffHasFeature, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
 import { publicClientSettings } from "./clientSettings.js";
 import {
   listClientAccessEntries,
@@ -661,6 +661,41 @@ function roleRequired(...roles) {
     }
 
     next();
+  };
+}
+
+/**
+ * Разграничение по разделам кабинета (permissions.tabs) на стороне сервера.
+ *
+ * Вкладки в интерфейсе — не граница безопасности: до этого менеджер с
+ * `tabs: ["orders"]` мог обратиться к любому manager-маршруту напрямую.
+ * Ставится ПОСЛЕ roleRequired, чтобы роль проверялась первой.
+ *
+ * admin проходит всегда (staffHasFeature возвращает true для admin),
+ * менеджер без явного ограничения tabs — тоже (fullAccess).
+ */
+function featureRequired(...featureIds) {
+  const required = featureIds.filter(Boolean);
+  return (req, res, next) => {
+    const user = req.user;
+    if (!isStaffRole(user?.role)) {
+      return res.status(403).json({
+        error: "Недостаточно прав для этого действия.",
+      });
+    }
+
+    const missing = required.filter((featureId) => !staffHasFeature(user, featureId));
+    if (missing.length === 0) return next();
+
+    auditFromRequest(req, "staff.feature.denied", {
+      method: req.method,
+      path: req.route?.path || req.originalUrl,
+      missing,
+    });
+    return res.status(403).json({
+      error: "Этот раздел недоступен для вашей учётной записи.",
+      code: "FEATURE_FORBIDDEN",
+    });
   };
 }
 
@@ -2972,6 +3007,7 @@ app.post(
   "/api/admin/orders/:orderId/restore",
   authRequired,
   roleRequired("manager"),
+  featureRequired("orders"),
   (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) {
@@ -3009,6 +3045,7 @@ app.delete(
   "/api/admin/orders/:orderId",
   authRequired,
   roleRequired("manager"),
+  featureRequired("orders"),
   (req, res) => {
     const settings = {
       ...DEFAULT_SETTINGS,
@@ -3060,6 +3097,7 @@ app.patch(
   "/api/orders/:orderId/status",
   authRequired,
   roleRequired("manager"),
+  featureRequired("orders"),
   (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) {
@@ -3103,6 +3141,7 @@ app.post(
   "/api/orders/status/bulk",
   authRequired,
   roleRequired("manager"),
+  featureRequired("orders"),
   (req, res) => {
     const orderIds = Array.isArray(req.body?.orderIds) ? req.body.orderIds : [];
     const status = req.body?.status;
@@ -3961,6 +4000,7 @@ app.put(
   "/api/state/products",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   (req, res) => {
     const incomingProducts = Array.isArray(req.body?.products)
       ? req.body.products.map(stripRuntimeProductPricing)
@@ -4158,6 +4198,7 @@ app.get(
   "/api/admin/clients/:clientId/matrix-prices",
   authRequired,
   roleRequired("manager"),
+  featureRequired("clients"),
   (req, res) => {
     const clientId = String(req.params.clientId || "").trim();
     const clientUser = findUserById(clientId);
@@ -4223,6 +4264,7 @@ app.put(
   "/api/admin/clients/:clientId",
   authRequired,
   roleRequired("manager"),
+  featureRequired("clients"),
   (req, res, next) => {
     try {
       const parsed = managerClientUpdateSchema.parse({
@@ -4293,6 +4335,7 @@ app.put(
   "/api/state/client-links",
   authRequired,
   roleRequired("manager"),
+  featureRequired("clients"),
   (req, res) => {
     const incomingLinks = req.body?.clientLinks || {};
     const storedLinks = getGlobalState("clientLinks", {});
@@ -4449,6 +4492,7 @@ app.post(
   "/api/migrate/manager",
   authRequired,
   roleRequired("manager"),
+  featureRequired("settings"),
   (req, res) => {
     if (
       Array.isArray(req.body?.products) &&
@@ -4487,6 +4531,7 @@ app.post(
   "/api/admin/products/:productId/image",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   imageUpload.single("image"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -4536,6 +4581,7 @@ app.delete(
   "/api/admin/products/:productId/image",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const productIndex = products.findIndex(
@@ -4571,6 +4617,7 @@ app.post(
   "/api/admin/products",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   (req, res) => {
     persistSingleCatalogProduct(req, res, { create: true });
   }
@@ -4580,6 +4627,7 @@ app.put(
   "/api/admin/products/:productId",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   (req, res) => {
     persistSingleCatalogProduct(req, res, { create: false });
   }
@@ -4589,6 +4637,7 @@ app.delete(
   "/api/admin/products/:productId",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   (req, res) => {
     const productId = String(req.params.productId || "").trim();
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -4668,6 +4717,7 @@ app.post(
   "/api/admin/products/:productId/certificate",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   certificateUpload.single("certificate"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -4719,6 +4769,7 @@ app.delete(
   "/api/admin/products/:productId/certificate",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const productIndex = products.findIndex(
@@ -4754,7 +4805,8 @@ app.delete(
 app.get(
   "/api/admin/backups",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("backup"),
   (req, res) => {
     res.json({ backups: listServerBackups() });
   }
@@ -4763,7 +4815,8 @@ app.get(
 app.post(
   "/api/admin/backups",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("backup"),
   (req, res) => {
     const backup = createServerBackup({
       label: req.body?.label || "manual",
@@ -4777,7 +4830,8 @@ app.post(
 app.post(
   "/api/admin/backups/cleanup",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("backup"),
   (req, res) => {
     const result = cleanupOldBackups({
       maxFiles: Number(req.body?.maxFiles) || 50,
@@ -4792,7 +4846,8 @@ app.post(
 app.get(
   "/api/admin/backups/:fileName/download",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("backup"),
   (req, res, next) => {
     try {
       const filePath = resolveBackupPath(req.params.fileName);
@@ -4806,7 +4861,8 @@ app.get(
 app.post(
   "/api/admin/backups/:fileName/restore",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("backup"),
   (req, res, next) => {
     try {
       createServerBackup({
@@ -4841,7 +4897,8 @@ app.post(
 app.get(
   "/api/admin/one-c/config",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("exchange"),
   (req, res) => {
     const stored = getGlobalState(ONE_C_STATE_KEY, DEFAULT_ONE_C_CONFIG);
     res.json({
@@ -4855,7 +4912,8 @@ app.get(
 app.put(
   "/api/admin/one-c/config",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("exchange"),
   (req, res, next) => {
     try {
       const config = sanitizeOneCConfig(req.body?.config || req.body || {});
@@ -4875,7 +4933,8 @@ app.put(
 app.post(
   "/api/admin/one-c/test",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("exchange"),
   async (req, res) => {
     const config = getGlobalState(ONE_C_STATE_KEY, DEFAULT_ONE_C_CONFIG);
     try {
@@ -5040,6 +5099,7 @@ app.get(
   "/api/admin/one-c/products",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const items = normalizeOneCProducts(
@@ -5093,6 +5153,7 @@ app.post(
   "/api/admin/one-c/products/from-catalog",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res, next) => {
     try {
       const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -5263,6 +5324,7 @@ app.post(
   "/api/admin/products/:productId/enrich",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   async (req, res, next) => {
     try {
       const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -5419,6 +5481,7 @@ app.post(
   "/api/admin/one-c/products/match-import",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
     if (!rows.length) {
@@ -5470,6 +5533,7 @@ app.get(
   "/api/admin/one-c/products/:productId/candidates",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const product = products.find(
@@ -5512,6 +5576,7 @@ app.post(
   "/api/admin/one-c/products/:productId/request",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const productIndex = products.findIndex(
@@ -5557,6 +5622,7 @@ app.post(
   "/api/admin/one-c/products/:productId/link",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res, next) => {
     try {
       const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -5595,6 +5661,7 @@ app.post(
   "/api/admin/one-c/products/auto-link",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const currentProducts = getGlobalState("products", DEFAULT_PRODUCTS);
     const oneCProducts = getGlobalState("oneCProducts", []);
@@ -5760,6 +5827,7 @@ app.get(
   "/api/admin/one-c/clients",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const clients = listClients();
     const clientLinks = getGlobalState("clientLinks", {});
@@ -5801,6 +5869,7 @@ app.get(
   "/api/admin/one-c/clients/:clientId/candidates",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const clients = listClients();
     const client = clients.find((item) => String(item.id) === String(req.params.clientId));
@@ -5836,6 +5905,7 @@ app.post(
   "/api/admin/one-c/clients/:clientId/link",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res, next) => {
     try {
       const links = getGlobalState("clientLinks", {});
@@ -5876,6 +5946,7 @@ app.post(
   "/api/admin/one-c/clients/auto-link",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const clients = listClients();
     const links = getGlobalState("clientLinks", {});
@@ -5900,6 +5971,7 @@ app.get(
   "/api/admin/one-c/preview/:type",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   async (req, res) => {
     const type = req.params.type === "clients" ? "clients" : req.params.type === "products" ? "products" : "";
     if (!type) {
@@ -5931,6 +6003,7 @@ app.post(
   "/api/admin/one-c/orders/:orderId/draft",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   async (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) return res.status(404).json({ error: "Заказ не найден." });
@@ -6047,6 +6120,7 @@ app.get(
   "/api/admin/exchange",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const orders = listOrders();
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -6106,6 +6180,7 @@ app.post(
   "/api/admin/exchange/orders/:orderId/check",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) return res.status(404).json({ error: "Заказ не найден." });
@@ -6153,6 +6228,7 @@ app.post(
   "/api/admin/exchange/orders/:orderId/send",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) return res.status(404).json({ error: "Заказ не найден." });
@@ -6249,6 +6325,7 @@ app.post(
   "/api/admin/exchange/orders/:orderId/reset",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) return res.status(404).json({ error: "Заказ не найден." });
@@ -6323,6 +6400,7 @@ app.get(
   "/api/admin/exchange/orders/:orderId/download",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) return res.status(404).json({ error: "Заказ не найден." });
@@ -6360,6 +6438,7 @@ app.get(
   "/api/admin/exchange/batch/download",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const clientLinks = getGlobalState("clientLinks", {});
@@ -6475,7 +6554,7 @@ app.post("/api/reconciliation", authRequired, roleRequired("client"), (req, res,
   } catch (error) { next(error); }
 });
 
-app.patch("/api/admin/reconciliation/:requestId", authRequired, roleRequired("manager"), (req, res, next) => {
+app.patch("/api/admin/reconciliation/:requestId", authRequired, roleRequired("manager"), featureRequired("acts"), (req, res, next) => {
   try {
     const input = reconciliationManagerSchema.parse(req.body);
     const request = updateReconciliationRequest(req.params.requestId, {
@@ -6495,7 +6574,7 @@ app.patch("/api/admin/reconciliation/:requestId", authRequired, roleRequired("ma
 
 app.post(
   "/api/admin/reconciliation/:requestId/file",
-  authRequired, roleRequired("manager"), reconciliationUpload.single("file"),
+  authRequired, roleRequired("manager"), featureRequired("acts"), reconciliationUpload.single("file"),
   async (req, res, next) => {
     try {
       if (!req.file?.path) {
@@ -6570,7 +6649,7 @@ app.get("/api/reconciliation/:requestId/file", authRequired, (req, res) => {
   return res.download(request.file_path, request.file_name || "Акт-сверки.pdf");
 });
 
-app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("manager"), async (req, res) => {
+app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("manager"), featureRequired("clients"), async (req, res) => {
   const status = String(req.body?.status || "");
   if (!["pending", "approved", "rejected"].includes(status)) {
     return res.status(400).json({ error: "Недопустимый статус регистрации." });
@@ -6761,6 +6840,7 @@ app.delete(
   "/api/admin/clients/:clientId",
   authRequired,
   roleRequired("manager"),
+  featureRequired("clients"),
   (req, res, next) => {
     try {
       const clientId = String(req.params.clientId || "").trim();
@@ -6872,7 +6952,7 @@ app.post("/api/push/unsubscribe", authRequired, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/admin/push/promotion", authRequired, roleRequired("manager"), async (req, res, next) => {
+app.post("/api/admin/push/promotion", authRequired, roleRequired("manager"), featureRequired("settings"), async (req, res, next) => {
   try {
     const title = String(req.body?.title || "Новость Clover").trim().slice(0, 100);
     const body = String(req.body?.body || "").trim().slice(0, 300);
@@ -6886,7 +6966,8 @@ app.post("/api/admin/push/promotion", authRequired, roleRequired("manager"), asy
 app.get(
   "/api/admin/audit",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("audit"),
   (req, res) => {
     res.json({ audit: listAudit(req.query.limit || 200) });
   }
@@ -6895,7 +6976,8 @@ app.get(
 app.post(
   "/api/admin/reset",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("settings"),
   (req, res) => {
     if (!isAdminFullResetAllowed(req)) {
       return res.status(403).json({
