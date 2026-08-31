@@ -117,6 +117,9 @@ server/.env
 server/.env.*
 !server/.env.example
 
+# Копии предыдущей сборки UI для отката (scripts/linux/restart-api-ui.sh)
+.deploy-backup/
+
 # Ключевой материал
 *.pem
 *.p12
