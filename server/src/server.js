@@ -514,15 +514,102 @@ function withStaffContactFields(staffUser) {
   };
 }
 
-/** Клиенту не отдаём personalManagerId (внутреннее назначение). */
-function publicClientLinkForClient(link = {}) {
-  if (!link || typeof link !== "object") return {};
+/** Внутренние поля ценообразования — не отдаём role=client (копия, state не трогаем). */
+const CLIENT_PRODUCT_PRICING_BLOCKLIST = new Set([
+  "purchasePrices",
+  "purchasePrice",
+  "purchasePriceUpdatedAt",
+  "purchasePriceReceivedAt",
+  "purchasePriceSourceUpdatedAt",
+  "purchasePriceSourceDatabase",
+  "purchasePriceSource",
+  "purchasePriceUnit",
+  "purchasePriceAvailable",
+  "salePricesByType",
+  "salePriceReceivedAt",
+  "markupPercent",
+  "defaultMarkupPercent",
+  "defaultPricingMode",
+  "clientPriceMode",
+  "clientPriceOverrideMode",
+  "oneCPriceTypeId",
+  "oneCPriceTypeName",
+  "priceSources",
+]);
+
+function sanitizeProductForClient(product = {}) {
+  if (!product || typeof product !== "object") return product;
   const out = {};
-  for (const [key, value] of Object.entries(link)) {
-    if (key === "personalManagerId") continue;
+  for (const [key, value] of Object.entries(product)) {
+    if (CLIENT_PRODUCT_PRICING_BLOCKLIST.has(key)) continue;
+    if (key.startsWith("basePrice")) continue;
     out[key] = value;
   }
   return out;
+}
+
+function sanitizeProductsForClient(products) {
+  return (Array.isArray(products) ? products : []).map(sanitizeProductForClient);
+}
+
+/**
+ * Клиенту не отдаём: personalManagerId, внутреннее ценообразование/1С-линк diagnostics.
+ */
+function sanitizeClientLinkForClient(link = {}) {
+  if (!link || typeof link !== "object") return {};
+  const out = {};
+  for (const [key, value] of Object.entries(link)) {
+    if (
+      key === "defaultMarkupPercent" ||
+      key === "defaultPricingMode" ||
+      key === "oneCPriceTypeId" ||
+      key === "oneCPriceTypeName" ||
+      key === "personalPrices" ||
+      key === "personalManagerId" ||
+      key === "oneCId" ||
+      key === "oneCCode" ||
+      key === "oneCName" ||
+      key === "oneCInn" ||
+      key === "oneCSearchQuery" ||
+      key === "managerNote" ||
+      key.startsWith("oneCMatch")
+    ) {
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
+/** Alias для совместимости с PCM-вызовами. */
+function publicClientLinkForClient(link = {}) {
+  return sanitizeClientLinkForClient(link);
+}
+
+function sanitizeOrderItemForClient(item = {}) {
+  if (!item || typeof item !== "object") return item;
+  const {
+    purchasePrice: _purchasePrice,
+    purchasePriceUpdatedAt: _purchasePriceUpdatedAt,
+    markupPercent: _markupPercent,
+    priceSource: _priceSource,
+    ...rest
+  } = item;
+  return rest;
+}
+
+function sanitizeOrderForClient(order = {}) {
+  if (!order || typeof order !== "object") return order;
+  return {
+    ...order,
+    items: (Array.isArray(order.items) ? order.items : []).map(
+      sanitizeOrderItemForClient
+    ),
+  };
+}
+
+function sanitizeOrdersForClient(orders) {
+  return (Array.isArray(orders) ? orders : []).map(sanitizeOrderForClient);
 }
 
 function assertCanManageTargetStaff(req, target) {
@@ -2763,10 +2850,10 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
 
   const clientPayload = {
     user: publicUser(req.user),
-    products: catalog.matrixProducts,
+    products: sanitizeProductsForClient(catalog.matrixProducts),
     catalogPolicy: catalog.policy,
     catalogPricesVersion: clientPricesRevision,
-    orders: listOrders(req.user.id),
+    orders: sanitizeOrdersForClient(listOrders(req.user.id)),
     trashedOrders: [],
     profile: state.profile,
     addresses: state.addresses,
@@ -2776,12 +2863,12 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
       ...managerContactSettings,
     },
     clientLinks: {
-      [req.user.id]: publicClientLinkForClient(catalog.link),
+      [req.user.id]: sanitizeClientLinkForClient(catalog.link),
     },
     clients: [],
     reconciliationRequests: listReconciliationRequests(req.user.id),
     services: { mail: publicMailStatus(), push: publicPushStatus() },
-    fullCatalogProducts: catalog.fullCatalogProducts,
+    fullCatalogProducts: sanitizeProductsForClient(catalog.fullCatalogProducts),
   };
 
   return res.json(clientPayload);
@@ -2835,8 +2922,8 @@ app.post(
         Boolean(matrixUpdate.alreadyInMatrix) ||
         catalog.policy.matrixMode === "all",
       catalogPolicy: catalog.policy,
-      products: catalog.matrixProducts,
-      fullCatalogProducts: catalog.fullCatalogProducts,
+      products: sanitizeProductsForClient(catalog.matrixProducts),
+      fullCatalogProducts: sanitizeProductsForClient(catalog.fullCatalogProducts),
     });
   }
 );
@@ -3083,7 +3170,9 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
 
   res.json({
     ok: true,
-    orders: orders.filter((order) => !isOrderTrashed(order)),
+    orders: isClientRole(req.user.role)
+      ? sanitizeOrdersForClient(orders.filter((order) => !isOrderTrashed(order)))
+      : orders.filter((order) => !isOrderTrashed(order)),
     trashedOrders: isStaffRole(req.user.role)
       ? orders.filter((order) => isOrderTrashed(order))
       : [],
@@ -3168,8 +3257,10 @@ app.post("/api/state/orders/:orderId/trash", authRequired, (req, res) => {
 
   res.json({
     ok: true,
-    order: updated,
-    orders: listOrders(isStaff ? null : req.user.id),
+    order: isClientRole(req.user.role) ? sanitizeOrderForClient(updated) : updated,
+    orders: isClientRole(req.user.role)
+      ? sanitizeOrdersForClient(listOrders(req.user.id))
+      : listOrders(isStaff ? null : req.user.id),
     trashedOrders: isStaff ? listTrashedOrders() : [],
   });
 });
