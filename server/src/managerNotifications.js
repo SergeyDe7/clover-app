@@ -3,6 +3,7 @@ import {
   getGlobalState,
   listManagerNotifications,
   listManagerUsers,
+  listStaffUsers,
   writeAudit,
 } from "./db.js";
 import { DEFAULT_SETTINGS } from "./defaults.js";
@@ -220,7 +221,11 @@ async function sendManagerPush(notification, settings) {
   if (settings.managerNotifyPush === false) {
     return { channel: "push", sent: 0, failed: 0, reason: "disabled" };
   }
-  const managers = listManagerUsers();
+  // listManagerUsers() — только role=manager; телефон подписан как admin,
+  // поэтому push уходил в no_push_subscription. Берём staff (manager+admin),
+  // клиентов listStaffUsers не возвращает. listManagerUsers не меняем:
+  // он ещё нужен для email-fallback.
+  const managers = listStaffUsers();
   const badgeCount = listManagerNotifications({ unreadOnly: true, limit: 500 }).length;
   const results = await Promise.all(
     managers.map((manager) => sendOrderPush(manager.id, {
