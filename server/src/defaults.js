@@ -84,6 +84,10 @@ export const DEFAULT_SETTINGS = {
   storefrontContactMapImageUrl: "",
   storefrontOneCClientId: "",
   storefrontOneCClientName: "Интернет магазин Clover",
+  /** Номенклатура 1С для платной доставки СПб (позиция «Доставка» 500 ₽). */
+  deliveryOneCId: "",
+  deliveryOneCCode: "",
+  deliveryOneCName: "Доставка",
 };
 
 export const EMPTY_LINK = {

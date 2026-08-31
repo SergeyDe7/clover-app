@@ -169,6 +169,13 @@ import {
   unitPriceField,
 } from "./pricing.js";
 import {
+  applyClientSpbDeliveryFees,
+  applyDeliveryLineSync,
+  ensureSpbDeliveryOnOrder,
+  isCloverDeliveryLine,
+  resolveDeliveryOneCRefs,
+} from "./deliveryFee.js";
+import {
   overlayStorefrontClientLink,
   resolveStorefrontOneCClient,
 } from "./storefrontCounterparty.js";
@@ -1391,6 +1398,7 @@ function repriceOrderWithCurrentOneC(order, products, rawLink, oneCProducts = []
   const issues = [];
 
   const items = (Array.isArray(order?.items) ? order.items : []).map((item) => {
+    if (isCloverDeliveryLine(item)) return item;
     const product = productsById.get(String(item.productId ?? item.id));
     if (!product) return item;
 
@@ -2773,6 +2781,37 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
         issues: repriced.issues.slice(0, 20),
       });
     }
+
+    // Доставка СПб: клиентский deliveryFee игнорируем, пересчёт по сумме позиций
+    // и позиция «Доставка» в items (для UI и 1С).
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    const deliveryMeta = {
+      deliveryOneCId: settings.deliveryOneCId,
+      deliveryOneCCode: settings.deliveryOneCCode,
+      deliveryOneCName: settings.deliveryOneCName || "Доставка",
+    };
+    orders = applyClientSpbDeliveryFees(orders, {
+      showPrices: Boolean(settings.showPrices),
+      oneCProducts: getGlobalState("oneCProducts", []),
+      ...deliveryMeta,
+    });
+  } else if (isStaffRole(req.user.role)) {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    orders = applyDeliveryLineSync(
+      orders,
+      {
+        deliveryOneCId: settings.deliveryOneCId,
+        deliveryOneCCode: settings.deliveryOneCCode,
+        deliveryOneCName: settings.deliveryOneCName || "Доставка",
+      },
+      getGlobalState("oneCProducts", [])
+    );
   }
 
   replaceOrders({
@@ -3251,14 +3290,46 @@ async function handleOneCTestOrder(req, res, next) {
         break;
       }
 
-      const draftItems = (candidate.items || []).map((item) => {
+      const deliverySettings = {
+        ...DEFAULT_SETTINGS,
+        ...getGlobalState("settings", DEFAULT_SETTINGS),
+      };
+      const oneCProducts = getGlobalState("oneCProducts", []);
+      const deliveryRefs = resolveDeliveryOneCRefs(deliverySettings, oneCProducts);
+      const candidateForLinkCheck = ensureSpbDeliveryOnOrder(
+        candidate,
+        {
+          deliveryOneCId: deliverySettings.deliveryOneCId,
+          deliveryOneCCode: deliverySettings.deliveryOneCCode,
+          deliveryOneCName: deliverySettings.deliveryOneCName || "Доставка",
+        },
+        oneCProducts
+      );
+      const draftItems = (candidateForLinkCheck.items || []).map((item) => {
         const product = productsById.get(String(item.productId ?? item.id));
+        const isDelivery = isCloverDeliveryLine(item);
+        const id = String(
+          item.oneCId ||
+            (isDelivery ? deliveryRefs.oneCId : "") ||
+            product?.oneCId ||
+            ""
+        ).trim();
+        const code = String(
+          item.oneCCode ||
+            item.code ||
+            (isDelivery ? deliveryRefs.oneCCode : "") ||
+            product?.oneCCode ||
+            product?.code ||
+            ""
+        ).trim();
         return {
-          id: String(item.oneCId || product?.oneCId || "").trim(),
+          id,
+          code,
+          linked: Boolean(id || code),
           displayName: item.name || product?.name || "",
         };
       });
-      const missingItems = draftItems.filter((item) => !item.id);
+      const missingItems = draftItems.filter((item) => !item.linked);
       if (missingItems.length) {
         claimBlockedReason = {
           status: 409,
@@ -3299,9 +3370,61 @@ async function handleOneCTestOrder(req, res, next) {
     // Цена уже согласована клиентом в заказе и фиксируется при постановке
     // в очередь. Свежая закупочная цена из 1С обязательна для контроля и
     // расчёта следующих заказов, но не меняет сумму уже созданного заказа.
-    const rawClaimItems = (realOrder.items || []).map((item) => {
+    const deliverySettings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    const oneCProductsCatalog = getGlobalState("oneCProducts", []);
+    // Старые заказы могли иметь только deliveryFee без строки в items —
+    // перед claim материализуем позицию «Доставка» и подтягиваем UUID по коду.
+    const orderForClaim = ensureSpbDeliveryOnOrder(
+      realOrder,
+      {
+        deliveryOneCId: deliverySettings.deliveryOneCId,
+        deliveryOneCCode: deliverySettings.deliveryOneCCode,
+        deliveryOneCName: deliverySettings.deliveryOneCName || "Доставка",
+      },
+      oneCProductsCatalog
+    );
+    const claimGrand = (orderForClaim.items || []).reduce(
+      (sum, line) => sum + (Number(line.lineTotal) || 0),
+      0
+    );
+    orderForClaim.total = claimGrand;
+    orderForClaim.amount = claimGrand;
+    if (
+      JSON.stringify(orderForClaim.items || []) !==
+      JSON.stringify(realOrder.items || [])
+    ) {
+      updateOrderPayload(realOrder.id, {
+        ...orderForClaim,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    const deliveryRefs = resolveDeliveryOneCRefs(
+      deliverySettings,
+      oneCProductsCatalog
+    );
+    if (
+      deliveryRefs.oneCId &&
+      deliveryRefs.oneCId !== String(deliverySettings.deliveryOneCId || "").trim()
+    ) {
+      setGlobalState("settings", {
+        ...deliverySettings,
+        deliveryOneCId: deliveryRefs.oneCId,
+        deliveryOneCCode:
+          deliveryRefs.oneCCode || deliverySettings.deliveryOneCCode || "",
+      });
+    }
+    const rawClaimItems = (orderForClaim.items || []).map((item) => {
       const product = productsById.get(String(item.productId ?? item.id));
-      const oneCId = String(item.oneCId || product?.oneCId || "").trim();
+      const isDelivery = isCloverDeliveryLine(item);
+      const oneCId = String(
+        item.oneCId ||
+          (isDelivery ? deliveryRefs.oneCId : "") ||
+          product?.oneCId ||
+          ""
+      ).trim();
       const quantity = Number(item.quantity) || 1;
       const price =
         Number(item.unitPrice) ||
@@ -3311,22 +3434,34 @@ async function handleOneCTestOrder(req, res, next) {
         ? item.unit
         : "piece";
       const multiplier = Math.max(1, Number(item.multiplier) || 1);
-      const totalPieces = quantity * multiplier;
+      const totalPieces = isDelivery ? 1 : quantity * multiplier;
       const lineTotal = Number(item.lineTotal) || quantity * price;
 
       return {
         id: oneCId,
-        code: item.oneCCode || product?.oneCCode || item.code || product?.code || "",
-        name: item.oneCName || product?.oneCName || item.name || product?.name || "",
-        displayName: item.name || product?.name || "",
+        code:
+          item.oneCCode ||
+          item.code ||
+          (isDelivery ? deliveryRefs.oneCCode : "") ||
+          product?.oneCCode ||
+          product?.code ||
+          "",
+        name:
+          item.oneCName ||
+          (isDelivery ? deliveryRefs.name : "") ||
+          product?.oneCName ||
+          item.name ||
+          product?.name ||
+          "",
+        displayName: item.name || product?.name || (isDelivery ? deliveryRefs.name : ""),
         saleUnit,
         saleUnitName: unitLabel(saleUnit),
         // 1С: всегда количество в шт (totalPieces), единица «шт»
         unit: "piece",
         unitName: "шт",
-        multiplier,
+        multiplier: isDelivery ? 1 : multiplier,
         totalPieces,
-        quantity,
+        quantity: isDelivery ? 1 : quantity,
         price,
         lineTotal,
       };
@@ -5949,10 +6084,15 @@ app.post(
 
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const clientLinks = getGlobalState("clientLinks", {});
+    const deliverySettings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
     const validation = validateOrderFor1C({
       order: stored.payload,
       products,
       clientLinks,
+      deliverySettings,
     });
 
     if (!validation.ready) {
@@ -5967,6 +6107,7 @@ app.post(
       order: stored.payload,
       products,
       clientLinks,
+      deliverySettings,
     });
 
     try {
@@ -6124,10 +6265,15 @@ app.post(
 
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const clientLinks = getGlobalState("clientLinks", {});
+    const deliverySettings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
     const validation = validateOrderFor1C({
       order: stored.payload,
       products,
       clientLinks,
+      deliverySettings,
     });
     const previous = normalizeExchangeState(stored.payload.exchange);
     const checkedAt = new Date().toISOString();
@@ -6193,10 +6339,32 @@ app.post(
 
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const clientLinks = getGlobalState("clientLinks", {});
+    const deliverySettings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    const oneCProducts = getGlobalState("oneCProducts", []);
+    const orderWithDelivery = ensureSpbDeliveryOnOrder(
+      stored.payload,
+      {
+        deliveryOneCId: deliverySettings.deliveryOneCId,
+        deliveryOneCCode: deliverySettings.deliveryOneCCode,
+        deliveryOneCName: deliverySettings.deliveryOneCName || "Доставка",
+      },
+      oneCProducts
+    );
+    const sendGrand = (orderWithDelivery.items || []).reduce(
+      (sum, line) => sum + (Number(line.lineTotal) || 0),
+      0
+    );
+    orderWithDelivery.total = sendGrand;
+    orderWithDelivery.amount = sendGrand;
     const validation = validateOrderFor1C({
-      order: stored.payload,
+      order: orderWithDelivery,
       products,
       clientLinks,
+      deliverySettings,
+      oneCProducts,
     });
     const attemptedAt = new Date().toISOString();
     const exchange = {
@@ -6219,7 +6387,7 @@ app.post(
         : validation.issues.join(" "),
     };
     const order = updateOrderPayload(stored.id, {
-      ...stored.payload,
+      ...orderWithDelivery,
       exchange,
       updatedAt: attemptedAt,
     });
@@ -6341,10 +6509,15 @@ app.get(
 
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const clientLinks = getGlobalState("clientLinks", {});
+    const deliverySettings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
     const payload = build1CPayload({
       order: stored.payload,
       products,
       clientLinks,
+      deliverySettings,
     });
     const safeNumber = String(stored.payload.number || stored.id).replace(/[^a-zA-Z0-9а-яА-Я_-]/g, "-");
     const format = String(req.query.format || "json").toLowerCase();
@@ -6381,7 +6554,15 @@ app.get(
       if (requestedStatus === "all") return true;
       return normalizeExchangeState(order.exchange).status === requestedStatus;
     });
-    const payloads = orders.map((order) => build1CPayload({ order, products, clientLinks }));
+    const payloads = orders.map((order) => build1CPayload({
+      order,
+      products,
+      clientLinks,
+      deliverySettings: {
+        ...DEFAULT_SETTINGS,
+        ...getGlobalState("settings", DEFAULT_SETTINGS),
+      },
+    }));
     const stamp = new Date().toISOString().slice(0, 10);
 
     auditFromRequest(req, "exchange.download.batch", {
