@@ -712,7 +712,7 @@ export const storefrontOrderSchema = z.object({
   items: z
     .array(
       z.object({
-        productId: z.union([z.string(), z.number()]),
+        productId: z.union([z.string().trim().min(1).max(120), z.number()]),
         code: z.string().trim().max(80).optional().default(""),
         unit: z.enum(SALE_UNITS).default("piece"),
         qty: z.coerce.number().int().positive().max(100000),
