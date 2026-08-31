@@ -405,7 +405,35 @@ app.use(cors({
   },
   credentials: false,
 }));
-app.use(express.json({ limit: "24mb" }));
+/**
+ * Раньше все маршруты принимали до 24 МБ JSON. Столько нужно единицам из
+ * них — массовым выгрузкам 1С и сохранению каталога целиком; для формы
+ * входа это просто дешёвый способ занять память сервера.
+ *
+ * Парсеры навешиваются от частного к общему: body-parser выставляет
+ * req._body и повторно тело не разбирает, поэтому первый подошедший
+ * лимит и оказывается действующим.
+ */
+const BULK_BODY_LIMIT = "24mb";
+const DEFAULT_BODY_LIMIT = "256kb";
+
+/** Маршруты, где большой объём — штатный режим работы. */
+const BULK_BODY_PATHS = [
+  "/api/one-c",
+  "/api/admin/one-c",
+  "/api/state/products",
+  "/api/state/orders",
+  "/api/state/settings",
+  "/api/admin/storefront",
+  "/api/migrate",
+];
+
+app.use("/api/auth", express.json({ limit: "32kb" }));
+app.use("/api/public/orders", express.json({ limit: "128kb" }));
+for (const bulkPath of BULK_BODY_PATHS) {
+  app.use(bulkPath, express.json({ limit: BULK_BODY_LIMIT }));
+}
+app.use(express.json({ limit: DEFAULT_BODY_LIMIT }));
 app.use("/uploads/reconciliation", (req, res) => res.status(404).end());
 app.use("/uploads", express.static(uploadsDirectory, { maxAge: "1h" }));
 
@@ -7064,6 +7092,12 @@ app.post(
 
 app.use((error, req, res, _next) => {
   console.error(error);
+
+  if (error?.type === "entity.too.large") {
+    return res.status(413).json({
+      error: "Слишком большой запрос.",
+    });
+  }
 
   if (Number.isInteger(error?.status) && error.status >= 400 && error.status < 600) {
     return res.status(error.status).json({ error: error.message });
