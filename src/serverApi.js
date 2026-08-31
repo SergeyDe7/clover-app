@@ -201,12 +201,34 @@ export const api = {
     return request("/auth/logout-other-sessions", { method: "POST" });
   },
 
-  createManager(email, password) {
-    return request("/admin/managers", { method: "POST", body: { email, password } });
+  createManager(email, password, contact = {}) {
+    return request("/admin/managers", {
+      method: "POST",
+      body: {
+        email,
+        password,
+        fullName: contact.fullName || "",
+        phone: contact.phone || "",
+        max: contact.max || "",
+        telegram: contact.telegram || "",
+      },
+    });
   },
 
   getStaffUsers() {
     return request("/admin/staff");
+  },
+
+  setStaffContacts(userId, contact = {}) {
+    return request(`/admin/staff/${encodeURIComponent(userId)}/contacts`, {
+      method: "PATCH",
+      body: {
+        fullName: contact.fullName || "",
+        phone: contact.phone || "",
+        max: contact.max || "",
+        telegram: contact.telegram || "",
+      },
+    });
   },
 
   setUserRole(userId, role) {

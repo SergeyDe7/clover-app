@@ -75,6 +75,7 @@ export function AdminRolePanel({ currentUser }) {
   const [draftPermissions, setDraftPermissions] = useState(null);
   const [revealed, setRevealed] = useState({});
   const [copiedKey, setCopiedKey] = useState("");
+  const [draftContacts, setDraftContacts] = useState(null);
 
   const load = async () => {
     setError("");
@@ -110,10 +111,17 @@ export function AdminRolePanel({ currentUser }) {
     if (!expandedUser) {
       setDraftPermissions(null);
       setDraftPassword("");
+      setDraftContacts(null);
       return;
     }
     setDraftPermissions(permissionsFromUser(expandedUser));
     setDraftPassword("");
+    setDraftContacts({
+      fullName: String(expandedUser.fullName || ""),
+      phone: String(expandedUser.phone || ""),
+      max: String(expandedUser.max || ""),
+      telegram: String(expandedUser.telegram || ""),
+    });
   }, [expandedUser]);
 
   const savedPasswordCount = useMemo(
@@ -158,6 +166,12 @@ export function AdminRolePanel({ currentUser }) {
     const formData = new FormData(event.currentTarget);
     const nextEmail = String(formData.get("managerEmail") || "").trim();
     const nextPassword = String(formData.get("managerPassword") || "");
+    const contact = {
+      fullName: String(formData.get("managerFullName") || "").trim(),
+      phone: String(formData.get("managerPhone") || "").trim(),
+      max: String(formData.get("managerMax") || "").trim(),
+      telegram: String(formData.get("managerTelegram") || "").trim(),
+    };
 
     if (!nextEmail) {
       const message = "Укажите email менеджера.";
@@ -176,7 +190,7 @@ export function AdminRolePanel({ currentUser }) {
     setError("");
     setNotice("");
     try {
-      await api.createManager(nextEmail, nextPassword);
+      await api.createManager(nextEmail, nextPassword, contact);
       setNotice(`Менеджер ${nextEmail} создан. Пароль сохранён в журнале.`);
       setFormKey((value) => value + 1);
       await load();
@@ -186,6 +200,23 @@ export function AdminRolePanel({ currentUser }) {
       await appAlert({ title: "Не создан", message, tone: "danger" });
     } finally {
       setCreating(false);
+    }
+  };
+
+  const saveContacts = async (user) => {
+    if (!draftContacts) return;
+    setBusyId(user.id);
+    setError("");
+    setNotice("");
+    try {
+      await api.setStaffContacts(user.id, draftContacts);
+      setNotice("Контакты менеджера сохранены.");
+      await load();
+    } catch (err) {
+      setError(err.message);
+      await appAlert({ title: "Ошибка", message: err.message, tone: "danger" });
+    } finally {
+      setBusyId("");
     }
   };
 
@@ -333,6 +364,46 @@ export function AdminRolePanel({ currentUser }) {
                 placeholder="минимум 6 символов"
               />
             </label>
+            <label className="field">
+              ФИО
+              <input
+                type="text"
+                name="managerFullName"
+                autoComplete="off"
+                defaultValue=""
+                placeholder="Иван Иванов"
+              />
+            </label>
+            <label className="field">
+              Телефон
+              <input
+                type="tel"
+                name="managerPhone"
+                autoComplete="off"
+                defaultValue=""
+                placeholder="+7 …"
+              />
+            </label>
+            <label className="field">
+              MAX
+              <input
+                type="text"
+                name="managerMax"
+                autoComplete="off"
+                defaultValue=""
+                placeholder="ник или ссылка"
+              />
+            </label>
+            <label className="field">
+              Telegram
+              <input
+                type="text"
+                name="managerTelegram"
+                autoComplete="off"
+                defaultValue=""
+                placeholder="@username"
+              />
+            </label>
           </div>
           <div className="form-actions">
             <button
@@ -382,8 +453,9 @@ export function AdminRolePanel({ currentUser }) {
             <div key={user.id} className="manager-contact-settings staff-user-card" style={{ marginTop: 0 }}>
               <div className="staff-card-top">
                 <div className="staff-card-identity">
-                  <strong>{user.email}</strong>
+                  <strong>{user.fullName || user.email}</strong>
                   <div className="staff-card-meta">
+                    {user.fullName ? <span className="staff-meta-chip">{user.email}</span> : null}
                     <span
                       className={
                         user.role === "admin" ? "staff-role-badge is-admin" : "staff-role-badge is-manager"
@@ -516,6 +588,80 @@ export function AdminRolePanel({ currentUser }) {
 
               {isExpanded && canManageStaff && (
                 <div className="staff-edit-panel">
+                  <div className="staff-edit-section">
+                    <div className="staff-edit-section-title">Контакты для клиентов</div>
+                    <p className="muted small" style={{ marginTop: 0 }}>
+                      Эти данные подставляются в кнопку «Связаться с менеджером»,
+                      если менеджер назначен клиенту как личный.
+                    </p>
+                    {draftContacts ? (
+                      <div className="form-grid">
+                        <label className="field">
+                          ФИО
+                          <input
+                            type="text"
+                            value={draftContacts.fullName}
+                            onChange={(event) =>
+                              setDraftContacts((current) => ({
+                                ...current,
+                                fullName: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="field">
+                          Телефон
+                          <input
+                            type="tel"
+                            value={draftContacts.phone}
+                            onChange={(event) =>
+                              setDraftContacts((current) => ({
+                                ...current,
+                                phone: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="field">
+                          MAX
+                          <input
+                            type="text"
+                            value={draftContacts.max}
+                            onChange={(event) =>
+                              setDraftContacts((current) => ({
+                                ...current,
+                                max: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="field">
+                          Telegram
+                          <input
+                            type="text"
+                            value={draftContacts.telegram}
+                            onChange={(event) =>
+                              setDraftContacts((current) => ({
+                                ...current,
+                                telegram: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                    ) : null}
+                    <div className="staff-edit-actions" style={{ marginTop: 10 }}>
+                      <button
+                        className="primary-button"
+                        type="button"
+                        disabled={busyId === user.id || !draftContacts}
+                        onClick={() => void saveContacts(user)}
+                      >
+                        Сохранить контакты
+                      </button>
+                    </div>
+                  </div>
+
                   {!isSelf ? (
                     <div className="staff-edit-section">
                       <div className="staff-edit-section-title">Доступ к аккаунту</div>

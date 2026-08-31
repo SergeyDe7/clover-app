@@ -870,9 +870,40 @@ export function ManagerClients({
   });
   const [editorProduct, setEditorProduct] = useState(undefined);
   const restoredOpenClient = useRef(false);
+  const [managerOptions, setManagerOptions] = useState([]);
 
   useEffect(() => {
     writeOpenManagerClientId("");
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await api.getStaffUsers();
+        if (cancelled) return;
+        const list = (Array.isArray(result.staff) ? result.staff : [])
+          .filter(
+            (item) =>
+              String(item.role) === "manager" &&
+              !item.disabled &&
+              !item.disabledAt
+          )
+          .map((item) => ({
+            id: String(item.id),
+            label:
+              String(item.fullName || "").trim() ||
+              String(item.email || item.login || item.id),
+            email: String(item.email || ""),
+          }));
+        setManagerOptions(list);
+      } catch {
+        if (!cancelled) setManagerOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -2032,6 +2063,30 @@ export function ManagerClients({
                       {matrixSaveState[client.id].message}
                     </span>
                   )}
+
+                  <div className="form-grid" style={{ marginTop: 12 }}>
+                    <label className="field">
+                      Личный менеджер
+                      <select
+                        value={String(link.personalManagerId || "")}
+                        onChange={(event) =>
+                          updateLink(client.id, {
+                            personalManagerId: event.target.value,
+                          })
+                        }
+                      >
+                        <option value="">Не назначен (общий контакт)</option>
+                        {managerOptions.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.label}
+                            {item.email && item.label !== item.email
+                              ? ` · ${item.email}`
+                              : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
 
                   <details className="client-matrix-settings" open={link.matrixMode === "pending"}>
                       <summary>1С и цены</summary>

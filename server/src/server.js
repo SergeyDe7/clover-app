@@ -113,6 +113,11 @@ import {
   removeStaffAccessEntry,
   saveStaffAccessCredentials,
 } from "./staffAccessVault.js";
+import {
+  normalizeStaffContact,
+  normalizeStaffContactsMap,
+  publicStaffContact,
+} from "./staffContacts.js";
 import { searchOneCProductsIndexed } from "./oneCSearchIndex.js";
 import {
   DEFAULT_ONE_C_CONFIG,
@@ -435,6 +440,89 @@ function publicUser(user) {
 function actorCanManageStaff(req) {
   // Создание/правка/удаление менеджеров — только admin.
   return req.user?.role === "admin" && staffCanManageStaff(req.user);
+}
+
+function readStaffContactsMap() {
+  return normalizeStaffContactsMap(getGlobalState("staffContacts", {}));
+}
+
+function writeStaffContactsMap(map) {
+  setGlobalState("staffContacts", normalizeStaffContactsMap(map));
+}
+
+function upsertStaffContact(userId, rawContact) {
+  const id = String(userId || "").trim();
+  if (!id) return null;
+  const map = readStaffContactsMap();
+  map[id] = normalizeStaffContact(rawContact);
+  writeStaffContactsMap(map);
+  return map[id];
+}
+
+function removeStaffContact(userId) {
+  const id = String(userId || "").trim();
+  if (!id) return;
+  const map = readStaffContactsMap();
+  if (!Object.prototype.hasOwnProperty.call(map, id)) return;
+  delete map[id];
+  writeStaffContactsMap(map);
+}
+
+/**
+ * Контакты для кнопки «Связаться с менеджером»:
+ * личный менеджер клиента → иначе global settings.
+ */
+function resolveClientManagerContactSettings(settings, personalManagerId = "") {
+  const fallback = {
+    managerFullName: String(settings?.managerFullName || ""),
+    managerPhone: String(settings?.managerPhone || ""),
+    managerMax: String(settings?.managerMax || ""),
+    managerTelegram: String(settings?.managerTelegram || ""),
+  };
+  const managerId = String(personalManagerId || "").trim();
+  if (!managerId) return fallback;
+
+  const user = findUserById(managerId);
+  if (
+    !user ||
+    String(user.role) !== "manager" ||
+    user.disabled_at ||
+    user.disabled
+  ) {
+    return fallback;
+  }
+
+  const contact = publicStaffContact(readStaffContactsMap()[managerId] || {});
+  return {
+    managerFullName: contact.fullName || fallback.managerFullName,
+    managerPhone: contact.phone || fallback.managerPhone,
+    managerMax: contact.max || fallback.managerMax,
+    managerTelegram: contact.telegram || fallback.managerTelegram,
+  };
+}
+
+function withStaffContactFields(staffUser) {
+  const contact = publicStaffContact(
+    readStaffContactsMap()[String(staffUser?.id || "")] || {}
+  );
+  return {
+    ...staffUser,
+    fullName: contact.fullName,
+    phone: contact.phone,
+    max: contact.max,
+    telegram: contact.telegram,
+  };
+}
+
+/** Клиенту не отдаём personalManagerId (внутреннее назначение). */
+function publicClientLinkForClient(link = {}) {
+  if (!link || typeof link !== "object") return {};
+  const out = {};
+  for (const [key, value] of Object.entries(link)) {
+    if (key === "personalManagerId") continue;
+    out[key] = value;
+  }
+  return out;
 }
 
 function assertCanManageTargetStaff(req, target) {
@@ -945,6 +1033,17 @@ const managerClientPasswordSchema = z.object({
 const managerCreateSchema = z.object({
   email: z.string().trim().email().max(200),
   password: z.string().min(6).max(200),
+  fullName: z.string().trim().max(160).optional(),
+  phone: z.string().trim().max(50).optional(),
+  max: z.string().trim().max(120).optional(),
+  telegram: z.string().trim().max(120).optional(),
+});
+
+const staffContactSchema = z.object({
+  fullName: z.string().trim().max(160).optional(),
+  phone: z.string().trim().max(50).optional(),
+  max: z.string().trim().max(120).optional(),
+  telegram: z.string().trim().max(120).optional(),
 });
 
 const staffPasswordSchema = z.object({
@@ -1198,6 +1297,7 @@ function normalizeClientLink(value) {
               .filter(([, config]) => config.source !== "inherit")
           )
         : {},
+    personalManagerId: String(link.personalManagerId || "").trim(),
   };
 }
 
@@ -2105,11 +2205,23 @@ app.post("/api/admin/managers", authRequired, roleRequired("manager"), async (re
       emailVerified: true,
       approvalStatus: "approved",
     });
+    const contact = upsertStaffContact(user.id, {
+      fullName: input.fullName || "",
+      phone: input.phone || "",
+      max: input.max || "",
+      telegram: input.telegram || "",
+    });
     rememberStaffPassword(user, input.password, req.user);
     auditFromRequest(req, "manager.create", { managerId: user.id });
     res.status(201).json({
       ok: true,
-      manager: publicUser(user),
+      manager: {
+        ...publicUser(user),
+        fullName: contact.fullName,
+        phone: contact.phone,
+        max: contact.max,
+        telegram: contact.telegram,
+      },
       requiresEmailVerification: false,
       message: "Менеджер создан. Можно сразу войти по email и паролю. Пароль сохранён в «Ещё → Доступы → Менеджеры».",
     });
@@ -2124,7 +2236,7 @@ app.get("/api/admin/staff", authRequired, roleRequired("manager"), (req, res) =>
     isStaffRole(req.user.role) &&
     (req.user.role === "admin" || adminCount === 0);
   const canManageStaff = actorCanManageStaff(req);
-  const staff = listStaffUsers();
+  const staff = listStaffUsers().map(withStaffContactFields);
   res.json({
     ok: true,
     staff: canManageStaff ? attachStaffAccess(staff) : staff,
@@ -2305,6 +2417,45 @@ app.patch(
   }
 );
 
+app.patch(
+  "/api/admin/staff/:userId/contacts",
+  authRequired,
+  roleRequired("manager"),
+  (req, res, next) => {
+    try {
+      if (!actorCanManageStaff(req)) {
+        return res.status(403).json({
+          error: "Недостаточно прав для управления менеджерами.",
+          code: "STAFF_MANAGE_FORBIDDEN",
+        });
+      }
+      const target = findUserById(String(req.params.userId || "").trim());
+      if (!target || !isStaffRole(target.role)) {
+        return res.status(404).json({ error: "Менеджер не найден." });
+      }
+      const input = staffContactSchema.parse(req.body || {});
+      const previous = readStaffContactsMap()[String(target.id)] || {};
+      const contact = upsertStaffContact(target.id, {
+        fullName:
+          input.fullName !== undefined ? input.fullName : previous.fullName,
+        phone: input.phone !== undefined ? input.phone : previous.phone,
+        max: input.max !== undefined ? input.max : previous.max,
+        telegram:
+          input.telegram !== undefined ? input.telegram : previous.telegram,
+      });
+      auditFromRequest(req, "manager.contacts.update", { managerId: target.id });
+      res.json({
+        ok: true,
+        message: "Контакты менеджера сохранены.",
+        user: withStaffContactFields(publicUser(target)),
+        contact,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 app.delete(
   "/api/admin/staff/:userId",
   authRequired,
@@ -2324,6 +2475,7 @@ app.delete(
         return res.status(404).json({ error: "Менеджер не найден." });
       }
       removeStaffAccessEntry(target.id);
+      removeStaffContact(target.id);
       auditFromRequest(req, "manager.delete", {
         managerId: target.id,
         email: target.email,
@@ -2603,6 +2755,12 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     String((catalog.link?.matrixProductIds || []).length),
   ].join("::");
 
+  const baseClientSettings = publicClientSettings(settings);
+  const managerContactSettings = resolveClientManagerContactSettings(
+    baseClientSettings,
+    catalog.link?.personalManagerId
+  );
+
   const clientPayload = {
     user: publicUser(req.user),
     products: catalog.matrixProducts,
@@ -2613,9 +2771,12 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     profile: state.profile,
     addresses: state.addresses,
     favorites: state.favorites,
-    settings: publicClientSettings(settings),
+    settings: {
+      ...baseClientSettings,
+      ...managerContactSettings,
+    },
     clientLinks: {
-      [req.user.id]: catalog.link,
+      [req.user.id]: publicClientLinkForClient(catalog.link),
     },
     clients: [],
     reconciliationRequests: listReconciliationRequests(req.user.id),
