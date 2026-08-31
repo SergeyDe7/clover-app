@@ -38,10 +38,6 @@ import {
   mergeOrderCustomItems,
 } from "./shared/orderAddendum";
 import { SoftBanner, ListSkeleton } from "./shared/uxFeedback";
-import {
-  installPushSyncListeners,
-  syncPushSubscription,
-} from "./shared/pushSync";
 import { ManagerContact } from "./screens/client/ManagerContact";
 
 const ClientScreen = lazy(() =>
@@ -798,17 +794,6 @@ function App() {
       window.removeEventListener("clover:update-available", onUpdateAvailable);
     };
   }, []);
-
-  // After UI/SW rebuild main.jsx unregisters the service worker, which drops the
-  // browser PushManager subscription. Resync on every logged-in session — not
-  // only when PushSettings is open — so status/manager pushes reach the phone.
-  useEffect(() => {
-    if (!isLoggedIn || !hydrated || !authUser) {
-      return undefined;
-    }
-    void syncPushSubscription();
-    return installPushSyncListeners();
-  }, [isLoggedIn, hydrated, authUser?.id]);
 
   useEffect(() => {
     if (!isLoggedIn || !hydrated || !authUser) {

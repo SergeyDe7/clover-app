@@ -490,15 +490,14 @@ export function PushSettings() {
             endpoint = browserSubscription?.endpoint || "";
             setCurrentEndpoint(endpoint);
           }
-        } else if (
-          endpoint &&
-          !(result.subscriptions || []).some((item) => item.endpoint === endpoint)
-        ) {
-          // Подписка в браузере есть, а на сервере её нет, и восстановить её
-          // автоматически не вышло. Раньше эта подсказка стояла соседней
-          // веткой того же условия и не показывалась никогда.
-          setMessage("Нажмите «Включить уведомления», чтобы восстановить push на этом устройстве.");
         }
+      } else if (
+        result.enabled &&
+        Notification.permission === "granted" &&
+        endpoint &&
+        !(result.subscriptions || []).some((item) => item.endpoint === endpoint)
+      ) {
+        setMessage("Нажмите «Включить уведомления», чтобы восстановить push на этом устройстве.");
       }
     } catch (error) {
       setMessage(error.message);

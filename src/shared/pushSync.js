@@ -47,19 +47,15 @@ export async function syncPushSubscription(preferences = {}) {
     });
   }
 
-  // Always upsert: after SW unregister/rebuild the browser may keep permission
-  // but lose the PushManager subscription; when it returns, server must get the
-  // current endpoint even if an older dead one is still stored for this user.
-  const wasMissing = !serverEndpoints.has(subscription.endpoint);
-  await api.subscribePush(subscription.toJSON(), {
-    orderEvents: true,
-    promotions,
-  });
-  return {
-    synced: true,
-    reason: wasMissing ? "registered" : "ok",
-    endpoint: subscription.endpoint,
-  };
+  if (!serverEndpoints.has(subscription.endpoint)) {
+    await api.subscribePush(subscription.toJSON(), {
+      orderEvents: true,
+      promotions,
+    });
+    return { synced: true, reason: "registered", endpoint: subscription.endpoint };
+  }
+
+  return { synced: true, reason: "ok", endpoint: subscription.endpoint };
 }
 
 export function installPushSyncListeners(callback) {
