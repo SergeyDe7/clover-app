@@ -102,6 +102,7 @@ import {
 import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffHasFeature, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
 import { publicClientSettings } from "./clientSettings.js";
 import { clientAddress, consumeRateLimit, rateLimit, resetRateLimit } from "./rateLimit.js";
+import { freezeLockedClientOrders } from "./clientOrderGuard.js";
 import {
   listClientAccessEntries,
   removeClientAccessEntry,
@@ -2862,6 +2863,36 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
   orders = statusPolicy.orders;
 
   if (isClientRole(req.user.role)) {
+    // Заказ с чужим id отбрасывается: вставка упёрлась бы в уникальный
+    // ключ и откатила всё сохранение, а заодно давала бы возможность
+    // проверять существование чужих заказов по коду ответа.
+    const foreignIds = [];
+    orders = orders.filter((order) => {
+      const id = String(order?.id || "");
+      if (!id || previousById.has(id)) return true;
+      const stored = getOrderById(id);
+      if (!stored || stored.userId === req.user.id) return true;
+      foreignIds.push(id);
+      return false;
+    });
+    if (foreignIds.length) {
+      auditFromRequest(req, "orders.save.foreign-id-dropped", {
+        orderIds: foreignIds.slice(0, 20),
+      });
+    }
+
+    // Заказы, ушедшие в работу, клиент менять и удалять не может.
+    // Присланные версии таких заказов заменяются сохранёнными, пропущенные —
+    // возвращаются на место; полная замена состояния при этом продолжает работать.
+    const frozen = freezeLockedClientOrders(previousOrders, orders);
+    orders = frozen.orders;
+    if (frozen.rejectedEdits.length || frozen.restoredDeletions.length) {
+      auditFromRequest(req, "orders.save.locked-preserved", {
+        rejectedEdits: frozen.rejectedEdits.slice(0, 20),
+        restoredDeletions: frozen.restoredDeletions.slice(0, 20),
+      });
+    }
+
     for (const order of orders) {
       const previous = previousById.get(String(order?.id || ""));
       const deliveryDate = String(order?.firstDeliveryDate || "").trim();

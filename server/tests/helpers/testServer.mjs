@@ -111,7 +111,13 @@ export async function startTestServer({ env = {} } = {}) {
     throw new Error(`${error.message}\n--- вывод сервера ---\n${logs.join("")}`);
   }
 
-  const openDb = () => new DatabaseSync(dbPath);
+  const openDb = () => {
+    const db = new DatabaseSync(dbPath);
+    // Сервер держит собственное соединение; без ожидания блокировки
+    // параллельная запись из теста падает с "database is locked".
+    db.exec("PRAGMA busy_timeout = 5000");
+    return db;
+  };
 
   /** Создаёт пользователя напрямую в БД, минуя регистрацию и почту. */
   const createUser = ({ email, password, role, permissions = null }) => {
@@ -138,6 +144,36 @@ export async function startTestServer({ env = {} } = {}) {
         ).run(id, new Date().toISOString());
       }
       return { id, email: email.toLowerCase(), password, role };
+    } finally {
+      db.close();
+    }
+  };
+
+  /** Кладёт заказ в БД напрямую, минуя матрицу и переоценку. */
+  const insertOrder = (userId, order) => {
+    const db = openDb();
+    try {
+      const stamp = order.createdAt || new Date().toISOString();
+      // Продакшен всегда пишет clientId в payload (replaceOrders), и менеджерское
+      // сохранение по нему определяет владельца. Без него заказ терялся бы.
+      const payload = { ...order, clientId: userId };
+      db.prepare(
+        "INSERT INTO orders(id, user_id, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+      ).run(String(order.id), userId, JSON.stringify(payload), stamp, stamp);
+      return payload;
+    } finally {
+      db.close();
+    }
+  };
+
+  /** Без userId возвращает заказы всех пользователей — как их видит менеджер. */
+  const readOrders = (userId) => {
+    const db = openDb();
+    try {
+      const rows = userId
+        ? db.prepare("SELECT payload_json FROM orders WHERE user_id = ?").all(userId)
+        : db.prepare("SELECT payload_json FROM orders").all();
+      return rows.map((row) => JSON.parse(row.payload_json));
     } finally {
       db.close();
     }
@@ -194,6 +230,8 @@ export async function startTestServer({ env = {} } = {}) {
     logs,
     openDb,
     createUser,
+    insertOrder,
+    readOrders,
     login,
     request,
     stop,
