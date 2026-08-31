@@ -101,3 +101,29 @@ INSTALL_STAGE*.bat
 INSTALL_UPDATE_STAGE*.bat
 INSTALL_BIG_*.bat
 INSTALL_FIX_*.bat
+
+# --- Секреты (security hardening 2026-08-31) ---
+# Любые env-файлы с реальными значениями. Явно безопасные примеры и шаблоны
+# перечислены исключениями ниже; всё остальное не должно попадать в git.
+.env
+.env.*
+!.env.production
+!.env.example
+*.env
+!*.env.example
+!*.env.template
+!*.env.datacenter.example
+server/.env
+server/.env.*
+!server/.env.example
+
+# Ключевой материал
+*.pem
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+secrets/
