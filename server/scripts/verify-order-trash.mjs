@@ -50,6 +50,25 @@ try {
   assert.equal(canRestoreOrder(active).ok, false);
   assert.equal(canPurgeOrder(active).ok, false);
 
+  const completed = {
+    id: "ord-done",
+    status: "Выполнен",
+    exchange: { status: "sent" },
+  };
+  assert.equal(canTrashOrder(completed, "manager").ok, false);
+  assert.equal(canTrashOrder(completed, "admin").ok, true);
+  assert.equal(canPurgeOrder(completed, "manager").ok, false);
+  assert.equal(canPurgeOrder(completed, "admin").ok, true);
+  assert.equal(canPurgeOrder(completed, "admin").code, undefined);
+
+  const delivering = {
+    id: "ord-delivering",
+    status: "Доставляется",
+    exchange: { status: "sent" },
+  };
+  assert.equal(canTrashOrder(delivering, "manager").ok, false);
+  assert.equal(canTrashOrder(delivering, "admin").ok, false);
+
   const preserved = preserveTrashedOrders(
     [active, trashed],
     [{ id: "ord-2", status: "Новый" }]

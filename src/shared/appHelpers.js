@@ -7356,7 +7356,7 @@ export function getPositionCount(order) {
 export function statusClass(status) {
   if (status === "Новый") return "status-new";
   if (["Принят", "Собирается", "Обработан вручную"].includes(status)) return "status-work";
-  if (status === "Готов к доставке") return "status-ready";
+  if (status === "Готов к доставке" || status === "Доставляется") return "status-ready";
   if (status === "Выполнен") return "status-done";
   return "status-cancel";
 }

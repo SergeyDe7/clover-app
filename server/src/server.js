@@ -51,6 +51,7 @@ import {
   getReconciliationRequestInternal,
   listReconciliationRequests,
   updateReconciliationRequest,
+  deleteReconciliationRequest,
   upsertPushSubscription,
   listPushSubscriptions,
   deletePushSubscription,
@@ -2909,10 +2910,15 @@ app.post("/api/state/orders/:orderId/trash", authRequired, (req, res) => {
   }
 
   if (isStaff && settings.managerCanDeleteOrders === false) {
-    return res.status(403).json({
-      error: "Удаление заказов менеджером отключено в настройках.",
-      code: "DELETE_DISABLED",
-    });
+    const adminCompleted =
+      req.user.role === "admin" &&
+      ["Выполнен"].includes(String(order.status || ""));
+    if (!adminCompleted) {
+      return res.status(403).json({
+        error: "Удаление заказов менеджером отключено в настройках.",
+        code: "DELETE_DISABLED",
+      });
+    }
   }
 
   if (isOwner && settings.allowClientDelete === false) {
@@ -2922,7 +2928,7 @@ app.post("/api/state/orders/:orderId/trash", authRequired, (req, res) => {
     });
   }
 
-  const role = isStaff ? "manager" : "client";
+  const role = isOwner ? "client" : req.user.role;
   const gate = canTrashOrder(order, role);
   if (!gate.ok) {
     return res.status(409).json({ error: gate.error, code: gate.code });
@@ -3014,19 +3020,25 @@ app.delete(
       ...DEFAULT_SETTINGS,
       ...getGlobalState("settings", DEFAULT_SETTINGS),
     };
-    if (settings.managerCanDeleteOrders === false) {
-      return res.status(403).json({
-        error: "Удаление заказов менеджером отключено в настройках.",
-        code: "DELETE_DISABLED",
-      });
-    }
 
     const stored = getOrderById(req.params.orderId);
     if (!stored) {
       return res.status(404).json({ error: "Заказ не найден.", code: "ORDER_NOT_FOUND" });
     }
 
-    const gate = canPurgeOrder(stored.payload);
+    if (settings.managerCanDeleteOrders === false) {
+      const adminCompleted =
+        req.user.role === "admin" &&
+        ["Выполнен"].includes(String(stored.payload?.status || ""));
+      if (!adminCompleted) {
+        return res.status(403).json({
+          error: "Удаление заказов менеджером отключено в настройках.",
+          code: "DELETE_DISABLED",
+        });
+      }
+    }
+
+    const gate = canPurgeOrder(stored.payload, req.user.role);
     if (!gate.ok) {
       return res.status(409).json({ error: gate.error, code: gate.code });
     }
@@ -6492,6 +6504,44 @@ app.patch("/api/admin/reconciliation/:requestId", authRequired, roleRequired("ma
     res.json({ ok: true, request });
   } catch (error) { next(error); }
 });
+
+app.delete(
+  "/api/admin/reconciliation/:requestId",
+  authRequired,
+  roleRequired("admin"),
+  (req, res) => {
+    const current = getReconciliationRequestInternal(req.params.requestId);
+    if (!current) {
+      return res.status(404).json({ error: "Запрос акта сверки не найден." });
+    }
+
+    const deleted = deleteReconciliationRequest(current.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Запрос акта сверки не найден." });
+    }
+
+    if (deleted.file_path && existsSync(deleted.file_path)) {
+      try {
+        unlinkSync(deleted.file_path);
+      } catch (error) {
+        console.error("Reconciliation file cleanup error", error);
+      }
+    }
+
+    deleteManagerNotificationsBySource(deleted.id);
+    auditFromRequest(req, "reconciliation.delete", {
+      requestId: deleted.id,
+      userId: deleted.user_id,
+      status: deleted.status,
+      fileName: deleted.file_name || "",
+    });
+
+    res.json({
+      ok: true,
+      reconciliationRequests: listReconciliationRequests(),
+    });
+  }
+);
 
 app.post(
   "/api/admin/reconciliation/:requestId/file",

@@ -21,7 +21,7 @@ import {
   buildOrderSearchHaystack,
   productArticle,
 } from "../../shared/appHelpers";
-import { canTrashOrder } from "../../shared/orderTrash";
+import { canPurgeOrder, canTrashOrder, isAdminHardDeleteStatus } from "../../shared/orderTrash";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
 
@@ -133,6 +133,7 @@ export function ManagerOrders({
   onApplyManagerNotifications,
   headerSearch = "",
   clientLinks = {},
+  staffRole = "manager",
 }) {
   const [status, setStatus] = useState("Все");
   const [exchangeFilter, setExchangeFilter] = useState("all");
@@ -653,7 +654,12 @@ export function ManagerOrders({
           {visible.map((order) => {
         const exchange = normalizeOrderExchange(order.exchange);
         const busy = busyOrderId === order.id;
-        const trashGate = canTrashOrder(order, "manager");
+        const trashGate = canTrashOrder(order, staffRole);
+        const hardDeleteCompleted =
+          staffRole === "admin" && isAdminHardDeleteStatus(order.status);
+        const canShowDelete =
+          !inTrash &&
+          (settings.managerCanDeleteOrders || hardDeleteCompleted);
         return (
         <article className="order-card manager-order-card-item" key={order.id}>
           <div className="order-card-header manager-order-card-header">
@@ -702,9 +708,20 @@ export function ManagerOrders({
                     <button className="primary-button manager-order-inline-action" type="button" onClick={() => onRestoreOrder?.(order)}>
                       Восстановить
                     </button>
-                    <button className="danger-button manager-order-inline-action" type="button" onClick={() => onPurgeOrder?.(order)}>
-                      Удалить навсегда
-                    </button>
+                    {(() => {
+                      const purgeGate = canPurgeOrder(order, staffRole);
+                      return (
+                        <button
+                          className="danger-button manager-order-inline-action"
+                          type="button"
+                          disabled={!purgeGate.ok}
+                          title={purgeGate.ok ? "Удалить навсегда" : purgeGate.error}
+                          onClick={() => onPurgeOrder?.(order)}
+                        >
+                          Удалить навсегда
+                        </button>
+                      );
+                    })()}
                   </>
                 ) : order.status === "Обработан вручную" ? (
                   <span
@@ -744,19 +761,21 @@ export function ManagerOrders({
                     {busy ? "Передача…" : exchangeSendLabel(exchange)}
                   </button>
                 )}
-                {!inTrash && settings.managerCanDeleteOrders ? (
+                {!inTrash && canShowDelete ? (
                   <button
                     className="danger-button manager-order-inline-action"
                     type="button"
                     disabled={!trashGate.ok}
                     title={
                       trashGate.ok
-                        ? "Перенести заказ в корзину"
+                        ? hardDeleteCompleted
+                          ? "Удалить заказ навсегда из Clover (документ в 1С не меняется)"
+                          : "Перенести заказ в корзину"
                         : trashGate.error
                     }
                     onClick={() => onDeleteOrder(order)}
                   >
-                    Удалить
+                    {hardDeleteCompleted ? "Удалить навсегда" : "Удалить"}
                   </button>
                 ) : null}
               </div>

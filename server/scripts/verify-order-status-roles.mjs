@@ -25,6 +25,7 @@ assert.deepEqual(ORDER_STATUSES, [
   "Обработан вручную",
   "Собирается",
   "Готов к доставке",
+  "Доставляется",
   "Выполнен",
   "Отменён",
 ]);
@@ -32,16 +33,20 @@ assert.deepEqual(ORDER_STATUSES, [
 assert.equal(canTransitionOrderStatus("Новый", "Принят"), true);
 assert.equal(canTransitionOrderStatus("Новый", "Выполнен"), true);
 assert.equal(canTransitionOrderStatus("Новый", "Обработан вручную"), true);
+assert.equal(canTransitionOrderStatus("Новый", "Доставляется"), true);
 assert.equal(canTransitionOrderStatus("Принят", "Выполнен"), true);
 assert.equal(canTransitionOrderStatus("Принят", "Новый"), false);
 assert.equal(canTransitionOrderStatus("Принят", "Принят"), true);
 assert.equal(canTransitionOrderStatus("Выполнен", "Отменён"), false);
+assert.equal(canTransitionOrderStatus("Готов к доставке", "Доставляется"), true);
+assert.equal(canTransitionOrderStatus("Доставляется", "Выполнен"), true);
 assert.deepEqual(allowedNextOrderStatuses("Новый"), [
   "Новый",
   "Принят",
   "Обработан вручную",
   "Собирается",
   "Готов к доставке",
+  "Доставляется",
   "Выполнен",
   "Отменён",
 ]);
@@ -50,8 +55,22 @@ assert.deepEqual(allowedNextOrderStatuses("Принят"), [
   "Обработан вручную",
   "Собирается",
   "Готов к доставке",
+  "Доставляется",
   "Выполнен",
   "Отменён",
+]);
+assert.deepEqual(allowedNextOrderStatuses("Готов к доставке"), [
+  "Готов к доставке",
+  "Доставляется",
+  "Выполнен",
+  "Отменён",
+  "Обработан вручную",
+]);
+assert.deepEqual(allowedNextOrderStatuses("Доставляется"), [
+  "Доставляется",
+  "Выполнен",
+  "Отменён",
+  "Обработан вручную",
 ]);
 
 const clientKeep = enforceOrderStatusChange({

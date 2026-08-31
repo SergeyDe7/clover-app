@@ -31,7 +31,7 @@ import {
 } from "./shared/appHelpers";
 import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
 import { appAlert, appConfirm } from "./shared/AppModal";
-import { canTrashOrder } from "./shared/orderTrash";
+import { canTrashOrder, isAdminHardDeleteStatus } from "./shared/orderTrash";
 import { SoftBanner, ListSkeleton } from "./shared/uxFeedback";
 import { ManagerContact } from "./screens/client/ManagerContact";
 
@@ -1696,7 +1696,11 @@ function App() {
   };
 
   const deleteManagerOrder = async (order) => {
-    if (!settings.managerCanDeleteOrders) {
+    const staffRole = authUser?.role === "admin" ? "admin" : "manager";
+    const hardDeleteCompleted =
+      staffRole === "admin" && isAdminHardDeleteStatus(order?.status);
+
+    if (!settings.managerCanDeleteOrders && !hardDeleteCompleted) {
       await appAlert({
         title: "Корзина отключена",
         message: "Удаление заказов менеджером сейчас отключено в настройках.",
@@ -1705,10 +1709,22 @@ function App() {
       return;
     }
 
-    const gate = canTrashOrder(order, "manager");
+    const gate = canTrashOrder(order, staffRole);
     if (!gate.ok) {
-      await appAlert({ title: "Нельзя переместить", message: gate.error, tone: "warn" });
+      await appAlert({ title: "Нельзя удалить", message: gate.error, tone: "warn" });
       return;
+    }
+
+    if (hardDeleteCompleted) {
+      const ok = await appConfirm({
+        title: `Удалить заказ № ${order.number} навсегда?`,
+        message:
+          "Заказ исчезнет из Clover у клиента и в кабинете. Документ в 1С не меняется и не удаляется. Восстановить будет нельзя без резервной копии.",
+        confirmLabel: "Удалить навсегда",
+        cancelLabel: "Отмена",
+        tone: "danger",
+      });
+      if (!ok) return;
     }
 
     const orderId = String(order.id);
@@ -1717,15 +1733,33 @@ function App() {
 
     void (async () => {
       try {
-        const result = await api.trashOrder(orderId);
-        skipNextOrdersSyncRef.current = true;
-        if (Array.isArray(result?.orders)) setOrders(result.orders);
-        if (Array.isArray(result?.trashedOrders)) setTrashedOrders(result.trashedOrders);
+        // «Навсегда» — сразу purge, без trash (иначе всплывает «перемещён в корзину»).
+        if (hardDeleteCompleted) {
+          const purgeResult = await api.purgeOrder(orderId);
+          skipNextOrdersSyncRef.current = true;
+          if (Array.isArray(purgeResult?.orders)) setOrders(purgeResult.orders);
+          if (Array.isArray(purgeResult?.trashedOrders)) {
+            setTrashedOrders(purgeResult.trashedOrders);
+          }
+        } else {
+          const trashResult = await api.trashOrder(orderId);
+          skipNextOrdersSyncRef.current = true;
+          if (Array.isArray(trashResult?.orders)) setOrders(trashResult.orders);
+          if (Array.isArray(trashResult?.trashedOrders)) {
+            setTrashedOrders(trashResult.trashedOrders);
+          }
+        }
         setSyncError("");
       } catch (error) {
-        const message = `${error.message}. Заказ не перемещён в корзину.`;
+        const message = hardDeleteCompleted
+          ? `${error.message}. Заказ не удалён.`
+          : `${error.message}. Заказ не перемещён в корзину.`;
         setSyncError(message);
-        void appAlert({ title: "Корзина", message, tone: "danger" });
+        void appAlert({
+          title: hardDeleteCompleted ? "Удаление" : "Корзина",
+          message,
+          tone: "danger",
+        });
         try {
           await loadBootstrap({ silent: true });
         } catch {
@@ -1755,9 +1789,20 @@ function App() {
   };
 
   const purgeManagerOrder = async (order) => {
+    const staffRole = authUser?.role === "admin" ? "admin" : "manager";
+    if (isAdminHardDeleteStatus(order?.status) && staffRole !== "admin") {
+      await appAlert({
+        title: "Недостаточно прав",
+        message: "Удалить выполненный заказ навсегда может только администратор.",
+        tone: "warn",
+      });
+      return;
+    }
     const ok = await appConfirm({
       title: `Удалить заказ № ${order.number} навсегда?`,
-      message: "Восстановить будет нельзя без резервной копии. Это действие необратимо.",
+      message: isAdminHardDeleteStatus(order?.status)
+        ? "Восстановить будет нельзя без резервной копии. Документ в 1С не меняется."
+        : "Восстановить будет нельзя без резервной копии. Это действие необратимо.",
       confirmLabel: "Удалить навсегда",
       cancelLabel: "Отмена",
       tone: "danger",
@@ -1964,6 +2009,9 @@ function App() {
           onResetAll={resetAll}
           onReload={() => loadBootstrap({ silent: true })}
           onApplyManagerNotifications={applyManagerNotificationList}
+          onApplyReconciliationRequests={(items) => {
+            setReconciliationRequests(Array.isArray(items) ? items : []);
+          }}
           onLogout={logout}
         />
       </Suspense>
