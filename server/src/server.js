@@ -99,8 +99,12 @@ import {
   applyOrderStatusPolicy,
   buildStatusUpdatedOrder,
 } from "./orderStatus.js";
-import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
+import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffHasFeature, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
+import { safeLinkUrl } from "./safeUrl.js";
+import { logError } from "./logRedaction.js";
 import { publicClientSettings } from "./clientSettings.js";
+import { clientAddress, consumeRateLimit, rateLimit, resetRateLimit } from "./rateLimit.js";
+import { freezeLockedClientOrders } from "./clientOrderGuard.js";
 import {
   listClientAccessEntries,
   removeClientAccessEntry,
@@ -386,6 +390,16 @@ function allowedCorsOrigin(origin) {
   }
 }
 
+/**
+ * За nginx настоящий адрес клиента приходит в X-Forwarded-For. Без этого
+ * req.ip у всех запросов равен адресу прокси, и любой лимит по IP
+ * превращается в один общий счётчик на весь сайт.
+ *
+ * Доверяем только петлевому адресу: подделать заголовок сможет лишь тот,
+ * кто уже подключается с самой машины.
+ */
+app.set("trust proxy", "loopback");
+
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(cors({
   origin(origin, callback) {
@@ -394,15 +408,93 @@ app.use(cors({
   },
   credentials: false,
 }));
-app.use(express.json({ limit: "24mb" }));
+/**
+ * Раньше все маршруты принимали до 24 МБ JSON. Столько нужно единицам из
+ * них — массовым выгрузкам 1С и сохранению каталога целиком; для формы
+ * входа это просто дешёвый способ занять память сервера.
+ *
+ * Парсеры навешиваются от частного к общему: body-parser выставляет
+ * req._body и повторно тело не разбирает, поэтому первый подошедший
+ * лимит и оказывается действующим.
+ */
+const BULK_BODY_LIMIT = "24mb";
+const DEFAULT_BODY_LIMIT = "256kb";
+
+/** Маршруты, где большой объём — штатный режим работы. */
+const BULK_BODY_PATHS = [
+  "/api/one-c",
+  "/api/admin/one-c",
+  "/api/state/products",
+  "/api/state/orders",
+  "/api/state/settings",
+  "/api/admin/storefront",
+  "/api/migrate",
+];
+
+app.use("/api/auth", express.json({ limit: "32kb" }));
+app.use("/api/public/orders", express.json({ limit: "128kb" }));
+for (const bulkPath of BULK_BODY_PATHS) {
+  app.use(bulkPath, express.json({ limit: BULK_BODY_LIMIT }));
+}
+app.use(express.json({ limit: DEFAULT_BODY_LIMIT }));
 app.use("/uploads/reconciliation", (req, res) => res.status(404).end());
 app.use("/uploads", express.static(uploadsDirectory, { maxAge: "1h" }));
-
-const loginAttempts = new Map();
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
+
+const emailFromBody = (req) => normalizeEmail(req.body?.email);
+
+/**
+ * Лимиты подобраны под реальный масштаб установки (единицы менеджеров,
+ * десятки клиентов): легитимный сценарий в них укладывается с большим
+ * запасом, а перебор и рассылка через форму восстановления — нет.
+ */
+const authRateLimits = {
+  login: rateLimit({
+    scope: "auth.login",
+    windowMs: 10 * 60 * 1000,
+    limit: { ip: 40, email: 10 },
+    keys: { ip: clientAddress, email: emailFromBody },
+    message: "Слишком много попыток входа. Попробуйте позже.",
+  }),
+  register: rateLimit({
+    scope: "auth.register",
+    windowMs: 60 * 60 * 1000,
+    limit: { ip: 5 },
+    keys: { ip: clientAddress },
+    message: "Слишком много попыток регистрации. Попробуйте позже.",
+  }),
+  forgotPassword: rateLimit({
+    scope: "auth.forgot",
+    windowMs: 60 * 60 * 1000,
+    limit: { ip: 10, email: 5 },
+    keys: { ip: clientAddress, email: emailFromBody },
+    message: "Слишком много запросов на восстановление. Попробуйте позже.",
+  }),
+  resendVerification: rateLimit({
+    scope: "auth.resend",
+    windowMs: 60 * 60 * 1000,
+    limit: { ip: 10, email: 5 },
+    keys: { ip: clientAddress, email: emailFromBody },
+    message: "Слишком много запросов на повторное письмо. Попробуйте позже.",
+  }),
+  passkey: rateLimit({
+    scope: "auth.passkey",
+    windowMs: 10 * 60 * 1000,
+    limit: { ip: 60 },
+    keys: { ip: clientAddress },
+    message: "Слишком много попыток входа. Попробуйте позже.",
+  }),
+  publicOrder: rateLimit({
+    scope: "public.order",
+    windowMs: 60 * 60 * 1000,
+    limit: { ip: 20 },
+    keys: { ip: clientAddress },
+    message: "Слишком много заказов с одного адреса. Попробуйте позже.",
+  }),
+};
 
 function publicUser(user) {
   const permissions = parseStaffPermissions(user.permissions_json ?? user.permissions);
@@ -473,7 +565,7 @@ function auditFromRequest(req, action, details = {}) {
       details,
     });
   } catch (error) {
-    console.error("Не удалось записать действие в журнал", error);
+    logError("Не удалось записать действие в журнал", error);
   }
 }
 
@@ -664,26 +756,59 @@ function roleRequired(...roles) {
   };
 }
 
-function checkLoginLimit(email) {
-  const key = normalizeEmail(email);
-  const current = loginAttempts.get(key);
-  const now = Date.now();
+/**
+ * Разграничение по разделам кабинета (permissions.tabs) на стороне сервера.
+ *
+ * Вкладки в интерфейсе — не граница безопасности: до этого менеджер с
+ * `tabs: ["orders"]` мог обратиться к любому manager-маршруту напрямую.
+ * Ставится ПОСЛЕ roleRequired, чтобы роль проверялась первой.
+ *
+ * admin проходит всегда (staffHasFeature возвращает true для admin),
+ * менеджер без явного ограничения tabs — тоже (fullAccess).
+ */
+function featureRequired(...featureIds) {
+  const required = featureIds.filter(Boolean);
+  return (req, res, next) => {
+    const user = req.user;
+    if (!isStaffRole(user?.role)) {
+      return res.status(403).json({
+        error: "Недостаточно прав для этого действия.",
+      });
+    }
 
-  if (!current || now - current.startedAt > 10 * 60 * 1000) {
-    loginAttempts.set(key, {
-      count: 1,
-      startedAt: now,
+    const missing = required.filter((featureId) => !staffHasFeature(user, featureId));
+    if (missing.length === 0) return next();
+
+    auditFromRequest(req, "staff.feature.denied", {
+      method: req.method,
+      path: req.route?.path || req.originalUrl,
+      missing,
     });
-    return true;
-  }
+    return res.status(403).json({
+      error: "Этот раздел недоступен для вашей учётной записи.",
+      code: "FEATURE_FORBIDDEN",
+    });
+  };
+}
 
-  current.count += 1;
+/**
+ * Счётчик неудачных входов. Раньше жил в Map и сбрасывался при каждом
+ * перезапуске; теперь переживает деплой, потому что хранится в БД.
+ */
+const FAILED_LOGIN_SCOPE = "auth.login.failed";
 
-  return current.count <= 20;
+function checkLoginLimit(email) {
+  const { allowed } = consumeRateLimit({
+    scope: FAILED_LOGIN_SCOPE,
+    identifier: normalizeEmail(email),
+    limit: 20,
+    windowMs: 10 * 60 * 1000,
+  });
+  return allowed;
 }
 
 function clearLoginLimit(email) {
-  loginAttempts.delete(normalizeEmail(email));
+  resetRateLimit({ scope: FAILED_LOGIN_SCOPE, identifier: normalizeEmail(email) });
 }
 
 
@@ -714,15 +839,43 @@ function localMachineAddresses() {
 
 const oneCLocalAddresses = localMachineAddresses();
 
+/**
+ * Ключи обмена с 1С.
+ *
+ * ONEC_API_KEY — общий ключ, работает со всеми разрешёнными базами; это
+ * текущее поведение, менять его нельзя, иначе рабочий обмен встанет.
+ * ONEC_API_KEY_TEST и ONEC_API_KEY_PROD — необязательные ключи, привязанные
+ * к контуру: с TEST-ключом нельзя писать в боевую базу. Пока они не заданы,
+ * ничего не меняется.
+ */
+function configuredOneCKeys() {
+  return [
+    { contour: null, value: String(process.env.ONEC_API_KEY || "").trim() },
+    { contour: "TEST", value: String(process.env.ONEC_API_KEY_TEST || "").trim() },
+    { contour: "PROD", value: String(process.env.ONEC_API_KEY_PROD || "").trim() },
+  ].filter((item) => item.value.length >= 24 && !isPlaceholderSecret(item.value));
+}
+
 function oneCAuthRequired(req, res, next) {
-  const configuredKey = String(process.env.ONEC_API_KEY || "").trim();
+  const keys = configuredOneCKeys();
   const bearer = String(req.headers.authorization || "").startsWith("Bearer ")
     ? String(req.headers.authorization).slice(7)
     : "";
   const supplied = String(req.headers["x-clover-key"] || bearer || "").trim();
 
-  if (configuredKey.length >= 24 && !isPlaceholderSecret(configuredKey)) {
-    if (secureEqual(supplied, configuredKey)) return next();
+  if (keys.length) {
+    // Сравниваются все ключи, а не до первого совпадения: так время ответа
+    // не зависит от того, какой именно ключ подошёл.
+    let matched = null;
+    for (const key of keys) {
+      if (secureEqual(supplied, key.value)) matched = key;
+    }
+
+    if (matched) {
+      req.oneCKeyContour = matched.contour;
+      return next();
+    }
+
     writeAudit({ action: "one-c.auth.denied", details: { ip: req.ip || "", mode: "api-key" } });
     return res.status(401).json({ error: "Неверный ключ обмена Clover." });
   }
@@ -759,6 +912,20 @@ function requireOneCTestDatabase(req, res) {
 /** Pull/ACK/цены: TEST всегда; другие базы — только при ONEC_PROD_EXCHANGE_ENABLED=true. */
 function requireOneCAllowedDatabase(req, res) {
   const database = extractOneCDatabase(req);
+
+  // Ключ, выданный на тестовый контур, не должен доставать до боевой базы.
+  if (req.oneCKeyContour === "TEST" && !isTestDatabase(database)) {
+    writeAudit({
+      action: "one-c.contour.denied",
+      details: { database, keyContour: "TEST" },
+    });
+    res.status(403).json({
+      error: "Этот ключ обмена выдан для контура TEST.",
+      code: "ONEC_KEY_CONTOUR_MISMATCH",
+    });
+    return null;
+  }
+
   if (!isAllowedOneCDatabase(database)) {
     const allowed = parseAllowedOneCDatabases().join(", ");
     res.status(403).json({
@@ -916,7 +1083,7 @@ function reconciliationPeriodText(request) {
 
 function queueManagerNotification(event) {
   notifyManagers(event).catch((error) => {
-    console.error("Manager notification error", error?.message || error);
+    logError("Manager notification error", error);
   });
 }
 
@@ -1060,6 +1227,14 @@ function normalizeManagerClientAddresses(addresses) {
     isDefault: index === selectedIndex,
   }));
 }
+
+/** Поля анкеты клиента, которые разрешено переносить из localStorage. */
+const MIGRATABLE_PROFILE_FIELDS = Object.freeze([
+  "companyName",
+  "contactName",
+  "phone",
+  "contacts",
+]);
 
 function normalizeClientProfileContacts(profile = {}, accountEmail = "") {
   const source = profile && typeof profile === "object" ? profile : {};
@@ -1318,6 +1493,12 @@ function stripRuntimeProductPricing(product = {}) {
     isMatrixProduct,
     ...stored
   } = product;
+
+  // Ссылки карточки уходят в href на витрине и в кабинете, поэтому схема
+  // проверяется на входе, а не только при отдаче.
+  if ("certificateUrl" in stored) stored.certificateUrl = safeLinkUrl(stored.certificateUrl);
+  if ("imageUrl" in stored) stored.imageUrl = safeLinkUrl(stored.imageUrl);
+
   return stored;
 }
 
@@ -1461,7 +1642,7 @@ function startOneCClaimRequeueTimer() {
     try {
       releaseExpiredOneCClaims();
     } catch (error) {
-      console.error("one-c claim auto-requeue failed", error);
+      logError("one-c claim auto-requeue failed", error);
     }
   }, intervalMs);
   if (typeof timer.unref === "function") timer.unref();
@@ -1724,7 +1905,7 @@ app.get("/api/public/site", (req, res) => {
   try {
     res.json({ site: getPublicSite() });
   } catch (error) {
-    console.error("public site failed", error);
+    logError("public site failed", error);
     res.status(500).json({ error: "Не удалось загрузить данные сайта." });
   }
 });
@@ -1743,10 +1924,34 @@ app.get("/api/public/manager-contact", (req, res) => {
   });
 });
 
+/**
+ * Каталог отдаётся без аутентификации и весит порядка полутора мегабайт.
+ * Express 5 сам на If-None-Match не отвечает, поэтому условный запрос
+ * обрабатывается здесь: повторный обход витрины превращается в цепочку
+ * 304 вместо полной перекачки.
+ */
+function sendPublicCatalogJson(req, res, payload) {
+  const body = JSON.stringify(payload);
+  const etag = `W/"${createHash("sha1").update(body).digest("base64")}"`;
+
+  res.setHeader("ETag", etag);
+  res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+  res.setHeader("Vary", "Accept-Encoding");
+
+  const requested = String(req.headers["if-none-match"] || "");
+  if (requested && requested.split(",").some((value) => value.trim() === etag)) {
+    return res.status(304).end();
+  }
+
+  return res.type("application/json").send(body);
+}
+
 /** Публичный каталог витрины clover-spb.ru (цены сайта, без матрицы ЛК). */
 app.get("/api/public/catalog", (req, res) => {
   try {
-    res.json(
+    sendPublicCatalogJson(
+      req,
+      res,
       getPublicCatalog({
         category: String(req.query.category || ""),
         subcategory: String(req.query.subcategory || ""),
@@ -1755,7 +1960,7 @@ app.get("/api/public/catalog", (req, res) => {
       })
     );
   } catch (error) {
-    console.error("public catalog failed", error);
+    logError("public catalog failed", error);
     res.status(500).json({ error: "Не удалось загрузить каталог." });
   }
 });
@@ -1766,15 +1971,15 @@ app.get("/api/public/catalog/:code", (req, res) => {
     if (!product) {
       return res.status(404).json({ error: "Товар не найден." });
     }
-    res.json({ product });
+    sendPublicCatalogJson(req, res, { product });
   } catch (error) {
-    console.error("public product failed", error);
+    logError("public product failed", error);
     res.status(500).json({ error: "Не удалось загрузить товар." });
   }
 });
 
 /** Гостевой заказ с витрины — только сайтовые цены. */
-app.post("/api/public/orders", async (req, res) => {
+app.post("/api/public/orders", authRateLimits.publicOrder, async (req, res) => {
   try {
     const order = createStorefrontOrder(req.body, {
       notify: (created) => {
@@ -1803,7 +2008,7 @@ app.post("/api/public/orders", async (req, res) => {
   }
 });
 
-app.post("/api/auth/register", async (req, res, next) => {
+app.post("/api/auth/register", authRateLimits.register, async (req, res, next) => {
   try {
     const input = registerSchema.parse(req.body);
     const email = normalizeEmail(input.email);
@@ -1842,7 +2047,7 @@ app.post("/api/auth/register", async (req, res, next) => {
     try {
       mail = await sendCloverMail({ to: email, ...message });
     } catch (mailError) {
-      console.error("Не удалось отправить письмо подтверждения", mailError);
+      logError("Не удалось отправить письмо подтверждения", mailError);
       mail = { sent: false, reason: "send_failed" };
     }
 
@@ -1903,7 +2108,7 @@ app.post("/api/auth/verify-email", (req, res, next) => {
   }
 });
 
-app.post("/api/auth/resend-verification", async (req, res, next) => {
+app.post("/api/auth/resend-verification", authRateLimits.resendVerification, async (req, res, next) => {
   try {
     const input = forgotPasswordSchema.parse(req.body);
     const email = normalizeEmail(input.email);
@@ -1922,7 +2127,7 @@ app.post("/api/auth/resend-verification", async (req, res, next) => {
         ? getClientState(user.id).profile?.companyName
         : "Менеджер Clover";
       const message = verificationEmail({ companyName, verifyUrl });
-      try { await sendCloverMail({ to: email, ...message }); } catch (error) { console.error(error); }
+      try { await sendCloverMail({ to: email, ...message }); } catch (error) { logError("Не удалось отправить письмо", error); }
       if (allowDevelopmentAuthLinks(req)) developmentLink = verifyUrl;
     }
     res.json({
@@ -1935,7 +2140,7 @@ app.post("/api/auth/resend-verification", async (req, res, next) => {
   }
 });
 
-app.post("/api/auth/forgot-password", async (req, res, next) => {
+app.post("/api/auth/forgot-password", authRateLimits.forgotPassword, async (req, res, next) => {
   try {
     const input = forgotPasswordSchema.parse(req.body);
     const email = normalizeEmail(input.email);
@@ -1951,7 +2156,7 @@ app.post("/api/auth/forgot-password", async (req, res, next) => {
       });
       const resetUrl = `${publicCabinetUrl(req)}/?reset=${encodeURIComponent(plainToken)}`;
       const message = resetPasswordEmail({ resetUrl });
-      try { await sendCloverMail({ to: email, ...message }); } catch (error) { console.error(error); }
+      try { await sendCloverMail({ to: email, ...message }); } catch (error) { logError("Не удалось отправить письмо", error); }
       if (allowDevelopmentAuthLinks(req)) developmentLink = resetUrl;
       writeAudit({
         userId: user.id, userEmail: user.email, userRole: user.role,
@@ -1988,7 +2193,7 @@ app.post("/api/auth/reset-password", async (req, res, next) => {
   }
 });
 
-app.post("/api/auth/login", async (req, res, next) => {
+app.post("/api/auth/login", authRateLimits.login, async (req, res, next) => {
   try {
     const input = loginSchema.parse(req.body);
     const email = normalizeEmail(input.email);
@@ -2410,7 +2615,7 @@ app.delete("/api/passkeys/:credentialId", authRequired, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/passkeys/authentication/options", async (req, res, next) => {
+app.post("/api/passkeys/authentication/options", authRateLimits.passkey, async (req, res, next) => {
   try {
     const input = passkeyAuthenticationOptionsSchema.parse(req.body || {});
     const email = input.email ? normalizeEmail(input.email) : "";
@@ -2445,7 +2650,7 @@ app.post("/api/passkeys/authentication/options", async (req, res, next) => {
   }
 });
 
-app.post("/api/passkeys/authentication/verify", async (req, res, next) => {
+app.post("/api/passkeys/authentication/verify", authRateLimits.passkey, async (req, res, next) => {
   try {
     const input = passkeyAuthenticationVerifySchema.parse(req.body || {});
     const email = input.email ? normalizeEmail(input.email) : "";
@@ -2716,6 +2921,36 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
   orders = statusPolicy.orders;
 
   if (isClientRole(req.user.role)) {
+    // Заказ с чужим id отбрасывается: вставка упёрлась бы в уникальный
+    // ключ и откатила всё сохранение, а заодно давала бы возможность
+    // проверять существование чужих заказов по коду ответа.
+    const foreignIds = [];
+    orders = orders.filter((order) => {
+      const id = String(order?.id || "");
+      if (!id || previousById.has(id)) return true;
+      const stored = getOrderById(id);
+      if (!stored || stored.userId === req.user.id) return true;
+      foreignIds.push(id);
+      return false;
+    });
+    if (foreignIds.length) {
+      auditFromRequest(req, "orders.save.foreign-id-dropped", {
+        orderIds: foreignIds.slice(0, 20),
+      });
+    }
+
+    // Заказы, ушедшие в работу, клиент менять и удалять не может.
+    // Присланные версии таких заказов заменяются сохранёнными, пропущенные —
+    // возвращаются на место; полная замена состояния при этом продолжает работать.
+    const frozen = freezeLockedClientOrders(previousOrders, orders);
+    orders = frozen.orders;
+    if (frozen.rejectedEdits.length || frozen.restoredDeletions.length) {
+      auditFromRequest(req, "orders.save.locked-preserved", {
+        rejectedEdits: frozen.rejectedEdits.slice(0, 20),
+        restoredDeletions: frozen.restoredDeletions.slice(0, 20),
+      });
+    }
+
     for (const order of orders) {
       const previous = previousById.get(String(order?.id || ""));
       const deliveryDate = String(order?.firstDeliveryDate || "").trim();
@@ -2876,7 +3111,7 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
           : changes.join("; "),
         url: `/?order=${encodeURIComponent(order.id)}`,
         tag: `order-${order.id}`,
-      }).catch((error) => console.error("Push order update error", error));
+      }).catch((error) => logError("Push order update error", error));
     }
   }
 
@@ -2972,6 +3207,7 @@ app.post(
   "/api/admin/orders/:orderId/restore",
   authRequired,
   roleRequired("manager"),
+  featureRequired("orders"),
   (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) {
@@ -3009,6 +3245,7 @@ app.delete(
   "/api/admin/orders/:orderId",
   authRequired,
   roleRequired("manager"),
+  featureRequired("orders"),
   (req, res) => {
     const settings = {
       ...DEFAULT_SETTINGS,
@@ -3053,13 +3290,14 @@ function notifyClientOrderStatusChanged(order, _previousStatus) {
     body: `статус: ${order.status}`,
     url: `/?order=${encodeURIComponent(order.id)}`,
     tag: `order-${order.id}`,
-  }).catch((error) => console.error("Push order status error", error));
+  }).catch((error) => logError("Push order status error", error));
 }
 
 app.patch(
   "/api/orders/:orderId/status",
   authRequired,
   roleRequired("manager"),
+  featureRequired("orders"),
   (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) {
@@ -3103,6 +3341,7 @@ app.post(
   "/api/orders/status/bulk",
   authRequired,
   roleRequired("manager"),
+  featureRequired("orders"),
   (req, res) => {
     const orderIds = Array.isArray(req.body?.orderIds) ? req.body.orderIds : [];
     const status = req.body?.status;
@@ -3961,6 +4200,7 @@ app.put(
   "/api/state/products",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   (req, res) => {
     const incomingProducts = Array.isArray(req.body?.products)
       ? req.body.products.map(stripRuntimeProductPricing)
@@ -4158,6 +4398,7 @@ app.get(
   "/api/admin/clients/:clientId/matrix-prices",
   authRequired,
   roleRequired("manager"),
+  featureRequired("clients"),
   (req, res) => {
     const clientId = String(req.params.clientId || "").trim();
     const clientUser = findUserById(clientId);
@@ -4223,6 +4464,7 @@ app.put(
   "/api/admin/clients/:clientId",
   authRequired,
   roleRequired("manager"),
+  featureRequired("clients"),
   (req, res, next) => {
     try {
       const parsed = managerClientUpdateSchema.parse({
@@ -4293,6 +4535,7 @@ app.put(
   "/api/state/client-links",
   authRequired,
   roleRequired("manager"),
+  featureRequired("clients"),
   (req, res) => {
     const incomingLinks = req.body?.clientLinks || {};
     const storedLinks = getGlobalState("clientLinks", {});
@@ -4353,16 +4596,27 @@ app.post(
   authRequired,
   roleRequired("client"),
   (req, res) => {
-    const importedProfile = req.body?.profile || {};
+    const importedProfile =
+      req.body?.profile && typeof req.body.profile === "object" && !Array.isArray(req.body.profile)
+        ? req.body.profile
+        : {};
     const currentState = getClientState(req.user.id);
-    const profile = {
-      ...currentState.profile,
-      ...Object.fromEntries(
-        Object.entries(importedProfile).filter(
-          ([, value]) => String(value || "").trim()
-        )
-      ),
-    };
+    // Только поля анкеты. Без списка ключей сюда переносилось произвольное
+    // содержимое localStorage, включая email — а он определяет логин
+    // и подставляется в customerEmail заказа.
+    const merged = { ...currentState.profile };
+    for (const field of MIGRATABLE_PROFILE_FIELDS) {
+      const value = importedProfile[field];
+      if (field === "contacts") {
+        if (Array.isArray(value) && value.length) merged.contacts = value;
+        continue;
+      }
+      if (String(value || "").trim()) merged[field] = value;
+    }
+    const profile = normalizeClientProfileContacts(
+      merged,
+      normalizeEmail(req.user.email) || currentState.profile?.email || ""
+    );
     const addressesIncoming = Array.isArray(req.body?.addresses)
       ? req.body.addresses
       : [];
@@ -4373,10 +4627,7 @@ app.post(
       ? req.body.orders
       : [];
 
-    setClientStateField(req.user.id, "profile", {
-      ...profile,
-      email: profile.email || req.user.email,
-    });
+    setClientStateField(req.user.id, "profile", profile);
     // Не затираем серверные адреса пустым localStorage при migrate после смены пароля.
     const addresses =
       addressesIncoming.length > 0
@@ -4449,6 +4700,7 @@ app.post(
   "/api/migrate/manager",
   authRequired,
   roleRequired("manager"),
+  featureRequired("settings"),
   (req, res) => {
     if (
       Array.isArray(req.body?.products) &&
@@ -4463,9 +4715,26 @@ app.post(
     }
 
     if (req.body?.settings) {
-      setGlobalState("settings", {
+      const current = {
+        ...DEFAULT_SETTINGS,
         ...getGlobalState("settings", DEFAULT_SETTINGS),
-        ...req.body.settings,
+      };
+      // То же правило, что и в PUT /api/state/settings: поля витрины меняет
+      // только admin. Через миграцию оно раньше не действовало, и менеджер
+      // мог переписать режим ценообразования и наценку.
+      const incoming =
+        req.user.role === "admin"
+          ? req.body.settings
+          : {
+              ...stripStorefrontSettings(req.body.settings),
+              ...Object.fromEntries(
+                STOREFRONT_SETTING_KEYS.map((key) => [key, current[key]])
+              ),
+            };
+
+      setGlobalState("settings", {
+        ...current,
+        ...incoming,
       });
     }
 
@@ -4487,6 +4756,7 @@ app.post(
   "/api/admin/products/:productId/image",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   imageUpload.single("image"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -4536,6 +4806,7 @@ app.delete(
   "/api/admin/products/:productId/image",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const productIndex = products.findIndex(
@@ -4571,6 +4842,7 @@ app.post(
   "/api/admin/products",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   (req, res) => {
     persistSingleCatalogProduct(req, res, { create: true });
   }
@@ -4580,6 +4852,7 @@ app.put(
   "/api/admin/products/:productId",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   (req, res) => {
     persistSingleCatalogProduct(req, res, { create: false });
   }
@@ -4589,6 +4862,7 @@ app.delete(
   "/api/admin/products/:productId",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   (req, res) => {
     const productId = String(req.params.productId || "").trim();
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -4668,6 +4942,7 @@ app.post(
   "/api/admin/products/:productId/certificate",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   certificateUpload.single("certificate"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -4719,6 +4994,7 @@ app.delete(
   "/api/admin/products/:productId/certificate",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const productIndex = products.findIndex(
@@ -4754,7 +5030,8 @@ app.delete(
 app.get(
   "/api/admin/backups",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("backup"),
   (req, res) => {
     res.json({ backups: listServerBackups() });
   }
@@ -4763,7 +5040,8 @@ app.get(
 app.post(
   "/api/admin/backups",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("backup"),
   (req, res) => {
     const backup = createServerBackup({
       label: req.body?.label || "manual",
@@ -4777,7 +5055,8 @@ app.post(
 app.post(
   "/api/admin/backups/cleanup",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("backup"),
   (req, res) => {
     const result = cleanupOldBackups({
       maxFiles: Number(req.body?.maxFiles) || 50,
@@ -4792,7 +5071,8 @@ app.post(
 app.get(
   "/api/admin/backups/:fileName/download",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("backup"),
   (req, res, next) => {
     try {
       const filePath = resolveBackupPath(req.params.fileName);
@@ -4806,7 +5086,8 @@ app.get(
 app.post(
   "/api/admin/backups/:fileName/restore",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("backup"),
   (req, res, next) => {
     try {
       createServerBackup({
@@ -4841,7 +5122,8 @@ app.post(
 app.get(
   "/api/admin/one-c/config",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("exchange"),
   (req, res) => {
     const stored = getGlobalState(ONE_C_STATE_KEY, DEFAULT_ONE_C_CONFIG);
     res.json({
@@ -4855,10 +5137,13 @@ app.get(
 app.put(
   "/api/admin/one-c/config",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("exchange"),
   (req, res, next) => {
     try {
-      const config = sanitizeOneCConfig(req.body?.config || req.body || {});
+      const config = sanitizeOneCConfig(req.body?.config || req.body || {}, {
+        enforceAllowlist: true,
+      });
       setGlobalState(ONE_C_STATE_KEY, config);
       auditFromRequest(req, "exchange.config.save", {
         mode: config.mode,
@@ -4875,7 +5160,8 @@ app.put(
 app.post(
   "/api/admin/one-c/test",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("exchange"),
   async (req, res) => {
     const config = getGlobalState(ONE_C_STATE_KEY, DEFAULT_ONE_C_CONFIG);
     try {
@@ -5040,6 +5326,7 @@ app.get(
   "/api/admin/one-c/products",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const items = normalizeOneCProducts(
@@ -5093,6 +5380,7 @@ app.post(
   "/api/admin/one-c/products/from-catalog",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res, next) => {
     try {
       const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -5263,6 +5551,7 @@ app.post(
   "/api/admin/products/:productId/enrich",
   authRequired,
   roleRequired("manager"),
+  featureRequired("products"),
   async (req, res, next) => {
     try {
       const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -5419,6 +5708,7 @@ app.post(
   "/api/admin/one-c/products/match-import",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
     if (!rows.length) {
@@ -5470,6 +5760,7 @@ app.get(
   "/api/admin/one-c/products/:productId/candidates",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const product = products.find(
@@ -5512,6 +5803,7 @@ app.post(
   "/api/admin/one-c/products/:productId/request",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const productIndex = products.findIndex(
@@ -5557,6 +5849,7 @@ app.post(
   "/api/admin/one-c/products/:productId/link",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res, next) => {
     try {
       const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -5595,6 +5888,7 @@ app.post(
   "/api/admin/one-c/products/auto-link",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const currentProducts = getGlobalState("products", DEFAULT_PRODUCTS);
     const oneCProducts = getGlobalState("oneCProducts", []);
@@ -5760,6 +6054,7 @@ app.get(
   "/api/admin/one-c/clients",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const clients = listClients();
     const clientLinks = getGlobalState("clientLinks", {});
@@ -5801,6 +6096,7 @@ app.get(
   "/api/admin/one-c/clients/:clientId/candidates",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const clients = listClients();
     const client = clients.find((item) => String(item.id) === String(req.params.clientId));
@@ -5836,6 +6132,7 @@ app.post(
   "/api/admin/one-c/clients/:clientId/link",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res, next) => {
     try {
       const links = getGlobalState("clientLinks", {});
@@ -5876,6 +6173,7 @@ app.post(
   "/api/admin/one-c/clients/auto-link",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const clients = listClients();
     const links = getGlobalState("clientLinks", {});
@@ -5900,6 +6198,7 @@ app.get(
   "/api/admin/one-c/preview/:type",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   async (req, res) => {
     const type = req.params.type === "clients" ? "clients" : req.params.type === "products" ? "products" : "";
     if (!type) {
@@ -5931,6 +6230,7 @@ app.post(
   "/api/admin/one-c/orders/:orderId/draft",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   async (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) return res.status(404).json({ error: "Заказ не найден." });
@@ -6047,6 +6347,7 @@ app.get(
   "/api/admin/exchange",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const orders = listOrders();
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -6106,6 +6407,7 @@ app.post(
   "/api/admin/exchange/orders/:orderId/check",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) return res.status(404).json({ error: "Заказ не найден." });
@@ -6153,6 +6455,7 @@ app.post(
   "/api/admin/exchange/orders/:orderId/send",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) return res.status(404).json({ error: "Заказ не найден." });
@@ -6249,6 +6552,7 @@ app.post(
   "/api/admin/exchange/orders/:orderId/reset",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) return res.status(404).json({ error: "Заказ не найден." });
@@ -6323,6 +6627,7 @@ app.get(
   "/api/admin/exchange/orders/:orderId/download",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const stored = getOrderById(req.params.orderId);
     if (!stored) return res.status(404).json({ error: "Заказ не найден." });
@@ -6360,6 +6665,7 @@ app.get(
   "/api/admin/exchange/batch/download",
   authRequired,
   roleRequired("manager"),
+  featureRequired("exchange"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const clientLinks = getGlobalState("clientLinks", {});
@@ -6429,7 +6735,7 @@ app.post("/api/one-c/reconciliation/:requestId/result", (req, res, next) => {
       body: "PDF получен из 1С и доступен в Clover.",
       url: "/?section=reconciliation",
       tag: `reconciliation-${request.id}`,
-    }).catch((error) => console.error(error));
+    }).catch((error) => logError("Не удалось отправить push", error));
     res.json({ ok: true, requestId: request.id, status: request.status });
   } catch (error) {
     next(error);
@@ -6475,7 +6781,7 @@ app.post("/api/reconciliation", authRequired, roleRequired("client"), (req, res,
   } catch (error) { next(error); }
 });
 
-app.patch("/api/admin/reconciliation/:requestId", authRequired, roleRequired("manager"), (req, res, next) => {
+app.patch("/api/admin/reconciliation/:requestId", authRequired, roleRequired("manager"), featureRequired("acts"), (req, res, next) => {
   try {
     const input = reconciliationManagerSchema.parse(req.body);
     const request = updateReconciliationRequest(req.params.requestId, {
@@ -6488,14 +6794,14 @@ app.patch("/api/admin/reconciliation/:requestId", authRequired, roleRequired("ma
       body: request.status === "ready" ? "Акт сверки готов к скачиванию." : `Статус запроса: ${request.status}`,
       url: "/?section=reconciliation",
       tag: `reconciliation-${request.id}`,
-    }).catch((error) => console.error(error));
+    }).catch((error) => logError("Не удалось отправить push", error));
     res.json({ ok: true, request });
   } catch (error) { next(error); }
 });
 
 app.post(
   "/api/admin/reconciliation/:requestId/file",
-  authRequired, roleRequired("manager"), reconciliationUpload.single("file"),
+  authRequired, roleRequired("manager"), featureRequired("acts"), reconciliationUpload.single("file"),
   async (req, res, next) => {
     try {
       if (!req.file?.path) {
@@ -6522,7 +6828,7 @@ app.post(
       sendOrderPush(request.userId, {
         title: "Акт сверки готов", body: "Откройте Clover, чтобы скачать PDF.",
         url: "/?section=reconciliation", tag: `reconciliation-${request.id}`,
-      }).catch((error) => console.error(error));
+      }).catch((error) => logError("Не удалось отправить push", error));
 
       const clientUser = findUserById(request.userId);
       let mail = { sent: false, reason: "account_not_found" };
@@ -6548,7 +6854,7 @@ app.post(
             }],
           });
         } catch (mailError) {
-          console.error("Reconciliation email error", mailError);
+          logError("Reconciliation email error", mailError);
           mail = { sent: false, reason: "send_failed" };
         }
       }
@@ -6570,7 +6876,7 @@ app.get("/api/reconciliation/:requestId/file", authRequired, (req, res) => {
   return res.download(request.file_path, request.file_name || "Акт-сверки.pdf");
 });
 
-app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("manager"), async (req, res) => {
+app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("manager"), featureRequired("clients"), async (req, res) => {
   const status = String(req.body?.status || "");
   if (!["pending", "approved", "rejected"].includes(status)) {
     return res.status(400).json({ error: "Недопустимый статус регистрации." });
@@ -6599,7 +6905,7 @@ app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("m
         ...approvalEmail({ approved: status === "approved" }),
       });
     } catch (mailError) {
-      console.error("Approval email error", mailError);
+      logError("Approval email error", mailError);
     }
   }
   res.json({
@@ -6761,6 +7067,7 @@ app.delete(
   "/api/admin/clients/:clientId",
   authRequired,
   roleRequired("manager"),
+  featureRequired("clients"),
   (req, res, next) => {
     try {
       const clientId = String(req.params.clientId || "").trim();
@@ -6872,7 +7179,7 @@ app.post("/api/push/unsubscribe", authRequired, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/admin/push/promotion", authRequired, roleRequired("manager"), async (req, res, next) => {
+app.post("/api/admin/push/promotion", authRequired, roleRequired("manager"), featureRequired("settings"), async (req, res, next) => {
   try {
     const title = String(req.body?.title || "Новость Clover").trim().slice(0, 100);
     const body = String(req.body?.body || "").trim().slice(0, 300);
@@ -6886,7 +7193,8 @@ app.post("/api/admin/push/promotion", authRequired, roleRequired("manager"), asy
 app.get(
   "/api/admin/audit",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("audit"),
   (req, res) => {
     res.json({ audit: listAudit(req.query.limit || 200) });
   }
@@ -6895,7 +7203,8 @@ app.get(
 app.post(
   "/api/admin/reset",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
+  featureRequired("settings"),
   (req, res) => {
     if (!isAdminFullResetAllowed(req)) {
       return res.status(403).json({
@@ -6922,7 +7231,13 @@ app.post(
 );
 
 app.use((error, req, res, _next) => {
-  console.error(error);
+  logError(`Ошибка запроса ${req.method} ${req.path}`, error);
+
+  if (error?.type === "entity.too.large") {
+    return res.status(413).json({
+      error: "Слишком большой запрос.",
+    });
+  }
 
   if (Number.isInteger(error?.status) && error.status >= 400 && error.status < 600) {
     return res.status(error.status).json({ error: error.message });
@@ -6978,7 +7293,7 @@ try {
     );
   }
 } catch (error) {
-  console.error("Не удалось создать автоматическую резервную копию", error);
+  logError("Не удалось создать автоматическую резервную копию", error);
 }
 
 app.listen(port, host, () => {

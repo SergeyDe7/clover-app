@@ -3,6 +3,7 @@ import {
   normalizeOneCDatabaseName,
   TEST_DATABASE_NAME,
 } from "./oneCPriceSync.js";
+import { csvCell } from "./csv.js";
 import {
   isStorefrontOrder,
   overlayStorefrontClientLink,
@@ -437,10 +438,6 @@ export function build1CPayload({
   };
 }
 
-function csvCell(value) {
-  const text = String(value ?? "");
-  return `"${text.replaceAll('"', '""')}"`;
-}
 
 export function payloadToCsv(payload) {
   const header = [

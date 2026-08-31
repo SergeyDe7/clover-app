@@ -8,6 +8,7 @@ import {
   setGlobalState,
 } from "./db.js";
 import { DEFAULT_PRODUCTS, DEFAULT_SETTINGS, EMPTY_LINK } from "./defaults.js";
+import { safeLinkUrl } from "./safeUrl.js";
 import { normalizeOneCProducts } from "./oneCProducts.js";
 import { normalizeOneCPriceTypes } from "./oneCSalePrices.js";
 import {
@@ -467,8 +468,8 @@ function toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId = "")
     ),
     subcategory: String(product.subcategory || "").trim(),
     facet: String(product.facet || "").trim(),
-    imageUrl: String(product.imageUrl || "").trim(),
-    certificateUrl: String(product.certificateUrl || "").trim(),
+    imageUrl: safeLinkUrl(product.imageUrl),
+    certificateUrl: safeLinkUrl(product.certificateUrl),
     oneCId: String(product.oneCId || "").trim(),
     oneCCode,
     saleUnits: publicSaleUnits(product),
@@ -529,6 +530,28 @@ function buildCategories(products) {
     ...CLOVER_PRODUCT_GROUPS,
     ...counts.keys(),
   ]).map((name) => ({ name, count: counts.get(name) || 0 }));
+}
+
+/**
+ * Поля, которые нужны серверу при оформлении заказа, но не витрине.
+ *
+ * priceSources раскрывает стратегию ценообразования по каждой единице
+ * («покупка + наценка», «вид цен 1С»), а oneC*-поля — внутренние
+ * идентификаторы учётной системы. Витрина ни то, ни другое не использует:
+ * товар отправляется в заказ по productId и code.
+ */
+const INTERNAL_CATALOG_FIELDS = [
+  "priceSources",
+  "oneCId",
+  "oneCCode",
+  "oneCName",
+  "cloverCode",
+];
+
+function toPublicCatalogProduct(product) {
+  const result = { ...product };
+  for (const field of INTERNAL_CATALOG_FIELDS) delete result[field];
+  return result;
 }
 
 export function getPublicCatalog({
@@ -594,7 +617,7 @@ export function getPublicCatalog({
 
   return {
     categories: buildCategories(listStorefrontProducts(settings)),
-    products,
+    products: products.map(toPublicCatalogProduct),
     priceType,
     site: buildPublicSite(settings),
   };
@@ -627,20 +650,20 @@ export function getPublicProductByCode(code) {
   const settings = getStorefrontSettings(
     getGlobalState("settings", DEFAULT_SETTINGS)
   );
-  return (
-    listStorefrontProducts(settings).find((product) => {
-      const aliases = [
-        product.code,
-        product.oneCCode,
-        product.cloverCode,
-        `id-${product.id}`,
-        String(product.id),
-      ]
-        .map((value) => String(value || "").trim().toLocaleLowerCase("ru-RU"))
-        .filter(Boolean);
-      return aliases.includes(needle);
-    }) || null
-  );
+  const found = listStorefrontProducts(settings).find((product) => {
+    const aliases = [
+      product.code,
+      product.oneCCode,
+      product.cloverCode,
+      `id-${product.id}`,
+      String(product.id),
+    ]
+      .map((value) => String(value || "").trim().toLocaleLowerCase("ru-RU"))
+      .filter(Boolean);
+    return aliases.includes(needle);
+  });
+
+  return found ? toPublicCatalogProduct(found) : null;
 }
 
 export function ensureStorefrontGuestUser() {
@@ -712,7 +735,7 @@ export const storefrontOrderSchema = z.object({
   items: z
     .array(
       z.object({
-        productId: z.union([z.string(), z.number()]),
+        productId: z.union([z.string().trim().min(1).max(120), z.number()]),
         code: z.string().trim().max(80).optional().default(""),
         unit: z.enum(SALE_UNITS).default("piece"),
         qty: z.coerce.number().int().positive().max(100000),

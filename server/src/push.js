@@ -2,6 +2,7 @@ import {
   deletePushSubscription,
   listPushSubscriptions,
 } from "./db.js";
+import { logError } from "./logRedaction.js";
 
 function config() {
   const publicKey = String(process.env.VAPID_PUBLIC_KEY || "").trim();
@@ -49,7 +50,7 @@ export async function sendPushToSubscriptions(subscriptions, payload) {
       if ([404, 410].includes(Number(error?.statusCode))) {
         deletePushSubscription(item.userId, item.endpoint);
       } else {
-        console.error("Push notification error", error?.message || error);
+        logError("Push notification error", error);
       }
     }
   }
