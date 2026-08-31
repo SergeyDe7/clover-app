@@ -101,6 +101,7 @@ import {
 } from "./orderStatus.js";
 import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffHasFeature, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
 import { publicClientSettings } from "./clientSettings.js";
+import { clientAddress, consumeRateLimit, rateLimit, resetRateLimit } from "./rateLimit.js";
 import {
   listClientAccessEntries,
   removeClientAccessEntry,
@@ -386,6 +387,16 @@ function allowedCorsOrigin(origin) {
   }
 }
 
+/**
+ * За nginx настоящий адрес клиента приходит в X-Forwarded-For. Без этого
+ * req.ip у всех запросов равен адресу прокси, и любой лимит по IP
+ * превращается в один общий счётчик на весь сайт.
+ *
+ * Доверяем только петлевому адресу: подделать заголовок сможет лишь тот,
+ * кто уже подключается с самой машины.
+ */
+app.set("trust proxy", "loopback");
+
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(cors({
   origin(origin, callback) {
@@ -398,11 +409,61 @@ app.use(express.json({ limit: "24mb" }));
 app.use("/uploads/reconciliation", (req, res) => res.status(404).end());
 app.use("/uploads", express.static(uploadsDirectory, { maxAge: "1h" }));
 
-const loginAttempts = new Map();
-
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
+
+const emailFromBody = (req) => normalizeEmail(req.body?.email);
+
+/**
+ * Лимиты подобраны под реальный масштаб установки (единицы менеджеров,
+ * десятки клиентов): легитимный сценарий в них укладывается с большим
+ * запасом, а перебор и рассылка через форму восстановления — нет.
+ */
+const authRateLimits = {
+  login: rateLimit({
+    scope: "auth.login",
+    windowMs: 10 * 60 * 1000,
+    limit: { ip: 40, email: 10 },
+    keys: { ip: clientAddress, email: emailFromBody },
+    message: "Слишком много попыток входа. Попробуйте позже.",
+  }),
+  register: rateLimit({
+    scope: "auth.register",
+    windowMs: 60 * 60 * 1000,
+    limit: { ip: 5 },
+    keys: { ip: clientAddress },
+    message: "Слишком много попыток регистрации. Попробуйте позже.",
+  }),
+  forgotPassword: rateLimit({
+    scope: "auth.forgot",
+    windowMs: 60 * 60 * 1000,
+    limit: { ip: 10, email: 5 },
+    keys: { ip: clientAddress, email: emailFromBody },
+    message: "Слишком много запросов на восстановление. Попробуйте позже.",
+  }),
+  resendVerification: rateLimit({
+    scope: "auth.resend",
+    windowMs: 60 * 60 * 1000,
+    limit: { ip: 10, email: 5 },
+    keys: { ip: clientAddress, email: emailFromBody },
+    message: "Слишком много запросов на повторное письмо. Попробуйте позже.",
+  }),
+  passkey: rateLimit({
+    scope: "auth.passkey",
+    windowMs: 10 * 60 * 1000,
+    limit: { ip: 60 },
+    keys: { ip: clientAddress },
+    message: "Слишком много попыток входа. Попробуйте позже.",
+  }),
+  publicOrder: rateLimit({
+    scope: "public.order",
+    windowMs: 60 * 60 * 1000,
+    limit: { ip: 20 },
+    keys: { ip: clientAddress },
+    message: "Слишком много заказов с одного адреса. Попробуйте позже.",
+  }),
+};
 
 function publicUser(user) {
   const permissions = parseStaffPermissions(user.permissions_json ?? user.permissions);
@@ -699,26 +760,24 @@ function featureRequired(...featureIds) {
   };
 }
 
+/**
+ * Счётчик неудачных входов. Раньше жил в Map и сбрасывался при каждом
+ * перезапуске; теперь переживает деплой, потому что хранится в БД.
+ */
+const FAILED_LOGIN_SCOPE = "auth.login.failed";
+
 function checkLoginLimit(email) {
-  const key = normalizeEmail(email);
-  const current = loginAttempts.get(key);
-  const now = Date.now();
-
-  if (!current || now - current.startedAt > 10 * 60 * 1000) {
-    loginAttempts.set(key, {
-      count: 1,
-      startedAt: now,
-    });
-    return true;
-  }
-
-  current.count += 1;
-
-  return current.count <= 20;
+  const { allowed } = consumeRateLimit({
+    scope: FAILED_LOGIN_SCOPE,
+    identifier: normalizeEmail(email),
+    limit: 20,
+    windowMs: 10 * 60 * 1000,
+  });
+  return allowed;
 }
 
 function clearLoginLimit(email) {
-  loginAttempts.delete(normalizeEmail(email));
+  resetRateLimit({ scope: FAILED_LOGIN_SCOPE, identifier: normalizeEmail(email) });
 }
 
 
@@ -1809,7 +1868,7 @@ app.get("/api/public/catalog/:code", (req, res) => {
 });
 
 /** Гостевой заказ с витрины — только сайтовые цены. */
-app.post("/api/public/orders", async (req, res) => {
+app.post("/api/public/orders", authRateLimits.publicOrder, async (req, res) => {
   try {
     const order = createStorefrontOrder(req.body, {
       notify: (created) => {
@@ -1838,7 +1897,7 @@ app.post("/api/public/orders", async (req, res) => {
   }
 });
 
-app.post("/api/auth/register", async (req, res, next) => {
+app.post("/api/auth/register", authRateLimits.register, async (req, res, next) => {
   try {
     const input = registerSchema.parse(req.body);
     const email = normalizeEmail(input.email);
@@ -1938,7 +1997,7 @@ app.post("/api/auth/verify-email", (req, res, next) => {
   }
 });
 
-app.post("/api/auth/resend-verification", async (req, res, next) => {
+app.post("/api/auth/resend-verification", authRateLimits.resendVerification, async (req, res, next) => {
   try {
     const input = forgotPasswordSchema.parse(req.body);
     const email = normalizeEmail(input.email);
@@ -1970,7 +2029,7 @@ app.post("/api/auth/resend-verification", async (req, res, next) => {
   }
 });
 
-app.post("/api/auth/forgot-password", async (req, res, next) => {
+app.post("/api/auth/forgot-password", authRateLimits.forgotPassword, async (req, res, next) => {
   try {
     const input = forgotPasswordSchema.parse(req.body);
     const email = normalizeEmail(input.email);
@@ -2023,7 +2082,7 @@ app.post("/api/auth/reset-password", async (req, res, next) => {
   }
 });
 
-app.post("/api/auth/login", async (req, res, next) => {
+app.post("/api/auth/login", authRateLimits.login, async (req, res, next) => {
   try {
     const input = loginSchema.parse(req.body);
     const email = normalizeEmail(input.email);
@@ -2445,7 +2504,7 @@ app.delete("/api/passkeys/:credentialId", authRequired, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/passkeys/authentication/options", async (req, res, next) => {
+app.post("/api/passkeys/authentication/options", authRateLimits.passkey, async (req, res, next) => {
   try {
     const input = passkeyAuthenticationOptionsSchema.parse(req.body || {});
     const email = input.email ? normalizeEmail(input.email) : "";
@@ -2480,7 +2539,7 @@ app.post("/api/passkeys/authentication/options", async (req, res, next) => {
   }
 });
 
-app.post("/api/passkeys/authentication/verify", async (req, res, next) => {
+app.post("/api/passkeys/authentication/verify", authRateLimits.passkey, async (req, res, next) => {
   try {
     const input = passkeyAuthenticationVerifySchema.parse(req.body || {});
     const email = input.email ? normalizeEmail(input.email) : "";
