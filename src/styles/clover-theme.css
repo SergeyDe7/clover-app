@@ -4356,16 +4356,16 @@ body:has(.clover-app) {
   box-sizing: border-box !important;
 }
 .clover-app .client-catalog-add-panel .client-matrix-card {
-  /* no top row — add panel cards have no favorites chrome */
-  grid-template-rows: auto auto auto auto auto !important;
+  /* Title row absorbs leftover height so price Y matches across a desktop row. */
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto !important;
   grid-template-areas:
     "photo"
     "title"
     "code"
     "price"
     "actions" !important;
-  height: auto !important;
-  overflow: visible !important;
+  height: 100% !important;
+  overflow: hidden !important;
   padding: 0 6px 6px !important;
 }
 .clover-app .client-matrix-panel .client-matrix-card {
@@ -4510,7 +4510,7 @@ body:has(.clover-app) {
   overflow: hidden !important;
   white-space: nowrap !important;
   text-overflow: ellipsis !important;
-  color: #2f5f2f !important;
+  color: #4F9A52 !important;
 }
 .clover-app .client-matrix-panel .client-matrix-card .product-price {
   grid-area: price !important;
@@ -7525,6 +7525,12 @@ html.clover-cart-open body {
   font-weight: 800 !important;
   line-height: 1.25 !important;
   flex: unset !important;
+}
+
+/* Desktop add-catalog only: beat shared #2f5f2f price color without touching matrix. */
+.clover-app .client-catalog-add-panel .product-price,
+.clover-app .client-catalog-add-panel .client-catalog-add-price {
+  color: #4F9A52 !important;
 }
 
 .clover-app .product-card-in-matrix {
