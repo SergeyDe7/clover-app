@@ -9814,3 +9814,129 @@ html.clover-storefront-add-open body {
     font-size: 1.5rem !important;
   }
 }
+.clover-app .page-content--price-list {
+  max-width: 720px;
+}
+
+.clover-app .manager-price-list {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 8px 0 24px;
+}
+
+.clover-app .manager-price-list-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.clover-app .manager-price-list-kicker {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--clover-green-deep, #2f5d3a);
+  opacity: 0.85;
+}
+
+.clover-app .manager-price-list-hero h2 {
+  margin: 0;
+  font-size: clamp(1.55rem, 2.4vw, 1.9rem);
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--text, #1a2a1c);
+}
+
+.clover-app .manager-price-list-lead {
+  margin: 0;
+  max-width: 36em;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: var(--muted, #5a6b5d);
+}
+
+.clover-app .manager-price-list-body {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.clover-app .manager-price-list-export {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 280px;
+}
+
+.clover-app .manager-price-list-markup {
+  width: 100%;
+  margin: 0;
+}
+
+.clover-app .manager-price-list-markup input {
+  width: 100%;
+  max-width: 160px;
+}
+
+.clover-app .manager-price-list-formula {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.clover-app .manager-price-list-download {
+  min-height: 44px;
+  min-width: 180px;
+  margin-top: 4px;
+}
+
+.clover-app .manager-price-list-notes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 36em;
+}
+
+.clover-app .manager-price-list-notes li {
+  position: relative;
+  padding-left: 1.1em;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: var(--muted, #5a6b5d);
+}
+
+.clover-app .manager-price-list-notes li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--clover-green, #4a8c5c);
+}
+
+@media (max-width: 640px) {
+  .clover-app .manager-price-list {
+    gap: 22px;
+    padding-top: 4px;
+  }
+
+  .clover-app .manager-price-list-export {
+    max-width: none;
+    width: 100%;
+  }
+
+  .clover-app .manager-price-list-markup input {
+    max-width: none;
+  }
+
+  .clover-app .manager-price-list-download {
+    width: 100%;
+  }
+}

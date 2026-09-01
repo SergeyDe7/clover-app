@@ -200,6 +200,7 @@ import {
   findPurchasePriceTypeId,
   heroSlideUploadUrls,
 } from "./storefrontPublic.js";
+import { buildStorefrontPriceListPdf } from "./storefrontPriceListPdf.js";
 import {
   buildAllPriceRequirements,
   buildOrderPriceRequirements,
@@ -4567,6 +4568,51 @@ app.put(
       settings: next,
       storefront: getStorefrontSettings(next),
     });
+  }
+);
+
+/** PDF прайс витрины: все товары с фото и накруткой % от закупки. */
+app.get(
+  "/api/admin/storefront/price-list.pdf",
+  authRequired,
+  roleRequired("admin"),
+  async (req, res, next) => {
+    try {
+      const markupRaw = req.query?.markupPercent;
+      const markupPercent =
+        markupRaw === undefined || markupRaw === null || String(markupRaw).trim() === ""
+          ? undefined
+          : Number(String(markupRaw).replace(",", "."));
+      if (
+        markupPercent !== undefined &&
+        (!Number.isFinite(markupPercent) || markupPercent < 0 || markupPercent > 1000)
+      ) {
+        return res.status(400).json({
+          error: "Укажите накрутку от 0 до 1000 %.",
+        });
+      }
+
+      const pdf = await buildStorefrontPriceListPdf({
+        markupPercent,
+        uploadsDirectory,
+      });
+      const stamp = new Date().toISOString().slice(0, 10);
+      const fileName = `clover-vitrina-price-list-${stamp}.pdf`;
+      auditFromRequest(req, "storefront.price-list.pdf", {
+        markupPercent:
+          markupPercent === undefined ? "settings" : markupPercent,
+        bytes: pdf.length,
+      });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${fileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`
+      );
+      res.setHeader("Content-Length", String(pdf.length));
+      res.send(pdf);
+    } catch (error) {
+      next(error);
+    }
   }
 );
 

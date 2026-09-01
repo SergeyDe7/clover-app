@@ -512,6 +512,45 @@ function listStorefrontProducts(storeSettings) {
     .filter((product) => product.name);
 }
 
+/**
+ * Товары витрины для PDF-прайса.
+ * Опциональный markupPercent временно переключает режим на purchase_markup
+ * только для файла — настройки сайта не меняются.
+ */
+export function getStorefrontPriceListProducts({ markupPercent } = {}) {
+  const base = getStorefrontSettings(
+    getGlobalState("settings", DEFAULT_SETTINGS)
+  );
+  const hasMarkupOverride =
+    markupPercent !== undefined &&
+    markupPercent !== null &&
+    String(markupPercent).trim() !== "";
+  const markup = hasMarkupOverride
+    ? normalizeStorefrontMarkupPercent(markupPercent)
+    : base.storefrontMarkupPercent;
+  const storeSettings = hasMarkupOverride
+    ? {
+        ...base,
+        storefrontPricingMode: "purchase_markup",
+        storefrontMarkupPercent: markup,
+      }
+    : base;
+  const products = listStorefrontProducts(storeSettings).sort((a, b) => {
+    const cat = String(a.category || "").localeCompare(
+      String(b.category || ""),
+      "ru"
+    );
+    if (cat !== 0) return cat;
+    return String(a.name || "").localeCompare(String(b.name || ""), "ru");
+  });
+  return {
+    settings: storeSettings,
+    markupPercent: storeSettings.storefrontMarkupPercent,
+    pricingMode: storeSettings.storefrontPricingMode,
+    products,
+  };
+}
+
 /** Группы витрины — как Opticom, канон из productGroups.js. */
 const CLOVER_PRODUCT_GROUPS = STOREFRONT_PRODUCT_GROUPS;
 
