@@ -593,6 +593,7 @@ export function buildOrderSearchHaystack(order = {}, link = {}) {
     link.oneCMatchPhone,
     exchange.remoteDocument?.number,
     exchange.remoteDocument?.id,
+    exchange.receipt,
     exchange.message,
   ]
     .filter(Boolean)
