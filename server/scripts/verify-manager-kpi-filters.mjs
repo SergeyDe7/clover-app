@@ -27,4 +27,59 @@ if (shouldActivateStatCard({ key: "Enter" })) {
 }
 assert.equal(activated, true);
 
+function simulateOrdersExchangeFilterSync(initial = "all") {
+  let parent = initial;
+  let local = initial;
+  return {
+    parent: () => parent,
+    local: () => local,
+    setExchangeFilterValue(next) {
+      local = next;
+      parent = next;
+    },
+    applyParentExchangeFilterFromKpi(prop) {
+      parent = prop;
+      if (prop) local = prop;
+    },
+    setLocalOnly(next) {
+      local = next;
+    },
+    reapplyParentPropWithoutChange(prop) {
+      if (prop) local = prop;
+    },
+  };
+}
+
+const synced = simulateOrdersExchangeFilterSync();
+synced.applyParentExchangeFilterFromKpi(managerKpiOrderFilters("exchangeErrors").exchangeFilter);
+assert.equal(synced.parent(), "error");
+assert.equal(synced.local(), "error");
+
+synced.setExchangeFilterValue("all");
+assert.equal(synced.parent(), "all");
+assert.equal(synced.local(), "all");
+
+synced.applyParentExchangeFilterFromKpi(managerKpiOrderFilters("exchangeErrors").exchangeFilter);
+assert.equal(synced.parent(), "error");
+assert.equal(synced.local(), "error");
+
+synced.setExchangeFilterValue("waiting");
+assert.equal(synced.parent(), "waiting");
+assert.equal(synced.local(), "waiting");
+
+synced.applyParentExchangeFilterFromKpi(managerKpiOrderFilters("exchangeErrors").exchangeFilter);
+assert.equal(synced.parent(), "error");
+assert.equal(synced.local(), "error");
+
+const desynced = simulateOrdersExchangeFilterSync();
+desynced.applyParentExchangeFilterFromKpi("error");
+desynced.setLocalOnly("all");
+assert.equal(desynced.parent(), "error");
+assert.equal(desynced.local(), "all");
+desynced.reapplyParentPropWithoutChange("error");
+assert.equal(desynced.local(), "all", "unchanged parent prop must not resync after local-only segment change");
+desynced.setExchangeFilterValue("error");
+assert.equal(desynced.parent(), "error");
+assert.equal(desynced.local(), "error");
+
 console.log("verify-manager-kpi-filters: ok");

@@ -503,7 +503,7 @@ export function ManagerOrders({
           type="button"
           onClick={() => {
             onOrdersViewChange?.("active");
-            setExchangeFilter("all");
+            setExchangeFilterValue("all");
           }}
         >
           Заказы
@@ -515,7 +515,7 @@ export function ManagerOrders({
               type="button"
               onClick={() => {
                 setFiltersOpen(false);
-                setExchangeFilter((current) => (current === "waiting" ? "all" : "waiting"));
+                setExchangeFilterValue(exchangeFilter === "waiting" ? "all" : "waiting");
               }}
             >
               Ждут передачи в 1С
@@ -530,7 +530,7 @@ export function ManagerOrders({
               type="button"
               onClick={() => {
                 setFiltersOpen(false);
-                setExchangeFilter((current) => (current === "queued" ? "all" : "queued"));
+                setExchangeFilterValue(exchangeFilter === "queued" ? "all" : "queued");
               }}
             >
               В очереди
