@@ -12,6 +12,8 @@ import {
   normalizeOrderExchange,
   formatDateTime,
   staffHasFeature,
+  managerKpiOrderFilters,
+  shouldActivateStatCard,
 } from "../../shared/appHelpers";
 import { ManagerOrders } from "./ManagerOrders";
 import { ManagerExchange } from "./ManagerExchange";
@@ -35,6 +37,8 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
   const [headerSearch, setHeaderSearch] = useState("");
   const [bellOpen, setBellOpen] = useState(false);
   const [ordersView, setOrdersView] = useState("active");
+  const [ordersStatusFilter, setOrdersStatusFilter] = useState("Все");
+  const [ordersExchangeFilter, setOrdersExchangeFilter] = useState("all");
 
   const allowedMainTabs = useMemo(
     () => MANAGER_TABS.filter(([id]) => staffHasFeature(authUser, id)),
@@ -76,6 +80,14 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
     setTab(nextTab);
     writeManagerActiveTab(nextTab);
     if (nextTab !== "orders") setHeaderSearch("");
+  };
+
+  const openOrdersWithKpiFilter = (kind) => {
+    const next = managerKpiOrderFilters(kind);
+    setOrdersStatusFilter(next.statusFilter);
+    setOrdersExchangeFilter(next.exchangeFilter);
+    setOrdersView("active");
+    if (staffHasFeature(authUser, "orders")) selectTab("orders");
   };
 
   const selectMoreTab = (nextTab) => {
@@ -244,9 +256,37 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
       })()}
       {tab !== "price-list" ? (
         <div className="stats-grid manager-stats-strip" aria-label="Сводка">
-          <article className="stat-card"><span>Новые заказы</span><strong>{newCount}</strong></article>
+          <article
+            className="stat-card stat-card-action"
+            role="button"
+            tabIndex={0}
+            title="Открыть заказы со статусом «Новый»"
+            onClick={() => openOrdersWithKpiFilter("newOrders")}
+            onKeyDown={(event) => {
+              if (!shouldActivateStatCard(event)) return;
+              event.preventDefault();
+              openOrdersWithKpiFilter("newOrders");
+            }}
+          >
+            <span>Новые заказы</span>
+            <strong>{newCount}</strong>
+          </article>
           <article className="stat-card"><span>Всего заказов</span><strong>{orders.length}</strong></article>
-          <article className="stat-card"><span>Ошибки 1С</span><strong>{exchangeErrors}</strong></article>
+          <article
+            className="stat-card stat-card-action"
+            role="button"
+            tabIndex={0}
+            title="Открыть заказы с ошибкой обмена 1С"
+            onClick={() => openOrdersWithKpiFilter("exchangeErrors")}
+            onKeyDown={(event) => {
+              if (!shouldActivateStatCard(event)) return;
+              event.preventDefault();
+              openOrdersWithKpiFilter("exchangeErrors");
+            }}
+          >
+            <span>Ошибки 1С</span>
+            <strong>{exchangeErrors}</strong>
+          </article>
           <article className="stat-card"><span>Непрочитано</span><strong>{unreadCount}</strong></article>
         </div>
       ) : null}
@@ -268,6 +308,10 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
           onReload={onReload}
           onApplyManagerNotifications={onApplyManagerNotifications}
           headerSearch={headerSearch}
+          statusFilter={ordersStatusFilter}
+          onStatusFilterChange={setOrdersStatusFilter}
+          exchangeFilter={ordersExchangeFilter}
+          onExchangeFilterChange={setOrdersExchangeFilter}
         />
       )}
       {tab === "exchange" && staffHasFeature(authUser, "exchange") && <ManagerExchange onReload={onReload} onApplyManagerNotifications={onApplyManagerNotifications} onNavigate={selectTab} />}

@@ -58,4 +58,37 @@ assert.equal(matchesTextSearch(buildOrderSearchHaystack({
   customerEmail: "shop@example.com",
 }, {}), "shop@example.com"), true);
 
+const receiptOnlyOrder = buildOrderSearchHaystack({
+  number: "CL-900",
+  customerName: "TEST1",
+  exchange: {
+    status: "sent",
+    receipt: "НФНФ-0042",
+    remoteDocument: null,
+  },
+}, link);
+assert.equal(matchesTextSearch(receiptOnlyOrder, "НФНФ-0042"), true);
+assert.equal(matchesTextSearch(receiptOnlyOrder, "CL-900"), true);
+assert.equal(matchesTextSearch(receiptOnlyOrder, "FRANK"), true);
+
+const remoteDocOrder = buildOrderSearchHaystack({
+  number: "CL-901",
+  exchange: {
+    status: "sent",
+    receipt: "НФНФ-0043",
+    remoteDocument: { number: "НФНФ-0099", id: "doc-99" },
+  },
+}, {});
+assert.equal(matchesTextSearch(remoteDocOrder, "НФНФ-0043"), true);
+assert.equal(matchesTextSearch(remoteDocOrder, "НФНФ-0099"), true);
+
+const emptyReceiptOrder = buildOrderSearchHaystack({
+  number: "CL-902",
+  customerName: "Acme",
+  exchange: { status: "sent", receipt: "", remoteDocument: null },
+}, {});
+assert.equal(matchesTextSearch(emptyReceiptOrder, "CL-902"), true);
+assert.equal(matchesTextSearch(emptyReceiptOrder, "Acme"), true);
+assert.equal(matchesTextSearch(emptyReceiptOrder, "НФНФ"), false);
+
 console.log("verify-manager-name-search: ok");

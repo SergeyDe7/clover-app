@@ -593,10 +593,26 @@ export function buildOrderSearchHaystack(order = {}, link = {}) {
     link.oneCMatchPhone,
     exchange.remoteDocument?.number,
     exchange.remoteDocument?.id,
+    exchange.receipt,
     exchange.message,
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+/** Preset filters for manager home KPI cards. */
+export function managerKpiOrderFilters(kind) {
+  if (kind === "newOrders") {
+    return { statusFilter: "Новый", exchangeFilter: "all" };
+  }
+  if (kind === "exchangeErrors") {
+    return { statusFilter: "Все", exchangeFilter: "error" };
+  }
+  return { statusFilter: "Все", exchangeFilter: "all" };
+}
+
+export function shouldActivateStatCard(event) {
+  return event?.key === "Enter" || event?.key === " ";
 }
 
 export function formatRussianPhone(value) {
@@ -1507,6 +1523,8 @@ textarea { resize: vertical; }
 }
 .stat-card span { display: block; margin-bottom: 10px; color: #747e74; font-size: 12px; }
 .stat-card strong { color: #386f37; font-size: 28px; }
+.stat-card-action { cursor: pointer; }
+.stat-card-action:focus-visible { outline: 2px solid #5b9d57; outline-offset: 2px; }
 
 .panel {
   margin-top: 22px;

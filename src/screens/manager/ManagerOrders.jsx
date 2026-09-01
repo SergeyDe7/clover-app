@@ -134,9 +134,13 @@ export function ManagerOrders({
   headerSearch = "",
   clientLinks = {},
   staffRole = "manager",
+  statusFilter = "Все",
+  onStatusFilterChange,
+  exchangeFilter: exchangeFilterProp = "all",
+  onExchangeFilterChange,
 }) {
-  const [status, setStatus] = useState("Все");
-  const [exchangeFilter, setExchangeFilter] = useState("all");
+  const [status, setStatus] = useState(statusFilter || "Все");
+  const [exchangeFilter, setExchangeFilter] = useState(exchangeFilterProp || "all");
   const [sort, setSort] = useState("newest");
   const [busyOrderId, setBusyOrderId] = useState("");
   const [exchangeContour, setExchangeContour] = useState({
@@ -187,6 +191,24 @@ export function ManagerOrders({
   const effectiveSearch = headerSearch.trim();
   const inTrash = ordersView === "trash";
   const sourceOrders = inTrash ? trashedOrders : orders;
+
+  useEffect(() => {
+    if (statusFilter) setStatus(statusFilter);
+  }, [statusFilter]);
+
+  useEffect(() => {
+    if (exchangeFilterProp) setExchangeFilter(exchangeFilterProp);
+  }, [exchangeFilterProp]);
+
+  const setStatusFilter = (next) => {
+    setStatus(next);
+    onStatusFilterChange?.(next);
+  };
+
+  const setExchangeFilterValue = (next) => {
+    setExchangeFilter(next);
+    onExchangeFilterChange?.(next);
+  };
 
   const waitingOneCCount = useMemo(
     () => orders.filter((order) => {
@@ -573,10 +595,10 @@ export function ManagerOrders({
 
       {!inTrash && filtersOpen && (
         <div className="toolbar three manager-orders-filters">
-          <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Фильтр статуса заказа"><option>Все</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
+          <select value={status} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Фильтр статуса заказа"><option>Все</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
           <select
             value={exchangeFilter}
-            onChange={(e) => setExchangeFilter(e.target.value)}
+            onChange={(e) => setExchangeFilterValue(e.target.value)}
             aria-label="Фильтр статуса 1С"
           >
             <option value="all">Все статусы 1С</option>
