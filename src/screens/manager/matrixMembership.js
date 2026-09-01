@@ -1,5 +1,5 @@
 import { uniqueMatrixProductIds } from "./matrixIds.js";
-import { normalizeProduct } from "../../shared/appHelpers";
+import { normalizeProduct } from "../../shared/appHelpers.js";
 
 /** Состав матрицы клиента: id товаров и oneCId, которые уже в матрице. */
 export function getClientMatrixMembership(link, products) {
@@ -274,6 +274,10 @@ export function mergeProductsFromCatalogResponse(previous, incoming) {
     }
     nextById.set(id, {
       ...next,
+      imageUrl: String(next.imageUrl || "").trim()
+        ? next.imageUrl
+        : prev.imageUrl || "",
+      imageUpdatedAt: next.imageUpdatedAt || prev.imageUpdatedAt || "",
       salePricesByType: hasTypedPrices(next.salePricesByType)
         ? next.salePricesByType
         : prev.salePricesByType || {},
