@@ -44,8 +44,8 @@ function simulateOrdersExchangeFilterSync(initial = "all") {
     setLocalOnly(next) {
       local = next;
     },
-    reapplyParentPropWithoutChange(prop) {
-      if (prop) local = prop;
+    repeatKpiWithoutParentChange() {
+      // Parent already "error"; React effect does not rerun when prop value is unchanged.
     },
   };
 }
@@ -76,7 +76,7 @@ desynced.applyParentExchangeFilterFromKpi("error");
 desynced.setLocalOnly("all");
 assert.equal(desynced.parent(), "error");
 assert.equal(desynced.local(), "all");
-desynced.reapplyParentPropWithoutChange("error");
+desynced.repeatKpiWithoutParentChange();
 assert.equal(desynced.local(), "all", "unchanged parent prop must not resync after local-only segment change");
 desynced.setExchangeFilterValue("error");
 assert.equal(desynced.parent(), "error");
