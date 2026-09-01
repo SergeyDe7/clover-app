@@ -15,6 +15,26 @@ const ONE_C_PRODUCT_FIELDS = [
 /** Upload/save payloads often omit these; bulk merge must not drop stored photos. */
 const CATALOG_IMAGE_FIELDS = ["imageUrl", "imageUpdatedAt"];
 
+/** Не затираем сохранённое фото, если в PUT пришли пустые imageUrl/imageUpdatedAt. */
+export function preserveCatalogImageFields(incoming, stored) {
+  if (!incoming || typeof incoming !== "object") return incoming;
+  if (!stored || typeof stored !== "object") return incoming;
+
+  let next = { ...incoming };
+  for (const field of CATALOG_IMAGE_FIELDS) {
+    const incomingValue = incoming[field];
+    const storedValue = stored[field];
+    const incomingEmpty =
+      incomingValue === undefined ||
+      incomingValue === null ||
+      (typeof incomingValue === "string" && !incomingValue.trim());
+    if (incomingEmpty && storedValue !== undefined && storedValue !== null) {
+      next[field] = storedValue;
+    }
+  }
+  return next;
+}
+
 const STOP_WORDS = new Set([
   "для",
   "и",
@@ -983,21 +1003,10 @@ export function mergeProductsPreservingOneCLinks(incomingProducts, storedProduct
     const stored = storedById.get(String(incoming.id));
     if (!stored) return incoming;
 
-    let next = { ...incoming };
+    let next = preserveCatalogImageFields(incoming, stored);
     for (const field of ["oneCMatchCode", "oneCMatchName", "oneCSearchQuery", "oneCSearchRequestedAt"]) {
       if (!(field in incoming) && stored[field] !== undefined) {
         next[field] = stored[field];
-      }
-    }
-    for (const field of CATALOG_IMAGE_FIELDS) {
-      const incomingValue = incoming[field];
-      const storedValue = stored[field];
-      const incomingEmpty =
-        incomingValue === undefined ||
-        incomingValue === null ||
-        (typeof incomingValue === "string" && !incomingValue.trim());
-      if (incomingEmpty && storedValue !== undefined && storedValue !== null) {
-        next[field] = storedValue;
       }
     }
 
@@ -1277,7 +1286,10 @@ export function upsertManagerCatalogProduct(
       };
     }
     const stored = source[index];
-    product = { ...stored, ...incoming, id: stored.id };
+    product = preserveCatalogImageFields(
+      { ...stored, ...incoming, id: stored.id },
+      stored
+    );
     next = source.map((item, idx) => (idx === index ? product : item));
   }
 

@@ -6937,6 +6937,11 @@ export function stripProductForSave(product = {}) {
     isMatrixProduct,
     ...stored
   } = product;
+  // Пустые поля фото не отправляем — иначе PUT одной карточки затирает загруженное изображение.
+  if (!String(stored.imageUrl || "").trim()) {
+    delete stored.imageUrl;
+    delete stored.imageUpdatedAt;
+  }
   return stored;
 }
 
