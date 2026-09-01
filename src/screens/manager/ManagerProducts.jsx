@@ -576,8 +576,8 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
           <div className="product-manager-side">
             <div className="product-manager-badges">
               <span className={product.active ? "badge green" : "badge gray"}>{product.active ? "Активен" : "Скрыт"}</span>
-              {product.showOnStorefront ? (
-                <span className="badge green">На витрине</span>
+              {product.showOnStorefront !== true ? (
+                <span className="badge red">Не на витрине</span>
               ) : null}
             </div>
             <div className="product-row-actions">

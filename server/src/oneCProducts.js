@@ -12,6 +12,9 @@ const ONE_C_PRODUCT_FIELDS = [
   "oneCSearchRequestedAt",
 ];
 
+/** Upload/save payloads often omit these; bulk merge must not drop stored photos. */
+const CATALOG_IMAGE_FIELDS = ["imageUrl", "imageUpdatedAt"];
+
 const STOP_WORDS = new Set([
   "для",
   "и",
@@ -984,6 +987,17 @@ export function mergeProductsPreservingOneCLinks(incomingProducts, storedProduct
     for (const field of ["oneCMatchCode", "oneCMatchName", "oneCSearchQuery", "oneCSearchRequestedAt"]) {
       if (!(field in incoming) && stored[field] !== undefined) {
         next[field] = stored[field];
+      }
+    }
+    for (const field of CATALOG_IMAGE_FIELDS) {
+      const incomingValue = incoming[field];
+      const storedValue = stored[field];
+      const incomingEmpty =
+        incomingValue === undefined ||
+        incomingValue === null ||
+        (typeof incomingValue === "string" && !incomingValue.trim());
+      if (incomingEmpty && storedValue !== undefined && storedValue !== null) {
+        next[field] = storedValue;
       }
     }
 
