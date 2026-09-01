@@ -576,9 +576,11 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
           <div className="product-manager-side">
             <div className="product-manager-badges">
               <span className={product.active ? "badge green" : "badge gray"}>{product.active ? "Активен" : "Скрыт"}</span>
-              {product.showOnStorefront !== true ? (
+              {product.showOnStorefront === true ? (
+                <span className="badge green">На витрине</span>
+              ) : (
                 <span className="badge red">Не на витрине</span>
-              ) : null}
+              )}
             </div>
             <div className="product-row-actions">
               <button className="secondary-button product-row-action" type="button" onClick={() => setEditorProduct(product)}>Изменить</button>
