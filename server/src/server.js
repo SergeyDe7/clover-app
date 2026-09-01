@@ -5012,6 +5012,7 @@ app.post(
     );
 
     setGlobalState("products", updatedProducts);
+    setGlobalState("catalogPricesVersion", new Date().toISOString());
     auditFromRequest(req, "product.image.upload", {
       productId: updatedProduct.id,
       productName: updatedProduct.name,
@@ -5052,6 +5053,7 @@ app.delete(
     );
 
     setGlobalState("products", updatedProducts);
+    setGlobalState("catalogPricesVersion", new Date().toISOString());
     auditFromRequest(req, "product.image.delete", {
       productId: updatedProduct.id,
       productName: updatedProduct.name,

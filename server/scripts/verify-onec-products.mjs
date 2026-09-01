@@ -4,10 +4,12 @@ import {
   buildOneCProductCandidates,
   linkCloverProduct,
   mergeProductsPreservingOneCLinks,
+  preserveCatalogImageFields,
   removeCloverProductFromState,
   normalizeOneCProducts,
   preserveOneCProductPricingFields,
   selectRelevantOneCProducts,
+  upsertManagerCatalogProduct,
 } from "../src/oneCProducts.js";
 
 const exactProducts = Array.from({ length: 26 }, (_, index) => ({
@@ -148,6 +150,30 @@ const partialSave = mergeProductsPreservingOneCLinks(
 assert.ok(partialSave.length >= cloverProducts.length);
 assert.equal(partialSave.find((item) => item.id === 27).name, "Частичное сохранение");
 assert.ok(partialSave.some((item) => item.id === cloverProducts[0].id));
+
+const withPhoto = {
+  id: 99,
+  name: "С фото",
+  imageUrl: "/uploads/product-99.jpg",
+  imageUpdatedAt: "2026-09-01T12:00:00.000Z",
+};
+const staleSave = upsertManagerCatalogProduct([withPhoto], {
+  id: 99,
+  name: "С фото (обновлено)",
+  imageUrl: "",
+});
+assert.equal(staleSave.product.imageUrl, "/uploads/product-99.jpg");
+assert.equal(staleSave.product.imageUpdatedAt, "2026-09-01T12:00:00.000Z");
+
+const bulkStale = mergeProductsPreservingOneCLinks(
+  [{ id: 99, name: "С фото (bulk)", imageUrl: "" }],
+  [withPhoto]
+);
+assert.equal(bulkStale.find((item) => item.id === 99).imageUrl, "/uploads/product-99.jpg");
+assert.equal(
+  preserveCatalogImageFields({ imageUrl: "" }, withPhoto).imageUrl,
+  "/uploads/product-99.jpg"
+);
 
 const removed = removeCloverProductFromState(27, {
   products: [
