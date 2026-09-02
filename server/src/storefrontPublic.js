@@ -20,8 +20,10 @@ import {
   calculateMarkupPrice,
   pickPurchaseMarkupCost,
   normalizeStorefrontPricing,
+  roundPriceUp,
 } from "./pricing.js";
 import { normalizeExchangeState } from "./exchange.js";
+import { ensureSpbDeliveryOnOrder } from "./deliveryFee.js";
 import {
   overlayStorefrontClientLink,
   resolveStorefrontOneCClient,
@@ -763,9 +765,13 @@ export const storefrontOrderSchema = z.object({
 
 export function createStorefrontOrder(input, { notify } = {}) {
   const parsed = storefrontOrderSchema.parse(input);
-  const settings = getStorefrontSettings(
-    getGlobalState("settings", DEFAULT_SETTINGS)
-  );
+  // Публичный getStorefrontSettings намеренно не отдаёт 1С-поля доставки.
+  // Для служебной строки «Доставка» читаем raw settings отдельно.
+  const rawSettings = {
+    ...DEFAULT_SETTINGS,
+    ...getGlobalState("settings", DEFAULT_SETTINGS),
+  };
+  const settings = getStorefrontSettings(rawSettings);
   const catalog = listStorefrontProducts(settings);
   const storedProducts = getGlobalState("products", DEFAULT_PRODUCTS);
   const rawById = new Map(
@@ -884,7 +890,7 @@ export function createStorefrontOrder(input, { notify } = {}) {
     parsed.email ? `Email: ${parsed.email}` : "",
   ].filter(Boolean);
 
-  const order = {
+  const draftOrder = {
     id: orderId,
     externalId: orderId,
     number,
@@ -924,6 +930,27 @@ export function createStorefrontOrder(input, { notify } = {}) {
     storefrontPriceTypeName: settings.storefrontPriceTypeName,
   };
 
+  // СПб доставка: не доверяем клиенту — сервер пересчитывает fee и позицию «Доставка».
+  const orderWithDelivery = ensureSpbDeliveryOnOrder(
+    draftOrder,
+    {
+      deliveryOneCId: rawSettings.deliveryOneCId,
+      deliveryOneCCode: rawSettings.deliveryOneCCode,
+      deliveryOneCName: rawSettings.deliveryOneCName || "Доставка",
+    },
+    getGlobalState("oneCProducts", [])
+  );
+  const itemsSum = (orderWithDelivery.items || []).reduce(
+    (sum, line) => sum + (Number(line.lineTotal) || 0),
+    0
+  );
+  const grandTotal = roundPriceUp(itemsSum) ?? 0;
+  const order = {
+    ...orderWithDelivery,
+    total: grandTotal,
+    amount: grandTotal,
+  };
+
   insertOrder(order, guest.id);
 
   if (typeof notify === "function") notify(order);
@@ -932,6 +959,7 @@ export function createStorefrontOrder(input, { notify } = {}) {
     id: order.id,
     number: order.number,
     total: order.total,
+    deliveryFee: order.deliveryFee || 0,
     status: order.status,
     firstDeliveryDate: order.firstDeliveryDate,
   };
