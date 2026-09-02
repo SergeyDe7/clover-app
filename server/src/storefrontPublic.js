@@ -20,6 +20,7 @@ import {
   calculateMarkupPrice,
   pickPurchaseMarkupCost,
   normalizeStorefrontPricing,
+  roundPriceUp,
 } from "./pricing.js";
 import { normalizeExchangeState } from "./exchange.js";
 import { ensureSpbDeliveryOnOrder } from "./deliveryFee.js";
@@ -935,10 +936,11 @@ export function createStorefrontOrder(input, { notify } = {}) {
     },
     getGlobalState("oneCProducts", [])
   );
-  const grandTotal = (orderWithDelivery.items || []).reduce(
+  const itemsSum = (orderWithDelivery.items || []).reduce(
     (sum, line) => sum + (Number(line.lineTotal) || 0),
     0
   );
+  const grandTotal = roundPriceUp(itemsSum) ?? 0;
   const order = {
     ...orderWithDelivery,
     total: grandTotal,

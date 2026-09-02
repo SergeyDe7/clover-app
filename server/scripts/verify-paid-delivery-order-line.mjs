@@ -1,21 +1,29 @@
 /**
  * Targeted verify: paid delivery 500₽ propagates to order items and 1C payload.
- * Also covers server-side fee authority, threshold flips, and addendum recalculation.
+ * Also covers server-side fee authority, threshold flips, addendum recalculation,
+ * PUT total/amount sync, and storefront create wiring via ensureSpbDeliveryOnOrder.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   CLOVER_DELIVERY_LINE_ID,
   FREE_DELIVERY_MIN_TOTAL,
   PAID_DELIVERY_FEE,
   applyClientSpbDeliveryFees,
   applyDeliveryLineSync,
+  ensureSpbDeliveryOnOrder,
   getSpbDeliveryFee,
   isCloverDeliveryLine,
   orderItemsMoneyTotal,
   resolveClientSpbDelivery,
 } from "../src/deliveryFee.js";
 import { build1CPayload } from "../src/exchange.js";
+import { roundPriceUp } from "../src/pricing.js";
 import { mergeOrderCatalogItems } from "../../src/shared/orderAddendum.js";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 const DELIVERY_UUID = "abd0ca3a-8033-11f1-abc0-b42e99f8290d";
 const DELIVERY_CODE = "НФ-00002361";
@@ -230,7 +238,19 @@ function moneyTotalLikePut(order) {
       sum + (Number(item?.unitPrice) || 0) * (Number(item?.quantity) || 0),
     0
   );
-  return Math.ceil(itemsTotal + customTotal);
+  return roundPriceUp(itemsTotal + customTotal) ?? 0;
+}
+
+/** Mirrors PUT /api/state/orders client branch: fee sync then persist total/amount. */
+function persistLikeClientPut(orders) {
+  return applyClientSpbDeliveryFees(orders, {
+    showPrices: true,
+    oneCProducts: [],
+    ...deliveryMeta,
+  }).map((order) => {
+    const grandTotal = moneyTotalLikePut(order);
+    return { ...order, total: grandTotal, amount: grandTotal };
+  });
 }
 
 // CASE 1: goods 1000 + custom 500 + delivery 500 = 2000
@@ -292,5 +312,127 @@ assert.equal(deliveryLines(customResaved).length, 1);
 const resaveTotal = moneyTotalLikePut(customResaved);
 assert.equal(resaveTotal, 2000, "resave must keep monetary total");
 assert.ok(resaveTotal >= persistedCustom.total, "resave must not shrink total");
+
+// I. PUT-LIKE PERSIST — fake fee cannot control stored totals
+const putPaid = persistLikeClientPut([
+  { ...baseOrder, id: "o-put-paid", deliveryFee: 0, total: 1, amount: 1 },
+])[0];
+assert.equal(putPaid.deliveryFee, PAID_DELIVERY_FEE);
+assert.equal(deliveryLines(putPaid).length, 1);
+assert.equal(putPaid.total, 1500);
+assert.equal(putPaid.amount, 1500);
+
+const putFree = persistLikeClientPut([
+  {
+    ...baseOrder,
+    id: "o-put-free",
+    items: [{ ...goodsLine, lineTotal: 6000, unitPrice: 6000 }],
+    deliveryFee: 9999,
+    total: 9999,
+    amount: 9999,
+  },
+])[0];
+assert.equal(putFree.deliveryFee, 0);
+assert.equal(deliveryLines(putFree).length, 0);
+assert.equal(putFree.total, 6000);
+assert.equal(putFree.amount, 6000);
+
+// J. STOREFRONT CREATE PATH — same ensureSpbDeliveryOnOrder + total/amount + response fee
+function persistLikeStorefrontCreate(draft) {
+  const orderWithDelivery = ensureSpbDeliveryOnOrder(draft, deliveryMeta, []);
+  const itemsSum = (orderWithDelivery.items || []).reduce(
+    (sum, line) => sum + (Number(line.lineTotal) || 0),
+    0
+  );
+  const grandTotal = roundPriceUp(itemsSum) ?? 0;
+  const order = {
+    ...orderWithDelivery,
+    total: grandTotal,
+    amount: grandTotal,
+  };
+  return {
+    saved: order,
+    response: {
+      id: order.id,
+      number: order.number,
+      total: order.total,
+      deliveryFee: order.deliveryFee || 0,
+      status: order.status,
+      firstDeliveryDate: order.firstDeliveryDate,
+    },
+  };
+}
+
+const sfPaidDraft = {
+  ...baseOrder,
+  id: "o-sf-paid",
+  source: "storefront",
+  total: 1000,
+  amount: 1000,
+  deliveryFee: 0,
+};
+const sfPaid = persistLikeStorefrontCreate(sfPaidDraft);
+assert.equal(sfPaid.saved.deliveryFee, PAID_DELIVERY_FEE);
+assert.equal(deliveryLines(sfPaid.saved).length, 1);
+assert.equal(sfPaid.saved.total, 1500);
+assert.equal(sfPaid.saved.amount, 1500);
+assert.equal(sfPaid.response.deliveryFee, PAID_DELIVERY_FEE);
+assert.equal(sfPaid.response.total, sfPaid.saved.total);
+assert.equal(deliveryLines(sfPaid.saved)[0].oneCId, DELIVERY_UUID);
+assert.equal(deliveryLines(sfPaid.saved)[0].oneCCode || deliveryLines(sfPaid.saved)[0].code, DELIVERY_CODE);
+
+const sfFree = persistLikeStorefrontCreate({
+  ...baseOrder,
+  id: "o-sf-free",
+  source: "storefront",
+  items: [{ ...goodsLine, lineTotal: 5000, unitPrice: 5000 }],
+  total: 5000,
+  amount: 5000,
+  deliveryFee: 500,
+});
+assert.equal(sfFree.saved.deliveryFee, 0);
+assert.equal(deliveryLines(sfFree.saved).length, 0);
+assert.equal(sfFree.saved.total, 5000);
+assert.equal(sfFree.response.deliveryFee, 0);
+assert.equal(sfFree.response.total, 5000);
+
+// K. SOURCE WIRING — PUT map + storefront create must stay connected
+const serverSource = readFileSync(path.join(root, "server/src/server.js"), "utf8");
+const storefrontSource = readFileSync(
+  path.join(root, "server/src/storefrontPublic.js"),
+  "utf8"
+);
+const putOrdersIdx = serverSource.indexOf('app.put("/api/state/orders"');
+assert.ok(putOrdersIdx >= 0, "PUT /api/state/orders missing");
+const nextRouteIdx = serverSource.indexOf("\napp.", putOrdersIdx + 1);
+const putSlice = serverSource.slice(
+  putOrdersIdx,
+  nextRouteIdx > putOrdersIdx ? nextRouteIdx : putOrdersIdx + 12000
+);
+assert.match(
+  putSlice,
+  /applyClientSpbDeliveryFees\([\s\S]*?\)\.map\(\(order\) => \{[\s\S]*?orderMoneyTotal\(order\)/,
+  "PUT client path must persist orderMoneyTotal after delivery sync"
+);
+assert.match(
+  putSlice,
+  /applyDeliveryLineSync\([\s\S]*?\)\.map\(\(order\) => \{[\s\S]*?orderMoneyTotal\(order\)/,
+  "PUT staff path must persist orderMoneyTotal after delivery sync"
+);
+assert.match(
+  storefrontSource,
+  /ensureSpbDeliveryOnOrder\([\s\S]*?deliveryOneCId: settings\.deliveryOneCId/,
+  "storefront create must call ensureSpbDeliveryOnOrder with settings refs"
+);
+assert.match(
+  storefrontSource,
+  /deliveryFee: order\.deliveryFee \|\| 0/,
+  "storefront create response must expose deliveryFee"
+);
+assert.match(
+  storefrontSource,
+  /roundPriceUp\(itemsSum\)/,
+  "storefront create total must use roundPriceUp"
+);
 
 console.log("verify-paid-delivery-order-line: ok");
