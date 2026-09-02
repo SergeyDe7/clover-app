@@ -22,6 +22,7 @@ import {
   normalizeStorefrontPricing,
 } from "./pricing.js";
 import { normalizeExchangeState } from "./exchange.js";
+import { ensureSpbDeliveryOnOrder } from "./deliveryFee.js";
 import {
   overlayStorefrontClientLink,
   resolveStorefrontOneCClient,
@@ -884,7 +885,7 @@ export function createStorefrontOrder(input, { notify } = {}) {
     parsed.email ? `Email: ${parsed.email}` : "",
   ].filter(Boolean);
 
-  const order = {
+  const draftOrder = {
     id: orderId,
     externalId: orderId,
     number,
@@ -924,6 +925,26 @@ export function createStorefrontOrder(input, { notify } = {}) {
     storefrontPriceTypeName: settings.storefrontPriceTypeName,
   };
 
+  // СПб доставка: не доверяем клиенту — сервер пересчитывает fee и позицию «Доставка».
+  const orderWithDelivery = ensureSpbDeliveryOnOrder(
+    draftOrder,
+    {
+      deliveryOneCId: settings.deliveryOneCId,
+      deliveryOneCCode: settings.deliveryOneCCode,
+      deliveryOneCName: settings.deliveryOneCName || "Доставка",
+    },
+    getGlobalState("oneCProducts", [])
+  );
+  const grandTotal = (orderWithDelivery.items || []).reduce(
+    (sum, line) => sum + (Number(line.lineTotal) || 0),
+    0
+  );
+  const order = {
+    ...orderWithDelivery,
+    total: grandTotal,
+    amount: grandTotal,
+  };
+
   insertOrder(order, guest.id);
 
   if (typeof notify === "function") notify(order);
@@ -932,6 +953,7 @@ export function createStorefrontOrder(input, { notify } = {}) {
     id: order.id,
     number: order.number,
     total: order.total,
+    deliveryFee: order.deliveryFee || 0,
     status: order.status,
     firstDeliveryDate: order.firstDeliveryDate,
   };

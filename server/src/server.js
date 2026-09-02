@@ -3095,6 +3095,9 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
       showPrices: Boolean(settings.showPrices),
       oneCProducts: getGlobalState("oneCProducts", []),
       ...deliveryMeta,
+    }).map((order) => {
+      const grandTotal = orderMoneyTotal(order);
+      return { ...order, total: grandTotal, amount: grandTotal };
     });
   } else if (isStaffRole(req.user.role)) {
     const settings = {
@@ -3109,7 +3112,10 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
         deliveryOneCName: settings.deliveryOneCName || "Доставка",
       },
       getGlobalState("oneCProducts", [])
-    );
+    ).map((order) => {
+      const grandTotal = orderMoneyTotal(order);
+      return { ...order, total: grandTotal, amount: grandTotal };
+    });
   }
 
   replaceOrders({
