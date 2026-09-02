@@ -9,7 +9,7 @@ import { createServer } from "node:net";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   FREE_DELIVERY_MIN_TOTAL,
   PAID_DELIVERY_FEE,
@@ -28,6 +28,10 @@ const password = "PaidDeliveryIntVerify!1";
 const DELIVERY_UUID = "abd0ca3a-8033-11f1-abc0-b42e99f8290d";
 const DELIVERY_CODE = "НФ-00002361";
 const DELIVERY_NAME = "Доставка СПб тест";
+
+function moduleUrl(absolutePath) {
+  return pathToFileURL(absolutePath).href;
+}
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -83,14 +87,14 @@ function seedDatabase() {
     `
 import { writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-const require = createRequire(${JSON.stringify(path.join(serverDir, "package.json"))});
+const require = createRequire(${JSON.stringify(moduleUrl(path.join(serverDir, "package.json")))});
 const bcrypt = require("bcryptjs");
 import {
   createUser,
   replaceOrders,
   getGlobalState,
   setGlobalState,
-} from ${JSON.stringify(path.join(serverDir, "src/db.js"))};
+} from ${JSON.stringify(moduleUrl(path.join(serverDir, "src/db.js")))};
 
 const password = ${JSON.stringify(password)};
 const passwordHash = bcrypt.hashSync(password, 4);
@@ -267,15 +271,15 @@ import {
   createStorefrontOrder,
   getStorefrontSettings,
   getPublicSite,
-} from ${JSON.stringify(path.join(serverDir, "src/storefrontPublic.js"))};
-import { getOrderById, getGlobalState } from ${JSON.stringify(path.join(serverDir, "src/db.js"))};
-import { roundPriceUp } from ${JSON.stringify(path.join(serverDir, "src/pricing.js"))};
+} from ${JSON.stringify(moduleUrl(path.join(serverDir, "src/storefrontPublic.js")))};
+import { getOrderById, getGlobalState } from ${JSON.stringify(moduleUrl(path.join(serverDir, "src/db.js")))};
+import { roundPriceUp } from ${JSON.stringify(moduleUrl(path.join(serverDir, "src/pricing.js")))};
 import {
   CLOVER_DELIVERY_LINE_ID,
   FREE_DELIVERY_MIN_TOTAL,
   PAID_DELIVERY_FEE,
   isCloverDeliveryLine,
-} from ${JSON.stringify(path.join(serverDir, "src/deliveryFee.js"))};
+} from ${JSON.stringify(moduleUrl(path.join(serverDir, "src/deliveryFee.js")))};
 
 const DELIVERY_UUID = ${JSON.stringify(DELIVERY_UUID)};
 const DELIVERY_CODE = ${JSON.stringify(DELIVERY_CODE)};
