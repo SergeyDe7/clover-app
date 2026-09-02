@@ -421,8 +421,8 @@ assert.match(
 );
 assert.match(
   storefrontSource,
-  /ensureSpbDeliveryOnOrder\([\s\S]*?deliveryOneCId: settings\.deliveryOneCId/,
-  "storefront create must call ensureSpbDeliveryOnOrder with settings refs"
+  /ensureSpbDeliveryOnOrder\([\s\S]*?deliveryOneCId: rawSettings\.deliveryOneCId/,
+  "storefront create must call ensureSpbDeliveryOnOrder with raw settings refs"
 );
 assert.match(
   storefrontSource,
