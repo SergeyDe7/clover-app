@@ -4,6 +4,7 @@ import { api } from "../../serverApi";
 import { PasswordSecurityPanel, PushSettings } from "../../shared/SharedPanels";
 import { getRussianPhoneLocalDigits, formatRussianPhone } from "../../shared/appHelpers";
 import { appAlert } from "../../shared/AppModal";
+import { FREE_DELIVERY_MIN_TOTAL, PAID_DELIVERY_FEE } from "../../config/orderConfig";
 
 function ManagerPromotionPanel() {
   const [title, setTitle] = useState("Новость Clover");
@@ -148,6 +149,59 @@ function ManagerNotificationSettings({ settings, set }) {
   );
 }
 
+export function DeliveryOneCSettings({ settings, set }) {
+  const freeDeliveryMinTotal = FREE_DELIVERY_MIN_TOTAL.toLocaleString("ru-RU");
+  const paidDeliveryFee = PAID_DELIVERY_FEE.toLocaleString("ru-RU");
+
+  return (
+    <div className="manager-contact-settings">
+      <h3>Номенклатура доставки в 1С</h3>
+      <p>
+        Для заказов менее {freeDeliveryMinTotal} ₽ Clover добавляет доставку {paidDeliveryFee} ₽;
+        от {freeDeliveryMinTotal} ₽ — бесплатно.
+      </p>
+      <div className="form-grid">
+        <label className="field" htmlFor="delivery-onec-name">
+          Наименование в 1С
+          <input
+            id="delivery-onec-name"
+            name="deliveryOneCName"
+            value={settings.deliveryOneCName ?? "Доставка"}
+            placeholder="Доставка"
+            onChange={(event) => set("deliveryOneCName", event.target.value)}
+          />
+        </label>
+        <label className="field" htmlFor="delivery-onec-code">
+          Код в 1С
+          <input
+            id="delivery-onec-code"
+            name="deliveryOneCCode"
+            value={settings.deliveryOneCCode ?? ""}
+            placeholder="Например: НФ-000001"
+            spellCheck="false"
+            onChange={(event) => set("deliveryOneCCode", event.target.value)}
+          />
+        </label>
+        <label className="field field-wide" htmlFor="delivery-onec-id">
+          ID в 1С
+          <input
+            id="delivery-onec-id"
+            name="deliveryOneCId"
+            value={settings.deliveryOneCId ?? ""}
+            placeholder="UUID номенклатуры"
+            spellCheck="false"
+            onChange={(event) => set("deliveryOneCId", event.target.value)}
+          />
+        </label>
+      </div>
+      <p className="manager-contact-help">
+        Укажите UUID или код позиции доставки из 1С. Эти значения используются для
+        сопоставления служебной строки доставки при передаче заказа.
+      </p>
+    </div>
+  );
+}
+
 export function ManagerSettings({ settings, setSettings, authUser }) {
   const isAdmin = authUser?.role === "admin";
   const set = (key, value) => setSettings((current) => ({ ...current, [key]: value }));
@@ -227,6 +281,7 @@ export function ManagerSettings({ settings, setSettings, authUser }) {
         </p>
       </div>
 
+      <DeliveryOneCSettings settings={settings} set={set} />
       <ManagerNotificationSettings settings={settings} set={set} />
       <PushSettings />
 
