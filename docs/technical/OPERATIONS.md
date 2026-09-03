@@ -12,7 +12,7 @@
 
 Состав daily tarball: `server/data` + `server/.env`. Полный zip (снимок + фото) — через `server/scripts/create-scheduled-backup.mjs`.
 
-Linux safety: `daily-backup.sh` ставит `umask 077`, держит non-blocking `flock` на `server/backups/.daily-backup.lock` на весь job (TGZ + scheduled ZIP + retention) и при занятом lock делает controlled skip (`SKIP:…`, exit 0). Новые каталоги backup — mode `700`, новые архивы и lock — mode `600`. Без `flock` скрипт не запускается. Cron schedule не меняется.
+Linux safety: `daily-backup.sh` ставит `umask 077`, держит non-blocking `flock` на `server/backups/.daily-backup.lock` на весь job (TGZ + scheduled ZIP + retention) и при занятом lock делает controlled skip (`SKIP:…`, exit 0). Новые каталоги backup — mode `700`, новые архивы и lock — mode `600`. Live `server/uploads` permissions не меняются. Без `flock` скрипт не запускается. Cron schedule не меняется.
 
 Если после деплоя процессы запущены вручную, а systemd-юниты `inactive` из‑за занятых портов — остановить ручные PID и `sudo systemctl restart clover-api clover-ui`.
 

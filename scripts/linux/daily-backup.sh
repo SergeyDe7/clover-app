@@ -53,7 +53,6 @@ if [[ -x /usr/bin/node || -n "$(command -v node)" ]]; then
     export CLOVER_SERVER_BACKUP_DIR="$BACKUP_ROOT"
     export CLOVER_UPLOADS_DIR="${CLOVER_UPLOADS_DIR:-$SERVER/uploads}"
     mkdir -p "$CLOVER_UPLOADS_DIR"
-    chmod 700 "$CLOVER_UPLOADS_DIR" 2>/dev/null || true
     node "$REPO_ROOT/server/scripts/create-scheduled-backup.mjs" >/dev/null
   ) || echo "WARN: create-scheduled-backup.mjs failed" >&2
 fi

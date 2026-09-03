@@ -51,7 +51,7 @@ function ensureSecureFile(filePath) {
 }
 
 ensureSecureDir(backupDirectory);
-ensureSecureDir(uploadsDirectory);
+mkdirSync(uploadsDirectory, { recursive: true });
 function cleanLabel(value) {
   const result = String(value || "manual")
     .trim()
