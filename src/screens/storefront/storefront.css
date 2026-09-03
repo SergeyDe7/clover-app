@@ -324,7 +324,6 @@ html.sf-catalog-lock .sf-main,
 .sf-hero-visual img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; opacity: 0; transition: opacity .55s ease; }
 .sf-hero-visual img.is-active { opacity: 1; }
 .sf-hero-visual.has-slide-link { cursor: pointer; }
-.sf-hero-visual img.is-app-slide { object-position: 68% center; }
 .sf-hero-slide-link { position: absolute; inset: 0; z-index: 1; display: flex; align-items: flex-end; justify-content: flex-start; padding: 14px 14px 30px; text-decoration: none; color: inherit; }
 .sf-hero-slide-link.is-cover-only { padding: 0; }
 .sf-hero-slide-btn { display: inline-flex; align-items: center; padding: 8px 14px; border-radius: 12px; background: var(--clover-green, #4f9a52); color: #fff; font-weight: 700; font-size: .9rem; line-height: 1.2; box-shadow: 0 8px 20px rgba(28, 31, 28, 0.18); }
@@ -368,9 +367,48 @@ html.sf-catalog-lock .sf-main,
   object-fit: cover;
   object-position: center;
 }
-.sf-home .sf-hero-visual img.is-app-slide {
-  object-position: 68% center;
+
+/* Install-app slide only: one full-width banner (other slides keep 50/50). */
+.sf-home .sf-hero.sf-hero-compact.sf-hero--full-banner {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0;
+  /* Drop compact/home hero height clamps that force crop vs 1400×746. */
+  min-height: 0;
+  max-height: none;
+  height: auto;
+  padding: clamp(10px, 1.6vw, 14px);
 }
+.sf-home .sf-hero.sf-hero--full-banner .sf-hero-visual,
+.sf-home .sf-hero.sf-hero--full-banner .sf-hero-visual.sf-hero-visual--full-banner {
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 1400 / 746;
+  /* Width-driven height only — do not inherit max-height: min(34vh, 320px). */
+  max-height: none;
+  min-height: 0;
+  height: auto;
+  justify-self: stretch;
+  align-self: stretch;
+  /* Avoid frame-in-frame: outer .sf-hero keeps site radius; drop inner chrome. */
+  border-radius: 18px;
+  box-shadow: none;
+  background: transparent;
+}
+.sf-home .sf-hero.sf-hero--full-banner .sf-hero-visual img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* contain = hard no-crop; equals cover when box is exactly 1400/746. */
+  object-fit: contain;
+  object-position: center;
+}
+.sf-home .sf-hero.sf-hero--full-banner .sf-hero-slide-link:focus-visible {
+  outline: 3px solid rgba(79, 154, 82, 0.55);
+  outline-offset: -3px;
+  border-radius: 18px;
+}
+
 .sf-section { margin-bottom: 40px; animation: sf-rise .55s ease both; }
 .sf-section-head { margin-bottom: 18px; }
 .sf-section-head h1, .sf-section-head h2 { margin: 0; letter-spacing: -.02em; }
@@ -1433,6 +1471,31 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
     min-height: 0;
     aspect-ratio: 1400 / 746;
     border-radius: 14px;
+  }
+  .sf-home .sf-hero.sf-hero-compact.sf-hero--full-banner {
+    gap: 0;
+    /* Mobile safe inset: keep raster text off screen edges (image stays centered). */
+    padding: 10px 14px;
+    min-height: 0;
+    max-height: none;
+    height: auto;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+  .sf-home .sf-hero.sf-hero--full-banner .sf-hero-visual,
+  .sf-home .sf-hero.sf-hero--full-banner .sf-hero-visual.sf-hero-visual--full-banner {
+    aspect-ratio: 1400 / 746;
+    width: 100%;
+    max-width: 100%;
+    max-height: none;
+    min-height: 0;
+    height: auto;
+    margin-inline: auto;
+    border-radius: 14px;
+  }
+  .sf-home .sf-hero.sf-hero--full-banner .sf-hero-visual img {
+    object-fit: contain;
+    object-position: center;
   }
   .sf-hero { min-height: 0; grid-template-columns: 1fr; padding: 20px 16px 16px; gap: 16px; }
   .sf-hero-compact { min-height: 0; padding: 20px 16px 16px; }

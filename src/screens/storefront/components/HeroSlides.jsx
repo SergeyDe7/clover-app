@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
   STOREFRONT_DEFAULT_HERO_SLIDES,
+  isStorefrontInstallAppHeroSlide,
   resolveStorefrontHeroSlideHref,
 } from "../siteCopy.js";
 import { storefrontHref } from "../mode.js";
@@ -36,7 +37,7 @@ function heroRouteFromHref(href) {
   return path;
 }
 
-export function HeroSlides({ slides, intervalSec }) {
+export function HeroSlides({ slides, intervalSec, onActiveInstallAppChange }) {
   const list =
     Array.isArray(slides) && slides.length
       ? slides
@@ -49,6 +50,7 @@ export function HeroSlides({ slides, intervalSec }) {
   const seconds = Number(intervalSec) || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC;
   const current = list[index] || list[0];
   const href = resolveStorefrontHeroSlideHref(current, index);
+  const isInstallAppSlide = isStorefrontInstallAppHeroSlide(current, index);
   const linkLabel =
     current?.buttonLabel ||
     current?.alt ||
@@ -69,6 +71,10 @@ export function HeroSlides({ slides, intervalSec }) {
   }, [index]);
 
   useEffect(() => {
+    onActiveInstallAppChange?.(isInstallAppSlide);
+  }, [isInstallAppSlide, onActiveInstallAppChange]);
+
+  useEffect(() => {
     if (list.length < 2 || paused || prefersReducedMotion()) return undefined;
     const timer = window.setInterval(() => {
       setIndex((currentIndex) => (currentIndex + 1) % list.length);
@@ -84,7 +90,9 @@ export function HeroSlides({ slides, intervalSec }) {
 
   return (
     <div
-      className={`sf-hero-visual${href ? " has-slide-link" : ""}`}
+      className={`sf-hero-visual${href ? " has-slide-link" : ""}${
+        isInstallAppSlide ? " sf-hero-visual--full-banner" : ""
+      }`}
       aria-roledescription="carousel"
       aria-label="Слайды на главной"
       onMouseEnter={() => setPaused(true)}
@@ -94,30 +102,24 @@ export function HeroSlides({ slides, intervalSec }) {
         if (!loadedIndexes.has(slideIndex)) return null;
         const isFirstPaint = slideIndex === 0;
         return (
-        <img
-          key={slide.src}
-          src={slide.src}
-          alt={slide.alt || ""}
-          width="1400"
-          height="746"
-          loading={isFirstPaint ? "eager" : "lazy"}
-          fetchPriority={isFirstPaint ? "high" : "low"}
-          decoding={isFirstPaint ? "sync" : "async"}
-          className={[
-            slideIndex === index ? "is-active" : "",
-            String(slide.src || "").includes("hero-app") ||
-            resolveStorefrontHeroSlideHref(slide, slideIndex) === "/install-app"
-              ? "is-app-slide"
-              : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        />
+          <img
+            key={slide.src}
+            src={slide.src}
+            alt={slide.alt || ""}
+            width="1400"
+            height="746"
+            loading={isFirstPaint ? "eager" : "lazy"}
+            fetchPriority={isFirstPaint ? "high" : "low"}
+            decoding={isFirstPaint ? "sync" : "async"}
+            className={slideIndex === index ? "is-active" : ""}
+          />
         );
       })}
       {href ? (
         <a
-          className={`sf-hero-slide-link${current?.buttonLabel ? "" : " is-cover-only"}`}
+          className={`sf-hero-slide-link${
+            current?.buttonLabel && !isInstallAppSlide ? "" : " is-cover-only"
+          }`}
           href={storefrontHref(heroRouteFromHref(href) || href)}
           aria-label={linkLabel}
           onClick={(event) => {
@@ -125,7 +127,7 @@ export function HeroSlides({ slides, intervalSec }) {
             openSlideLink();
           }}
         >
-          {current?.buttonLabel ? (
+          {current?.buttonLabel && !isInstallAppSlide ? (
             <span className="sf-hero-slide-btn">{current.buttonLabel}</span>
           ) : null}
         </a>

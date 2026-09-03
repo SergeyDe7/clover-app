@@ -34,3 +34,8 @@ export function resolveStorefrontHeroSlideHref(slide, index = 0) {
   if (Number(index) === 0) return "/install-app";
   return "";
 }
+
+/** Full-banner app promo: href resolves to /install-app (not upload filename). */
+export function isStorefrontInstallAppHeroSlide(slide, index = 0) {
+  return resolveStorefrontHeroSlideHref(slide, index) === "/install-app";
+}
