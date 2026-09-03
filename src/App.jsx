@@ -38,6 +38,10 @@ import {
   mergeOrderCustomItems,
 } from "./shared/orderAddendum";
 import { SoftBanner, ListSkeleton } from "./shared/uxFeedback";
+import {
+  installPushSyncListeners,
+  syncPushSubscription,
+} from "./shared/pushSync";
 import { ManagerContact } from "./screens/client/ManagerContact";
 
 const ClientScreen = lazy(() =>
@@ -794,6 +798,17 @@ function App() {
       window.removeEventListener("clover:update-available", onUpdateAvailable);
     };
   }, []);
+
+  // Session push resync is fire-and-forget: never awaited by mount/login/boot.
+  // Automatic path only proceeds when Notification.permission is already granted
+  // (enforced inside syncPushSubscription) — no permission prompt here.
+  useEffect(() => {
+    if (!isLoggedIn || !hydrated || !authUser) {
+      return undefined;
+    }
+    void syncPushSubscription();
+    return installPushSyncListeners();
+  }, [isLoggedIn, hydrated, authUser?.id]);
 
   useEffect(() => {
     if (!isLoggedIn || !hydrated || !authUser) {
