@@ -159,12 +159,63 @@ function buildFixture() {
   };
 }
 
+/** Tracked fixture DatabaseSync handles — must all close before rmSync(fixture.root). */
+const trackedFixtureDbs = new Set();
+
+function assertFixtureDbPath(fixture) {
+  const dbPath = process.env.DB_PATH || "";
+  assert.ok(dbPath, "DB_PATH must be set to fixture before importing db/backups");
+  assert.equal(
+    path.resolve(dbPath),
+    path.resolve(fixture.dbPath),
+    "DB_PATH must point at fixture db (refusing production/default db import)"
+  );
+  assert.ok(
+    path.resolve(dbPath).startsWith(path.resolve(fixture.root) + path.sep),
+    "DB_PATH must stay inside fixture.root"
+  );
+}
+
+function trackFixtureDb(db) {
+  if (db && typeof db.close === "function") trackedFixtureDbs.add(db);
+}
+
+function closeTrackedFixtureDbs() {
+  const errors = [];
+  for (const db of trackedFixtureDbs) {
+    try {
+      db.close();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  trackedFixtureDbs.clear();
+  return errors;
+}
+
 async function initFixtureDb(fixture) {
   process.env.DB_PATH = fixture.dbPath;
   process.env.CLOVER_SERVER_BACKUP_DIR = fixture.backups;
   process.env.CLOVER_UPLOADS_DIR = fixture.uploads;
+  assertFixtureDbPath(fixture);
+  // Ephemeral schema init module (query-unique); close immediately after bootstrap.
   const dbMod = await import(`../src/db.js?backupSafety=${Date.now()}-${Math.random()}`);
+  trackFixtureDb(dbMod.db);
   dbMod.db.close();
+  trackedFixtureDbs.delete(dbMod.db);
+}
+
+/** Import backups.js only after fixture DB_PATH is set; track the shared ./db.js handle. */
+async function importFixtureBackups(fixture, tag) {
+  assertFixtureDbPath(fixture);
+  const backupsMod = await import(
+    `../src/backups.js?${tag}=${Date.now()}-${Math.random()}`
+  );
+  // backups.js imports canonical ../src/db.js (no query) — track that handle for cleanup.
+  const dbMod = await import("../src/db.js");
+  assertFixtureDbPath(fixture);
+  trackFixtureDb(dbMod.db);
+  return backupsMod;
 }
 
 function runDailyBackup(fixture) {
@@ -312,7 +363,7 @@ async function testPermissiveUmask(fixture, prodBefore) {
   process.env.CLOVER_SERVER_BACKUP_DIR = fixture.backups;
   process.env.CLOVER_UPLOADS_DIR = fixture.uploads;
   const beforeManual = countZips(fixture);
-  const backupsMod = await import(`../src/backups.js?perm=${Date.now()}-${Math.random()}`);
+  const backupsMod = await importFixtureBackups(fixture, "perm");
   const manual = backupsMod.createServerBackup({
     label: "manual",
     reason: "fixture manual backup",
@@ -409,7 +460,7 @@ async function testPortableBackupsJs(fixture, prodBefore) {
   process.env.CLOVER_UPLOADS_DIR = fixture.uploads;
   const uploadsBefore = isWin ? null : modeOf(fixture.uploads);
 
-  const backupsMod = await import(`../src/backups.js?portable=${Date.now()}-${Math.random()}`);
+  const backupsMod = await importFixtureBackups(fixture, "portable");
   assert.equal(
     path.resolve(backupsMod.backupDirectory),
     path.resolve(fixture.backups),
@@ -457,10 +508,33 @@ function assertScriptMentions(patterns, label) {
   );
 }
 
+async function cleanupFixtureRoot(fixture) {
+  const cleanupErrors = [];
+
+  for (const error of closeTrackedFixtureDbs()) {
+    cleanupErrors.push(error);
+  }
+
+  try {
+    rmSync(fixture.root, { recursive: true, force: true });
+  } catch (error) {
+    cleanupErrors.push(error);
+  }
+
+  if (existsSync(fixture.root)) {
+    cleanupErrors.push(
+      new Error(`fixture root still exists after rmSync: ${fixture.root}`)
+    );
+  }
+
+  return cleanupErrors;
+}
+
 async function main() {
   assert.ok(existsSync(DAILY_BACKUP), "daily-backup.sh missing");
   assert.notEqual(REPO_ROOT, "/opt/clover/clover-app", "refusing to run from production worktree");
 
+  // Fingerprints before any db import; never import db/backups before fixture DB_PATH.
   const prodBefore = snapshotProdFingerprints();
   const fixture = buildFixture();
   let failed = null;
@@ -476,37 +550,49 @@ async function main() {
       console.log("SKIP TEST C — successful later run (Linux-only)");
       console.log("SKIP TEST D — failure safety (Linux-only)");
       console.log("verify-backup-lock-permissions: PASS (win32 portable + SKIP Linux-only)");
-      return;
+    } else {
+      assertFlockPresent();
+
+      console.log("TEST A — lock contention");
+      await testLockContention(fixture, prodBefore);
+
+      console.log("TEST B — permissive umask + zip modes");
+      await testPermissiveUmask(fixture, prodBefore);
+
+      console.log("TEST C — successful later run");
+      await testSuccessfulLaterRun(fixture, prodBefore);
+
+      console.log("TEST D — failure safety");
+      await testFailureSafety(fixture, prodBefore);
+
+      assertScriptMentions([/umask\s+077/, /flock/, /\.daily-backup\.lock/], "source");
+      assertProdUntouched(prodBefore);
+      console.log("verify-backup-lock-permissions: PASS");
     }
-
-    assertFlockPresent();
-
-    console.log("TEST A — lock contention");
-    await testLockContention(fixture, prodBefore);
-
-    console.log("TEST B — permissive umask + zip modes");
-    await testPermissiveUmask(fixture, prodBefore);
-
-    console.log("TEST C — successful later run");
-    await testSuccessfulLaterRun(fixture, prodBefore);
-
-    console.log("TEST D — failure safety");
-    await testFailureSafety(fixture, prodBefore);
-
-    assertScriptMentions([/umask\s+077/, /flock/, /\.daily-backup\.lock/], "source");
-    assertProdUntouched(prodBefore);
-    console.log("verify-backup-lock-permissions: PASS");
   } catch (err) {
     failed = err;
-    throw err;
-  } finally {
-    // Only fixture.root may be deleted by this verifier.
-    try {
-      rmSync(fixture.root, { recursive: true, force: true });
-    } catch {
-      /* ignore */
-    }
   }
+
+  // Only fixture.root may be deleted by this verifier (never reviewer leftovers / prod).
+  const cleanupErrors = await cleanupFixtureRoot(fixture);
+  if (cleanupErrors.length) {
+    for (const error of cleanupErrors) {
+      console.error("cleanup error:", error);
+    }
+    if (failed) {
+      console.error("primary test error:", failed);
+      throw new Error(
+        `test failed; fixture cleanup also failed: ${cleanupErrors
+          .map((e) => e.message || String(e))
+          .join("; ")}`,
+        { cause: failed }
+      );
+    }
+    throw cleanupErrors.length === 1
+      ? cleanupErrors[0]
+      : new AggregateError(cleanupErrors, "fixture cleanup failed");
+  }
+
   if (failed) throw failed;
 }
 
