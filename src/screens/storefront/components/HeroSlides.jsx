@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
   STOREFRONT_DEFAULT_HERO_SLIDES,
-  isStorefrontAppHeroSlide,
   resolveStorefrontHeroSlideHref,
 } from "../siteCopy.js";
 import { storefrontHref } from "../mode.js";
@@ -37,13 +36,7 @@ function heroRouteFromHref(href) {
   return path;
 }
 
-const APP_PERKS = [
-  { icon: "⚡", label: "Быстрый заказ" },
-  { icon: "▦", label: "Удобный каталог" },
-  { icon: "◷", label: "История покупок" },
-];
-
-export function HeroSlides({ slides, intervalSec, onActiveAppChange }) {
+export function HeroSlides({ slides, intervalSec }) {
   const list =
     Array.isArray(slides) && slides.length
       ? slides
@@ -56,12 +49,10 @@ export function HeroSlides({ slides, intervalSec, onActiveAppChange }) {
   const seconds = Number(intervalSec) || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC;
   const current = list[index] || list[0];
   const href = resolveStorefrontHeroSlideHref(current, index);
-  const isAppSlide = isStorefrontAppHeroSlide(current, index);
   const linkLabel =
     current?.buttonLabel ||
     current?.alt ||
     "Инструкция по установке приложения";
-  const installHref = storefrontHref({ name: "install-app" });
 
   useEffect(() => {
     setIndex((currentIndex) => (currentIndex < list.length ? currentIndex : 0));
@@ -78,10 +69,6 @@ export function HeroSlides({ slides, intervalSec, onActiveAppChange }) {
   }, [index]);
 
   useEffect(() => {
-    onActiveAppChange?.(isAppSlide);
-  }, [isAppSlide, onActiveAppChange]);
-
-  useEffect(() => {
     if (list.length < 2 || paused || prefersReducedMotion()) return undefined;
     const timer = window.setInterval(() => {
       setIndex((currentIndex) => (currentIndex + 1) % list.length);
@@ -89,21 +76,15 @@ export function HeroSlides({ slides, intervalSec, onActiveAppChange }) {
     return () => window.clearInterval(timer);
   }, [list.length, paused, seconds]);
 
-  const openSlideLink = (targetHref) => {
-    if (!targetHref) return;
-    const route = heroRouteFromHref(targetHref);
+  const openSlideLink = () => {
+    if (!href) return;
+    const route = heroRouteFromHref(href);
     if (route) navigateStorefront(route);
   };
 
   return (
     <div
-      className={[
-        "sf-hero-visual",
-        href || isAppSlide ? "has-slide-link" : "",
-        isAppSlide ? "sf-hero-visual--app" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
+      className={`sf-hero-visual${href ? " has-slide-link" : ""}`}
       aria-roledescription="carousel"
       aria-label="Слайды на главной"
       onMouseEnter={() => setPaused(true)}
@@ -112,85 +93,28 @@ export function HeroSlides({ slides, intervalSec, onActiveAppChange }) {
       {list.map((slide, slideIndex) => {
         if (!loadedIndexes.has(slideIndex)) return null;
         const isFirstPaint = slideIndex === 0;
-        const slideIsApp = isStorefrontAppHeroSlide(slide, slideIndex);
-        // App slide image is rendered inside the HTML phone frame, not full-bleed.
-        if (slideIsApp) return null;
         return (
-          <img
-            key={slide.src}
-            src={slide.src}
-            alt={slide.alt || ""}
-            width="1400"
-            height="746"
-            loading={isFirstPaint ? "eager" : "lazy"}
-            fetchPriority={isFirstPaint ? "high" : "low"}
-            decoding={isFirstPaint ? "sync" : "async"}
-            className={slideIndex === index ? "is-active" : ""}
-          />
+        <img
+          key={slide.src}
+          src={slide.src}
+          alt={slide.alt || ""}
+          width="1400"
+          height="746"
+          loading={isFirstPaint ? "eager" : "lazy"}
+          fetchPriority={isFirstPaint ? "high" : "low"}
+          decoding={isFirstPaint ? "sync" : "async"}
+          className={slideIndex === index ? "is-active" : ""}
+        />
         );
       })}
-
-      {isAppSlide ? (
-        <a
-          className="sf-hero-app"
-          href={installHref}
-          aria-label={linkLabel}
-          onClick={(event) => {
-            event.preventDefault();
-            openSlideLink("/install-app");
-          }}
-        >
-          <div className="sf-hero-app-copy">
-            <p className="sf-hero-app-brand">Clover</p>
-            <h2 className="sf-hero-app-title">
-              Первое мобильное
-              <br />
-              приложение для
-              <br />
-              заказов хозтоваров
-            </h2>
-            <p className="sf-hero-app-sub">
-              Заказывайте в любое время —
-              <br />
-              прямо с телефона
-            </p>
-            <ul className="sf-hero-app-perks">
-              {APP_PERKS.map((perk) => (
-                <li key={perk.label}>
-                  <span className="sf-hero-app-perk-icon" aria-hidden="true">
-                    {perk.icon}
-                  </span>
-                  <span>{perk.label}</span>
-                </li>
-              ))}
-            </ul>
-            <span className="sf-hero-app-cta">Установить приложение</span>
-          </div>
-          <div className="sf-hero-app-phone" aria-hidden="true">
-            {current?.src ? (
-              <img
-                src={current.src}
-                alt=""
-                width="1400"
-                height="746"
-                loading="eager"
-                fetchPriority="high"
-                decoding="sync"
-                className="is-app-slide is-active"
-              />
-            ) : null}
-          </div>
-        </a>
-      ) : null}
-
-      {href && !isAppSlide ? (
+      {href ? (
         <a
           className={`sf-hero-slide-link${current?.buttonLabel ? "" : " is-cover-only"}`}
           href={storefrontHref(heroRouteFromHref(href) || href)}
           aria-label={linkLabel}
           onClick={(event) => {
             event.preventDefault();
-            openSlideLink(href);
+            openSlideLink();
           }}
         >
           {current?.buttonLabel ? (
