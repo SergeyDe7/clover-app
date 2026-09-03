@@ -1,5 +1,13 @@
 import { api } from "../serverApi";
 
+/** Bound wait for serviceWorker.ready so push resync cannot hang app recovery. */
+export const PUSH_READY_TIMEOUT_MS = 4000;
+
+export const PUSH_RESTORE_HINT =
+  "Нажмите «Включить уведомления», чтобы восстановить push на этом устройстве.";
+
+let pushSyncInFlight = null;
+
 export function urlBase64ToUint8Array(value) {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
   const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -8,56 +16,190 @@ export function urlBase64ToUint8Array(value) {
 }
 
 /**
- * Синхронизирует браузерную push-подписку с сервером после обновления SW/PWA.
+ * Production decision for PushSettings restore hint.
+ * Used by SharedPanels — do not duplicate this logic in tests.
  */
-export async function syncPushSubscription(preferences = {}) {
-  if (
-    typeof window === "undefined" ||
-    !("Notification" in window) ||
-    !("serviceWorker" in navigator) ||
-    !("PushManager" in window)
-  ) {
-    return { synced: false, reason: "unsupported" };
-  }
-
-  let status;
-  try {
-    status = await api.getPushStatus();
-  } catch {
-    return { synced: false, reason: "status_error" };
-  }
-
-  if (!status?.enabled) return { synced: false, reason: "disabled" };
-  if (Notification.permission !== "granted") return { synced: false, reason: "denied" };
-
-  const registration = await navigator.serviceWorker.ready;
-  let subscription = await registration.pushManager.getSubscription();
-  const serverSubs = status.subscriptions || [];
-  const serverEndpoints = new Set(serverSubs.map((item) => item.endpoint));
-  const saved = subscription
-    ? serverSubs.find((item) => item.endpoint === subscription.endpoint)
-    : null;
-  const promotions =
-    preferences.promotions ?? saved?.promotions ?? false;
-
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(status.publicKey),
-    });
-  }
-
-  if (!serverEndpoints.has(subscription.endpoint)) {
-    await api.subscribePush(subscription.toJSON(), {
-      orderEvents: true,
-      promotions,
-    });
-    return { synced: true, reason: "registered", endpoint: subscription.endpoint };
-  }
-
-  return { synced: true, reason: "ok", endpoint: subscription.endpoint };
+export function pushRestoreHintMessage({
+  syncReason,
+  browserEndpoint,
+  serverSubscriptions,
+}) {
+  if (syncReason === "registered") return null;
+  const endpoint = String(browserEndpoint || "").trim();
+  if (!endpoint) return null;
+  const subs = Array.isArray(serverSubscriptions) ? serverSubscriptions : [];
+  if (subs.some((item) => item && item.endpoint === endpoint)) return null;
+  return PUSH_RESTORE_HINT;
 }
 
+/**
+ * Race a promise against a timeout. Always clears the timer.
+ * Resolves with { timedOut:true } on timeout (never rejects from the timer).
+ */
+export function withBoundedReady(promise, timeoutMs = PUSH_READY_TIMEOUT_MS) {
+  let timer = null;
+  let settled = false;
+  return new Promise((resolve) => {
+    const finish = (payload) => {
+      if (settled) return;
+      settled = true;
+      if (timer != null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      resolve(payload);
+    };
+    timer = setTimeout(() => {
+      timer = null;
+      finish({ timedOut: true, value: null, error: null });
+    }, timeoutMs);
+    Promise.resolve(promise).then(
+      (value) => finish({ timedOut: false, value, error: null }),
+      (error) => finish({ timedOut: false, value: null, error })
+    );
+  });
+}
+
+async function syncPushSubscriptionOnce(preferences = {}) {
+  try {
+    if (
+      typeof window === "undefined" ||
+      !("Notification" in window) ||
+      !("serviceWorker" in navigator) ||
+      !("PushManager" in window)
+    ) {
+      return { synced: false, reason: "unsupported" };
+    }
+
+    // Lifecycle / automatic resync must never call Notification.requestPermission().
+    if (Notification.permission !== "granted") {
+      return { synced: false, reason: "denied" };
+    }
+
+    let status;
+    try {
+      status = await api.getPushStatus();
+    } catch {
+      return { synced: false, reason: "status_error" };
+    }
+
+    if (!status?.enabled) return { synced: false, reason: "disabled" };
+
+    if (
+      status.subscriptions != null &&
+      !Array.isArray(status.subscriptions)
+    ) {
+      return { synced: false, reason: "malformed_status" };
+    }
+    const serverSubs = Array.isArray(status.subscriptions)
+      ? status.subscriptions
+      : [];
+
+    const ready = await withBoundedReady(navigator.serviceWorker.ready);
+    if (ready.timedOut) {
+      return { synced: false, reason: "ready_timeout" };
+    }
+    if (ready.error || !ready.value) {
+      return {
+        synced: false,
+        reason: "ready_error",
+        error: String(ready.error?.message || ready.error || "ready_failed"),
+      };
+    }
+
+    const registration = ready.value;
+    let subscription;
+    try {
+      subscription = await registration.pushManager.getSubscription();
+    } catch (error) {
+      return {
+        synced: false,
+        reason: "subscription_read_error",
+        error: String(error?.message || error),
+      };
+    }
+
+    const saved = subscription
+      ? serverSubs.find((item) => item?.endpoint === subscription.endpoint)
+      : null;
+    const promotions = preferences.promotions ?? saved?.promotions ?? false;
+
+    try {
+      if (!subscription) {
+        // Permission already granted — subscribe does not open a permission prompt.
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(status.publicKey),
+        });
+      }
+
+      // Always upsert: after SW unregister/rebuild the browser may keep permission
+      // but lose PushManager state / server may still hold a dead endpoint.
+      const wasMissing = !serverSubs.some(
+        (item) => item?.endpoint === subscription.endpoint
+      );
+      await api.subscribePush(subscription.toJSON(), {
+        orderEvents: true,
+        promotions,
+      });
+      return {
+        synced: true,
+        reason: wasMissing ? "registered" : "ok",
+        endpoint: subscription.endpoint,
+      };
+    } catch (error) {
+      return {
+        synced: false,
+        reason: "sync_error",
+        error: String(error?.message || error),
+      };
+    }
+  } catch (error) {
+    return {
+      synced: false,
+      reason: "unexpected_error",
+      error: String(error?.message || error),
+    };
+  }
+}
+
+/**
+ * Синхронизирует браузерную push-подписку с сервером после обновления SW/PWA.
+ * Single-flight: concurrent callers share one in-flight operation.
+ * Failures always resolve to structured results — never reject into App root.
+ */
+export function syncPushSubscription(preferences = {}) {
+  if (pushSyncInFlight) {
+    return pushSyncInFlight;
+  }
+  pushSyncInFlight = Promise.resolve()
+    .then(() => syncPushSubscriptionOnce(preferences))
+    .catch((error) => ({
+      synced: false,
+      reason: "unexpected_error",
+      error: String(error?.message || error),
+    }))
+    .finally(() => {
+      pushSyncInFlight = null;
+    });
+  return pushSyncInFlight;
+}
+
+function runLifecycleSync(callback) {
+  // Fire-and-forget: contain rejections so App/root never sees them.
+  void syncPushSubscription()
+    .then((result) => {
+      callback?.(result);
+    })
+    .catch(() => {
+      callback?.({ synced: false, reason: "unhandled_sync_error" });
+    });
+}
+
+/**
+ * Session lifecycle + SW message hooks for push resync.
+ * Automatic paths never request Notification permission.
+ */
 export function installPushSyncListeners(callback) {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
     return () => {};
@@ -80,19 +222,50 @@ export function installPushSyncListeners(callback) {
       return;
     }
     if (data.type === "clover-push-resync") {
-      void syncPushSubscription().then((result) => callback?.(result));
+      runLifecycleSync(callback);
     }
   };
 
   const onSwReady = () => {
-    void syncPushSubscription().then((result) => callback?.(result));
+    runLifecycleSync(callback);
+  };
+
+  const onPageShow = () => {
+    runLifecycleSync(callback);
+  };
+
+  const onOnline = () => {
+    runLifecycleSync(callback);
+  };
+
+  const onFocus = () => {
+    runLifecycleSync(callback);
+  };
+
+  const onVisibility = () => {
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+      return;
+    }
+    runLifecycleSync(callback);
   };
 
   navigator.serviceWorker.addEventListener("message", onMessage);
   window.addEventListener("clover-sw-ready", onSwReady);
+  window.addEventListener("pageshow", onPageShow);
+  window.addEventListener("online", onOnline);
+  window.addEventListener("focus", onFocus);
+  if (typeof document !== "undefined" && document?.addEventListener) {
+    document.addEventListener("visibilitychange", onVisibility);
+  }
 
   return () => {
     navigator.serviceWorker.removeEventListener("message", onMessage);
     window.removeEventListener("clover-sw-ready", onSwReady);
+    window.removeEventListener("pageshow", onPageShow);
+    window.removeEventListener("online", onOnline);
+    window.removeEventListener("focus", onFocus);
+    if (typeof document !== "undefined" && document?.removeEventListener) {
+      document.removeEventListener("visibilitychange", onVisibility);
+    }
   };
 }
