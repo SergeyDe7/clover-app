@@ -2315,6 +2315,12 @@ body:has(.clover-app) {
   font-weight: 500 !important;
 }
 
+.clover-app .app-top-chrome-client,
+.clover-app .app-nav-bar-client,
+.clover-app .page-content-client {
+  --clover-page-max-width: 1520px;
+}
+
 .clover-app .page-content-client {
   width: min(var(--clover-page-max-width), calc(100% - var(--clover-page-gutter))) !important;
   max-width: 100% !important;
@@ -2741,7 +2747,7 @@ body:has(.clover-app) {
 
 .clover-app .product-grid {
   align-items: stretch !important;
-  grid-template-columns: repeat(4, minmax(240px, 1fr)) !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   gap: 10px !important;
 }
 
@@ -3580,7 +3586,7 @@ body:has(.clover-app) {
   }
 
   .clover-app .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) {
-    grid-template-columns: repeat(3, minmax(240px, 1fr)) !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
     gap: 10px !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -9392,7 +9398,7 @@ html.clover-storefront-add-open body {
 @media (min-width: 901px) {
   .clover-app .page-content-client .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list),
   .clover-app .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) {
-    grid-template-columns: repeat(3, minmax(240px, 1fr)) !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
     gap: 10px !important;
     align-items: stretch !important;
   }
@@ -9651,10 +9657,15 @@ html.clover-storefront-add-open body {
   }
 }
 
-@media (min-width: 1440px) {
+@media (min-width: 901px) and (max-width: 1199px) {
   .clover-app .page-content-client .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list),
   .clover-app .embedded-catalog.client-order-catalog .product-grid:not(.product-grid-list) {
-    grid-template-columns: repeat(4, minmax(240px, 1fr)) !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .clover-app .page-content-client .client-matrix-panel .client-matrix-grid,
+  .clover-app .client-matrix-panel .client-matrix-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
 }
 
@@ -9662,7 +9673,7 @@ html.clover-storefront-add-open body {
 @media (min-width: 901px) {
   .clover-app .page-content-client .client-matrix-panel .client-matrix-grid,
   .clover-app .client-matrix-panel .client-matrix-grid {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
     gap: 10px !important;
     align-items: stretch !important;
   }
@@ -9812,6 +9823,12 @@ html.clover-storefront-add-open body {
     max-width: 44px !important;
     height: 48px !important;
     font-size: 1.5rem !important;
+  }
+}
+@media (min-width: 901px) and (max-width: 1199px) {
+  .clover-app .page-content-client .client-matrix-panel .client-matrix-grid,
+  .clover-app .client-matrix-panel .client-matrix-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
 }
 .clover-app .page-content--price-list {
