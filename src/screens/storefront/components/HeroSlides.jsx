@@ -103,15 +103,7 @@ export function HeroSlides({ slides, intervalSec }) {
           loading={isFirstPaint ? "eager" : "lazy"}
           fetchPriority={isFirstPaint ? "high" : "low"}
           decoding={isFirstPaint ? "sync" : "async"}
-          className={[
-            slideIndex === index ? "is-active" : "",
-            String(slide.src || "").includes("hero-app") ||
-            resolveStorefrontHeroSlideHref(slide, slideIndex) === "/install-app"
-              ? "is-app-slide"
-              : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
+          className={slideIndex === index ? "is-active" : ""}
         />
         );
       })}
