@@ -89,6 +89,9 @@ function installBrowserGlobals({
   const documentRef = {
     visibilityState: "visible",
     hidden: false,
+    addEventListener: (type, fn) => add(documentRef, type, fn),
+    removeEventListener: (type, fn) => remove(documentRef, type, fn),
+    _dispatch: (type, event) => dispatch(documentRef, type, event),
   };
 
   const windowObj = {
@@ -444,7 +447,7 @@ async function testE_singleFlight() {
     harness.env.windowObj._dispatch("focus");
     harness.env.documentRef.visibilityState = "visible";
     harness.env.documentRef.hidden = false;
-    harness.env.windowObj._dispatch("visibilitychange");
+    harness.env.documentRef._dispatch("visibilitychange");
 
     await delay(30);
     release();
@@ -477,25 +480,39 @@ async function testF_listenerCleanup() {
   try {
     assert.equal(typeof harness.mod.installPushSyncListeners, "function");
     const cleanup = harness.mod.installPushSyncListeners();
-    for (const type of ["pageshow", "online", "focus", "visibilitychange"]) {
+    for (const type of ["pageshow", "online", "focus"]) {
       assert.ok(
         harness.env.listenerCount(harness.env.windowObj, type) >= 1,
-        `TEST F RED/expected after fix: missing ${type} listener`
+        `TEST F: missing window ${type} listener`
       );
     }
+    assert.equal(
+      harness.env.listenerCount(harness.env.windowObj, "visibilitychange"),
+      0,
+      "TEST F RED/expected after fix: visibilitychange must NOT be on window"
+    );
+    assert.ok(
+      harness.env.listenerCount(harness.env.documentRef, "visibilitychange") >= 1,
+      "TEST F RED/expected after fix: visibilitychange must be on document"
+    );
     cleanup();
-    for (const type of ["pageshow", "online", "focus", "visibilitychange"]) {
+    for (const type of ["pageshow", "online", "focus"]) {
       assert.equal(
         harness.env.listenerCount(harness.env.windowObj, type),
         0,
-        `TEST F: ${type} listener not removed`
+        `TEST F: window ${type} listener not removed`
       );
     }
+    assert.equal(
+      harness.env.listenerCount(harness.env.documentRef, "visibilitychange"),
+      0,
+      "TEST F: document visibilitychange listener not removed"
+    );
     const before = harness.subscribePushCalls;
     harness.env.windowObj._dispatch("pageshow");
     harness.env.windowObj._dispatch("online");
     harness.env.windowObj._dispatch("focus");
-    harness.env.windowObj._dispatch("visibilitychange");
+    harness.env.documentRef._dispatch("visibilitychange");
     await delay(30);
     assert.equal(
       harness.subscribePushCalls,
@@ -505,58 +522,124 @@ async function testF_listenerCleanup() {
   } finally {
     harness.cleanup();
   }
-  console.log("TEST F PASS: lifecycle listeners cleaned up");
+  console.log("TEST F PASS: lifecycle listeners cleaned up (visibility on document)");
 }
 
-function testG_restoreHintReachable() {
-  const source = readFileSync(sharedPanelsPath, "utf8");
-  const hintAt = source.indexOf(HINT);
-  assert.notEqual(hintAt, -1, "restore hint string missing");
-
-  const outerAt = source.indexOf(
-    'if (result.enabled && Notification.permission === "granted")'
+async function testG_restoreHintProductionDecision() {
+  const panels = readFileSync(sharedPanelsPath, "utf8");
+  assert.match(
+    panels,
+    /pushRestoreHintMessage\s*\(/,
+    "TEST G RED/expected after fix: SharedPanels must call production pushRestoreHintMessage()"
   );
-  assert.notEqual(outerAt, -1, "outer granted/enabled branch missing");
-
-  const syncAt = source.indexOf('if (sync.reason === "registered")', outerAt);
-  assert.notEqual(syncAt, -1, "registered branch missing");
-
-  assert.ok(syncAt < hintAt, "hint must follow sync attempt");
-
-  const between = source.slice(outerAt, hintAt);
   assert.equal(
-    between.includes(
-      '} else if (\n        result.enabled &&\n        Notification.permission === "granted"'
-    ),
+    panels.includes("function decideHint"),
     false,
-    "TEST G RED/expected after fix: hint must not be dead sibling of outer enabled/granted if"
+    "TEST G: test-only decideHint must not live in SharedPanels"
   );
 
-  // Behavioral decision table for the intended control flow after fix:
-  // sync.reason !== registered AND browser endpoint not on server → show hint
-  function decideHint({ syncReason, endpoint, serverEndpoints }) {
-    if (syncReason === "registered") return null;
-    if (endpoint && !serverEndpoints.includes(endpoint)) return HINT;
-    return null;
-  }
-  assert.equal(
-    decideHint({
+  const harness = await loadPushSyncModule({
+    permission: "granted",
+    subscription: makeSub("https://push.example/browser-only"),
+  });
+  try {
+    assert.equal(
+      typeof harness.mod.pushRestoreHintMessage,
+      "function",
+      "TEST G RED/expected after fix: pushRestoreHintMessage must be exported from pushSync"
+    );
+    const hint = harness.mod.pushRestoreHintMessage({
       syncReason: "ok",
-      endpoint: "https://push.example/browser",
-      serverEndpoints: [],
-    }),
-    HINT
-  );
-  assert.equal(
-    decideHint({
-      syncReason: "registered",
-      endpoint: "https://push.example/browser",
-      serverEndpoints: [],
-    }),
-    null
-  );
+      browserEndpoint: "https://push.example/browser-only",
+      serverSubscriptions: [],
+    });
+    assert.equal(
+      hint,
+      HINT,
+      "TEST G: production decision must return restore hint when browser endpoint missing on server"
+    );
+    assert.equal(
+      harness.mod.pushRestoreHintMessage({
+        syncReason: "registered",
+        browserEndpoint: "https://push.example/browser-only",
+        serverSubscriptions: [],
+      }),
+      null,
+      "TEST G: registered sync must not show restore hint"
+    );
+    assert.equal(
+      harness.mod.pushRestoreHintMessage({
+        syncReason: "sync_error",
+        browserEndpoint: "https://push.example/browser-only",
+        serverSubscriptions: [{ endpoint: "https://push.example/browser-only" }],
+      }),
+      null,
+      "TEST G: endpoint already on server → no hint"
+    );
+  } finally {
+    harness.cleanup();
+  }
+  console.log("TEST G PASS: production restore-hint decision");
+}
 
-  console.log("TEST G PASS: restore hint branch reachable");
+async function testH_malformedStatusNeverRejects() {
+  const existing = makeSub("https://push.example/ok-sub");
+  let call = 0;
+  const harness = await loadPushSyncModule({
+    permission: "granted",
+    subscription: existing,
+    getPushStatus: async () => {
+      call += 1;
+      if (call === 1) {
+        return {
+          enabled: true,
+          publicKey: "BOxx",
+          subscriptions: "not-an-array",
+        };
+      }
+      return {
+        enabled: true,
+        publicKey: "BOxx",
+        subscriptions: [{ endpoint: existing.endpoint }],
+      };
+    },
+  });
+  let unhandled = null;
+  const onUnhandled = (reason) => {
+    unhandled = reason;
+  };
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    let threw = false;
+    let first;
+    try {
+      first = await harness.mod.syncPushSubscription();
+    } catch (error) {
+      threw = true;
+      first = error;
+    }
+    assert.equal(
+      threw,
+      false,
+      "TEST H RED/expected after fix: malformed subscriptions must not reject Promise"
+    );
+    assert.equal(first?.synced, false);
+    assert.ok(first?.reason, "TEST H: structured failure reason required");
+    await delay(20);
+    assert.equal(unhandled, null, "TEST H: unhandled rejection after malformed status");
+
+    const second = await harness.mod.syncPushSubscription();
+    assert.equal(
+      second.synced,
+      true,
+      "TEST H RED/expected after fix: second sync after failure must run (single-flight cleared)"
+    );
+    assert.ok(harness.subscribePushCalls >= 1, "TEST H: second sync must upsert");
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+    harness.cleanup();
+  }
+  console.log("TEST H PASS: malformed status contained + single-flight cleared");
 }
 
 function testAppFireAndForget() {
@@ -597,7 +680,8 @@ await run("C_reupsert", testC_existingSubscriptionReUpsert);
 await run("D_permission", testD_permissionSafety);
 await run("E_single_flight", testE_singleFlight);
 await run("F_listener_cleanup", testF_listenerCleanup);
-await run("G_restore_hint", testG_restoreHintReachable);
+await run("G_restore_hint", testG_restoreHintProductionDecision);
+await run("H_malformed_status", testH_malformedStatusNeverRejects);
 await run("App_fire_and_forget", testAppFireAndForget);
 
 const failed = results.filter((r) => !r.ok);

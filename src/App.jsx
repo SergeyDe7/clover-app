@@ -808,7 +808,7 @@ function App() {
     }
     void syncPushSubscription();
     return installPushSyncListeners();
-  }, [isLoggedIn, hydrated, authUser?.id]);
+  }, [isLoggedIn, hydrated, authUser]);
 
   useEffect(() => {
     if (!isLoggedIn || !hydrated || !authUser) {

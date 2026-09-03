@@ -8,6 +8,7 @@ import { formatDateTime } from "./appHelpers";
 import { appConfirm } from "./AppModal";
 import {
   installPushSyncListeners,
+  pushRestoreHintMessage,
   syncPushSubscription,
   urlBase64ToUint8Array,
 } from "./pushSync";
@@ -490,14 +491,13 @@ export function PushSettings() {
             endpoint = browserSubscription?.endpoint || "";
             setCurrentEndpoint(endpoint);
           }
-        } else if (
-          endpoint &&
-          !(result.subscriptions || []).some((item) => item.endpoint === endpoint)
-        ) {
-          // Browser has a subscription endpoint, server does not — auto restore
-          // failed. Hint used to be a sibling of the outer enabled/granted if and
-          // was unreachable.
-          setMessage("Нажмите «Включить уведомления», чтобы восстановить push на этом устройстве.");
+        } else {
+          const hint = pushRestoreHintMessage({
+            syncReason: sync.reason,
+            browserEndpoint: endpoint,
+            serverSubscriptions: result.subscriptions,
+          });
+          if (hint) setMessage(hint);
         }
       }
     } catch (error) {

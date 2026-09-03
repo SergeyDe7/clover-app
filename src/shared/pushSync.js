@@ -3,6 +3,9 @@ import { api } from "../serverApi";
 /** Bound wait for serviceWorker.ready so push resync cannot hang app recovery. */
 export const PUSH_READY_TIMEOUT_MS = 4000;
 
+export const PUSH_RESTORE_HINT =
+  "Нажмите «Включить уведомления», чтобы восстановить push на этом устройстве.";
+
 let pushSyncInFlight = null;
 
 export function urlBase64ToUint8Array(value) {
@@ -10,6 +13,23 @@ export function urlBase64ToUint8Array(value) {
   const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = window.atob(base64);
   return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
+}
+
+/**
+ * Production decision for PushSettings restore hint.
+ * Used by SharedPanels — do not duplicate this logic in tests.
+ */
+export function pushRestoreHintMessage({
+  syncReason,
+  browserEndpoint,
+  serverSubscriptions,
+}) {
+  if (syncReason === "registered") return null;
+  const endpoint = String(browserEndpoint || "").trim();
+  if (!endpoint) return null;
+  const subs = Array.isArray(serverSubscriptions) ? serverSubscriptions : [];
+  if (subs.some((item) => item && item.endpoint === endpoint)) return null;
+  return PUSH_RESTORE_HINT;
 }
 
 /**
@@ -41,86 +61,103 @@ export function withBoundedReady(promise, timeoutMs = PUSH_READY_TIMEOUT_MS) {
 }
 
 async function syncPushSubscriptionOnce(preferences = {}) {
-  if (
-    typeof window === "undefined" ||
-    !("Notification" in window) ||
-    !("serviceWorker" in navigator) ||
-    !("PushManager" in window)
-  ) {
-    return { synced: false, reason: "unsupported" };
-  }
-
-  // Lifecycle / automatic resync must never call Notification.requestPermission().
-  if (Notification.permission !== "granted") {
-    return { synced: false, reason: "denied" };
-  }
-
-  let status;
   try {
-    status = await api.getPushStatus();
-  } catch {
-    return { synced: false, reason: "status_error" };
-  }
-
-  if (!status?.enabled) return { synced: false, reason: "disabled" };
-
-  const ready = await withBoundedReady(navigator.serviceWorker.ready);
-  if (ready.timedOut) {
-    return { synced: false, reason: "ready_timeout" };
-  }
-  if (ready.error || !ready.value) {
-    return {
-      synced: false,
-      reason: "ready_error",
-      error: String(ready.error?.message || ready.error || "ready_failed"),
-    };
-  }
-
-  const registration = ready.value;
-  let subscription;
-  try {
-    subscription = await registration.pushManager.getSubscription();
-  } catch (error) {
-    return {
-      synced: false,
-      reason: "subscription_read_error",
-      error: String(error?.message || error),
-    };
-  }
-
-  const serverSubs = status.subscriptions || [];
-  const saved = subscription
-    ? serverSubs.find((item) => item.endpoint === subscription.endpoint)
-    : null;
-  const promotions = preferences.promotions ?? saved?.promotions ?? false;
-
-  try {
-    if (!subscription) {
-      // Permission already granted — subscribe does not open a permission prompt.
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(status.publicKey),
-      });
+    if (
+      typeof window === "undefined" ||
+      !("Notification" in window) ||
+      !("serviceWorker" in navigator) ||
+      !("PushManager" in window)
+    ) {
+      return { synced: false, reason: "unsupported" };
     }
 
-    // Always upsert: after SW unregister/rebuild the browser may keep permission
-    // but lose PushManager state / server may still hold a dead endpoint.
-    const wasMissing = !serverSubs.some(
-      (item) => item.endpoint === subscription.endpoint
-    );
-    await api.subscribePush(subscription.toJSON(), {
-      orderEvents: true,
-      promotions,
-    });
-    return {
-      synced: true,
-      reason: wasMissing ? "registered" : "ok",
-      endpoint: subscription.endpoint,
-    };
+    // Lifecycle / automatic resync must never call Notification.requestPermission().
+    if (Notification.permission !== "granted") {
+      return { synced: false, reason: "denied" };
+    }
+
+    let status;
+    try {
+      status = await api.getPushStatus();
+    } catch {
+      return { synced: false, reason: "status_error" };
+    }
+
+    if (!status?.enabled) return { synced: false, reason: "disabled" };
+
+    if (
+      status.subscriptions != null &&
+      !Array.isArray(status.subscriptions)
+    ) {
+      return { synced: false, reason: "malformed_status" };
+    }
+    const serverSubs = Array.isArray(status.subscriptions)
+      ? status.subscriptions
+      : [];
+
+    const ready = await withBoundedReady(navigator.serviceWorker.ready);
+    if (ready.timedOut) {
+      return { synced: false, reason: "ready_timeout" };
+    }
+    if (ready.error || !ready.value) {
+      return {
+        synced: false,
+        reason: "ready_error",
+        error: String(ready.error?.message || ready.error || "ready_failed"),
+      };
+    }
+
+    const registration = ready.value;
+    let subscription;
+    try {
+      subscription = await registration.pushManager.getSubscription();
+    } catch (error) {
+      return {
+        synced: false,
+        reason: "subscription_read_error",
+        error: String(error?.message || error),
+      };
+    }
+
+    const saved = subscription
+      ? serverSubs.find((item) => item?.endpoint === subscription.endpoint)
+      : null;
+    const promotions = preferences.promotions ?? saved?.promotions ?? false;
+
+    try {
+      if (!subscription) {
+        // Permission already granted — subscribe does not open a permission prompt.
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(status.publicKey),
+        });
+      }
+
+      // Always upsert: after SW unregister/rebuild the browser may keep permission
+      // but lose PushManager state / server may still hold a dead endpoint.
+      const wasMissing = !serverSubs.some(
+        (item) => item?.endpoint === subscription.endpoint
+      );
+      await api.subscribePush(subscription.toJSON(), {
+        orderEvents: true,
+        promotions,
+      });
+      return {
+        synced: true,
+        reason: wasMissing ? "registered" : "ok",
+        endpoint: subscription.endpoint,
+      };
+    } catch (error) {
+      return {
+        synced: false,
+        reason: "sync_error",
+        error: String(error?.message || error),
+      };
+    }
   } catch (error) {
     return {
       synced: false,
-      reason: "sync_error",
+      reason: "unexpected_error",
       error: String(error?.message || error),
     };
   }
@@ -129,15 +166,22 @@ async function syncPushSubscriptionOnce(preferences = {}) {
 /**
  * Синхронизирует браузерную push-подписку с сервером после обновления SW/PWA.
  * Single-flight: concurrent callers share one in-flight operation.
- * Failures return structured results — they do not throw into App root.
+ * Failures always resolve to structured results — never reject into App root.
  */
 export function syncPushSubscription(preferences = {}) {
   if (pushSyncInFlight) {
     return pushSyncInFlight;
   }
-  pushSyncInFlight = syncPushSubscriptionOnce(preferences).finally(() => {
-    pushSyncInFlight = null;
-  });
+  pushSyncInFlight = Promise.resolve()
+    .then(() => syncPushSubscriptionOnce(preferences))
+    .catch((error) => ({
+      synced: false,
+      reason: "unexpected_error",
+      error: String(error?.message || error),
+    }))
+    .finally(() => {
+      pushSyncInFlight = null;
+    });
   return pushSyncInFlight;
 }
 
@@ -210,7 +254,9 @@ export function installPushSyncListeners(callback) {
   window.addEventListener("pageshow", onPageShow);
   window.addEventListener("online", onOnline);
   window.addEventListener("focus", onFocus);
-  window.addEventListener("visibilitychange", onVisibility);
+  if (typeof document !== "undefined" && document?.addEventListener) {
+    document.addEventListener("visibilitychange", onVisibility);
+  }
 
   return () => {
     navigator.serviceWorker.removeEventListener("message", onMessage);
@@ -218,6 +264,8 @@ export function installPushSyncListeners(callback) {
     window.removeEventListener("pageshow", onPageShow);
     window.removeEventListener("online", onOnline);
     window.removeEventListener("focus", onFocus);
-    window.removeEventListener("visibilitychange", onVisibility);
+    if (typeof document !== "undefined" && document?.removeEventListener) {
+      document.removeEventListener("visibilitychange", onVisibility);
+    }
   };
 }
