@@ -292,6 +292,7 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
       (visibility === "Активные" && product.active) ||
       (visibility === "Скрытые" && !product.active) ||
       (visibility === "На витрине сайта" && product.showOnStorefront === true) ||
+      (visibility === "Не на витрине" && product.showOnStorefront !== true) ||
       (visibility === "Связанные с 1С" && hasOneCLink) ||
       (visibility === "Без связи с 1С" && !hasOneCLink) ||
       (visibility === "Есть варианты" && hasVariants);
@@ -446,6 +447,7 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
           <option>Активные</option>
           <option>Скрытые</option>
           <option>На витрине сайта</option>
+          <option>Не на витрине</option>
           <option>Связанные с 1С</option>
           <option>Без связи с 1С</option>
           <option>Есть варианты</option>
