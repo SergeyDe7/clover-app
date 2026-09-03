@@ -8,6 +8,7 @@ import {
   STOREFRONT_DEFAULT_HERO_SLIDES,
   STOREFRONT_HERO_LEAD,
   STOREFRONT_HERO_TITLE,
+  isStorefrontAppHeroSlide,
 } from "../siteCopy.js";
 
 export function HomePage() {
@@ -20,6 +21,7 @@ export function HomePage() {
     intervalSec: STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
   });
   const [ready, setReady] = useState(false);
+  const [appHeroActive, setAppHeroActive] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,6 +41,11 @@ export function HomePage() {
           intervalSec:
             site.heroIntervalSec || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
         });
+        const nextSlides =
+          Array.isArray(site.heroSlides) && site.heroSlides.length
+            ? site.heroSlides
+            : STOREFRONT_DEFAULT_HERO_SLIDES;
+        setAppHeroActive(isStorefrontAppHeroSlide(nextSlides[0], 0));
         setReady(true);
       })
       .catch((err) => {
@@ -48,6 +55,9 @@ export function HomePage() {
             ...prev,
             slides: STOREFRONT_DEFAULT_HERO_SLIDES,
           }));
+          setAppHeroActive(
+            isStorefrontAppHeroSlide(STOREFRONT_DEFAULT_HERO_SLIDES[0], 0)
+          );
           setReady(true);
         }
       });
@@ -58,18 +68,27 @@ export function HomePage() {
 
   return (
     <div className="sf-home">
-      <section className="sf-hero sf-hero-compact" aria-label="Компания КЛЕВЕР">
-        <div className="sf-hero-copy">
-          <p className="sf-hero-brand">КЛЕВЕР</p>
-          <h1>
-            {hero.title || STOREFRONT_HERO_TITLE}
-          </h1>
-          <p className="sf-hero-lead">
-            {hero.lead || STOREFRONT_HERO_LEAD}
-          </p>
-        </div>
+      <section
+        className={`sf-hero sf-hero-compact${appHeroActive ? " sf-hero--app" : ""}`}
+        aria-label="Компания КЛЕВЕР"
+      >
+        {appHeroActive ? null : (
+          <div className="sf-hero-copy">
+            <p className="sf-hero-brand">КЛЕВЕР</p>
+            <h1>
+              {hero.title || STOREFRONT_HERO_TITLE}
+            </h1>
+            <p className="sf-hero-lead">
+              {hero.lead || STOREFRONT_HERO_LEAD}
+            </p>
+          </div>
+        )}
         {Array.isArray(hero.slides) ? (
-          <HeroSlides slides={hero.slides} intervalSec={hero.intervalSec} />
+          <HeroSlides
+            slides={hero.slides}
+            intervalSec={hero.intervalSec}
+            onActiveAppChange={setAppHeroActive}
+          />
         ) : (
           <div className="sf-hero-visual" aria-hidden="true" />
         )}

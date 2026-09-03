@@ -34,3 +34,20 @@ export function resolveStorefrontHeroSlideHref(slide, index = 0) {
   if (Number(index) === 0) return "/install-app";
   return "";
 }
+
+/** App promo slide: dedicated HTML layout + phone crop (not full-bleed raster). */
+export function isStorefrontAppHeroSlide(slide, index = 0) {
+  void index;
+  const src = String(slide?.src || "");
+  if (src.includes("hero-app")) return true;
+  if (src.includes("/uploads/storefront-hero-")) return true;
+  const explicitHref = String(slide?.href || "").trim();
+  if (
+    explicitHref === "/install-app" ||
+    explicitHref.endsWith("/install-app")
+  ) {
+    return true;
+  }
+  const label = `${slide?.buttonLabel || ""} ${slide?.alt || ""}`;
+  return /прилож|install app|мобильн/i.test(label);
+}
