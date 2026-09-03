@@ -152,5 +152,8 @@ export function formatMoney(value) {
 
 export function navigateStorefront(route) {
   window.history.pushState({}, "", storefrontHref(route));
+  const scrollOptions = { top: 0, left: 0, behavior: "auto" };
+  document.querySelector(".sf-catalog-main")?.scrollTo(scrollOptions);
+  window.scrollTo(scrollOptions);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
