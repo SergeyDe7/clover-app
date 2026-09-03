@@ -1,4 +1,5 @@
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -19,12 +20,38 @@ import {
 const currentFile = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFile);
 const serverDirectory = path.resolve(currentDirectory, "..");
-export const backupDirectory = path.resolve(serverDirectory, "backups");
-export const uploadsDirectory = path.resolve(serverDirectory, "uploads");
+export const backupDirectory = path.resolve(
+  process.env.CLOVER_SERVER_BACKUP_DIR || path.resolve(serverDirectory, "backups")
+);
+export const uploadsDirectory = path.resolve(
+  process.env.CLOVER_UPLOADS_DIR || path.resolve(serverDirectory, "uploads")
+);
 
-mkdirSync(backupDirectory, { recursive: true });
+function ensureSecureDir(directory) {
+  mkdirSync(directory, { recursive: true });
+  if (process.platform === "win32") return;
+  try {
+    chmodSync(directory, 0o700);
+  } catch (error) {
+    throw new Error(`Не удалось установить mode 700 для ${directory}: ${error.message}`, {
+      cause: error,
+    });
+  }
+}
+
+function ensureSecureFile(filePath) {
+  if (process.platform === "win32") return;
+  try {
+    chmodSync(filePath, 0o600);
+  } catch (error) {
+    throw new Error(`Не удалось установить mode 600 для ${filePath}: ${error.message}`, {
+      cause: error,
+    });
+  }
+}
+
+ensureSecureDir(backupDirectory);
 mkdirSync(uploadsDirectory, { recursive: true });
-
 function cleanLabel(value) {
   const result = String(value || "manual")
     .trim()
@@ -128,6 +155,7 @@ export function createServerBackup({
   }
 
   zip.writeZip(filePath);
+  ensureSecureFile(filePath);
 
   const result = {
     fileName,
