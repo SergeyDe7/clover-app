@@ -101,6 +101,57 @@ export function getDeliveryFeeForGoodsSubtotal(goodsSubtotal, zone = null) {
   return amount >= freeFrom ? 0 : fee;
 }
 
+/** Trimmed zone id; empty/null/missing → "". */
+export function normalizeDeliveryZoneId(value) {
+  if (value == null) return "";
+  return String(value).trim();
+}
+
+/**
+ * Resolve enabled zone for a saved address from settings.deliveryZones.
+ * Unknown / disabled / empty id → null (global fallback).
+ * Does NOT parse address text.
+ */
+export function resolveDeliveryZoneForAddress(address, settingsOrZones = []) {
+  const zones = Array.isArray(settingsOrZones)
+    ? sanitizeDeliveryZones(settingsOrZones)
+    : sanitizeDeliveryZones(settingsOrZones?.deliveryZones);
+  const zoneId = normalizeDeliveryZoneId(address?.deliveryZoneId);
+  if (!zoneId) return null;
+  const zone = zones.find((row) => row.id === zoneId);
+  if (!zone || zone.enabled !== true) return null;
+  return zone;
+}
+
+/**
+ * Order → selected addressId → persisted deliveryZoneId → enabled zone.
+ * Free-text order.address is never used for zone matching.
+ */
+export function resolveDeliveryZoneForOrder(
+  order,
+  { addresses = [], deliveryZones = [] } = {}
+) {
+  const addressId = String(order?.addressId || "").trim();
+  if (!addressId) return null;
+  const list = Array.isArray(addresses) ? addresses : [];
+  const address = list.find((row) => String(row?.id || "").trim() === addressId);
+  if (!address) return null;
+  return resolveDeliveryZoneForAddress(address, deliveryZones);
+}
+
+function resolveZoneFromDeliveryOptions(order, options = {}) {
+  if (Object.prototype.hasOwnProperty.call(options, "zone")) {
+    return options.zone || null;
+  }
+  if (options.addresses != null || options.deliveryZones != null) {
+    return resolveDeliveryZoneForOrder(order, {
+      addresses: options.addresses,
+      deliveryZones: options.deliveryZones,
+    });
+  }
+  return null;
+}
+
 /** Сумма товарных позиций без доставки (порог бесплатной доставки). */
 export function orderItemsMoneyTotal(order) {
   const itemsTotal = (Array.isArray(order?.items) ? order.items : [])
@@ -188,18 +239,22 @@ export function syncDeliveryLineFromFee(order, meta = {}, oneCProducts = null) {
 /**
  * Для клиента: fee и note по сумме позиций + позиция «Доставка» в items.
  * showPrices=false или пустая корзина → 0 (как в OrderEditor).
+ * Zone: options.zone, or resolve from addresses + deliveryZones via order.addressId.
  */
-export function resolveClientSpbDelivery(order, { showPrices = true } = {}) {
+export function resolveClientSpbDelivery(order, options = {}) {
+  const { showPrices = true } = options;
   const itemsTotal = orderItemsMoneyTotal(order);
   if (!showPrices || itemsTotal <= 0) {
     return { deliveryFee: 0, deliveryNote: "" };
   }
-  const deliveryFee = getSpbDeliveryFee(itemsTotal);
+  const zone = resolveZoneFromDeliveryOptions(order, options);
+  const tariff = resolveEffectiveDeliveryTariff(zone);
+  const deliveryFee = getDeliveryFeeForGoodsSubtotal(itemsTotal, zone);
   return {
     deliveryFee,
     deliveryNote:
       deliveryFee > 0
-        ? `Доставка по СПб платная: ${PAID_DELIVERY_FEE} ₽ (заказ менее ${FREE_DELIVERY_MIN_TOTAL} ₽)`
+        ? `Доставка по СПб платная: ${tariff.fee} ₽ (заказ менее ${tariff.freeFrom} ₽)`
         : "Доставка по СПб бесплатная",
   };
 }
@@ -207,9 +262,18 @@ export function resolveClientSpbDelivery(order, { showPrices = true } = {}) {
 /**
  * Пересчитать правило СПб по сумме товаров и материализовать строку «Доставка».
  * Нужно на claim/send: старые заказы витрины могли сохраниться без deliveryFee.
+ * zoneOptions: { zone } | { addresses, deliveryZones } — omit for global fallback.
  */
-export function ensureSpbDeliveryOnOrder(order, meta = {}, oneCProducts = null) {
-  const delivery = resolveClientSpbDelivery(order, { showPrices: true });
+export function ensureSpbDeliveryOnOrder(
+  order,
+  meta = {},
+  oneCProducts = null,
+  zoneOptions = {}
+) {
+  const delivery = resolveClientSpbDelivery(order, {
+    showPrices: true,
+    ...zoneOptions,
+  });
   return syncDeliveryLineFromFee(
     {
       ...order,
@@ -222,9 +286,20 @@ export function ensureSpbDeliveryOnOrder(order, meta = {}, oneCProducts = null) 
 }
 
 export function applyClientSpbDeliveryFees(orders, options = {}) {
-  const { showPrices = true, oneCProducts = null, ...lineMeta } = options;
+  const {
+    showPrices = true,
+    oneCProducts = null,
+    addresses,
+    deliveryZones,
+    zone,
+    ...lineMeta
+  } = options;
+  const resolveOpts = { showPrices, addresses, deliveryZones };
+  if (Object.prototype.hasOwnProperty.call(options, "zone")) {
+    resolveOpts.zone = zone;
+  }
   return (Array.isArray(orders) ? orders : []).map((order) => {
-    const delivery = resolveClientSpbDelivery(order, { showPrices });
+    const delivery = resolveClientSpbDelivery(order, resolveOpts);
     return syncDeliveryLineFromFee(
       {
         ...order,

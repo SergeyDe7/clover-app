@@ -183,6 +183,8 @@ import {
   ensureSpbDeliveryOnOrder,
   isCloverDeliveryLine,
   resolveDeliveryOneCRefs,
+  sanitizeDeliveryZones,
+  normalizeDeliveryZoneId,
 } from "./deliveryFee.js";
 import {
   overlayStorefrontClientLink,
@@ -1216,6 +1218,7 @@ const managerClientAddressSchema = z.object({
   label: z.string().trim().min(1).max(120),
   address: z.string().trim().min(3).max(500),
   isDefault: z.boolean().optional().default(false),
+  deliveryZoneId: z.string().trim().max(160).optional().default(""),
 });
 
 const managerClientUpdateSchema = z.object({
@@ -1247,6 +1250,7 @@ function normalizeManagerClientAddresses(addresses) {
     label: String(item.label || "Адрес").trim(),
     address: String(item.address || "").trim(),
     isDefault: Boolean(item.isDefault),
+    deliveryZoneId: normalizeDeliveryZoneId(item.deliveryZoneId),
   }));
 
   if (!normalized.length) return [];
@@ -3081,7 +3085,7 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     }
 
     // Доставка СПб: клиентский deliveryFee игнорируем, пересчёт по сумме позиций
-    // и позиция «Доставка» в items (для UI и 1С).
+    // и зона из выбранного адреса (addressId → addresses.deliveryZoneId).
     const settings = {
       ...DEFAULT_SETTINGS,
       ...getGlobalState("settings", DEFAULT_SETTINGS),
@@ -3091,9 +3095,12 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
       deliveryOneCCode: settings.deliveryOneCCode,
       deliveryOneCName: settings.deliveryOneCName || "Доставка",
     };
+    const clientAddresses = getClientState(req.user.id).addresses || [];
     orders = applyClientSpbDeliveryFees(orders, {
       showPrices: Boolean(settings.showPrices),
       oneCProducts: getGlobalState("oneCProducts", []),
+      addresses: clientAddresses,
+      deliveryZones: sanitizeDeliveryZones(settings.deliveryZones),
       ...deliveryMeta,
     }).map((order) => {
       const grandTotal = orderMoneyTotal(order);
@@ -4390,8 +4397,15 @@ app.put(
       return res.json({ ok: true, addresses: current, rejectedEmpty: true });
     }
 
-    setClientStateField(req.user.id, "addresses", incoming);
-    res.json({ ok: true, addresses: incoming });
+    const addresses = incoming.map((item) => {
+      if (!item || typeof item !== "object") return item;
+      return {
+        ...item,
+        deliveryZoneId: normalizeDeliveryZoneId(item.deliveryZoneId),
+      };
+    });
+    setClientStateField(req.user.id, "addresses", addresses);
+    res.json({ ok: true, addresses });
   }
 );
 
