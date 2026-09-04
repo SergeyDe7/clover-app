@@ -150,10 +150,24 @@ export function formatMoney(value) {
   }).format(Number(value) || 0);
 }
 
-export function navigateStorefront(route) {
-  window.history.pushState({}, "", storefrontHref(route));
+export function scrollStorefrontCatalogToTop() {
   const scrollOptions = { top: 0, left: 0, behavior: "auto" };
   document.querySelector(".sf-catalog-main")?.scrollTo(scrollOptions);
   window.scrollTo(scrollOptions);
+}
+
+export function catalogScrollRouteKey(category = "", subcategory = "", facet = "") {
+  return `${String(category || "")}\0${String(subcategory || "")}\0${String(facet || "")}`;
+}
+
+/** Scrolls only when category/subcategory/facet identity actually changes. */
+export function resetCatalogScrollOnRouteIdentity(previousKey, nextKey) {
+  if (previousKey === nextKey) return false;
+  scrollStorefrontCatalogToTop();
+  return true;
+}
+
+export function navigateStorefront(route) {
+  window.history.pushState({}, "", storefrontHref(route));
   window.dispatchEvent(new PopStateEvent("popstate"));
 }

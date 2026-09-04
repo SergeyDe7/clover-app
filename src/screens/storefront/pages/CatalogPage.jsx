@@ -1,6 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
-import { navigateStorefront } from "../components/StoreHeader.jsx";
+import {
+  catalogScrollRouteKey,
+  navigateStorefront,
+  resetCatalogScrollOnRouteIdentity,
+} from "../components/StoreHeader.jsx";
 import { ProductCard } from "../components/ProductCard.jsx";
 import { CatalogGroupNav } from "../components/CatalogGroupNav.jsx";
 import { GroupIcon } from "../components/GroupIcon.jsx";
@@ -48,6 +52,13 @@ export function CatalogPage({
       cancelled = true;
     };
   }, [category, subcategory, facet]);
+
+  const routeKey = catalogScrollRouteKey(category, subcategory, facet);
+  const prevRouteKeyRef = useRef(null);
+  useLayoutEffect(() => {
+    resetCatalogScrollOnRouteIdentity(prevRouteKeyRef.current, routeKey);
+    prevRouteKeyRef.current = routeKey;
+  }, [routeKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
