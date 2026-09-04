@@ -88,6 +88,8 @@ export const DEFAULT_SETTINGS = {
   deliveryOneCId: "",
   deliveryOneCCode: "",
   deliveryOneCName: "Доставка",
+  /** Admin-defined delivery zones (tariffs). Empty = always global 5000/500 fallback. */
+  deliveryZones: [],
 };
 
 export const EMPTY_LINK = {

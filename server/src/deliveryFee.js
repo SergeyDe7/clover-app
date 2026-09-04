@@ -17,11 +17,88 @@ export function isCloverDeliveryLine(item) {
   return id === CLOVER_DELIVERY_LINE_ID;
 }
 
-/** 0 = бесплатно (сумма ≥ порога), иначе платная доставка. */
+/** 0 = бесплатно (сумма ≥ порога), иначе платная доставка. Global fallback only. */
 export function getSpbDeliveryFee(orderTotal) {
-  const amount = Number(orderTotal) || 0;
-  if (amount <= 0) return PAID_DELIVERY_FEE;
-  return amount >= FREE_DELIVERY_MIN_TOTAL ? 0 : PAID_DELIVERY_FEE;
+  return getDeliveryFeeForGoodsSubtotal(orderTotal, null);
+}
+
+/**
+ * Normalize settings.deliveryZones. Invalid rows are dropped (no crash).
+ */
+export function sanitizeDeliveryZones(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const id = String(row.id || "").trim();
+    const name = String(row.name || "").trim();
+    if (!id || !name || seen.has(id)) continue;
+
+    let freeFrom = null;
+    if (row.freeFrom !== null && row.freeFrom !== undefined && row.freeFrom !== "") {
+      const n = Number(row.freeFrom);
+      if (!Number.isFinite(n) || n < 0) continue;
+      freeFrom = n;
+    }
+
+    let fee = null;
+    if (row.fee !== null && row.fee !== undefined && row.fee !== "") {
+      const n = Number(row.fee);
+      if (!Number.isFinite(n) || n < 0) continue;
+      fee = n;
+    }
+
+    seen.add(id);
+    out.push({
+      id,
+      name,
+      enabled: row.enabled === true,
+      freeFrom,
+      fee,
+    });
+  }
+  return out;
+}
+
+/**
+ * Effective freeFrom + fee for an optional zone object.
+ * Missing / disabled / invalid zone → global constants.
+ * null field on an enabled zone → that field falls back to global.
+ */
+export function resolveEffectiveDeliveryTariff(zone = null) {
+  const global = {
+    freeFrom: FREE_DELIVERY_MIN_TOTAL,
+    fee: PAID_DELIVERY_FEE,
+  };
+  if (!zone || typeof zone !== "object" || zone.enabled !== true) {
+    return global;
+  }
+
+  let freeFrom = global.freeFrom;
+  if (zone.freeFrom !== null && zone.freeFrom !== undefined && zone.freeFrom !== "") {
+    const n = Number(zone.freeFrom);
+    if (Number.isFinite(n) && n >= 0) freeFrom = n;
+  }
+
+  let fee = global.fee;
+  if (zone.fee !== null && zone.fee !== undefined && zone.fee !== "") {
+    const n = Number(zone.fee);
+    if (Number.isFinite(n) && n >= 0) fee = n;
+  }
+
+  return { freeFrom, fee };
+}
+
+/**
+ * Delivery fee from goods subtotal + optional zone tariff.
+ * goodsSubtotal must exclude the delivery line itself.
+ */
+export function getDeliveryFeeForGoodsSubtotal(goodsSubtotal, zone = null) {
+  const amount = Number(goodsSubtotal) || 0;
+  const { freeFrom, fee } = resolveEffectiveDeliveryTariff(zone);
+  if (amount <= 0) return fee;
+  return amount >= freeFrom ? 0 : fee;
 }
 
 /** Сумма товарных позиций без доставки (порог бесплатной доставки). */
