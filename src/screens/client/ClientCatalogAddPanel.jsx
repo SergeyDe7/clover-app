@@ -1,5 +1,12 @@
 // Каталог ЛК: только добавление товара в свою матрицу, без корзины.
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   UNIT_CONFIG,
   UNIT_ORDER,
@@ -73,6 +80,19 @@ function NavChevron() {
   );
 }
 
+/** Stable identity for client LK catalog category / subcategory navigation. */
+export function clientCatalogNavKey(category = "", subcategory = "") {
+  return `${String(category || "")}\0${String(subcategory || "")}`;
+}
+
+/** Window is the product-list scrollport in client LK catalog (not an inner overflow pane). */
+export function resetClientCatalogScrollOnNavIdentity(previousKey, nextKey) {
+  if (previousKey === nextKey) return false;
+  if (typeof window === "undefined") return false;
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  return true;
+}
+
 export function ClientCatalogAddPanel({
   products = [],
   matrixProductIds = [],
@@ -100,6 +120,13 @@ export function ClientCatalogAddPanel({
     mq.addEventListener?.("change", collapseOnMobile);
     return () => mq.removeEventListener?.("change", collapseOnMobile);
   }, []);
+
+  const navKey = clientCatalogNavKey(category, subcategory);
+  const prevNavKeyRef = useRef(null);
+  useLayoutEffect(() => {
+    resetClientCatalogScrollOnNavIdentity(prevNavKeyRef.current, navKey);
+    prevNavKeyRef.current = navKey;
+  }, [navKey]);
 
   useMobileFixedChromeHeight(
     stickyChromeRef,
