@@ -92,9 +92,95 @@ export function isCloverDeliveryLine(item) {
   return id === CLOVER_DELIVERY_LINE_ID;
 }
 
-/** 0 = бесплатно (сумма ≥ порога), иначе платная доставка. */
+function normalizeZoneId(value) {
+  if (value == null) return "";
+  return String(value).trim();
+}
+
+/** Client-safe zone list (enabled tariffs only). */
+export function sanitizeClientDeliveryZones(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const id = normalizeZoneId(row.id);
+    if (!id || seen.has(id)) continue;
+    let freeFrom = null;
+    if (row.freeFrom !== null && row.freeFrom !== undefined && row.freeFrom !== "") {
+      const n = Number(row.freeFrom);
+      if (!Number.isFinite(n) || n < 0) continue;
+      freeFrom = n;
+    }
+    let fee = null;
+    if (row.fee !== null && row.fee !== undefined && row.fee !== "") {
+      const n = Number(row.fee);
+      if (!Number.isFinite(n) || n < 0) continue;
+      fee = n;
+    }
+    // Client projection may omit enabled/name; treat missing enabled as true.
+    if (row.enabled === false) continue;
+    seen.add(id);
+    out.push({ id, freeFrom, fee });
+  }
+  return out;
+}
+
+export function resolveEffectiveDeliveryTariff(zone = null) {
+  const global = {
+    freeFrom: FREE_DELIVERY_MIN_TOTAL,
+    fee: PAID_DELIVERY_FEE,
+  };
+  if (!zone || typeof zone !== "object") return global;
+
+  let freeFrom = global.freeFrom;
+  if (zone.freeFrom !== null && zone.freeFrom !== undefined && zone.freeFrom !== "") {
+    const n = Number(zone.freeFrom);
+    if (Number.isFinite(n) && n >= 0) freeFrom = n;
+  }
+
+  let fee = global.fee;
+  if (zone.fee !== null && zone.fee !== undefined && zone.fee !== "") {
+    const n = Number(zone.fee);
+    if (Number.isFinite(n) && n >= 0) fee = n;
+  }
+
+  return { freeFrom, fee };
+}
+
+export function getDeliveryFeeForGoodsSubtotal(goodsSubtotal, zone = null) {
+  const amount = Number(goodsSubtotal) || 0;
+  const { freeFrom, fee } = resolveEffectiveDeliveryTariff(zone);
+  if (amount <= 0) return fee;
+  return amount >= freeFrom ? 0 : fee;
+}
+
+/** 0 = бесплатно (сумма ≥ порога), иначе платная доставка. Global fallback only. */
 export function getSpbDeliveryFee(orderTotal) {
-  const amount = Number(orderTotal) || 0;
-  if (amount <= 0) return PAID_DELIVERY_FEE;
-  return amount >= FREE_DELIVERY_MIN_TOTAL ? 0 : PAID_DELIVERY_FEE;
+  return getDeliveryFeeForGoodsSubtotal(orderTotal, null);
+}
+
+export function resolveDeliveryZoneForAddress(address, deliveryZones = []) {
+  const zones = sanitizeClientDeliveryZones(deliveryZones);
+  const zoneId = normalizeZoneId(address?.deliveryZoneId);
+  if (!zoneId) return null;
+  return zones.find((row) => row.id === zoneId) || null;
+}
+
+export function resolveEffectiveDeliveryTariffForAddress(address, deliveryZones = []) {
+  return resolveEffectiveDeliveryTariff(
+    resolveDeliveryZoneForAddress(address, deliveryZones)
+  );
+}
+
+/** UX preview mirror of server address→zone fee. Server remains authoritative. */
+export function getDeliveryFeeForSelectedAddress(
+  goodsSubtotal,
+  address,
+  deliveryZones = []
+) {
+  return getDeliveryFeeForGoodsSubtotal(
+    goodsSubtotal,
+    resolveDeliveryZoneForAddress(address, deliveryZones)
+  );
 }

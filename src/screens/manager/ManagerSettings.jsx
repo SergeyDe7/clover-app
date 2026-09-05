@@ -202,6 +202,128 @@ export function DeliveryOneCSettings({ settings, set }) {
   );
 }
 
+function newDeliveryZoneId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return `zone-${crypto.randomUUID()}`;
+  }
+  return `zone-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function parseOptionalMoney(value) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed.replace(",", "."));
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+export function DeliveryZonesSettings({ settings, set }) {
+  const zones = Array.isArray(settings.deliveryZones) ? settings.deliveryZones : [];
+
+  const updateZones = (next) => set("deliveryZones", next);
+
+  const patchZone = (zoneId, patch) => {
+    updateZones(
+      zones.map((zone) => (zone.id === zoneId ? { ...zone, ...patch } : zone))
+    );
+  };
+
+  const addZone = () => {
+    updateZones([
+      ...zones,
+      {
+        id: newDeliveryZoneId(),
+        name: "",
+        enabled: true,
+        freeFrom: null,
+        fee: null,
+      },
+    ]);
+  };
+
+  const toggleZone = (zoneId) => {
+    const current = zones.find((zone) => zone.id === zoneId);
+    if (!current) return;
+    patchZone(zoneId, { enabled: !current.enabled });
+  };
+
+  return (
+    <div className="manager-contact-settings">
+      <h3>Зоны доставки</h3>
+      <p>
+        Для каждого адреса клиента можно выбрать зону. Пустые поля берут глобальные
+        значения: бесплатно от {FREE_DELIVERY_MIN_TOTAL} ₽, доставка {PAID_DELIVERY_FEE} ₽.
+      </p>
+      {zones.map((zone) => (
+        <div className="form-grid" key={zone.id} style={{ marginBottom: 12 }}>
+          <label className="field" htmlFor={`delivery-zone-name-${zone.id}`}>
+            Название
+            <input
+              id={`delivery-zone-name-${zone.id}`}
+              name={`deliveryZoneName-${zone.id}`}
+              value={zone.name ?? ""}
+              placeholder="Например: Мурино"
+              onChange={(event) => patchZone(zone.id, { name: event.target.value })}
+            />
+          </label>
+          <label className="field" htmlFor={`delivery-zone-free-${zone.id}`}>
+            Бесплатная доставка от, ₽
+            <input
+              id={`delivery-zone-free-${zone.id}`}
+              name={`deliveryZoneFreeFrom-${zone.id}`}
+              type="number"
+              min="0"
+              step="1"
+              value={zone.freeFrom == null ? "" : zone.freeFrom}
+              placeholder={`По умолчанию: ${FREE_DELIVERY_MIN_TOTAL}`}
+              onChange={(event) =>
+                patchZone(zone.id, { freeFrom: parseOptionalMoney(event.target.value) })
+              }
+            />
+            <small>По умолчанию: {FREE_DELIVERY_MIN_TOTAL} ₽</small>
+          </label>
+          <label className="field" htmlFor={`delivery-zone-fee-${zone.id}`}>
+            Стоимость доставки, ₽
+            <input
+              id={`delivery-zone-fee-${zone.id}`}
+              name={`deliveryZoneFee-${zone.id}`}
+              type="number"
+              min="0"
+              step="1"
+              value={zone.fee == null ? "" : zone.fee}
+              placeholder={`По умолчанию: ${PAID_DELIVERY_FEE}`}
+              onChange={(event) =>
+                patchZone(zone.id, { fee: parseOptionalMoney(event.target.value) })
+              }
+            />
+            <small>По умолчанию: {PAID_DELIVERY_FEE} ₽</small>
+          </label>
+          <div className="field" style={{ display: "flex", alignItems: "end", gap: 8 }}>
+            <button
+              type="button"
+              className="secondary-button"
+              data-zone-id={zone.id}
+              onClick={() => toggleZone(zone.id)}
+            >
+              {zone.enabled === false ? "Включить" : "Отключить"}
+            </button>
+            <span className={zone.enabled === false ? "badge yellow" : "badge green"}>
+              {zone.enabled === false ? "Отключена" : "Активна"}
+            </span>
+          </div>
+        </div>
+      ))}
+      <button type="button" className="secondary-button" onClick={addZone}>
+        Добавить зону
+      </button>
+      <p className="manager-contact-help">
+        Изменения сохраняются вместе с настройками кабинета. Удаление зон не
+        выполняется — отключите зону, если она больше не нужна.
+      </p>
+    </div>
+  );
+}
+
 export function ManagerSettings({ settings, setSettings, authUser }) {
   const isAdmin = authUser?.role === "admin";
   const set = (key, value) => setSettings((current) => ({ ...current, [key]: value }));
@@ -282,6 +404,7 @@ export function ManagerSettings({ settings, setSettings, authUser }) {
       </div>
 
       <DeliveryOneCSettings settings={settings} set={set} />
+      <DeliveryZonesSettings settings={settings} set={set} />
       <ManagerNotificationSettings settings={settings} set={set} />
       <PushSettings />
 

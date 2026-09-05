@@ -241,6 +241,7 @@ export function normalizeManagerClientAddresses(addresses = []) {
           label: index === 0 ? "Основной адрес" : `Адрес ${index + 1}`,
           address,
           isDefault: index === 0,
+          deliveryZoneId: "",
         };
       }
 
@@ -252,6 +253,7 @@ export function normalizeManagerClientAddresses(addresses = []) {
         label: String(item?.label || `Адрес ${index + 1}`).trim(),
         address,
         isDefault: Boolean(item?.isDefault),
+        deliveryZoneId: String(item?.deliveryZoneId || "").trim(),
       };
     })
     .filter(Boolean);
@@ -294,7 +296,14 @@ function createManagerClientForm(client) {
   };
 }
 
-function ManagerClientEditor({ client, link, onLinkChange, onReload, onClose }) {
+function ManagerClientEditor({
+  client,
+  link,
+  onLinkChange,
+  onReload,
+  onClose,
+  deliveryZones = [],
+}) {
   const [form, setForm] = useState(() => createManagerClientForm(client));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -352,6 +361,7 @@ function ManagerClientEditor({ client, link, onLinkChange, onReload, onClose }) 
           label: "",
           address: "",
           isDefault: current.addresses.length === 0,
+          deliveryZoneId: "",
         },
       ],
     }));
@@ -429,6 +439,7 @@ function ManagerClientEditor({ client, link, onLinkChange, onReload, onClose }) 
       ...item,
       label: item.label.trim(),
       address: item.address.trim(),
+      deliveryZoneId: String(item.deliveryZoneId || "").trim(),
     }));
 
     if (!companyName && !contactName) {
@@ -683,6 +694,24 @@ function ManagerClientEditor({ client, link, onLinkChange, onReload, onClose }) 
                 onChange={(event) => updateAddress(item.id, { address: event.target.value })}
               />
             </label>
+            <label className="field">
+              Зона доставки
+              <select
+                value={item.deliveryZoneId || ""}
+                onChange={(event) =>
+                  updateAddress(item.id, { deliveryZoneId: event.target.value })
+                }
+              >
+                <option value="">Не выбрана</option>
+                {(Array.isArray(deliveryZones) ? deliveryZones : [])
+                  .filter((zone) => zone && zone.enabled !== false)
+                  .map((zone) => (
+                    <option key={zone.id} value={zone.id}>
+                      {zone.name || zone.id}
+                    </option>
+                  ))}
+              </select>
+            </label>
             <label className="manager-client-default-address">
               <input
                 type="radio"
@@ -838,6 +867,7 @@ export function ManagerClients({
   catalogPricesVersion = "",
   onReload,
 }) {
+  const [deliveryZones, setDeliveryZones] = useState([]);
   const [search, setSearch] = useState("");
   const [matrixSearch, setMatrixSearch] = useState("");
   const [defaultMarkupDrafts, setDefaultMarkupDrafts] = useState({});
@@ -874,6 +904,26 @@ export function ManagerClients({
 
   useEffect(() => {
     writeOpenManagerClientId("");
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.bootstrap();
+        if (cancelled) return;
+        setDeliveryZones(
+          Array.isArray(data?.settings?.deliveryZones)
+            ? data.settings.deliveryZones
+            : []
+        );
+      } catch {
+        if (!cancelled) setDeliveryZones([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -1947,6 +1997,7 @@ export function ManagerClients({
                   <ManagerClientEditor
                     client={client}
                     link={link}
+                    deliveryZones={deliveryZones}
                     onLinkChange={(patch) => {
                       setClientLinks((current) => ({
                         ...current,

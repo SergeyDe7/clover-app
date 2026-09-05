@@ -29,9 +29,8 @@ import {
   validateDeliveryDate,
 } from "../../shared/deliveryDateRules";
 import {
-  FREE_DELIVERY_MIN_TOTAL,
-  PAID_DELIVERY_FEE,
-  getSpbDeliveryFee,
+  getDeliveryFeeForSelectedAddress,
+  resolveEffectiveDeliveryTariffForAddress,
   isCloverDeliveryLine,
 } from "../../config/orderConfig";
 import { findLatestAddendumOrder } from "../../shared/orderAddendum";
@@ -631,13 +630,22 @@ export function OrderEditor({
         0
       )
   );
-  // СПб: <5000 → 500 ₽ в итоге; ≥5000 → 0. Строка «Доставка» материализуется на сервере.
+  const selectedAddress = addresses.find((item) => item.id === addressId);
+  const deliveryZones = Array.isArray(settings.deliveryZones)
+    ? settings.deliveryZones
+    : [];
+  const deliveryTariff = resolveEffectiveDeliveryTariffForAddress(
+    selectedAddress,
+    deliveryZones
+  );
+  // Preview only — server recalculates on save from address.deliveryZoneId.
   const deliveryFee =
-    settings.showPrices && total > 0 ? getSpbDeliveryFee(total) : 0;
+    settings.showPrices && total > 0
+      ? getDeliveryFeeForSelectedAddress(total, selectedAddress, deliveryZones)
+      : 0;
   const grandTotal = roundPriceUp(total + deliveryFee);
   const cartCount =
     selectedItems.length + customItems.length + (deliveryFee > 0 ? 1 : 0);
-  const selectedAddress = addresses.find((item) => item.id === addressId);
   const deliveryDateParts = getDeliveryDateParts(deliveryDate);
 
   // Дозаказ только из нового/повтора: в edit уже «Сохранить изменения».
@@ -831,21 +839,27 @@ export function OrderEditor({
     setMissingFields({ date: false, address: false });
 
     const submitDeliveryFee =
-      settings.showPrices && total > 0 ? getSpbDeliveryFee(total) : 0;
+      settings.showPrices && total > 0
+        ? getDeliveryFeeForSelectedAddress(total, checkoutAddress, deliveryZones)
+        : 0;
+    const submitTariff = resolveEffectiveDeliveryTariffForAddress(
+      checkoutAddress,
+      deliveryZones
+    );
     const previousFee =
       session.mode === "edit"
         ? Math.max(0, Number(session.order?.deliveryFee) || 0)
         : 0;
     if (submitDeliveryFee > previousFee) {
-      const needMore = Math.max(0, FREE_DELIVERY_MIN_TOTAL - total);
+      const needMore = Math.max(0, submitTariff.freeFrom - total);
       const ok = await appConfirm({
         title: "Платная доставка",
         message:
-          `Сумма заказа меньше ${formatMoney(FREE_DELIVERY_MIN_TOTAL)}. ` +
-          `Доставка по Санкт-Петербургу — ${formatMoney(PAID_DELIVERY_FEE)}. ` +
+          `Сумма заказа меньше ${formatMoney(submitTariff.freeFrom)}. ` +
+          `Доставка — ${formatMoney(submitTariff.fee)}. ` +
           `Добавьте товаров ещё на ${formatMoney(needMore)} для бесплатной доставки ` +
           `либо оформите заказ с платной доставкой.`,
-        confirmLabel: `Оформить (+${formatMoney(PAID_DELIVERY_FEE)})`,
+        confirmLabel: `Оформить (+${formatMoney(submitTariff.fee)})`,
         cancelLabel: "Вернуться к заказу",
         tone: "warn",
       });
@@ -870,7 +884,7 @@ export function OrderEditor({
         deliveryFee: submitDeliveryFee,
         deliveryNote:
           submitDeliveryFee > 0
-            ? `Доставка по СПб платная: ${PAID_DELIVERY_FEE} ₽ (заказ менее ${FREE_DELIVERY_MIN_TOTAL} ₽)`
+            ? `Доставка по СПб платная: ${submitTariff.fee} ₽ (заказ менее ${submitTariff.freeFrom} ₽)`
             : "Доставка по СПб бесплатная",
       })
     )
@@ -1578,7 +1592,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                         }`}
                       >
                         {deliveryFee > 0
-                          ? `В заказе позиция «Доставка» — ${formatMoney(PAID_DELIVERY_FEE)}. До бесплатной ещё ${formatMoney(FREE_DELIVERY_MIN_TOTAL - total)}.`
+                          ? `В заказе позиция «Доставка» — ${formatMoney(deliveryTariff.fee)}. До бесплатной ещё ${formatMoney(Math.max(0, deliveryTariff.freeFrom - total))}.`
                           : "Доставка по СПб — бесплатно."}
                       </p>
                     ) : null}
@@ -1870,7 +1884,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                     }`}
                   >
                     {deliveryFee > 0
-                      ? `В заказе позиция «Доставка» — ${formatMoney(PAID_DELIVERY_FEE)}. Добавьте ещё на ${formatMoney(FREE_DELIVERY_MIN_TOTAL - total)} для бесплатной.`
+                      ? `В заказе позиция «Доставка» — ${formatMoney(deliveryTariff.fee)}. Добавьте ещё на ${formatMoney(Math.max(0, deliveryTariff.freeFrom - total))} для бесплатной.`
                       : "Доставка по Санкт-Петербургу — бесплатно."}
                   </p>
                 ) : null}

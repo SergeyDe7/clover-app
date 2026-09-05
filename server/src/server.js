@@ -185,6 +185,8 @@ import {
   resolveDeliveryOneCRefs,
   sanitizeDeliveryZones,
   normalizeDeliveryZoneId,
+  preserveClientAddressDeliveryZones,
+  projectClientDeliveryZones,
 } from "./deliveryFee.js";
 import {
   overlayStorefrontClientLink,
@@ -2870,6 +2872,8 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     settings: {
       ...baseClientSettings,
       ...managerContactSettings,
+      // Client-safe delivery tariffs only (enabled zones: id/freeFrom/fee).
+      deliveryZones: projectClientDeliveryZones(settings.deliveryZones),
     },
     clientLinks: {
       [req.user.id]: sanitizeClientLinkForClient(catalog.link),
@@ -4397,13 +4401,7 @@ app.put(
       return res.json({ ok: true, addresses: current, rejectedEmpty: true });
     }
 
-    const addresses = incoming.map((item) => {
-      if (!item || typeof item !== "object") return item;
-      return {
-        ...item,
-        deliveryZoneId: normalizeDeliveryZoneId(item.deliveryZoneId),
-      };
-    });
+    const addresses = preserveClientAddressDeliveryZones(incoming, current);
     setClientStateField(req.user.id, "addresses", addresses);
     res.json({ ok: true, addresses });
   }
@@ -4530,6 +4528,7 @@ app.put(
     setGlobalState("settings", {
       ...DEFAULT_SETTINGS,
       ...safeIncoming,
+      deliveryZones: sanitizeDeliveryZones(safeIncoming.deliveryZones),
     });
     auditFromRequest(req, "settings.save", {});
 

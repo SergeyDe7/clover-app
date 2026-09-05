@@ -108,6 +108,42 @@ export function normalizeDeliveryZoneId(value) {
 }
 
 /**
+ * Client-safe delivery zone projection for bootstrap.
+ * Enabled zones only; id + nullable freeFrom/fee (no admin names / disabled rows).
+ */
+export function projectClientDeliveryZones(raw) {
+  return sanitizeDeliveryZones(raw)
+    .filter((zone) => zone.enabled === true)
+    .map((zone) => ({
+      id: zone.id,
+      freeFrom: zone.freeFrom,
+      fee: zone.fee,
+    }));
+}
+
+/**
+ * Client PUT /addresses must not escalate zone assignment.
+ * Existing address → keep prior deliveryZoneId.
+ * New address → empty zone.
+ */
+export function preserveClientAddressDeliveryZones(incoming, current = []) {
+  const currentById = new Map(
+    (Array.isArray(current) ? current : [])
+      .filter((row) => row && typeof row === "object")
+      .map((row) => [String(row.id || "").trim(), row])
+  );
+  return (Array.isArray(incoming) ? incoming : []).map((item) => {
+    if (!item || typeof item !== "object") return item;
+    const id = String(item.id || "").trim();
+    const previous = id ? currentById.get(id) : null;
+    const deliveryZoneId = previous
+      ? normalizeDeliveryZoneId(previous.deliveryZoneId)
+      : "";
+    return { ...item, deliveryZoneId };
+  });
+}
+
+/**
  * Resolve enabled zone for a saved address from settings.deliveryZones.
  * Unknown / disabled / empty id → null (global fallback).
  * Does NOT parse address text.
