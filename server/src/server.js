@@ -3622,7 +3622,13 @@ async function handleOneCTestOrder(req, res, next) {
           deliveryOneCCode: deliverySettings.deliveryOneCCode,
           deliveryOneCName: deliverySettings.deliveryOneCName || "Доставка",
         },
-        oneCProducts
+        oneCProducts,
+        {
+          addresses: candidate.clientId
+            ? getClientState(candidate.clientId).addresses || []
+            : [],
+          deliveryZones: sanitizeDeliveryZones(deliverySettings.deliveryZones),
+        }
       );
       const draftItems = (candidateForLinkCheck.items || []).map((item) => {
         const product = productsById.get(String(item.productId ?? item.id));
@@ -3703,7 +3709,13 @@ async function handleOneCTestOrder(req, res, next) {
         deliveryOneCCode: deliverySettings.deliveryOneCCode,
         deliveryOneCName: deliverySettings.deliveryOneCName || "Доставка",
       },
-      oneCProductsCatalog
+      oneCProductsCatalog,
+      {
+        addresses: realOrder.clientId
+          ? getClientState(realOrder.clientId).addresses || []
+          : [],
+        deliveryZones: sanitizeDeliveryZones(deliverySettings.deliveryZones),
+      }
     );
     const claimGrand = (orderForClaim.items || []).reduce(
       (sum, line) => sum + (Number(line.lineTotal) || 0),
@@ -6719,7 +6731,13 @@ app.post(
         deliveryOneCCode: deliverySettings.deliveryOneCCode,
         deliveryOneCName: deliverySettings.deliveryOneCName || "Доставка",
       },
-      oneCProducts
+      oneCProducts,
+      {
+        addresses: stored.payload.clientId
+          ? getClientState(stored.payload.clientId).addresses || []
+          : [],
+        deliveryZones: sanitizeDeliveryZones(deliverySettings.deliveryZones),
+      }
     );
     const sendGrand = (orderWithDelivery.items || []).reduce(
       (sum, line) => sum + (Number(line.lineTotal) || 0),
