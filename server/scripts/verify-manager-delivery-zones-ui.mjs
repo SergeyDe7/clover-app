@@ -168,8 +168,8 @@ try {
   );
   assert.match(
     clientsSrc,
-    /Не выбрана/,
-    "ManagerClients must offer empty zone option"
+    /<option\s+value="">По умолчанию<\/option>/,
+    "ManagerClients must label the empty zone option as default"
   );
   assert.equal(
     typeof clientsMod.normalizeManagerClientAddresses,
