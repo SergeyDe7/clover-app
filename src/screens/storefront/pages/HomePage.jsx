@@ -3,12 +3,25 @@ import { storefrontApi } from "../publicApi.js";
 import { GroupTile } from "../components/GroupTile.jsx";
 import { HeroSlides } from "../components/HeroSlides.jsx";
 import { CLOVER_PRODUCT_GROUPS } from "../productGroups.js";
+import { storefrontHref } from "../mode.js";
 import {
   STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
   STOREFRONT_DEFAULT_HERO_SLIDES,
   STOREFRONT_HERO_LEAD,
   STOREFRONT_HERO_TITLE,
 } from "../siteCopy.js";
+
+function navigatePromoLink(link) {
+  const href = String(link || "").trim();
+  if (!href) return;
+  if (/^https:\/\//i.test(href)) {
+    window.open(href, "_blank", "noopener,noreferrer");
+    return;
+  }
+  const path = href.startsWith("/") ? href : `/${href}`;
+  window.history.pushState({}, "", storefrontHref(path));
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}
 
 export function HomePage() {
   const [error, setError] = useState("");
@@ -19,6 +32,7 @@ export function HomePage() {
     slides: null,
     intervalSec: STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
   });
+  const [homePromotions, setHomePromotions] = useState([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -39,6 +53,9 @@ export function HomePage() {
           intervalSec:
             site.heroIntervalSec || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
         });
+        setHomePromotions(
+          Array.isArray(site.homePromotions) ? site.homePromotions : []
+        );
         setReady(true);
       })
       .catch((err) => {
@@ -48,6 +65,7 @@ export function HomePage() {
             ...prev,
             slides: STOREFRONT_DEFAULT_HERO_SLIDES,
           }));
+          setHomePromotions([]);
           setReady(true);
         }
       });
@@ -61,12 +79,8 @@ export function HomePage() {
       <section className="sf-hero sf-hero-compact" aria-label="Компания КЛЕВЕР">
         <div className="sf-hero-copy">
           <p className="sf-hero-brand">КЛЕВЕР</p>
-          <h1>
-            {hero.title || STOREFRONT_HERO_TITLE}
-          </h1>
-          <p className="sf-hero-lead">
-            {hero.lead || STOREFRONT_HERO_LEAD}
-          </p>
+          <h1>{hero.title || STOREFRONT_HERO_TITLE}</h1>
+          <p className="sf-hero-lead">{hero.lead || STOREFRONT_HERO_LEAD}</p>
         </div>
         {Array.isArray(hero.slides) ? (
           <HeroSlides slides={hero.slides} intervalSec={hero.intervalSec} />
@@ -74,6 +88,47 @@ export function HomePage() {
           <div className="sf-hero-visual" aria-hidden="true" />
         )}
       </section>
+
+      {homePromotions.length > 0 ? (
+        <section className="sf-section sf-home-promos" aria-label="Акции">
+          <div className="sf-section-head">
+            <h2>Акции</h2>
+            <a
+              className="sf-section-more"
+              href={storefrontHref({ name: "aktsii" })}
+              onClick={(e) => {
+                e.preventDefault();
+                window.history.pushState({}, "", storefrontHref({ name: "aktsii" }));
+                window.dispatchEvent(new PopStateEvent("popstate"));
+              }}
+            >
+              Все акции
+            </a>
+          </div>
+          <ul className="sf-home-promo-list">
+            {homePromotions.map((promo) => (
+              <li key={promo.id} className="sf-home-promo-card">
+                {promo.imageUrl ? (
+                  <img src={promo.imageUrl} alt="" loading="lazy" />
+                ) : null}
+                <div className="sf-home-promo-copy">
+                  <h3>{promo.title}</h3>
+                  {promo.shortText ? <p>{promo.shortText}</p> : null}
+                  {promo.link ? (
+                    <button
+                      type="button"
+                      className="sf-btn sf-btn-ghost sf-btn-sm"
+                      onClick={() => navigatePromoLink(promo.link)}
+                    >
+                      {promo.buttonText || "Подробнее"}
+                    </button>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="sf-section sf-groups-section">
         <div className="sf-section-head">

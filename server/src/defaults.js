@@ -75,6 +75,7 @@ export const DEFAULT_SETTINGS = {
   storefrontHeroLead: "",
   storefrontHeroSlides: [],
   storefrontHeroIntervalSec: 6,
+  storefrontPromotions: [],
   storefrontContactPhone: "",
   storefrontContactEmail: "",
   storefrontContactAddress: "",

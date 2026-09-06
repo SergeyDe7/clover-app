@@ -49,6 +49,21 @@ function IconUser() {
   );
 }
 
+function IconPromo() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+      <path
+        d="M5 8.5 12 4l7 4.5v7L12 20l-7-4.5v-7Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path d="M12 12v8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M5 8.5 12 12l7-3.5" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function StoreHeader({ current }) {
   const [count, setCount] = useState(getCartCount);
   useEffect(() => subscribeCart(() => setCount(getCartCount())), []);
@@ -87,6 +102,7 @@ export function StoreHeader({ current }) {
       <nav className="sf-nav" aria-label="Навигация">
         {link("home", "Главная", "home")}
         {link({ name: "catalog" }, "Каталог", "catalog")}
+        {link({ name: "aktsii" }, "Акции", "aktsii")}
         {link({ name: "contacts" }, "Контакты", "contacts")}
         {link(
           { name: "cart" },
@@ -107,7 +123,18 @@ export function StoreHeader({ current }) {
           <IconCatalog />
           <span className="sf-header-tool-label">Каталог</span>
         </a>
-        <StorefrontContacts />
+        <a
+          className="sf-header-tool sf-aktsii-mobile"
+          href={storefrontHref({ name: "aktsii" })}
+          aria-label="Акции"
+          onClick={(e) => {
+            e.preventDefault();
+            go({ name: "aktsii" });
+          }}
+        >
+          <IconPromo />
+          <span className="sf-header-tool-label">Акции</span>
+        </a>
         <a
           className="sf-header-tool sf-cart-mobile"
           href={storefrontHref({ name: "cart" })}
@@ -121,6 +148,7 @@ export function StoreHeader({ current }) {
           <span className="sf-header-tool-label">Корзина</span>
           {count > 0 ? <span className="sf-header-badge">{count > 99 ? "99+" : count}</span> : null}
         </a>
+        <StorefrontContacts />
         <a
           className="sf-header-tool sf-login-mobile"
           href={cabinetLoginUrl("/")}

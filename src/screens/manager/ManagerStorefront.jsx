@@ -3,6 +3,11 @@ import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
 import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber, matchesCatalogPrefixSearch, productCatalogSearchHaystack, formatRussianPhone, getRussianPhoneLocalDigits } from "../../shared/appHelpers";
 import { StorefrontProductAdd } from "./StorefrontProductAdd";
+import {
+  ManagerStorefrontPromotions,
+  clonePromotions,
+  promotionsKey,
+} from "./ManagerStorefrontPromotions";
 import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE, STOREFRONT_DEFAULT_HERO_SLIDES, STOREFRONT_DEFAULT_HERO_INTERVAL_SEC, STOREFRONT_MAX_HERO_SLIDES } from "../storefront/siteCopy.js";
 import { normalizeYandexMapsUrl } from "../../shared/yandexMaps.js";
 
@@ -83,6 +88,7 @@ export function ManagerStorefront({
     storefrontHeroSlides: heroSlidesDraft(settings?.storefrontHeroSlides),
     storefrontHeroIntervalSec:
       settings?.storefrontHeroIntervalSec || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
+    storefrontPromotions: clonePromotions(settings?.storefrontPromotions),
     storefrontContactPhone: formatRussianPhone(settings?.storefrontContactPhone || ""),
     storefrontContactEmail: settings?.storefrontContactEmail || "",
     storefrontContactAddress: settings?.storefrontContactAddress || "",
@@ -114,6 +120,7 @@ export function ManagerStorefront({
         storefrontHeroIntervalSec:
           settings?.storefrontHeroIntervalSec ||
           STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
+        storefrontPromotions: clonePromotions(settings?.storefrontPromotions),
         storefrontContactPhone: formatRussianPhone(settings?.storefrontContactPhone || ""),
         storefrontContactEmail: settings?.storefrontContactEmail || "",
         storefrontContactAddress: settings?.storefrontContactAddress || "",
@@ -135,6 +142,8 @@ export function ManagerStorefront({
         prev.storefrontHeroLead === next.storefrontHeroLead &&
         slidesKey(prev.storefrontHeroSlides) === slidesKey(next.storefrontHeroSlides) &&
         Number(prev.storefrontHeroIntervalSec) === Number(next.storefrontHeroIntervalSec) &&
+        promotionsKey(prev.storefrontPromotions) ===
+          promotionsKey(next.storefrontPromotions) &&
         prev.storefrontContactPhone === next.storefrontContactPhone &&
         prev.storefrontContactEmail === next.storefrontContactEmail &&
         prev.storefrontContactAddress === next.storefrontContactAddress &&
@@ -156,6 +165,7 @@ export function ManagerStorefront({
     settings?.storefrontHeroLead,
     settings?.storefrontHeroSlides,
     settings?.storefrontHeroIntervalSec,
+    settings?.storefrontPromotions,
     settings?.storefrontContactPhone,
     settings?.storefrontContactEmail,
     settings?.storefrontContactAddress,
@@ -241,6 +251,15 @@ export function ManagerStorefront({
     setBusy(true);
     setSettingsSaved(false);
     try {
+      const draftPromos = clonePromotions(draft.storefrontPromotions);
+      if (draftPromos.some((item) => !String(item.title || "").trim())) {
+        await appAlert({
+          title: "Заполните акции",
+          message: "У каждой акции нужен заголовок. Пустые записи не сохраняются.",
+          tone: "danger",
+        });
+        return;
+      }
       const payload = {
         ...draft,
         storefrontMarkupPercent: parseMarkupPercent(draft.storefrontMarkupPercent),
@@ -255,6 +274,7 @@ export function ManagerStorefront({
         storefrontContactMapImageUrl: String(draft.storefrontContactMapImageUrl || "").trim(),
         storefrontHeroSlides: cloneHeroSlides(draft.storefrontHeroSlides),
         storefrontHeroIntervalSec: Number(draft.storefrontHeroIntervalSec) || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
+        storefrontPromotions: draftPromos,
       };
       const result = await api.saveStorefrontSettings(payload);
       const next = result.settings || { ...settings, ...payload };
@@ -786,6 +806,11 @@ export function ManagerStorefront({
           </button>
         </div>
       </div>
+
+      <ManagerStorefrontPromotions
+        promotions={draft.storefrontPromotions}
+        onChange={(next) => setField("storefrontPromotions", next)}
+      />
 
       <div className="manager-contact-settings" style={{ marginTop: 20 }}>
         <h3>Контакты на витрине</h3>
