@@ -702,7 +702,7 @@ function ManagerClientEditor({
                   updateAddress(item.id, { deliveryZoneId: event.target.value })
                 }
               >
-                <option value="">Не выбрана</option>
+                <option value="">По умолчанию</option>
                 {(Array.isArray(deliveryZones) ? deliveryZones : [])
                   .filter((zone) => zone && zone.enabled !== false)
                   .map((zone) => (
