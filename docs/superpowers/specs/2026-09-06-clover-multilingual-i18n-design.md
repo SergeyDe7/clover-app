@@ -50,22 +50,32 @@ The supported-language registry is code-owned and immutable at runtime. Admin co
 
 All boundaries use a canonicalization function. It accepts only these codes and maps public `zh` to internal `zh-CN`. Unknown, empty and disabled language values resolve to `ru`; they never reach translation lookup as arbitrary keys.
 
-The selector uses the approved compact labels `🇷🇺 RU`, `🇺🇸 EN`, `🇺🇿 UZ`, `🇰🇬 KY`, `🇹🇯 TG`, `🇨🇳 ZH`, `🇸🇦 AR`. Accessible names contain the language name in that language and Russian for admin clarity.
+The approved country mapping is Russia for RU, USA for EN, Uzbekistan for UZ, Kyrgyzstan for KY, Tajikistan for TG, China for ZH and Saudi Arabia for AR. Emoji (`🇷🇺 🇺🇸 🇺🇿 🇰🇬 🇹🇯 🇨🇳 🇸🇦`) may illustrate this mapping in documentation, but production UI must not depend on platform emoji rendering.
+
+Production `LanguageSelector` uses a controlled code-to-asset map of bundled local static flags, preferably SVG, shipped with Clover. It has no external CDN/network dependency and provides consistent appearance on Windows, iOS, Android, desktop/mobile browsers and PWA. Every flag is accompanied by RU/EN/UZ/KY/TG/ZH/AR text and an accessible localized language name through `alt` or `aria-label`.
 
 ## 4. User experience
 
 ### Resolution precedence
 
-Language is resolved once by the application shell in this order:
+Language is resolved once by the application shell with surface-specific precedence.
 
-1. An explicit supported and enabled language prefix in the current URL.
-2. The authenticated user's server-side `preferred_language` after session bootstrap.
+For the public storefront only:
+
+1. An explicit supported and enabled language prefix in the current public URL.
+2. The authenticated user's server-side `preferred_language` after session bootstrap, when a storefront session exists.
 3. A valid manual choice in local storage.
 4. Russian.
 
+For client, manager and admin cabinets on their existing unprefixed paths:
+
+1. The authenticated user's server-side `preferred_language` after session bootstrap.
+2. A valid manual choice in local storage.
+3. Russian.
+
 There is no redirect based on browser language. A first visit with no saved choice is Russian. For an authenticated manual selection, Clover updates the in-memory locale immediately, saves it locally and writes the same canonical value to the profile endpoint. A failed profile write does not revert the visible choice; it shows a localized retryable error and retains the local preference.
 
-On login, an explicit URL wins for the current navigation. Otherwise the server preference wins and refreshes local storage. On logout, the last manual local preference remains on that device. Disabling a language makes existing saved preferences resolve safely to Russian without deleting the stored value, so re-enabling can restore it.
+On public navigation, an explicit public language URL wins. In a cabinet there is no language prefix and the server preference wins after login, refreshing local storage. On logout, the last manual local preference remains on that device. Disabling a language makes existing saved preferences resolve safely to Russian without deleting the stored value, so re-enabling can restore it.
 
 ### Selector placement
 
@@ -76,7 +86,7 @@ One shared `LanguageSelector` contract is used by both lazy-loaded shells:
 - mobile and PWA: compact flag/code trigger opening a keyboard- and screen-reader-accessible list;
 - manager/admin: the same selector changes only the operator's UI, never client data or business behavior.
 
-The selector preserves the current route identity, query and hash. On public routes it swaps the language prefix; on legacy unprefixed routes it creates the corresponding prefixed route. It must not reset a cart, unsaved form or authenticated session.
+The selector preserves the current route identity, query and hash. On public storefront routes it swaps or adds the language prefix. In every cabinet it changes UI locale and preference only; it never changes `/lk` pathname into a prefixed variant. It must not reset a cart, unsaved form or authenticated session.
 
 ### Fallback contract
 
@@ -94,14 +104,16 @@ User-entered content is shown exactly as entered, except for the separate order-
 
 ### Route model
 
-The current application chooses storefront versus cabinet in `src/main.jsx`, parses storefront paths in `src/screens/storefront/mode.js`, and manages metadata in `src/screens/storefront/seo.js`. The multilingual route parser must extract an optional language prefix before passing the unchanged internal path to those existing decisions.
+The current application chooses storefront versus cabinet in `src/main.jsx`, parses storefront paths in `src/screens/storefront/mode.js`, and manages metadata in `src/screens/storefront/seo.js`. The multilingual route parser may extract an optional language prefix only inside the public storefront route space before passing the unchanged internal public path to those existing decisions.
 
-Public and cabinet aliases are supported as:
+Public aliases are supported as:
 
 - `/ru/...`, `/en/...`, `/uz/...`, `/ky/...`, `/tg/...`, `/zh/...`, `/ar/...`;
 - internal route segments remain unchanged, for example `/en/catalog/hozyajstvennye-tovary/...`;
-- `/ru/lk`, `/en/lk` and equivalent prefixes select the cabinet shell while preserving the existing internal `/lk` semantics;
-- API, assets, uploaded files, service worker, manifests and health paths are never interpreted as language prefixes.
+- language-prefixed routes apply only to the public site/storefront/SEO;
+- API, assets, uploaded files, service worker, manifests, health paths and cabinet paths are never interpreted as language-prefixed public routes.
+
+Cabinets retain their existing canonical unprefixed routes, including `/lk`, `/lk/client`, `/lk/manager`, `/lk/admin` and current project variants. `/ru/lk`, `/en/lk`, `/uz/lk`, `/ky/lk`, `/tg/lk`, `/zh/lk` and `/ar/lk` are not introduced. This protects authentication, callbacks, PWA scope/navigation fallback, deep links, session restoration and existing bookmarks. Cabinet language selection never mutates pathname.
 
 Route generation always uses the public URL code, so internal `zh-CN` emits `/zh/`.
 
@@ -110,7 +122,7 @@ Route generation always uses the public URL code, so internal `zh-CN` emits `/zh
 Rollout is deliberately two-step:
 
 1. At multilingual-route launch, existing unprefixed URLs continue to render Russian and return success. Their canonical points to the equivalent `/ru/...` URL. This protects old links, saved PWA navigation and current indexing while prefixed pages are observed.
-2. Only after search-console, access-log and PWA verification may public storefront URLs receive a permanent 308 redirect to `/ru/...`. `/lk`, authentication callbacks and operational endpoints are excluded until their own compatibility gate passes.
+2. Only after search-console, access-log and PWA verification may public storefront URLs receive a permanent 308 redirect to `/ru/...`. Cabinets, authentication callbacks and operational endpoints remain permanently outside this public-prefix redirect strategy.
 
 No redirect chain is allowed. Query parameters and fragments are preserved. Unknown first segments keep existing route behavior rather than being guessed as languages.
 
@@ -135,8 +147,8 @@ SEO fallback to Russian keeps a page usable but does not qualify a non-Russian p
 
 Implementation should introduce four explicit layers:
 
-- `languageRegistry`: valid codes, URL mapping, direction, flags, labels and canonicalization;
-- `languageResolver`: URL/profile/local preference precedence and navigation helpers;
+- `languageRegistry`: valid codes, public URL mapping, direction, local flag-asset mapping, labels and canonicalization;
+- `languageResolver`: public URL/profile/local precedence, cabinet profile/local precedence and surface-aware navigation helpers;
 - `translationRuntime`: immutable snapshot lookup, interpolation, plural/number/date formatting and Russian fallback;
 - `localizedProjection`: server-side public/client projections for products, categories, content and SEO.
 
@@ -245,6 +257,10 @@ The section has five views:
 
 All views support search, language filter, section filter and “только непереведённые”. Rows show Russian source, EN/UZ/KY/TG/ZH/AR values, state, stale-source warning and last editor/time. Editing a value creates or changes it to MANUAL. An explicit “вернуть к AUTO” action requires confirmation and changes only that field/language.
 
+The admin translation workspace is fully usable on desktop, laptop, tablet, mobile browser and PWA wherever the admin shell is available. Desktop may use a grid, language columns that comfortably fit, or language tabs/filter. A seven-language horizontal table is never required.
+
+At narrow widths, the editor shows one selected target language at a time using compact tabs, dropdown or accordion. Russian source remains visible as context; the target field appears below or alongside it; AUTO/MANUAL/MISSING state remains visible. The layout must not squeeze seven columns, clip controls or cause horizontal page scroll. Every translation-management view is included in the 390/430/768/900/1440 regression matrix.
+
 Language enablement shows completeness by domain: interface, product names, categories, page content, FAQ, SEO and critical checkout. Russian is visibly locked on. Enable is rejected server-side until all critical items for that language are non-fallback, non-empty and not stale.
 
 Bulk automatic generation operates only on MISSING, FALLBACK_RU and AUTO records. Its update condition explicitly excludes MANUAL records in the transaction. Every admin write and generation run is audited.
@@ -271,7 +287,7 @@ Generation performs these steps:
 
 1. Detect and protect immutable tokens, brands, models and measurements.
 2. Apply the longest matching glossary phrases with context before shorter terms.
-3. Ask the selected free provider for a natural catalog title, allowing language-specific word order.
+3. Run the controlled content-localization/import adapter for a natural catalog title, allowing language-specific word order. This adapter is independent of the runtime order-comment provider.
 4. Restore and validate protected tokens and numeric semantics.
 5. Reject empty, token-losing or measurement-changing output.
 6. Save acceptable output as AUTO with source hash and run metadata.
@@ -279,6 +295,8 @@ Generation performs these steps:
 Glossary edits affect only future or explicitly requested regeneration of AUTO values. They never rewrite MANUAL values. Regeneration previews counts and impacted fields before execution and is resumable/idempotent.
 
 Quality acceptance uses native or market-competent human review samples per major category. Literal correctness alone is insufficient.
+
+Initial product, category, SEO and static-content localization is a one-time controlled generation/import workflow. Its results are persisted as AUTO until an editor corrects them; normal rendering makes no translator call. Regeneration is an explicit admin-controlled operation only. The architecture does not require the dynamic order-comment provider for catalog/content generation. A separate offline/import adapter may be approved later, but it cannot weaken glossary, protected-token, editorial-review or MANUAL non-overwrite contracts.
 
 ## 11. Order comment translation pipeline
 
@@ -360,7 +378,7 @@ Each admin edit commits data and increments `catalogVersion` in one transaction.
 
 Do not put entire product translations into the initial UI dictionary. Code-split UI namespaces with the existing storefront/cabinet split, paginate admin searches and index translation tables by language, namespace, entity and missing/stale state.
 
-No external provider call occurs in request-time UI rendering. Initial generation and bulk regeneration are explicit background/admin jobs with bounded concurrency and progress checkpoints.
+No external provider call occurs in request-time UI rendering. Initial static/product generation and bulk regeneration are explicit background/admin import jobs with bounded concurrency and progress checkpoints, using a content-localization adapter independent of the dynamic order-comment provider.
 
 ## 17. Migration and backward compatibility
 
@@ -389,7 +407,7 @@ Gate: current Russian UI and all business regression suites remain identical; fa
 
 ### Phase 2 — selector and preference synchronization
 
-Add the shared selector, local persistence and authenticated `preferred_language` endpoint/sync for storefront and all cabinets. Foreign choices may be exercised only in TEST/preview.
+Add the shared selector, local persistence and authenticated `preferred_language` endpoint/sync for storefront and all cabinets. The storefront selector changes public prefixes; cabinet selectors retain existing unprefixed `/lk` paths. Foreign choices may be exercised only in TEST/preview.
 
 Gate: precedence, offline behavior, login/logout/device synchronization and role authorization tests.
 
@@ -413,19 +431,19 @@ Gate: per-page completeness and safe public projections; text-in-image assets re
 
 ### Phase 6 — products, glossary and initial population
 
-Add per-product translation cards, glossary, protected-token validation and one-time resumable AUTO population.
+Add per-product translation cards, glossary, protected-token validation and one-time resumable AUTO population through a controlled content-localization/import workflow independent of the order-comment provider.
 
 Gate: same product IDs/1C mappings/prices/UOM/matrices across every locale; human market-language sample approval.
 
 ### Phase 7 — multilingual routes and SEO
 
-Enable prefixed routing, canonical/hreflang, localized sitemap and legacy Russian compatibility. Publicly enable only languages passing their completeness gate.
+Enable prefixes only for public storefront routing, canonical/hreflang, localized sitemap and legacy Russian compatibility. Keep every cabinet on its existing unprefixed path. Publicly enable only languages passing their completeness gate.
 
 Gate: crawl test, redirect/canonical matrix, old-link/PWA compatibility and no duplicate canonical pages.
 
 ### Phase 8 — free order-comment translator
 
-Complete provider research gate, implement detection/translation abstraction, persisted original/Russian fields and fail-open 1C text selection.
+Complete the free-provider research gate only for dynamic order comments (`en→ru`, `uz→ru`, `ky→ru`, `tg→ru`, `zh→ru`, `ar→ru`), then implement detection/translation abstraction, persisted original/Russian fields and fail-open 1C text selection. Failure of this gate stops phase 8 but does not block static multilingual storefront/content phases.
 
 Gate: all six language-to-Russian pairs, outage/timeout tests, queue/pre-claim/claim idempotency and real 1C TEST validation with a controlled test order only after separate approval.
 
@@ -470,11 +488,11 @@ Gate: full Clover regression matrix, zero critical missing items, reviewed rollb
 
 ### Route and SEO tests
 
-For every enabled language and public route type, assert status, preserved internal slug, canonical, `hreflang`, `x-default`, localized title/description/H1 and sitemap inclusion. Verify legacy unprefixed Russian URLs and exclude API/assets/service worker/cabinet-private routes from public SEO behavior.
+For every enabled language and public route type, assert status, preserved internal slug, canonical, `hreflang`, `x-default`, localized title/description/H1 and sitemap inclusion. Verify legacy unprefixed Russian URLs and exclude API/assets/service worker/all cabinet routes from public prefix and SEO behavior. Assert that language selection in `/lk`, `/lk/client`, `/lk/manager`, `/lk/admin` and existing variants never changes pathname or breaks auth, callbacks, deep links, session restoration, bookmarks or PWA navigation fallback.
 
 ### Visual, accessibility and E2E
 
-Run storefront, product, cart, checkout, auth, client, manager and admin journeys in all seven languages at 390, 430, 768, 900 and 1440 px. Include keyboard selector use, screen-reader names, focus restoration, dialog/validation/error states, PWA standalone mode and Arabic RTL.
+Run storefront, product, cart, checkout, auth, client, manager and admin journeys in all seven languages at 390, 430, 768, 900 and 1440 px. Include keyboard selector use, bundled local flag assets and accessible names, focus restoration, dialog/validation/error states, PWA standalone mode and Arabic RTL. Admin translation screens must prove one-target-language narrow layouts with visible Russian context/state and no seven-column squeeze or horizontal page scroll.
 
 Every phase must retain PASS for auth/login, all cabinets, catalog/product cards, cart/checkout, delivery zones/prices, order creation/status, recurring orders, reconciliation, matrices, pricing, PWA, storefront, current Russian SEO and existing 1C regression verifiers.
 
@@ -502,7 +520,7 @@ The following are implementation gates, not permission to guess:
 - exact deployment architecture for background generation without introducing order delays;
 - complete inventory of hard-coded Russian UI text across large JSX modules, server errors, emails, push messages and generated documents;
 - whether server-rendered/static SEO support is needed for crawlers beyond the current client-side metadata mechanism;
-- reverse-proxy/PWA handling of prefixed `/.../lk` and service-worker navigation fallbacks;
+- reverse-proxy/PWA enforcement that public prefixes never create cabinet aliases, while existing unprefixed cabinet service-worker navigation fallbacks continue working;
 - canonical strategy observation period and evidence required before any 308 rollout;
 - source identity for categories whose current Russian labels also serve as internal taxonomy keys;
 - safe product source-hash normalization that does not mistake formatting changes for semantic changes;
