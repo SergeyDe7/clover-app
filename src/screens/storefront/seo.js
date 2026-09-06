@@ -127,6 +127,14 @@ export function storefrontRouteDocumentMeta(route) {
       path: storefrontHref(route),
     };
   }
+  if (route.name === "aktsii") {
+    return {
+      title: `Акции | ${STOREFRONT_SITE_NAME}`,
+      description:
+        "Акции и специальные предложения компании КЛЕВЕР для HoReCa. Актуальные информационные материалы на сайте clover-spb.ru.",
+      path: "https://clover-spb.ru/aktsii",
+    };
+  }
   return {
     title: STOREFRONT_DEFAULT_TITLE,
     description: STOREFRONT_DEFAULT_DESCRIPTION,

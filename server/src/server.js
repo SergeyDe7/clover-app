@@ -204,6 +204,7 @@ import {
   findPurchasePriceTypeId,
   heroSlideUploadUrls,
 } from "./storefrontPublic.js";
+import { promotionUploadUrls } from "../../src/shared/storefrontPromotions.js";
 import { buildStorefrontPriceListPdf } from "./storefrontPriceListPdf.js";
 import {
   buildAllPriceRequirements,
@@ -342,6 +343,33 @@ const heroImageUpload = multer({
       callback(
         null,
         `storefront-hero-${Date.now()}-${randomUUID()}${extensionMap[file.mimetype] || ".img"}`
+      );
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter(req, file, callback) {
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.mimetype)) {
+      return callback(
+        new Error("Разрешены только изображения JPG, PNG или WEBP.")
+      );
+    }
+    callback(null, true);
+  },
+});
+
+const promoImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadsDirectory,
+    filename(req, file, callback) {
+      const extensionMap = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+      };
+      callback(
+        null,
+        `storefront-promo-${Date.now()}-${randomUUID()}${extensionMap[file.mimetype] || ".img"}`
       );
     },
   }),
@@ -4588,6 +4616,12 @@ app.put(
     for (const imageUrl of heroSlideUploadUrls(current.storefrontHeroSlides)) {
       if (!nextHeroUploads.has(imageUrl)) removeUploadedImage(imageUrl);
     }
+    const nextPromoUploads = new Set(
+      promotionUploadUrls(next.storefrontPromotions)
+    );
+    for (const imageUrl of promotionUploadUrls(current.storefrontPromotions)) {
+      if (!nextPromoUploads.has(imageUrl)) removeUploadedImage(imageUrl);
+    }
     setGlobalState("settings", next);
     auditFromRequest(req, "storefront.settings.save", {
       pricingMode: next.storefrontPricingMode || "price_type",
@@ -4673,6 +4707,21 @@ app.post(
     }
     const imageUrl = `/uploads/${req.file.filename}`;
     auditFromRequest(req, "storefront.hero-image.upload", { imageUrl });
+    res.status(201).json({ ok: true, imageUrl });
+  }
+);
+
+app.post(
+  "/api/admin/storefront/promo-image",
+  authRequired,
+  roleRequired("admin"),
+  promoImageUpload.single("image"),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Выберите изображение акции." });
+    }
+    const imageUrl = `/uploads/${req.file.filename}`;
+    auditFromRequest(req, "storefront.promo-image.upload", { imageUrl });
     res.status(201).json({ ok: true, imageUrl });
   }
 );

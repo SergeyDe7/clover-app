@@ -472,6 +472,15 @@ export const api = {
     });
   },
 
+  uploadStorefrontPromoImage(file) {
+    const formData = new FormData();
+    formData.append("image", file);
+    return request("/admin/storefront/promo-image", {
+      method: "POST",
+      body: formData,
+    });
+  },
+
   saveClientLinks(clientLinks) {
     return request("/state/client-links", {
       method: "PUT",

@@ -51,6 +51,12 @@ import {
   STOREFRONT_DEFAULT_HERO_SLIDES,
   STOREFRONT_MAX_HERO_SLIDES,
 } from "../../src/screens/storefront/siteCopy.js";
+import {
+  listActivePromotions,
+  listAdminPromotions,
+  listHomePromotions,
+  normalizeStorefrontPromotions,
+} from "../../src/shared/storefrontPromotions.js";
 
 const STOREFRONT_GUEST_EMAIL = "storefront-guest@clover.local";
 
@@ -76,6 +82,9 @@ export function getStorefrontSettings(settingsInput) {
     ),
     storefrontHeroIntervalSec: normalizeStorefrontHeroIntervalSec(
       settings.storefrontHeroIntervalSec
+    ),
+    storefrontPromotions: normalizeStorefrontPromotions(
+      settings.storefrontPromotions
     ),
     storefrontContactPhone: normalizeStorefrontContactPhone(
       settings.storefrontContactPhone
@@ -228,6 +237,7 @@ export const STOREFRONT_SETTING_KEYS = [
   "storefrontHeroLead",
   "storefrontHeroSlides",
   "storefrontHeroIntervalSec",
+  "storefrontPromotions",
   "storefrontContactPhone",
   "storefrontContactEmail",
   "storefrontContactAddress",
@@ -287,6 +297,11 @@ export function mergeStorefrontSettings(baseSettings, patch = {}) {
       incoming.storefrontHeroIntervalSec !== undefined
         ? incoming.storefrontHeroIntervalSec
         : current.storefrontHeroIntervalSec
+    ),
+    storefrontPromotions: normalizeStorefrontPromotions(
+      incoming.storefrontPromotions !== undefined
+        ? incoming.storefrontPromotions
+        : current.storefrontPromotions
     ),
     storefrontContactPhone: normalizeStorefrontContactPhone(
       incoming.storefrontContactPhone ?? current.storefrontContactPhone ?? ""
@@ -641,13 +656,16 @@ export function getPublicCatalog({
   };
 }
 
-export function buildPublicSite(settingsInput) {
+export function buildPublicSite(settingsInput, now = new Date()) {
   const settings = getStorefrontSettings(settingsInput);
+  const promotions = listActivePromotions(settings.storefrontPromotions, now);
   return {
     heroTitle: settings.storefrontHeroTitle || "",
     heroLead: settings.storefrontHeroLead || "",
     heroSlides: settings.storefrontHeroSlides,
     heroIntervalSec: settings.storefrontHeroIntervalSec,
+    promotions,
+    homePromotions: listHomePromotions(settings.storefrontPromotions, now),
     contactPhone: settings.storefrontContactPhone || "",
     contactEmail: settings.storefrontContactEmail || "",
     contactAddress: settings.storefrontContactAddress || "",
@@ -656,6 +674,11 @@ export function buildPublicSite(settingsInput) {
     contactMapsUrl: settings.storefrontContactMapsUrl || "",
     contactMapImageUrl: settings.storefrontContactMapImageUrl || "",
   };
+}
+
+export function getAdminStorefrontPromotions(settingsInput, now = new Date()) {
+  const settings = getStorefrontSettings(settingsInput);
+  return listAdminPromotions(settings.storefrontPromotions, now);
 }
 
 export function getPublicSite() {

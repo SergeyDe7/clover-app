@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { StoreHeader } from "./components/StoreHeader.jsx";
+import { StoreFooter } from "./components/StoreFooter.jsx";
 import { parseStorefrontRoute } from "./mode.js";
 import { isCabinetPath } from "../../config/urls.js";
 import { HomePage } from "./pages/HomePage.jsx";
@@ -23,6 +24,9 @@ const CheckoutPage = lazy(() =>
 );
 const ContactsPage = lazy(() =>
   import("./pages/ContactsPage.jsx").then((m) => ({ default: m.ContactsPage }))
+);
+const AktsiiPage = lazy(() =>
+  import("./pages/AktsiiPage.jsx").then((m) => ({ default: m.AktsiiPage }))
 );
 const InstallAppPage = lazy(() =>
   import("./pages/InstallAppPage.jsx").then((m) => ({
@@ -105,6 +109,9 @@ export default function StorefrontApp() {
   } else if (route.name === "contacts") {
     page = <ContactsPage />;
     current = "contacts";
+  } else if (route.name === "aktsii") {
+    page = <AktsiiPage />;
+    current = "aktsii";
   } else if (route.name === "install-app") {
     page = <InstallAppPage />;
     current = "home";
@@ -118,6 +125,7 @@ export default function StorefrontApp() {
       <main className="sf-main">
         <Suspense fallback={null}>{page}</Suspense>
       </main>
+      {route.name === "catalog" ? null : <StoreFooter current={current} />}
     </div>
   );
 }
