@@ -255,61 +255,66 @@ export function DeliveryZonesSettings({ settings, set }) {
         значения: бесплатно от {FREE_DELIVERY_MIN_TOTAL} ₽, доставка {PAID_DELIVERY_FEE} ₽.
       </p>
       {zones.map((zone) => (
-        <div className="form-grid" key={zone.id} style={{ marginBottom: 12 }}>
-          <label className="field" htmlFor={`delivery-zone-name-${zone.id}`}>
-            Название
-            <input
-              id={`delivery-zone-name-${zone.id}`}
-              name={`deliveryZoneName-${zone.id}`}
-              value={zone.name ?? ""}
-              placeholder="Например: Мурино"
-              onChange={(event) => patchZone(zone.id, { name: event.target.value })}
-            />
-          </label>
-          <label className="field" htmlFor={`delivery-zone-free-${zone.id}`}>
-            Бесплатная доставка от, ₽
-            <input
-              id={`delivery-zone-free-${zone.id}`}
-              name={`deliveryZoneFreeFrom-${zone.id}`}
-              type="number"
-              min="0"
-              step="1"
-              value={zone.freeFrom == null ? "" : zone.freeFrom}
-              placeholder={`По умолчанию: ${FREE_DELIVERY_MIN_TOTAL}`}
-              onChange={(event) =>
-                patchZone(zone.id, { freeFrom: parseOptionalMoney(event.target.value) })
-              }
-            />
-            <small>По умолчанию: {FREE_DELIVERY_MIN_TOTAL} ₽</small>
-          </label>
-          <label className="field" htmlFor={`delivery-zone-fee-${zone.id}`}>
-            Стоимость доставки, ₽
-            <input
-              id={`delivery-zone-fee-${zone.id}`}
-              name={`deliveryZoneFee-${zone.id}`}
-              type="number"
-              min="0"
-              step="1"
-              value={zone.fee == null ? "" : zone.fee}
-              placeholder={`По умолчанию: ${PAID_DELIVERY_FEE}`}
-              onChange={(event) =>
-                patchZone(zone.id, { fee: parseOptionalMoney(event.target.value) })
-              }
-            />
-            <small>По умолчанию: {PAID_DELIVERY_FEE} ₽</small>
-          </label>
-          <div className="field" style={{ display: "flex", alignItems: "end", gap: 8 }}>
-            <button
-              type="button"
-              className="secondary-button"
-              data-zone-id={zone.id}
-              onClick={() => toggleZone(zone.id)}
-            >
-              {zone.enabled === false ? "Включить" : "Отключить"}
-            </button>
-            <span className={zone.enabled === false ? "badge yellow" : "badge green"}>
-              {zone.enabled === false ? "Отключена" : "Активна"}
-            </span>
+        <div className="delivery-zone-item" key={zone.id}>
+          <div className="delivery-zone-header">
+            <strong className="delivery-zone-title">{zone.name}</strong>
+            <div className="delivery-zone-actions">
+              <span className={zone.enabled === false ? "badge yellow" : "badge green"}>
+                {zone.enabled === false ? "Отключена" : "Активна"}
+              </span>
+              <button
+                type="button"
+                className="secondary-button"
+                data-zone-id={zone.id}
+                onClick={() => toggleZone(zone.id)}
+              >
+                {zone.enabled === false ? "Включить" : "Отключить"}
+              </button>
+            </div>
+          </div>
+          <div className="form-grid delivery-zone-fields">
+            <label className="field" htmlFor={`delivery-zone-name-${zone.id}`}>
+              Название
+              <input
+                id={`delivery-zone-name-${zone.id}`}
+                name={`deliveryZoneName-${zone.id}`}
+                value={zone.name ?? ""}
+                placeholder="Например: Мурино"
+                onChange={(event) => patchZone(zone.id, { name: event.target.value })}
+              />
+            </label>
+            <label className="field" htmlFor={`delivery-zone-free-${zone.id}`}>
+              Бесплатная доставка от, ₽
+              <input
+                id={`delivery-zone-free-${zone.id}`}
+                name={`deliveryZoneFreeFrom-${zone.id}`}
+                type="number"
+                min="0"
+                step="1"
+                value={zone.freeFrom == null ? "" : zone.freeFrom}
+                placeholder={`По умолчанию: ${FREE_DELIVERY_MIN_TOTAL}`}
+                onChange={(event) =>
+                  patchZone(zone.id, { freeFrom: parseOptionalMoney(event.target.value) })
+                }
+              />
+              <small>По умолчанию: {FREE_DELIVERY_MIN_TOTAL} ₽</small>
+            </label>
+            <label className="field" htmlFor={`delivery-zone-fee-${zone.id}`}>
+              Стоимость доставки, ₽
+              <input
+                id={`delivery-zone-fee-${zone.id}`}
+                name={`deliveryZoneFee-${zone.id}`}
+                type="number"
+                min="0"
+                step="1"
+                value={zone.fee == null ? "" : zone.fee}
+                placeholder={`По умолчанию: ${PAID_DELIVERY_FEE}`}
+                onChange={(event) =>
+                  patchZone(zone.id, { fee: parseOptionalMoney(event.target.value) })
+                }
+              />
+              <small>По умолчанию: {PAID_DELIVERY_FEE} ₽</small>
+            </label>
           </div>
         </div>
       ))}

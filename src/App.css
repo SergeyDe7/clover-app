@@ -1274,9 +1274,56 @@ html.login-lock body {
 .passkey-row > div { display: grid; gap: 3px; }
 .passkey-row span { color: #707a70; font-size: 11px; }
 
+.delivery-zone-item {
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.delivery-zone-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  margin-bottom: 8px;
+}
+
+.delivery-zone-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delivery-zone-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.delivery-zone-fields {
+  min-width: 0;
+}
+
 @media (max-width: 640px) {
   .passkey-row { align-items: stretch; flex-direction: column; }
   .passkey-row button { width: 100%; }
+
+  .delivery-zone-header {
+    flex-wrap: wrap;
+  }
+
+  .delivery-zone-title {
+    flex: 1 1 140px;
+  }
+
+  .delivery-zone-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 100%;
+    margin-left: auto;
+  }
 }
 
 .manager-notification-center {
