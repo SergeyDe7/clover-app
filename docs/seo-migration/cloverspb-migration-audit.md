@@ -109,30 +109,26 @@
 - `robots.txt` разрешает public crawl и запрещает `/lk`, `/api/`, `/vitrina/lk`.
 - Raw HTML главной, `/catalog`, representative category и product route отвечает 200, но содержит одинаковый общий `<title>` и не содержит server-rendered H1 или canonical. Page-specific metadata добавляются клиентским JavaScript (`src/screens/storefront/seo.js`). Это существующий SEO-риск: до cutover требуется rendered inspection в Google Search Console/Яндекс Вебмастере; возможная SSR/prerender/runtime-коррекция является отдельным change scope.
 
-## 9. Результат redirect matching
+## 9. Результат focused review redirect matching
 
-- `EXACT`: 104.
-  - Главная: 1.
-  - Info: 1 (`/kontakty` → `/contacts`).
-  - Категории: 17.
-  - Товары: 85, из них 73 по уникальному с обеих сторон публичному article/SKU и 12 по точному нормализованному публичному названию (9 по product name, 3 по public `oneCName` с сохранением значимой фасовки `(4)`).
-- `HIGH`: 181.
-  - Info: 2 (`/search` и HTML `/sitemap` → `/catalog`).
-  - Категории: 33 семантически эквивалентные category/subcategory.
-  - Старые отсутствующие товары: 146 fallback-редиректов только в релевантную категорию или подкатегорию; ни один fuzzy product candidate не повышен до HIGH.
-- `REVIEW` action: 590.
-  - MegaGroup navigation aliases: 552.
-  - Похожие product candidates без достаточного доказательства идентичности: 22.
-  - Pagination/canonical variants: 16.
-- `NO_MATCH` confidence: 51.
-  - Из них 34 рекомендованы как 410, 1 как 404, 16 pagination variants оставлены REVIEW до решения query/path policy.
-- Итоговые действия: 285 × 301, 590 × REVIEW, 34 × 410, 1 × 404.
-- Один дублированный старый артикул `0565` используется двумя различными товарами; оба намеренно не получили EXACT и отправлены в релевантную category fallback.
+- Повторный crawl старых 910 и новых 747 URL не выполнялся. Рабочей основой были CSV из commit `8ec0b42dd2e5a550dced0ad07448b8c93fee3936`.
+- 910 старых URL сведены к 342 уникальным содержательным сущностям: 1 главная, 14 info, 50 category и 277 product. Отдельные решения не требуются для 552 legacy navigation aliases и 16 pagination URL.
+- Все 552 alias URL наследуют решение фактической старой цели из `current_location`; все 16 pagination URL наследуют решение базовой категории из `canonical`.
+- Для 22 товаров из REVIEW использовались article/model, нормализованное название, тип, размер/объём, фасовка, материал/цвет и категория. Итог: 10 EXACT product, 4 HIGH product и 8 HIGH category fallback. Конфликтующие fuzzy-кандидаты не использовались как товарные цели.
+- Для 23 ранее NO_MATCH товаров доказан наиболее узкий актуальный раздел того же назначения; они переведены в HIGH category fallback. Единственный старый товарный URL, уже отвечавший 404, оставлен 404.
+- `EXACT`: 313 (до focused review: 104).
+  - Главная: 1; info: 1; category: 17; product: 95; alias: 188; pagination: 11.
+- `HIGH`: 585 (до focused review: 181).
+  - Info: 2; category: 33; product: 181; alias: 364; pagination: 5.
+- `REVIEW`: 0 (до focused review: 574 confidence / 590 action, включая 16 NO_MATCH pagination rows).
+- `NO_MATCH`: 12 (до focused review: 51): 11 info без публичного эквивалента и 1 старый URL со статусом 404.
+- Итоговые действия: 898 × 301, 11 × 410 candidate, 1 × 404 candidate.
+- Один дублированный старый артикул `0565` используется двумя различными товарами; оба по-прежнему направлены только в релевантную category fallback.
 
 ## 10. Автоматическая валидация карты
 
-- Уникальных 301 target URL: 127.
-- Все 127 ответили прямым 200 при повторной проверке.
+- Изменены решения для 613 строк. Их 301-цели дедуплицированы до 138 URL и проверены targeted GET с отключённым автоматическим redirect; массовый recheck 747 новых URL не выполнялся.
+- Все 138 ответили прямым 200.
 - Target redirects/chains: 0.
 - Redirect loops: 0.
 - Invalid targets: 0.
@@ -142,21 +138,22 @@
 - Дублированные old paths: 0.
 - Повторно используемые target URL: 37 групп, 195 строк, максимум 17 старых URL на одну category target. Это ожидаемые category fallbacks, а не коллизии старых URL.
 - Blanket homepage redirect: отсутствует. На homepage направлена только старая homepage.
-- Query-bearing mapping не одобрен автоматически. Pagination variants остаются REVIEW.
+- Pagination variants не содержат query и наследуют доказанную цель своей явной canonical category; самостоятельными контентными сущностями они не считаются.
 
 ## 11. Артефакты
 
 - Полный old inventory: [`cloverspb-old-url-inventory.csv`](./cloverspb-old-url-inventory.csv), 910 data rows; SHA-256 `C667ACF5AB6FD25277888CA77C435411BB72F0F73CE9AEC24E2F3B1607F7FE12`.
 - Полный new inventory: [`cloverspb-new-url-inventory.csv`](./cloverspb-new-url-inventory.csv), 747 data rows; SHA-256 `CF207BC7216D613629BEC4AD628582390E3309225E37BDF3FB6030B6A501FCD9`.
 - Полная карта: [`cloverspb-redirect-map.csv`](./cloverspb-redirect-map.csv), 910 data rows.
-- Очередь ручной проверки и no-match: [`cloverspb-unmatched.csv`](./cloverspb-unmatched.csv), 625 data rows.
-- SHA-256 карты на момент генерации: `DEB7EBC95F8AA10023DDAB3E5A1E9C365531E253792E217B2FAEE694FEC18F26`.
-- SHA-256 unmatched на момент генерации: `F3BA17792028DBF2C1F5209E0A8E2E62EB7AD4E664DA7F6C6D160093FA20E210`.
-- 34 строки с `action=410` являются рекомендациями discovery, а не утверждёнными production decisions; каждая требует отдельного подтверждения permanent removal в decision log.
+- Оставшаяся очередь no-match: [`cloverspb-unmatched.csv`](./cloverspb-unmatched.csv), 12 data rows.
+- Сводка focused review: [`cloverspb-review-summary.md`](./cloverspb-review-summary.md).
+- SHA-256 карты после focused review: `4F0A590FB2864535342C8854A721DEDD3F9444FFE6080C2428AD4327B2C2E221`.
+- SHA-256 unmatched после focused review: `FC8BB2057A496E9780E2699DBE3688EBA519D4767F7135C05AB74CFE2E719BAC`.
+- 11 строк с `action=410` являются рекомендациями, а не утверждёнными production decisions; каждая требует отдельного подтверждения permanent removal либо решения о создании публичного контента.
 
 ## 12. Блокеры перед cutover
 
-1. Вручную закрыть 590 REVIEW entries или явно исключить технические aliases из production map.
+1. Принять 11 содержательных решений по info URL: утвердить 410 либо создать релевантную публичную страницу и заменить target.
 2. Получить Search Console, Яндекс Вебмастер, analytics/access-log inventory для приоритетных URL и query semantics.
 3. Подтвердить возможность менять A/TXT в текущей MegaGroup DNS-зоне либо спроектировать полный NS migration.
 4. До A-record cutover выпустить и установить отдельный сертификат для `cloverspb.ru` + `www.cloverspb.ru`, предпочтительно через DNS-01; без этого cutover запрещён.
@@ -174,4 +171,4 @@
 
 ## 14. Итог аудита
 
-Артефакты пригодны для review и последующей gated-реализации, но не для немедленного cutover. Текущее состояние production, DNS, nginx и SSL оставлено без изменений.
+Focused review закрыл все повторяющиеся alias/pagination решения и все товарные REVIEW/NO_MATCH без нерелевантных homepage fallback. Карта пригодна для следующего human decision gate по 11 info URL и последующей gated-реализации, но не для немедленного cutover. Текущее состояние production, DNS, nginx и SSL оставлено без изменений.
