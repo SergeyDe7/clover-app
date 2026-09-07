@@ -309,8 +309,9 @@ html.sf-catalog-lock .sf-main,
 }
 .sf-footer {
   width: min(var(--sf-page-max-width), calc(100% - var(--sf-page-gutter)));
-  margin: 0 auto 28px; padding-top: 18px; border-top: 1px solid rgba(28, 31, 28, 0.08); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; }
-.sf-footer-nav { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+  margin: 0 auto 28px; padding-top: 18px; border-top: 1px solid rgba(28, 31, 28, 0.08); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.sf-footer-primary { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; min-width: 0; }
+.sf-footer-nav { display: flex; flex-wrap: wrap; gap: 8px 14px; min-width: 0; }
 .sf-footer-link { text-decoration: none; color: #5a5e5a; font-weight: 600; }
 .sf-footer-link:hover, .sf-footer-link.is-active { color: #1c1f1c; }
 .sf-footer-copy { margin: 0; color: #6b6f6b; font-size: .92rem; }.sf-btn { appearance: none; border: 1px solid transparent; border-radius: 14px; padding: 12px 18px; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: transform .18s, background .18s; }
@@ -394,6 +395,16 @@ html.sf-catalog-lock .sf-main,
 .sf-aktsii-body h2 { margin: 0; font-size: 1.25rem; }
 .sf-aktsii-short { margin: 0; color: #3f4a3f; font-weight: 600; }
 .sf-aktsii-full p { margin: 0 0 8px; color: #3f4a3f; line-height: 1.45; }
+.sf-info-page { display: grid; gap: 18px; max-width: 860px; }
+.sf-info-body { background: #fff; border: 1px solid rgba(28, 31, 28, 0.08); border-radius: 20px; padding: 24px 22px; display: grid; gap: 14px; justify-items: start; }
+.sf-info-body h2 { margin: 6px 0 0; font-size: 1.15rem; }
+.sf-info-body p { margin: 0; color: #3f4a3f; line-height: 1.55; }
+.sf-info-lead { font-weight: 600; color: #1c1f1c !important; }
+.sf-info-list { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: #3f4a3f; line-height: 1.5; }
+.sf-info-link { margin-top: 4px; }
+.sf-footer-info { gap: 6px 16px; font-size: .92rem; width: 100%; }
+.sf-footer-info .sf-footer-link { font-weight: 500; color: #6b6f6b; overflow-wrap: anywhere; }
+
 .sf-section-foot { margin-top: 18px; }
 .sf-groups-section { margin-bottom: 36px; }
 .sf-group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }

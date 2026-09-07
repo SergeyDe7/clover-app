@@ -1,5 +1,6 @@
 import { PUBLIC_BASE_URL } from "../../config/urls.js";
 import { storefrontHref } from "./mode.js";
+import { findStorefrontInfoPage } from "./pages/infoPages.js";
 import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE } from "./siteCopy.js";
 
 export const STOREFRONT_SITE_NAME = "КЛЕВЕР";
@@ -134,6 +135,16 @@ export function storefrontRouteDocumentMeta(route) {
         "Акции и специальные предложения компании КЛЕВЕР для HoReCa. Актуальные информационные материалы на сайте clover-spb.ru.",
       path: "https://clover-spb.ru/aktsii",
     };
+  }
+  if (route.name === "info") {
+    const page = findStorefrontInfoPage(route.slug);
+    if (page) {
+      return {
+        title: `${page.title} | ${STOREFRONT_SITE_NAME}`,
+        description: page.description,
+        path: storefrontHref(route),
+      };
+    }
   }
   return {
     title: STOREFRONT_DEFAULT_TITLE,

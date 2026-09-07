@@ -1,0 +1,5 @@
+# Сгенерировано scripts/seo/generate-cloverspb-nginx-map.mjs — не редактировать вручную.
+# Источник: docs/seo-migration/cloverspb-production-map.csv
+"/registraciya" 1;
+"/registraciya/forgot_password" 1;
+"/registraciya/register" 1;

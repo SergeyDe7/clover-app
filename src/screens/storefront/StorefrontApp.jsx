@@ -33,6 +33,9 @@ const InstallAppPage = lazy(() =>
     default: m.InstallAppPage,
   }))
 );
+const InfoPage = lazy(() =>
+  import("./pages/InfoPage.jsx").then((m) => ({ default: m.InfoPage }))
+);
 
 export default function StorefrontApp() {
   const [route, setRoute] = useState(() =>
@@ -115,6 +118,9 @@ export default function StorefrontApp() {
   } else if (route.name === "install-app") {
     page = <InstallAppPage />;
     current = "home";
+  } else if (route.name === "info") {
+    page = <InfoPage slug={route.slug} />;
+    current = `info:${route.slug}`;
   } else {
     page = <HomePage />;
   }
