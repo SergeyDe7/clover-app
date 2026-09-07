@@ -394,6 +394,16 @@ html.sf-catalog-lock .sf-main,
 .sf-aktsii-body h2 { margin: 0; font-size: 1.25rem; }
 .sf-aktsii-short { margin: 0; color: #3f4a3f; font-weight: 600; }
 .sf-aktsii-full p { margin: 0 0 8px; color: #3f4a3f; line-height: 1.45; }
+.sf-info-page { display: grid; gap: 18px; max-width: 860px; }
+.sf-info-body { background: #fff; border: 1px solid rgba(28, 31, 28, 0.08); border-radius: 20px; padding: 24px 22px; display: grid; gap: 14px; justify-items: start; }
+.sf-info-body h2 { margin: 6px 0 0; font-size: 1.15rem; }
+.sf-info-body p { margin: 0; color: #3f4a3f; line-height: 1.55; }
+.sf-info-lead { font-weight: 600; color: #1c1f1c !important; }
+.sf-info-list { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: #3f4a3f; line-height: 1.5; }
+.sf-info-link { margin-top: 4px; }
+.sf-footer-info { gap: 6px 14px; font-size: .92rem; }
+.sf-footer-info .sf-footer-link { font-weight: 500; color: #6b6f6b; }
+
 .sf-section-foot { margin-top: 18px; }
 .sf-groups-section { margin-bottom: 36px; }
 .sf-group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }

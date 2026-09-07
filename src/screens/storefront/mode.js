@@ -1,4 +1,5 @@
 import { STORE_HOSTS, CABINET_PATH, isCabinetPath } from "../../config/urls.js";
+import { STOREFRONT_INFO_SLUGS } from "./pages/infoPages.js";
 
 const PREVIEW_PREFIX = "/vitrina";
 
@@ -59,6 +60,9 @@ export function parseStorefrontRoute(pathname = window.location.pathname) {
   if (parts[0] === "contacts") return { name: "contacts" };
   if (parts[0] === "aktsii") return { name: "aktsii" };
   if (parts[0] === "install-app") return { name: "install-app" };
+  if (parts.length === 1 && STOREFRONT_INFO_SLUGS.includes(parts[0])) {
+    return { name: "info", slug: parts[0] };
+  }
   return { name: "home" };
 }
 
@@ -89,6 +93,9 @@ export function storefrontHref(route) {
   if (route.name === "contacts") return `${prefix}/contacts`;
   if (route.name === "aktsii") return `${prefix}/aktsii`;
   if (route.name === "install-app") return `${prefix}/install-app`;
+  if (route.name === "info" && STOREFRONT_INFO_SLUGS.includes(route.slug)) {
+    return `${prefix}/${route.slug}`;
+  }
   return prefix || "/";
 }
 
