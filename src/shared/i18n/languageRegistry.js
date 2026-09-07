@@ -73,12 +73,22 @@ export function isSupportedPublicLocale(value) {
   return PUBLIC_LOCALE_CODES.includes(raw);
 }
 
-export function isLanguageEnabled(value) {
+export function isLanguageEnabled(value, enabledLanguages) {
   const internal = recognizedInternalCode(value);
   if (!internal) return false;
-  return LANGUAGE_REGISTRY[internal]?.alwaysEnabled === true;
+  if (LANGUAGE_REGISTRY[internal]?.alwaysEnabled === true) return true;
+  if (!Array.isArray(enabledLanguages)) return false;
+  return enabledLanguages.some((code) => recognizedInternalCode(code) === internal);
 }
 
-export function getEnabledLocales() {
-  return [DEFAULT_LOCALE];
+export function getEnabledLocales(enabledLanguages) {
+  const enabled = [DEFAULT_LOCALE];
+  if (!Array.isArray(enabledLanguages)) return enabled;
+  for (const code of enabledLanguages) {
+    const internal = recognizedInternalCode(code);
+    if (!internal) continue;
+    const publicCode = INTERNAL_TO_PUBLIC[internal] || DEFAULT_LOCALE;
+    if (!enabled.includes(publicCode)) enabled.push(publicCode);
+  }
+  return enabled;
 }

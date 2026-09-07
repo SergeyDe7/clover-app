@@ -25,6 +25,13 @@ assert.equal(staffHasFeature(manager, "more"), true);
 assert.equal(staffHasFeature(manager, "backup"), false);
 assert.equal(staffHasFeature({ role: "admin" }, "storefront"), true);
 assert.equal(staffHasFeature({ role: "manager" }, "storefront"), false);
+assert.equal(staffHasFeature({ role: "admin" }, "languages"), true);
+assert.equal(staffHasFeature({ role: "manager" }, "languages"), false);
+assert.equal(
+  staffHasFeature({ role: "manager", permissions: { fullAccess: true } }, "languages"),
+  false
+);
+assert.equal(STAFF_FEATURE_IDS.includes("languages"), false);
 
 const legacyFull = parseStaffPermissions({});
 assert.equal(legacyFull.fullAccess, true);
