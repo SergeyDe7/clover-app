@@ -81,6 +81,8 @@ assert.doesNotMatch(seo, /noindex/i);
 assert.match(app, /InfoPage/);
 assert.match(app, /route\.name === "info"/);
 assert.match(footer, /STOREFRONT_INFO_PAGES/);
+assert.match(footer, /sf-footer-primary/);
+assert.match(footer, /sf-footer-info/);
 assert.match(page, /<h1>\{page\.heading\}<\/h1>/);
 
 for (const [slug] of REQUIRED) {
