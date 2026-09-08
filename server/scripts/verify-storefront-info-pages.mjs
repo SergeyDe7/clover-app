@@ -74,7 +74,7 @@ const appJsx = readFileSync(path.join(projectRoot, "src/App.jsx"), "utf8");
 
 assert.match(mode, /STOREFRONT_INFO_SLUGS/);
 assert.match(mode, /name: "info"/);
-assert.match(seo, /findStorefrontInfoPage/);
+assert.match(seo, /resolveStorefrontInfoPage/);
 assert.match(seo, /route\.name === "info"/);
 assert.match(seo, /https:\/\/clover-spb\.ru\/aktsii/);
 assert.doesNotMatch(seo, /noindex/i);

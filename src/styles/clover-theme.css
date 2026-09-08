@@ -8205,6 +8205,93 @@ html.clover-cart-open body {
   line-height: 1.45;
 }
 
+.storefront-info-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.storefront-info-nav {
+  display: grid;
+  gap: 6px;
+}
+
+.storefront-info-nav-btn {
+  width: 100%;
+  text-align: left;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid rgba(40, 60, 40, 0.12);
+  border-radius: 10px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+}
+
+.storefront-info-nav-btn.is-active {
+  border-color: rgba(86, 156, 80, 0.55);
+  background: #eef6ec;
+  font-weight: 600;
+}
+
+.storefront-info-editor {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.storefront-info-url {
+  margin: 0;
+  color: var(--muted, #5b675c);
+  font-size: 0.92rem;
+}
+
+.storefront-info-url code {
+  display: inline-block;
+  margin-top: 2px;
+}
+
+.storefront-info-legal-warning {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(176, 124, 40, 0.35);
+  border-radius: 12px;
+  background: #fff7e8;
+  color: #5c4a1f;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.storefront-info-blocks {
+  display: grid;
+  gap: 10px;
+}
+
+.storefront-info-block {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(40, 60, 40, 0.12);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.storefront-info-block-toolbar,
+.storefront-info-block-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+@media (max-width: 820px) {
+  .storefront-info-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .storefront-hero-slide-list {
   display: grid;
   gap: 10px;

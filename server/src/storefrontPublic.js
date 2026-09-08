@@ -57,6 +57,7 @@ import {
   listHomePromotions,
   normalizeStorefrontPromotions,
 } from "../../src/shared/storefrontPromotions.js";
+import { normalizeStorefrontInfoPages } from "../../src/shared/storefrontInfoPages.js";
 
 const STOREFRONT_GUEST_EMAIL = "storefront-guest@clover.local";
 
@@ -110,6 +111,7 @@ export function getStorefrontSettings(settingsInput) {
     storefrontContactMapImageUrl: normalizeStorefrontMapImageUrl(
       settings.storefrontContactMapImageUrl
     ),
+    storefrontInfoPages: normalizeStorefrontInfoPages(settings.storefrontInfoPages),
     storefrontOneCClientId: String(settings.storefrontOneCClientId || "").trim(),
     storefrontOneCClientName:
       String(settings.storefrontOneCClientName || "").trim() ||
@@ -245,6 +247,7 @@ export const STOREFRONT_SETTING_KEYS = [
   "storefrontContactNote",
   "storefrontContactMapsUrl",
   "storefrontContactMapImageUrl",
+  "storefrontInfoPages",
   "storefrontOneCClientId",
   "storefrontOneCClientName",
 ];
@@ -328,6 +331,12 @@ export function mergeStorefrontSettings(baseSettings, patch = {}) {
       incoming.storefrontContactMapImageUrl ??
         current.storefrontContactMapImageUrl ??
         ""
+    ),
+    storefrontInfoPages: normalizeStorefrontInfoPages(
+      incoming.storefrontInfoPages !== undefined
+        ? incoming.storefrontInfoPages
+        : current.storefrontInfoPages,
+      { previous: current.storefrontInfoPages }
     ),
     storefrontOneCClientId: String(
       incoming.storefrontOneCClientId ?? current.storefrontOneCClientId ?? ""
@@ -673,6 +682,7 @@ export function buildPublicSite(settingsInput, now = new Date()) {
     contactNote: settings.storefrontContactNote || "",
     contactMapsUrl: settings.storefrontContactMapsUrl || "",
     contactMapImageUrl: settings.storefrontContactMapImageUrl || "",
+    infoPages: settings.storefrontInfoPages,
   };
 }
 

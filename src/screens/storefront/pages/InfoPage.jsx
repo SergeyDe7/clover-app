@@ -1,6 +1,5 @@
 import { storefrontHref } from "../mode.js";
-import { STOREFRONT_INFO_CONTENT } from "./infoPageContent.js";
-import { findStorefrontInfoPage } from "./infoPages.js";
+import { resolveStorefrontInfoPage } from "../../../shared/storefrontInfoPages.js";
 
 function go(route) {
   window.history.pushState({}, "", storefrontHref(route));
@@ -40,10 +39,9 @@ function Block({ block, index }) {
   return <p>{block.text}</p>;
 }
 
-export function InfoPage({ slug }) {
-  const page = findStorefrontInfoPage(slug);
-  const blocks = page ? STOREFRONT_INFO_CONTENT[page.slug] : null;
-  if (!page || !blocks) return null;
+export function InfoPage({ slug, infoPages }) {
+  const page = resolveStorefrontInfoPage(slug, infoPages);
+  if (!page || !page.blocks?.length) return null;
 
   return (
     <div className="sf-info-page">
@@ -51,7 +49,7 @@ export function InfoPage({ slug }) {
         <h1>{page.heading}</h1>
       </header>
       <div className="sf-info-body">
-        {blocks.map((block, index) => (
+        {page.blocks.map((block, index) => (
           <Block key={`${page.slug}-${index}`} block={block} index={index} />
         ))}
       </div>

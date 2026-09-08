@@ -1,7 +1,10 @@
 import { storefrontHref } from "../mode.js";
-import { STOREFRONT_INFO_PAGES } from "../pages/infoPages.js";
+import {
+  STOREFRONT_INFO_PAGES,
+  resolveStorefrontInfoPage,
+} from "../../../shared/storefrontInfoPages.js";
 
-export function StoreFooter({ current }) {
+export function StoreFooter({ current, infoPages }) {
   function go(route) {
     window.history.pushState({}, "", storefrontHref(route));
     window.dispatchEvent(new PopStateEvent("popstate"));
@@ -27,13 +30,14 @@ export function StoreFooter({ current }) {
         <p className="sf-footer-copy">© КЛЕВЕР</p>
       </div>
       <nav className="sf-footer-nav sf-footer-info" aria-label="Информация">
-        {STOREFRONT_INFO_PAGES.map((page) =>
-          link(
+        {STOREFRONT_INFO_PAGES.map((page) => {
+          const resolved = resolveStorefrontInfoPage(page.slug, infoPages);
+          return link(
             { name: "info", slug: page.slug },
-            page.heading,
+            resolved?.heading || page.heading,
             `info:${page.slug}`
-          )
-        )}
+          );
+        })}
       </nav>
     </footer>
   );

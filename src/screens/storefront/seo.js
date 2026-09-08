@@ -1,6 +1,9 @@
 import { PUBLIC_BASE_URL } from "../../config/urls.js";
 import { storefrontHref } from "./mode.js";
-import { findStorefrontInfoPage } from "./pages/infoPages.js";
+import {
+  formatStorefrontDocumentTitle as formatInfoPageTitle,
+  resolveStorefrontInfoPage,
+} from "../../shared/storefrontInfoPages.js";
 import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE } from "./siteCopy.js";
 
 export const STOREFRONT_SITE_NAME = "КЛЕВЕР";
@@ -49,6 +52,12 @@ function upsertLink(rel, href) {
   el.setAttribute("href", href);
 }
 
+export function formatStorefrontDocumentTitle(title) {
+  return (
+    formatInfoPageTitle(title, STOREFRONT_SITE_NAME) || STOREFRONT_DEFAULT_TITLE
+  );
+}
+
 export function applyStorefrontDocumentMeta({
   title,
   description,
@@ -82,7 +91,7 @@ export function applyStorefrontDocumentMeta({
   upsertMetaByName("twitter:image", ogImage);
 }
 
-export function storefrontRouteDocumentMeta(route) {
+export function storefrontRouteDocumentMeta(route, site) {
   if (!route || route.name === "home") {
     return {
       title: STOREFRONT_DEFAULT_TITLE,
@@ -137,10 +146,10 @@ export function storefrontRouteDocumentMeta(route) {
     };
   }
   if (route.name === "info") {
-    const page = findStorefrontInfoPage(route.slug);
+    const page = resolveStorefrontInfoPage(route.slug, site?.infoPages);
     if (page) {
       return {
-        title: `${page.title} | ${STOREFRONT_SITE_NAME}`,
+        title: formatStorefrontDocumentTitle(page.title),
         description: page.description,
         path: storefrontHref(route),
       };
