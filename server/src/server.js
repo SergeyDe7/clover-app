@@ -625,11 +625,6 @@ function sanitizeClientLinkForClient(link = {}) {
   return out;
 }
 
-/** Alias для совместимости с PCM-вызовами. */
-function publicClientLinkForClient(link = {}) {
-  return sanitizeClientLinkForClient(link);
-}
-
 function sanitizeOrderItemForClient(item = {}) {
   if (!item || typeof item !== "object") return item;
   const {

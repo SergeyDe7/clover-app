@@ -6999,7 +6999,7 @@ export function formatDateTime(value) {
  */
 export function glueProductNameUnits(name) {
   return String(name || "").replace(
-    /(\d+(?:[.,]\d+)?)(\s*)(мл|кг|мм|см|шт|л|г)(?=$|[\s,.;:!?…)\]\}])/gi,
+    /(\d+(?:[.,]\d+)?)(\s*)(мл|кг|мм|см|шт|л|г)(?=$|[\s,.;:!?…)\]}])/gi,
     (_, num, space, unit) => (space ? `${num}\u00A0${unit}` : `${num}\u2060${unit}`)
   );
 }
