@@ -20,6 +20,7 @@ export {
 
 export {
   MISSING_TRANSLATION_FALLBACK_RU,
+  createLocalizationRuntime,
   translate,
 } from "./translationRuntime.js";
 
