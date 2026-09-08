@@ -83,6 +83,7 @@ export const DEFAULT_SETTINGS = {
   storefrontContactNote: "",
   storefrontContactMapsUrl: "",
   storefrontContactMapImageUrl: "",
+  storefrontInfoPages: {},
   storefrontOneCClientId: "",
   storefrontOneCClientName: "Интернет магазин Clover",
   /** Номенклатура 1С для платной доставки СПб (позиция «Доставка» 500 ₽). */

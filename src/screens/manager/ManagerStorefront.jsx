@@ -8,6 +8,11 @@ import {
   clonePromotions,
   promotionsKey,
 } from "./ManagerStorefrontPromotions";
+import { ManagerStorefrontInfoPages } from "./ManagerStorefrontInfoPages";
+import {
+  cloneStorefrontInfoPages,
+  storefrontInfoPagesKey,
+} from "../../shared/storefrontInfoPages.js";
 import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE, STOREFRONT_DEFAULT_HERO_SLIDES, STOREFRONT_DEFAULT_HERO_INTERVAL_SEC, STOREFRONT_MAX_HERO_SLIDES } from "../storefront/siteCopy.js";
 import { normalizeYandexMapsUrl } from "../../shared/yandexMaps.js";
 
@@ -96,6 +101,7 @@ export function ManagerStorefront({
     storefrontContactNote: settings?.storefrontContactNote || "",
     storefrontContactMapsUrl: settings?.storefrontContactMapsUrl || "",
     storefrontContactMapImageUrl: settings?.storefrontContactMapImageUrl || "",
+    storefrontInfoPages: cloneStorefrontInfoPages(settings?.storefrontInfoPages),
     storefrontOneCClientId: settings?.storefrontOneCClientId || "",
     storefrontOneCClientName:
       settings?.storefrontOneCClientName || "Интернет магазин Clover",
@@ -128,6 +134,7 @@ export function ManagerStorefront({
         storefrontContactNote: settings?.storefrontContactNote || "",
         storefrontContactMapsUrl: settings?.storefrontContactMapsUrl || "",
         storefrontContactMapImageUrl: settings?.storefrontContactMapImageUrl || "",
+        storefrontInfoPages: cloneStorefrontInfoPages(settings?.storefrontInfoPages),
         storefrontOneCClientId: settings?.storefrontOneCClientId || "",
         storefrontOneCClientName:
           settings?.storefrontOneCClientName || "Интернет магазин Clover",
@@ -151,6 +158,8 @@ export function ManagerStorefront({
         prev.storefrontContactNote === next.storefrontContactNote &&
         prev.storefrontContactMapsUrl === next.storefrontContactMapsUrl &&
         prev.storefrontContactMapImageUrl === next.storefrontContactMapImageUrl &&
+        storefrontInfoPagesKey(prev.storefrontInfoPages) ===
+          storefrontInfoPagesKey(next.storefrontInfoPages) &&
         prev.storefrontOneCClientId === next.storefrontOneCClientId &&
         prev.storefrontOneCClientName === next.storefrontOneCClientName;
       return same ? prev : next;
@@ -173,6 +182,7 @@ export function ManagerStorefront({
     settings?.storefrontContactNote,
     settings?.storefrontContactMapsUrl,
     settings?.storefrontContactMapImageUrl,
+    settings?.storefrontInfoPages,
     settings?.storefrontOneCClientId,
     settings?.storefrontOneCClientName,
   ]);
@@ -275,6 +285,7 @@ export function ManagerStorefront({
         storefrontHeroSlides: cloneHeroSlides(draft.storefrontHeroSlides),
         storefrontHeroIntervalSec: Number(draft.storefrontHeroIntervalSec) || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
         storefrontPromotions: draftPromos,
+        storefrontInfoPages: cloneStorefrontInfoPages(draft.storefrontInfoPages),
       };
       const result = await api.saveStorefrontSettings(payload);
       const next = result.settings || { ...settings, ...payload };
@@ -964,6 +975,11 @@ export function ManagerStorefront({
           </div>
         </div>
       </div>
+
+      <ManagerStorefrontInfoPages
+        pages={draft.storefrontInfoPages}
+        onChange={(next) => setField("storefrontInfoPages", next)}
+      />
 
       <div className="form-actions" style={{ marginTop: 16 }}>
         <button

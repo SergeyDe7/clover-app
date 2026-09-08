@@ -4,6 +4,7 @@ import { StoreFooter } from "./components/StoreFooter.jsx";
 import { parseStorefrontRoute } from "./mode.js";
 import { isCabinetPath } from "../../config/urls.js";
 import { HomePage } from "./pages/HomePage.jsx";
+import { loadPublicSite, peekPublicSite } from "./publicSite.js";
 import {
   applyStorefrontDocumentMeta,
   storefrontRouteDocumentMeta,
@@ -41,6 +42,7 @@ export default function StorefrontApp() {
   const [route, setRoute] = useState(() =>
     parseStorefrontRoute(window.location.pathname)
   );
+  const [site, setSite] = useState(() => peekPublicSite());
 
   useEffect(() => {
     const onPop = () =>
@@ -85,9 +87,23 @@ export default function StorefrontApp() {
   }, [route.name]);
 
   useEffect(() => {
+    let cancelled = false;
+    loadPublicSite()
+      .then((next) => {
+        if (!cancelled) setSite(next);
+      })
+      .catch(() => {
+        if (!cancelled) setSite(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (route.name === "product") return;
-    applyStorefrontDocumentMeta(storefrontRouteDocumentMeta(route));
-  }, [route]);
+    applyStorefrontDocumentMeta(storefrontRouteDocumentMeta(route, site));
+  }, [route, site]);
 
   let page;
   let current = "home";
@@ -119,7 +135,7 @@ export default function StorefrontApp() {
     page = <InstallAppPage />;
     current = "home";
   } else if (route.name === "info") {
-    page = <InfoPage slug={route.slug} />;
+    page = <InfoPage slug={route.slug} infoPages={site?.infoPages} />;
     current = `info:${route.slug}`;
   } else {
     page = <HomePage />;
@@ -131,7 +147,9 @@ export default function StorefrontApp() {
       <main className="sf-main">
         <Suspense fallback={null}>{page}</Suspense>
       </main>
-      {route.name === "catalog" ? null : <StoreFooter current={current} />}
+      {route.name === "catalog" ? null : (
+        <StoreFooter current={current} infoPages={site?.infoPages} />
+      )}
     </div>
   );
 }
