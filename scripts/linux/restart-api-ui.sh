@@ -12,38 +12,14 @@ MAIN_JS="$(grep -o 'src="/assets/index-[^"]*\.js"' dist/index.html | head -1 || 
 echo "UI build tag: ${BUILD_TAG:-unknown}"
 echo "UI bundle: ${MAIN_JS:-unknown}"
 
-echo "Stopping API/UI processes (all duplicates, not only port holders)..."
-# Процессы стартуют как `node src/server.js` (cwd=server) — полный путь в cmdline часто нет.
-pkill -f '/opt/clover/clover-app/server/src/server.js' 2>/dev/null || true
-pkill -f '/usr/bin/node src/server.js' 2>/dev/null || true
-pkill -f 'node src/server.js' 2>/dev/null || true
-pkill -f 'vite preview --host 0.0.0.0 --port 5273' 2>/dev/null || true
-pkill -f 'npm run preview -- --host 0.0.0.0 --port 5273' 2>/dev/null || true
-sleep 1
-for port in 4100 5273; do
-  pids="$(ss -tlnp "sport = :$port" 2>/dev/null | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u || true)"
-  for pid in $pids; do
-    echo "kill -9 $pid (port $port)"
-    kill -9 "$pid" 2>/dev/null || true
-  done
-done
-# Добиваем осиротевшие API без listen (иначе копятся десятки node src/server.js).
-sleep 1
-leftover="$(pgrep -f 'node src/server.js' || true)"
-if [[ -n "${leftover:-}" ]]; then
-  echo "kill leftover API pids: $leftover"
-  # shellcheck disable=SC2086
-  kill -9 $leftover 2>/dev/null || true
-fi
-sleep 1
-ss -tlnp | grep -E ':4100|:5273' && echo "WARN: ports still busy" >&2 || echo "ports free"
-
-start_manual() {
-  echo "Starting API/UI manually..."
-  cd "$ROOT/server"
-  nohup /usr/bin/node src/server.js >> /tmp/clover-api.log 2>&1 &
-  cd "$ROOT"
-  nohup /usr/bin/npm run preview -- --host 0.0.0.0 --port 5273 >> /tmp/clover-ui.log 2>&1 &
+require_loaded_unit() {
+  local unit="$1"
+  local load
+  load="$(systemctl show "$unit" --no-pager -p LoadState 2>/dev/null || true)"
+  if [[ "$load" != "LoadState=loaded" ]]; then
+    echo "ERROR: systemd unit $unit is not loaded (${load:-LoadState=unavailable}); refusing unmanaged process start" >&2
+    exit 1
+  fi
 }
 
 wait_for_health() {
@@ -58,20 +34,33 @@ wait_for_health() {
   return 1
 }
 
-if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files clover-api.service 2>/dev/null | grep -q clover-api; then
-  if sudo -n systemctl restart clover-api clover-ui 2>/dev/null; then
-    :
-  elif sudo systemctl restart clover-api clover-ui 2>/dev/null; then
-    :
-  elif ! systemctl is-active --quiet clover-ui 2>/dev/null; then
-    echo "systemd restart unavailable — starting manually"
-    start_manual
-  fi
-else
-  start_manual
+if ! command -v systemctl >/dev/null 2>&1; then
+  echo "ERROR: systemctl is required; refusing unmanaged process start" >&2
+  exit 1
+fi
+
+require_loaded_unit clover-api.service
+require_loaded_unit clover-ui.service
+
+echo "Restarting clover-api.service and clover-ui.service via systemd..."
+if ! sudo -n /bin/systemctl restart clover-api clover-ui; then
+  echo "ERROR: non-interactive systemd restart of clover-api.service clover-ui.service failed" >&2
+  exit 1
+fi
+
+if ! systemctl is-active --quiet clover-api.service; then
+  echo "ERROR: clover-api.service is not active after restart" >&2
+  exit 1
+fi
+if ! systemctl is-active --quiet clover-ui.service; then
+  echo "ERROR: clover-ui.service is not active after restart" >&2
+  exit 1
 fi
 
 wait_for_health
+
+echo "Listener diagnostics (no process termination):"
+ss -tlnp | grep -E ':4100|:5273' || echo "WARN: expected ports 4100/5273 not listed" >&2
 
 LIVE_TAG="$(curl -fsS http://127.0.0.1:5273/ | grep -o 'name="clover-ui-build" content="[^"]*"' | sed 's/.*content="//;s/"$//' || true)"
 LIVE_JS="$(curl -fsS http://127.0.0.1:5273/ | grep -o 'src="/assets/index-[^"]*\.js"' | head -1 || true)"
