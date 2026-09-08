@@ -17,6 +17,7 @@ export const MANAGER_TABS = [
   ["acts", "Акты сверок"],
   ["exchange", "1С"],
   ["price-list", "Прайс"],
+  ["languages", "Языки и переводы"],
   ["more", "Ещё"],
 ];
 
@@ -46,7 +47,9 @@ export const STAFF_FEATURE_IDS = STAFF_FEATURE_OPTIONS.map(([id]) => id);
 export function staffHasFeature(authUser, featureId) {
   if (!authUser) return false;
   const id = String(featureId || "");
-  if (id === "storefront" || id === "price-list") return authUser.role === "admin";
+  if (id === "storefront" || id === "price-list" || id === "languages") {
+    return authUser.role === "admin";
+  }
   if (authUser.role === "admin") return true;
   const permissions = authUser.permissions;
   if (!permissions || permissions.fullAccess) return true;
@@ -6996,7 +6999,7 @@ export function formatDateTime(value) {
  */
 export function glueProductNameUnits(name) {
   return String(name || "").replace(
-    /(\d+(?:[.,]\d+)?)(\s*)(мл|кг|мм|см|шт|л|г)(?=$|[\s,.;:!?…)\]\}])/gi,
+    /(\d+(?:[.,]\d+)?)(\s*)(мл|кг|мм|см|шт|л|г)(?=$|[\s,.;:!?…)\]}])/gi,
     (_, num, space, unit) => (space ? `${num}\u00A0${unit}` : `${num}\u2060${unit}`)
   );
 }

@@ -105,6 +105,13 @@ import {
   assertClientOrderOwnership,
 } from "./orderClientEdit.js";
 import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
+import {
+  completenessByLanguage,
+  listWorkspaceRows,
+  readLocalizationSettings,
+  writeLocalizationSettings,
+} from "./localizationStore.js";
+import { localeChoices } from "../../src/shared/i18n/localizationSettings.js";
 import { publicClientSettings } from "./clientSettings.js";
 import {
   listClientAccessEntries,
@@ -616,11 +623,6 @@ function sanitizeClientLinkForClient(link = {}) {
     out[key] = value;
   }
   return out;
-}
-
-/** Alias для совместимости с PCM-вызовами. */
-function publicClientLinkForClient(link = {}) {
-  return sanitizeClientLinkForClient(link);
 }
 
 function sanitizeOrderItemForClient(item = {}) {
@@ -4632,6 +4634,57 @@ app.put(
       ok: true,
       settings: next,
       storefront: getStorefrontSettings(next),
+    });
+  }
+);
+
+app.get(
+  "/api/admin/localization",
+  authRequired,
+  roleRequired("admin"),
+  (req, res) => {
+    const settings = readLocalizationSettings();
+    res.json({
+      settings,
+      completeness: completenessByLanguage(),
+      locales: localeChoices(),
+    });
+  }
+);
+
+app.put(
+  "/api/admin/localization",
+  authRequired,
+  roleRequired("admin"),
+  (req, res) => {
+    const result = writeLocalizationSettings(req.body || {}, req.user?.email || req.user?.id || "");
+    auditFromRequest(req, "localization.settings.save", {
+      enabledLanguages: result.settings.enabledLanguages,
+      rejected: result.rejected,
+      catalogVersion: result.settings.catalogVersion,
+    });
+    res.json({
+      ok: true,
+      settings: result.settings,
+      rejected: result.rejected,
+      completeness: result.completeness,
+    });
+  }
+);
+
+app.get(
+  "/api/admin/translations",
+  authRequired,
+  roleRequired("admin"),
+  (req, res) => {
+    res.json({
+      rows: listWorkspaceRows({
+        view: req.query?.view,
+        query: req.query?.query,
+        language: req.query?.language,
+        untranslatedOnly:
+          req.query?.untranslatedOnly === "1" || req.query?.untranslatedOnly === "true",
+      }),
     });
   }
 );

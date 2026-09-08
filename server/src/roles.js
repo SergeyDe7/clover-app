@@ -103,7 +103,7 @@ export function staffPermissionsPayload(input = {}) {
 export function staffHasFeature(userOrPermissions, featureId) {
   const role = userOrPermissions?.role;
   const id = String(featureId || "").trim();
-  if (id === "storefront") {
+  if (id === "storefront" || id === "languages") {
     return normalizeRole(role) === ROLES.ADMIN;
   }
   if (normalizeRole(role) === ROLES.ADMIN) return true;

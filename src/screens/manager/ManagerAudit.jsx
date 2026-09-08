@@ -9,6 +9,7 @@ export const AUDIT_ACTION_LABELS = {
   "orders.save": "Сохранены заказы",
   "products.save": "Изменён каталог",
   "settings.save": "Изменены настройки",
+  "localization.settings.save": "Сохранены языки и переводы",
   "manager.notification": "Отправлено уведомление менеджеру",
   "manager.notification.read": "Уведомление отмечено прочитанным",
   "manager.notification.read_all": "Все уведомления отмечены прочитанными",

@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { staffHasFeature } from "../../src/shared/appHelpers.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const managerDir = path.join(root, "src/screens/manager");
@@ -19,6 +20,8 @@ const MAIN_TAB_TO_PANEL = {
   clients: "ManagerClients",
   acts: "ManagerReconciliation",
   exchange: "ManagerExchange",
+  "price-list": "ManagerPriceList",
+  languages: "ManagerLanguages",
   more: null,
 };
 
@@ -37,6 +40,8 @@ const PANEL_FILES = {
   ManagerReconciliation: "ManagerReconciliation.jsx",
   ManagerAccessVault: "ManagerAccessVault.jsx",
   ManagerStorefront: "ManagerStorefront.jsx",
+  ManagerPriceList: "ManagerPriceList.jsx",
+  ManagerLanguages: "ManagerLanguages.jsx",
   ManagerSettings: "ManagerSettings.jsx",
   ManagerBackup: "ManagerBackup.jsx",
   ManagerAudit: "ManagerAudit.jsx",
@@ -96,8 +101,8 @@ assert.ok(
 
 assert.deepEqual(
   mainTabs,
-  ["orders", "products", "storefront", "clients", "acts", "exchange", "more"],
-  "Порядок главного меню: Заказы, Товары, Витрина, Клиенты, Акты сверок, 1С, Ещё"
+  ["orders", "products", "storefront", "clients", "acts", "exchange", "price-list", "languages", "more"],
+  "Порядок главного меню: Заказы, Товары, Витрина, Клиенты, Акты сверок, 1С, Прайс, Языки и переводы, Ещё"
 );
 
 assert.equal(
@@ -128,6 +133,51 @@ assert.ok(
 assert.ok(
   screenSource.includes("allowedMainTabs"),
   "ManagerScreen не строит список доступных вкладок"
+);
+
+const ADMIN_ONLY_MAIN_TABS = ["storefront", "price-list", "languages"];
+for (const id of ADMIN_ONLY_MAIN_TABS) {
+  assert.equal(
+    staffHasFeature({ role: "admin" }, id),
+    true,
+    `admin должен видеть ${id}`
+  );
+  assert.equal(
+    staffHasFeature(
+      {
+        role: "manager",
+        permissions: { fullAccess: true },
+      },
+      id
+    ),
+    false,
+    `manager fullAccess не должен видеть admin-only ${id}`
+  );
+  assert.equal(
+    staffHasFeature(
+      {
+        role: "manager",
+        permissions: {
+          tabs: [id],
+          fullAccess: false,
+        },
+      },
+      id
+    ),
+    false,
+    `manager не должен получить admin-only ${id} через explicit tabs`
+  );
+}
+assert.equal(
+  staffHasFeature(
+    {
+      role: "manager",
+      permissions: { fullAccess: true },
+    },
+    "orders"
+  ),
+  true,
+  "manager fullAccess должен сохранять доступ к orders"
 );
 assert.ok(
   screenSource.includes("ManagerNotificationBell"),
@@ -179,7 +229,8 @@ assert.ok(
 const appSource = readFileSync(path.join(root, "src/App.jsx"), "utf8");
 assert.ok(
   appSource.includes('from "./screens/manager/ManagerScreen"') ||
-    appSource.includes('from "./screens/manager"'),
+    appSource.includes('from "./screens/manager"') ||
+    appSource.includes('import("./screens/manager/ManagerScreen")'),
   "App.jsx не подключает ManagerScreen"
 );
 

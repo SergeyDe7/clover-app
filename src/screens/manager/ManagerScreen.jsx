@@ -23,6 +23,7 @@ import { ManagerProducts } from "./ManagerProducts";
 import { ManagerSettings } from "./ManagerSettings";
 import { ManagerStorefront } from "./ManagerStorefront";
 import { ManagerPriceList } from "./ManagerPriceList";
+import { ManagerLanguages } from "./ManagerLanguages";
 import { ManagerBackup } from "./ManagerBackup";
 import { ManagerAudit } from "./ManagerAudit";
 import { managerNotificationTab, ManagerNotificationBell, parseManagerNotification, ManagerOrderSummaryLines } from "./ManagerNotifications";
@@ -343,6 +344,9 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
       )}
       {tab === "price-list" && staffHasFeature(authUser, "price-list") && (
         <ManagerPriceList settings={settings} />
+      )}
+      {tab === "languages" && staffHasFeature(authUser, "languages") && (
+        <ManagerLanguages />
       )}
       {tab === "more" && staffHasFeature(authUser, "more") && (
         <section>

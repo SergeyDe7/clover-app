@@ -425,46 +425,6 @@ function groupSortKey(item) {
   };
 }
 
-function buildFamilyBlockAnchors(products = []) {
-  const anchors = new Map();
-  for (const item of products) {
-    const meta = groupSortKey(item);
-    if (meta.mode !== "family") continue;
-    const current = anchors.get(meta.block);
-    if (meta.kind === 0) {
-      if (!current || meta.name.localeCompare(current, "ru", { numeric: true }) < 0) {
-        anchors.set(meta.block, meta.name);
-      }
-    } else if (!current) {
-      anchors.set(meta.block, meta.name);
-    }
-  }
-  return anchors;
-}
-
-function compareGrouped(a, b, anchors = new Map()) {
-  const left = groupSortKey(a);
-  const right = groupSortKey(b);
-
-  const leftAnchor =
-    left.mode === "family" ? anchors.get(left.block) || left.name : left.name;
-  const rightAnchor =
-    right.mode === "family" ? anchors.get(right.block) || right.name : right.name;
-
-  const anchorCmp = leftAnchor.localeCompare(rightAnchor, "ru", {
-    sensitivity: "base",
-    numeric: true,
-  });
-  if (anchorCmp) return anchorCmp;
-
-  if (left.mode === "family" && right.mode === "family" && left.block === right.block) {
-    if (left.kind !== right.kind) return left.kind - right.kind;
-    return left.name.localeCompare(right.name, "ru", { sensitivity: "base", numeric: true });
-  }
-
-  return left.name.localeCompare(right.name, "ru", { sensitivity: "base", numeric: true });
-}
-
 /**
  * Явные ссылки «(крышка арт. X)» → блок art:X (несколько баз + одна крышка без дублей).
  */

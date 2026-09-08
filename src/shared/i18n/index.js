@@ -22,3 +22,18 @@ export {
   MISSING_TRANSLATION_FALLBACK_RU,
   translate,
 } from "./translationRuntime.js";
+
+export {
+  COMPLETENESS_DOMAINS,
+  LOCALIZATION_SETTINGS_KEY,
+  TRANSLATION_WORKSPACE_VIEWS,
+  applyEnabledLanguages,
+  computeLanguageCompleteness,
+  emptyLocalizationSettings,
+  filterTranslationRows,
+  localeChoices,
+  namespaceToCompletenessDomain,
+  normalizeLocalizationSettings,
+  saveSettingsPreservingTranslations,
+  upsertManualTranslation,
+} from "./localizationSettings.js";

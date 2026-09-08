@@ -416,6 +416,28 @@ export const api = {
     });
   },
 
+  getLocalizationSettings() {
+    return request("/admin/localization");
+  },
+
+  saveLocalizationSettings(settings) {
+    return request("/admin/localization", {
+      method: "PUT",
+      body: settings || {},
+    });
+  },
+
+  getLocalizationTranslations(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.view) params.set("view", String(filters.view));
+    if (filters.query) params.set("query", String(filters.query));
+    if (filters.language) params.set("language", String(filters.language));
+    if (filters.untranslatedOnly) params.set("untranslatedOnly", "1");
+    const query = params.toString();
+    return request(`/admin/translations${query ? `?${query}` : ""}`);
+  },
+
+
   async downloadStorefrontPriceListPdf(markupPercent) {
     const token = getApiToken();
     const params = new URLSearchParams();
