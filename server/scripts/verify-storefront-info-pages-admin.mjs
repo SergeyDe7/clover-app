@@ -15,11 +15,13 @@ import {
   STOREFRONT_INFO_SLUGS,
   STOREFRONT_INFO_LIMITS,
   STOREFRONT_LEGAL_INFO_SLUGS,
+  applyEditorInfoPagesPatch,
   cloneStorefrontInfoPages,
   formatStorefrontDocumentTitle,
   normalizeStorefrontInfoBlock,
   normalizeStorefrontInfoPages,
   normalizeStorefrontInfoRoute,
+  readEditorStorefrontInfoPage,
   resolveStorefrontInfoPage,
   storefrontInfoPageUrl,
 } from "../../src/shared/storefrontInfoPages.js";
@@ -471,5 +473,80 @@ assert.match(contactsPage, /<h1>Контакты<\/h1>/);
 assert.doesNotMatch(contactsPage, /storefrontInfoPages/);
 assert.doesNotMatch(shared, /enabledLanguages|locale:|rtl/i);
 assert.doesNotMatch(shared, /dangerouslySetInnerHTML|innerHTML|eval\(|new Function/);
+
+// Edit-time draft must keep raw spaces; save/public still normalize.
+const headingDraft = applyEditorInfoPagesPatch({}, "about", {
+  heading: "Привет ",
+});
+assert.equal(
+  readEditorStorefrontInfoPage("about", headingDraft).heading,
+  "Привет "
+);
+const internalDraft = applyEditorInfoPagesPatch({}, "about", {
+  heading: "Привет  мир",
+  description: "Привет  мир",
+  blocks: [{ type: "p", text: "Привет  мир" }],
+});
+const internalView = readEditorStorefrontInfoPage("about", internalDraft);
+assert.equal(internalView.heading, "Привет  мир");
+assert.equal(internalView.description, "Привет  мир");
+assert.equal(internalView.blocks[0].text, "Привет  мир");
+
+const listDraft = applyEditorInfoPagesPatch({}, "about", {
+  blocks: [{ type: "list", items: ["Первое слово "] }],
+});
+assert.equal(
+  readEditorStorefrontInfoPage("about", listDraft).blocks[0].items[0],
+  "Первое слово "
+);
+const routeDraft = applyEditorInfoPagesPatch({}, "about", {
+  blocks: [{ type: "route", label: "Связаться ", route: { name: "contacts" } }],
+});
+assert.equal(
+  readEditorStorefrontInfoPage("about", routeDraft).blocks[0].label,
+  "Связаться "
+);
+
+const saved = cloneStorefrontInfoPages(
+  applyEditorInfoPagesPatch({}, "about", {
+    heading: "Текст страницы   ",
+    title: "Текст страницы   ",
+    description: "Текст страницы   ",
+    blocks: [
+      { type: "lead", text: "Текст страницы   " },
+      { type: "p", text: "Текст страницы   " },
+      { type: "h2", text: "Текст страницы   " },
+      { type: "list", items: ["Текст страницы   "] },
+      { type: "route", label: "Текст страницы   ", route: { name: "contacts" } },
+    ],
+  })
+);
+assert.equal(saved.about.heading, "Текст страницы");
+assert.equal(saved.about.title, "Текст страницы");
+assert.equal(saved.about.description, "Текст страницы");
+assert.equal(saved.about.blocks[0].text, "Текст страницы");
+assert.equal(saved.about.blocks[1].text, "Текст страницы");
+assert.equal(saved.about.blocks[2].text, "Текст страницы");
+assert.equal(saved.about.blocks[3].items[0], "Текст страницы");
+assert.equal(saved.about.blocks[4].label, "Текст страницы");
+
+const xssDraft = applyEditorInfoPagesPatch({}, "about", {
+  heading: "<script>alert(1)</script>",
+  blocks: [{ type: "p", text: "<img src=x onerror=alert(1)>" }],
+});
+const xssSaved = cloneStorefrontInfoPages(xssDraft);
+assert.equal(xssSaved.about.heading, "<script>alert(1)</script>");
+assert.equal(xssSaved.about.blocks[0].text, "<img src=x onerror=alert(1)>");
+assert.equal(
+  normalizeStorefrontInfoBlock({
+    type: "route",
+    label: "XSS",
+    route: "javascript:alert(1)",
+  }),
+  null
+);
+assert.match(editor, /applyEditorInfoPagesPatch/);
+assert.match(editor, /readEditorStorefrontInfoPage/);
+assert.doesNotMatch(editor, /cloneStorefrontInfoPages\(/);
 
 console.log("verify-storefront-info-pages-admin: ok");

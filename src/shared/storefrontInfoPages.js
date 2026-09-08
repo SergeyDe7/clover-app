@@ -196,3 +196,66 @@ export function resolveStorefrontInfoPage(slug, storedPages) {
       : null,
   };
 }
+
+function cloneEditorBlocks(blocks) {
+  if (!Array.isArray(blocks)) return null;
+  return blocks.map((block) => {
+    if (block?.type === "list") {
+      return {
+        type: "list",
+        items: Array.isArray(block.items) ? block.items.map((item) => String(item)) : [""],
+      };
+    }
+    if (block?.type === "route") {
+      return {
+        type: "route",
+        label: block.label == null ? "" : String(block.label),
+        route: { ...(block.route || { name: "contacts" }) },
+      };
+    }
+    return {
+      type: block?.type || "p",
+      text: block?.text == null ? "" : String(block.text),
+    };
+  });
+}
+
+/** Live admin draft: keep exact input, including trailing spaces. Do not trim. */
+export function readEditorStorefrontInfoPage(slug, pages) {
+  const fallback = resolveStorefrontInfoPage(slug);
+  if (!fallback) return null;
+  const raw =
+    pages && typeof pages === "object" && !Array.isArray(pages) ? pages[slug] : null;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {
+      heading: fallback.heading,
+      title: fallback.title,
+      description: fallback.description,
+      blocks: cloneEditorBlocks(fallback.blocks) || [],
+      updatedAt: fallback.updatedAt,
+    };
+  }
+  return {
+    heading: raw.heading == null ? fallback.heading : String(raw.heading),
+    title: raw.title == null ? fallback.title : String(raw.title),
+    description: raw.description == null ? fallback.description : String(raw.description),
+    blocks: cloneEditorBlocks(raw.blocks) || cloneEditorBlocks(fallback.blocks) || [],
+    updatedAt: raw.updatedAt || fallback.updatedAt,
+  };
+}
+
+export function applyEditorInfoPagesPatch(pages, slug, patch) {
+  const current =
+    pages && typeof pages === "object" && !Array.isArray(pages) ? { ...pages } : {};
+  const view = readEditorStorefrontInfoPage(slug, current);
+  const nextPage = { ...view, ...patch };
+  return {
+    ...current,
+    [slug]: {
+      heading: nextPage.heading,
+      title: nextPage.title,
+      description: nextPage.description,
+      blocks: nextPage.blocks,
+    },
+  };
+}

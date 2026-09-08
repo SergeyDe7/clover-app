@@ -1,10 +1,10 @@
 import { useState } from "react";
 import {
   STOREFRONT_INFO_PAGES,
-  cloneStorefrontInfoPages,
+  applyEditorInfoPagesPatch,
   isStorefrontLegalInfoSlug,
   normalizeStorefrontInfoRoute,
-  resolveStorefrontInfoPage,
+  readEditorStorefrontInfoPage,
   storefrontInfoPageUrl,
 } from "../../shared/storefrontInfoPages.js";
 
@@ -54,59 +54,16 @@ function emptyBlock(type) {
   return { type: "p", text: "" };
 }
 
-function clonePage(page) {
-  return {
-    heading: String(page?.heading || ""),
-    title: String(page?.title || ""),
-    description: String(page?.description || ""),
-    blocks: Array.isArray(page?.blocks)
-      ? page.blocks.map((block) => {
-          if (block?.type === "list") {
-            return {
-              type: "list",
-              items: Array.isArray(block.items) ? block.items.slice() : [""],
-            };
-          }
-          if (block?.type === "route") {
-            return {
-              type: "route",
-              label: String(block.label || ""),
-              route: { ...(block.route || { name: "contacts" }) },
-            };
-          }
-          return {
-            type: block?.type || "p",
-            text: String(block?.text || ""),
-          };
-        })
-      : [],
-    updatedAt: page?.updatedAt || null,
-  };
-}
-
 export function ManagerStorefrontInfoPages({ pages, onChange }) {
-  const stored = cloneStorefrontInfoPages(pages);
   const [selectedSlug, setSelectedSlug] = useState(STOREFRONT_INFO_PAGES[0].slug);
   const selected = STOREFRONT_INFO_PAGES.find((page) => page.slug === selectedSlug)
     || STOREFRONT_INFO_PAGES[0];
-  const view = clonePage(resolveStorefrontInfoPage(selected.slug, stored));
+  const view = readEditorStorefrontInfoPage(selected.slug, pages);
   const legal = isStorefrontLegalInfoSlug(selected.slug);
   const publicUrl = storefrontInfoPageUrl(selected.slug);
 
-  function writePage(nextPage) {
-    onChange({
-      ...stored,
-      [selected.slug]: {
-        heading: nextPage.heading,
-        title: nextPage.title,
-        description: nextPage.description,
-        blocks: nextPage.blocks,
-      },
-    });
-  }
-
   function patchPage(patch) {
-    writePage({ ...view, ...patch });
+    onChange(applyEditorInfoPagesPatch(pages, selected.slug, patch));
   }
 
   function patchBlock(index, patch) {
@@ -126,7 +83,8 @@ export function ManagerStorefrontInfoPages({ pages, onChange }) {
   }
 
   function resetSelected() {
-    const next = { ...stored };
+    const next =
+      pages && typeof pages === "object" && !Array.isArray(pages) ? { ...pages } : {};
     delete next[selected.slug];
     onChange(next);
   }
