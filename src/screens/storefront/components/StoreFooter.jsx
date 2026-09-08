@@ -24,12 +24,6 @@ export function StoreFooter({ current }) {
   return (
     <footer className="sf-footer">
       <div className="sf-footer-primary">
-        <nav className="sf-footer-nav" aria-label="Ссылки в подвале">
-          {link("home", "Главная", "home")}
-          {link({ name: "catalog" }, "Каталог", "catalog")}
-          {link({ name: "aktsii" }, "Акции", "aktsii")}
-          {link({ name: "contacts" }, "Контакты", "contacts")}
-        </nav>
         <p className="sf-footer-copy">© КЛЕВЕР</p>
       </div>
       <nav className="sf-footer-nav sf-footer-info" aria-label="Информация">
