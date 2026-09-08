@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import "./styles/clover-theme.css";
 import { AppModalHost } from "./shared/AppModal.jsx";
+import { LocalizationProvider } from "./shared/i18n/LocalizationProvider.jsx";
 import { shouldRenderStorefront } from "./screens/storefront/mode.js";
 
 // Витрина и ЛК — разные чанки: на витрине не тянем админку/клиентский кабинет.
@@ -29,7 +30,9 @@ function RootShell() {
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <RootShell />
+    <LocalizationProvider>
+      <RootShell />
+    </LocalizationProvider>
   </StrictMode>
 );
 
