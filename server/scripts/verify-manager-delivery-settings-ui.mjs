@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
+import { createI18nStubVitePlugin } from "./i18n-test-localization-stub.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const vite = await createServer({
@@ -9,6 +10,7 @@ const vite = await createServer({
   appType: "custom",
   logLevel: "silent",
   server: { middlewareMode: true },
+  plugins: [createI18nStubVitePlugin()],
 });
 
 function flattenElements(node, result = []) {

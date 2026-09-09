@@ -94,7 +94,8 @@ assert.match(robots, /Disallow: \/lk/);
 assert.match(robots, /Disallow: \/api\//);
 assert.doesNotMatch(robots, /Disallow: \/about/);
 
-assert.match(client, /Повторить заказ/);
+assert.match(client, /t\("client.reorder"\)/);
+assert.match(client, /settings.allowRepeatOrder/);
 assert.match(appJsx, /openRepeat/);
 assert.doesNotMatch(pricing, /STOREFRONT_INFO_|infoPages/);
 assert.doesNotMatch(delivery, /STOREFRONT_INFO_|infoPages/);

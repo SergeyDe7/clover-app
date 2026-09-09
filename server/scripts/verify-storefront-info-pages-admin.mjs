@@ -413,25 +413,22 @@ assert.match(admin, /api\.saveStorefrontSettings/);
 assert.match(admin, /catch \(error\)/);
 assert.doesNotMatch(admin, /setDraft\(\(\) => \(\{[\s\S]*storefrontInfoPages: \{\}\)/);
 
-assert.match(editor, /Информационные страницы/);
+assert.match(editor, /t\("manager.infoPages"\)/);
 assert.match(editor, /STOREFRONT_INFO_PAGES\.map/);
-assert.match(editor, /Публичный адрес/);
+assert.match(editor, /t\("manager.publicUrl"\)/);
 assert.match(editor, /storefrontInfoPageUrl/);
 assert.doesNotMatch(editor, /Добавить страницу|новый slug|new slug/i);
-assert.match(editor, /Заголовок страницы \(H1\)/);
+assert.match(editor, /t\("manager.pageHeadingH1"\)/);
 assert.match(editor, /SEO title/);
 assert.match(editor, /SEO description/);
-assert.match(editor, /Добавить абзац/);
-assert.match(editor, /Удалить/);
-assert.match(editor, /Вверх/);
-assert.match(editor, /Вниз/);
-assert.match(editor, /Вернуть текст по умолчанию/);
+assert.match(editor, /t\("manager.addParagraph"\)/);
+assert.match(editor, /t\("shared.action.delete"\)/);
+assert.match(editor, /t\("manager.up"\)/);
+assert.match(editor, /t\("manager.down"\)/);
+assert.match(editor, /t\("manager.restoreDefaultText"\)/);
 assert.match(editor, /delete next\[selected\.slug\]/);
 assert.match(editor, /ROUTE_OPTIONS/);
-assert.match(
-  editor,
-  /Изменение этого текста сразу отобразится на публичном сайте/
-);
+assert.match(editor, /t\("manager.changingThisTextAppearsOnThe"\)/);
 assert.match(editor, /isStorefrontLegalInfoSlug/);
 assert.doesNotMatch(editor, /api\.|saveStorefrontSettings|fetch\(/);
 assert.doesNotMatch(editor, /dangerouslySetInnerHTML|innerHTML|WYSIWYG|markdown/i);
@@ -469,7 +466,7 @@ assert.doesNotMatch(robots, /Disallow: \/about/);
 assert.doesNotMatch(deliveryFee, /storefrontInfoPages|STOREFRONT_INFO_/);
 assert.doesNotMatch(checkout, /storefrontInfoPages|STOREFRONT_INFO_/);
 assert.match(contactsPage, /storefrontApi/);
-assert.match(contactsPage, /<h1>Контакты<\/h1>/);
+assert.match(contactsPage, /<h1>\{t\("storefront.nav.contacts"\)\}<\/h1>/);
 assert.doesNotMatch(contactsPage, /storefrontInfoPages/);
 assert.doesNotMatch(shared, /enabledLanguages|locale:|rtl/i);
 assert.doesNotMatch(shared, /dangerouslySetInnerHTML|innerHTML|eval\(|new Function/);
