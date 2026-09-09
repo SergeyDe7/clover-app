@@ -3,10 +3,11 @@
  * Fail-closed. Does not weaken verify-i18n-stage-3-system-ui.mjs.
  */
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { projectRoot } from "./readFrontendUiSource.mjs";
+import { scanStage32Display } from "./i18n-stage32-display-scan.mjs";
 import { UI_CATALOG, hasCatalogKey } from "../../src/shared/i18n/uiCatalog.js";
 import { placeholdersMatch } from "../../src/shared/i18n/placeholderValidation.js";
 import {
@@ -236,21 +237,182 @@ const authorityScan = scanSource(
 assert.ok(authorityScan.authorityUnsafe.length >= 1, "t() must not flow into authority payloads");
 assert.equal(AUTHORITY_CALLEE_NAMES.has("selectLinkFilter"), true);
 
-const featureFiles = [
+const redTranslatedState = scanStage32Display(
+  `export function Panel({ api, body }) {
+  const [title] = useState(() => t("manager.settings.newsTitleDefault"));
+  api.sendPromotion(title, body);
+}`,
+  "red-translated-state.jsx"
+);
+assert.equal(redTranslatedState.parseError || "", "", "RED fixture 1 must parse");
+assert.ok(
+  redTranslatedState.translatedDataFlows.length >= 1,
+  "UNSAFE TRANSLATED DATA FLOW"
+);
+
+const redPhotoPayload = scanStage32Display(
+  `export function attach(file, onAdd, t) {
+  const photo = { name: file.name || t("shared.productPhoto") };
+  onAdd({ photo });
+}`,
+  "red-photo-payload.jsx"
+);
+assert.equal(redPhotoPayload.parseError || "", "", "RED fixture 2 must parse");
+assert.ok(
+  redPhotoPayload.translatedPayloadFlows.length >= 1,
+  "UNSAFE TRANSLATED PAYLOAD FLOW"
+);
+
+const redRawSetError = scanStage32Display(
+  `export function fail(setError) {
+  try { throw new Error("x"); } catch (error) { setError(error.message); }
+}`,
+  "red-raw-set-error.jsx"
+);
+assert.equal(redRawSetError.parseError || "", "", "RED fixture 3 must parse");
+assert.ok(
+  redRawSetError.rawErrorDisplays.length >= 1,
+  "UNSAFE RAW SYSTEM ERROR DISPLAY"
+);
+
+const redRawAppAlert = scanStage32Display(
+  `export function fail(error, appAlert) {
+  appAlert({ message: error.message });
+}`,
+  "red-raw-app-alert.jsx"
+);
+assert.equal(redRawAppAlert.parseError || "", "", "RED fixture 4 must parse");
+assert.ok(
+  redRawAppAlert.rawErrorDisplays.length >= 1,
+  "UNSAFE RAW SYSTEM ERROR DISPLAY"
+);
+
+const STAGE3_SCAN_DIRS = [
+  "src/components",
+  "src/shared",
+  "src/screens/client",
+  "src/screens/manager",
+  "src/screens/storefront/components",
+  "src/screens/storefront/pages",
+];
+const STAGE3_SCAN_FILES = [
   "src/App.jsx",
   "src/serverApi.js",
   "src/screens/storefront/publicApi.js",
-  "src/shared/SharedPanels.jsx",
-  "src/shared/pushSync.js",
-  "src/shared/productPhoto.js",
-  "src/shared/matrixExcelImport.js",
-  "src/shared/appHelpers.js",
 ];
-for (const rel of featureFiles) {
-  const findings = scanSource(readRel(rel), rel);
-  assert.equal(findings.parseError || "", "", `${rel} parse error`);
-  assert.deepEqual(findings.authorityUnsafe, [], `authority-unsafe t() in ${rel}`);
+
+function listStage3SourceFiles() {
+  const out = [...STAGE3_SCAN_FILES];
+  function walk(relDir) {
+    const fullDir = path.join(projectRoot, relDir);
+    if (!existsSync(fullDir)) return;
+    for (const name of readdirSync(fullDir)) {
+      const rel = `${relDir}/${name}`;
+      const full = path.join(projectRoot, rel);
+      if (statSync(full).isDirectory()) {
+        walk(rel);
+        continue;
+      }
+      if (/\.(jsx?)$/i.test(name) && !rel.endsWith("src/shared/i18n/uiCatalog.js")) {
+        out.push(rel);
+      }
+    }
+  }
+  for (const dir of STAGE3_SCAN_DIRS) walk(dir);
+  return [...new Set(out)].sort();
 }
+
+const RAW_MESSAGE_ALLOWLIST = [
+  {
+    path: "src/screens/client/OrderEditor.jsx",
+    kind: "LOCAL_ALREADY_LOCALIZED_ERROR",
+    pattern: /check\.message|result\.message/,
+    reason: "validateDeliveryDate / calendar already project via t()",
+  },
+  {
+    path: "src/screens/client/DeliveryDateCalendar.jsx",
+    kind: "LOCAL_ALREADY_LOCALIZED_ERROR",
+    pattern: /check\.message/,
+    reason: "validateDeliveryDate already projects via t()",
+  },
+  {
+    path: "src/screens/manager/ManagerOrders.jsx",
+    kind: "EXTERNAL_BUSINESS_CONTENT",
+    pattern: /exchange\.message/,
+    reason: "1C exchange protocol text shown verbatim to manager",
+  },
+  {
+    path: "src/screens/manager/ManagerExchange.jsx",
+    kind: "EXTERNAL_BUSINESS_CONTENT",
+    pattern: /exchange\.message|result\.result\.message/,
+    reason: "1C exchange protocol / action result text shown verbatim",
+  },
+  {
+    path: "src/screens/manager/ManagerAudit.jsx",
+    kind: "EXTERNAL_BUSINESS_CONTENT",
+    pattern: /details\.message/,
+    reason: "1C/exchange audit detail payload shown verbatim",
+  },
+];
+
+function isAllowlistedDisplay(rel, finding) {
+  const text = `${finding.path || ""} ${finding.text || ""}`;
+  return RAW_MESSAGE_ALLOWLIST.some(
+    (row) => row.path === rel && row.pattern.test(text)
+  );
+}
+
+const JSX_CYRILLIC_AFTER_EXPR = /\}[^<>{}]*[А-Яа-яЁё][^<>{}]*</;
+
+const stage3Files = listStage3SourceFiles();
+assert.ok(stage3Files.includes("src/screens/manager/ManagerSettings.jsx"));
+assert.ok(stage3Files.includes("src/components/CustomProductForm.jsx"));
+assert.ok(stage3Files.includes("src/screens/client/CustomItemForm.jsx"));
+assert.ok(stage3Files.includes("src/screens/manager/ProductEditor.jsx"));
+assert.ok(stage3Files.includes("src/App.jsx"));
+
+const displayLeaks = [];
+const parseFailures = [];
+for (const rel of stage3Files) {
+  const src = readRel(rel);
+  const base = scanSource(src, rel);
+  if (base.parseError) parseFailures.push(`${rel}: ${base.parseError}`);
+  assert.deepEqual(base.authorityUnsafe, [], `authority-unsafe t() in ${rel}`);
+
+  const display = scanStage32Display(src, rel);
+  if (display.parseError) parseFailures.push(`${rel}: ${display.parseError}`);
+  for (const row of display.translatedDataFlows) {
+    displayLeaks.push(`${rel}:${row.line}:UNSAFE TRANSLATED DATA FLOW:${row.text}`);
+  }
+  for (const row of display.translatedPayloadFlows) {
+    displayLeaks.push(`${rel}:${row.line}:UNSAFE TRANSLATED PAYLOAD FLOW:${row.text}`);
+  }
+  for (const row of display.rawErrorDisplays) {
+    if (isAllowlistedDisplay(rel, row)) continue;
+    displayLeaks.push(`${rel}:${row.line}:UNSAFE RAW SYSTEM ERROR DISPLAY:${row.text}`);
+  }
+  for (const row of display.resultMessageDisplays) {
+    if (isAllowlistedDisplay(rel, row)) continue;
+    displayLeaks.push(`${rel}:${row.line}:UNSAFE RESULT MESSAGE DISPLAY:${row.text}`);
+  }
+  if (JSX_CYRILLIC_AFTER_EXPR.test(src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, ""))) {
+    displayLeaks.push(`${rel}:UNCLASSIFIED JSX CYRILLIC AFTER EXPRESSION`);
+  }
+}
+assert.deepEqual(parseFailures, [], `parse errors:\n${parseFailures.join("\n")}`);
+assert.deepEqual(displayLeaks, [], `Stage 3.2 display leaks:\n${displayLeaks.slice(0, 40).join("\n")}`);
+
+assert.match(readRel("src/screens/manager/ManagerSettings.jsx"), /useState\(""\)/);
+assert.doesNotMatch(
+  readRel("src/screens/manager/ManagerSettings.jsx"),
+  /useState\(\(\)\s*=>\s*t\(/
+);
+assert.match(readRel("src/screens/manager/ManagerSettings.jsx"), /placeholder=\{t\("manager\.settings\.newsTitleDefault"\)\}/);
+assert.match(readRel("src/components/CustomProductForm.jsx"), /file\.name\s*\|\|\s*["']photo\.jpg["']/);
+assert.match(readRel("src/screens/client/CustomItemForm.jsx"), /file\.name\s*\|\|\s*["']photo\.jpg["']/);
+assert.doesNotMatch(readRel("src/screens/client/CustomItemForm.jsx"), /пикс\./);
+assert.match(readRel("src/shared/productPhoto.js"), /Браузер не смог подготовить фотографию/);
+assert.match(readRel("src/shared/matrixExcelImport.js"), /Не найдено ни одной строки с названием/);
 
 const pushSrc = readRel("src/shared/pushSync.js");
 for (const reason of CANONICAL_PUSH_REASONS) {

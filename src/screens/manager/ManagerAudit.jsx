@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../serverApi";
 import { formatDateTime } from "../../shared/appHelpers";
 import { backupReasonLabel } from "../../shared/i18n/displayLabels";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 
 export const AUDIT_ACTION_LABELS = {
   "auth.register": "manager.clientRegistered",
@@ -196,7 +197,7 @@ export function ManagerAudit() {
       setItems(result.audit || []);
       setError("");
     } catch (loadError) {
-      setError(loadError.message);
+      setError(errorDisplayMessage(loadError, t, "shared.error.loadFailed"));
     } finally {
       setLoadingAudit(false);
     }
@@ -204,7 +205,7 @@ export function ManagerAudit() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [t]);
 
   return <section className="panel" style={{ marginTop: 0 }}>
     <div className="panel-heading"><div><p className="eyebrow">{t("manager.control")}</p><h2>{t("manager.activityLog")}</h2><p>{t("manager.recentSignInsCatalogMatrixPhoto")}</p></div><button className="secondary-button" type="button" onClick={load}>{t("shared.action.refresh")}</button></div>

@@ -10,7 +10,7 @@ import { FREE_DELIVERY_MIN_TOTAL, PAID_DELIVERY_FEE } from "../../config/orderCo
 
 function ManagerPromotionPanel() {
   const { t } = useLocalization();
-  const [title, setTitle] = useState(() => t("manager.settings.newsTitleDefault"));
+  const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const send = async () => {
@@ -26,7 +26,11 @@ function ManagerPromotionPanel() {
       });
       setBody("");
     } catch (error) {
-      await appAlert({ title: t("manager.sendError"), message: error.message, tone: "danger" });
+      await appAlert({
+        title: t("manager.sendError"),
+        message: errorDisplayMessage(error, t, "manager.sendError"),
+        tone: "danger",
+      });
     } finally {
       setBusy(false);
     }
@@ -34,7 +38,7 @@ function ManagerPromotionPanel() {
   return (
     <div className="manager-contact-settings">
       <h3>{t("manager.pushAboutAPromoOrNew")}</h3>
-      <div className="form-grid"><label className="field">{t("shared.field.title")}<input value={title} onChange={(event) => setTitle(event.target.value)} /></label><label className="field field-wide">{t("manager.field.bodyText")}<textarea rows="3" value={body} onChange={(event) => setBody(event.target.value)} /></label></div>
+      <div className="form-grid"><label className="field">{t("shared.field.title")}<input value={title} placeholder={t("manager.settings.newsTitleDefault")} onChange={(event) => setTitle(event.target.value)} /></label><label className="field field-wide">{t("manager.field.bodyText")}<textarea rows="3" value={body} onChange={(event) => setBody(event.target.value)} /></label></div>
       <div className="form-actions"><button className="primary-button" type="button" disabled={busy || !body.trim()} onClick={send}>{t("manager.sendToSubscribedClients")}</button></div>
     </div>
   );
@@ -55,11 +59,11 @@ function ManagerNotificationSettings({ settings, set }) {
       const result = await api.getManagerNotifications({ limit: 1 });
       setStatus(result.status || null);
     } catch (error) {
-      setMessage(error.message);
+      setMessage(errorDisplayMessage(error, t, "manager.error.channelsCheckFailed"));
     }
   };
 
-  useEffect(() => { loadStatus(); }, []);
+  useEffect(() => { loadStatus(); }, [t]);
 
   const reasonRu = (channel, reason, error) => {
     const code = String(reason || error || "").trim();

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 import {
   TRANSLATION_WORKSPACE_VIEWS,
 } from "../../shared/i18n/localizationSettings.js";
@@ -111,7 +112,7 @@ export function ManagerLanguages() {
       setSettings({ enabledLanguages: ["ru"], catalogVersion: 0 });
       setCompleteness({});
       setRows([]);
-      setMessage(error.message || t("admin.languages.loadFailed"));
+      setMessage(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
     }
   }, [view, query, untranslatedOnly, safeLanguage, t]);
 
@@ -143,7 +144,7 @@ export function ManagerLanguages() {
     } catch (error) {
       await appAlert({
         title: t("admin.languages.saveFailed"),
-        message: error.message,
+        message: errorDisplayMessage(error, t, "admin.languages.saveFailed"),
         tone: "danger",
       });
     } finally {
@@ -161,7 +162,7 @@ export function ManagerLanguages() {
       setMessage(t("admin.languages.saved"));
       await load();
     } catch (error) {
-      setMessage(error.message || t("admin.languages.saveFailed"));
+      setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -181,7 +182,7 @@ export function ManagerLanguages() {
       setDrafts((current) => clearTranslationDraft(current, row.id, targetLanguage));
       await load();
     } catch (error) {
-      setMessage(error.message || t("admin.languages.saveFailed"));
+      setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
     } finally {
       setBusy(false);
     }

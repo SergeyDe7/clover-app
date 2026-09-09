@@ -24,6 +24,7 @@ export const DOMAIN_ERROR_CODES = Object.freeze([
   "PHOTO_STILL_TOO_LARGE",
   "PHOTO_READ_FAILED",
   "PHOTO_ATTACH_FAILED",
+  "PHOTO_CUSTOM_MAX_SIZE",
   "EXCEL_NO_NAME_ROWS",
 ]);
 
@@ -46,6 +47,7 @@ export const DOMAIN_ERROR_KEY_BY_CODE = Object.freeze({
   PHOTO_STILL_TOO_LARGE: "shared.error.photoStillTooLarge",
   PHOTO_READ_FAILED: "shared.error.photoReadFailed",
   PHOTO_ATTACH_FAILED: "shared.error.photoAttachFailed",
+  PHOTO_CUSTOM_MAX_SIZE: "shared.maximumPhotoSizeIs12Mb",
   EXCEL_NO_NAME_ROWS: "shared.error.excelNoNameRows",
 });
 

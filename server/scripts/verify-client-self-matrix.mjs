@@ -55,20 +55,20 @@ const addPanel = readFileSync(
   path.join(projectRoot, "src/screens/client/ClientCatalogAddPanel.jsx"),
   "utf8"
 );
-assert.ok(addPanel.includes("В матрицу"));
+assert.ok(addPanel.includes('t("client.matrix.add")'));
 assert.ok(addPanel.includes("catalogAddPrice"));
 assert.ok(addPanel.includes("client-matrix-grid"));
 assert.ok(addPanel.includes("client-matrix-card"));
 assert.ok(addPanel.includes("client-catalog-add-price"));
-assert.ok(addPanel.includes("Заказ оформляется"));
+assert.ok(addPanel.includes('t("client.addItemsToTheMatrixOr")'));
 assert.ok(!addPanel.includes("setCart"));
 
 const helpers = readFileSync(
   path.join(projectRoot, "src/shared/appHelpers.js"),
   "utf8"
 );
-assert.ok(helpers.includes('["matrix", "Моя матрица"]'));
-assert.ok(helpers.includes('["catalog", "Добавить товары из каталога"]'));
+assert.ok(helpers.includes('["matrix", "client.nav.matrix"]'));
+assert.ok(helpers.includes('["catalog", "client.nav.catalog"]'));
 assert.ok(helpers.includes("repeat(2, minmax(0, 1fr))"));
 assert.ok(helpers.includes("repeat(5, minmax(0, 1fr))"));
 assert.ok(helpers.includes("aspect-ratio: 1 / 1"));

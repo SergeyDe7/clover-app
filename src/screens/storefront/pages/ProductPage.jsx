@@ -1,4 +1,5 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../../../shared/i18n/errorDisplay.js";
 import { useEffect, useMemo, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
 import { addToCart } from "../cartStorage.js";
@@ -41,7 +42,7 @@ export function ProductPage({ code }) {
         setQty(getUnitOrderStep(next, nextUnit));
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message || t("storefront.productNotFound"));
+        if (!cancelled) setError(errorDisplayMessage(err, t, "storefront.productNotFound"));
       });
     return () => {
       cancelled = true;

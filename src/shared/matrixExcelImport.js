@@ -102,7 +102,7 @@ export async function parseMatrixExcelFile(file) {
   if (!parsed.length) {
     throw codedError(
       "EXCEL_NO_NAME_ROWS",
-      "No named rows found. Expected Name/Product columns and optional Code."
+      "Не найдено ни одной строки с названием. Ожидаются колонки «Название»/«Товар» и опционально «Код»."
     );
   }
 

@@ -1,4 +1,5 @@
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../../serverApi";
@@ -101,7 +102,7 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
       }
     } catch (searchError) {
       if (requestId !== searchRequestId.current) return;
-      setError(searchError.message);
+      setError(errorDisplayMessage(searchError, t, "shared.error.loadFailed"));
       setItems([]);
       setTotal(0);
     } finally {
@@ -188,7 +189,7 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
       if (skipped) setError(t("manager.storefront.skippedAlready", { count: skipped }));
       await runSearch(search);
     } catch (addError) {
-      setError(addError.message);
+      setError(errorDisplayMessage(addError, t, "shared.error.addFailed"));
     } finally {
       setLoading(false);
     }

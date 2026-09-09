@@ -339,7 +339,7 @@ export function ManagerOrders({
         try {
           await api.resetExchangeOrder(order.id);
         } catch (error) {
-          errors.push(`${order.number || order.id}: ${error.message}`);
+          errors.push(`${order.number || order.id}: ${errorDisplayMessage(error, t, "manager.error.oneCCancelFailed")}`);
         }
       }
       await onReload();
@@ -454,7 +454,7 @@ export function ManagerOrders({
         try {
           await api.trashOrder(order.id);
         } catch (error) {
-          errors.push(`${order.number || order.id}: ${error.message}`);
+          errors.push(`${order.number || order.id}: ${errorDisplayMessage(error, t, "shared.error.deleteFailed")}`);
         }
       }
       await onReload();
@@ -486,7 +486,7 @@ export function ManagerOrders({
             onApplyManagerNotifications?.(result.managerNotifications);
           }
         } catch (error) {
-          errors.push(error.message);
+          errors.push(errorDisplayMessage(error, t, "manager.error.oneCSendFailed"));
         }
       }
       await onReload();

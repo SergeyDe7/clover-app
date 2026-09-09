@@ -1972,5 +1972,117 @@
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
     "reason": "Public RU display of canonical promo status codes. Manager UI uses promoStatusLabel(); identity is the English status code."
+  },
+  {
+    "path": "src/components/CustomProductForm.jsx",
+    "literal": "Разрешены только изображения JPG, PNG или WEBP.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/components/CustomProductForm.jsx",
+    "literal": "Максимальный размер фотографии — 12 МБ.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/components/CustomProductForm.jsx",
+    "literal": "Не удалось прочитать фотографию.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/screens/client/CustomItemForm.jsx",
+    "literal": "Не удалось прочитать фотографию.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/screens/client/CustomItemForm.jsx",
+    "literal": "Файл не удалось распознать как фотографию.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/screens/client/CustomItemForm.jsx",
+    "literal": "Разрешены только изображения JPG, PNG или WEBP.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/screens/client/CustomItemForm.jsx",
+    "literal": "Максимальный размер фотографии — 12 МБ.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/screens/client/CustomItemForm.jsx",
+    "literal": "Браузер не смог подготовить фотографию.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/screens/client/CustomItemForm.jsx",
+    "literal": "После обработки фото всё ещё слишком большое. Выберите снимок меньшего размера.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "Не найдено ни одной строки с названием. Ожидаются колонки «Название»/«Товар» и опционально «Код».",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Браузер не смог подготовить фотографию.",
+    "count": 2,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Файл не удалось распознать как фотографию.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Выберите фотографию товара.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Разрешены только изображения JPG, PNG или WEBP.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Максимальный размер файла — 5 МБ.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "После обработки фото всё ещё слишком большое. Выберите снимок меньшего размера.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
   }
 ]

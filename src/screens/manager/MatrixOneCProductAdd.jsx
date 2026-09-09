@@ -1,4 +1,5 @@
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../serverApi";
 import { EMPTY_LINK } from "../../shared/appHelpers";
@@ -87,7 +88,7 @@ export function MatrixOneCProductAdd({
       }
     } catch (searchError) {
       if (requestId !== searchRequestId.current) return;
-      setError(searchError.message);
+      setError(errorDisplayMessage(searchError, t, "shared.error.loadFailed"));
       setItems([]);
       setTotal(0);
     } finally {
@@ -220,7 +221,7 @@ export function MatrixOneCProductAdd({
       // Обновим выдачу с учётом новой матрицы.
       await runSearch(search);
     } catch (selectError) {
-      setError(selectError.message);
+      setError(errorDisplayMessage(selectError, t, "shared.error.addFailed"));
     } finally {
       setLoading(false);
     }

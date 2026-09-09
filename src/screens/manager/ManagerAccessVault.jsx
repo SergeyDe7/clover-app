@@ -126,7 +126,7 @@ function ClientAccessPanel() {
     } catch (removeError) {
       await appAlert({
         title: t("shared.status.error"),
-        message: removeError.message,
+        message: errorDisplayMessage(removeError, t, "shared.error.deleteFailed"),
         tone: "danger",
       });
     }
@@ -158,7 +158,7 @@ function ClientAccessPanel() {
       );
       await appAlert({
         title: t("manager.clientDeleted"),
-        message: result.message || t("manager.theClientAccountHasBeenDeleted"),
+        message: t("manager.theClientAccountHasBeenDeleted"),
         tone: "success",
       });
     } catch (deleteError) {

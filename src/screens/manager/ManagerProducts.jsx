@@ -57,7 +57,7 @@ function OneCProductsPanel({
       setCatalog(result);
       return result;
     } catch (loadError) {
-      setError(loadError.message);
+      setError(errorDisplayMessage(loadError, t, "shared.error.loadFailed"));
       return null;
     } finally {
       setLoading(false);
@@ -90,7 +90,7 @@ function OneCProductsPanel({
         });
       }
     } catch (linkError) {
-      setError(linkError.message);
+      setError(errorDisplayMessage(linkError, t, "shared.error.requestFailed"));
     } finally {
       setLinking(false);
     }
@@ -98,7 +98,7 @@ function OneCProductsPanel({
 
   useEffect(() => {
     void loadCatalog("");
-  }, []);
+  }, [t]);
 
   const summary = catalog?.summary || {};
   const candidateProductIds = useMemo(() => {

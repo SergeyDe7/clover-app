@@ -12988,6 +12988,20 @@ const RAW_CATALOG = [
     "namespace": "ui",
     "surface": "storefront",
     "critical": true
+  },
+  {
+    "key": "auth.forgot.sent",
+    "sourceRu": "Если аккаунт существует, мы отправили ссылку для сброса пароля.",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "auth.verify.resent",
+    "sourceRu": "Письмо подтверждения отправлено.",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
   }
 ];
 

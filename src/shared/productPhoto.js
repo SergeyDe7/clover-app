@@ -12,7 +12,7 @@ function canvasToJpegBlob(canvas, quality) {
     canvas.toBlob(
       (blob) => {
         if (!blob) {
-          reject(codedError("PHOTO_PREPARE_FAILED", "Failed to prepare the photograph."));
+          reject(codedError("PHOTO_PREPARE_FAILED", "Браузер не смог подготовить фотографию."));
           return;
         }
         resolve(blob);
@@ -37,7 +37,7 @@ async function loadImageBitmap(file) {
     const image = await new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => resolve(img);
-      img.onerror = () => reject(codedError("PHOTO_UNRECOGNIZED", "The file is not a photograph."));
+      img.onerror = () => reject(codedError("PHOTO_UNRECOGNIZED", "Файл не удалось распознать как фотографию."));
       img.src = objectUrl;
     });
     return image;
@@ -52,7 +52,7 @@ function drawContainOnWhite(source, size) {
   canvas.height = size;
   const context = canvas.getContext("2d");
   if (!context) {
-    throw codedError("PHOTO_PREPARE_FAILED", "Failed to prepare the photograph.");
+    throw codedError("PHOTO_PREPARE_FAILED", "Браузер не смог подготовить фотографию.");
   }
 
   context.fillStyle = "#ffffff";
@@ -85,13 +85,13 @@ function jpegFileName(originalName) {
  */
 export async function normalizeProductPhotoFile(file) {
   if (!file) {
-    throw codedError("PHOTO_REQUIRED", "Choose a product photograph.");
+    throw codedError("PHOTO_REQUIRED", "Выберите фотографию товара.");
   }
   if (!PRODUCT_PHOTO_TYPES.includes(file.type)) {
-    throw codedError("PHOTO_TYPE", "Only JPG, PNG, or WEBP images are allowed.");
+    throw codedError("PHOTO_TYPE", "Разрешены только изображения JPG, PNG или WEBP.");
   }
   if (file.size > PRODUCT_PHOTO_MAX_SOURCE_BYTES) {
-    throw codedError("PHOTO_MAX_SIZE", "Maximum file size is 5 MB.");
+    throw codedError("PHOTO_MAX_SIZE", "Максимальный размер файла — 5 МБ.");
   }
 
   const bitmap = await loadImageBitmap(file);
@@ -101,7 +101,7 @@ export async function normalizeProductPhotoFile(file) {
     if (blob.size > PRODUCT_PHOTO_MAX_SOURCE_BYTES) {
       const tighter = await canvasToJpegBlob(canvas, 0.72);
       if (tighter.size > PRODUCT_PHOTO_MAX_SOURCE_BYTES) {
-        throw codedError("PHOTO_STILL_TOO_LARGE", "The processed photograph is still too large.");
+        throw codedError("PHOTO_STILL_TOO_LARGE", "После обработки фото всё ещё слишком большое. Выберите снимок меньшего размера.");
       }
       return new File([tighter], jpegFileName(file.name), {
         type: "image/jpeg",

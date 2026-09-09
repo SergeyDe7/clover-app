@@ -12,6 +12,7 @@ import {
 } from "../../shared/appHelpers";
 import { AUDIT_ACTION_LABELS } from "./ManagerAudit";
 import { appAlert } from "../../shared/AppModal";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 import { exchangeStatusLabel, orderStatusLabel } from "../../shared/i18n/displayLabels";
 
 export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavigate }) {
@@ -59,13 +60,13 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       applyOneCState(oneCResult);
       setError("");
     } catch (loadError) {
-      setError(loadError.message);
+      setError(errorDisplayMessage(loadError, t, "shared.error.loadFailed"));
     } finally {
       setLoadingExchange(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [t]);
 
   const saveConnection = async () => {
     setBusyConnection("save");
@@ -80,7 +81,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
         tone: "success",
       });
     } catch (saveError) {
-      await appAlert({ title: t("manager.saveError2"), message: saveError.message, tone: "danger" });
+      await appAlert({ title: t("manager.saveError2"), message: errorDisplayMessage(saveError, t, "manager.saveError2"), tone: "danger" });
     } finally {
       setBusyConnection("");
     }
@@ -96,7 +97,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       setConnectionResult(result.result || null);
       setPreview(null);
     } catch (testError) {
-      setConnectionResult({ ok: false, message: testError.message });
+      setConnectionResult({ ok: false, message: errorDisplayMessage(testError, t, "manager.connectionError") });
     } finally {
       setBusyConnection("");
     }
@@ -110,7 +111,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       const result = await api.previewOneCCatalog(type, 20);
       setPreview(result);
     } catch (previewError) {
-      await appAlert({ title: t("manager.previewError"), message: previewError.message, tone: "danger" });
+      await appAlert({ title: t("manager.previewError"), message: errorDisplayMessage(previewError, t, "manager.previewError"), tone: "danger" });
     } finally {
       setBusyConnection("");
     }
@@ -139,7 +140,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       await onReload();
       await load();
     } catch (actionError) {
-      await appAlert({ title: t("manager.exchangeError"), message: actionError.message, tone: "danger" });
+      await appAlert({ title: t("manager.exchangeError"), message: errorDisplayMessage(actionError, t, "manager.exchangeError"), tone: "danger" });
       await onReload();
       await load();
     } finally {
@@ -153,7 +154,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       const blob = await api.downloadExchangeOrder(row.id, format);
       downloadBlobFile(blob, `clover-order-${row.number || row.id}-1c.${format}`);
     } catch (downloadError) {
-      await appAlert({ title: t("manager.downloadError"), message: downloadError.message, tone: "danger" });
+      await appAlert({ title: t("manager.downloadError"), message: errorDisplayMessage(downloadError, t, "manager.downloadError"), tone: "danger" });
     } finally {
       setBusyId("");
     }
@@ -165,7 +166,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       const blob = await api.downloadExchangeBatch(format, batchStatus);
       downloadBlobFile(blob, `clover-orders-1c.${format}`);
     } catch (downloadError) {
-      await appAlert({ title: t("manager.downloadError"), message: downloadError.message, tone: "danger" });
+      await appAlert({ title: t("manager.downloadError"), message: errorDisplayMessage(downloadError, t, "manager.downloadError"), tone: "danger" });
     } finally {
       setBusyBatch("");
     }

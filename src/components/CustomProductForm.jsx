@@ -1,5 +1,5 @@
 import { useLocalization } from "../shared/i18n/LocalizationProvider";
-import { errorDisplayMessage, isKnownErrorCode } from "../shared/i18n/errorDisplay.js";
+import { codedError, errorDisplayMessage } from "../shared/i18n/errorDisplay.js";
 import { useState } from "react";
 import "./CustomProductForm.css";
 
@@ -13,20 +13,20 @@ const INITIAL_FORM = {
 
 const ACCEPTED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-function readPhoto(file, t) {
+function readPhoto(file) {
   return new Promise((resolve, reject) => {
     if (!ACCEPTED_PHOTO_TYPES.includes(file?.type)) {
-      reject(new Error(t("shared.youCanAttachJpgPngOr")));
+      reject(codedError("PHOTO_TYPE", "Разрешены только изображения JPG, PNG или WEBP."));
       return;
     }
     if (file.size > 12 * 1024 * 1024) {
-      reject(new Error(t("shared.maximumPhotoSizeIs12Mb")));
+      reject(codedError("PHOTO_CUSTOM_MAX_SIZE", "Максимальный размер фотографии — 12 МБ."));
       return;
     }
     const reader = new FileReader();
-    reader.onerror = () => reject(Object.assign(new Error("Failed to read the photograph."), { code: "PHOTO_READ_FAILED" }));
+    reader.onerror = () => reject(codedError("PHOTO_READ_FAILED", "Не удалось прочитать фотографию."));
     reader.onload = () => resolve({
-      name: file.name || t("shared.productPhoto"),
+      name: file.name || "photo.jpg",
       type: file.type,
       size: file.size,
       dataUrl: String(reader.result || ""),
@@ -55,13 +55,9 @@ function CustomProductForm({ onAdd }) {
     if (!file) return;
     setPhotoError("");
     try {
-      updateField("photo", await readPhoto(file, t));
+      updateField("photo", await readPhoto(file));
     } catch (error) {
-      setPhotoError(
-        isKnownErrorCode(error?.code)
-          ? errorDisplayMessage(error, t, "shared.error.photoAttachFailed")
-          : error.message || t("shared.error.photoAttachFailed")
-      );
+      setPhotoError(errorDisplayMessage(error, t, "shared.error.photoAttachFailed"));
     }
   };
 

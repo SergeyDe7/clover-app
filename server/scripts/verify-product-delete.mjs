@@ -75,7 +75,7 @@ const catalogAddSource = await readFile(
   "utf8"
 );
 assert.equal(
-  catalogAddSource.includes("Добавить из каталога"),
+  catalogAddSource.includes('t("manager.addFromCatalog")'),
   true,
   "Кнопка добавления из каталога Clover есть в панели матрицы"
 );

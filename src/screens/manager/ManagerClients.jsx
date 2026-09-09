@@ -107,7 +107,7 @@ function OneCClientPicker({ client, link, onChange }) {
       const result = await api.getOneCClients({ search: client.companyName || "", limit: 30 });
       setItems(result.items || []);
     } catch (loadError) {
-      setError(loadError.message);
+      setError(errorDisplayMessage(loadError, t, "shared.error.loadFailed"));
       setItems([]);
     } finally {
       setLoading(false);
@@ -121,7 +121,7 @@ function OneCClientPicker({ client, link, onChange }) {
       const result = await api.getOneCClients({ search, limit: 50 });
       setItems(result.items || []);
     } catch (searchError) {
-      setError(searchError.message);
+      setError(errorDisplayMessage(searchError, t, "shared.error.loadFailed"));
       setItems([]);
     } finally {
       setLoading(false);
@@ -136,7 +136,7 @@ function OneCClientPicker({ client, link, onChange }) {
       onChange(result.clientLink || {});
       setOpen(false);
     } catch (selectError) {
-      setError(selectError.message);
+      setError(errorDisplayMessage(selectError, t, "shared.error.saveFailed"));
     } finally {
       setLoading(false);
     }
@@ -1135,7 +1135,7 @@ export function ManagerClients({
       await api.setClientApproval(client.id, status);
       await onReload();
     } catch (error) {
-      await appAlert({ title: t("manager.accessError"), message: error.message, tone: "danger" });
+      await appAlert({ title: t("manager.accessError"), message: errorDisplayMessage(error, t, "manager.accessError"), tone: "danger" });
     } finally {
       setApprovalBusyId("");
     }
@@ -1889,7 +1889,7 @@ export function ManagerClients({
                                     await onReload();
                                     await appAlert({
                                       title: t("manager.clientDeleted"),
-                                      message: result.message || t("manager.theClientAccountHasBeenDeleted"),
+                                      message: t("manager.theClientAccountHasBeenDeleted"),
                                       tone: "success",
                                     });
                                   } catch (deleteError) {

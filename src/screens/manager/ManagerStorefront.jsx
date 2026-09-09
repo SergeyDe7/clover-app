@@ -1081,9 +1081,7 @@ export function ManagerStorefront({
                   });
                   await appAlert({
                     title: t("manager.queueStarted"),
-                    message:
-                      result.message ||
-                      t("manager.storefront.enrichQueued", { count: result.queued || 0 }),
+                    message: t("manager.storefront.enrichQueued", { count: result.queued || 0 }),
                     tone: "success",
                   });
                 } catch (error) {

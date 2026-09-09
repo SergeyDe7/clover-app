@@ -22,8 +22,13 @@ assert.match(
 );
 assert.match(
   applyHandler,
-  /Сохранить товар/,
+  /t\("manager\.products\.oneC\.selectedCategory"/,
   "The user must be told to save the product explicitly."
+);
+assert.match(
+  source,
+  /t\("manager\.saveProduct"\)/,
+  "The editor must keep an explicit Save product action."
 );
 
 const selectStart = source.indexOf("const selectOneCProduct =");

@@ -254,7 +254,7 @@ export function MatrixExcelReview({
       });
     } catch (searchError) {
       updateRow(rowIndex, { searchLoading: false });
-      setError(searchError.message);
+      setError(errorDisplayMessage(searchError, t, "shared.error.loadFailed"));
     }
   };
 
@@ -445,7 +445,7 @@ export function MatrixExcelReview({
       if (parts.length) setError(parts.join(". ") + ".");
       onAdded?.(addedNames);
     } catch (addError) {
-      setError(addError.message);
+      setError(errorDisplayMessage(addError, t, "shared.error.addFailed"));
       setImportState({ status: "review", message: t("manager.excelLoadError") });
     } finally {
       setBusy(false);

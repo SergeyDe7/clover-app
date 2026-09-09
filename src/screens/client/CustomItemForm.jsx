@@ -3,7 +3,7 @@ import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useState } from "react";
 import { CustomRequestPhoto } from "../../shared/SharedPanels";
 import { makeId } from "../../shared/appHelpers";
-import { codedError, errorDisplayMessage, isKnownErrorCode } from "../../shared/i18n/errorDisplay.js";
+import { codedError, errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 
 const CUSTOM_REQUEST_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
@@ -14,7 +14,7 @@ const CUSTOM_REQUEST_PHOTO_MAX_DIMENSION = 1600;
 export function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(codedError("PHOTO_READ_FAILED", "Failed to read the photograph."));
+    reader.onerror = () => reject(codedError("PHOTO_READ_FAILED", "Не удалось прочитать фотографию."));
     reader.onload = () => resolve(String(reader.result || ""));
     reader.readAsDataURL(file);
   });
@@ -23,18 +23,18 @@ export function readFileAsDataUrl(file) {
 export function loadBrowserImage(source) {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.onerror = () => reject(codedError("PHOTO_UNRECOGNIZED", "The file is not a photograph."));
+    image.onerror = () => reject(codedError("PHOTO_UNRECOGNIZED", "Файл не удалось распознать как фотографию."));
     image.onload = () => resolve(image);
     image.src = source;
   });
 }
 
-async function prepareCustomRequestPhoto(file, t) {
+async function prepareCustomRequestPhoto(file) {
   if (!CUSTOM_REQUEST_PHOTO_TYPES.includes(file?.type)) {
-    throw new Error(t("shared.youCanAttachJpgPngOr"));
+    throw codedError("PHOTO_TYPE", "Разрешены только изображения JPG, PNG или WEBP.");
   }
   if (file.size > CUSTOM_REQUEST_PHOTO_MAX_SOURCE_BYTES) {
-    throw new Error(t("client.thePhotoIsTooLargeThe"));
+    throw codedError("PHOTO_CUSTOM_MAX_SIZE", "Максимальный размер фотографии — 12 МБ.");
   }
 
   const source = await readFileAsDataUrl(file);
@@ -50,17 +50,17 @@ async function prepareCustomRequestPhoto(file, t) {
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d");
-  if (!context) throw new Error(t("client.theBrowserCouldNotPrepareThe"));
+  if (!context) throw codedError("PHOTO_PREPARE_FAILED", "Браузер не смог подготовить фотографию.");
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
   context.drawImage(image, 0, 0, width, height);
   const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
   if (dataUrl.length > 6 * 1024 * 1024) {
-    throw new Error(t("client.afterProcessingThePhotoIsStill"));
+    throw codedError("PHOTO_STILL_TOO_LARGE", "После обработки фото всё ещё слишком большое. Выберите снимок меньшего размера.");
   }
 
   return {
-    name: file.name || t("client.productPhotoJpg"),
+    name: file.name || "photo.jpg",
     type: "image/jpeg",
     size: Math.round((dataUrl.length * 3) / 4),
     width,
@@ -92,14 +92,10 @@ export function CustomItemForm({ onAdd }) {
     setPhotoBusy(true);
     setPhotoError("");
     try {
-      const photo = await prepareCustomRequestPhoto(file, t);
+      const photo = await prepareCustomRequestPhoto(file);
       setForm((current) => ({ ...current, photo }));
     } catch (error) {
-      setPhotoError(
-        isKnownErrorCode(error?.code)
-          ? errorDisplayMessage(error, t, "shared.error.photoAttachFailed")
-          : error.message || t("shared.error.photoAttachFailed")
-      );
+      setPhotoError(errorDisplayMessage(error, t, "shared.error.photoAttachFailed"));
     } finally {
       setPhotoBusy(false);
     }
@@ -173,7 +169,7 @@ export function CustomItemForm({ onAdd }) {
               <CustomRequestPhoto photo={form.photo} />
               <div>
                 <strong>{form.photo.name}</strong>
-                <small>{form.photo.width} × {form.photo.height} пикс.</small>
+                <small>{form.photo.width} × {form.photo.height} px</small>
                 <button
                   className="danger-button"
                   type="button"

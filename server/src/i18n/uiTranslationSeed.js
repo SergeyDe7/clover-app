@@ -257,6 +257,22 @@ export const SEEDS = {
     "zh-CN": "请填写邮箱 — 我们会发送设置新密码的链接。",
     "ar": "أدخل البريد — سنرسل رابطًا لتعيين كلمة مرور جديدة."
   },
+  "auth.forgot.sent": {
+    "en": "If the account exists, we sent a password reset link.",
+    "uz": "Agar akkaunt mavjud bo‘lsa, parolni tiklash havolasini yubordik.",
+    "ky": "Эгер аккаунт бар болсо, сырсөздү калыбына келтирүү шилтемесин жөнөттүк.",
+    "tg": "Агар ҳисоб мавҷуд бошад, пайванди барқароркунии рамзро фиристодем.",
+    "zh-CN": "如果账号存在，我们已发送密码重置链接。",
+    "ar": "إذا كان الحساب موجودًا، فقد أرسلنا رابط إعادة تعيين كلمة المرور."
+  },
+  "auth.verify.resent": {
+    "en": "The confirmation email has been sent.",
+    "uz": "Tasdiqlash xati yuborildi.",
+    "ky": "Ырастоо каты жөнөтүлдү.",
+    "tg": "Номаи тасдиқ фиристода шуд.",
+    "zh-CN": "确认邮件已发送。",
+    "ar": "تم إرسال رسالة التأكيد."
+  },
   "auth.reset.title": {
     "en": "New password",
     "uz": "Yangi parol",
