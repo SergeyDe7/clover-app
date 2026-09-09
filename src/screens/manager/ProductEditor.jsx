@@ -6,7 +6,6 @@ import { createPortal } from "react-dom";
 import { api } from "../../serverApi";
 import {
   UNIT_ORDER,
-  UNIT_CONFIG,
   unitSizeField,
   unitPriceField,
   unitConvertsOneToOneToPieces,
@@ -18,6 +17,8 @@ import {
   inferProductCategory,
   pickProductCardOneCCost,
 } from "../../shared/appHelpers";
+import { unitDisplayLabel } from "../../shared/i18n/unitDisplay.js";
+import { ProductTranslationEditor } from "./ProductTranslationEditor";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { normalizeProductPhotoFile, productImageSrc } from "../../shared/productPhoto";
 import {
@@ -78,6 +79,7 @@ export function ProductEditor({
   product,
   products = [],
   oneCPriceTypes = [],
+  staffRole = "manager",
   onClose,
   onSave,
   onDelete,
@@ -653,7 +655,7 @@ export function ProductEditor({
                   <strong>{available ? formatMoney(card.cost) : "—"}</strong>
                   <small>
                     {available
-                      ? `${card.sourceLabel} · ${UNIT_CONFIG[card.unit]?.label || "шт"}`
+                      ? `${card.sourceLabel} · ${unitDisplayLabel(card.unit, t) || "шт"}`
                       : t("manager.no1cPrice")}
                   </small>
                 </div>
@@ -895,6 +897,7 @@ export function ProductEditor({
               />
             </label>
           </div>
+          {staffRole === "admin" && !isNew ? <ProductTranslationEditor product={form} /> : null}
           <div className="form-grid" style={{ marginTop: 12 }}>
             <label className="field field-wide">{
               t("manager.websitePrice")
@@ -925,7 +928,7 @@ export function ProductEditor({
               ? (form.saleUnits || ["piece"]).map((unit) => (
                   <label className="field" key={`sf-price-${unit}`}>
                     {t("manager.products.websitePriceUnit", {
-                      unit: UNIT_CONFIG[unit]?.label || unit,
+                      unit: unitDisplayLabel(unit, t) || unit,
                     })}
                     <input
                       type="number"
@@ -1153,7 +1156,7 @@ export function ProductEditor({
                     checked={form.saleUnits.includes(unit)}
                     onChange={(e) => toggleUnit(unit, e.target.checked)}
                   />
-                  {UNIT_CONFIG[unit].label}
+                  {unitDisplayLabel(unit, t)}
                 </label>
                 {unit === "piece" ? (
                   <label className="field">{

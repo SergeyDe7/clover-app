@@ -58,6 +58,8 @@ import {
   normalizeStorefrontPromotions,
 } from "../../src/shared/storefrontPromotions.js";
 import { normalizeStorefrontInfoPages } from "../../src/shared/storefrontInfoPages.js";
+import { projectLocalizedProductDisplay } from "./productLocalizationStore.js";
+import { readLocalizationSettings } from "./localizationStore.js";
 
 const STOREFRONT_GUEST_EMAIL = "storefront-guest@clover.local";
 
@@ -456,6 +458,31 @@ function buildStorefrontPrices(product, oneCItem, storeSettings, costPriceTypeId
   return { prices, priceSources };
 }
 
+function applyPublicProductLocalization(publicProduct, canonical, language) {
+  if (!language || !publicProduct || !canonical) return publicProduct;
+  const settings = readLocalizationSettings();
+  const projected = projectLocalizedProductDisplay(
+    canonical,
+    language,
+    settings.enabledLanguages
+  );
+  if (!projected || projected === canonical) return publicProduct;
+  const details = publicProduct.details && typeof publicProduct.details === "object"
+    ? publicProduct.details
+    : {};
+  return {
+    ...publicProduct,
+    name: projected.name || publicProduct.name,
+    details: {
+      description: String(projected.storefrontDetails?.description ?? details.description ?? ""),
+      composition: String(projected.storefrontDetails?.composition ?? details.composition ?? ""),
+      characteristics: String(
+        projected.storefrontDetails?.characteristics ?? details.characteristics ?? ""
+      ),
+    },
+  };
+}
+
 function toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId = "") {
   const { prices, priceSources } = buildStorefrontPrices(
     product,
@@ -517,7 +544,7 @@ function toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId = "")
   };
 }
 
-function listStorefrontProducts(storeSettings) {
+function listStorefrontProducts(storeSettings, language) {
   const products = getGlobalState("products", DEFAULT_PRODUCTS);
   const oneCProducts = getGlobalState("oneCProducts", []);
   const priceTypes = getGlobalState("oneCPriceTypes", []);
@@ -533,7 +560,8 @@ function listStorefrontProducts(storeSettings) {
     })
     .map((product) => {
       const oneCItem = byId.get(String(product.oneCId || "")) || null;
-      return toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId);
+      const publicProduct = toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId);
+      return applyPublicProductLocalization(publicProduct, product, language);
     })
     .filter((product) => product.name);
 }

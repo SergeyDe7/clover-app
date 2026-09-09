@@ -5,7 +5,6 @@ import { api } from "../../serverApi";
 import { ORDER_STATUSES, MANAGER_BULK_ORDER_STATUSES, allowedNextOrderStatuses, canCancelOneCTransfer } from "../../config/orderConfig";
 import { CustomRequestPhoto, OrderTimeline } from "../../shared/SharedPanels";
 import {
-  UNIT_CONFIG,
   selectDefaultNumber,
   EXCHANGE_STATUS_LABELS,
   normalizeOrderExchange,
@@ -22,6 +21,7 @@ import {
   buildOrderSearchHaystack,
   productArticle,
 } from "../../shared/appHelpers";
+import { unitDisplayShort } from "../../shared/i18n/unitDisplay.js";
 import { canPurgeOrder, canTrashOrder, isAdminHardDeleteStatus } from "../../shared/orderTrash";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
@@ -60,9 +60,9 @@ function exchangeSendButtonClass(exchange) {
   return "manager-send-onec-button manager-send-onec-idle";
 }
 
-function orderLineQty(item) {
+function orderLineQty(item, t) {
   const qty = Number(item.quantity) || 0;
-  const unit = UNIT_CONFIG[item.unit]?.shortLabel || item.unit || "шт";
+  const unit = unitDisplayShort(item.unit, t) || item.unit || "шт";
   return `${qty} ${unit}`;
 }
 
@@ -101,7 +101,7 @@ function OrderLinesTable({ order, settings }) {
                 <span className="order-lines-name">{item.name}</span>
                 {article ? <span className="order-lines-article">{article}</span> : null}
               </td>
-              <td>{orderLineQty(item)}</td>
+              <td>{orderLineQty(item, t)}</td>
               <td>{orderLinePrice(item, settings)}</td>
             </tr>
           );

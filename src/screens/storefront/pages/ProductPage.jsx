@@ -72,7 +72,7 @@ export function ProductPage({ code }) {
   const qtyHint =
     unitSize > 1
       ? t("storefront.qty.inUnitPieces", {
-          unit: storefrontUnitLabel(unit),
+          unit: storefrontUnitLabel(unit, t),
           count: unitSize,
         })
       : orderStep > 1
@@ -128,7 +128,7 @@ export function ProductPage({ code }) {
 
           <div className="sf-price-block">
             <strong>{price > 0 ? formatMoney(price) : t("storefront.price.onRequest")}</strong>
-            <span className="sf-unit"> / {storefrontUnitLabel(unit)}</span>
+            <span className="sf-unit"> / {storefrontUnitLabel(unit, t)}</span>
           </div>
 
           <div className="sf-buy-row">
@@ -149,7 +149,7 @@ export function ProductPage({ code }) {
               <span>
                 {t("storefront.product.quantity")}
                 {qtyHint ? ` (${qtyHint})` : ""}
-                {unitSize > 1 ? t("storefront.product.pieceSuffix") : t("storefront.product.unitSuffix", { unit: storefrontUnitLabel(unit) })}
+                {unitSize > 1 ? t("storefront.product.pieceSuffix") : t("storefront.product.unitSuffix", { unit: storefrontUnitLabel(unit, t) })}
               </span>
               <input
                 className="sf-input"
@@ -181,7 +181,7 @@ export function ProductPage({ code }) {
                     code: product.code,
                     name: product.name,
                     unit,
-                    unitLabel: storefrontUnitLabel(unit),
+                    unitLabel: storefrontUnitLabel(unit, t),
                     price,
                     imageUrl: product.imageUrl,
                     orderStep,

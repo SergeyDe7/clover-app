@@ -24,7 +24,7 @@ export function ProductCard({ product }) {
   const price = Number(product.prices?.[unit]) || 0;
   const orderStep = getUnitOrderStep(product, unit);
   const unitSize = getUnitMultiplier(product, unit);
-  const unitLabel = storefrontUnitLabel(unit);
+  const unitLabel = storefrontUnitLabel(unit, t);
 
   return (
     <article className="sf-product-card">

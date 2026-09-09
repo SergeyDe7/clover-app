@@ -480,6 +480,40 @@ export const api = {
     );
   },
 
+  getProductTranslations(productId) {
+    return request(`/admin/product-translations/${encodeURIComponent(productId)}`);
+  },
+
+  saveProductTranslation(productId, language, field, value) {
+    return request(
+      `/admin/product-translations/${encodeURIComponent(productId)}/${encodeURIComponent(language)}/${encodeURIComponent(field)}`,
+      { method: "PUT", body: { value } }
+    );
+  },
+
+  resetProductTranslation(productId, language, field) {
+    return request(
+      `/admin/product-translations/${encodeURIComponent(productId)}/${encodeURIComponent(language)}/${encodeURIComponent(field)}/reset-auto`,
+      { method: "POST", body: {} }
+    );
+  },
+
+  getGlossaryEntries(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.query) params.set("query", String(filters.query));
+    if (filters.language) params.set("language", String(filters.language));
+    const query = params.toString();
+    return request(`/admin/glossary${query ? `?${query}` : ""}`);
+  },
+
+  saveGlossaryEntry(entry) {
+    return request("/admin/glossary", { method: "PUT", body: entry || {} });
+  },
+
+  deleteGlossaryEntry(id) {
+    return request(`/admin/glossary/${encodeURIComponent(id)}`, { method: "DELETE" });
+  },
+
 
   async downloadStorefrontPriceListPdf(markupPercent) {
     const token = getApiToken();

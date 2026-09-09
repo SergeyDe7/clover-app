@@ -25,6 +25,7 @@ import {
   resetServerData,
   setClientStateField,
   setGlobalState,
+  runInTransaction,
   removeProductIdFromAllFavorites,
   listAudit,
   listExchangeAudit,
@@ -114,6 +115,16 @@ import {
   saveManualTranslation,
   writeLocalizationSettings,
 } from "./localizationStore.js";
+import {
+  deleteProductLocalization,
+  getProductTranslationWorkspace,
+  importProductAutoArtifact,
+  listGlossaryEntries,
+  removeGlossaryEntry,
+  resetProductTranslationToAuto,
+  saveGlossaryEntry,
+  saveProductManualTranslation,
+} from "./productLocalizationStore.js";
 import { localeChoices } from "../../src/shared/i18n/localizationSettings.js";
 import { publicClientSettings } from "./clientSettings.js";
 import {
@@ -4747,6 +4758,145 @@ app.post(
   }
 );
 
+app.get(
+  "/api/admin/product-translations/:productId",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      res.json({ ok: true, workspace: getProductTranslationWorkspace(req.params.productId) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.put(
+  "/api/admin/product-translations/:productId/:language/:field",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      const result = saveProductManualTranslation(
+        req.params.productId,
+        req.params.language,
+        req.params.field,
+        req.body?.value,
+        req.user?.email || req.user?.id || ""
+      );
+      auditFromRequest(req, "localization.product.manual.save", {
+        productId: req.params.productId,
+        language: req.params.language,
+        field: req.params.field,
+        changed: result.changed === true,
+      });
+      res.json({ ok: true, changed: result.changed === true, field: result.field });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  "/api/admin/product-translations/:productId/:language/:field/reset-auto",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      const result = resetProductTranslationToAuto(
+        req.params.productId,
+        req.params.language,
+        req.params.field,
+        req.user?.email || req.user?.id || ""
+      );
+      auditFromRequest(req, "localization.product.auto.reset", {
+        productId: req.params.productId,
+        language: req.params.language,
+        field: req.params.field,
+        changed: result.changed === true,
+      });
+      res.json({ ok: true, changed: result.changed === true, field: result.field });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  "/api/admin/glossary",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      res.json({
+        ok: true,
+        entries: listGlossaryEntries({
+          query: req.query?.query,
+          language: req.query?.language,
+        }),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.put(
+  "/api/admin/glossary",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      const result = saveGlossaryEntry(req.body || {}, req.user?.email || req.user?.id || "");
+      auditFromRequest(req, "localization.glossary.save", {
+        id: result.entry?.id,
+        language: result.entry?.languageCode,
+        protected: Number(result.entry?.protected) === 1,
+      });
+      res.json({ ok: true, entry: result.entry });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.delete(
+  "/api/admin/glossary/:id",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      const result = removeGlossaryEntry(req.params.id);
+      auditFromRequest(req, "localization.glossary.delete", { id: result.id });
+      res.json({ ok: true, id: result.id });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  "/api/admin/product-translations/import-auto",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      const result = importProductAutoArtifact(
+        req.body || {},
+        req.user?.email || req.user?.id || "auto-import"
+      );
+      auditFromRequest(req, "localization.product.auto.import", {
+        runId: result.runId,
+        imported: result.imported,
+        skipped: result.skipped,
+      });
+      res.json({ ok: true, ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 /** PDF прайс витрины: все товары с фото и накруткой % от закупки. */
 app.get(
   "/api/admin/storefront/price-list.pdf",
@@ -5285,11 +5435,14 @@ app.delete(
       return res.status(404).json({ error: "Товар не найден." });
     }
 
+    runInTransaction(() => {
+      setGlobalState("products", removed.products);
+      setGlobalState("clientLinks", removed.clientLinks);
+      setGlobalState("catalogPricesVersion", new Date().toISOString());
+      deleteProductLocalization(productId);
+    });
     removeUploadedImage(removed.product.imageUrl);
     removeUploadedImage(removed.product.certificateUrl);
-    setGlobalState("products", removed.products);
-    setGlobalState("clientLinks", removed.clientLinks);
-    setGlobalState("catalogPricesVersion", new Date().toISOString());
     const favoritesChanged = removeProductIdFromAllFavorites(productId);
 
     auditFromRequest(req, "product.delete", {

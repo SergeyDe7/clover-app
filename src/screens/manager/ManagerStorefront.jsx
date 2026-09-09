@@ -4,7 +4,8 @@ import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
 import { visibilityFilterLabel } from "../../shared/i18n/displayLabels";
 import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
-import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber, matchesCatalogPrefixSearch, productCatalogSearchHaystack, formatRussianPhone, getRussianPhoneLocalDigits } from "../../shared/appHelpers";
+import { normalizeProduct, productArticle, UNIT_ORDER, unitPriceField, selectDefaultNumber, matchesCatalogPrefixSearch, productCatalogSearchHaystack, formatRussianPhone, getRussianPhoneLocalDigits } from "../../shared/appHelpers";
+import { unitDisplayLabel } from "../../shared/i18n/unitDisplay.js";
 import { StorefrontProductAdd } from "./StorefrontProductAdd";
 import {
   ManagerStorefrontPromotions,
@@ -1246,7 +1247,7 @@ export function ManagerStorefront({
                               : ["piece"]
                             ).map((unit) => (
                               <label className="field" key={`sf-m-${item.id}-${unit}`}>
-                                {UNIT_CONFIG[unit]?.label || unit}, ₽
+                                {unitDisplayLabel(unit, t) || unit}, ₽
                                 <input
                                   type="number"
                                   min="0"

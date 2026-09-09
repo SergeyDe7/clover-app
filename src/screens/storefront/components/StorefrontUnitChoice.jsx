@@ -1,8 +1,9 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
-import { orderedSaleUnits, UNIT_CONFIG, getUnitMultiplier } from "../../../shared/appHelpers.js";
+import { orderedSaleUnits, getUnitMultiplier } from "../../../shared/appHelpers.js";
+import { unitDisplayShort } from "../../../shared/i18n/unitDisplay.js";
 
-export function storefrontUnitLabel(unit) {
-  const short = UNIT_CONFIG[unit]?.shortLabel || unit;
+export function storefrontUnitLabel(unit, t) {
+  const short = unitDisplayShort(unit, t) || unit;
   return String(short).replace(/\.$/, "");
 }
 
@@ -28,7 +29,7 @@ export function StorefrontUnitChoice({
     >
       {units.map((item) => {
         const size = getUnitMultiplier(product, item);
-        const label = storefrontUnitLabel(item);
+        const label = storefrontUnitLabel(item, t);
         const active = unit === item;
         return (
           <button

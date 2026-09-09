@@ -34,6 +34,10 @@ import {
   namespaceToCompletenessDomain,
   normalizeLocalizationSettings,
 } from "../../src/shared/i18n/localizationSettings.js";
+import {
+  buildProductWorkspaceRows,
+  productCompletenessItems,
+} from "./productLocalizationStore.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -112,6 +116,7 @@ function completenessItems(store) {
       });
     }
   }
+  items.push(...productCompletenessItems());
   return items;
 }
 
@@ -309,8 +314,15 @@ export function listWorkspaceRows(filters = {}) {
     }
   }
   const languageRaw = filters.language;
+  const view = String(filters.view || "interface");
+  if (view === "glossary") {
+    return [];
+  }
   const store = currentCatalogItems(readTranslationStore());
-  return filterTranslationRows(buildTranslationRows(store), {
+  const uiRows = buildTranslationRows(store);
+  const productRows = view === "products" || view === "untranslated" ? buildProductWorkspaceRows() : [];
+  const combined = view === "products" ? productRows : [...uiRows, ...productRows];
+  return filterTranslationRows(combined, {
     ...filters,
     language: languageRaw,
   });
