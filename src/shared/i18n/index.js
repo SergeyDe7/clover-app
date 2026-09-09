@@ -64,3 +64,4 @@ export {
   isKnownErrorCode,
   resolveTransportCode,
 } from "./errorDisplay.js";
+export { notificationDeliveryReasonLabel } from "./notificationDeliveryReasonLabel.js";

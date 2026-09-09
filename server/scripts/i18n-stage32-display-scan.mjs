@@ -140,6 +140,52 @@ function isFileNameOrT(node) {
   return leftIsFileName && rightIsT;
 }
 
+function isReasonOrErrorIdent(node) {
+  return node?.type === "Identifier" && (node.name === "reason" || node.name === "error");
+}
+
+function exprMentionsReasonOrError(node) {
+  if (!node || typeof node !== "object") return false;
+  if (isReasonOrErrorIdent(node)) return true;
+  if (node.type === "LogicalExpression" || node.type === "ConditionalExpression") {
+    return (
+      exprMentionsReasonOrError(node.left) ||
+      exprMentionsReasonOrError(node.right) ||
+      exprMentionsReasonOrError(node.consequent) ||
+      exprMentionsReasonOrError(node.alternate)
+    );
+  }
+  if (node.type === "CallExpression") {
+    return (node.arguments || []).some(exprMentionsReasonOrError) || exprMentionsReasonOrError(node.callee);
+  }
+  if (node.type === "MemberExpression") {
+    return exprMentionsReasonOrError(node.object);
+  }
+  return false;
+}
+
+function unwrapTrimCall(node) {
+  if (
+    node?.type === "CallExpression" &&
+    node.callee?.type === "MemberExpression" &&
+    !node.callee.computed &&
+    node.callee.property?.name === "trim"
+  ) {
+    return node.callee.object;
+  }
+  return node;
+}
+
+function isStringCoerceOfReasonOrError(node) {
+  const target = unwrapTrimCall(node);
+  return (
+    target?.type === "CallExpression" &&
+    target.callee?.type === "Identifier" &&
+    target.callee.name === "String" &&
+    exprMentionsReasonOrError(target.arguments?.[0])
+  );
+}
+
 export function scanStage32Display(code, filename = "fixture.jsx") {
   const findings = {
     parseError: "",
@@ -147,10 +193,12 @@ export function scanStage32Display(code, filename = "fixture.jsx") {
     translatedPayloadFlows: [],
     rawErrorDisplays: [],
     resultMessageDisplays: [],
+    rawDiagnosticReturns: [],
   };
 
   const translatedState = new Set();
   const translatedPhotoVars = new Set();
+  const rawDiagnosticIdents = new Set();
 
   const linter = new Linter({ configType: "flat" });
   const messages = linter.verify(
@@ -248,6 +296,9 @@ export function scanStage32Display(code, filename = "fixture.jsx") {
 
                   return {
                     VariableDeclarator(node) {
+                      if (node.id?.type === "Identifier" && isStringCoerceOfReasonOrError(node.init)) {
+                        rawDiagnosticIdents.add(node.id.name);
+                      }
                       const init = node.init;
                       if (
                         init?.type === "CallExpression" &&
@@ -291,6 +342,20 @@ export function scanStage32Display(code, filename = "fixture.jsx") {
                           });
                         }
                       }
+                    },
+                    ReturnStatement(node) {
+                      const arg = node.argument;
+                      if (arg?.type === "Identifier" && rawDiagnosticIdents.has(arg.name)) {
+                        findings.rawDiagnosticReturns.push({
+                          kind: "raw-diagnostic-return",
+                          ident: arg.name,
+                          line: locOf(node),
+                          text: snippet(node),
+                        });
+                      }
+                    },
+                    JSXExpressionContainer(node) {
+                      inspectMessageSink(node.expression, "jsx-expression");
                     },
                     CallExpression(node) {
                       const name = calleeName(node.callee);

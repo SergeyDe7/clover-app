@@ -29,6 +29,7 @@ import {
   errorDisplayMessage,
   isKnownErrorCode,
 } from "../../src/shared/i18n/errorDisplay.js";
+import { notificationDeliveryReasonLabel } from "../../src/shared/i18n/notificationDeliveryReasonLabel.js";
 import { PUBLIC_LANGUAGE_PREFIXES_ENABLED } from "../../src/shared/i18n/languageResolver.js";
 import { FALLBACK_LOCALE, LANGUAGE_REGISTRY } from "../../src/shared/i18n/languageRegistry.js";
 import { MISSING_TRANSLATION_FALLBACK_RU } from "../../src/shared/i18n/translationRuntime.js";
@@ -287,6 +288,61 @@ assert.ok(
   "UNSAFE RAW SYSTEM ERROR DISPLAY"
 );
 
+const redJsxErrorMessage = scanStage32Display(
+  `function Example({ error }) {
+  return <div>{error.message}</div>;
+}`,
+  "red-jsx-error-message.jsx"
+);
+assert.equal(redJsxErrorMessage.parseError || "", "", "RED JSX error.message fixture must parse");
+assert.ok(
+  redJsxErrorMessage.rawErrorDisplays.length >= 1,
+  "UNSAFE RAW SYSTEM ERROR DISPLAY"
+);
+
+const redJsxErrMessage = scanStage32Display(
+  `function Example({ err }) {
+  return <span>{err.message}</span>;
+}`,
+  "red-jsx-err-message.jsx"
+);
+assert.equal(redJsxErrMessage.parseError || "", "", "RED JSX err.message fixture must parse");
+assert.ok(
+  redJsxErrMessage.rawErrorDisplays.length >= 1,
+  "UNSAFE RAW SYSTEM ERROR DISPLAY"
+);
+
+const redRawDiagnostic = scanStage32Display(
+  `function diagnostic(reason, error) {
+  const code = String(reason || error || "").trim();
+  if (code) return code;
+}
+export function show(setMessage) {
+  setMessage(\`email: \${diagnostic("", "RAW_TECHNICAL_ERROR")}\`);
+}`,
+  "red-raw-notification-diagnostic.jsx"
+);
+assert.equal(redRawDiagnostic.parseError || "", "", "RED diagnostic fixture must parse");
+assert.ok(
+  redRawDiagnostic.rawDiagnosticReturns.length >= 1,
+  "UNSAFE RAW TECHNICAL DIAGNOSTIC DISPLAY"
+);
+
+const greenCanonicalPromotion = scanStage32Display(
+  `const DEFAULT_PROMOTION_TITLE = "Новость Clover";
+export function Panel({ api, body }) {
+  const [title] = useState(DEFAULT_PROMOTION_TITLE);
+  api.sendPromotion(title, body);
+}`,
+  "green-canonical-promotion.jsx"
+);
+assert.equal(greenCanonicalPromotion.parseError || "", "", "canonical promotion fixture must parse");
+assert.equal(
+  greenCanonicalPromotion.translatedDataFlows.length,
+  0,
+  "canonical constant → sendPromotion must be SAFE"
+);
+
 const STAGE3_SCAN_DIRS = [
   "src/components",
   "src/shared",
@@ -395,6 +451,9 @@ for (const rel of stage3Files) {
     if (isAllowlistedDisplay(rel, row)) continue;
     displayLeaks.push(`${rel}:${row.line}:UNSAFE RESULT MESSAGE DISPLAY:${row.text}`);
   }
+  for (const row of display.rawDiagnosticReturns) {
+    displayLeaks.push(`${rel}:${row.line}:UNSAFE RAW TECHNICAL DIAGNOSTIC DISPLAY:${row.text}`);
+  }
   if (JSX_CYRILLIC_AFTER_EXPR.test(src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, ""))) {
     displayLeaks.push(`${rel}:UNCLASSIFIED JSX CYRILLIC AFTER EXPRESSION`);
   }
@@ -402,12 +461,64 @@ for (const rel of stage3Files) {
 assert.deepEqual(parseFailures, [], `parse errors:\n${parseFailures.join("\n")}`);
 assert.deepEqual(displayLeaks, [], `Stage 3.2 display leaks:\n${displayLeaks.slice(0, 40).join("\n")}`);
 
-assert.match(readRel("src/screens/manager/ManagerSettings.jsx"), /useState\(""\)/);
-assert.doesNotMatch(
-  readRel("src/screens/manager/ManagerSettings.jsx"),
-  /useState\(\(\)\s*=>\s*t\(/
+const settingsSrc = readRel("src/screens/manager/ManagerSettings.jsx");
+assert.match(
+  settingsSrc,
+  /const DEFAULT_PROMOTION_TITLE = "Новость Clover"/
 );
-assert.match(readRel("src/screens/manager/ManagerSettings.jsx"), /placeholder=\{t\("manager\.settings\.newsTitleDefault"\)\}/);
+assert.match(settingsSrc, /useState\(DEFAULT_PROMOTION_TITLE\)/);
+assert.doesNotMatch(settingsSrc, /useState\(\(\)\s*=>\s*t\(/);
+assert.doesNotMatch(settingsSrc, /useState\(\s*t\(/);
+assert.match(settingsSrc, /notificationDeliveryReasonLabel\(/);
+assert.doesNotMatch(settingsSrc, /if \(code\) return code/);
+assert.match(settingsSrc, /errorDisplayMessage/);
+
+const tLookupReason = (key) => `T:${key}`;
+assert.equal(
+  notificationDeliveryReasonLabel("telegram", "telegram_not_configured", "", tLookupReason),
+  "T:manager.noBotTokenInEnvOr"
+);
+assert.equal(
+  notificationDeliveryReasonLabel("telegram", "", "ETIMEDOUT connecting", tLookupReason),
+  "T:manager.noAccessFromTheDcTo"
+);
+assert.equal(
+  notificationDeliveryReasonLabel("email", "", "ENETUNREACH", tLookupReason),
+  "T:manager.noAccessFromTheDcTo"
+);
+assert.equal(
+  notificationDeliveryReasonLabel("email", "", "", tLookupReason),
+  "T:manager.notSent"
+);
+assert.equal(
+  notificationDeliveryReasonLabel("push", "", "", tLookupReason),
+  "T:manager.notSentPwaSubscriptionIsNot"
+);
+assert.equal(
+  notificationDeliveryReasonLabel(
+    "telegram",
+    "telegram_api_error",
+    "Bad Request: chat not found SECRET_TECHNICAL_DIAGNOSTIC_XYZ",
+    tLookupReason
+  ),
+  "T:manager.telegramApiReturnedAnError"
+);
+const unknownDiagnostic = notificationDeliveryReasonLabel(
+  "telegram",
+  "",
+  "SECRET_TECHNICAL_DIAGNOSTIC_XYZ",
+  tLookupReason
+);
+assert.equal(unknownDiagnostic, "T:manager.sendError");
+assert.doesNotMatch(unknownDiagnostic, /SECRET_TECHNICAL_DIAGNOSTIC_XYZ/);
+assert.notEqual(
+  notificationDeliveryReasonLabel("email", "SECRET_TECHNICAL_DIAGNOSTIC_XYZ", "", tLookupReason),
+  "SECRET_TECHNICAL_DIAGNOSTIC_XYZ"
+);
+assert.doesNotMatch(
+  notificationDeliveryReasonLabel("telegram", "telegram_send_failed", "raw error.message from fetch", tLookupReason),
+  /raw error\.message from fetch/
+);
 assert.match(readRel("src/components/CustomProductForm.jsx"), /file\.name\s*\|\|\s*["']photo\.jpg["']/);
 assert.match(readRel("src/screens/client/CustomItemForm.jsx"), /file\.name\s*\|\|\s*["']photo\.jpg["']/);
 assert.doesNotMatch(readRel("src/screens/client/CustomItemForm.jsx"), /пикс\./);

@@ -539,6 +539,13 @@
     "reason": "Canonical shipping-mode identity used for settings comparison, not a Stage 3.1 chrome sentence."
   },
   {
+    "path": "src/screens/manager/ManagerSettings.jsx",
+    "literal": "Новость Clover",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical locale-independent manager notification title default restored from BASE. Display-only localization must not replace this submitted content."
+  },
+  {
     "path": "src/screens/manager/ManagerStorefront.jsx",
     "literal": "Все",
     "count": 3,

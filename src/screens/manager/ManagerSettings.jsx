@@ -1,5 +1,6 @@
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
+import { notificationDeliveryReasonLabel } from "../../shared/i18n/notificationDeliveryReasonLabel.js";
 // Раздел менеджера: настройки кабинета, уведомления и роли.
 import { useEffect, useState } from "react";
 import { api } from "../../serverApi";
@@ -8,9 +9,11 @@ import { getRussianPhoneLocalDigits, formatRussianPhone } from "../../shared/app
 import { appAlert } from "../../shared/AppModal";
 import { FREE_DELIVERY_MIN_TOTAL, PAID_DELIVERY_FEE } from "../../config/orderConfig";
 
+const DEFAULT_PROMOTION_TITLE = "Новость Clover";
+
 function ManagerPromotionPanel() {
   const { t } = useLocalization();
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(DEFAULT_PROMOTION_TITLE);
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const send = async () => {
@@ -65,28 +68,6 @@ function ManagerNotificationSettings({ settings, set }) {
 
   useEffect(() => { loadStatus(); }, [t]);
 
-  const reasonRu = (channel, reason, error) => {
-    const code = String(reason || error || "").trim();
-    const map = {
-      smtp_not_configured: t("manager.smtpIsNotConfiguredInServer"),
-      recipient_not_configured: t("manager.enterTheEmailAbove"),
-      telegram_not_configured: t("manager.noBotTokenInEnvOr"),
-      telegram_unreachable: t("manager.noAccessFromTheDcTo"),
-      telegram_api_error: t("manager.telegramApiReturnedAnError"),
-      telegram_send_failed: t("manager.telegramSendError"),
-      push_not_configured: t("manager.httpsAndVapidAreRequiredOn"),
-      no_push_subscription: t("manager.installThePwaAndAllowNotifications"),
-      disabled: t("manager.turnedOffWithTheSwitch"),
-    };
-    if (map[code]) return map[code];
-    if (/fetch failed|ETIMEDOUT|ENETUNREACH|AbortError/i.test(code)) {
-      return t("manager.noAccessFromTheDcTo");
-    }
-    if (code) return code;
-    if (channel === "push") return t("manager.notSentPwaSubscriptionIsNot");
-    return t("manager.notSent");
-  };
-
   const test = async () => {
     setBusy(true);
     setMessage("");
@@ -98,7 +79,7 @@ function ManagerNotificationSettings({ settings, set }) {
       const parts = delivery.map((item) => {
         const channel = item.channel === "email" ? "email" : item.channel === "telegram" ? "Telegram" : item.channel === "push" ? "push" : t("manager.channel");
         if (item.sent === true || Number(item.sent) > 0) return t("manager.settings.channelSent", { channel });
-        return `${channel}: ${reasonRu(item.channel, item.reason, item.error)}`;
+        return `${channel}: ${notificationDeliveryReasonLabel(item.channel, item.reason, item.error, t)}`;
       });
       if (!settings.managerNotifyEmail && !delivery.some((item) => item.channel === "email")) {
         parts.unshift(t("manager.settings.emailToggleHint"));
