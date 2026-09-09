@@ -1,4 +1,5 @@
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 // Панель запроса и списка актов сверки клиента.
 import { useState } from "react";
 import { api } from "../../serverApi";
@@ -33,8 +34,8 @@ export function ReconciliationPanel({ requests = [], onReload }) {
       setSuccessOpen(true);
     } catch (error) {
       await appAlert({
-        title: "Не удалось отправить",
-        message: error.message || t("client.statementRequestError"),
+        title: t("shared.error.sendFailed"),
+        message: errorDisplayMessage(error, t, "client.statementRequestError"),
         tone: "danger",
       });
     } finally {
@@ -48,8 +49,8 @@ export function ReconciliationPanel({ requests = [], onReload }) {
       downloadBlobFile(blob, item.fileName || t("client.acts.fileName", { id: item.id }));
     } catch (error) {
       await appAlert({
-        title: "Не удалось скачать",
-        message: error.message || t("client.fileDownloadError"),
+        title: t("shared.error.downloadFailed"),
+        message: errorDisplayMessage(error, t, "client.fileDownloadError"),
         tone: "danger",
       });
     }

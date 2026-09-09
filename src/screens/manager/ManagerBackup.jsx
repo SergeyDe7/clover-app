@@ -5,6 +5,7 @@ import { api } from "../../serverApi";
 import { formatDateTime } from "../../shared/appHelpers";
 import { backupReasonLabel } from "../../shared/i18n/displayLabels";
 import { appAlert, appConfirm } from "../../shared/AppModal";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 
 function formatFileSize(value, t) {
   const bytes = Number(value) || 0;
@@ -25,13 +26,13 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
       setBackups(result.backups || []);
       setError("");
     } catch (loadError) {
-      setError(loadError.message);
+      setError(errorDisplayMessage(loadError, t, "shared.error.loadFailed"));
     }
   };
 
   useEffect(() => {
     loadBackups();
-  }, []);
+  }, [t]);
 
   const createBackup = async () => {
     setBusy(true);
@@ -47,7 +48,7 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
         tone: "success",
       });
     } catch (createError) {
-      await appAlert({ title: t("shared.status.error"), message: createError.message, tone: "danger" });
+      await appAlert({ title: t("shared.status.error"), message: errorDisplayMessage(createError, t), tone: "danger" });
     } finally {
       setBusy(false);
     }
@@ -81,7 +82,7 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
         tone: "success",
       });
     } catch (cleanupError) {
-      await appAlert({ title: t("manager.cleanupError"), message: cleanupError.message, tone: "danger" });
+      await appAlert({ title: t("manager.cleanupError"), message: errorDisplayMessage(cleanupError, t, "manager.cleanupError"), tone: "danger" });
     } finally {
       setBusy(false);
     }
@@ -98,7 +99,7 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
       link.click();
       URL.revokeObjectURL(url);
     } catch (downloadError) {
-      await appAlert({ title: t("manager.downloadError"), message: downloadError.message, tone: "danger" });
+      await appAlert({ title: t("manager.downloadError"), message: errorDisplayMessage(downloadError, t, "manager.downloadError"), tone: "danger" });
     } finally {
       setBusy(false);
     }
@@ -127,7 +128,7 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
         tone: "success",
       });
     } catch (restoreError) {
-      await appAlert({ title: t("manager.restoreError"), message: restoreError.message, tone: "danger" });
+      await appAlert({ title: t("manager.restoreError"), message: errorDisplayMessage(restoreError, t, "manager.restoreError"), tone: "danger" });
     } finally {
       setBusy(false);
     }
@@ -154,7 +155,7 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
       } catch {
         await appAlert({
           title: t("manager.fileError"),
-          message: "Не удалось прочитать файл резервной копии.",
+          message: t("manager.error.backupReadFailed"),
           tone: "danger",
         });
       }

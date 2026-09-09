@@ -31,6 +31,7 @@ import {
   requestStatusLabel,
   roleLabel,
 } from "../../shared/i18n/displayLabels";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 
 const CUSTOM_STATUSES = [
   "Новый запрос",
@@ -296,8 +297,8 @@ export function ManagerOrders({
       await onReload();
     } catch (error) {
       await appAlert({
-        title: action === "cancel" ? "Не удалось отменить передачу" : "Не удалось передать в 1С",
-        message: error.message,
+        title: action === "cancel" ? t("manager.error.oneCCancelFailed") : t("manager.error.oneCSendFailed"),
+        message: errorDisplayMessage(error, t),
         tone: "danger",
       });
       await onReload();
@@ -338,7 +339,7 @@ export function ManagerOrders({
         try {
           await api.resetExchangeOrder(order.id);
         } catch (error) {
-          errors.push(`${order.number || order.id}: ${error.message}`);
+          errors.push(`${order.number || order.id}: ${errorDisplayMessage(error, t, "manager.error.oneCCancelFailed")}`);
         }
       }
       await onReload();
@@ -453,7 +454,7 @@ export function ManagerOrders({
         try {
           await api.trashOrder(order.id);
         } catch (error) {
-          errors.push(`${order.number || order.id}: ${error.message}`);
+          errors.push(`${order.number || order.id}: ${errorDisplayMessage(error, t, "shared.error.deleteFailed")}`);
         }
       }
       await onReload();
@@ -485,7 +486,7 @@ export function ManagerOrders({
             onApplyManagerNotifications?.(result.managerNotifications);
           }
         } catch (error) {
-          errors.push(error.message);
+          errors.push(errorDisplayMessage(error, t, "manager.error.oneCSendFailed"));
         }
       }
       await onReload();

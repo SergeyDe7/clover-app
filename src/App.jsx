@@ -34,6 +34,7 @@ import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
 import { appAlert, appConfirm } from "./shared/AppModal";
 import { canTrashOrder, isAdminHardDeleteStatus } from "./shared/orderTrash";
 import { orderStatusLabel } from "./shared/i18n/displayLabels";
+import { errorDisplayMessage } from "./shared/i18n/errorDisplay.js";
 import {
   canOrderAcceptAddendum,
   mergeOrderCatalogItems,
@@ -180,14 +181,14 @@ function LoginView({ onAuth, authBusy, authError }) {
     if (!verifyToken) return;
     let cancelled = false;
     api.verifyEmail(verifyToken)
-      .then((result) => {
+      .then(() => {
         if (cancelled) return;
-        setMessage(result.message || t("auth.verify.confirmed"));
+        setMessage(t("auth.verify.confirmed"));
         window.history.replaceState({}, "", window.location.pathname);
         setMode("login");
       })
       .catch((error) => {
-        if (!cancelled) setLocalError(error.message);
+        if (!cancelled) setLocalError(errorDisplayMessage(error, t, "shared.error.requestFailed"));
       })
       .finally(() => {
         if (!cancelled) setVerificationBusy(false);
@@ -214,16 +215,17 @@ function LoginView({ onAuth, authBusy, authError }) {
     try {
       if (mode === "forgot") {
         const result = await api.forgotPassword(form.email);
-        setMessage(result.message);
+        setMessage(t("auth.forgot.sent"));
         setDevelopmentLink(result.developmentLink || "");
         return;
       }
       if (mode === "reset") {
         if (form.password !== form.confirmPassword) {
-          throw new Error(t("auth.reset.mismatch"));
+          setLocalError(t("auth.reset.mismatch"));
+          return;
         }
-        const result = await api.resetPassword(resetToken, form.password);
-        setMessage(result.message);
+        await api.resetPassword(resetToken, form.password);
+        setMessage(t("shared.passwordChanged"));
         window.history.replaceState({}, "", window.location.pathname);
         setMode("login");
         setForm((current) => ({ ...current, password: "", confirmPassword: "" }));
@@ -238,12 +240,12 @@ function LoginView({ onAuth, authBusy, authError }) {
         password: form.password,
       });
       if (mode === "register" && result) {
-        setMessage(result.message || t("auth.register.created"));
+        setMessage(t("auth.register.created"));
         setDevelopmentLink(result.developmentLink || "");
         setMode("login");
       }
     } catch (error) {
-      setLocalError(error.message);
+      setLocalError(errorDisplayMessage(error, t, "shared.error.requestFailed"));
     }
   };
 
@@ -251,10 +253,10 @@ function LoginView({ onAuth, authBusy, authError }) {
     setLocalError("");
     try {
       const result = await api.resendVerification(form.email);
-      setMessage(result.message);
+      setMessage(t("auth.verify.resent"));
       setDevelopmentLink(result.developmentLink || "");
     } catch (error) {
-      setLocalError(error.message);
+      setLocalError(errorDisplayMessage(error, t, "shared.error.requestFailed"));
     }
   };
 
@@ -277,10 +279,7 @@ function LoginView({ onAuth, authBusy, authError }) {
       if (name === "NotAllowedError") {
         setLocalError(t("auth.passkeyCancelled"));
       } else {
-        setLocalError(
-          error.message
-          || "Не удалось войти по Face ID. Если ключ добавляли раньше — укажите почту или добавьте Face ID заново в профиле."
-        );
+        setLocalError(errorDisplayMessage(error, t, "auth.error.faceIdLoginFailed"));
       }
     } finally {
       setPasskeyBusy(false);
@@ -758,7 +757,7 @@ function App() {
           matrixProductIds: [],
         });
       } else {
-        setSyncError(error.message);
+        setSyncError(errorDisplayMessage(error, t, "shared.error.loadFailed"));
         // Без успешного bootstrap не показываем кабинет на локальных дефолтах:
         // иначе manager-токен может открыть client UI и затереть заказы.
         if (!hydrated) {
@@ -940,7 +939,7 @@ function App() {
             matrixProductIds: [],
           });
         } else {
-          setSyncError(error.message);
+          setSyncError(errorDisplayMessage(error, t, "shared.error.requestFailed"));
         }
       } finally {
         requestInProgress = false;
@@ -971,7 +970,7 @@ function App() {
       document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("pageshow", handlePageShow);
     };
-  }, [isLoggedIn, hydrated, authUser?.id, authUser?.role]);
+  }, [isLoggedIn, hydrated, authUser?.id, authUser?.role, t]);
 
   const scheduleSync = (callback, delay = 650) => {
     const timeoutId = window.setTimeout(async () => {
@@ -980,7 +979,7 @@ function App() {
         setSyncError("");
       } catch (error) {
         setSyncError(
-          t("auth.sync.keptOnScreen", { message: error.message })
+          t("auth.sync.keptOnScreen", { message: errorDisplayMessage(error, t) })
         );
       }
     }, delay);
@@ -1190,7 +1189,7 @@ function App() {
       clearApiToken();
       setIsLoggedIn(false);
       setHydrated(false);
-      setAuthError(error.message);
+      setAuthError(errorDisplayMessage(error, t, "shared.error.requestFailed"));
       setLoading(false);
       throw error;
     } finally {
@@ -1220,7 +1219,7 @@ function App() {
       await api.readManagerNotification(notificationId);
       await loadBootstrap({ silent: true });
     } catch (error) {
-      setSyncError(error.message);
+      setSyncError(errorDisplayMessage(error, t, "shared.error.requestFailed"));
     }
   };
 
@@ -1237,7 +1236,7 @@ function App() {
       await api.readAllManagerNotifications();
       await loadBootstrap({ silent: true });
     } catch (error) {
-      setSyncError(error.message);
+      setSyncError(errorDisplayMessage(error, t, "shared.error.requestFailed"));
     }
   };
 
@@ -1377,8 +1376,8 @@ function App() {
       return data;
     } catch (error) {
       await appAlert({
-        title: "Не удалось добавить",
-        message: error.message || t("auth.productWasNotAddedToThe"),
+        title: t("shared.error.addFailed"),
+        message: errorDisplayMessage(error, t, "auth.productWasNotAddedToThe"),
         tone: "danger",
       });
       throw error;
@@ -1545,7 +1544,7 @@ function App() {
             // оставляем откат к previousOrders
           }
         }
-        const message = t("auth.order.notSavedOnServer", { message: error.message });
+        const message = t("auth.order.notSavedOnServer", { message: errorDisplayMessage(error, t) });
         setSyncError(message);
         void appAlert({ title: t("auth.orderNotSaved"), message, tone: "danger" });
         throw error;
@@ -1583,7 +1582,7 @@ function App() {
         setSyncError("");
       } catch (error) {
         pendingDeletedOrderIdsRef.current.delete(orderId);
-        const message = t("auth.order.notDeletedOnServer", { message: error.message });
+        const message = t("auth.order.notDeletedOnServer", { message: errorDisplayMessage(error, t) });
         setSyncError(message);
         void appAlert({ title: t("auth.deletionWasNotCompleted"), message, tone: "danger" });
         try {
@@ -1635,8 +1634,8 @@ function App() {
               )
             );
           }
-          setSyncError(error.message);
-          void appAlert({ title: t("auth.updateError"), message: error.message, tone: "danger" });
+          setSyncError(errorDisplayMessage(error, t, "auth.updateError"));
+          void appAlert({ title: t("auth.updateError"), message: errorDisplayMessage(error, t, "auth.updateError"), tone: "danger" });
         }
       })();
       return;
@@ -1722,8 +1721,8 @@ function App() {
               : null,
           });
         } catch (error) {
-          setSyncError(error.message);
-          void appAlert({ title: t("auth.updateError"), message: error.message, tone: "danger" });
+          setSyncError(errorDisplayMessage(error, t, "auth.updateError"));
+          void appAlert({ title: t("auth.updateError"), message: errorDisplayMessage(error, t, "auth.updateError"), tone: "danger" });
         }
       })();
       return;
@@ -1813,8 +1812,8 @@ function App() {
         setSyncError("");
       } catch (error) {
         const message = hardDeleteCompleted
-          ? t("auth.order.notDeleted", { message: error.message })
-          : t("auth.order.notMovedToTrash", { message: error.message });
+          ? t("auth.order.notDeleted", { message: errorDisplayMessage(error, t) })
+          : t("auth.order.notMovedToTrash", { message: errorDisplayMessage(error, t) });
         setSyncError(message);
         void appAlert({
           title: hardDeleteCompleted ? t("auth.deletion") : t("storefront.nav.cart"),
@@ -1845,7 +1844,11 @@ function App() {
       if (Array.isArray(result?.trashedOrders)) setTrashedOrders(result.trashedOrders);
       setSyncError("");
     } catch (error) {
-      await appAlert({ title: "Не удалось восстановить", message: error.message, tone: "danger" });
+      await appAlert({
+        title: t("shared.error.restoreFailed"),
+        message: errorDisplayMessage(error, t, "shared.error.restoreFailed"),
+        tone: "danger",
+      });
     }
   };
 
@@ -1876,7 +1879,11 @@ function App() {
       if (Array.isArray(result?.trashedOrders)) setTrashedOrders(result.trashedOrders);
       setSyncError("");
     } catch (error) {
-      await appAlert({ title: "Не удалось удалить", message: error.message, tone: "danger" });
+      await appAlert({
+        title: t("shared.error.deleteFailed"),
+        message: errorDisplayMessage(error, t, "shared.error.deleteFailed"),
+        tone: "danger",
+      });
     }
   };
 
@@ -2008,7 +2015,7 @@ function App() {
         tone: "success",
       });
     } catch (error) {
-      await appAlert({ title: t("auth.resetError"), message: error.message, tone: "danger" });
+      await appAlert({ title: t("auth.resetError"), message: errorDisplayMessage(error, t, "auth.resetError"), tone: "danger" });
     }
   };
 

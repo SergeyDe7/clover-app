@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
 import { promoStatusLabel } from "../../shared/i18n/displayLabels.js";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 import {
   STOREFRONT_MAX_PROMOTIONS,
   promotionStatus,
@@ -261,8 +262,8 @@ export function ManagerStorefrontPromotions({
                         })
                         .catch((error) =>
                           appAlert({
-                            title: "Не удалось загрузить картинку акции",
-                            message: error.message || t("manager.loadError"),
+                            title: t("manager.error.promoImageLoadFailed"),
+                            message: errorDisplayMessage(error, t, "manager.loadError"),
                             tone: "danger",
                           })
                         )

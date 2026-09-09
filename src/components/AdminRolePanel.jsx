@@ -3,6 +3,7 @@ import { api } from "../serverApi";
 import { appAlert, appConfirm } from "../shared/AppModal";
 import { STAFF_FEATURE_OPTIONS, STAFF_FEATURE_IDS, formatDateTime } from "../shared/appHelpers";
 import { useLocalization } from "../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../shared/i18n/errorDisplay.js";
 
 function generateAccessPassword(length = 10) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -95,7 +96,7 @@ export function AdminRolePanel({ currentUser }) {
       if (err.status === 401) {
         setError(t("shared.theSessionExpiredSignOutAnd"));
       } else {
-        setError(err.message);
+        setError(errorDisplayMessage(err, t, "shared.error.loadFailed"));
       }
     }
   };
@@ -136,7 +137,7 @@ export function AdminRolePanel({ currentUser }) {
     if (!ok) {
       await appAlert({
         title: t("shared.notCopied"),
-        message: "Не удалось скопировать в буфер обмена.",
+        message: t("shared.error.copyFailed"),
         tone: "warn",
       });
       return;
@@ -156,8 +157,9 @@ export function AdminRolePanel({ currentUser }) {
       setNotice(t("admin.staff.roleUpdated", { role }));
       await load();
     } catch (err) {
-      setError(err.message);
-      await appAlert({ title: t("shared.status.error"), message: err.message, tone: "danger" });
+      const message = errorDisplayMessage(err, t, "shared.error.saveFailed");
+      setError(message);
+      await appAlert({ title: t("shared.status.error"), message, tone: "danger" });
     } finally {
       setBusyId("");
     }
@@ -197,7 +199,7 @@ export function AdminRolePanel({ currentUser }) {
       setFormKey((value) => value + 1);
       await load();
     } catch (err) {
-      const message = err.message || "Не удалось создать менеджера.";
+      const message = errorDisplayMessage(err, t, "manager.error.managerCreateFailed");
       setError(message);
       await appAlert({ title: t("shared.notCreated"), message, tone: "danger" });
     } finally {
@@ -215,8 +217,9 @@ export function AdminRolePanel({ currentUser }) {
       setNotice(t("shared.managerContactsSaved"));
       await load();
     } catch (err) {
-      setError(err.message);
-      await appAlert({ title: t("shared.status.error"), message: err.message, tone: "danger" });
+      const message = errorDisplayMessage(err, t, "shared.error.saveFailed");
+      setError(message);
+      await appAlert({ title: t("shared.status.error"), message, tone: "danger" });
     } finally {
       setBusyId("");
     }
@@ -236,12 +239,13 @@ export function AdminRolePanel({ currentUser }) {
     setBusyId(user.id);
     setError("");
     try {
-      const result = await api.setStaffAccess(user.id, disable);
-      setNotice(result.message || (disable ? t("shared.accessIsClosed") : t("shared.accessIsOpen")));
+      await api.setStaffAccess(user.id, disable);
+      setNotice(disable ? t("shared.accessIsClosed") : t("shared.accessIsOpen"));
       await load();
     } catch (err) {
-      setError(err.message);
-      await appAlert({ title: t("shared.status.error"), message: err.message, tone: "danger" });
+      const message = errorDisplayMessage(err, t, "shared.error.saveFailed");
+      setError(message);
+      await appAlert({ title: t("shared.status.error"), message, tone: "danger" });
     } finally {
       setBusyId("");
     }
@@ -257,14 +261,15 @@ export function AdminRolePanel({ currentUser }) {
     setBusyId(user.id);
     setError("");
     try {
-      const result = await api.setStaffPassword(user.id, draftPassword);
+      await api.setStaffPassword(user.id, draftPassword);
       setDraftPassword("");
       setRevealed((current) => ({ ...current, [user.id]: true }));
       await load();
-      setNotice(result.message || t("shared.passwordUpdated"));
+      setNotice(t("shared.passwordUpdated"));
     } catch (err) {
-      setError(err.message);
-      await appAlert({ title: t("shared.status.error"), message: err.message, tone: "danger" });
+      const message = errorDisplayMessage(err, t, "shared.error.saveFailed");
+      setError(message);
+      await appAlert({ title: t("shared.status.error"), message, tone: "danger" });
     } finally {
       setBusyId("");
     }
@@ -281,13 +286,14 @@ export function AdminRolePanel({ currentUser }) {
     setBusyId(user.id);
     setError("");
     try {
-      const result = await api.setStaffPermissions(user.id, payload);
-      setNotice(result.message || t("shared.permissionsUpdated"));
+      await api.setStaffPermissions(user.id, payload);
+      setNotice(t("shared.permissionsUpdated"));
       await load();
-      await appAlert({ title: t("shared.permissionsSaved"), message: result.message || t("shared.status.donePeriod"), tone: "success" });
+      await appAlert({ title: t("shared.permissionsSaved"), message: t("shared.status.donePeriod"), tone: "success" });
     } catch (err) {
-      setError(err.message);
-      await appAlert({ title: t("shared.status.error"), message: err.message, tone: "danger" });
+      const message = errorDisplayMessage(err, t, "shared.error.saveFailed");
+      setError(message);
+      await appAlert({ title: t("shared.status.error"), message, tone: "danger" });
     } finally {
       setBusyId("");
     }
@@ -304,13 +310,14 @@ export function AdminRolePanel({ currentUser }) {
     setBusyId(user.id);
     setError("");
     try {
-      const result = await api.deleteStaffUser(user.id);
+      await api.deleteStaffUser(user.id);
       if (String(expandedId) === String(user.id)) setExpandedId("");
-      setNotice(result.message || t("shared.managerDeleted"));
+      setNotice(t("shared.managerDeleted"));
       await load();
     } catch (err) {
-      setError(err.message);
-      await appAlert({ title: t("shared.status.error"), message: err.message, tone: "danger" });
+      const message = errorDisplayMessage(err, t, "shared.error.deleteFailed");
+      setError(message);
+      await appAlert({ title: t("shared.status.error"), message, tone: "danger" });
     } finally {
       setBusyId("");
     }

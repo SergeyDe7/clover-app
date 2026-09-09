@@ -5,6 +5,7 @@ import { api } from "../../serverApi";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { formatDateTime } from "../../shared/appHelpers";
 import { AdminRolePanel } from "../../components/AdminRolePanel";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 
 function generateAccessPassword(length = 10) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -63,7 +64,7 @@ function ClientAccessPanel() {
       const result = await api.getClientAccessVault();
       setItems(Array.isArray(result.items) ? result.items : []);
     } catch (loadError) {
-      setError(loadError.message || "Не удалось загрузить доступы.");
+      setError(errorDisplayMessage(loadError, t, "manager.error.vaultLoadFailed"));
       setItems([]);
     } finally {
       setLoading(false);
@@ -99,7 +100,7 @@ function ClientAccessPanel() {
     if (!ok) {
       await appAlert({
         title: t("shared.notCopied"),
-        message: "Не удалось скопировать в буфер обмена.",
+        message: t("shared.error.copyFailed"),
         tone: "warn",
       });
       return;
@@ -125,7 +126,7 @@ function ClientAccessPanel() {
     } catch (removeError) {
       await appAlert({
         title: t("shared.status.error"),
-        message: removeError.message,
+        message: errorDisplayMessage(removeError, t, "shared.error.deleteFailed"),
         tone: "danger",
       });
     }
@@ -157,13 +158,13 @@ function ClientAccessPanel() {
       );
       await appAlert({
         title: t("manager.clientDeleted"),
-        message: result.message || t("manager.theClientAccountHasBeenDeleted"),
+        message: t("manager.theClientAccountHasBeenDeleted"),
         tone: "success",
       });
     } catch (deleteError) {
       await appAlert({
-        title: "Не удалось удалить",
-        message: deleteError.message || t("manager.failedToDeleteTheClient"),
+        title: t("shared.error.deleteFailed"),
+        message: errorDisplayMessage(deleteError, t, "manager.failedToDeleteTheClient"),
         tone: "danger",
       });
     }
@@ -198,8 +199,8 @@ function ClientAccessPanel() {
       cancelPasswordEditor();
     } catch (saveError) {
       await appAlert({
-        title: "Не удалось сохранить",
-        message: saveError.message || t("manager.passwordSaveError"),
+        title: t("shared.error.saveFailed"),
+        message: errorDisplayMessage(saveError, t, "manager.passwordSaveError"),
         tone: "danger",
       });
     } finally {

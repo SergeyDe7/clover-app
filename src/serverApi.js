@@ -5,6 +5,39 @@ const DEFAULT_TIMEOUT_MS = 20000;
 const AUTH_TIMEOUT_MS = 12000;
 const BOOTSTRAP_TIMEOUT_MS = 25000;
 
+const TRANSPORT_RU = Object.freeze({
+  TIMEOUT: "Сервер временно недоступен. Попробуйте ещё раз.",
+  NETWORK: "Не удалось связаться с сервером. Проверьте интернет и попробуйте снова.",
+  API_UNAVAILABLE: "Сервер API сейчас недоступен. Обновите страницу через минуту или обратитесь к менеджеру.",
+  REQUEST_TOO_LARGE: "Запрос слишком большой для сервера. Обновите страницу и сохраните товар ещё раз.",
+  INVALID_RESPONSE: "Не удалось прочитать ответ сервера. Обновите страницу или войдите снова.",
+  NO_RESPONSE: "Сервер не ответил. Войдите снова или попробуйте позже.",
+  REQUEST_FAILED: "Не удалось выполнить запрос. Попробуйте позже.",
+});
+
+function isAbortError(err) {
+  return (
+    err?.name === "AbortError" ||
+    (typeof DOMException !== "undefined" && err instanceof DOMException && err.name === "AbortError")
+  );
+}
+
+function inferTransportCode(status, payload) {
+  const fromPayload = typeof payload?.code === "string" ? payload.code.trim() : "";
+  if (fromPayload) return fromPayload;
+  if (status === 413) return "REQUEST_TOO_LARGE";
+  if (status === 502 || status === 503 || status === 504) return "API_UNAVAILABLE";
+  return "REQUEST_FAILED";
+}
+
+function makeTransportError(code, { status = 0, payload, message } = {}) {
+  const error = new Error(message || TRANSPORT_RU[code] || TRANSPORT_RU.REQUEST_FAILED);
+  error.status = status;
+  error.code = code;
+  if (payload !== undefined) error.payload = payload;
+  return error;
+}
+
 export function getApiToken() {
   return localStorage.getItem(TOKEN_KEY) || "";
 }
@@ -73,17 +106,8 @@ async function request(path, options = {}) {
           : fetchOptions.body,
     });
   } catch (err) {
-    const aborted =
-      err?.name === "AbortError" ||
-      (typeof DOMException !== "undefined" && err instanceof DOMException && err.name === "AbortError");
-    const error = new Error(
-      aborted
-        ? "Сервер временно недоступен. Попробуйте ещё раз."
-        : "Не удалось связаться с сервером. Проверьте интернет и попробуйте снова."
-    );
-    error.status = 0;
-    error.code = aborted ? "TIMEOUT" : "NETWORK";
-    throw error;
+    const aborted = isAbortError(err);
+    throw makeTransportError(aborted ? "TIMEOUT" : "NETWORK", { status: 0 });
   } finally {
     timed.clear();
   }
@@ -94,30 +118,28 @@ async function request(path, options = {}) {
     try {
       payload = JSON.parse(rawText);
     } catch {
-          const gatewayDown = response.status === 502 || response.status === 503 || response.status === 504;
+      const code = inferTransportCode(response.status, {});
+      const resolved = code === "REQUEST_FAILED" ? "INVALID_RESPONSE" : code;
       payload = {
-        error: gatewayDown
-          ? "Сервер API сейчас недоступен. Обновите страницу через минуту или обратитесь к менеджеру."
-          : response.status === 413
-            ? "Запрос слишком большой для сервера. Обновите страницу и сохраните товар ещё раз."
-          : "Не удалось прочитать ответ сервера. Обновите страницу или войдите снова.",
+        error: TRANSPORT_RU[resolved] || TRANSPORT_RU.INVALID_RESPONSE,
         raw: rawText.slice(0, 120),
+        code: resolved,
       };
     }
   } else if (!response.ok) {
     payload = {
-      error: "Сервер не ответил. Войдите снова или попробуйте позже.",
+      error: TRANSPORT_RU.NO_RESPONSE,
+      code: "NO_RESPONSE",
     };
   }
 
   if (!response.ok) {
-    const error = new Error(
-      payload.error || "Не удалось выполнить запрос. Попробуйте позже."
-    );
-    error.status = response.status;
-    error.code = payload.code || "";
-    error.payload = payload;
-    throw error;
+    const code = inferTransportCode(response.status, payload);
+    throw makeTransportError(code, {
+      status: response.status,
+      payload,
+      message: payload.error || TRANSPORT_RU[code] || TRANSPORT_RU.REQUEST_FAILED,
+    });
   }
 
   return payload;
@@ -139,15 +161,19 @@ async function requestBlob(path, options = {}) {
       ...options,
       headers,
     });
-  } catch {
-    throw new Error(
-      "Не удалось связаться с сервером. Проверьте интернет и попробуйте снова."
-    );
+  } catch (err) {
+    const aborted = isAbortError(err);
+    throw makeTransportError(aborted ? "TIMEOUT" : "NETWORK", { status: 0 });
   }
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.error || "Не удалось выполнить запрос. Попробуйте позже.");
+    const code = inferTransportCode(response.status, payload);
+    throw makeTransportError(code, {
+      status: response.status,
+      payload,
+      message: payload.error || TRANSPORT_RU[code] || TRANSPORT_RU.REQUEST_FAILED,
+    });
   }
 
   return response.blob();

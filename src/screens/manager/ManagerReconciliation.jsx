@@ -7,6 +7,7 @@ import {
   reconciliationPeriodDisplayLabel,
   reconciliationStatusLabel,
 } from "../../shared/i18n/displayLabels";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { OrderThankYouOverlay } from "../../shared/SharedPanels";
 
@@ -54,8 +55,8 @@ export function ManagerReconciliation({
       setSuccessOpen(true);
     } catch (error) {
       await appAlert({
-        title: "Не удалось отправить",
-        message: error.message || t("manager.failedToSendTheStatement"),
+        title: t("shared.error.sendFailed"),
+        message: errorDisplayMessage(error, t, "manager.failedToSendTheStatement"),
         tone: "danger",
       });
     } finally {
@@ -94,8 +95,8 @@ export function ManagerReconciliation({
       }
     } catch (error) {
       await appAlert({
-        title: "Не удалось удалить",
-        message: error.message || t("manager.failedToDeleteTheStatement"),
+        title: t("shared.error.deleteFailed"),
+        message: errorDisplayMessage(error, t, "manager.failedToDeleteTheStatement"),
         tone: "danger",
       });
     } finally {

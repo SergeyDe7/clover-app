@@ -102,7 +102,7 @@ export function writeClientSeenReadyActs(ids) {
     const unique = [...new Set((ids || []).map(String))];
     localStorage.setItem(CLIENT_SEEN_READY_ACTS_KEY, JSON.stringify(unique));
   } catch (error) {
-    console.error("Не удалось сохранить просмотренные акты сверки", error);
+    console.error("Failed to persist seen reconciliation statements", error);
   }
 }
 
@@ -153,7 +153,7 @@ export function writeManagerActiveTab(value) {
   try {
     localStorage.setItem(MANAGER_ACTIVE_TAB_KEY, value);
   } catch (error) {
-    console.error("Не удалось сохранить раздел менеджера", error);
+    console.error("Failed to persist manager section", error);
   }
 }
 
@@ -170,7 +170,7 @@ export function writeManagerMoreTab(value) {
   try {
     localStorage.setItem(MANAGER_MORE_TAB_KEY, value);
   } catch (error) {
-    console.error("Не удалось сохранить подраздел «Ещё»", error);
+    console.error("Failed to persist manager More subsection", error);
   }
 }
 
@@ -188,7 +188,7 @@ export function writeClientActiveTab(value) {
   try {
     localStorage.setItem(CLIENT_ACTIVE_TAB_KEY, value);
   } catch (error) {
-    console.error("Не удалось сохранить раздел клиента", error);
+    console.error("Failed to persist client section", error);
   }
 }
 
@@ -207,7 +207,7 @@ export function writeClientCabinetSection(value) {
   try {
     localStorage.setItem(CLIENT_CABINET_SECTION_KEY, value);
   } catch (error) {
-    console.error("Не удалось сохранить подраздел кабинета", error);
+    console.error("Failed to persist cabinet subsection", error);
   }
 }
 
@@ -274,7 +274,7 @@ export function writeOpenManagerClientId(value) {
       localStorage.removeItem(MANAGER_OPEN_CLIENT_KEY);
     }
   } catch (error) {
-    console.error("Не удалось сохранить открытую карточку клиента", error);
+    console.error("Failed to persist open client card", error);
   }
 }
 
@@ -6694,7 +6694,7 @@ export function writeDemoSession(isLoggedIn, role) {
       })
     );
   } catch (error) {
-    console.error("Не удалось сохранить текущий вход", error);
+    console.error("Failed to persist current session", error);
   }
 }
 
@@ -6711,7 +6711,7 @@ export function safeWrite(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (error) {
-    console.error(`Не удалось сохранить ${key}`, error);
+    console.error(`Failed to persist ${key}`, error);
   }
 }
 

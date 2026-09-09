@@ -1,4 +1,5 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../../../shared/i18n/errorDisplay.js";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
 import {
@@ -48,12 +49,12 @@ export function CatalogPage({
         if (!cancelled) setData(payload);
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message || "Не удалось загрузить каталог.");
+        if (!cancelled) setError(errorDisplayMessage(err, t, "storefront.error.catalogLoadFailed"));
       });
     return () => {
       cancelled = true;
     };
-  }, [category, subcategory, facet]);
+  }, [category, subcategory, facet, t]);
 
   const routeKey = catalogScrollRouteKey(category, subcategory, facet);
   const prevRouteKeyRef = useRef(null);

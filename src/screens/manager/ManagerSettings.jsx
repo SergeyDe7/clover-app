@@ -1,4 +1,6 @@
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
+import { notificationDeliveryReasonLabel } from "../../shared/i18n/notificationDeliveryReasonLabel.js";
 // Раздел менеджера: настройки кабинета, уведомления и роли.
 import { useEffect, useState } from "react";
 import { api } from "../../serverApi";
@@ -7,9 +9,11 @@ import { getRussianPhoneLocalDigits, formatRussianPhone } from "../../shared/app
 import { appAlert } from "../../shared/AppModal";
 import { FREE_DELIVERY_MIN_TOTAL, PAID_DELIVERY_FEE } from "../../config/orderConfig";
 
+const DEFAULT_PROMOTION_TITLE = "Новость Clover";
+
 function ManagerPromotionPanel() {
   const { t } = useLocalization();
-  const [title, setTitle] = useState("Новость Clover");
+  const [title, setTitle] = useState(DEFAULT_PROMOTION_TITLE);
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const send = async () => {
@@ -25,7 +29,11 @@ function ManagerPromotionPanel() {
       });
       setBody("");
     } catch (error) {
-      await appAlert({ title: t("manager.sendError"), message: error.message, tone: "danger" });
+      await appAlert({
+        title: t("manager.sendError"),
+        message: errorDisplayMessage(error, t, "manager.sendError"),
+        tone: "danger",
+      });
     } finally {
       setBusy(false);
     }
@@ -33,7 +41,7 @@ function ManagerPromotionPanel() {
   return (
     <div className="manager-contact-settings">
       <h3>{t("manager.pushAboutAPromoOrNew")}</h3>
-      <div className="form-grid"><label className="field">{t("shared.field.title")}<input value={title} onChange={(event) => setTitle(event.target.value)} /></label><label className="field field-wide">{t("manager.field.bodyText")}<textarea rows="3" value={body} onChange={(event) => setBody(event.target.value)} /></label></div>
+      <div className="form-grid"><label className="field">{t("shared.field.title")}<input value={title} placeholder={t("manager.settings.newsTitleDefault")} onChange={(event) => setTitle(event.target.value)} /></label><label className="field field-wide">{t("manager.field.bodyText")}<textarea rows="3" value={body} onChange={(event) => setBody(event.target.value)} /></label></div>
       <div className="form-actions"><button className="primary-button" type="button" disabled={busy || !body.trim()} onClick={send}>{t("manager.sendToSubscribedClients")}</button></div>
     </div>
   );
@@ -54,33 +62,11 @@ function ManagerNotificationSettings({ settings, set }) {
       const result = await api.getManagerNotifications({ limit: 1 });
       setStatus(result.status || null);
     } catch (error) {
-      setMessage(error.message);
+      setMessage(errorDisplayMessage(error, t, "manager.error.channelsCheckFailed"));
     }
   };
 
-  useEffect(() => { loadStatus(); }, []);
-
-  const reasonRu = (channel, reason, error) => {
-    const code = String(reason || error || "").trim();
-    const map = {
-      smtp_not_configured: t("manager.smtpIsNotConfiguredInServer"),
-      recipient_not_configured: t("manager.enterTheEmailAbove"),
-      telegram_not_configured: t("manager.noBotTokenInEnvOr"),
-      telegram_unreachable: t("manager.noAccessFromTheDcTo"),
-      telegram_api_error: t("manager.telegramApiReturnedAnError"),
-      telegram_send_failed: t("manager.telegramSendError"),
-      push_not_configured: t("manager.httpsAndVapidAreRequiredOn"),
-      no_push_subscription: t("manager.installThePwaAndAllowNotifications"),
-      disabled: t("manager.turnedOffWithTheSwitch"),
-    };
-    if (map[code]) return map[code];
-    if (/fetch failed|ETIMEDOUT|ENETUNREACH|AbortError/i.test(code)) {
-      return t("manager.noAccessFromTheDcTo");
-    }
-    if (code) return code;
-    if (channel === "push") return t("manager.notSentPwaSubscriptionIsNot");
-    return t("manager.notSent");
-  };
+  useEffect(() => { loadStatus(); }, [t]);
 
   const test = async () => {
     setBusy(true);
@@ -93,10 +79,10 @@ function ManagerNotificationSettings({ settings, set }) {
       const parts = delivery.map((item) => {
         const channel = item.channel === "email" ? "email" : item.channel === "telegram" ? "Telegram" : item.channel === "push" ? "push" : t("manager.channel");
         if (item.sent === true || Number(item.sent) > 0) return t("manager.settings.channelSent", { channel });
-        return `${channel}: ${reasonRu(item.channel, item.reason, item.error)}`;
+        return `${channel}: ${notificationDeliveryReasonLabel(item.channel, item.reason, item.error, t)}`;
       });
       if (!settings.managerNotifyEmail && !delivery.some((item) => item.channel === "email")) {
-        parts.unshift("email: включите тумблер «Отправлять на email» и обновите страницу");
+        parts.unshift(t("manager.settings.emailToggleHint"));
       }
       const emailOk = delivery.some((item) => item.channel === "email" && (item.sent === true || Number(item.sent) > 0));
       const summary = parts.length ? parts.join("; ") : t("manager.anInternalNotificationWasCreatedExternal");
@@ -106,7 +92,7 @@ function ManagerNotificationSettings({ settings, set }) {
       }) : summary);
       setStatus(result.status || null);
     } catch (error) {
-      setMessage(error.message || "Не удалось проверить каналы");
+      setMessage(errorDisplayMessage(error, t, "manager.error.channelsCheckFailed"));
     } finally {
       setBusy(false);
     }

@@ -155,14 +155,14 @@ assert.match(
   "«Контакты» стоят между «Корзина» и «Войти в ЛК»."
 );
 assert.match(contacts, /name: "contacts"/);
-assert.match(page, /Режим работы/);
-assert.match(page, /Связаться/);
-assert.match(page, /Как нас найти/);
-assert.match(page, /Позвонить/);
-assert.match(page, /Написать/);
-assert.match(page, /label="Телефон"/);
-assert.match(page, /label="Почта"/);
-assert.match(page, /label="Адрес"/);
+assert.match(page, /t\("storefront\.workingHours"\)/);
+assert.match(page, /t\("storefront\.contact"\)/);
+assert.match(page, /t\("storefront\.howToFindUs"\)/);
+assert.match(page, /t\("storefront\.call"\)/);
+assert.match(page, /t\("storefront\.write"\)/);
+assert.match(page, /t\("auth\.register\.phone"\)/);
+assert.match(page, /t\("shared\.field\.emailShort"\)/);
+assert.match(page, /t\("shared\.field\.address"\)/);
 assert.doesNotMatch(
   page,
   /телефон, почта, адрес и как нас найти/,
@@ -177,9 +177,9 @@ assert.match(page, /mailto:/);
 assert.match(page, /javascript/i);
 assert.match(page, /yandexStaticMapSrc/);
 assert.match(page, /yandexEmbedSrc/);
-assert.match(page, /Открыть в Яндекс.Картах/);
-assert.match(page, /Увеличить карту/);
-assert.match(page, /Уменьшить карту/);
+assert.match(page, /t\("storefront\.openInYandexMaps"\)/);
+assert.match(page, /t\("storefront\.zoomInMap"\)/);
+assert.match(page, /t\("storefront\.zoomOutMap"\)/);
 assert.match(page, /yandexMapWidgetSrc/);
 assert.match(page, /MAP_Z_MIN = 4/);
 assert.match(page, /MAP_Z_MAX = 21/);
@@ -190,10 +190,10 @@ assert.doesNotMatch(
   /MAP_ZOOM_MIN = 1/,
   "Минус не заблокирован на стартовом CSS-scale=1: зум идёт через z Яндекса."
 );
-assert.match(admin, /Контакты на витрине/);
+assert.match(admin, /t\("manager\.storefrontContacts"\)/);
 assert.match(
   admin,
-  /Кнопка «Контакты» открывает страницу с телефоном, почтой, адресом/
+  /t\("manager\.theContactsButtonOpensAPage"\)/
 );
 assert.doesNotMatch(
   admin,

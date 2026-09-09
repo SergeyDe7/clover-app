@@ -15,7 +15,7 @@ const selectMatch = source.match(
 );
 assert.ok(selectMatch, "Не найден select фильтра visibility");
 
-const options = [...selectMatch[1].matchAll(/<option>([^<]*)<\/option>/g)].map((m) => m[1]);
+const options = [...selectMatch[1].matchAll(/<option value="([^"]+)">/g)].map((m) => m[1]);
 const storefrontIndex = options.indexOf("На витрине сайта");
 assert.notEqual(storefrontIndex, -1, "В select должен остаться пункт «На витрине сайта»");
 assert.equal(
@@ -36,6 +36,16 @@ assert.deepEqual(
     "Есть варианты",
   ],
   "Остальные пункты select не должны меняться"
+);
+assert.match(
+  selectMatch[1],
+  /visibilityFilterLabel\("На витрине сайта"/,
+  "Storefront filter labels must stay display-projected"
+);
+assert.match(
+  selectMatch[1],
+  /visibilityFilterLabel\("Не на витрине"/,
+  "Off-storefront filter label must stay display-projected"
 );
 
 const visibilityMatch = source.match(/const byVisibility =\s*([\s\S]*?);/);

@@ -7,6 +7,7 @@ import { startPasskeyRegistration } from "../utils/webauthn";
 import { api, setApiToken } from "../serverApi";
 import { formatDateTime } from "./appHelpers";
 import { historyActorLabel, orderHistoryLabel } from "./i18n/displayLabels";
+import { errorDisplayMessage } from "./i18n/errorDisplay.js";
 import { appConfirm } from "./AppModal";
 import {
   installPushSyncListeners,
@@ -32,11 +33,11 @@ export class PanelErrorBoundary extends Component {
   render() {
     if (this.state.error) {
       return (
-        <div className="sync-error" style={{ marginTop: 12 }}>
-          <strong>{this.props.label || "Не удалось показать блок"}.</strong>
-          <div style={{ marginTop: 8 }}>{String(this.state.error?.message || this.state.error)}</div>
-          <PanelErrorRetry onRetry={() => this.setState({ error: null })} />
-        </div>
+        <PanelErrorFallback
+          label={this.props.label}
+          error={this.state.error}
+          onRetry={() => this.setState({ error: null })}
+        />
       );
     }
     return this.props.children;
@@ -78,6 +79,17 @@ export function OrderTimeline({ order }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function PanelErrorFallback({ label, error, onRetry }) {
+  const { t } = useLocalization();
+  return (
+    <div className="sync-error" style={{ marginTop: 12 }}>
+      <strong>{label || t("shared.error.panelShowFailed")}.</strong>
+      <div style={{ marginTop: 8 }}>{errorDisplayMessage(error, t)}</div>
+      <PanelErrorRetry onRetry={onRetry} />
     </div>
   );
 }
@@ -276,11 +288,11 @@ export function PasswordSecurityPanel({
       const result = await api.listPasskeys();
       setPasskeys(result.passkeys || []);
     } catch (loadError) {
-      setError(loadError.message);
+      setError(errorDisplayMessage(loadError, t, "shared.error.loadFailed"));
     }
   };
 
-  useEffect(() => { loadPasskeys(); }, []);
+  useEffect(() => { loadPasskeys(); }, [t]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -295,10 +307,10 @@ export function PasswordSecurityPanel({
     try {
       const result = await api.changePassword(form.currentPassword, form.newPassword);
       if (result.token) setApiToken(result.token);
-      setMessage(result.message || t("shared.passwordChanged"));
+      setMessage(t("shared.passwordChanged"));
       setForm({ currentPassword: "", newPassword: "", repeatPassword: "" });
     } catch (changeError) {
-      setError(changeError.message);
+      setError(errorDisplayMessage(changeError, t, "shared.error.saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -311,9 +323,9 @@ export function PasswordSecurityPanel({
     try {
       const result = await api.logoutOtherSessions();
       if (result.token) setApiToken(result.token);
-      setMessage(result.message || t("shared.otherSessionsWereEnded"));
+      setMessage(t("shared.otherSessionsWereEnded"));
     } catch (sessionError) {
-      setError(sessionError.message);
+      setError(errorDisplayMessage(sessionError, t, "shared.error.requestFailed"));
     } finally {
       setBusy(false);
     }
@@ -330,11 +342,11 @@ export function PasswordSecurityPanel({
     try {
       const ceremony = await api.getPasskeyRegistrationOptions();
       const response = await startPasskeyRegistration(ceremony.options);
-      const result = await api.verifyPasskeyRegistration(ceremony.ceremonyId, response);
-      setMessage(result.message || t("shared.passkeyAdded"));
+      await api.verifyPasskeyRegistration(ceremony.ceremonyId, response);
+      setMessage(t("shared.passkeyAdded"));
       await loadPasskeys();
     } catch (registrationError) {
-      setError(registrationError.message || "Не удалось добавить ключ доступа.");
+      setError(errorDisplayMessage(registrationError, t, "shared.error.passkeyAddFailed"));
     } finally {
       setPasskeyBusy(false);
     }
@@ -356,7 +368,7 @@ export function PasswordSecurityPanel({
       setMessage(t("shared.passkeyDeleted"));
       await loadPasskeys();
     } catch (deleteError) {
-      setError(deleteError.message);
+      setError(errorDisplayMessage(deleteError, t, "shared.error.deleteFailed"));
     } finally {
       setPasskeyBusy(false);
     }
@@ -511,11 +523,11 @@ export function PushSettings() {
             browserEndpoint: endpoint,
             serverSubscriptions: result.subscriptions,
           });
-          if (hint) setMessage(hint);
+          if (hint) setMessage(t("shared.push.restoreHint"));
         }
       }
     } catch (error) {
-      setMessage(error.message);
+      setMessage(errorDisplayMessage(error, t));
     }
   };
 
@@ -524,18 +536,25 @@ export function PushSettings() {
     return installPushSyncListeners(() => {
       void load();
     });
-  }, []);
+  }, [t]);
 
   const enable = async () => {
     setBusy(true);
     setMessage("");
     try {
-      if (!status?.enabled) throw new Error(t("shared.pushWillBeAvailableAfterThe"));
+      if (!status?.enabled) {
+        setMessage(t("shared.pushWillBeAvailableAfterThe"));
+        return;
+      }
       if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-        throw new Error(t("shared.thisBrowserDoesNotSupportPush"));
+        setMessage(t("shared.thisBrowserDoesNotSupportPush"));
+        return;
       }
       const permission = await Notification.requestPermission();
-      if (permission !== "granted") throw new Error(t("shared.notificationPermissionWasNotGranted"));
+      if (permission !== "granted") {
+        setMessage(t("shared.notificationPermissionWasNotGranted"));
+        return;
+      }
       const registration = await navigator.serviceWorker.ready;
       let subscription = await registration.pushManager.getSubscription();
       if (!subscription) {
@@ -545,7 +564,7 @@ export function PushSettings() {
       setMessage(currentEndpoint ? t("shared.notificationSettingsSaved") : t("shared.notificationsAreEnabledOnThisDevice"));
       await load();
     } catch (error) {
-      setMessage(error.message);
+      setMessage(errorDisplayMessage(error, t));
     } finally {
       setBusy(false);
     }
@@ -565,7 +584,7 @@ export function PushSettings() {
       setMessage(t("shared.notificationsAreDisabledOnThisDevice"));
       await load();
     } catch (error) {
-      setMessage(error.message);
+      setMessage(errorDisplayMessage(error, t));
     } finally {
       setBusy(false);
     }

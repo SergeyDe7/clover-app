@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { createServer } from "vite";
+import { createI18nStubVitePlugin } from "./i18n-test-localization-stub.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const vite = await createServer({
@@ -13,6 +14,7 @@ const vite = await createServer({
   appType: "custom",
   logLevel: "silent",
   server: { middlewareMode: true },
+  plugins: [createI18nStubVitePlugin()],
 });
 
 function flattenElements(node, result = []) {
@@ -163,12 +165,12 @@ try {
   );
   assert.match(
     clientsSrc,
-    /Зона доставки/,
+    /t\("manager.deliveryZone"\)/,
     "ManagerClients must show zone selector label"
   );
   assert.match(
     clientsSrc,
-    /<option\s+value="">По умолчанию<\/option>/,
+    /<option value="">\{t\("manager.default"\)\}<\/option>/,
     "ManagerClients must label the empty zone option as default"
   );
   assert.equal(

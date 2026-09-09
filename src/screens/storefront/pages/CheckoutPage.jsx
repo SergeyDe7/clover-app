@@ -1,4 +1,5 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../../../shared/i18n/errorDisplay.js";
 import { useEffect, useState } from "react";
 import {
   cartDeliveryFee,
@@ -87,7 +88,7 @@ export function CheckoutPage() {
       clearCart();
       setDone(result.order || result);
     } catch (err) {
-      setError(err.message || "Не удалось оформить заказ.");
+      setError(errorDisplayMessage(err, t, "storefront.error.checkoutFailed"));
     } finally {
       setBusy(false);
     }

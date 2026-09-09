@@ -43,34 +43,6 @@
   },
   {
     "path": "src/App.jsx",
-    "literal": "Не удалось войти по Face ID. Если ключ добавляли раньше — укажите почту или добавьте Face ID заново в профиле.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/App.jsx",
-    "literal": "Не удалось восстановить",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/App.jsx",
-    "literal": "Не удалось добавить",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/App.jsx",
-    "literal": "Не удалось удалить",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/App.jsx",
     "literal": "Новый",
     "count": 2,
     "classification": "CANONICAL_BUSINESS_VALUE",
@@ -105,20 +77,6 @@
     "reason": "Sample/placeholder person name, not system chrome."
   },
   {
-    "path": "src/components/AdminRolePanel.jsx",
-    "literal": "Не удалось скопировать в буфер обмена.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/components/AdminRolePanel.jsx",
-    "literal": "Не удалось создать менеджера.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
     "path": "src/components/CustomProductForm.jsx",
     "literal": "кг",
     "count": 2,
@@ -131,20 +89,6 @@
     "count": 2,
     "classification": "CANONICAL_BUSINESS_VALUE",
     "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
-  },
-  {
-    "path": "src/components/CustomProductForm.jsx",
-    "literal": "Не удалось прикрепить фотографию.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/components/CustomProductForm.jsx",
-    "literal": "Не удалось прочитать фотографию.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/components/CustomProductForm.jsx",
@@ -246,20 +190,6 @@
   },
   {
     "path": "src/screens/client/CustomItemForm.jsx",
-    "literal": "Не удалось прикрепить фотографию.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/client/CustomItemForm.jsx",
-    "literal": "Не удалось прочитать фотографию.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/client/CustomItemForm.jsx",
     "literal": "Новый запрос",
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
@@ -285,13 +215,6 @@
     "count": 2,
     "classification": "CANONICAL_BUSINESS_VALUE",
     "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
-  },
-  {
-    "path": "src/screens/client/CustomItemForm.jsx",
-    "literal": "Файл не удалось распознать как фотографию.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/client/CustomItemForm.jsx",
@@ -371,55 +294,6 @@
     "reason": "Canonical datalist option value remains BASE-compatible. Display projection: contactRoleLabel via the option label attribute."
   },
   {
-    "path": "src/screens/client/ReconciliationPanel.jsx",
-    "literal": "Не удалось отправить",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/client/ReconciliationPanel.jsx",
-    "literal": "Не удалось скачать",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerAccessVault.jsx",
-    "literal": "Не удалось загрузить доступы.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerAccessVault.jsx",
-    "literal": "Не удалось скопировать в буфер обмена.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerAccessVault.jsx",
-    "literal": "Не удалось сохранить",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerAccessVault.jsx",
-    "literal": "Не удалось удалить",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerBackup.jsx",
-    "literal": "Не удалось прочитать файл резервной копии.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
     "path": "src/screens/manager/ManagerBackup.jsx",
     "literal": "Ручная копия из кабинета менеджера",
     "count": 1,
@@ -439,62 +313,6 @@
     "count": 5,
     "classification": "CANONICAL_BUSINESS_VALUE",
     "reason": "Canonical contact/address identity for storage/comparison. Display projection: contactLabel/addressLabel where shown."
-  },
-  {
-    "path": "src/screens/manager/ManagerClients.jsx",
-    "literal": "Не удалось загрузить цены",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerClients.jsx",
-    "literal": "Не удалось сменить пароль",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerClients.jsx",
-    "literal": "Не удалось создать клиента",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerClients.jsx",
-    "literal": "Не удалось сохранить",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerClients.jsx",
-    "literal": "Не удалось сохранить данные клиента.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerClients.jsx",
-    "literal": "Не удалось сохранить матрицу.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerClients.jsx",
-    "literal": "Не удалось удалить",
-    "count": 2,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerClients.jsx",
-    "literal": "Не удалось удалить товар.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
@@ -582,20 +400,6 @@
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
-    "literal": "Не удалось отменить передачу",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerOrders.jsx",
-    "literal": "Не удалось передать в 1С",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerOrders.jsx",
     "literal": "Новый",
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
@@ -651,13 +455,6 @@
     "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
-    "path": "src/screens/manager/ManagerPriceList.jsx",
-    "literal": "Не удалось выгрузить прайс",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Активные",
     "count": 3,
@@ -701,34 +498,6 @@
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
-    "literal": "Не удалось сохранить",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerProducts.jsx",
-    "literal": "Не удалось удалить",
-    "count": 2,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerProducts.jsx",
-    "literal": "Не удалось удалить выбранные товары.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerProducts.jsx",
-    "literal": "Не удалось удалить товар.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Связанные с 1С",
     "count": 6,
     "classification": "CANONICAL_BUSINESS_VALUE",
@@ -740,20 +509,6 @@
     "count": 3,
     "classification": "CANONICAL_BUSINESS_VALUE",
     "reason": "Filter/control identity \"Скрытые\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
-  },
-  {
-    "path": "src/screens/manager/ManagerReconciliation.jsx",
-    "literal": "Не удалось отправить",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerReconciliation.jsx",
-    "literal": "Не удалось удалить",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerScreen.jsx",
@@ -785,24 +540,10 @@
   },
   {
     "path": "src/screens/manager/ManagerSettings.jsx",
-    "literal": "Не удалось проверить каналы",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerSettings.jsx",
     "literal": "Новость Clover",
     "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Diagnostic/test notification or settings hint reserved with operational copy."
-  },
-  {
-    "path": "src/screens/manager/ManagerSettings.jsx",
-    "literal": "email: включите тумблер «Отправлять на email» и обновите страницу",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Diagnostic/test notification or settings hint reserved with operational copy."
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical locale-independent manager notification title default restored from BASE. Display-only localization must not replace this submitted content."
   },
   {
     "path": "src/screens/manager/ManagerStorefront.jsx",
@@ -833,41 +574,6 @@
     "reason": "Filter/control identity \"Не на витрине\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
-    "path": "src/screens/manager/ManagerStorefront.jsx",
-    "literal": "Не удалось загрузить карту",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerStorefront.jsx",
-    "literal": "Не удалось загрузить слайд",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerStorefront.jsx",
-    "literal": "Не удалось обновить описания",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerStorefront.jsx",
-    "literal": "Не удалось сохранить",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/manager/ManagerStorefront.jsx",
-    "literal": "Не удалось сохранить товары",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
     "path": "src/screens/manager/ManagerStorefrontInfoPages.jsx",
     "literal": "Связаться с нами",
     "count": 1,
@@ -875,25 +581,11 @@
     "reason": "Info-page heading/content owned by later category/page/SEO stage."
   },
   {
-    "path": "src/screens/manager/ManagerStorefrontPromotions.jsx",
-    "literal": "Не удалось загрузить картинку акции",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
     "path": "src/screens/manager/ProductEditor.jsx",
     "literal": "Из 1С",
     "count": 1,
     "classification": "EXTERNAL_BUSINESS_CONTENT",
     "reason": "1C/external product contour label shown verbatim from the integration, not a Stage 3.1 UI catalog string."
-  },
-  {
-    "path": "src/screens/manager/ProductEditor.jsx",
-    "literal": "Не удалось дополнить",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ProductEditor.jsx",
@@ -978,41 +670,6 @@
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
     "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
-  },
-  {
-    "path": "src/screens/storefront/pages/AktsiiPage.jsx",
-    "literal": "Не удалось загрузить акции.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/storefront/pages/CatalogPage.jsx",
-    "literal": "Не удалось загрузить каталог.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/storefront/pages/CheckoutPage.jsx",
-    "literal": "Не удалось оформить заказ.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/storefront/pages/ContactsPage.jsx",
-    "literal": "Не удалось загрузить контакты.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/screens/storefront/pages/HomePage.jsx",
-    "literal": "Не удалось загрузить витрину.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
@@ -1358,20 +1015,6 @@
     "reason": "Synthetic missing-history fallback canonical label. Display projection: orderHistoryLabel."
   },
   {
-    "path": "src/shared/SharedPanels.jsx",
-    "literal": "Не удалось добавить ключ доступа.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/shared/SharedPanels.jsx",
-    "literal": "Не удалось показать блок",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
     "path": "src/shared/appHelpers.js",
     "literal": "1 квартал",
     "count": 1,
@@ -1711,57 +1354,8 @@
     "path": "src/shared/appHelpers.js",
     "literal": "Не удалось передать",
     "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось сохранить открытую карточку клиента",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось сохранить подраздел «Ещё»",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось сохранить подраздел кабинета",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось сохранить просмотренные акты сверки",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось сохранить раздел клиента",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось сохранить раздел менеджера",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось сохранить текущий вход",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical exchange status label. Display projection: exchangeStatusLabel. Identity remains BASE RU."
   },
   {
     "path": "src/shared/appHelpers.js",
@@ -2220,13 +1814,6 @@
   },
   {
     "path": "src/shared/matrixExcelImport.js",
-    "literal": "Не найдено ни одной строки с названием. Ожидаются колонки «Название»/«Товар» и опционально «Код».",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Operational/error/PWA copy reserved for Stage 3.2 or shown as exception text without changing business identity."
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
     "literal": "номенклатура",
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
@@ -2359,55 +1946,6 @@
     "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
   },
   {
-    "path": "src/shared/productPhoto.js",
-    "literal": "Браузер не смог подготовить фотографию.",
-    "count": 2,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Operational/error/PWA copy reserved for Stage 3.2 or shown as exception text without changing business identity."
-  },
-  {
-    "path": "src/shared/productPhoto.js",
-    "literal": "Выберите фотографию товара.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Operational/error/PWA copy reserved for Stage 3.2 or shown as exception text without changing business identity."
-  },
-  {
-    "path": "src/shared/productPhoto.js",
-    "literal": "Максимальный размер файла — 5 МБ.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Operational/error/PWA copy reserved for Stage 3.2 or shown as exception text without changing business identity."
-  },
-  {
-    "path": "src/shared/productPhoto.js",
-    "literal": "После обработки фото всё ещё слишком большое. Выберите снимок меньшего размера.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Operational/error/PWA copy reserved for Stage 3.2 or shown as exception text without changing business identity."
-  },
-  {
-    "path": "src/shared/productPhoto.js",
-    "literal": "Разрешены только изображения JPG, PNG или WEBP.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Operational/error/PWA copy reserved for Stage 3.2 or shown as exception text without changing business identity."
-  },
-  {
-    "path": "src/shared/productPhoto.js",
-    "literal": "Файл не удалось распознать как фотографию.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
-  },
-  {
-    "path": "src/shared/pushSync.js",
-    "literal": "Нажмите «Включить уведомления», чтобы восстановить push на этом устройстве.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Operational/error/PWA copy reserved for Stage 3.2 or shown as exception text without changing business identity."
-  },
-  {
     "path": "src/shared/storefrontInfoPages.js",
     "literal": "КЛЕВЕР",
     "count": 2,
@@ -2441,5 +1979,117 @@
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
     "reason": "Public RU display of canonical promo status codes. Manager UI uses promoStatusLabel(); identity is the English status code."
+  },
+  {
+    "path": "src/components/CustomProductForm.jsx",
+    "literal": "Разрешены только изображения JPG, PNG или WEBP.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/components/CustomProductForm.jsx",
+    "literal": "Максимальный размер фотографии — 12 МБ.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/components/CustomProductForm.jsx",
+    "literal": "Не удалось прочитать фотографию.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/screens/client/CustomItemForm.jsx",
+    "literal": "Не удалось прочитать фотографию.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/screens/client/CustomItemForm.jsx",
+    "literal": "Файл не удалось распознать как фотографию.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/screens/client/CustomItemForm.jsx",
+    "literal": "Разрешены только изображения JPG, PNG или WEBP.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/screens/client/CustomItemForm.jsx",
+    "literal": "Максимальный размер фотографии — 12 МБ.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/screens/client/CustomItemForm.jsx",
+    "literal": "Браузер не смог подготовить фотографию.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/screens/client/CustomItemForm.jsx",
+    "literal": "После обработки фото всё ещё слишком большое. Выберите снимок меньшего размера.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "Не найдено ни одной строки с названием. Ожидаются колонки «Название»/«Товар» и опционально «Код».",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Браузер не смог подготовить фотографию.",
+    "count": 2,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Файл не удалось распознать как фотографию.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Выберите фотографию товара.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Разрешены только изображения JPG, PNG или WEBP.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Максимальный размер файла — 5 МБ.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "После обработки фото всё ещё слишком большое. Выберите снимок меньшего размера.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
   }
 ]

@@ -614,13 +614,6 @@ const TEMPLATE_EXCEPTIONS = [
     reason: "constructs canonical numbered address labels; visible UI uses addressLabel",
   },
   {
-    path: "src/shared/appHelpers.js",
-    pattern: "Не удалось сохранить ${}",
-    expectedCount: 1,
-    classification: "STAGE32_ERROR_PWA",
-    reason: "generic save-error string reserved for Stage 3.2 error pipeline",
-  },
-  {
     path: "src/shared/productCatalogOrder.js",
     pattern: "мл",
     expectedCount: 1,

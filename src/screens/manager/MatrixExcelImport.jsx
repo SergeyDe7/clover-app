@@ -9,6 +9,7 @@ import {
 } from "./matrixMembership";
 import { EMPTY_LINK } from "../../shared/appHelpers";
 import { parseMatrixExcelFile } from "../../shared/matrixExcelImport";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 
 function statusLabel(status, t) {
   if (status === "exact") return t("manager.exactName");
@@ -147,7 +148,7 @@ export function MatrixExcelReview({
       );
       setImportState({ status: "review", message: t("manager.excelMatching") });
     } catch (pickError) {
-      setError(pickError.message);
+      setError(errorDisplayMessage(pickError, t, "shared.error.excelNoNameRows"));
       setImportState({ status: "idle" });
       resetFileInput();
     } finally {
@@ -253,7 +254,7 @@ export function MatrixExcelReview({
       });
     } catch (searchError) {
       updateRow(rowIndex, { searchLoading: false });
-      setError(searchError.message);
+      setError(errorDisplayMessage(searchError, t, "shared.error.loadFailed"));
     }
   };
 
@@ -444,7 +445,7 @@ export function MatrixExcelReview({
       if (parts.length) setError(parts.join(". ") + ".");
       onAdded?.(addedNames);
     } catch (addError) {
-      setError(addError.message);
+      setError(errorDisplayMessage(addError, t, "shared.error.addFailed"));
       setImportState({ status: "review", message: t("manager.excelLoadError") });
     } finally {
       setBusy(false);

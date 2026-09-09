@@ -1,4 +1,5 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../../../shared/i18n/errorDisplay.js";
 import { useEffect, useState } from "react";
 import {
   formatRussianPhone,
@@ -141,14 +142,14 @@ export function ContactsPage() {
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err.message || "Не удалось загрузить контакты.");
+          setError(errorDisplayMessage(err, t, "storefront.error.contactsLoadFailed"));
           setReady(true);
         }
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   const phoneValue = formatRussianPhone(site.contactPhone);
   const phoneLinks = getManagerPhoneLinks(site.contactPhone);

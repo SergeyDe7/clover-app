@@ -14,8 +14,7 @@ const pushSyncSrcPath = path.join(root, "src/shared/pushSync.js");
 const sharedPanelsPath = path.join(root, "src/shared/SharedPanels.jsx");
 const appPath = path.join(root, "src/App.jsx");
 
-const HINT =
-  "Нажмите «Включить уведомления», чтобы восстановить push на этом устройстве.";
+const HINT = "shared.push.restoreHint";
 
 function activeTimeoutCount() {
   if (typeof process.getActiveResourcesInfo === "function") {

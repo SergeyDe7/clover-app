@@ -15,12 +15,15 @@ const server = readFileSync(serverPath, "utf8");
 
 assert.ok(panel.includes("access-vault-field"), "AdminRolePanel: нет блока полей пароля");
 assert.ok(panel.includes("user.password"), "AdminRolePanel: не показывает пароль staff");
-assert.ok(panel.includes("Пароль сохранён"), "AdminRolePanel: нет статуса пароля");
-assert.ok(access.includes("логины, пароли и права"), "ManagerAccessVault: устаревший текст вкладки");
+assert.ok(panel.includes('t("shared.passwordSaved")'), "AdminRolePanel: нет статуса пароля");
+assert.ok(
+  access.includes('t("manager.clientsCabinetLoginsManagersLoginsPasswords")'),
+  "ManagerAccessVault: устаревший текст вкладки"
+);
 
 assert.ok(server.includes("staffAccessVault.js"), "server.js: не подключён staffAccessVault");
 assert.ok(server.includes("rememberStaffPassword"), "server.js: нет сохранения пароля staff");
-assert.ok(panel.includes("Ваш пароль"), "AdminRolePanel: нет блока пароля админа");
+assert.ok(panel.includes('t("shared.yourPassword")'), "AdminRolePanel: нет блока пароля админа");
 assert.ok(!panel.includes("canManageStaff && !isSelf"), "AdminRolePanel: Управление скрыто для своей карточки");
 assert.ok(server.includes("assertCanSetStaffPassword"), "server.js: нет assertCanSetStaffPassword");
 
