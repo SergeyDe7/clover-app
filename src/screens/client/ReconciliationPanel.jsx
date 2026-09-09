@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Панель запроса и списка актов сверки клиента.
 import { useState } from "react";
 import { api } from "../../serverApi";
@@ -11,6 +12,7 @@ import { appAlert } from "../../shared/AppModal";
 import { OrderThankYouOverlay } from "../../shared/SharedPanels";
 
 export function ReconciliationPanel({ requests = [], onReload }) {
+  const { t } = useLocalization();
   const nowDate = new Date();
   const [periodType, setPeriodType] = useState(`q${Math.floor(nowDate.getMonth() / 3) + 1}`);
   const [year, setYear] = useState(nowDate.getFullYear());
@@ -30,7 +32,7 @@ export function ReconciliationPanel({ requests = [], onReload }) {
     } catch (error) {
       await appAlert({
         title: "Не удалось отправить",
-        message: error.message || "Ошибка запроса акта сверки.",
+        message: error.message || t("client.statementRequestError"),
         tone: "danger",
       });
     } finally {
@@ -45,7 +47,7 @@ export function ReconciliationPanel({ requests = [], onReload }) {
     } catch (error) {
       await appAlert({
         title: "Не удалось скачать",
-        message: error.message || "Ошибка скачивания файла.",
+        message: error.message || t("client.fileDownloadError"),
         tone: "danger",
       });
     }
@@ -59,20 +61,20 @@ export function ReconciliationPanel({ requests = [], onReload }) {
       <section className="panel client-reconciliation" id="reconciliation">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">Документы</p>
-            <h2>Запросить акт сверки</h2>
-            <p>Выберите период и отправьте запрос менеджеру.</p>
+            <p className="eyebrow">{t("shared.section.documents")}</p>
+            <h2>{t("client.requestAStatement")}</h2>
+            <p>{t("client.chooseAPeriodAndSendA")}</p>
           </div>
         </div>
 
         <div className="period-buttons client-reconciliation-periods">
           {[
-            ["q1", "1 кв."],
-            ["q2", "2 кв."],
-            ["q3", "3 кв."],
-            ["q4", "4 кв."],
-            ["all", "Весь период"],
-            ["custom", "Свои даты"],
+            ["q1", t("client.q1")],
+            ["q2", t("client.q2")],
+            ["q3", t("client.q3")],
+            ["q4", t("client.q4")],
+            ["all", t("client.allTime")],
+            ["custom", t("client.customDates")],
           ].map(([value, label]) => (
             <button
               className={periodType === value ? "category-button active" : "category-button"}
@@ -87,9 +89,9 @@ export function ReconciliationPanel({ requests = [], onReload }) {
 
         <div className="client-reconciliation-form">
           {showYear && (
-            <label className="field client-reconciliation-year">
-              Год
-              <input
+            <label className="field client-reconciliation-year">{
+              t("client.year")
+              }<input
                 type="number"
                 min="2000"
                 max="2100"
@@ -100,23 +102,23 @@ export function ReconciliationPanel({ requests = [], onReload }) {
           )}
           {showDates && (
             <>
-              <label className="field client-reconciliation-date">
-                Дата с
-                <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+              <label className="field client-reconciliation-date">{
+                t("client.dateFrom")
+                }<input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
               </label>
-              <label className="field client-reconciliation-date">
-                Дата по
-                <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+              <label className="field client-reconciliation-date">{
+                t("client.dateTo")
+                }<input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
               </label>
             </>
           )}
-          <label className="field client-reconciliation-comment">
-            Комментарий
-            <input
+          <label className="field client-reconciliation-comment">{
+            t("checkout.comment")
+            }<input
               type="text"
               value={comment}
               onChange={(event) => setComment(event.target.value)}
-              placeholder="Необязательно"
+              placeholder={t("client.optional")}
             />
           </label>
           <div className="client-reconciliation-submit">
@@ -126,7 +128,7 @@ export function ReconciliationPanel({ requests = [], onReload }) {
               disabled={busy}
               onClick={() => void submit()}
             >
-              {busy ? "Отправляем…" : "Запросить акт сверки"}
+              {busy ? t("client.sending") : t("client.requestAStatement")}
             </button>
           </div>
         </div>
@@ -145,13 +147,13 @@ export function ReconciliationPanel({ requests = [], onReload }) {
                 </p>
               </div>
               {item.hasFile && (
-                <button className="primary-button" type="button" onClick={() => void download(item)}>
-                  Скачать PDF
-                </button>
+                <button className="primary-button" type="button" onClick={() => void download(item)}>{
+                  t("manager.downloadPdf")
+                }</button>
               )}
             </article>
           )) : (
-            <div className="empty-box">Запросов актов сверки пока нет.</div>
+            <div className="empty-box">{t("client.noReconciliationRequestsYet")}</div>
           )}
         </div>
       </section>
@@ -159,9 +161,9 @@ export function ReconciliationPanel({ requests = [], onReload }) {
       <OrderThankYouOverlay
         open={successOpen}
         onDone={() => setSuccessOpen(false)}
-        title="Запрос отправлен"
-        message="Менеджер подготовит акт сверки и пришлёт PDF в этот раздел."
-        confirmLabel="Понятно"
+        title={t("client.requestSent")}
+        message={t("client.aManagerWillPrepareTheStatement")}
+        confirmLabel={t("shared.modal.ok")}
       />
     </>
   );

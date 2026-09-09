@@ -1,3 +1,4 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { useEffect, useMemo, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
 import { addToCart } from "../cartStorage.js";
@@ -18,6 +19,7 @@ import {
 } from "../components/StorefrontUnitChoice.jsx";
 
 export function ProductPage({ code }) {
+  const { t } = useLocalization();
   const [product, setProduct] = useState(null);
   const [error, setError] = useState("");
   const [unit, setUnit] = useState("piece");
@@ -39,7 +41,7 @@ export function ProductPage({ code }) {
         setQty(getUnitOrderStep(next, nextUnit));
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message || "Товар не найден.");
+        if (!cancelled) setError(err.message || t("storefront.productNotFound"));
       });
     return () => {
       cancelled = true;
@@ -83,14 +85,14 @@ export function ProductPage({ code }) {
           type="button"
           className="sf-btn sf-btn-ghost"
           onClick={() => navigateStorefront({ name: "catalog" })}
-        >
-          В каталог
-        </button>
+        >{
+          t("storefront.nav.toCatalog")
+        }</button>
       </div>
     );
   }
 
-  if (!product) return <p className="sf-muted">Загрузка карточки…</p>;
+  if (!product) return <p className="sf-muted">{t("storefront.loadingTheCard")}</p>;
 
   return (
     <div className="sf-product-page">
@@ -104,7 +106,7 @@ export function ProductPage({ code }) {
           })
         }
       >
-        ← {product.category || "Каталог"}
+        ← {product.category || t("storefront.nav.catalog")}
       </button>
 
       <div className="sf-product-layout">
@@ -121,14 +123,14 @@ export function ProductPage({ code }) {
           <p className="sf-product-code">Артикул {product.code}</p>
 
           <div className="sf-price-block">
-            <strong>{price > 0 ? formatMoney(price) : "Цена по запросу"}</strong>
+            <strong>{price > 0 ? formatMoney(price) : t("storefront.price.onRequest")}</strong>
             <span className="sf-unit"> / {storefrontUnitLabel(unit)}</span>
           </div>
 
           <div className="sf-buy-row">
             {units.length > 1 ? (
               <div className="sf-field sf-field-units">
-                <span>Единица</span>
+                <span>{t("shared.field.unit")}</span>
                 <StorefrontUnitChoice
                   product={product}
                   unit={unit}
@@ -185,9 +187,9 @@ export function ProductPage({ code }) {
                 );
                 navigateStorefront({ name: "cart" });
               }}
-            >
-              В корзину
-            </button>
+            >{
+              t("checkout.addToCart")
+            }</button>
           </div>
 
           {(details.description ||
@@ -196,19 +198,19 @@ export function ProductPage({ code }) {
             <div className="sf-details">
               {details.description ? (
                 <>
-                  <h2>Описание</h2>
+                  <h2>{t("shared.field.description")}</h2>
                   <p>{details.description}</p>
                 </>
               ) : null}
               {details.composition ? (
                 <>
-                  <h2>Состав</h2>
+                  <h2>{t("manager.contents")}</h2>
                   <p>{details.composition}</p>
                 </>
               ) : null}
               {details.characteristics ? (
                 <>
-                  <h2>Характеристики</h2>
+                  <h2>{t("manager.specifications")}</h2>
                   <p>{details.characteristics}</p>
                 </>
               ) : null}
@@ -222,9 +224,9 @@ export function ProductPage({ code }) {
                 href={product.certificateUrl}
                 target="_blank"
                 rel="noreferrer"
-              >
-                Сертификат
-              </a>
+              >{
+                t("shared.media.certificate")
+              }</a>
             </p>
           ) : null}
         </div>

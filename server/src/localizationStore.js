@@ -1,35 +1,78 @@
-import { getGlobalState, setGlobalState } from "./db.js";
-import { PUBLIC_LOCALE_CODES } from "../../src/shared/i18n/languageRegistry.js";
+import { randomUUID } from "node:crypto";
+import {
+  getGlobalState,
+  setGlobalState,
+  runInTransaction,
+  listTranslationEntryRows,
+  listTranslationValueRows,
+  getTranslationEntryRow,
+  findTranslationEntryByIdentity,
+  insertTranslationEntryRow,
+  updateTranslationEntryRow,
+  getTranslationValueRow,
+  upsertTranslationValueRow,
+} from "./db.js";
+import {
+  DEFAULT_LOCALE,
+  PUBLIC_LOCALE_CODES,
+  TARGET_INTERNAL_LOCALES,
+  canonicalizeTargetLocale,
+  isSupportedTargetLocale,
+  toPublicLocaleCode,
+} from "../../src/shared/i18n/languageRegistry.js";
+import { sourceHash } from "../../src/shared/i18n/sourceHash.js";
+import { placeholdersMatch, isNonEmptyText } from "../../src/shared/i18n/placeholderValidation.js";
+import { UI_CATALOG, UI_CATALOG_BY_KEY } from "../../src/shared/i18n/uiCatalog.js";
+import { getSeedTranslation } from "./i18n/uiTranslationSeed.js";
 import {
   LOCALIZATION_SETTINGS_KEY,
   applyEnabledLanguages,
   buildTranslationRows,
   computeLanguageCompleteness,
   emptyLocalizationSettings,
-  emptyTranslationStore,
   filterTranslationRows,
   namespaceToCompletenessDomain,
   normalizeLocalizationSettings,
-  saveSettingsPreservingTranslations,
 } from "../../src/shared/i18n/localizationSettings.js";
 
-function completenessItems(store) {
-  const rows = buildTranslationRows(store);
-  const items = [];
-  for (const row of rows) {
-    const domain = namespaceToCompletenessDomain(row.namespace);
-    for (const [language, cell] of Object.entries(row.languages || {})) {
-      items.push({
-        domain,
-        language,
-        state: cell.state,
-        stale: cell.stale,
-        critical: row.critical,
-        value: cell.value,
-      });
-    }
-  }
-  return items;
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function currentCatalogKeys() {
+  return new Set(UI_CATALOG.map((entry) => `${entry.namespace}\0${entry.key}`));
+}
+
+function isCurrentCatalogEntry(entry) {
+  if (!entry) return false;
+  if (String(entry.entityType || "") !== "" || String(entry.entityId || "") !== "") return false;
+  return currentCatalogKeys().has(`${entry.namespace}\0${entry.fieldKey}`);
+}
+
+function mapStore(entries, values) {
+  return {
+    entries: entries.map((entry) => ({
+      id: entry.id,
+      namespace: entry.namespace,
+      entityType: entry.entityType || "",
+      entityId: entry.entityId || "",
+      fieldKey: entry.fieldKey,
+      sourceRu: entry.sourceRu,
+      sourceHash: entry.sourceHash,
+      critical: Number(entry.critical) === 1 || entry.critical === true,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+    })),
+    values: values.map((value) => ({
+      entryId: value.entryId,
+      languageCode: value.languageCode,
+      value: value.value,
+      state: value.state,
+      sourceHash: value.sourceHash,
+      updatedAt: value.updatedAt,
+      updatedBy: value.updatedBy || "",
+    })),
+  };
 }
 
 export function readLocalizationSettings() {
@@ -39,7 +82,37 @@ export function readLocalizationSettings() {
 }
 
 export function readTranslationStore() {
-  return emptyTranslationStore();
+  return mapStore(listTranslationEntryRows(), listTranslationValueRows());
+}
+
+function currentCatalogItems(store) {
+  const current = store.entries.filter(isCurrentCatalogEntry);
+  const currentIds = new Set(current.map((entry) => entry.id));
+  return {
+    entries: current,
+    values: store.values.filter((value) => currentIds.has(value.entryId)),
+  };
+}
+
+function completenessItems(store) {
+  const current = currentCatalogItems(store);
+  const rows = buildTranslationRows(current);
+  const items = [];
+  for (const row of rows) {
+    const domain = namespaceToCompletenessDomain(row.namespace);
+    if (!domain) continue;
+    for (const [language, cell] of Object.entries(row.languages || {})) {
+      items.push({
+        domain,
+        language,
+        state: cell.stale ? "STALE" : cell.state,
+        stale: cell.stale,
+        critical: row.critical,
+        value: cell.value,
+      });
+    }
+  }
+  return items;
 }
 
 export function completenessByLanguage(store = readTranslationStore()) {
@@ -51,6 +124,31 @@ export function completenessByLanguage(store = readTranslationStore()) {
   return reports;
 }
 
+function persistSettings(next) {
+  setGlobalState(LOCALIZATION_SETTINGS_KEY, next);
+  return next;
+}
+
+function bumpCatalogVersion(current, actor) {
+  const next = normalizeLocalizationSettings({
+    ...current,
+    catalogVersion: Number(current.catalogVersion || 0) + 1,
+    updatedAt: nowIso(),
+    updatedBy: actor || current.updatedBy || "",
+  });
+  persistSettings(next);
+  return next;
+}
+
+function settingsEqual(a, b) {
+  const left = normalizeLocalizationSettings(a);
+  const right = normalizeLocalizationSettings(b);
+  return (
+    left.enabledLanguages.join("\0") === right.enabledLanguages.join("\0") &&
+    Number(left.catalogVersion) === Number(right.catalogVersion)
+  );
+}
+
 export function writeLocalizationSettings(patch = {}, actor = "") {
   const current = readLocalizationSettings();
   const translations = readTranslationStore();
@@ -60,18 +158,259 @@ export function writeLocalizationSettings(patch = {}, actor = "") {
     patch.enabledLanguages ?? current.enabledLanguages,
     reports
   );
-  const saved = saveSettingsPreservingTranslations(current, translations, {
+  const requested = normalizeLocalizationSettings({
+    ...current,
     enabledLanguages: applied.enabledLanguages,
     updatedBy: actor,
   });
-  setGlobalState(LOCALIZATION_SETTINGS_KEY, saved.settings);
+  if (requested.enabledLanguages.join("\0") === current.enabledLanguages.join("\0")) {
+    return {
+      settings: current,
+      rejected: applied.rejected,
+      completeness: reports,
+    };
+  }
+  const saved = bumpCatalogVersion(
+    { ...current, enabledLanguages: requested.enabledLanguages },
+    actor
+  );
+  saved.enabledLanguages = requested.enabledLanguages;
+  persistSettings(saved);
   return {
-    settings: saved.settings,
+    settings: saved,
     rejected: applied.rejected,
-    completeness: reports,
+    completeness: completenessByLanguage(),
   };
 }
 
-export function listWorkspaceRows(filters = {}) {
-  return filterTranslationRows(buildTranslationRows(readTranslationStore()), filters);
+function syncCatalogBatch() {
+  const stamp = nowIso();
+  let dirty = false;
+  const settings = readLocalizationSettings();
+
+  for (const entry of UI_CATALOG) {
+    const hash = sourceHash(entry.sourceRu);
+    const existing = findTranslationEntryByIdentity(entry.namespace, entry.key);
+    if (!existing) {
+      const id = randomUUID();
+      insertTranslationEntryRow({
+        id,
+        namespace: entry.namespace,
+        entityType: "",
+        entityId: "",
+        fieldKey: entry.key,
+        sourceRu: entry.sourceRu,
+        sourceHash: hash,
+        critical: entry.critical,
+        createdAt: stamp,
+        updatedAt: stamp,
+      });
+      for (const locale of TARGET_INTERNAL_LOCALES) {
+        upsertTranslationValueRow({
+          entryId: id,
+          languageCode: locale,
+          value: getSeedTranslation(entry.key, locale),
+          state: "AUTO",
+          sourceHash: hash,
+          updatedAt: stamp,
+          updatedBy: "catalog-seed",
+        });
+      }
+      dirty = true;
+      continue;
+    }
+
+    const sourceChanged = existing.sourceHash !== hash || existing.sourceRu !== entry.sourceRu;
+    const criticalChanged = Boolean(existing.critical) !== Boolean(entry.critical);
+    if (sourceChanged || criticalChanged) {
+      updateTranslationEntryRow({
+        id: existing.id,
+        sourceRu: entry.sourceRu,
+        sourceHash: hash,
+        critical: entry.critical,
+        updatedAt: stamp,
+      });
+      dirty = true;
+    }
+
+    const entryHash = sourceChanged ? hash : existing.sourceHash;
+    for (const locale of TARGET_INTERNAL_LOCALES) {
+      const seed = getSeedTranslation(entry.key, locale);
+      const value = getTranslationValueRow(existing.id, locale);
+      if (!value) {
+        upsertTranslationValueRow({
+          entryId: existing.id,
+          languageCode: locale,
+          value: seed,
+          state: "AUTO",
+          sourceHash: entryHash,
+          updatedAt: stamp,
+          updatedBy: "catalog-seed",
+        });
+        dirty = true;
+        continue;
+      }
+      if (value.state === "MANUAL") {
+        continue;
+      }
+      const seedChanged = value.value !== seed || value.sourceHash !== entryHash;
+      if (sourceChanged || seedChanged) {
+        upsertTranslationValueRow({
+          entryId: existing.id,
+          languageCode: locale,
+          value: seed,
+          state: "AUTO",
+          sourceHash: entryHash,
+          updatedAt: stamp,
+          updatedBy: "catalog-seed",
+        });
+        dirty = true;
+      }
+    }
+  }
+
+  if (dirty) {
+    bumpCatalogVersion(settings, "catalog-sync");
+  }
+  return { dirty };
 }
+
+let initialized = false;
+
+export function initializeLocalizationCatalog() {
+  const result = runInTransaction(() => syncCatalogBatch());
+  initialized = true;
+  return result;
+}
+
+export function listWorkspaceRows(filters = {}) {
+  const languageRaw = filters.language;
+  if (typeof languageRaw === "string" && languageRaw.trim()) {
+    if (!isSupportedTargetLocale(languageRaw)) {
+      const error = new Error("Unsupported translation language.");
+      error.status = 400;
+      error.code = "UNSUPPORTED_LOCALE";
+      throw error;
+    }
+  }
+  const store = currentCatalogItems(readTranslationStore());
+  return filterTranslationRows(buildTranslationRows(store), {
+    ...filters,
+    language: languageRaw && isSupportedTargetLocale(languageRaw) ? toPublicLocaleCode(languageRaw) : languageRaw,
+  });
+}
+
+function requireCurrentUiEntry(entryId) {
+  const entry = getTranslationEntryRow(entryId);
+  if (!entry) {
+    const error = new Error("Translation entry not found.");
+    error.status = 404;
+    error.code = "UNKNOWN_ENTRY";
+    throw error;
+  }
+  if (!isCurrentCatalogEntry(entry)) {
+    const error = new Error("Orphan translation entry cannot be edited from the current catalog.");
+    error.status = 409;
+    error.code = "ORPHAN_ENTRY";
+    throw error;
+  }
+  return entry;
+}
+
+function requireTargetLocale(language) {
+  if (!isSupportedTargetLocale(language)) {
+    const error = new Error("Unsupported translation language.");
+    error.status = 400;
+    error.code = "UNSUPPORTED_LOCALE";
+    throw error;
+  }
+  const internal = canonicalizeTargetLocale(language);
+  if (!internal) {
+    const error = new Error("Unsupported translation language.");
+    error.status = 400;
+    error.code = "UNSUPPORTED_LOCALE";
+    throw error;
+  }
+  return internal;
+}
+
+export function saveManualTranslation(entryId, language, value, actor = "") {
+  const internal = requireTargetLocale(language);
+  const text = typeof value === "string" ? value : "";
+  if (!isNonEmptyText(text)) {
+    const error = new Error("Translation value cannot be empty.");
+    error.status = 400;
+    error.code = "EMPTY_VALUE";
+    throw error;
+  }
+  return runInTransaction(() => {
+    const entry = requireCurrentUiEntry(entryId);
+    if (!placeholdersMatch(entry.sourceRu, text)) {
+      const error = new Error("Translation placeholders do not match the Russian source.");
+      error.status = 400;
+      error.code = "PLACEHOLDER_MISMATCH";
+      throw error;
+    }
+    const existing = getTranslationValueRow(entry.id, internal);
+    const unchanged =
+      existing &&
+      existing.value === text &&
+      existing.state === "MANUAL" &&
+      existing.sourceHash === entry.sourceHash &&
+      String(existing.updatedBy || "") === String(actor || "");
+    if (unchanged) {
+      return { changed: false, entry, value: existing };
+    }
+    const stamp = nowIso();
+    upsertTranslationValueRow({
+      entryId: entry.id,
+      languageCode: internal,
+      value: text,
+      state: "MANUAL",
+      sourceHash: entry.sourceHash,
+      updatedAt: stamp,
+      updatedBy: String(actor || ""),
+    });
+    bumpCatalogVersion(readLocalizationSettings(), actor);
+    return { changed: true, entry, value: getTranslationValueRow(entry.id, internal) };
+  });
+}
+
+export function resetTranslationToAuto(entryId, language, actor = "") {
+  const internal = requireTargetLocale(language);
+  return runInTransaction(() => {
+    const entry = requireCurrentUiEntry(entryId);
+    if (!UI_CATALOG_BY_KEY.has(entry.fieldKey)) {
+      const error = new Error("Unknown catalog key cannot be reset from seed.");
+      error.status = 409;
+      error.code = "NO_SEED";
+      throw error;
+    }
+    const seed = getSeedTranslation(entry.fieldKey, internal);
+    const existing = getTranslationValueRow(entry.id, internal);
+    const unchanged =
+      existing &&
+      existing.value === seed &&
+      existing.state === "AUTO" &&
+      existing.sourceHash === entry.sourceHash;
+    if (unchanged) {
+      return { changed: false, entry, value: existing };
+    }
+    const stamp = nowIso();
+    upsertTranslationValueRow({
+      entryId: entry.id,
+      languageCode: internal,
+      value: seed,
+      state: "AUTO",
+      sourceHash: entry.sourceHash,
+      updatedAt: stamp,
+      updatedBy: String(actor || "auto-reset"),
+    });
+    bumpCatalogVersion(readLocalizationSettings(), actor || "auto-reset");
+    return { changed: true, entry, value: getTranslationValueRow(entry.id, internal) };
+  });
+}
+
+void initialized;
+void DEFAULT_LOCALE;
+void settingsEqual;

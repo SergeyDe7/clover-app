@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Раздел менеджера: обмен заказами с 1С.
 import { useEffect, useState } from "react";
 import { api } from "../../serverApi";
@@ -13,6 +14,7 @@ import { AUDIT_ACTION_LABELS } from "./ManagerAudit";
 import { appAlert } from "../../shared/AppModal";
 
 export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavigate }) {
+  const { t } = useLocalization();
   const [data, setData] = useState(null);
   const [oneC, setOneC] = useState(null);
   const [configForm, setConfigForm] = useState({
@@ -72,12 +74,12 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       setConnectionResult(null);
       setPreview(null);
       await appAlert({
-        title: "Сохранено",
-        message: "Настройки подключения к 1С сохранены.",
+        title: t("shared.status.saved"),
+        message: t("manager.text5"),
         tone: "success",
       });
     } catch (saveError) {
-      await appAlert({ title: "Ошибка сохранения", message: saveError.message, tone: "danger" });
+      await appAlert({ title: t("manager.saveError2"), message: saveError.message, tone: "danger" });
     } finally {
       setBusyConnection("");
     }
@@ -107,7 +109,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       const result = await api.previewOneCCatalog(type, 20);
       setPreview(result);
     } catch (previewError) {
-      await appAlert({ title: "Ошибка предпросмотра", message: previewError.message, tone: "danger" });
+      await appAlert({ title: t("manager.previewError"), message: previewError.message, tone: "danger" });
     } finally {
       setBusyConnection("");
     }
@@ -131,12 +133,12 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       }
       if (type === "reset") result = await api.resetExchangeOrder(row.id);
       if (result?.result?.message) {
-        await appAlert({ title: "Обмен с 1С", message: result.result.message, tone: "success" });
+        await appAlert({ title: t("manager.text6"), message: result.result.message, tone: "success" });
       }
       await onReload();
       await load();
     } catch (actionError) {
-      await appAlert({ title: "Ошибка обмена", message: actionError.message, tone: "danger" });
+      await appAlert({ title: t("manager.exchangeError"), message: actionError.message, tone: "danger" });
       await onReload();
       await load();
     } finally {
@@ -150,7 +152,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       const blob = await api.downloadExchangeOrder(row.id, format);
       downloadBlobFile(blob, `clover-order-${row.number || row.id}-1c.${format}`);
     } catch (downloadError) {
-      await appAlert({ title: "Ошибка скачивания", message: downloadError.message, tone: "danger" });
+      await appAlert({ title: t("manager.downloadError"), message: downloadError.message, tone: "danger" });
     } finally {
       setBusyId("");
     }
@@ -162,7 +164,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       const blob = await api.downloadExchangeBatch(format, batchStatus);
       downloadBlobFile(blob, `clover-orders-1c.${format}`);
     } catch (downloadError) {
-      await appAlert({ title: "Ошибка скачивания", message: downloadError.message, tone: "danger" });
+      await appAlert({ title: t("manager.downloadError"), message: downloadError.message, tone: "danger" });
     } finally {
       setBusyBatch("");
     }
@@ -179,9 +181,9 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
   const modeIsReal = configForm.mode === "real";
   const connectionLabel = modeIsReal
     ? runtime.readyForRead
-      ? "Режим реальной 1С"
-      : "Требуется адрес публикации"
-    : "Безопасный симулятор";
+      ? t("manager.live1cMode")
+      : t("manager.publicationAddressIsRequired")
+    : t("manager.safeSimulator");
   const missingClients = summary.missingClientLinks || 0;
   const missingProducts = summary.missingProductLinks || 0;
   const matchingOk = missingClients === 0 && missingProducts === 0;
@@ -191,15 +193,15 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
     <section className="manager-exchange">
       <div className="exchange-notice manager-home-notice-row">
         <p>
-          <strong>Действия по заказу</strong> — в карточке на вкладке «Заказы». Здесь сводка очереди, подключение и пакетные операции.
-        </p>
-        <button className="secondary-button" type="button" onClick={goToOrders}>К заказам</button>
+          <strong>{t("manager.orderActions")}</strong>{ t("manager.onTheCardInTheOrders")
+        }</p>
+        <button className="secondary-button" type="button" onClick={goToOrders}>{t("manager.toOrders")}</button>
       </div>
 
       <div className="exchange-summary-strip">
-        <article className="stat-card"><span>Очередь / не отправлено</span><strong>{summary.notSent || 0}</strong></article>
-        <article className="stat-card"><span>Ошибки обмена</span><strong>{summary.error || 0}</strong></article>
-        <article className="stat-card"><span>Связь 1С</span><strong>{connectionLabel}</strong></article>
+        <article className="stat-card"><span>{t("manager.queueNotSent")}</span><strong>{summary.notSent || 0}</strong></article>
+        <article className="stat-card"><span>{t("manager.exchangeErrors")}</span><strong>{summary.error || 0}</strong></article>
+        <article className="stat-card"><span>{t("manager.text25")}</span><strong>{connectionLabel}</strong></article>
       </div>
 
       <details className="panel manager-exchange-block" open={!modeIsReal || !runtime.readyForRead}>
@@ -208,34 +210,34 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
         </summary>
         <div className="manager-exchange-block-body">
           <div className="form-grid">
-            <label className="field">
-              Режим подключения
-              <select value={configForm.mode} onChange={(event) => setConfigForm({ ...configForm, mode: event.target.value })}>
-                <option value="simulation">Безопасный симулятор</option>
-                <option value="real">Реальная 1С по локальной сети</option>
+            <label className="field">{
+              t("manager.connectionMode")
+              }<select value={configForm.mode} onChange={(event) => setConfigForm({ ...configForm, mode: event.target.value })}>
+                <option value="simulation">{t("manager.safeSimulator")}</option>
+                <option value="real">{t("manager.real1cOnTheLocalNetwork")}</option>
               </select>
             </label>
-            <label className="field">
-              Адрес опубликованной базы 1С
-              <input
+            <label className="field">{
+              t("manager.published1cBaseUrl")
+              }<input
                 value={configForm.baseUrl || ""}
                 disabled={Boolean(runtime.baseUrlFromEnv)}
                 placeholder="http://192.168.1.10/clover"
                 onChange={(event) => setConfigForm({ ...configForm, baseUrl: event.target.value })}
               />
             </label>
-            <label className="field">
-              Пользователь обмена 1С
-              <input
+            <label className="field">{
+              t("manager.text26")
+              }<input
                 value={configForm.username || ""}
                 disabled={Boolean(runtime.usernameFromEnv)}
                 placeholder="CloverExchange"
                 onChange={(event) => setConfigForm({ ...configForm, username: event.target.value })}
               />
             </label>
-            <label className="field">
-              Тайм-аут, мс
-              <input
+            <label className="field">{
+              t("manager.timeoutMs")
+              }<input
                 type="number"
                 min="3000"
                 max="30000"
@@ -246,44 +248,44 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
           </div>
 
           <details className="manager-exchange-nested">
-            <summary className="section-toggle">Технические пути HTTP-сервиса</summary>
+            <summary className="section-toggle">{t("manager.httpServiceTechnicalPaths")}</summary>
             <div className="form-grid">
-              <label className="field">Проверка связи<input value={configForm.healthPath || ""} onChange={(event) => setConfigForm({ ...configForm, healthPath: event.target.value })} /></label>
-              <label className="field">Контрагенты<input value={configForm.clientsPath || ""} onChange={(event) => setConfigForm({ ...configForm, clientsPath: event.target.value })} /></label>
-              <label className="field">Номенклатура<input value={configForm.productsPath || ""} onChange={(event) => setConfigForm({ ...configForm, productsPath: event.target.value })} /></label>
-              <label className="field">Черновик заказа<input value={configForm.draftOrderPath || ""} onChange={(event) => setConfigForm({ ...configForm, draftOrderPath: event.target.value })} /></label>
+              <label className="field">{t("manager.connectionCheck")}<input value={configForm.healthPath || ""} onChange={(event) => setConfigForm({ ...configForm, healthPath: event.target.value })} /></label>
+              <label className="field">{t("manager.counterparties")}<input value={configForm.clientsPath || ""} onChange={(event) => setConfigForm({ ...configForm, clientsPath: event.target.value })} /></label>
+              <label className="field">{t("manager.nomenclature")}<input value={configForm.productsPath || ""} onChange={(event) => setConfigForm({ ...configForm, productsPath: event.target.value })} /></label>
+              <label className="field">{t("manager.orderDraft")}<input value={configForm.draftOrderPath || ""} onChange={(event) => setConfigForm({ ...configForm, draftOrderPath: event.target.value })} /></label>
             </div>
           </details>
 
           <div className="setting-card">
             <div>
-              <h3>Разрешить создание черновика</h3>
-              <p>Даже после включения здесь рабочая запись останется заблокированной, пока в server/.env не установлено ONEC_WRITE_ENABLED=true.</p>
+              <h3>{t("manager.allowDraftCreation")}</h3>
+              <p>{t("manager.evenAfterEnablingHereLiveWrites")}</p>
             </div>
             <button
               className={configForm.allowDraftCreation ? "toggle active" : "toggle"}
               type="button"
               onClick={() => setConfigForm({ ...configForm, allowDraftCreation: !configForm.allowDraftCreation })}
-              aria-label="Разрешить создание черновика"
+              aria-label={t("manager.allowDraftCreation")}
             ><span /></button>
           </div>
 
           <div className="exchange-actions">
-            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={saveConnection}>{busyConnection === "save" ? "Сохраняем…" : "Сохранить настройки"}</button>
-            <button className="primary-button" disabled={Boolean(busyConnection)} type="button" onClick={testConnection}>{busyConnection === "test" ? "Проверяем…" : "Проверить связь"}</button>
-            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={() => loadPreview("clients")}>{busyConnection === "clients" ? "Загружаем…" : "Контрагенты"}</button>
-            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={() => loadPreview("products")}>{busyConnection === "products" ? "Загружаем…" : "Номенклатура"}</button>
+            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={saveConnection}>{busyConnection === "save" ? t("shared.status.saving") : t("shared.action.saveSettings")}</button>
+            <button className="primary-button" disabled={Boolean(busyConnection)} type="button" onClick={testConnection}>{busyConnection === "test" ? t("manager.checking") : t("manager.testConnection")}</button>
+            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={() => loadPreview("clients")}>{busyConnection === "clients" ? t("manager.loading") : t("manager.counterparties")}</button>
+            <button className="secondary-button" disabled={Boolean(busyConnection)} type="button" onClick={() => loadPreview("products")}>{busyConnection === "products" ? t("manager.loading") : t("manager.nomenclature")}</button>
           </div>
 
           <div className="manager-exchange-status-row">
-            <div className="warning-box">Секрет в server/.env: {runtime.secretConfigured ? "настроен" : "не настроен"}</div>
-            <div className="warning-box">Чтение: {runtime.readyForRead ? "доступно" : "не готово"}</div>
-            <div className="warning-box">Запись: {runtime.readyForWrite ? "разрешена" : "заблокирована"}</div>
-            <div className="warning-box">База: УНФ 1.6 · документ ЗаказПокупателя</div>
+            <div className="warning-box">Секрет в server/.env: {runtime.secretConfigured ? t("manager.configured") : t("manager.notConfigured")}</div>
+            <div className="warning-box">Чтение: {runtime.readyForRead ? t("manager.available") : t("manager.notReady")}</div>
+            <div className="warning-box">Запись: {runtime.readyForWrite ? t("manager.allowed") : t("manager.blocked")}</div>
+            <div className="warning-box">{t("manager.baseUnf16Document")}</div>
             <div className={exchangeContour.prodEnabled ? "success-box" : "warning-box"}>
               Контур заказов: {exchangeContour.prodEnabled
                 ? `prod включён · базы ${allowedDatabases}`
-                : "только 1С TEST (prod выключен)"}
+                : t("manager.text16")}
             </div>
           </div>
 
@@ -291,18 +293,18 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
             <div className={connectionResult.ok === false ? "auth-error" : "success-box"}>
               {connectionResult.ok === false
                 ? connectionResult.message
-                : <><strong>Связь работает.</strong> {connectionResult.configuration || "1С:УНФ"}{connectionResult.database ? ` · база ${connectionResult.database}` : ""}{connectionResult.extensionVersion ? ` · расширение ${connectionResult.extensionVersion}` : ""}</>}
+                : <><strong>{t("manager.connectionWorks")}</strong> {connectionResult.configuration || "1С:УНФ"}{connectionResult.database ? ` · база ${connectionResult.database}` : ""}{connectionResult.extensionVersion ? ` · расширение ${connectionResult.extensionVersion}` : ""}</>}
             </div>
           )}
 
           {preview && (
             <div className="comment-box">
-              <strong>{preview.type === "clients" ? "Контрагенты" : "Номенклатура"}: {preview.count || 0}</strong>
-              <p className="muted small">Только просмотр. Данные Clover пока не изменяются.</p>
+              <strong>{preview.type === "clients" ? t("manager.counterparties") : t("manager.nomenclature")}: {preview.count || 0}</strong>
+              <p className="muted small">{t("manager.viewOnlyCloverDataIsNot")}</p>
               <div className="manager-exchange-preview-list">
                 {(preview.items || []).map((item, index) => (
                   <div key={item.id || index} className="manager-exchange-preview-item">
-                    <strong>{item.name || item.presentation || item.code || "Без названия"}</strong>
+                    <strong>{item.name || item.presentation || item.code || t("manager.untitled")}</strong>
                     <small>ID: {item.id || "—"}{item.article ? ` · артикул ${item.article}` : ""}{item.inn ? ` · ИНН ${item.inn}` : ""}</small>
                   </div>
                 ))}
@@ -315,34 +317,34 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       <section className="panel manager-exchange-block">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">Интеграция</p>
-            <h2>Очередь обмена</h2>
-            <p>Сводка и пакетные операции. Передача отдельного заказа — в карточке на вкладке «Заказы».</p>
+            <p className="eyebrow">{t("manager.integration")}</p>
+            <h2>{t("manager.exchangeQueue")}</h2>
+            <p>{t("manager.summaryAndBatchOperationsSendingA")}</p>
           </div>
           <div className="manager-exchange-heading-actions">
-            <button className="secondary-button" type="button" onClick={goToOrders}>К заказам</button>
-            <button className="secondary-button" type="button" onClick={load} disabled={loadingExchange}>{loadingExchange ? "Обновляем…" : "Обновить"}</button>
+            <button className="secondary-button" type="button" onClick={goToOrders}>{t("manager.toOrders")}</button>
+            <button className="secondary-button" type="button" onClick={load} disabled={loadingExchange}>{loadingExchange ? t("manager.updating") : t("shared.action.refresh")}</button>
           </div>
         </div>
         {error && <div className="auth-error">{error}</div>}
         <div className="exchange-grid">
-          <article><span>Не отправлено</span><strong>{summary.notSent || 0}</strong></article>
-          <article><span>Готово</span><strong>{summary.ready || 0}</strong></article>
-          <article><span>Передано тестово</span><strong>{summary.sent || 0}</strong></article>
-          <article><span>Черновики 1С</span><strong>{summary.draft || 0}</strong></article>
-          <article><span>Ошибки</span><strong>{summary.error || 0}</strong></article>
+          <article><span>{t("manager.notSent2")}</span><strong>{summary.notSent || 0}</strong></article>
+          <article><span>{t("shared.status.done")}</span><strong>{summary.ready || 0}</strong></article>
+          <article><span>{t("manager.sentAsATest")}</span><strong>{summary.sent || 0}</strong></article>
+          <article><span>{t("manager.text27")}</span><strong>{summary.draft || 0}</strong></article>
+          <article><span>{t("manager.errors")}</span><strong>{summary.error || 0}</strong></article>
         </div>
         <div className="manager-exchange-batch">
-          <select value={batchStatus} onChange={(e) => setBatchStatus(e.target.value)} aria-label="Фильтр пакета заказов" disabled={Boolean(busyBatch)}>
-            <option value="all">Все заказы</option>
+          <select value={batchStatus} onChange={(e) => setBatchStatus(e.target.value)} aria-label={t("manager.orderPackFilter")} disabled={Boolean(busyBatch)}>
+            <option value="all">{t("manager.allOrders")}</option>
             {Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}
           </select>
-          <button className="secondary-button" type="button" disabled={Boolean(busyBatch)} onClick={() => downloadBatch("json")}>{busyBatch === "json" ? "Скачиваем…" : "Скачать пакет JSON"}</button>
-          <button className="secondary-button" type="button" disabled={Boolean(busyBatch)} onClick={() => downloadBatch("csv")}>{busyBatch === "csv" ? "Скачиваем…" : "Скачать пакет CSV"}</button>
+          <button className="secondary-button" type="button" disabled={Boolean(busyBatch)} onClick={() => downloadBatch("json")}>{busyBatch === "json" ? t("manager.downloading") : t("manager.downloadJsonPack")}</button>
+          <button className="secondary-button" type="button" disabled={Boolean(busyBatch)} onClick={() => downloadBatch("csv")}>{busyBatch === "csv" ? t("manager.downloading") : t("manager.downloadCsvPack")}</button>
         </div>
         <div className={`${matchingOk ? "success-box" : "warning-box"} manager-exchange-match-note`}>
           {matchingOk
-            ? "Сопоставление с 1С: клиенты и товары в очереди связаны."
+            ? t("manager.text14")
             : `Не сопоставлено клиентов: ${missingClients} · товаров: ${missingProducts}`}
         </div>
         <div className="exchange-order-list">
@@ -357,16 +359,16 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
                     <h3>Заказ № {row.number} · {row.customerName}</h3>
                     <p className="muted small">Создан {formatDateTime(row.createdAt)} · доставка {formatDate(row.deliveryDate)} · статус заказа: {row.orderStatus}</p>
                   </div>
-                  <strong>{row.validation?.ready ? "Готов" : `${row.validation?.issues?.length || 0} ошибок`}</strong>
+                  <strong>{row.validation?.ready ? t("manager.ready2") : `${row.validation?.issues?.length || 0} ошибок`}</strong>
                 </div>
                 {row.validation?.issues?.length > 0 && <ul className="exchange-issues">{row.validation.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>}
                 {exchange.message && <div className="exchange-message">{exchange.message}{exchange.receipt ? ` · ${exchange.receipt}` : ""}</div>}
-                {exchange.remoteDocument && <div className="exchange-message">Документ: {exchange.remoteDocument.number || exchange.remoteDocument.id || "—"} · {exchange.remoteDocument.posted ? "проведён" : "не проведён"} · {exchange.remoteDocument.mode === "real" ? "рабочая 1С" : "симулятор"}</div>}
+                {exchange.remoteDocument && <div className="exchange-message">Документ: {exchange.remoteDocument.number || exchange.remoteDocument.id || "—"} · {exchange.remoteDocument.posted ? t("manager.posted") : t("manager.notPosted")} · {exchange.remoteDocument.mode === "real" ? t("manager.production1c") : t("manager.simulator")}</div>}
                 <div className="exchange-actions">
-                  <button className="secondary-button" type="button" onClick={goToOrders}>В заказах</button>
-                  <button className="secondary-button" disabled={busy} type="button" onClick={() => action(row, "check")}>Проверить</button>
-                  <button className="secondary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => action(row, "send")}>{exchange.status === "sending" ? "Ожидает ACK 1С" : "Проверить и передать тестово"}</button>
-                  <button className="primary-button" disabled={busy || !runtime.readyForWrite} title={!runtime.readyForWrite ? "Запись пока заблокирована настройками" : ""} type="button" onClick={() => action(row, "draft")}>{modeIsReal ? "Черновик в 1С" : "Черновик в симуляторе"}</button>
+                  <button className="secondary-button" type="button" onClick={goToOrders}>{t("manager.inOrders")}</button>
+                  <button className="secondary-button" disabled={busy} type="button" onClick={() => action(row, "check")}>{t("manager.check")}</button>
+                  <button className="secondary-button" disabled={busy || exchange.status === "sending"} type="button" onClick={() => action(row, "send")}>{exchange.status === "sending" ? t("manager.waitingFor1cAck") : t("manager.checkAndSendAsATest")}</button>
+                  <button className="primary-button" disabled={busy || !runtime.readyForWrite} title={!runtime.readyForWrite ? t("manager.savingIsBlockedBySettings") : ""} type="button" onClick={() => action(row, "draft")}>{modeIsReal ? t("manager.draftIn1c") : t("manager.draftInTheSimulator")}</button>
                   <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "json")}>JSON</button>
                   <button className="secondary-button" disabled={busy} type="button" onClick={() => downloadOne(row, "csv")}>CSV</button>
                   {exchange.status !== "not_sent" && exchange.status !== "sent" && !(
@@ -377,9 +379,9 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
                       disabled={busy}
                       type="button"
                       onClick={() => action(row, "reset")}
-                    >
-                      Сбросить
-                    </button>
+                    >{
+                      t("shared.action.reset")
+                    }</button>
                   )}
                 </div>
               </article>
@@ -387,12 +389,12 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
           })}
           {!loadingExchange && !(data?.rows || []).length && !error && (
             <div className="empty-box">
-              <p>Заказов для обмена пока нет.</p>
-              <p className="muted small">Новые заказы появляются здесь после создания на вкладке «Заказы».</p>
-              <button className="secondary-button" type="button" onClick={goToOrders}>Открыть заказы</button>
+              <p>{t("manager.noOrdersForExchangeYet")}</p>
+              <p className="muted small">{t("manager.newOrdersAppearHereAfterThey")}</p>
+              <button className="secondary-button" type="button" onClick={goToOrders}>{t("manager.openOrders")}</button>
             </div>
           )}
-          {loadingExchange && <div className="empty-box">Загружаем центр обмена…</div>}
+          {loadingExchange && <div className="empty-box">{t("manager.loadingTheExchangeCenter")}</div>}
         </div>
       </section>
 
@@ -400,9 +402,9 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
         <section className="panel manager-exchange-block">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">Подготовка данных</p>
-              <h2>Мастер сопоставления с 1С</h2>
-              <p>Показаны только клиенты и товары, которые используются в заказах и ещё не имеют ID из 1С.</p>
+              <p className="eyebrow">{t("manager.dataPreparation")}</p>
+              <h2>{t("manager.text28")}</h2>
+              <p>{t("manager.onlyClientsAndProductsUsedIn")}</p>
             </div>
           </div>
           <div className="form-grid">
@@ -412,11 +414,11 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
                 {(data?.matching?.clients || []).slice(0, 8).map((client) => (
                   <div key={client.id}>
                     <strong>{client.companyName || client.email}</strong>
-                    <small>{client.contactName || "Контакт не указан"} · {client.email}</small>
+                    <small>{client.contactName || t("manager.noContactGiven")} · {client.email}</small>
                   </div>
                 ))}
               </div>
-              <button className="secondary-button" type="button" onClick={() => onNavigate("clients")}>Открыть клиентов</button>
+              <button className="secondary-button" type="button" onClick={() => onNavigate("clients")}>{t("manager.openClients")}</button>
             </div>
             <div className="comment-box">
               <strong>Товары без ID номенклатуры: {data?.matching?.products?.length || 0}</strong>
@@ -424,11 +426,11 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
                 {(data?.matching?.products || []).slice(0, 8).map((product) => (
                   <div key={product.id}>
                     <strong>{product.name}</strong>
-                    <small>{product.code || "Без внутреннего кода"}</small>
+                    <small>{product.code || t("manager.noInternalCode")}</small>
                   </div>
                 ))}
               </div>
-              <button className="secondary-button" type="button" onClick={() => onNavigate("products")}>Открыть товары</button>
+              <button className="secondary-button" type="button" onClick={() => onNavigate("products")}>{t("manager.openProducts")}</button>
             </div>
           </div>
         </section>
@@ -437,22 +439,22 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       <section className="panel manager-exchange-block">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">История</p>
-            <h2>Журнал обмена</h2>
-            <p>Последние операции проверки, передачи и сброса по очереди 1С.</p>
+            <p className="eyebrow">{t("shared.section.history")}</p>
+            <h2>{t("manager.exchangeLog")}</h2>
+            <p>{t("manager.recentCheckSendAndResetOperations")}</p>
           </div>
         </div>
         <div className="exchange-log">
           {(data?.log || []).map((item) => (
             <article className="exchange-log-row" key={item.id}>
-              <h4>{AUDIT_ACTION_LABELS[item.action] || item.action}</h4>
-              <p>{formatDateTime(item.createdAt)} · заказ № {item.details?.orderNumber || "—"} · {item.userEmail || "Система"}</p>
+              <h4>{AUDIT_ACTION_LABELS[item.action] ? t(AUDIT_ACTION_LABELS[item.action]) : item.action}</h4>
+              <p>{formatDateTime(item.createdAt)} · заказ № {item.details?.orderNumber || "—"} · {item.userEmail || t("shared.role.system")}</p>
             </article>
           ))}
           {!(data?.log || []).length && (
             <div className="empty-box">
-              <p>Операций обмена пока нет.</p>
-              <p className="muted small">Записи появятся после проверки связи или передачи заказа.</p>
+              <p>{t("manager.noExchangeOperationsYet")}</p>
+              <p className="muted small">{t("manager.recordsWillAppearAfterAConnection")}</p>
             </div>
           )}
         </div>

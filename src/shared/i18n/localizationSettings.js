@@ -101,7 +101,12 @@ function emptyDomainReport() {
 }
 
 export function computeLanguageCompleteness(language, items = []) {
-  const publicCode = isSupportedPublicLocale(language) ? toPublicLocaleCode(language) : canonicalizeLocale(language) === DEFAULT_LOCALE ? DEFAULT_LOCALE : toPublicLocaleCode(language);
+  if (!isSupportedPublicLocale(language)) {
+    const domains = emptyDomainReport();
+    return { language: typeof language === "string" ? language : "", complete: false, domains };
+  }
+
+  const publicCode = toPublicLocaleCode(language);
   if (publicCode === DEFAULT_LOCALE) {
     const domains = emptyDomainReport();
     for (const domain of COMPLETENESS_DOMAINS) domains[domain].complete = true;
@@ -112,32 +117,26 @@ export function computeLanguageCompleteness(language, items = []) {
   const list = Array.isArray(items) ? items : [];
   for (const item of list) {
     if (!item || item.critical !== true) continue;
+    if (!isSupportedPublicLocale(item.language || publicCode)) continue;
     const itemLang = toPublicLocaleCode(item.language || publicCode);
     if (itemLang !== publicCode) continue;
     const domain = COMPLETENESS_DOMAINS.includes(item.domain) ? item.domain : null;
     if (!domain) continue;
-    domains[domain].total += 1;
+    const state = String(item.state || "");
     const ready =
       item.stale !== true &&
-      item.state !== "MISSING" &&
-      item.state !== "FALLBACK_RU" &&
+      (state === "MANUAL" || state === "AUTO") &&
       Boolean(String(item.value || "").trim());
+    domains[domain].total += 1;
     if (ready) domains[domain].ready += 1;
   }
 
   let complete = true;
-  let anyCritical = false;
   for (const domain of COMPLETENESS_DOMAINS) {
     const report = domains[domain];
-    if (report.total > 0) {
-      anyCritical = true;
-      report.complete = report.ready === report.total;
-      if (!report.complete) complete = false;
-    } else {
-      report.complete = true;
-    }
+    report.complete = report.total > 0 && report.ready === report.total;
+    if (!report.complete) complete = false;
   }
-  if (!anyCritical) complete = false;
 
   return { language: publicCode, complete, domains };
 }

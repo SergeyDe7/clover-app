@@ -1,3 +1,4 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { useEffect, useState } from "react";
 import {
   cartDeliveryFee,
@@ -14,6 +15,7 @@ import { formatMoney, navigateStorefront } from "../components/StoreHeader.jsx";
 import { StorefrontCartQtyControl } from "../components/StorefrontQtyControl.jsx";
 
 export function CartPage() {
+  const { t } = useLocalization();
   const [items, setItems] = useState(getCartItems);
   useEffect(() => subscribeCart(() => setItems(getCartItems())), []);
   const goodsTotal = cartGoodsTotal(items);
@@ -23,15 +25,15 @@ export function CartPage() {
   if (!items.length) {
     return (
       <div className="sf-cart sf-empty">
-        <h1>Корзина</h1>
-        <p className="sf-muted">Пока пусто — добавьте товары из каталога.</p>
+        <h1>{t("storefront.nav.cart")}</h1>
+        <p className="sf-muted">{t("storefront.emptyForNowAddProductsFrom")}</p>
         <button
           type="button"
           className="sf-btn sf-btn-primary"
           onClick={() => navigateStorefront({ name: "catalog" })}
-        >
-          В каталог
-        </button>
+        >{
+          t("storefront.nav.toCatalog")
+        }</button>
       </div>
     );
   }
@@ -39,8 +41,8 @@ export function CartPage() {
   return (
     <div className="sf-cart">
       <div className="sf-section-head">
-        <h1>Корзина</h1>
-        <p>Цены сайта — без персональных условий ЛК.</p>
+        <h1>{t("storefront.nav.cart")}</h1>
+        <p>{t("storefront.websitePricesWithoutPersonalCabinetTerms")}</p>
       </div>
       <ul className="sf-cart-list">
         {items.map((item) => (
@@ -80,7 +82,7 @@ export function CartPage() {
               aria-label={`Удалить ${item.name}`}
               onClick={() => removeFromCart(item.productId, item.unit)}
             >
-              <span className="sf-cart-remove-label">Удалить</span>
+              <span className="sf-cart-remove-label">{t("shared.action.delete")}</span>
               <span className="sf-cart-remove-icon" aria-hidden="true">
                 ×
               </span>
@@ -90,7 +92,7 @@ export function CartPage() {
         {deliveryFee > 0 ? (
           <li className="sf-cart-item sf-cart-item--delivery">
             <div className="sf-cart-meta">
-              <strong>Доставка</strong>
+              <strong>{t("checkout.delivery")}</strong>
               <p className="sf-muted">
                 По СПб · заказ менее {formatMoney(FREE_DELIVERY_MIN_TOTAL)}
               </p>
@@ -111,10 +113,10 @@ export function CartPage() {
             >
               {deliveryFee > 0
                 ? `Доставка ${formatMoney(PAID_DELIVERY_FEE)}. До бесплатной ещё ${formatMoney(FREE_DELIVERY_MIN_TOTAL - goodsTotal)}.`
-                : "Доставка по Санкт-Петербургу — бесплатно (заказ от 5000 ₽)."}
+                : t("storefront.deliveryInSaintPetersburgIsFree")}
             </p>
           ) : null}
-          <p className="sf-muted">Итого</p>
+          <p className="sf-muted">{t("checkout.total")}</p>
           <strong className="sf-cart-total">{formatMoney(grandTotal)}</strong>
         </div>
         <div className="sf-cart-actions">
@@ -122,16 +124,16 @@ export function CartPage() {
             type="button"
             className="sf-btn sf-btn-ghost"
             onClick={() => clearCart()}
-          >
-            Очистить
-          </button>
+          >{
+            t("shared.action.clear")
+          }</button>
           <button
             type="button"
             className="sf-btn sf-btn-primary"
             onClick={() => navigateStorefront({ name: "checkout" })}
-          >
-            Оформить заказ
-          </button>
+          >{
+            t("storefront.nav.checkout")
+          }</button>
         </div>
       </div>
     </div>

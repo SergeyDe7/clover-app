@@ -186,7 +186,171 @@ db.exec(`
     expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL
   ) STRICT;
+
+  CREATE TABLE IF NOT EXISTS translation_entries (
+    id TEXT PRIMARY KEY,
+    namespace TEXT NOT NULL,
+    entity_type TEXT NOT NULL DEFAULT '',
+    entity_id TEXT NOT NULL DEFAULT '',
+    field_key TEXT NOT NULL,
+    source_ru TEXT NOT NULL CHECK(length(trim(source_ru)) > 0),
+    source_hash TEXT NOT NULL CHECK(length(trim(source_hash)) > 0),
+    critical INTEGER NOT NULL CHECK(critical IN (0, 1)),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(namespace, entity_type, entity_id, field_key)
+  ) STRICT;
+
+  CREATE TABLE IF NOT EXISTS translation_values (
+    entry_id TEXT NOT NULL,
+    language_code TEXT NOT NULL CHECK(language_code IN ('en', 'uz', 'ky', 'tg', 'zh-CN', 'ar')),
+    value TEXT NOT NULL CHECK(length(trim(value)) > 0),
+    state TEXT NOT NULL CHECK(state IN ('AUTO', 'MANUAL')),
+    source_hash TEXT NOT NULL CHECK(length(trim(source_hash)) > 0),
+    updated_at TEXT NOT NULL,
+    updated_by TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY(entry_id, language_code),
+    FOREIGN KEY(entry_id) REFERENCES translation_entries(id) ON DELETE CASCADE
+  ) STRICT;
+
+  CREATE INDEX IF NOT EXISTS idx_translation_entries_namespace
+    ON translation_entries(namespace, field_key);
+
+  CREATE INDEX IF NOT EXISTS idx_translation_values_language
+    ON translation_values(language_code, state);
 `);
+
+export function getDatabasePath() {
+  return databasePath;
+}
+
+export function runInTransaction(fn) {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const result = fn();
+    db.exec("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      // ignore rollback failure after a failed begin/commit
+    }
+    throw error;
+  }
+}
+
+export function listTranslationEntryRows() {
+  return db
+    .prepare(
+      `SELECT id, namespace, entity_type AS entityType, entity_id AS entityId,
+              field_key AS fieldKey, source_ru AS sourceRu, source_hash AS sourceHash,
+              critical, created_at AS createdAt, updated_at AS updatedAt
+       FROM translation_entries
+       ORDER BY namespace, field_key`
+    )
+    .all();
+}
+
+export function listTranslationValueRows() {
+  return db
+    .prepare(
+      `SELECT entry_id AS entryId, language_code AS languageCode, value, state,
+              source_hash AS sourceHash, updated_at AS updatedAt, updated_by AS updatedBy
+       FROM translation_values`
+    )
+    .all();
+}
+
+export function getTranslationEntryRow(id) {
+  return (
+    db
+      .prepare(
+        `SELECT id, namespace, entity_type AS entityType, entity_id AS entityId,
+                field_key AS fieldKey, source_ru AS sourceRu, source_hash AS sourceHash,
+                critical, created_at AS createdAt, updated_at AS updatedAt
+         FROM translation_entries WHERE id = ?`
+      )
+      .get(String(id || "")) || null
+  );
+}
+
+export function findTranslationEntryByIdentity(namespace, fieldKey) {
+  return (
+    db
+      .prepare(
+        `SELECT id, namespace, entity_type AS entityType, entity_id AS entityId,
+                field_key AS fieldKey, source_ru AS sourceRu, source_hash AS sourceHash,
+                critical, created_at AS createdAt, updated_at AS updatedAt
+         FROM translation_entries
+         WHERE namespace = ? AND entity_type = '' AND entity_id = '' AND field_key = ?`
+      )
+      .get(String(namespace || ""), String(fieldKey || "")) || null
+  );
+}
+
+export function insertTranslationEntryRow(row) {
+  db.prepare(
+    `INSERT INTO translation_entries(
+       id, namespace, entity_type, entity_id, field_key, source_ru, source_hash,
+       critical, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    row.id,
+    row.namespace,
+    row.entityType || "",
+    row.entityId || "",
+    row.fieldKey,
+    row.sourceRu,
+    row.sourceHash,
+    row.critical ? 1 : 0,
+    row.createdAt,
+    row.updatedAt
+  );
+}
+
+export function updateTranslationEntryRow(row) {
+  db.prepare(
+    `UPDATE translation_entries
+     SET source_ru = ?, source_hash = ?, critical = ?, updated_at = ?
+     WHERE id = ?`
+  ).run(row.sourceRu, row.sourceHash, row.critical ? 1 : 0, row.updatedAt, row.id);
+}
+
+export function getTranslationValueRow(entryId, languageCode) {
+  return (
+    db
+      .prepare(
+        `SELECT entry_id AS entryId, language_code AS languageCode, value, state,
+                source_hash AS sourceHash, updated_at AS updatedAt, updated_by AS updatedBy
+         FROM translation_values
+         WHERE entry_id = ? AND language_code = ?`
+      )
+      .get(String(entryId || ""), String(languageCode || "")) || null
+  );
+}
+
+export function upsertTranslationValueRow(row) {
+  db.prepare(
+    `INSERT INTO translation_values(
+       entry_id, language_code, value, state, source_hash, updated_at, updated_by
+     ) VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(entry_id, language_code) DO UPDATE SET
+       value = excluded.value,
+       state = excluded.state,
+       source_hash = excluded.source_hash,
+       updated_at = excluded.updated_at,
+       updated_by = excluded.updated_by`
+  ).run(
+    row.entryId,
+    row.languageCode,
+    row.value,
+    row.state,
+    row.sourceHash,
+    row.updatedAt,
+    row.updatedBy || ""
+  );
+}
 
 ensureColumn("users", "email_verified", "INTEGER NOT NULL DEFAULT 1");
 ensureColumn("users", "approval_status", "TEXT NOT NULL DEFAULT 'approved'");

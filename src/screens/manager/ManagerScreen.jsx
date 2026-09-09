@@ -28,6 +28,7 @@ import { ManagerBackup } from "./ManagerBackup";
 import { ManagerAudit } from "./ManagerAudit";
 import { managerNotificationTab, ManagerNotificationBell, parseManagerNotification, ManagerOrderSummaryLines } from "./ManagerNotifications";
 import { ManagerAccessVault } from "./ManagerAccessVault";
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 
 function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, dirtyClientLinkIdsRef, oneCPriceTypes = [], catalogPricesVersion = "", managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onRestoreOrder, onPurgeOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onApplyReconciliationRequests, onLogout }) {
   const [tab, setTab] = useState(readManagerActiveTab);
@@ -40,6 +41,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
   const [ordersView, setOrdersView] = useState("active");
   const [ordersStatusFilter, setOrdersStatusFilter] = useState("Все");
   const [ordersExchangeFilter, setOrdersExchangeFilter] = useState("all");
+  const { t } = useLocalization();
 
   const allowedMainTabs = useMemo(
     () => MANAGER_TABS.filter(([id]) => staffHasFeature(authUser, id)),
@@ -142,7 +144,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
       ) {
         current.addresses.push({
           id: `order-address-${order.id || current.addresses.length}`,
-          label: "Адрес из заказа",
+          label: t("manager.addressFromTheOrder"),
           address: order.address,
           isDefault: current.addresses.length === 0,
         });
@@ -163,10 +165,10 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
   return <main className="clover-app">
     <StickyCabinetChrome>
       <Header
-        title={authUser?.role === "admin" ? "Кабинет админа" : "Кабинет менеджера"}
+        title={authUser?.role === "admin" ? t("manager.adminCabinet") : t("manager.managerCabinet")}
         onLogout={onLogout}
         nav={
-          <nav className="manager-nav" aria-label={authUser?.role === "admin" ? "Разделы админа" : "Разделы менеджера"}>
+          <nav className="manager-nav" aria-label={authUser?.role === "admin" ? t("manager.adminSections") : t("manager.managerSections")}>
             {allowedMainTabs.map(([id, label]) => (
               <button
                 className={tab === id ? "active" : ""}
@@ -174,7 +176,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
                 key={id}
                 onClick={() => selectTab(id)}
               >
-                {label}
+                {t(label)}
                 {id === "acts" && newActsCount > 0 ? (
                   <span className="manager-nav-count" aria-label={`Новых запросов: ${newActsCount}`}>
                     {newActsCount}
@@ -190,13 +192,13 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
             <input
               className="manager-search-input"
               type="search"
-              placeholder="Поиск заказа"
+              placeholder={t("manager.searchOrder")}
               value={headerSearch}
               onChange={(e) => {
                 setHeaderSearch(e.target.value);
                 if (tab !== "orders" && staffHasFeature(authUser, "orders")) selectTab("orders");
               }}
-              aria-label="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
+              aria-label={t("manager.searchByClientOrderTaxId")}
             />
             <ManagerNotificationBell
               notifications={managerNotifications}
@@ -214,7 +216,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
     </StickyCabinetChrome>
     <section className={`page-content${tab === "price-list" ? " page-content--price-list" : ""}`}>
       {tab !== "price-list" && managerNotice && (() => {
-        const parsed = parseManagerNotification(managerNotice);
+        const parsed = parseManagerNotification(managerNotice, t);
         const hasOrderSummary = Boolean(
           parsed.clientName || parsed.amount || parsed.positions || parsed.deliveryDate || parsed.orderDate || parsed.orderNumber
         );
@@ -246,22 +248,22 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
               )}
             </div>
             <div className="exchange-actions">
-              <button className="primary-button" type="button" onClick={() => { openFromNotification(managerNotice); onDismissNotice(); }}>
-                Открыть
-              </button>
-              <button className="secondary-button" type="button" onClick={onDismissNotice}>Прочитано</button>
+              <button className="primary-button" type="button" onClick={() => { openFromNotification(managerNotice); onDismissNotice(); }}>{
+                t("shared.action.open")
+              }</button>
+              <button className="secondary-button" type="button" onClick={onDismissNotice}>{t("manager.read")}</button>
             </div>
           </div>
         </div>
         );
       })()}
       {tab !== "price-list" ? (
-        <div className="stats-grid manager-stats-strip" aria-label="Сводка">
+        <div className="stats-grid manager-stats-strip" aria-label={t("manager.summary")}>
           <article
             className="stat-card stat-card-action"
             role="button"
             tabIndex={0}
-            title="Открыть заказы со статусом «Новый»"
+            title={t("manager.openOrdersWithStatusNew")}
             onClick={() => openOrdersWithKpiFilter("newOrders")}
             onKeyDown={(event) => {
               if (!shouldActivateStatCard(event)) return;
@@ -269,15 +271,15 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
               openOrdersWithKpiFilter("newOrders");
             }}
           >
-            <span>Новые заказы</span>
+            <span>{t("manager.newOrders")}</span>
             <strong>{newCount}</strong>
           </article>
-          <article className="stat-card"><span>Всего заказов</span><strong>{orders.length}</strong></article>
+          <article className="stat-card"><span>{t("manager.totalOrders")}</span><strong>{orders.length}</strong></article>
           <article
             className="stat-card stat-card-action"
             role="button"
             tabIndex={0}
-            title="Открыть заказы с ошибкой обмена 1С"
+            title={t("manager.openOrdersWith1cExchangeErrors")}
             onClick={() => openOrdersWithKpiFilter("exchangeErrors")}
             onKeyDown={(event) => {
               if (!shouldActivateStatCard(event)) return;
@@ -285,10 +287,10 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
               openOrdersWithKpiFilter("exchangeErrors");
             }}
           >
-            <span>Ошибки 1С</span>
+            <span>{t("manager.text31")}</span>
             <strong>{exchangeErrors}</strong>
           </article>
-          <article className="stat-card"><span>Непрочитано</span><strong>{unreadCount}</strong></article>
+          <article className="stat-card"><span>{t("manager.unread")}</span><strong>{unreadCount}</strong></article>
         </div>
       ) : null}
       {tab === "orders" && staffHasFeature(authUser, "orders") && (
@@ -350,7 +352,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
       )}
       {tab === "more" && staffHasFeature(authUser, "more") && (
         <section>
-          <nav className="manager-more-nav" aria-label="Дополнительно">
+          <nav className="manager-more-nav" aria-label={t("manager.more")}>
             {allowedMoreTabs.map(([id, label]) => (
               <button
                 className={moreTab === id ? "category-button active" : "category-button"}
@@ -358,7 +360,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
                 key={id}
                 onClick={() => selectMoreTab(id)}
               >
-                {label}
+                {t(label)}
               </button>
             ))}
           </nav>

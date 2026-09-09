@@ -1,3 +1,4 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { useEffect, useState } from "react";
 import {
   cabinetLoginUrl,
@@ -65,6 +66,7 @@ function IconPromo() {
 }
 
 export function StoreHeader({ current }) {
+  const { t } = useLocalization();
   const [count, setCount] = useState(getCartCount);
   useEffect(() => subscribeCart(() => setCount(getCartCount())), []);
 
@@ -95,15 +97,15 @@ export function StoreHeader({ current }) {
           e.preventDefault();
           go("home");
         }}
-        aria-label="Clover — на главную"
+        aria-label={t("storefront.cloverHome")}
       >
         <img src="/clover-logo.png" alt="Clover" width="160" height="108" />
       </a>
-      <nav className="sf-nav" aria-label="Навигация">
-        {link("home", "Главная", "home")}
-        {link({ name: "catalog" }, "Каталог", "catalog")}
-        {link({ name: "aktsii" }, "Акции", "aktsii")}
-        {link({ name: "contacts" }, "Контакты", "contacts")}
+      <nav className="sf-nav" aria-label={t("storefront.nav.aria")}>
+        {link("home", t("storefront.nav.home"), "home")}
+        {link({ name: "catalog" }, t("storefront.nav.catalog"), "catalog")}
+        {link({ name: "aktsii" }, t("storefront.nav.promos"), "aktsii")}
+        {link({ name: "contacts" }, t("storefront.nav.contacts"), "contacts")}
         {link(
           { name: "cart" },
           `Корзина${count ? ` (${count})` : ""}`,
@@ -114,57 +116,57 @@ export function StoreHeader({ current }) {
         <a
           className="sf-header-tool sf-catalog-mobile"
           href={storefrontHref({ name: "catalog" })}
-          aria-label="Каталог"
+          aria-label={t("storefront.nav.catalog")}
           onClick={(e) => {
             e.preventDefault();
             go({ name: "catalog" });
           }}
         >
           <IconCatalog />
-          <span className="sf-header-tool-label">Каталог</span>
+          <span className="sf-header-tool-label">{t("storefront.nav.catalog")}</span>
         </a>
         <a
           className="sf-header-tool sf-aktsii-mobile"
           href={storefrontHref({ name: "aktsii" })}
-          aria-label="Акции"
+          aria-label={t("storefront.nav.promos")}
           onClick={(e) => {
             e.preventDefault();
             go({ name: "aktsii" });
           }}
         >
           <IconPromo />
-          <span className="sf-header-tool-label">Акции</span>
+          <span className="sf-header-tool-label">{t("storefront.nav.promos")}</span>
         </a>
         <a
           className="sf-header-tool sf-cart-mobile"
           href={storefrontHref({ name: "cart" })}
-          aria-label={count ? `Корзина: ${count} поз.` : "Корзина"}
+          aria-label={count ? `Корзина: ${count} поз.` : t("storefront.nav.cart")}
           onClick={(e) => {
             e.preventDefault();
             go({ name: "cart" });
           }}
         >
           <IconCart />
-          <span className="sf-header-tool-label">Корзина</span>
+          <span className="sf-header-tool-label">{t("storefront.nav.cart")}</span>
           {count > 0 ? <span className="sf-header-badge">{count > 99 ? "99+" : count}</span> : null}
         </a>
         <StorefrontContacts />
         <a
           className="sf-header-tool sf-login-mobile"
           href={cabinetLoginUrl("/")}
-          aria-label="Личный кабинет"
+          aria-label={t("auth.login.title")}
           onClick={navigateToCabinetLogin}
         >
           <IconUser />
-          <span className="sf-header-tool-label">ЛК</span>
+          <span className="sf-header-tool-label">{t("storefront.cabinet")}</span>
         </a>
         <a
           className="sf-btn sf-btn-ghost sf-login sf-login-desktop"
           href={cabinetLoginUrl("/")}
           onClick={navigateToCabinetLogin}
-        >
-          Войти в ЛК
-        </a>
+        >{
+          t("storefront.signInToCabinet")
+        }</a>
       </div>
     </header>
   );

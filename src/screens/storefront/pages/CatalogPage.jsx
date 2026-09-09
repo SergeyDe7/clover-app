@@ -1,3 +1,4 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
 import {
@@ -25,6 +26,7 @@ export function CatalogPage({
   subcategory = "",
   facet = "",
 }) {
+  const { t } = useLocalization();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -102,14 +104,14 @@ export function CatalogPage({
     return groupProductsByCloverGroup(products);
   }, [category, subcategory, products]);
 
-  const title = category || "Каталог";
+  const title = category || t("storefront.nav.catalog");
 
   const searchToolbar = (
     <div className="sf-catalog-toolbar">
       <input
         className="sf-input sf-catalog-search"
         type="search"
-        placeholder="Поиск по названию или артикулу"
+        placeholder={t("storefront.searchByNameOrSku")}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
@@ -128,7 +130,7 @@ export function CatalogPage({
             aria-expanded={treeOpen}
             onClick={() => setTreeOpen((open) => !open)}
           >
-            <span>{category || "Категории"}</span>
+            <span>{category || t("client.catalog.categories")}</span>
             <svg
               className="sf-catalog-tree-toggle-icon"
               viewBox="0 0 12 12"
@@ -145,7 +147,7 @@ export function CatalogPage({
               />
             </svg>
           </button>
-          <p className="sf-catalog-side-title">Каталог</p>
+          <p className="sf-catalog-side-title">{t("storefront.nav.catalog")}</p>
           <div className="sf-catalog-tree-body">
             <CatalogGroupNav
               categories={data?.categories || []}
@@ -163,14 +165,14 @@ export function CatalogPage({
                 <GroupIcon name={activeMeta.icon} />
               </div>
               <div className="sf-group-landing-copy">
-                <nav className="sf-crumb sf-group-landing-crumb" aria-label="Навигация">
+                <nav className="sf-crumb sf-group-landing-crumb" aria-label={t("storefront.nav.aria")}>
                   <button
                     type="button"
                     className="sf-back"
                     onClick={() => navigateStorefront({ name: "catalog" })}
-                  >
-                    Каталог
-                  </button>
+                  >{
+                    t("storefront.nav.catalog")
+                  }</button>
                   {category ? (
                     <>
                       <span className="sf-crumb-sep">/</span>
@@ -197,12 +199,12 @@ export function CatalogPage({
             </header>
           ) : (
             <div className="sf-section-head">
-              <h1>Каталог</h1>
+              <h1>{t("storefront.nav.catalog")}</h1>
             </div>
           )}
 
           {subgroups.length > 0 ? (
-            <div className="sf-subcat-chips" aria-label="Подгруппы">
+            <div className="sf-subcat-chips" aria-label={t("storefront.subgroups")}>
               {subgroups.map((child) => (
                 <button
                   key={child.name}
@@ -225,7 +227,7 @@ export function CatalogPage({
           ) : null}
 
           {subcategory && facets.length > 0 ? (
-            <section className="sf-subgroup-strip" aria-label="Уточнение">
+            <section className="sf-subgroup-strip" aria-label={t("storefront.clarification")}>
               <div className="sf-facet-tree" role="list">
                 <button
                   type="button"
@@ -237,9 +239,9 @@ export function CatalogPage({
                       subcategory,
                     })
                   }
-                >
-                  Все
-                </button>
+                >{
+                  t("shared.filter.all")
+                }</button>
                 {facets.map((item) => (
                   <button
                     key={item.name}
@@ -286,8 +288,8 @@ export function CatalogPage({
           {!error && data && !products.length ? (
             <p className="sf-muted">
               {category
-                ? "В этой группе пока нет товаров."
-                : "В каталоге пока нет товаров."}
+                ? t("storefront.thereAreNoProductsInThis")
+                : t("storefront.thereAreNoProductsInThe")}
             </p>
           ) : null}
         </div>

@@ -1,3 +1,4 @@
+import { useLocalization } from "../shared/i18n/LocalizationProvider";
 import { useState } from "react";
 import "./CustomProductForm.css";
 
@@ -11,20 +12,20 @@ const INITIAL_FORM = {
 
 const ACCEPTED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-function readPhoto(file) {
+function readPhoto(file, t) {
   return new Promise((resolve, reject) => {
     if (!ACCEPTED_PHOTO_TYPES.includes(file?.type)) {
-      reject(new Error("Можно прикрепить JPG, PNG или WEBP."));
+      reject(new Error(t("shared.youCanAttachJpgPngOr")));
       return;
     }
     if (file.size > 12 * 1024 * 1024) {
-      reject(new Error("Максимальный размер фотографии — 12 МБ."));
+      reject(new Error(t("shared.maximumPhotoSizeIs12Mb")));
       return;
     }
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("Не удалось прочитать фотографию."));
     reader.onload = () => resolve({
-      name: file.name || "Фото товара",
+      name: file.name || t("shared.productPhoto"),
       type: file.type,
       size: file.size,
       dataUrl: String(reader.result || ""),
@@ -34,6 +35,7 @@ function readPhoto(file) {
 }
 
 function CustomProductForm({ onAdd }) {
+  const { t } = useLocalization();
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
   const [photoError, setPhotoError] = useState("");
@@ -52,7 +54,7 @@ function CustomProductForm({ onAdd }) {
     if (!file) return;
     setPhotoError("");
     try {
-      updateField("photo", await readPhoto(file));
+      updateField("photo", await readPhoto(file, t));
     } catch (error) {
       setPhotoError(error.message || "Не удалось прикрепить фотографию.");
     }
@@ -83,22 +85,22 @@ function CustomProductForm({ onAdd }) {
   return (
     <section className="custom-product-card">
       <div>
-        <span className="custom-product-label">Не нашли нужный товар?</span>
-        <h2>Добавьте запрос менеджеру</h2>
-        <p>Укажите название, количество, характеристики и при необходимости приложите фото.</p>
+        <span className="custom-product-label">{t("shared.canTFindTheProductYou")}</span>
+        <h2>{t("shared.sendARequestToTheManager")}</h2>
+        <p>{t("shared.enterTheNameQuantitySpecificationsAnd")}</p>
       </div>
 
       {!isOpen ? (
-        <button className="open-custom-form" type="button" onClick={() => setIsOpen(true)}>
-          + Добавить отсутствующий товар
-        </button>
+        <button className="open-custom-form" type="button" onClick={() => setIsOpen(true)}>{
+          t("shared.addAMissingProduct")
+        }</button>
       ) : (
         <form className="custom-product-form" onSubmit={handleSubmit}>
-          <label>
-            Название товара
-            <input
+          <label>{
+            t("shared.productName")
+            }<input
               type="text"
-              placeholder="Например: салфетки красные 33 × 33 см"
+              placeholder={t("shared.forExampleRedNapkins3333")}
               value={form.name}
               onChange={(event) => updateField("name", event.target.value)}
               required
@@ -106,9 +108,9 @@ function CustomProductForm({ onAdd }) {
           </label>
 
           <div className="custom-product-row">
-            <label>
-              Количество
-              <input
+            <label>{
+              t("shared.field.qty")
+              }<input
                 type="number"
                 min="1"
                 step="1"
@@ -119,9 +121,9 @@ function CustomProductForm({ onAdd }) {
               />
             </label>
 
-            <label>
-              Единица
-              <select value={form.unit} onChange={(event) => updateField("unit", event.target.value)}>
+            <label>{
+              t("shared.field.unit")
+              }<select value={form.unit} onChange={(event) => updateField("unit", event.target.value)}>
                 <option value="шт.">шт.</option>
                 <option value="пач.">пач.</option>
                 <option value="уп.">уп.</option>
@@ -131,27 +133,27 @@ function CustomProductForm({ onAdd }) {
             </label>
           </div>
 
-          <label>
-            Марка или характеристики
-            <textarea
+          <label>{
+            t("shared.brandOrSpecifications")
+            }<textarea
               rows="3"
-              placeholder="Цвет, размер, производитель или другое уточнение"
+              placeholder={t("shared.colorSizeManufacturerOrAnotherDetail")}
               value={form.details}
               onChange={(event) => updateField("details", event.target.value)}
             />
           </label>
 
-          <label>
-            Фото товара — необязательно
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhoto} />
+          <label>{
+            t("shared.productPhotoOptional")
+            }<input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhoto} />
           </label>
           {photoError && <div className="custom-photo-error">{photoError}</div>}
           {form.photo?.dataUrl && (
             <div className="custom-photo-preview">
-              <img src={form.photo.dataUrl} alt={form.photo.name || "Фото запроса"} />
+              <img src={form.photo.dataUrl} alt={form.photo.name || t("shared.requestPhoto")} />
               <div>
                 <strong>{form.photo.name}</strong>
-                <button type="button" onClick={() => updateField("photo", null)}>Удалить фото</button>
+                <button type="button" onClick={() => updateField("photo", null)}>{t("shared.deletePhoto")}</button>
               </div>
             </div>
           )}
@@ -165,11 +167,11 @@ function CustomProductForm({ onAdd }) {
                 setPhotoError("");
                 setIsOpen(false);
               }}
-            >
-              Отмена
-            </button>
+            >{
+              t("shared.modal.cancel")
+            }</button>
 
-            <button className="add-custom-product" type="submit">Добавить в заказ</button>
+            <button className="add-custom-product" type="submit">{t("checkout.addToOrder")}</button>
           </div>
         </form>
       )}

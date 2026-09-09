@@ -1,46 +1,47 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Раздел менеджера: журнал действий.
 import { useEffect, useState } from "react";
 import { api } from "../../serverApi";
 import { formatDateTime } from "../../shared/appHelpers";
 
 export const AUDIT_ACTION_LABELS = {
-  "auth.register": "Зарегистрирован клиент",
-  "auth.login": "Вход в кабинет",
-  "orders.save": "Сохранены заказы",
-  "products.save": "Изменён каталог",
-  "settings.save": "Изменены настройки",
-  "localization.settings.save": "Сохранены языки и переводы",
-  "manager.notification": "Отправлено уведомление менеджеру",
-  "manager.notification.read": "Уведомление отмечено прочитанным",
-  "manager.notification.read_all": "Все уведомления отмечены прочитанными",
-  "manager.notification.test": "Проверены каналы уведомлений",
-  "client.matrix.save": "Изменена матрица клиента",
-  "client.profile.manager_update": "Менеджер изменил данные клиента",
-  "product.image.upload": "Загружено фото товара",
-  "product.image.delete": "Удалено фото товара",
-  "product.delete": "Удалён товар из каталога",
-  "backup.create": "Создана резервная копия",
-  "backup.restore": "Восстановлена резервная копия",
-  "backup.cleanup": "Удалены старые резервные копии",
-  "server.reset": "Выполнен полный сброс",
-  "exchange.check": "Проверен заказ для 1С",
-  "exchange.send.test": "Заказ поставлен в очередь 1С",
-  "exchange.send.error": "Ошибка тестовой передачи в 1С",
-  "exchange.reset": "Сброшен статус обмена с 1С",
-  "exchange.download.order": "Скачан файл заказа для 1С",
-  "exchange.download.batch": "Скачан пакет заказов для 1С",
-  "exchange.config.save": "Сохранены настройки подключения к 1С",
-  "exchange.connection.test": "Проверено подключение к 1С",
-  "exchange.connection.error": "Ошибка подключения к 1С",
-  "exchange.catalog.preview": "Просмотрен справочник 1С",
-  "exchange.catalog.error": "Ошибка чтения справочника 1С",
-  "one-c.products.receive": "Получена номенклатура из 1С",
-  "one-c.products.auto-link": "Автоматически сопоставлены товары с 1С",
-  "exchange.send.draft": "Создан черновик заказа в 1С",
-  "exchange.send.draft.error": "Ошибка создания черновика в 1С",
+  "auth.register": "manager.clientRegistered",
+  "auth.login": "manager.cabinetSignIn",
+  "orders.save": "manager.ordersSaved",
+  "products.save": "manager.catalogChanged",
+  "settings.save": "manager.settingsChanged",
+  "localization.settings.save": "manager.languagesAndTranslationsSaved",
+  "manager.notification": "manager.managerWasNotified",
+  "manager.notification.read": "manager.notificationMarkedAsRead",
+  "manager.notification.read_all": "manager.allNotificationsMarkedAsRead",
+  "manager.notification.test": "manager.notificationChannelsChecked",
+  "client.matrix.save": "manager.clientMatrixChanged",
+  "client.profile.manager_update": "manager.managerChangedClientDetails",
+  "product.image.upload": "manager.productPhotoUploaded",
+  "product.image.delete": "manager.productPhotoDeleted",
+  "product.delete": "manager.productDeletedFromTheCatalog",
+  "backup.create": "manager.backupCreated",
+  "backup.restore": "manager.backupRestored",
+  "backup.cleanup": "manager.oldBackupsDeleted",
+  "server.reset": "manager.fullResetCompleted",
+  "exchange.check": "manager.orderCheckedFor1c",
+  "exchange.send.test": "manager.orderQueuedFor1c",
+  "exchange.send.error": "manager.text8",
+  "exchange.reset": "manager.text12",
+  "exchange.download.order": "manager.orderFileDownloadedFor1c",
+  "exchange.download.batch": "manager.orderPackDownloadedFor1c",
+  "exchange.config.save": "manager.text15",
+  "exchange.connection.test": "manager.text10",
+  "exchange.connection.error": "manager.text7",
+  "exchange.catalog.preview": "manager.text11",
+  "exchange.catalog.error": "manager.failedToReadThe1cCatalog",
+  "one-c.products.receive": "manager.nomenclatureReceivedFrom1c",
+  "one-c.products.auto-link": "manager.productsWereMatchedWith1cAutomatically",
+  "exchange.send.draft": "manager.text13",
+  "exchange.send.draft.error": "manager.failedToCreateA1cDraft",
 };
 
-function formatAuditDetails(item) {
+function formatAuditDetails(item, t) {
   const details = item?.details || {};
 
   switch (item?.action) {
@@ -55,15 +56,15 @@ function formatAuditDetails(item) {
     case "product.image.upload":
       return details.productName
         ? `Товар: ${details.productName}`
-        : "Фотография загружена";
+        : t("manager.photoUploaded");
     case "product.image.delete":
       return details.productName
         ? `Товар: ${details.productName}`
-        : "Фотография удалена";
+        : t("manager.photoDeleted");
     case "product.delete":
       return details.productName
         ? `Товар: ${details.productName} · матриц: ${Number(details.matricesChanged) || 0}`
-        : "Товар удалён из каталога";
+        : t("manager.productRemovedFromTheCatalog");
     case "backup.create":
       return `${details.reason || "Резервная копия"}${
         details.photoCount !== undefined
@@ -77,13 +78,13 @@ function formatAuditDetails(item) {
     case "backup.cleanup":
       return `Удалено копий: ${Array.isArray(details.removed) ? details.removed.length : 0} · осталось: ${Number(details.remaining) || 0}`;
     case "settings.save":
-      return "Настройки кабинета обновлены";
+      return t("manager.cabinetSettingsUpdated");
     case "auth.login":
-      return "Успешный вход";
+      return t("manager.successfulSignIn");
     case "auth.register":
-      return "Создан новый аккаунт клиента";
+      return t("manager.newClientAccountCreated");
     case "server.reset":
-      return "Данные сброшены после создания страховочной копии";
+      return t("manager.dataWasResetAfterASafety");
     case "exchange.check":
       return `Заказ № ${details.orderNumber || "—"} · ${details.ready ? "готов к передаче" : `ошибок: ${(details.issues || []).length}`}`;
     case "exchange.send.test":
@@ -97,13 +98,13 @@ function formatAuditDetails(item) {
     case "exchange.download.batch":
       return `Формат: ${String(details.format || "json").toUpperCase()} · заказов: ${Number(details.count) || 0}`;
     case "exchange.config.save":
-      return `Режим: ${details.mode === "real" ? "реальная 1С" : "симулятор"} · адрес: ${details.baseUrlConfigured ? "заполнен" : "не заполнен"}`;
+      return `Режим: ${details.mode === "real" ? "реальная 1С" : t("manager.simulator")} · адрес: ${details.baseUrlConfigured ? "заполнен" : "не заполнен"}`;
     case "exchange.connection.test":
       return `${details.mode === "real" ? "Реальная 1С" : "Симулятор"} · ${details.configuration || "подключение проверено"}`;
     case "exchange.connection.error":
-      return details.message || "Ошибка подключения";
+      return details.message || t("manager.connectionError");
     case "exchange.catalog.preview":
-      return `${details.type === "clients" ? "Контрагенты" : "Номенклатура"} · записей: ${Number(details.count) || 0}`;
+      return `${details.type === "clients" ? t("manager.counterparties") : t("manager.nomenclature")} · записей: ${Number(details.count) || 0}`;
     case "exchange.catalog.error":
       return `${details.type || "Справочник"} · ${details.message || "ошибка"}`;
     case "one-c.products.receive":
@@ -111,7 +112,7 @@ function formatAuditDetails(item) {
     case "one-c.products.auto-link":
       return `Товаров Clover: ${Number(details.cloverTotal) || 0} · связанных: ${Number(details.linked) || 0} · новых связей: ${Number(details.newlyLinked) || 0}`;
     case "exchange.send.draft":
-      return `Заказ № ${details.orderNumber || "—"} · документ ${details.documentNumber || details.documentId || "создан"} · ${details.mode === "real" ? "1С" : "симулятор"}`;
+      return `Заказ № ${details.orderNumber || "—"} · документ ${details.documentNumber || details.documentId || "создан"} · ${details.mode === "real" ? t("manager.nav.exchange") : t("manager.simulator")}`;
     case "exchange.send.draft.error":
       return `Заказ № ${details.orderNumber || "—"} · ${details.message || "ошибка"}`;
     default:
@@ -120,6 +121,7 @@ function formatAuditDetails(item) {
 }
 
 export function ManagerAudit() {
+  const { t } = useLocalization();
   const [items, setItems] = useState([]);
   const [loadingAudit, setLoadingAudit] = useState(true);
   const [error, setError] = useState("");
@@ -142,14 +144,14 @@ export function ManagerAudit() {
   }, []);
 
   return <section className="panel" style={{ marginTop: 0 }}>
-    <div className="panel-heading"><div><p className="eyebrow">Контроль</p><h2>Журнал действий</h2><p>Последние входы, изменения каталога, матриц, фотографий и резервных копий.</p></div><button className="secondary-button" type="button" onClick={load}>Обновить</button></div>
+    <div className="panel-heading"><div><p className="eyebrow">{t("manager.control")}</p><h2>{t("manager.activityLog")}</h2><p>{t("manager.recentSignInsCatalogMatrixPhoto")}</p></div><button className="secondary-button" type="button" onClick={load}>{t("shared.action.refresh")}</button></div>
     {error && <div className="auth-error">{error}</div>}
     <div className="audit-list">
       {items.map((item) => <article className="audit-row" key={item.id}>
-        <div><h3>{AUDIT_ACTION_LABELS[item.action] || item.action}</h3><p>{formatDateTime(item.createdAt)} · {item.userEmail || "Система"} · {item.userRole === "manager" ? "менеджер" : item.userRole === "client" ? "клиент" : "система"}</p>{formatAuditDetails(item) && <div className="audit-details">{formatAuditDetails(item)}</div>}</div>
+        <div><h3>{AUDIT_ACTION_LABELS[item.action] ? t(AUDIT_ACTION_LABELS[item.action]) : item.action}</h3><p>{formatDateTime(item.createdAt)} · {item.userEmail || t("shared.role.system")} · {item.userRole === "manager" ? t("manager.manager") : item.userRole === "client" ? t("manager.client") : t("manager.system")}</p>{formatAuditDetails(item, t) && <div className="audit-details">{formatAuditDetails(item, t)}</div>}</div>
       </article>)}
-      {!loadingAudit && !items.length && !error && <div className="empty-box">Записей пока нет.</div>}
-      {loadingAudit && <div className="empty-box">Загружаем журнал...</div>}
+      {!loadingAudit && !items.length && !error && <div className="empty-box">{t("manager.noRecordsYet")}</div>}
+      {loadingAudit && <div className="empty-box">{t("manager.loadingTheLog")}</div>}
     </div>
   </section>;
 }

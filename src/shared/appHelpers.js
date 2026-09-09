@@ -10,36 +10,36 @@ export const MANAGER_OPEN_CLIENT_KEY = "clover-manager-open-client-v1";
 export const CLIENT_ACTIVE_TAB_KEY = "clover-client-active-tab-v1";
 
 export const MANAGER_TABS = [
-  ["orders", "Заказы"],
-  ["products", "Товары"],
-  ["storefront", "Витрина"],
-  ["clients", "Клиенты"],
-  ["acts", "Акты сверок"],
-  ["exchange", "1С"],
-  ["price-list", "Прайс"],
-  ["languages", "Языки и переводы"],
-  ["more", "Ещё"],
+  ["orders", "manager.nav.orders"],
+  ["products", "manager.nav.products"],
+  ["storefront", "manager.nav.storefront"],
+  ["clients", "manager.nav.clients"],
+  ["acts", "manager.nav.acts"],
+  ["exchange", "manager.nav.exchange"],
+  ["price-list", "manager.nav.priceList"],
+  ["languages", "manager.nav.languages"],
+  ["more", "manager.nav.more"],
 ];
 
 /** Вкладки внутри «Ещё» у менеджера. */
 export const MANAGER_MORE_TABS = [
-  ["access", "Доступы"],
-  ["settings", "Настройки"],
-  ["backup", "Резервные копии"],
-  ["audit", "Журнал"],
+  ["access", "manager.nav.access"],
+  ["settings", "manager.nav.settings"],
+  ["backup", "manager.nav.backup"],
+  ["audit", "manager.nav.audit"],
 ];
 
 /** Права разделов для ограничения менеджера. */
 export const STAFF_FEATURE_OPTIONS = [
-  ["orders", "Заказы"],
-  ["clients", "Клиенты"],
-  ["products", "Товары"],
-  ["exchange", "1С"],
-  ["acts", "Акты сверок"],
-  ["access", "Доступы"],
-  ["settings", "Настройки"],
-  ["backup", "Резервные копии"],
-  ["audit", "Журнал"],
+  ["orders", "manager.nav.orders"],
+  ["clients", "manager.nav.clients"],
+  ["products", "manager.nav.products"],
+  ["exchange", "manager.nav.exchange"],
+  ["acts", "manager.nav.acts"],
+  ["access", "manager.nav.access"],
+  ["settings", "manager.nav.settings"],
+  ["backup", "manager.nav.backup"],
+  ["audit", "manager.nav.audit"],
 ];
 
 export const STAFF_FEATURE_IDS = STAFF_FEATURE_OPTIONS.map(([id]) => id);
@@ -63,17 +63,17 @@ export function staffHasFeature(authUser, featureId) {
 export const MANAGER_MORE_TAB_KEY = "clover-manager-more-tab-v1";
 
 export const CLIENT_TABS = [
-  ["matrix", "Моя матрица"],
-  ["catalog", "Добавить товары из каталога"],
-  ["orders", "Мои заказы"],
-  ["reconciliation", "Акт сверки"],
-  ["cabinet", "Настройки"],
+  ["matrix", "client.nav.matrix"],
+  ["catalog", "client.nav.catalog"],
+  ["orders", "client.nav.orders"],
+  ["reconciliation", "client.nav.reconciliation"],
+  ["cabinet", "client.nav.cabinet"],
 ];
 
 /** Подразделы «Настроек» на мобильном. */
 export const CLIENT_CABINET_SECTIONS = [
-  ["addresses", "Адреса"],
-  ["settings", "Профиль"],
+  ["addresses", "client.nav.addresses"],
+  ["settings", "client.nav.profile"],
 ];
 
 export const CLIENT_CABINET_SECTION_KEY = "clover-client-cabinet-section-v1";

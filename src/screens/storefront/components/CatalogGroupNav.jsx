@@ -1,3 +1,4 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { useState } from "react";
 import { buildGroupNav, canonicalizeProductSubcategory } from "../productGroups.js";
 import { navigateStorefront } from "./StoreHeader.jsx";
@@ -32,6 +33,7 @@ export function CatalogGroupNav({
   activeSubcategory = "",
   variant = "side",
 }) {
+  const { t } = useLocalization();
   const groups = buildGroupNav(categories);
   const [openParents, setOpenParents] = useState(() => new Set());
 
@@ -69,15 +71,15 @@ export function CatalogGroupNav({
   return (
     <nav
       className={`sf-group-nav sf-group-nav-${variant}`}
-      aria-label="Группы товаров"
+      aria-label={t("storefront.productGroups")}
     >
       <button
         type="button"
         className={`sf-cat-btn${!activeCategory ? " is-active" : ""}`}
         onClick={goAll}
-      >
-        Все
-      </button>
+      >{
+        t("shared.filter.all")
+      }</button>
 
       {groups.map((group) => {
         const hasChildren = group.children.length > 0;

@@ -437,6 +437,23 @@ export const api = {
     return request(`/admin/translations${query ? `?${query}` : ""}`);
   },
 
+  saveLocalizationTranslation(entryId, language, value) {
+    return request(
+      `/admin/translations/${encodeURIComponent(entryId)}/${encodeURIComponent(language)}`,
+      {
+        method: "PUT",
+        body: { value },
+      }
+    );
+  },
+
+  resetLocalizationTranslation(entryId, language) {
+    return request(
+      `/admin/translations/${encodeURIComponent(entryId)}/${encodeURIComponent(language)}/reset-auto`,
+      { method: "POST", body: {} }
+    );
+  },
+
 
   async downloadStorefrontPriceListPdf(markupPercent) {
     const token = getApiToken();

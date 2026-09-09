@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Раздел менеджера: заказы клиентов.
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../serverApi";
@@ -33,13 +34,13 @@ const CUSTOM_STATUSES = [
   "Отклонён",
 ];
 
-function exchangeSendLabel(exchange) {
-  if (exchange.status === "sending") return "Ожидает ответ 1С…";
+function exchangeSendLabel(exchange, t) {
+  if (exchange.status === "sending") return t("manager.waitingFor1c");
   if (exchange.status === "ready" || exchange.status === "sent" || exchange.status === "draft") {
-    return "Передано в 1С";
+    return t("manager.sentTo1c");
   }
-  if (exchange.status === "error") return "Передать повторно";
-  return "Передать в 1С";
+  if (exchange.status === "error") return t("manager.sendAgain");
+  return t("manager.sendTo1c");
 }
 
 function exchangeSendButtonClass(exchange) {
@@ -69,18 +70,19 @@ function orderLinePrice(item, settings) {
 }
 
 function OrderLinesTable({ order, settings }) {
-  const items = Array.isArray(order.items) ? order.items : [];
+  const { t } = useLocalization();
+    const items = Array.isArray(order.items) ? order.items : [];
   const customItems = Array.isArray(order.customItems) ? order.customItems : [];
   if (!items.length && !customItems.length) {
-    return <p className="muted small">Позиции в заказе не сохранены.</p>;
+    return <p className="muted small">{t("manager.orderItemsAreNotSaved")}</p>;
   }
   return (
     <table className="order-lines-table">
       <thead>
         <tr>
-          <th>Наименование</th>
-          <th>Количество</th>
-          <th>Цена</th>
+          <th>{t("manager.name")}</th>
+          <th>{t("shared.field.qty")}</th>
+          <th>{t("shared.field.price")}</th>
         </tr>
       </thead>
       <tbody>
@@ -101,7 +103,7 @@ function OrderLinesTable({ order, settings }) {
           <tr key={`${order.id}-custom-${item.id}`}>
             <td>
               <span className="order-lines-name">{item.name}</span>
-              <span className="order-lines-article">Вне матрицы</span>
+              <span className="order-lines-article">{t("manager.outsideTheMatrix")}</span>
             </td>
             <td>
               {Number(item.quantity) || 0} {item.unit || "шт"}
@@ -109,7 +111,7 @@ function OrderLinesTable({ order, settings }) {
             <td>
               {Number(item.unitPrice) > 0
                 ? formatMoney(Number(item.unitPrice))
-                : "Цена уточняется"}
+                : t("shared.price.pending")}
             </td>
           </tr>
         ))}
@@ -139,6 +141,7 @@ export function ManagerOrders({
   exchangeFilter: exchangeFilterProp = "all",
   onExchangeFilterChange,
 }) {
+  const { t } = useLocalization();
   const [status, setStatus] = useState(statusFilter || "Все");
   const [exchangeFilter, setExchangeFilter] = useState(exchangeFilterProp || "all");
   const [sort, setSort] = useState("newest");
@@ -259,11 +262,11 @@ export function ManagerOrders({
     }
     if (action === "cancel" && !canCancelOneCTransfer(exchange)) {
       await appAlert({
-        title: "Отмена недоступна",
+        title: t("manager.cancelUnavailable"),
         message:
           exchange.status === "sent" || exchange.status === "draft"
-            ? "Заказ уже принят в 1С. Отозвать передачу нельзя."
-            : "Отменить можно только заказ в очереди до принятия в 1С.",
+            ? t("manager.theOrderHasAlreadyBeenAccepted")
+            : t("manager.onlyAnOrderStillInThe"),
         tone: "warn",
       });
       return;
@@ -306,18 +309,18 @@ export function ManagerOrders({
     );
     if (!cancellable.length) {
       await appAlert({
-        title: "Нечего отменять",
+        title: t("manager.nothingToCancel"),
         message:
-          "Среди выбранных нет заказов в очереди 1С (до принятия). Уже принятые в 1С отозвать нельзя.",
+          t("manager.noneOfTheSelectedOrdersAre"),
         tone: "warn",
       });
       return;
     }
     const ok = await appConfirm({
-      title: "Отменить передачу в 1С?",
+      title: t("manager.cancelThe1cTransfer"),
       message: `Будет отменена передача для ${cancellable.length} заказ(ов). Кнопка снова станет «Передать в 1С».`,
-      confirmLabel: "Отменить передачу",
-      cancelLabel: "Не надо",
+      confirmLabel: t("manager.cancelTransfer"),
+      cancelLabel: t("manager.noNeed"),
       tone: "danger",
     });
     if (!ok) return;
@@ -335,7 +338,7 @@ export function ManagerOrders({
       await onReload();
       if (errors.length) {
         await appAlert({
-          title: "Не все передачи отменены",
+          title: t("manager.notAllTransfersWereCancelled"),
           message: errors.join("\n"),
           tone: "danger",
         });
@@ -380,13 +383,13 @@ export function ManagerOrders({
     if (!allowedIds.length) {
       if (alreadySame.length === selected.length) {
         await appAlert({
-          title: "Без изменений",
+          title: t("manager.noChanges"),
           message: `Все выбранные заказы уже в статусе «${bulkStatus}».`,
         });
         return;
       }
       await appAlert({
-        title: "Статус не изменён",
+        title: t("manager.statusNotChanged"),
         message: [
           `Статус «${bulkStatus}» недоступен для выбранных заказов.`,
           alreadySame.length ? `Уже в этом статусе: ${alreadySame.length}.` : "",
@@ -403,7 +406,7 @@ export function ManagerOrders({
     setSelectedIds([]);
     if (forbidden > 0 || alreadySame.length > 0) {
       await appAlert({
-        title: "Статус обновлён частично",
+        title: t("auth.statusUpdatedPartially"),
         message: [
           `К обновлению: ${allowedIds.length}.`,
           alreadySame.length ? `Уже в этом статусе: ${alreadySame.length}.` : "",
@@ -420,8 +423,8 @@ export function ManagerOrders({
     if (!selectedIds.length) return;
     if (!settings.managerCanDeleteOrders) {
       await appAlert({
-        title: "Корзина отключена",
-        message: "Удаление заказов менеджером сейчас отключено в настройках.",
+        title: t("auth.trashIsDisabled"),
+        message: t("auth.managerOrderDeletionIsCurrentlyDisabled"),
         tone: "warn",
       });
       return;
@@ -431,9 +434,9 @@ export function ManagerOrders({
     );
     if (!trashable.length) {
       await appAlert({
-        title: "Нечего удалять",
+        title: t("manager.nothingToDelete"),
         message:
-          "Среди выбранных нет заказов, которые можно убрать в корзину. Принятые и стоящие в очереди 1С не удаляются.",
+          t("manager.noneOfTheSelectedOrdersCan"),
         tone: "warn",
       });
       return;
@@ -452,7 +455,7 @@ export function ManagerOrders({
       await onReload();
       if (errors.length) {
         await appAlert({
-          title: "Не все заказы удалены",
+          title: t("manager.notAllOrdersWereDeleted"),
           message: errors.join("\n"),
           tone: "danger",
         });
@@ -484,7 +487,7 @@ export function ManagerOrders({
       await onReload();
       if (errors.length) {
         await appAlert({
-          title: "Не все заказы обработаны",
+          title: t("manager.notAllOrdersWereProcessed"),
           message: errors.join("\n"),
           tone: "danger",
         });
@@ -497,7 +500,7 @@ export function ManagerOrders({
 
   return (
     <section className="manager-orders-section">
-      <div className="manager-orders-topbar" role="toolbar" aria-label="Заказы и действия">
+      <div className="manager-orders-topbar" role="toolbar" aria-label={t("manager.ordersAndActions")}>
         <button
           className={ordersView === "active" && exchangeFilter === "all" ? "manager-orders-seg active" : "manager-orders-seg"}
           type="button"
@@ -505,9 +508,9 @@ export function ManagerOrders({
             onOrdersViewChange?.("active");
             setExchangeFilterValue("all");
           }}
-        >
-          Заказы
-        </button>
+        >{
+          t("manager.nav.orders")
+        }</button>
         {!inTrash && (
           <>
             <button
@@ -546,7 +549,7 @@ export function ManagerOrders({
               aria-expanded={filtersOpen}
               onClick={() => setFiltersOpen((open) => !open)}
             >
-              {filtersOpen ? "Скрыть фильтры" : "Фильтры"}
+              {filtersOpen ? t("manager.hideFilters") : t("shared.filter.title")}
             </button>
             <button
               className={bulkPanelOpen ? "manager-orders-seg manager-bulk-toggle active" : "manager-orders-seg manager-bulk-toggle"}
@@ -554,7 +557,7 @@ export function ManagerOrders({
               aria-expanded={bulkPanelOpen}
               onClick={() => setBulkPanelOpen((open) => !open)}
             >
-              {bulkPanelOpen ? "Скрыть действия" : "Массовые действия"}
+              {bulkPanelOpen ? t("manager.hideActions") : t("manager.bulkActions")}
               {selectedIds.length > 0 ? (
                 <span className="manager-nav-count" aria-label={`Выбрано: ${selectedIds.length}`}>
                   {selectedIds.length}
@@ -578,15 +581,15 @@ export function ManagerOrders({
       </div>
 
       {!inTrash && exchangeContour.prodEnabled && (exchangeContour.allowedDatabases || []).length > 1 ? (
-        <label className="field manager-orders-contour" style={{ marginTop: 12, maxWidth: 320 }}>
-          Контур передачи в 1С
-          <select
+        <label className="field manager-orders-contour" style={{ marginTop: 12, maxWidth: 320 }}>{
+          t("manager.text29")
+          }<select
             value={sendDatabase}
             onChange={(event) => setSendDatabase(event.target.value)}
           >
             {(exchangeContour.allowedDatabases || ["TEST"]).map((name) => (
               <option key={name} value={name}>
-                {String(name).toUpperCase() === "TEST" ? "Тестовая 1С" : "Рабочая 1С"}
+                {String(name).toUpperCase() === "TEST" ? t("manager.test1c") : t("manager.production1c2")}
               </option>
             ))}
           </select>
@@ -595,18 +598,18 @@ export function ManagerOrders({
 
       {!inTrash && filtersOpen && (
         <div className="toolbar three manager-orders-filters">
-          <select value={status} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Фильтр статуса заказа"><option>Все</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
+          <select value={status} onChange={(e) => setStatusFilter(e.target.value)} aria-label={t("manager.orderStatusFilter")}><option>{t("shared.filter.all")}</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
           <select
             value={exchangeFilter}
             onChange={(e) => setExchangeFilterValue(e.target.value)}
-            aria-label="Фильтр статуса 1С"
+            aria-label={t("manager.text17")}
           >
-            <option value="all">Все статусы 1С</option>
-            <option value="waiting">Ждут передачи в 1С</option>
-            <option value="queued">В очереди</option>
+            <option value="all">{t("manager.all1cStatuses")}</option>
+            <option value="waiting">{t("manager.waitingFor1cTransfer")}</option>
+            <option value="queued">{t("manager.inQueue")}</option>
             {Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}
           </select>
-          <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Сортировка заказов"><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="delivery">По дате доставки</option></select>
+          <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label={t("manager.orderSorting")}><option value="newest">{t("manager.newestFirst")}</option><option value="oldest">{t("manager.oldestFirst")}</option><option value="delivery">{t("manager.byDeliveryDate")}</option></select>
         </div>
       )}
 
@@ -615,14 +618,14 @@ export function ManagerOrders({
           <div className="manager-bulk-status-row">
             <button className="secondary-button manager-bulk-chip" type="button" onClick={selectVisible}>
               {visible.length > 0 && visible.every((order) => selectedIds.includes(order.id))
-                ? "Снять выбор"
-                : "Выбрать все"}
+                ? t("shared.action.clearSelection")
+                : t("shared.action.selectAll")}
             </button>
             <select
               className="manager-bulk-status-select"
               value={bulkStatus}
               onChange={(e) => setBulkStatus(e.target.value)}
-              aria-label="Статус для массового изменения"
+              aria-label={t("manager.statusForBulkChange")}
             >
               {MANAGER_BULK_ORDER_STATUSES.map((item) => (
                 <option key={item}>{item}</option>
@@ -646,26 +649,26 @@ export function ManagerOrders({
               type="button"
               disabled={!selectedIds.length || bulkBusy}
               onClick={() => void runBulkSendToOneC()}
-            >
-              Передать выбранные в 1С
-            </button>
+            >{
+              t("manager.sendSelectedTo1c")
+            }</button>
             <button
               className="danger-button manager-cancel-onec-button"
               type="button"
               disabled={!selectedIds.length || bulkBusy}
               onClick={() => void runBulkCancelOneC()}
-            >
-              Отменить передачу в 1С
-            </button>
+            >{
+              t("manager.cancelTransferTo1c")
+            }</button>
             <button
               className="danger-button"
               type="button"
               disabled={!selectedIds.length || bulkBusy}
               onClick={() => void runBulkTrash()}
-            >
-              Удалить
-            </button>
-            {selectedIds.length > 0 && <button className="secondary-button" type="button" onClick={() => setSelectedIds([])}>Очистить выбор</button>}
+            >{
+              t("shared.action.delete")
+            }</button>
+            {selectedIds.length > 0 && <button className="secondary-button" type="button" onClick={() => setSelectedIds([])}>{t("manager.clearSelection")}</button>}
             <span className="muted small">Выбрано заказов: {selectedIds.length}</span>
           </div>
         </div>
@@ -699,7 +702,7 @@ export function ManagerOrders({
                 <strong className="manager-order-sum success-text">
                   {settings.showPrices && getOrderTotal(order) > 0
                     ? formatMoney(getOrderTotal(order))
-                    : "уточняется"}
+                    : t("shared.price.pendingShort")}
                 </strong>
               </div>
               <div className="manager-order-status-row exchange-status-line">
@@ -727,9 +730,9 @@ export function ManagerOrders({
                 </span>
                 {inTrash ? (
                   <>
-                    <button className="primary-button manager-order-inline-action" type="button" onClick={() => onRestoreOrder?.(order)}>
-                      Восстановить
-                    </button>
+                    <button className="primary-button manager-order-inline-action" type="button" onClick={() => onRestoreOrder?.(order)}>{
+                      t("shared.action.restore")
+                    }</button>
                     {(() => {
                       const purgeGate = canPurgeOrder(order, staffRole);
                       return (
@@ -737,18 +740,18 @@ export function ManagerOrders({
                           className="danger-button manager-order-inline-action"
                           type="button"
                           disabled={!purgeGate.ok}
-                          title={purgeGate.ok ? "Удалить навсегда" : purgeGate.error}
+                          title={purgeGate.ok ? t("shared.action.deleteForever") : purgeGate.error}
                           onClick={() => onPurgeOrder?.(order)}
-                        >
-                          Удалить навсегда
-                        </button>
+                        >{
+                          t("shared.action.deleteForever")
+                        }</button>
                       );
                     })()}
                   </>
                 ) : order.status === "Обработан вручную" ? (
                   <span
                     className="badge status-work manager-manual-processed-badge"
-                    title="Заказ обработан вручную. Передача в 1С не требуется или отменена."
+                    title={t("manager.theOrderWasProcessedManuallySending")}
                   >
                     Обработан вручную
                   </span>
@@ -769,18 +772,18 @@ export function ManagerOrders({
                     type="button"
                     title={
                       exchange.status === "ready"
-                        ? "Заказ уже в очереди 1С. 1С сама заберёт его при следующем обмене."
+                        ? t("manager.theOrderIsAlreadyInThe")
                         : exchange.status === "sent" || exchange.status === "draft"
-                          ? "Заказ уже передан в 1С."
+                          ? t("manager.theOrderHasAlreadyBeenSent")
                           : exchange.status === "sending"
-                            ? "Ждём подтверждение от 1С"
+                            ? t("manager.waitingFor1cConfirmation")
                             : exchange.status === "error"
-                              ? "Произошла ошибка — нажмите, чтобы передать снова"
-                              : "Поставить заказ в очередь обмена с 1С"
+                              ? t("manager.anErrorOccurredTapToSend")
+                              : t("manager.queueTheOrderFor1cExchange")
                     }
                     onClick={() => runExchangeAction(order, "send")}
                   >
-                    {busy ? "Передача…" : exchangeSendLabel(exchange)}
+                    {busy ? t("manager.sending") : exchangeSendLabel(exchange, t)}
                   </button>
                 )}
                 {!inTrash && canShowDelete ? (
@@ -791,40 +794,40 @@ export function ManagerOrders({
                     title={
                       trashGate.ok
                         ? hardDeleteCompleted
-                          ? "Удалить заказ навсегда из Clover (документ в 1С не меняется)"
-                          : "Перенести заказ в корзину"
+                          ? t("manager.deleteTheOrderFromCloverForever")
+                          : t("manager.moveOrderToTrash")
                         : trashGate.error
                     }
                     onClick={() => onDeleteOrder(order)}
                   >
-                    {hardDeleteCompleted ? "Удалить навсегда" : "Удалить"}
+                    {hardDeleteCompleted ? t("shared.action.deleteForever") : t("shared.action.delete")}
                   </button>
                 ) : null}
               </div>
             </div>
           </div>
           <details className="manager-order-extra" open={false}>
-            <summary>Подробнее</summary>
+            <summary>{t("storefront.more")}</summary>
             <div className="order-meta manager-order-meta">
               <div>
-                <span>Номер</span>
+                <span>{t("manager.number")}</span>
                 <strong>{order.number || "—"}</strong>
               </div>
               <div>
-                <span>Создан</span>
+                <span>{t("manager.created")}</span>
                 <strong>{order.createdAt ? formatDateTime(order.createdAt) : "—"}</strong>
               </div>
               <div>
-                <span>Дата доставки</span>
-                <strong>{order.firstDeliveryDate ? formatDate(order.firstDeliveryDate) : "не указана"}</strong>
+                <span>{t("checkout.deliveryDate")}</span>
+                <strong>{order.firstDeliveryDate ? formatDate(order.firstDeliveryDate) : t("manager.notSpecified")}</strong>
               </div>
               <div>
-                <span>Позиций</span>
+                <span>{t("shared.field.positions")}</span>
                 <strong>{getPositionCount(order)}</strong>
               </div>
               {(order.customerContact || order.customerPhone || order.customerEmail) ? (
                 <div className="order-meta-wide">
-                  <span>Контакт</span>
+                  <span>{t("manager.contact")}</span>
                   <strong>
                     {[order.customerContact, order.customerPhone, order.customerEmail]
                       .filter(Boolean)
@@ -833,14 +836,14 @@ export function ManagerOrders({
                 </div>
               ) : null}
               <div className="order-meta-wide">
-                <span>Адрес</span>
+                <span>{t("shared.field.address")}</span>
                 <strong>{order.address || "—"}</strong>
               </div>
             </div>
             {order.clientComment ? (
               <div className="manager-client-comment">
                 <div className="comment-box comment-box-compact">
-                  <strong>Комментарий клиента:</strong>
+                  <strong>{t("manager.clientComment")}</strong>
                   <p>{order.clientComment}</p>
                 </div>
               </div>
@@ -848,7 +851,7 @@ export function ManagerOrders({
             <div className="manager-order-controls">
               <div className="exchange-actions">
                 {inTrash ? (
-                  <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
+                  <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>{t("manager.print")}</button>
                 ) : (
                   <>
                     {canCancelOneCTransfer(exchange) ? (
@@ -856,13 +859,13 @@ export function ManagerOrders({
                         className="danger-button manager-cancel-onec-button"
                         type="button"
                         disabled={busy}
-                        title="Вернуть заказ из очереди 1С. После принятия в 1С отменить нельзя."
+                        title={t("manager.removeTheOrderFromThe1c")}
                         onClick={() => void runExchangeAction(order, "cancel")}
-                      >
-                        Отменить передачу в 1С
-                      </button>
+                      >{
+                        t("manager.cancelTransferTo1c")
+                      }</button>
                     ) : null}
-                    <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>Печать</button>
+                    <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>{t("manager.print")}</button>
                   </>
                 )}
               </div>
@@ -885,7 +888,7 @@ export function ManagerOrders({
                   item.photo?.dataUrl ? (
                     <div className="custom-line" key={`${order.id}-${item.id}-photo`}>
                       <div className="manager-request-photo-block">
-                        <strong>Фотография клиента</strong>
+                        <strong>{t("manager.customerPhoto")}</strong>
                         <CustomRequestPhoto photo={item.photo} className="custom-request-photo-manager" />
                       </div>
                     </div>
@@ -894,21 +897,21 @@ export function ManagerOrders({
                   <div className="custom-line" key={`${order.id}-${item.id}`}>
                     {item.photo?.dataUrl && (
                       <div className="manager-request-photo-block">
-                        <strong>Фотография клиента</strong>
+                        <strong>{t("manager.customerPhoto")}</strong>
                         <CustomRequestPhoto photo={item.photo} className="custom-request-photo-manager" />
                       </div>
                     )}
                     <div className="form-grid">
-                      <label className="field">Статус запроса
-                        <select value={item.requestStatus || "Новый запрос"} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, requestStatus: e.target.value } : value) })}>{CUSTOM_STATUSES.map((value) => <option key={value}>{value}</option>)}</select>
+                      <label className="field">{t("manager.requestStatus")
+                        }<select value={item.requestStatus || "Новый запрос"} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, requestStatus: e.target.value } : value) })}>{CUSTOM_STATUSES.map((value) => <option key={value}>{value}</option>)}</select>
                       </label>
-                      <label className="field">Цена за указанную единицу
-                        <input type="number" min="0" step="0.01" value={item.unitPrice || ""} onFocus={selectDefaultNumber} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, unitPrice: Number(e.target.value) || 0 } : value) })} />
+                      <label className="field">{t("manager.pricePerSelectedUnit")
+                        }<input type="number" min="0" step="0.01" value={item.unitPrice || ""} onFocus={selectDefaultNumber} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, unitPrice: Number(e.target.value) || 0 } : value) })} />
                       </label>
-                      <label className="field">Комментарий клиенту
-                        <input value={item.managerComment || ""} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, managerComment: e.target.value } : value) })} />
+                      <label className="field">{t("manager.commentToTheClient")
+                        }<input value={item.managerComment || ""} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, managerComment: e.target.value } : value) })} />
                       </label>
-                      <div className="field"><span>Действие</span><button className="primary-button" type="button" onClick={() => onCreateProductFromCustom(order, item)}>Создать товар в каталоге</button></div>
+                      <div className="field"><span>{t("manager.action")}</span><button className="primary-button" type="button" onClick={() => onCreateProductFromCustom(order, item)}>{t("manager.createProductInCatalog")}</button></div>
                     </div>
                   </div>
                 )
@@ -922,13 +925,13 @@ export function ManagerOrders({
         </div>
       ) : (
         <EmptyState
-          title={inTrash ? "Удалённых заказов нет" : "Заказы не найдены"}
+          title={inTrash ? t("manager.noDeletedOrders") : t("client.noOrdersFound")}
           message={
             inTrash
-              ? "Здесь появятся заказы, которые вы удалите."
+              ? t("manager.ordersYouDeleteWillAppearHere")
               : exchangeFilter !== "all" || status !== "Все"
-                ? "По текущим фильтрам ничего нет. Сбросьте фильтр или выберите другой."
-                : "Когда клиенты оформят заказы, они появятся в этом списке."
+                ? t("manager.nothingMatchesTheCurrentFiltersReset")
+                : t("manager.whenClientsPlaceOrdersTheyWill")
           }
         />
       )}

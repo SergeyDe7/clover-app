@@ -107,8 +107,11 @@ import {
 import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
 import {
   completenessByLanguage,
+  initializeLocalizationCatalog,
   listWorkspaceRows,
   readLocalizationSettings,
+  resetTranslationToAuto,
+  saveManualTranslation,
   writeLocalizationSettings,
 } from "./localizationStore.js";
 import { localeChoices } from "../../src/shared/i18n/localizationSettings.js";
@@ -4676,16 +4679,67 @@ app.get(
   "/api/admin/translations",
   authRequired,
   roleRequired("admin"),
-  (req, res) => {
-    res.json({
-      rows: listWorkspaceRows({
-        view: req.query?.view,
-        query: req.query?.query,
-        language: req.query?.language,
-        untranslatedOnly:
-          req.query?.untranslatedOnly === "1" || req.query?.untranslatedOnly === "true",
-      }),
-    });
+  (req, res, next) => {
+    try {
+      res.json({
+        rows: listWorkspaceRows({
+          view: req.query?.view,
+          query: req.query?.query,
+          language: req.query?.language,
+          untranslatedOnly:
+            req.query?.untranslatedOnly === "1" || req.query?.untranslatedOnly === "true",
+        }),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.put(
+  "/api/admin/translations/:entryId/:language",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      const result = saveManualTranslation(
+        req.params.entryId,
+        req.params.language,
+        req.body?.value,
+        req.user?.email || req.user?.id || ""
+      );
+      auditFromRequest(req, "localization.translation.manual.save", {
+        entryId: req.params.entryId,
+        language: req.params.language,
+        changed: result.changed === true,
+      });
+      res.json({ ok: true, changed: result.changed === true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  "/api/admin/translations/:entryId/:language/reset-auto",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      const result = resetTranslationToAuto(
+        req.params.entryId,
+        req.params.language,
+        req.user?.email || req.user?.id || ""
+      );
+      auditFromRequest(req, "localization.translation.auto.reset", {
+        entryId: req.params.entryId,
+        language: req.params.language,
+        changed: result.changed === true,
+      });
+      res.json({ ok: true, changed: result.changed === true });
+    } catch (error) {
+      next(error);
+    }
   }
 );
 
@@ -7688,6 +7742,8 @@ app.use((error, req, res, _next) => {
     error: "Внутренняя ошибка сервера Clover.",
   });
 });
+
+initializeLocalizationCatalog();
 
 try {
   const automaticBackup = ensureDailyBackup();

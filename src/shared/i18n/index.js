@@ -3,10 +3,13 @@ export {
   FALLBACK_LOCALE,
   LANGUAGE_REGISTRY,
   PUBLIC_LOCALE_CODES,
+  TARGET_INTERNAL_LOCALES,
   canonicalizeLocale,
+  canonicalizeTargetLocale,
   getEnabledLocales,
   isLanguageEnabled,
   isSupportedPublicLocale,
+  isSupportedTargetLocale,
   toPublicLocaleCode,
 } from "./languageRegistry.js";
 
@@ -38,3 +41,6 @@ export {
   saveSettingsPreservingTranslations,
   upsertManualTranslation,
 } from "./localizationSettings.js";
+
+export { RU_DICTIONARY, UI_CATALOG, UI_CATALOG_BY_KEY } from "./uiCatalog.js";
+export { translationStoreToDictionaries } from "./translationStoreProjection.js";

@@ -91,11 +91,11 @@ assert.equal(runtimeMod.MISSING_TRANSLATION_FALLBACK_RU, MISSING_TRANSLATION_FAL
 const { createLocalizationRuntime, translate } = runtimeMod;
 
 assert.equal(Object.isFrozen(RU_DICTIONARY), true);
-assert.deepEqual({ ...RU_DICTIONARY }, { ...FOUNDATIONAL_RU });
 for (const [key, value] of Object.entries(FOUNDATIONAL_RU)) {
   assert.equal(RU_DICTIONARY[key], value);
   assert.equal(Object.hasOwn(RU_DICTIONARY, key), true);
 }
+assert.ok(Object.keys(RU_DICTIONARY).length >= Object.keys(FOUNDATIONAL_RU).length);
 
 assert.match(
   appModalSrc,

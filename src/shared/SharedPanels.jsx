@@ -1,3 +1,4 @@
+import { useLocalization } from "./i18n/LocalizationProvider";
 // Компоненты, общие для экрана клиента и экрана менеджера.
 import { Component, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -24,7 +25,7 @@ export class PanelErrorBoundary extends Component {
   }
 
   componentDidCatch(error) {
-    console.error(this.props.label || "Ошибка панели Clover", error);
+    console.error(this.props.label || "Clover panel error", error);
   }
 
   render() {
@@ -33,14 +34,7 @@ export class PanelErrorBoundary extends Component {
         <div className="sync-error" style={{ marginTop: 12 }}>
           <strong>{this.props.label || "Не удалось показать блок"}.</strong>
           <div style={{ marginTop: 8 }}>{String(this.state.error?.message || this.state.error)}</div>
-          <button
-            className="secondary-button"
-            type="button"
-            style={{ marginTop: 10 }}
-            onClick={() => this.setState({ error: null })}
-          >
-            Попробовать снова
-          </button>
+          <PanelErrorRetry onRetry={() => this.setState({ error: null })} />
         </div>
       );
     }
@@ -49,7 +43,8 @@ export class PanelErrorBoundary extends Component {
 }
 
 export function OrderTimeline({ order }) {
-  const history = Array.isArray(order?.history) ? order.history : [];
+  const { t } = useLocalization();
+    const history = Array.isArray(order?.history) ? order.history : [];
   const items = history.length
     ? [...history].sort((a, b) =>
         String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
@@ -57,7 +52,7 @@ export function OrderTimeline({ order }) {
     : [
         {
           id: `created-${order.id}`,
-          label: "Заказ создан",
+          label: t("shared.orderCreated"),
           actor: order.customerContact || "Клиент",
           createdAt: order.createdAt,
         },
@@ -65,7 +60,7 @@ export function OrderTimeline({ order }) {
 
   return (
     <div className="comment-box" style={{ marginTop: 14 }}>
-      <strong>История заказа</strong>
+      <strong>{t("shared.orderHistory")}</strong>
       <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
         {items.map((item) => (
           <div
@@ -77,7 +72,7 @@ export function OrderTimeline({ order }) {
           >
             <div style={{ fontWeight: 700 }}>{item.label}</div>
             <small>
-              {formatDateTime(item.createdAt)} · {item.actor || "Система"}
+              {formatDateTime(item.createdAt)} · {item.actor || t("shared.role.system")}
             </small>
           </div>
         ))}
@@ -86,7 +81,22 @@ export function OrderTimeline({ order }) {
   );
 }
 
+function PanelErrorRetry({ onRetry }) {
+  const { t } = useLocalization();
+  return (
+    <button
+      className="secondary-button"
+      type="button"
+      style={{ marginTop: 10 }}
+      onClick={onRetry}
+    >
+      {t("shared.tryAgain")}
+    </button>
+  );
+}
+
 export function Header({ title, subtitle, onLogout, onLogoClick, nav, between, children }) {
+  const { t } = useLocalization();
   const headerRef = useRef(null);
   const [compactHeader, setCompactHeader] = useState(() => {
     if (typeof window === "undefined" || !window.matchMedia) return false;
@@ -147,8 +157,8 @@ export function Header({ title, subtitle, onLogout, onLogoClick, nav, between, c
           type="button"
           className="app-header-logo-button"
           onClick={handleLogoClick}
-          aria-label="Обновить страницу"
-          title="Обновить страницу"
+          aria-label={t("shared.action.reloadPage")}
+          title={t("shared.action.reloadPage")}
         >
           {logo}
         </button>
@@ -162,9 +172,9 @@ export function Header({ title, subtitle, onLogout, onLogoClick, nav, between, c
           )}
           {children}
           {onLogout && (
-            <button className="header-button header-logout" type="button" onClick={onLogout}>
-              Выйти
-            </button>
+            <button className="header-button header-logout" type="button" onClick={onLogout}>{
+              t("shared.signOut")
+            }</button>
           )}
         </div>
       </div>
@@ -185,6 +195,7 @@ export function StickyCabinetNav({ children, className = "" }) {
 }
 
 export function CustomRequestPhoto({ photo, className = "" }) {
+  const { t } = useLocalization();
   const [viewerOpen, setViewerOpen] = useState(false);
 
   useEffect(() => {
@@ -206,7 +217,7 @@ export function CustomRequestPhoto({ photo, className = "" }) {
 
   if (!photo?.dataUrl) return null;
 
-  const altText = photo.name || "Фото товара из запроса";
+  const altText = photo.name || t("shared.requestProductPhoto");
 
   return (
     <>
@@ -214,7 +225,7 @@ export function CustomRequestPhoto({ photo, className = "" }) {
         className={`custom-request-photo ${className}`.trim()}
         type="button"
         onClick={() => setViewerOpen(true)}
-        title="Открыть фотографию"
+        title={t("shared.openPhoto")}
         aria-label={`Открыть фотографию: ${altText}`}
       >
         <img src={photo.dataUrl} alt={altText} />
@@ -231,8 +242,8 @@ export function CustomRequestPhoto({ photo, className = "" }) {
             className="custom-photo-viewer-close"
             type="button"
             onClick={() => setViewerOpen(false)}
-            aria-label="Закрыть фотографию"
-            title="Закрыть"
+            aria-label={t("shared.closePhoto")}
+            title={t("shared.action.close")}
           >
             ×
           </button>
@@ -251,6 +262,7 @@ export function PasswordSecurityPanel({
   allowPasswordChange = true,
   passwordChangeHint = "",
 } = {}) {
+  const { t } = useLocalization();
   const [form, setForm] = useState({ currentPassword: "", newPassword: "", repeatPassword: "" });
   const [busy, setBusy] = useState(false);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
@@ -275,14 +287,14 @@ export function PasswordSecurityPanel({
     setError("");
     setMessage("");
     if (form.newPassword !== form.repeatPassword) {
-      setError("Новые пароли не совпадают.");
+      setError(t("shared.theNewPasswordsDoNotMatch"));
       return;
     }
     setBusy(true);
     try {
       const result = await api.changePassword(form.currentPassword, form.newPassword);
       if (result.token) setApiToken(result.token);
-      setMessage(result.message || "Пароль изменён.");
+      setMessage(result.message || t("shared.passwordChanged"));
       setForm({ currentPassword: "", newPassword: "", repeatPassword: "" });
     } catch (changeError) {
       setError(changeError.message);
@@ -298,7 +310,7 @@ export function PasswordSecurityPanel({
     try {
       const result = await api.logoutOtherSessions();
       if (result.token) setApiToken(result.token);
-      setMessage(result.message || "Другие сессии завершены.");
+      setMessage(result.message || t("shared.otherSessionsWereEnded"));
     } catch (sessionError) {
       setError(sessionError.message);
     } finally {
@@ -310,7 +322,7 @@ export function PasswordSecurityPanel({
     setError("");
     setMessage("");
     if (!("PublicKeyCredential" in window)) {
-      setError("Это устройство или браузер не поддерживает Face ID, отпечаток или ключи доступа.");
+      setError(t("shared.thisDeviceOrBrowserDoesNot"));
       return;
     }
     setPasskeyBusy(true);
@@ -318,7 +330,7 @@ export function PasswordSecurityPanel({
       const ceremony = await api.getPasskeyRegistrationOptions();
       const response = await startPasskeyRegistration(ceremony.options);
       const result = await api.verifyPasskeyRegistration(ceremony.ceremonyId, response);
-      setMessage(result.message || "Ключ доступа добавлен.");
+      setMessage(result.message || t("shared.passkeyAdded"));
       await loadPasskeys();
     } catch (registrationError) {
       setError(registrationError.message || "Не удалось добавить ключ доступа.");
@@ -329,10 +341,10 @@ export function PasswordSecurityPanel({
 
   const removePasskey = async (credentialId) => {
     const ok = await appConfirm({
-      title: "Удалить ключ доступа?",
-      message: "Удалить этот ключ доступа? Вход по паролю останется доступен.",
-      confirmLabel: "Удалить",
-      cancelLabel: "Отмена",
+      title: t("shared.deleteThePasskey"),
+      message: t("shared.deleteThisPasskeyPasswordSignIn"),
+      confirmLabel: t("shared.action.delete"),
+      cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
     });
     if (!ok) return;
@@ -340,7 +352,7 @@ export function PasswordSecurityPanel({
     setError("");
     try {
       await api.deletePasskey(credentialId);
-      setMessage("Ключ доступа удалён.");
+      setMessage(t("shared.passkeyDeleted"));
       await loadPasskeys();
     } catch (deleteError) {
       setError(deleteError.message);
@@ -353,13 +365,13 @@ export function PasswordSecurityPanel({
     <section className="panel compact-panel security-panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Безопасность</p>
-          <h2>{allowPasswordChange ? "Пароль и вход по устройству" : "Вход по устройству"}</h2>
+          <p className="eyebrow">{t("shared.security")}</p>
+          <h2>{allowPasswordChange ? t("shared.passwordAndDeviceSignIn") : t("shared.deviceSignIn")}</h2>
           <p>
             {allowPasswordChange
-              ? "Можно входить по паролю либо через Face ID, отпечаток или код блокировки телефона."
+              ? t("shared.youCanSignInWithA")
               : passwordChangeHint ||
-                "Смену пароля выполняет менеджер. Здесь можно добавить Face ID, отпечаток или завершить другие сессии."}
+                t("shared.aManagerChangesThePasswordHere")}
           </p>
         </div>
       </div>
@@ -367,13 +379,13 @@ export function PasswordSecurityPanel({
       {allowPasswordChange ? (
         <div className="security-block">
           <div className="security-block-head">
-            <h3>Смена пароля</h3>
-            <p className="muted small">Минимум 6 символов. После смены другие сессии можно завершить отдельно.</p>
+            <h3>{t("shared.changePassword3")}</h3>
+            <p className="muted small">{t("shared.atLeast6CharactersAfterChanging")}</p>
           </div>
           <form className="security-password-form" onSubmit={submit}>
-            <label className="field">
-              Текущий пароль
-              <input
+            <label className="field">{
+              t("shared.currentPassword")
+              }<input
                 type="password"
                 autoComplete="current-password"
                 value={form.currentPassword}
@@ -381,9 +393,9 @@ export function PasswordSecurityPanel({
                 required
               />
             </label>
-            <label className="field">
-              Новый пароль
-              <input
+            <label className="field">{
+              t("auth.reset.title")
+              }<input
                 type="password"
                 autoComplete="new-password"
                 minLength="6"
@@ -392,9 +404,9 @@ export function PasswordSecurityPanel({
                 required
               />
             </label>
-            <label className="field">
-              Повторите новый пароль
-              <input
+            <label className="field">{
+              t("auth.reset.confirm")
+              }<input
                 type="password"
                 autoComplete="new-password"
                 minLength="6"
@@ -405,7 +417,7 @@ export function PasswordSecurityPanel({
             </label>
             <div className="form-actions">
               <button className="primary-button" disabled={busy} type="submit">
-                {busy ? "Сохраняем…" : "Изменить пароль"}
+                {busy ? t("shared.status.saving") : t("shared.changePassword")}
               </button>
             </div>
           </form>
@@ -414,26 +426,26 @@ export function PasswordSecurityPanel({
 
       <div className="security-block">
         <div className="security-block-head">
-          <h3>Сессии</h3>
-          <p className="muted small">Завершает вход на других устройствах и в браузерах. Текущая сессия останется.</p>
+          <h3>{t("shared.sessions")}</h3>
+          <p className="muted small">{t("shared.endsSignInOnOtherDevices")}</p>
         </div>
         <div className="security-block-actions">
-          <button className="secondary-button" type="button" disabled={busy} onClick={endOtherSessions}>
-            Завершить другие сессии
-          </button>
+          <button className="secondary-button" type="button" disabled={busy} onClick={endOtherSessions}>{
+            t("shared.endOtherSessions")
+          }</button>
         </div>
       </div>
 
       <div className="security-block">
         <div className="security-block-head security-block-head-row">
           <div>
-            <h3>Face ID / отпечаток</h3>
-            <p className="muted small">
-              Данные лица и отпечатка остаются только на устройстве. Clover получает лишь подтверждение входа.
-            </p>
+            <h3>{t("shared.faceIdFingerprint")}</h3>
+            <p className="muted small">{
+              t("shared.faceAndFingerprintDataStayOn")
+            }</p>
           </div>
           <button className="secondary-button" type="button" disabled={passkeyBusy} onClick={addPasskey}>
-            {passkeyBusy ? "Подождите…" : passkeys.length ? "Добавить ещё устройство" : "Включить вход по устройству"}
+            {passkeyBusy ? t("auth.login.wait") : passkeys.length ? t("shared.addAnotherDevice") : t("shared.enableDeviceSignIn")}
           </button>
         </div>
         <div className="passkey-list">
@@ -441,14 +453,14 @@ export function PasswordSecurityPanel({
             <div className="passkey-row" key={item.id}>
               <div>
                 <strong>Ключ доступа {index + 1}</strong>
-                <span>{item.backedUp ? "Синхронизируется с аккаунтом устройства" : "Сохранён на этом устройстве"}</span>
+                <span>{item.backedUp ? t("shared.syncedWithTheDeviceAccount") : t("shared.savedOnThisDevice")}</span>
               </div>
-              <button className="danger-button" type="button" disabled={passkeyBusy} onClick={() => removePasskey(item.id)}>
-                Удалить
-              </button>
+              <button className="danger-button" type="button" disabled={passkeyBusy} onClick={() => removePasskey(item.id)}>{
+                t("shared.action.delete")
+              }</button>
             </div>
           ))}
-          {!passkeys.length && <div className="empty-box">Ключи доступа пока не добавлены.</div>}
+          {!passkeys.length && <div className="empty-box">{t("shared.noPasskeysAddedYet")}</div>}
         </div>
       </div>
 
@@ -459,6 +471,7 @@ export function PasswordSecurityPanel({
 }
 
 export function PushSettings() {
+  const { t } = useLocalization();
   const [status, setStatus] = useState(null);
   const [currentEndpoint, setCurrentEndpoint] = useState("");
   const [busy, setBusy] = useState(false);
@@ -482,7 +495,7 @@ export function PushSettings() {
       if (result.enabled && Notification.permission === "granted") {
         const sync = await syncPushSubscription({ promotions: saved?.promotions });
         if (sync.reason === "registered") {
-          setMessage("Подписка на уведомления восстановлена после обновления приложения.");
+          setMessage(t("shared.theNotificationSubscriptionWasRestoredAfter"));
           const refreshed = await api.getPushStatus();
           setStatus(refreshed);
           if ("serviceWorker" in navigator && "PushManager" in window) {
@@ -516,19 +529,19 @@ export function PushSettings() {
     setBusy(true);
     setMessage("");
     try {
-      if (!status?.enabled) throw new Error("Push будет доступен после настройки домена, HTTPS и VAPID-ключей.");
+      if (!status?.enabled) throw new Error(t("shared.pushWillBeAvailableAfterThe"));
       if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-        throw new Error("Этот браузер не поддерживает push-уведомления.");
+        throw new Error(t("shared.thisBrowserDoesNotSupportPush"));
       }
       const permission = await Notification.requestPermission();
-      if (permission !== "granted") throw new Error("Разрешение на уведомления не предоставлено.");
+      if (permission !== "granted") throw new Error(t("shared.notificationPermissionWasNotGranted"));
       const registration = await navigator.serviceWorker.ready;
       let subscription = await registration.pushManager.getSubscription();
       if (!subscription) {
         subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(status.publicKey) });
       }
       await api.subscribePush(subscription.toJSON(), { orderEvents: true, promotions });
-      setMessage(currentEndpoint ? "Настройки уведомлений сохранены." : "Уведомления включены на этом устройстве.");
+      setMessage(currentEndpoint ? t("shared.notificationSettingsSaved") : t("shared.notificationsAreEnabledOnThisDevice"));
       await load();
     } catch (error) {
       setMessage(error.message);
@@ -548,7 +561,7 @@ export function PushSettings() {
         await subscription.unsubscribe();
       }
       setCurrentEndpoint("");
-      setMessage("Уведомления отключены на этом устройстве.");
+      setMessage(t("shared.notificationsAreDisabledOnThisDevice"));
       await load();
     } catch (error) {
       setMessage(error.message);
@@ -560,20 +573,19 @@ export function PushSettings() {
   const subscribed = Boolean(currentEndpoint && status?.subscriptions?.some((item) => item.endpoint === currentEndpoint));
   return (
     <section className="panel compact-panel">
-      <div className="panel-heading"><div><p className="eyebrow">Уведомления</p><h2>Уведомления на телефоне</h2><p>Push на экран и, где поддерживается, цифра на иконке приложения. Акции можно отключить отдельно.</p></div></div>
-      <label className="checkbox-line"><input type="checkbox" checked={promotions} onChange={(event) => setPromotions(event.target.checked)} /> Получать акции и новинки</label>
+      <div className="panel-heading"><div><p className="eyebrow">{t("manager.notifications.title")}</p><h2>{t("shared.phoneNotifications")}</h2><p>{t("shared.onScreenPushAndWhereSupported")}</p></div></div>
+      <label className="checkbox-line"><input type="checkbox" checked={promotions} onChange={(event) => setPromotions(event.target.checked)} />{ t("shared.receivePromosAndNewItems")}</label>
       <div className="inline-actions">
-        <button className="primary-button" type="button" disabled={busy} onClick={enable}>{busy ? "Сохраняем…" : subscribed ? "Сохранить настройки" : "Включить уведомления"}</button>
-        {subscribed && <button className="secondary-button" type="button" disabled={busy} onClick={disable}>Отключить на этом устройстве</button>}
+        <button className="primary-button" type="button" disabled={busy} onClick={enable}>{busy ? t("shared.status.saving") : subscribed ? t("shared.action.saveSettings") : t("shared.enableNotifications")}</button>
+        {subscribed && <button className="secondary-button" type="button" disabled={busy} onClick={disable}>{t("shared.turnOffOnThisDevice")}</button>}
       </div>
-      {!status?.enabled && <p className="muted small">Техническая часть подготовлена. Фактическая отправка включится после домена, HTTPS и VAPID-ключей (см. docs/deploy/PUSH_ENABLE.md).</p>}
+      {!status?.enabled && <p className="muted small">{t("shared.theTechnicalPartIsReadyActual")}</p>}
       {status?.enabled && Notification.permission === "granted" && !subscribed && (
-        <p className="muted small">
-          Разрешение есть, но подписка на этом устройстве не активна — нажмите «Включить уведомления».
-          На iPhone push работает только из установленного приложения (Safari → «На экран Домой»).
-        </p>
+        <p className="muted small">{
+          t("shared.permissionIsGrantedButTheSubscription")
+        }</p>
       )}
-      {status?.subscriptions?.length > 0 && !subscribed && Notification.permission !== "granted" && <p className="muted small">Уведомления уже включены на другом устройстве. На этом телефоне или компьютере их можно включить отдельно.</p>}
+      {status?.subscriptions?.length > 0 && !subscribed && Notification.permission !== "granted" && <p className="muted small">{t("shared.notificationsAreAlreadyOnForAnother")}</p>}
       {message && <div className="request-photo-status">{message}</div>}
     </section>
   );
@@ -583,10 +595,14 @@ export function PushSettings() {
 export function OrderThankYouOverlay({
   open,
   onDone,
-  title = "Благодарим за Ваш заказ!",
-  message = "Мы уже начали его обрабатывать.",
-  confirmLabel = "К моим заказам",
+  title,
+  message,
+  confirmLabel,
 }) {
+  const { t } = useLocalization();
+  const resolvedTitle = title ?? t("checkout.thanks");
+  const resolvedMessage = message ?? t("shared.weHaveAlreadyStartedProcessingIt");
+  const resolvedConfirm = confirmLabel ?? t("shared.toMyOrders");
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
   const [isMobile, setIsMobile] = useState(() => {
@@ -719,13 +735,13 @@ export function OrderThankYouOverlay({
           />
         </div>
         <h2 id="order-thankyou-title" className="order-thankyou-title">
-          {title}
+          {resolvedTitle}
         </h2>
         <p className="order-thankyou-text">
-          {message}
+          {resolvedMessage}
         </p>
         <button className="primary-button order-thankyou-button" type="button" onClick={() => onDoneRef.current?.()}>
-          {confirmLabel}
+          {resolvedConfirm}
         </button>
       </div>
     </div>,

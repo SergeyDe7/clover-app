@@ -1,3 +1,4 @@
+import { useLocalization } from "../shared/i18n/LocalizationProvider";
 import { useState } from "react";
 import "./AddressManager.css";
 import { appConfirm } from "../shared/AppModal";
@@ -8,6 +9,7 @@ const EMPTY_FORM = {
 };
 
 function AddressManager({ addresses, onChange }) {
+  const { t } = useLocalization();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -98,10 +100,10 @@ function AddressManager({ addresses, onChange }) {
     }
 
     const shouldDelete = await appConfirm({
-      title: "Удалить адрес?",
+      title: t("shared.deleteTheAddress"),
       message: `Удалить адрес «${addressToDelete.label}»?`,
-      confirmLabel: "Удалить",
-      cancelLabel: "Отмена",
+      confirmLabel: t("shared.action.delete"),
+      cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
     });
 
@@ -130,20 +132,20 @@ function AddressManager({ addresses, onChange }) {
     <section className="address-manager">
       <div className="address-manager-heading">
         <div>
-          <p className="small-title">Доставка</p>
-          <h2>Мои адреса</h2>
-          <p>
-            Сохраните несколько адресов и выбирайте нужный при заказе.
-          </p>
+          <p className="small-title">{t("checkout.delivery")}</p>
+          <h2>{t("shared.myAddresses")}</h2>
+          <p>{
+            t("shared.saveSeveralAddressesAndPickOne")
+          }</p>
         </div>
 
         <button
           className="add-address-button"
           type="button"
           onClick={openAddForm}
-        >
-          + Добавить адрес
-        </button>
+        >{
+          t("client.action.addAddress")
+        }</button>
       </div>
 
       {addresses.length > 0 ? (
@@ -158,7 +160,7 @@ function AddressManager({ addresses, onChange }) {
                   <h3>{savedAddress.label}</h3>
 
                   {savedAddress.isDefault && (
-                    <span>Основной</span>
+                    <span>{t("shared.address.primary")}</span>
                   )}
                 </div>
 
@@ -172,48 +174,48 @@ function AddressManager({ addresses, onChange }) {
                     onClick={() =>
                       setDefaultAddress(savedAddress.id)
                     }
-                  >
-                    Сделать основным
-                  </button>
+                  >{
+                    t("shared.makePrimary")
+                  }</button>
                 )}
 
                 <button
                   type="button"
                   onClick={() => openEditForm(savedAddress)}
-                >
-                  Изменить
-                </button>
+                >{
+                  t("shared.action.edit")
+                }</button>
 
                 <button
                   className="delete-address-button"
                   type="button"
                   onClick={() => deleteAddress(savedAddress.id)}
-                >
-                  Удалить
-                </button>
+                >{
+                  t("shared.action.delete")
+                }</button>
               </div>
             </article>
           ))}
         </div>
       ) : (
         <div className="address-empty">
-          <p>
-            Адресов пока нет. Добавьте адрес перед созданием заказа.
-          </p>
+          <p>{
+            t("client.address.emptyHint")
+          }</p>
         </div>
       )}
 
       {isFormOpen && (
         <form className="address-form" onSubmit={handleSubmit}>
           <h3>
-            {editingId ? "Изменить адрес" : "Новый адрес"}
+            {editingId ? t("shared.editAddress") : t("shared.newAddress")}
           </h3>
 
-          <label>
-            Название
-            <input
+          <label>{
+            t("shared.field.name")
+            }<input
               type="text"
-              placeholder="Например: Магазин на Ленина"
+              placeholder={t("shared.forExampleShopOnLeninStreet")}
               value={form.label}
               onChange={(event) =>
                 updateField("label", event.target.value)
@@ -222,11 +224,11 @@ function AddressManager({ addresses, onChange }) {
             />
           </label>
 
-          <label>
-            Полный адрес
-            <textarea
+          <label>{
+            t("shared.fullAddress")
+            }<textarea
               rows="3"
-              placeholder="Город, улица, дом, помещение"
+              placeholder={t("shared.cityStreetBuildingPremises")}
               value={form.address}
               onChange={(event) =>
                 updateField("address", event.target.value)
@@ -240,16 +242,16 @@ function AddressManager({ addresses, onChange }) {
               className="cancel-address-button"
               type="button"
               onClick={closeForm}
-            >
-              Отмена
-            </button>
+            >{
+              t("shared.modal.cancel")
+            }</button>
 
             <button
               className="save-address-button"
               type="submit"
-            >
-              Сохранить адрес
-            </button>
+            >{
+              t("shared.saveAddress")
+            }</button>
           </div>
         </form>
       )}

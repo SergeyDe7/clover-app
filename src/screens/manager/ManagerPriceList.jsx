@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useEffect, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
@@ -19,6 +20,7 @@ function parseMarkupPercent(value) {
  * Выгрузка прайса витрины — отдельный спокойный экран без сводки заказов.
  */
 export function ManagerPriceList({ settings }) {
+  const { t } = useLocalization();
   const [busy, setBusy] = useState(false);
   const [markup, setMarkup] = useState(() =>
     formatMarkupDraft(settings?.storefrontMarkupPercent ?? 30)
@@ -45,7 +47,7 @@ export function ManagerPriceList({ settings }) {
     } catch (error) {
       appAlert({
         title: "Не удалось выгрузить прайс",
-        message: error.message || "Ошибка формирования PDF.",
+        message: error.message || t("manager.pdfGenerationError"),
         tone: "danger",
       });
     } finally {
@@ -58,19 +60,18 @@ export function ManagerPriceList({ settings }) {
   return (
     <section className="manager-price-list" aria-labelledby="manager-price-list-title">
       <header className="manager-price-list-hero">
-        <p className="manager-price-list-kicker">Витрина clover-spb.ru</p>
-        <h2 id="manager-price-list-title">Прайс-лист</h2>
-        <p className="manager-price-list-lead">
-          PDF со всеми товарами витрины и фото. Накрутка применяется только в
-          файле — настройки сайта не меняются.
-        </p>
+        <p className="manager-price-list-kicker">{t("manager.storefrontCloverSpbRu")}</p>
+        <h2 id="manager-price-list-title">{t("manager.priceList")}</h2>
+        <p className="manager-price-list-lead">{
+          t("manager.pdfWithAllStorefrontProductsAnd")
+        }</p>
       </header>
 
       <div className="manager-price-list-body">
         <div className="manager-price-list-export">
-          <label className="field manager-price-list-markup">
-            Накрутка, %
-            <input
+          <label className="field manager-price-list-markup">{
+            t("manager.markup")
+            }<input
               type="text"
               inputMode="decimal"
               autoComplete="off"
@@ -98,14 +99,14 @@ export function ManagerPriceList({ settings }) {
             disabled={busy}
             onClick={() => void downloadPdf()}
           >
-            {busy ? "Формируем PDF…" : "Скачать PDF"}
+            {busy ? t("manager.generatingPdf") : t("manager.downloadPdf")}
           </button>
         </div>
 
         <ul className="manager-price-list-notes">
-          <li>Берутся товары, которые сейчас на витрине</li>
-          <li>В файле — название, фото и цена с вашей накруткой</li>
-          <li>Удобно отправить клиенту или распечатать</li>
+          <li>{t("manager.usesProductsCurrentlyOnTheStorefront")}</li>
+          <li>{t("manager.theFileHasTheNamePhoto")}</li>
+          <li>{t("manager.convenientToSendToAClient")}</li>
         </ul>
       </div>
     </section>

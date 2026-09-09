@@ -1,10 +1,7 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { useEffect, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
 import { storefrontHref } from "../mode.js";
-
-const EMPTY_MESSAGE_PRIMARY = "Сейчас специальных предложений нет.";
-const EMPTY_MESSAGE_SECONDARY =
-  "Следите за обновлениями — новые акции будут появляться здесь.";
 
 function navigatePromoLink(link) {
   const href = String(link || "").trim();
@@ -20,6 +17,7 @@ function navigatePromoLink(link) {
 }
 
 export function AktsiiPage() {
+  const { t } = useLocalization();
   const [promotions, setPromotions] = useState(null);
   const [error, setError] = useState("");
 
@@ -51,21 +49,20 @@ export function AktsiiPage() {
   return (
     <div className="sf-aktsii-page">
       <header className="sf-aktsii-head">
-        <h1>Акции</h1>
-        <p className="sf-muted">
-          Специальные предложения компании КЛЕВЕР. Информационные материалы —
-          без автоматического изменения цен в каталоге и корзине.
-        </p>
+        <h1>{t("storefront.nav.promos")}</h1>
+        <p className="sf-muted">{
+          t("storefront.specialOffersFromInformationalMaterialsNo")
+        }</p>
       </header>
 
       {error ? <p className="sf-error">{error}</p> : null}
 
       {list === null ? (
-        <p className="sf-muted">Загрузка…</p>
+        <p className="sf-muted">{t("shared.status.loadingEllipsis")}</p>
       ) : empty ? (
         <div className="sf-aktsii-empty" role="status">
-          <p>{EMPTY_MESSAGE_PRIMARY}</p>
-          <p>{EMPTY_MESSAGE_SECONDARY}</p>
+          <p>{t("storefront.thereAreNoSpecialOffersRight")}</p>
+          <p>{t("storefront.stayTunedNewPromotionsWillAppear")}</p>
         </div>
       ) : (
         <ul className="sf-aktsii-list">
@@ -94,7 +91,7 @@ export function AktsiiPage() {
                     className="sf-btn sf-btn-primary"
                     onClick={() => navigatePromoLink(promo.link)}
                   >
-                    {promo.buttonText || "Подробнее"}
+                    {promo.buttonText || t("storefront.more")}
                   </button>
                 ) : null}
               </div>

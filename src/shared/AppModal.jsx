@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import cloverLogo from "../assets/clover-logo.png";
+import { useLocalization } from "./i18n/LocalizationProvider";
 
 let pushDialog = null;
 let hostGeneration = 0;
@@ -99,6 +100,7 @@ function toneCardClass(tone) {
 }
 
 export function AppModalHost() {
+  const { t } = useLocalization();
   const [dialog, setDialog] = useState(null);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined" || !window.matchMedia) return false;
@@ -285,7 +287,7 @@ export function AppModalHost() {
               type="button"
               onClick={() => close(false)}
             >
-              {dialog.cancelLabel || "Отмена"}
+              {dialog.cancelLabel || t("shared.modal.cancel")}
             </button>
           ) : null}
           <button
@@ -294,7 +296,7 @@ export function AppModalHost() {
             autoFocus
             onClick={() => close(isConfirm ? true : undefined)}
           >
-            {dialog.confirmLabel || (isConfirm ? "Подтвердить" : "Понятно")}
+            {dialog.confirmLabel || (isConfirm ? t("shared.modal.confirm") : t("shared.modal.ok"))}
           </button>
         </div>
       </div>

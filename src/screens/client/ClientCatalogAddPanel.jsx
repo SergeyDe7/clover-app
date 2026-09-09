@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Каталог ЛК: только добавление товара в свою матрицу, без корзины.
 import {
   useDeferredValue,
@@ -61,7 +62,7 @@ function catalogAddPrice(product) {
 }
 
 function NavChevron() {
-  return (
+    return (
     <svg
       className="client-catalog-add-cat-chevron"
       viewBox="0 0 12 12"
@@ -102,6 +103,7 @@ export function ClientCatalogAddPanel({
   onAdd,
   onRemove,
 }) {
+  const { t } = useLocalization();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
@@ -147,7 +149,7 @@ export function ClientCatalogAddPanel({
   const groups = useMemo(
     () =>
       buildGroupNav(
-        activeProducts.map((item) => canonicalizeProductCategory(item.category || "Прочее"))
+        activeProducts.map((item) => canonicalizeProductCategory(item.category || t("client.other")))
       ),
     [activeProducts]
   );
@@ -256,21 +258,21 @@ export function ClientCatalogAddPanel({
               onClick={() => setCategoriesOpen((open) => !open)}
             >
               <span>
-                {activeSubcategory || activeCategory || "Категории"}
+                {activeSubcategory || activeCategory || t("client.catalog.categories")}
               </span>
               <NavChevron />
             </button>
             <nav
               className="category-list client-catalog-add-categories"
-              aria-label="Категории каталога"
+              aria-label={t("client.catalogCategories")}
             >
               <button
                 className={!activeCategory ? "category-button active" : "category-button"}
                 type="button"
                 onClick={selectAll}
-              >
-                Все
-              </button>
+              >{
+                t("shared.filter.all")
+              }</button>
 
               {groups.map((group) => {
                 const hasChildren = group.children.length > 0;
@@ -336,7 +338,7 @@ export function ClientCatalogAddPanel({
             {activeChildren.length > 0 ? (
               <div
                 className="client-catalog-add-subcats-mobile"
-                aria-label="Подкатегории"
+                aria-label={t("client.subcategories")}
               >
                 <button
                   type="button"
@@ -346,9 +348,9 @@ export function ClientCatalogAddPanel({
                       : "category-button"
                   }
                   onClick={() => selectGroup(activeCategory)}
-                >
-                  Все в категории
-                </button>
+                >{
+                  t("client.allInCategory")
+                }</button>
                 {activeChildren.map((child) => (
                   <button
                     key={child.name}
@@ -370,12 +372,11 @@ export function ClientCatalogAddPanel({
 
         <div className="client-catalog-add-intro panel-heading">
           <div>
-            <p className="eyebrow">Каталог Clover</p>
-            <h2>Добавить товары из каталога</h2>
-            <p>
-              Добавляйте позиции в матрицу или убирайте лишние. Заказ оформляется
-              во вкладке «Моя матрица».
-            </p>
+            <p className="eyebrow">{t("client.cloverCatalog")}</p>
+            <h2>{t("client.nav.catalog")}</h2>
+            <p>{
+              t("client.addItemsToTheMatrixOr")
+            }</p>
           </div>
         </div>
 
@@ -404,7 +405,7 @@ export function ClientCatalogAddPanel({
                         loading="lazy"
                       />
                     ) : (
-                      <span className="product-image-placeholder">Нет фото</span>
+                      <span className="product-image-placeholder">{t("shared.media.noPhoto")}</span>
                     )}
                   </div>
                   <h2>{product.name}</h2>
@@ -416,7 +417,7 @@ export function ClientCatalogAddPanel({
                         <small>/ {(UNIT_CONFIG[unit] || UNIT_CONFIG.piece).shortLabel}</small>
                       </>
                     ) : (
-                      "Цена уточняется"
+                      t("shared.price.pending")
                     )}
                   </p>
                   <div className="product-card-controls">
@@ -427,7 +428,7 @@ export function ClientCatalogAddPanel({
                         disabled={busy || !onRemove}
                         onClick={() => onRemove?.(product)}
                       >
-                        {busy ? "Убираем…" : "Убрать из матрицы"}
+                        {busy ? t("client.removing") : t("client.removeFromMatrix")}
                       </button>
                     ) : (
                       <button
@@ -436,7 +437,7 @@ export function ClientCatalogAddPanel({
                         disabled={busy}
                         onClick={() => onAdd?.(product)}
                       >
-                        {busy ? "Добавляем…" : "В матрицу"}
+                        {busy ? t("client.adding") : t("client.matrix.add")}
                       </button>
                     )}
                   </div>
@@ -445,11 +446,11 @@ export function ClientCatalogAddPanel({
             })}
             {!filtered.length ? (
               <EmptyState
-                title="Товары не найдены"
+                title={t("client.productsNotFound")}
                 message={
                   activeProducts.length
-                    ? "Попробуйте другую категорию, подкатегорию или другой запрос."
-                    : "Каталог пока пуст. Обратитесь к менеджеру."
+                    ? t("client.tryAnotherCategorySubcategoryOrQuery")
+                    : t("client.theCatalogIsEmptyForNow")
                 }
               />
             ) : null}

@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Раздел «Ещё» → «Доступы»: клиенты (все staff) и менеджеры (только admin).
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../serverApi";
@@ -44,6 +45,7 @@ async function copyText(value) {
 }
 
 function ClientAccessPanel() {
+  const { t } = useLocalization();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -96,7 +98,7 @@ function ClientAccessPanel() {
     const ok = await copyText(value);
     if (!ok) {
       await appAlert({
-        title: "Не скопировано",
+        title: t("shared.notCopied"),
         message: "Не удалось скопировать в буфер обмена.",
         tone: "warn",
       });
@@ -110,10 +112,10 @@ function ClientAccessPanel() {
 
   const handleRemove = async (item) => {
     const ok = await appConfirm({
-      title: "Убрать из журнала доступов?",
+      title: t("manager.removeFromTheAccessLog"),
       message: `Пароль для «${item.companyName}» исчезнет из журнала. Аккаунт клиента не удалится.`,
-      confirmLabel: "Убрать",
-      cancelLabel: "Отмена",
+      confirmLabel: t("shared.action.remove"),
+      cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
     });
     if (!ok) return;
@@ -122,7 +124,7 @@ function ClientAccessPanel() {
       setItems(Array.isArray(result.items) ? result.items : []);
     } catch (removeError) {
       await appAlert({
-        title: "Ошибка",
+        title: t("shared.status.error"),
         message: removeError.message,
         tone: "danger",
       });
@@ -136,10 +138,10 @@ function ClientAccessPanel() {
       return;
     }
     const ok = await appConfirm({
-      title: "Удалить клиента?",
+      title: t("manager.deleteTheClient"),
       message: `Удалить «${item.companyName}» (${item.login || item.email || "без логина"})?\n\nБудут удалены аккаунт, матрица, журнал доступов и связанные заказы. Это необратимо.`,
-      confirmLabel: "Удалить клиента",
-      cancelLabel: "Отмена",
+      confirmLabel: t("manager.deleteClient"),
+      cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
     });
     if (!ok) return;
@@ -151,14 +153,14 @@ function ClientAccessPanel() {
           : (await api.getClientAccessVault()).items || []
       );
       await appAlert({
-        title: "Клиент удалён",
-        message: result.message || "Аккаунт клиента удалён.",
+        title: t("manager.clientDeleted"),
+        message: result.message || t("manager.theClientAccountHasBeenDeleted"),
         tone: "success",
       });
     } catch (deleteError) {
       await appAlert({
         title: "Не удалось удалить",
-        message: deleteError.message || "Ошибка удаления клиента.",
+        message: deleteError.message || t("manager.failedToDeleteTheClient"),
         tone: "danger",
       });
     }
@@ -178,8 +180,8 @@ function ClientAccessPanel() {
     const password = passwordDraft.trim();
     if (password.length < 6) {
       await appAlert({
-        title: "Короткий пароль",
-        message: "Пароль должен быть не короче 6 символов.",
+        title: t("manager.passwordTooShort"),
+        message: t("shared.passwordMustBeAtLeast6"),
         tone: "warn",
       });
       return;
@@ -194,7 +196,7 @@ function ClientAccessPanel() {
     } catch (saveError) {
       await appAlert({
         title: "Не удалось сохранить",
-        message: saveError.message || "Ошибка сохранения пароля.",
+        message: saveError.message || t("manager.passwordSaveError"),
         tone: "danger",
       });
     } finally {
@@ -208,28 +210,27 @@ function ClientAccessPanel() {
         <input
           type="search"
           className="access-vault-search"
-          placeholder="Поиск по компании, логину, телефону"
+          placeholder={t("manager.searchByCompanyLoginOrPhone")}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          aria-label="Поиск доступов клиентов"
+          aria-label={t("manager.searchClientAccess")}
         />
         <div className="access-vault-stats">
           <span>{savedCount} с паролем</span>
           <span>{items.length} клиентов</span>
         </div>
         <button className="secondary-button" type="button" onClick={load} disabled={loading}>
-          {loading ? "Обновляем…" : "Обновить"}
+          {loading ? t("manager.updating") : t("shared.action.refresh")}
         </button>
       </div>
 
-      <p className="muted small" style={{ margin: "0 0 12px" }}>
-        Логины и пароли ЛК. Пишутся в журнал при создании клиента и при смене пароля.
-        Старые пароли до появления журнала восстановить нельзя — задайте новый.
-      </p>
+      <p className="muted small" style={{ margin: "0 0 12px" }}>{
+        t("manager.cabinetLoginsAndPasswordsWrittenTo")
+      }</p>
 
       {error ? <div className="sync-error">{error}</div> : null}
       {loading && !items.length ? (
-        <div className="access-vault-empty">Загружаем доступы…</div>
+        <div className="access-vault-empty">{t("manager.loadingAccessRecords")}</div>
       ) : filtered.length ? (
         <div className="access-vault-list">
           {filtered.map((item) => {
@@ -244,17 +245,17 @@ function ClientAccessPanel() {
                     <strong>{item.companyName}</strong>
                     <span>
                       {[item.contactName, item.phone].filter(Boolean).join(" · ") ||
-                        "Контакт не указан"}
+                        t("manager.noContactGiven")}
                     </span>
                   </div>
                   <span className={item.hasPassword ? "badge green" : "badge yellow"}>
-                    {item.hasPassword ? "Пароль сохранён" : "Нет пароля"}
+                    {item.hasPassword ? t("shared.passwordSaved") : t("shared.noPassword")}
                   </span>
                 </div>
 
                 <div className="access-vault-fields">
                   <div className="access-vault-field">
-                    <span>Логин</span>
+                    <span>{t("auth.login.email")}</span>
                     <code>{item.login || "—"}</code>
                     <button
                       className="secondary-button"
@@ -262,17 +263,17 @@ function ClientAccessPanel() {
                       disabled={!item.login}
                       onClick={() => handleCopy(loginKey, item.login)}
                     >
-                      {copiedKey === loginKey ? "Скопировано" : "Копировать"}
+                      {copiedKey === loginKey ? t("shared.action.copied") : t("shared.action.copy")}
                     </button>
                   </div>
                   <div className="access-vault-field">
-                    <span>Пароль</span>
+                    <span>{t("auth.login.password")}</span>
                     <code>
                       {item.hasPassword
                         ? showPassword
                           ? item.password
                           : "••••••••••"
-                        : "не сохранён"}
+                        : t("shared.notSaved")}
                     </code>
                     <div className="access-vault-field-actions">
                       {item.hasPassword ? (
@@ -287,31 +288,31 @@ function ClientAccessPanel() {
                               }))
                             }
                           >
-                            {showPassword ? "Скрыть" : "Показать"}
+                            {showPassword ? t("shared.action.hide") : t("shared.action.show")}
                           </button>
                           <button
                             className="secondary-button"
                             type="button"
                             onClick={() => handleCopy(passKey, item.password)}
                           >
-                            {copiedKey === passKey ? "Скопировано" : "Копировать"}
+                            {copiedKey === passKey ? t("shared.action.copied") : t("shared.action.copy")}
                           </button>
                           <button
                             className="secondary-button"
                             type="button"
                             onClick={() => openPasswordEditor(item)}
-                          >
-                            Сменить
-                          </button>
+                          >{
+                            t("manager.change")
+                          }</button>
                         </>
                       ) : (
                         <button
                           className="secondary-button"
                           type="button"
                           onClick={() => openPasswordEditor(item)}
-                        >
-                          Задать пароль
-                        </button>
+                        >{
+                          t("manager.setPassword")
+                        }</button>
                       )}
                     </div>
                   </div>
@@ -319,9 +320,9 @@ function ClientAccessPanel() {
 
                 {editing ? (
                   <div className="access-vault-password-editor">
-                    <label className="field">
-                      Новый пароль
-                      <input
+                    <label className="field">{
+                      t("auth.reset.title")
+                      }<input
                         type="text"
                         autoComplete="off"
                         minLength={6}
@@ -336,24 +337,24 @@ function ClientAccessPanel() {
                         type="button"
                         disabled={passwordBusy}
                         onClick={() => setPasswordDraft(generateAccessPassword())}
-                      >
-                        Сгенерировать
-                      </button>
+                      >{
+                        t("manager.generate")
+                      }</button>
                       <button
                         className="secondary-button"
                         type="button"
                         disabled={passwordBusy}
                         onClick={cancelPasswordEditor}
-                      >
-                        Отмена
-                      </button>
+                      >{
+                        t("shared.modal.cancel")
+                      }</button>
                       <button
                         className="primary-button"
                         type="button"
                         disabled={passwordBusy}
                         onClick={() => savePassword(item)}
                       >
-                        {passwordBusy ? "Сохраняем…" : "Сохранить пароль"}
+                        {passwordBusy ? t("shared.status.saving") : t("auth.reset.submit")}
                       </button>
                     </div>
                   </div>
@@ -363,7 +364,7 @@ function ClientAccessPanel() {
                   <small>
                     {item.updatedAt
                       ? `Обновлён ${formatDateTime(item.updatedAt)}`
-                      : "Задайте пароль здесь или в карточке клиента"}
+                      : t("manager.setAPasswordHereOrIn")}
                     {item.updatedBy ? ` · ${item.updatedBy}` : ""}
                   </small>
                   <div className="access-vault-field-actions">
@@ -372,17 +373,17 @@ function ClientAccessPanel() {
                         className="secondary-button"
                         type="button"
                         onClick={() => handleRemove(item)}
-                      >
-                        Убрать из журнала
-                      </button>
+                      >{
+                        t("manager.removeFromTheLog")
+                      }</button>
                     ) : null}
                     <button
                       className="secondary-button staff-edit-danger"
                       type="button"
                       onClick={() => handleDeleteClient(item)}
-                    >
-                      Удалить клиента
-                    </button>
+                    >{
+                      t("manager.deleteClient")
+                    }</button>
                   </div>
                 </footer>
               </article>
@@ -392,8 +393,8 @@ function ClientAccessPanel() {
       ) : (
         <div className="access-vault-empty">
           {search
-            ? "Ничего не найдено по запросу."
-            : "Пока нет клиентов. Создайте доступ в разделе «Клиенты»."}
+            ? t("manager.nothingFoundForThisQuery")
+            : t("manager.thereAreNoClientsYetCreate")}
         </div>
       )}
     </div>
@@ -401,6 +402,7 @@ function ClientAccessPanel() {
 }
 
 export function ManagerAccessVault({ authUser }) {
+  const { t } = useLocalization();
   const isAdmin = authUser?.role === "admin";
   const [scope, setScope] = useState("clients");
 
@@ -414,30 +416,30 @@ export function ManagerAccessVault({ authUser }) {
     <section className="access-vault-page" aria-labelledby="access-vault-title">
       <header className="access-vault-head">
         <div>
-          <p className="eyebrow">Ещё</p>
-          <h2 id="access-vault-title">Доступы</h2>
-          <p className="muted small" style={{ margin: "6px 0 0" }}>
-            Клиенты — логины ЛК. Менеджеры — логины, пароли и права (только администратор).
-          </p>
+          <p className="eyebrow">{t("manager.nav.more")}</p>
+          <h2 id="access-vault-title">{t("manager.nav.access")}</h2>
+          <p className="muted small" style={{ margin: "6px 0 0" }}>{
+            t("manager.clientsCabinetLoginsManagersLoginsPasswords")
+          }</p>
         </div>
       </header>
 
-      <nav className="manager-more-nav" aria-label="Тип доступов" style={{ marginBottom: 16 }}>
+      <nav className="manager-more-nav" aria-label={t("manager.accessType")} style={{ marginBottom: 16 }}>
         <button
           className={scope === "clients" ? "category-button active" : "category-button"}
           type="button"
           onClick={() => setScope("clients")}
-        >
-          Клиенты
-        </button>
+        >{
+          t("manager.nav.clients")
+        }</button>
         {isAdmin ? (
           <button
             className={scope === "managers" ? "category-button active" : "category-button"}
             type="button"
             onClick={() => setScope("managers")}
-          >
-            Менеджеры
-          </button>
+          >{
+            t("manager.managers")
+          }</button>
         ) : null}
       </nav>
 

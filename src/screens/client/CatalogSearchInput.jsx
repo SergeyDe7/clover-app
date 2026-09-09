@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useEffect, useRef, useState } from "react";
 
 /**
@@ -7,9 +8,11 @@ import { useEffect, useRef, useState } from "react";
 export function CatalogSearchInput({
   value,
   onChange,
-  placeholder = "Поиск по названию или коду",
+  placeholder,
   className = "catalog-search",
 }) {
+  const { t } = useLocalization();
+  const resolvedPlaceholder = placeholder ?? t("client.searchByNameOrCode");
   const inputRef = useRef(null);
   const armedRef = useRef(false);
   const [armed, setArmed] = useState(false);
@@ -50,7 +53,7 @@ export function CatalogSearchInput({
       autoFocus={false}
       autoComplete="off"
       readOnly={!armed}
-      placeholder={placeholder}
+      placeholder={resolvedPlaceholder}
       value={value}
       onChange={onChange}
       onPointerDown={arm}

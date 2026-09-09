@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useEffect, useMemo, useState } from "react";
 import { matchesCatalogPrefixSearch, productArticle, productCatalogSearchHaystack } from "../../shared/appHelpers";
 import { getClientMatrixMembership } from "./matrixMembership";
@@ -14,6 +15,7 @@ export function MatrixCloverCatalogAdd({
   onAddToMatrix,
   onPanelChange,
 }) {
+  const { t } = useLocalization();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -79,14 +81,14 @@ export function MatrixCloverCatalogAdd({
       .map((product) => product?.id)
       .filter((id) => id != null && !membership.matrixIds.has(String(id)));
     if (!ids.length) {
-      setNotice("Выбранные товары уже есть в матрице.");
+      setNotice(t("manager.selectedProductsAreAlreadyInThe"));
       return;
     }
     onAddToMatrix?.(ids);
     setSelectedIds(new Set());
     setNotice(
       ids.length === 1
-        ? "Товар добавлен в матрицу клиента. Нажмите «Сохранить матрицу»."
+        ? t("manager.theProductWasAddedToThe")
         : `В матрицу клиента добавлено: ${ids.length} поз. Нажмите «Сохранить матрицу».`
     );
   };
@@ -107,9 +109,9 @@ export function MatrixCloverCatalogAdd({
           setOpen(true);
         }}
         disabled={open}
-      >
-        Добавить из каталога
-      </button>
+      >{
+        t("manager.addFromCatalog")
+      }</button>
       {notice && !open && (
         <div className="matrix-save-message saved">
           {notice}
@@ -121,13 +123,13 @@ export function MatrixCloverCatalogAdd({
           <div className="one-c-products-search">
             <input
               type="search"
-              placeholder="Название, артикул или код"
+              placeholder={t("manager.nameSkuOrCode")}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-            <button className="secondary-button" type="button" onClick={closePanel}>
-              Отмена
-            </button>
+            <button className="secondary-button" type="button" onClick={closePanel}>{
+              t("shared.modal.cancel")
+            }</button>
           </div>
           {notice && (
             <div className="matrix-save-message saved">
@@ -177,7 +179,7 @@ export function MatrixCloverCatalogAdd({
                     <div>
                       <strong>{product.name}</strong>
                       <span>
-                        {productArticle(product)} · {product.category || "Без категории"}
+                        {productArticle(product)} · {product.category || t("manager.noCategory")}
                       </span>
                     </div>
                   </label>
@@ -185,17 +187,17 @@ export function MatrixCloverCatalogAdd({
                     className="secondary-button"
                     type="button"
                     onClick={() => addProducts([product])}
-                  >
-                    В матрицу
-                  </button>
+                  >{
+                    t("client.matrix.add")
+                  }</button>
                 </article>
               );
             })}
             {!items.length && (
               <div className="empty-box">
                 {available.length === 0
-                  ? "Все товары каталога Clover уже есть в матрице этого клиента."
-                  : "По запросу ничего не найдено. Уточните название или артикул."}
+                  ? t("manager.everyCloverCatalogProductIsAlready")
+                  : t("manager.nothingWasFoundForThisQuery")}
               </div>
             )}
           </div>

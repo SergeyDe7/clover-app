@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Раздел менеджера: акты сверки.
 import { useState } from "react";
 import { api } from "../../serverApi";
@@ -11,6 +12,7 @@ export function ManagerReconciliation({
   staffRole = "manager",
   onApplyReconciliationRequests,
 }) {
+  const { t } = useLocalization();
   const [busyId, setBusyId] = useState("");
   const [pendingFiles, setPendingFiles] = useState({});
   const [successOpen, setSuccessOpen] = useState(false);
@@ -33,8 +35,8 @@ export function ManagerReconciliation({
     const file = pendingFiles[item.id];
     if (!file) {
       await appAlert({
-        title: "Нет файла",
-        message: "Сначала прикрепите PDF акта сверки.",
+        title: t("manager.noFile"),
+        message: t("manager.attachTheStatementPdfFirst"),
         tone: "warn",
       });
       return;
@@ -49,7 +51,7 @@ export function ManagerReconciliation({
     } catch (error) {
       await appAlert({
         title: "Не удалось отправить",
-        message: error.message || "Ошибка отправки акта сверки.",
+        message: error.message || t("manager.failedToSendTheStatement"),
         tone: "danger",
       });
     } finally {
@@ -59,12 +61,12 @@ export function ManagerReconciliation({
 
   const remove = async (item) => {
     if (!isAdmin) return;
-    const clientLabel = item.client?.companyName || item.client?.email || "клиента";
+    const clientLabel = item.client?.companyName || item.client?.email || t("manager.client2");
     const ok = await appConfirm({
-      title: "Удалить акт сверки?",
+      title: t("manager.deleteTheStatement"),
       message: `Запрос «${reconciliationPeriodLabel(item)}» для ${clientLabel} будет удалён навсегда — и у менеджера, и в ЛК клиента.${item.fileName ? " PDF-файл тоже будет удалён с сервера." : ""}`,
-      confirmLabel: "Удалить",
-      cancelLabel: "Отмена",
+      confirmLabel: t("shared.action.delete"),
+      cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
     });
     if (!ok) return;
@@ -81,7 +83,7 @@ export function ManagerReconciliation({
     } catch (error) {
       await appAlert({
         title: "Не удалось удалить",
-        message: error.message || "Ошибка удаления акта сверки.",
+        message: error.message || t("manager.failedToDeleteTheStatement"),
         tone: "danger",
       });
     } finally {
@@ -94,11 +96,11 @@ export function ManagerReconciliation({
     <section className="panel" style={{ marginTop: 0 }}>
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Документы</p>
-          <h2>Акты сверок</h2>
+          <p className="eyebrow">{t("shared.section.documents")}</p>
+          <h2>{t("manager.nav.acts")}</h2>
           <p>
             Прикрепите PDF акта из 1С и нажмите «Отправить».
-            {isAdmin ? " Админ может удалить акт — он исчезнет и у клиента." : ""}
+            {isAdmin ? t("manager.anAdminCanDeleteTheStatement") : ""}
           </p>
         </div>
       </div>
@@ -115,7 +117,7 @@ export function ManagerReconciliation({
                 <span className={`badge ${item.status === "ready" ? "green" : item.status === "rejected" ? "red" : "yellow"}`}>
                   {RECONCILIATION_STATUS_LABELS[item.status] || item.status}
                 </span>
-                <h3>{item.client?.companyName || item.client?.email || "Клиент"}</h3>
+                <h3>{item.client?.companyName || item.client?.email || t("shared.role.client")}</h3>
                 <p>{reconciliationPeriodLabel(item)} · {formatDateTime(item.createdAt)}</p>
                 {item.clientComment && <p>Комментарий клиента: {item.clientComment}</p>}
                 {alreadySent && (
@@ -127,9 +129,9 @@ export function ManagerReconciliation({
                 {!alreadySent ? (
                   <>
                     {!pending ? (
-                      <label className="import-label manager-reconciliation-attach">
-                        Прикрепить файл
-                        <input
+                      <label className="import-label manager-reconciliation-attach">{
+                        t("manager.attachAFile")
+                        }<input
                           type="file"
                           accept="application/pdf"
                           disabled={busy}
@@ -147,7 +149,7 @@ export function ManagerReconciliation({
                           type="button"
                           disabled={busy}
                           onClick={() => clearPending(item.id)}
-                          aria-label="Убрать файл"
+                          aria-label={t("manager.removeFile")}
                         >
                           ×
                         </button>
@@ -160,7 +162,7 @@ export function ManagerReconciliation({
                       disabled={!canSend}
                       onClick={() => void send(item)}
                     >
-                      {busy ? "Отправка…" : "Отправить"}
+                      {busy ? t("shared.status.sending") : t("shared.action.send")}
                     </button>
                   </>
                 ) : null}
@@ -172,23 +174,23 @@ export function ManagerReconciliation({
                     disabled={busy}
                     onClick={() => void remove(item)}
                   >
-                    {busy ? "Удаление…" : "Удалить"}
+                    {busy ? t("manager.deleting") : t("shared.action.delete")}
                   </button>
                 ) : null}
               </div>
             </article>
           );
         }) : (
-          <div className="empty-box">Новых запросов актов сверки нет.</div>
+          <div className="empty-box">{t("manager.noNewReconciliationRequests")}</div>
         )}
       </div>
     </section>
     <OrderThankYouOverlay
       open={successOpen}
       onDone={() => setSuccessOpen(false)}
-      title="Акт сверки отправлен"
-      message="Файл успешно отправлен клиенту. Клиент получит уведомление."
-      confirmLabel="Отлично"
+      title={t("manager.reconciliationStatementSent")}
+      message={t("manager.theFileWasSentToThe")}
+      confirmLabel={t("manager.great")}
     />
     </>
   );

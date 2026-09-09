@@ -1,3 +1,4 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { orderedSaleUnits, UNIT_CONFIG, getUnitMultiplier } from "../../../shared/appHelpers.js";
 
 export function storefrontUnitLabel(unit) {
@@ -12,6 +13,7 @@ export function StorefrontUnitChoice({
   onChange,
   compact = false,
 }) {
+  const { t } = useLocalization();
   const units = orderedSaleUnits(product);
   if (!units.length) return null;
 
@@ -21,7 +23,7 @@ export function StorefrontUnitChoice({
         units.length === 1 ? " is-single" : ""
       }`}
       role="group"
-      aria-label="Единица измерения"
+      aria-label={t("storefront.unitOfMeasure")}
       onClick={(event) => event.stopPropagation()}
     >
       {units.map((item) => {

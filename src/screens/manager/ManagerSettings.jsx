@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Раздел менеджера: настройки кабинета, уведомления и роли.
 import { useEffect, useState } from "react";
 import { api } from "../../serverApi";
@@ -7,6 +8,7 @@ import { appAlert } from "../../shared/AppModal";
 import { FREE_DELIVERY_MIN_TOTAL, PAID_DELIVERY_FEE } from "../../config/orderConfig";
 
 function ManagerPromotionPanel() {
+  const { t } = useLocalization();
   const [title, setTitle] = useState("Новость Clover");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
@@ -15,24 +17,24 @@ function ManagerPromotionPanel() {
     try {
       const result = await api.sendPromotion(title, body);
       await appAlert({
-        title: result.result?.enabled ? "Отправлено" : "Push не настроен",
+        title: result.result?.enabled ? t("manager.sent") : t("manager.pushIsNotConfigured"),
         message: result.result?.enabled
           ? `Отправлено: ${result.result.sent}`
-          : "Push пока не настроен на сервере.",
+          : t("manager.pushIsNotConfiguredOnThe"),
         tone: result.result?.enabled ? "success" : "warn",
       });
       setBody("");
     } catch (error) {
-      await appAlert({ title: "Ошибка отправки", message: error.message, tone: "danger" });
+      await appAlert({ title: t("manager.sendError"), message: error.message, tone: "danger" });
     } finally {
       setBusy(false);
     }
   };
   return (
     <div className="manager-contact-settings">
-      <h3>Push-уведомление об акции или новинке</h3>
-      <div className="form-grid"><label className="field">Заголовок<input value={title} onChange={(event) => setTitle(event.target.value)} /></label><label className="field field-wide">Текст<textarea rows="3" value={body} onChange={(event) => setBody(event.target.value)} /></label></div>
-      <div className="form-actions"><button className="primary-button" type="button" disabled={busy || !body.trim()} onClick={send}>Отправить подписанным клиентам</button></div>
+      <h3>{t("manager.pushAboutAPromoOrNew")}</h3>
+      <div className="form-grid"><label className="field">{t("shared.field.title")}<input value={title} onChange={(event) => setTitle(event.target.value)} /></label><label className="field field-wide">{t("manager.text19")}<textarea rows="3" value={body} onChange={(event) => setBody(event.target.value)} /></label></div>
+      <div className="form-actions"><button className="primary-button" type="button" disabled={busy || !body.trim()} onClick={send}>{t("manager.sendToSubscribedClients")}</button></div>
     </div>
   );
 }
@@ -42,6 +44,7 @@ function ToggleSetting({ title, description, value, onChange }) {
 }
 
 function ManagerNotificationSettings({ settings, set }) {
+  const { t } = useLocalization();
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -60,23 +63,23 @@ function ManagerNotificationSettings({ settings, set }) {
   const reasonRu = (channel, reason, error) => {
     const code = String(reason || error || "").trim();
     const map = {
-      smtp_not_configured: "SMTP не настроен в server/.env",
-      recipient_not_configured: "укажите email выше",
-      telegram_not_configured: "нет токена бота в .env или Chat ID",
-      telegram_unreachable: "нет доступа с DC до api.telegram.org (сеть/firewall)",
-      telegram_api_error: "ответ Telegram API с ошибкой",
-      telegram_send_failed: "ошибка отправки в Telegram",
-      push_not_configured: "нужны HTTPS и VAPID на сервере",
-      no_push_subscription: "установите PWA и разрешите уведомления",
-      disabled: "выключено тумблером",
+      smtp_not_configured: t("manager.smtpIsNotConfiguredInServer"),
+      recipient_not_configured: t("manager.enterTheEmailAbove"),
+      telegram_not_configured: t("manager.noBotTokenInEnvOr"),
+      telegram_unreachable: t("manager.noAccessFromTheDcTo"),
+      telegram_api_error: t("manager.telegramApiReturnedAnError"),
+      telegram_send_failed: t("manager.telegramSendError"),
+      push_not_configured: t("manager.httpsAndVapidAreRequiredOn"),
+      no_push_subscription: t("manager.installThePwaAndAllowNotifications"),
+      disabled: t("manager.turnedOffWithTheSwitch"),
     };
     if (map[code]) return map[code];
     if (/fetch failed|ETIMEDOUT|ENETUNREACH|AbortError/i.test(code)) {
-      return "нет доступа с DC до api.telegram.org (сеть/firewall)";
+      return t("manager.noAccessFromTheDcTo");
     }
     if (code) return code;
-    if (channel === "push") return "не отправлено (PWA-подписка не нужна для email)";
-    return "не отправлено";
+    if (channel === "push") return t("manager.notSentPwaSubscriptionIsNot");
+    return t("manager.notSent");
   };
 
   const test = async () => {
@@ -88,7 +91,7 @@ function ManagerNotificationSettings({ settings, set }) {
       const result = await api.testManagerNotifications();
       const delivery = result.result?.delivery || [];
       const parts = delivery.map((item) => {
-        const channel = item.channel === "email" ? "email" : item.channel === "telegram" ? "Telegram" : item.channel === "push" ? "push" : "канал";
+        const channel = item.channel === "email" ? "email" : item.channel === "telegram" ? "Telegram" : item.channel === "push" ? "push" : t("manager.channel");
         if (item.sent === true || Number(item.sent) > 0) return `${channel}: отправлено`;
         return `${channel}: ${reasonRu(item.channel, item.reason, item.error)}`;
       });
@@ -96,7 +99,7 @@ function ManagerNotificationSettings({ settings, set }) {
         parts.unshift("email: включите тумблер «Отправлять на email» и обновите страницу");
       }
       const emailOk = delivery.some((item) => item.channel === "email" && (item.sent === true || Number(item.sent) > 0));
-      const summary = parts.length ? parts.join("; ") : "Внутреннее уведомление создано. Внешние каналы пока выключены.";
+      const summary = parts.length ? parts.join("; ") : t("manager.anInternalNotificationWasCreatedExternal");
       setMessage(emailOk ? `Письмо ушло на ${status?.email?.recipient || settings.managerNotificationEmail || "указанный адрес"}. ${summary}` : summary);
       setStatus(result.status || null);
     } catch (error) {
@@ -108,41 +111,41 @@ function ManagerNotificationSettings({ settings, set }) {
 
   return (
     <div className="manager-contact-settings manager-notification-settings">
-      <h3>Уведомления менеджеру</h3>
-      <p>Новый заказ, изменение заказа, товар вне матрицы, запрос акта сверки, регистрация клиента и ошибки 1С.</p>
+      <h3>{t("manager.managerNotifications")}</h3>
+      <p>{t("manager.newOrderOrderChangeProductOutside")}</p>
       <div className="settings-grid">
-        <ToggleSetting title="Уведомления в Clover" description="Показывать новые события сразу в кабинете менеджера." value={settings.managerNotificationsEnabled !== false} onChange={(value) => set("managerNotificationsEnabled", value)} />
-        <ToggleSetting title="Новые заказы" description="Сообщать о каждом новом заказе клиента." value={settings.managerNotifyNewOrders !== false} onChange={(value) => set("managerNotifyNewOrders", value)} />
-        <ToggleSetting title="Изменения заказов" description="Сообщать, когда клиент меняет или удаляет новый заказ." value={settings.managerNotifyOrderChanges !== false} onChange={(value) => set("managerNotifyOrderChanges", value)} />
-        <ToggleSetting title="Товары вне матрицы" description="Отдельно сообщать о новой позиции, комментарии и фотографии." value={settings.managerNotifyCustomItems !== false} onChange={(value) => set("managerNotifyCustomItems", value)} />
-        <ToggleSetting title="Запросы актов сверки" description="Сообщать о новом запросе с выбранным периодом." value={settings.managerNotifyReconciliation !== false} onChange={(value) => set("managerNotifyReconciliation", value)} />
-        <ToggleSetting title="Новые регистрации" description="Сообщать о клиентах, ожидающих подтверждения менеджера." value={settings.managerNotifyRegistrations !== false} onChange={(value) => set("managerNotifyRegistrations", value)} />
-        <ToggleSetting title="Ошибки обмена с 1С" description="Сообщать о сбоях передачи и обработки заказов." value={settings.managerNotifyOneCErrors !== false} onChange={(value) => set("managerNotifyOneCErrors", value)} />
-        <ToggleSetting title="Push на устройства менеджера" description="Отправлять уведомления в установленную PWA Clover." value={settings.managerNotifyPush !== false} onChange={(value) => set("managerNotifyPush", value)} />
-        <ToggleSetting title="Отправлять на email" description="Письмо о новом заказе с полным составом для ручного ввода в 1С. Нужны SMTP в server/.env и адрес ниже." value={Boolean(settings.managerNotifyEmail)} onChange={(value) => set("managerNotifyEmail", value)} />
-        <ToggleSetting title="Отправлять в Telegram-бот" description="Токен хранится только в server/.env, Chat ID указывается ниже." value={Boolean(settings.managerNotifyTelegram)} onChange={(value) => set("managerNotifyTelegram", value)} />
+        <ToggleSetting title={t("manager.cloverNotifications")} description={t("manager.showNewEventsImmediatelyInThe")} value={settings.managerNotificationsEnabled !== false} onChange={(value) => set("managerNotificationsEnabled", value)} />
+        <ToggleSetting title={t("manager.newOrders")} description={t("manager.notifyAboutEveryNewClientOrder")} value={settings.managerNotifyNewOrders !== false} onChange={(value) => set("managerNotifyNewOrders", value)} />
+        <ToggleSetting title={t("manager.orderChanges")} description={t("manager.notifyWhenAClientChangesOr")} value={settings.managerNotifyOrderChanges !== false} onChange={(value) => set("managerNotifyOrderChanges", value)} />
+        <ToggleSetting title={t("manager.productsOutsideTheMatrix")} description={t("manager.notifySeparatelyAboutANewItem")} value={settings.managerNotifyCustomItems !== false} onChange={(value) => set("managerNotifyCustomItems", value)} />
+        <ToggleSetting title={t("manager.statementRequests")} description={t("manager.notifyAboutANewRequestWith")} value={settings.managerNotifyReconciliation !== false} onChange={(value) => set("managerNotifyReconciliation", value)} />
+        <ToggleSetting title={t("manager.newRegistrations")} description={t("manager.notifyAboutClientsWaitingForManager")} value={settings.managerNotifyRegistrations !== false} onChange={(value) => set("managerNotifyRegistrations", value)} />
+        <ToggleSetting title={t("manager.text9")} description={t("manager.notifyAboutOrderSendAndProcessing")} value={settings.managerNotifyOneCErrors !== false} onChange={(value) => set("managerNotifyOneCErrors", value)} />
+        <ToggleSetting title={t("manager.pushToManagerDevices")} description={t("manager.sendNotificationsToTheInstalledClover")} value={settings.managerNotifyPush !== false} onChange={(value) => set("managerNotifyPush", value)} />
+        <ToggleSetting title={t("manager.sendToEmail")} description={t("manager.anEmailAboutANewOrder")} value={Boolean(settings.managerNotifyEmail)} onChange={(value) => set("managerNotifyEmail", value)} />
+        <ToggleSetting title={t("manager.sendToTelegramBot")} description={t("manager.theTokenIsStoredOnlyIn")} value={Boolean(settings.managerNotifyTelegram)} onChange={(value) => set("managerNotifyTelegram", value)} />
       </div>
       <div className="form-grid" style={{ marginTop: 14 }}>
-        <label className="field">Email для уведомлений
-          <input type="email" value={settings.managerNotificationEmail || ""} placeholder="clover-order@mail.ru" onChange={(event) => set("managerNotificationEmail", event.target.value)} />
+        <label className="field">{t("manager.notificationEmail")
+          }<input type="email" value={settings.managerNotificationEmail || ""} placeholder="clover-order@mail.ru" onChange={(event) => set("managerNotificationEmail", event.target.value)} />
         </label>
-        <label className="field">Telegram Chat ID менеджера
-          <input value={settings.managerTelegramChatId || ""} placeholder="Например: 123456789" onChange={(event) => set("managerTelegramChatId", event.target.value.trim())} />
+        <label className="field">{t("manager.managerTelegramChatId")
+          }<input value={settings.managerTelegramChatId || ""} placeholder={t("manager.forExample123456789")} onChange={(event) => set("managerTelegramChatId", event.target.value.trim())} />
         </label>
       </div>
       <div className="notification-channel-status">
         <span className={status?.email?.configured && settings.managerNotifyEmail ? "badge green" : "badge yellow"}>
           Email: {settings.managerNotifyEmail
-            ? (status?.email?.configured ? "включён и готов" : status?.email?.smtpConfigured ? "включён, укажите адрес" : "включён, SMTP не настроен")
-            : (status?.email?.configured ? "готов, но выключен" : "выключен")}
+            ? (status?.email?.configured ? t("manager.enabledAndReady") : status?.email?.smtpConfigured ? t("manager.enabledEnterAnAddress") : t("manager.enabledSmtpIsNotConfigured"))
+            : (status?.email?.configured ? t("manager.readyButDisabled") : t("manager.off"))}
         </span>
-        <span className={status?.telegram?.configured ? "badge green" : "badge yellow"}>Telegram: {status?.telegram?.configured ? "готов" : status?.telegram?.tokenConfigured ? "укажите Chat ID" : "токен не настроен"}</span>
-        <span className={status?.push?.configured ? "badge green" : "badge yellow"}>Push: {status?.push?.configured ? "готов" : "после HTTPS и VAPID"}</span>
+        <span className={status?.telegram?.configured ? "badge green" : "badge yellow"}>Telegram: {status?.telegram?.configured ? t("manager.ready") : status?.telegram?.tokenConfigured ? t("manager.enterTheChatId") : t("manager.tokenIsNotConfigured")}</span>
+        <span className={status?.push?.configured ? "badge green" : "badge yellow"}>Push: {status?.push?.configured ? t("manager.ready") : t("manager.afterHttpsAndVapid")}</span>
       </div>
-      <p className="manager-contact-help">Токен Telegram-бота и SMTP-пароль не вводятся в браузере — они уже задаются в server/.env на этом ПК (позже будет отдельный локальный настройщик). Для письма достаточно тумблера «Отправлять на email» и адреса выше. Push для проверки не обязателен.</p>
+      <p className="manager-contact-help">{t("manager.theTelegramBotTokenAndSmtp")}</p>
       <div className="inline-actions">
-        <button className="primary-button" type="button" disabled={busy} onClick={test}>{busy ? "Проверяем…" : "Отправить тестовое уведомление"}</button>
-        <button className="secondary-button" type="button" disabled={busy} onClick={loadStatus}>Обновить статус</button>
+        <button className="primary-button" type="button" disabled={busy} onClick={test}>{busy ? t("manager.checking") : t("manager.sendATestNotification")}</button>
+        <button className="secondary-button" type="button" disabled={busy} onClick={loadStatus}>{t("manager.refreshStatus")}</button>
       </div>
       {message && <div className="request-photo-status">{message}</div>}
     </div>
@@ -150,54 +153,54 @@ function ManagerNotificationSettings({ settings, set }) {
 }
 
 export function DeliveryOneCSettings({ settings, set }) {
+  const { t } = useLocalization();
   const freeDeliveryMinTotal = FREE_DELIVERY_MIN_TOTAL.toLocaleString("ru-RU");
   const paidDeliveryFee = PAID_DELIVERY_FEE.toLocaleString("ru-RU");
 
   return (
     <div className="manager-contact-settings">
-      <h3>Номенклатура доставки в 1С</h3>
+      <h3>{t("manager.text32")}</h3>
       <p>
         Для заказов менее {freeDeliveryMinTotal} ₽ Clover добавляет доставку {paidDeliveryFee} ₽;
         от {freeDeliveryMinTotal} ₽ — бесплатно.
       </p>
       <div className="form-grid">
-        <label className="field" htmlFor="delivery-onec-name">
-          Наименование в 1С
-          <input
+        <label className="field" htmlFor="delivery-onec-name">{
+          t("manager.nameIn1c")
+          }<input
             id="delivery-onec-name"
             name="deliveryOneCName"
-            value={settings.deliveryOneCName ?? "Доставка"}
-            placeholder="Доставка"
+            value={settings.deliveryOneCName ?? t("checkout.delivery")}
+            placeholder={t("checkout.delivery")}
             onChange={(event) => set("deliveryOneCName", event.target.value)}
           />
         </label>
-        <label className="field" htmlFor="delivery-onec-code">
-          Код в 1С
-          <input
+        <label className="field" htmlFor="delivery-onec-code">{
+          t("manager.codeIn1c")
+          }<input
             id="delivery-onec-code"
             name="deliveryOneCCode"
             value={settings.deliveryOneCCode ?? ""}
-            placeholder="Например: НФ-000001"
+            placeholder={t("manager.forExampleNf000001")}
             spellCheck="false"
             onChange={(event) => set("deliveryOneCCode", event.target.value)}
           />
         </label>
-        <label className="field field-wide" htmlFor="delivery-onec-id">
-          ID в 1С
-          <input
+        <label className="field field-wide" htmlFor="delivery-onec-id">{
+          t("manager.idIn1c")
+          }<input
             id="delivery-onec-id"
             name="deliveryOneCId"
             value={settings.deliveryOneCId ?? ""}
-            placeholder="UUID номенклатуры"
+            placeholder={t("manager.nomenclatureUuid")}
             spellCheck="false"
             onChange={(event) => set("deliveryOneCId", event.target.value)}
           />
         </label>
       </div>
-      <p className="manager-contact-help">
-        Укажите UUID или код позиции доставки из 1С. Эти значения используются для
-        сопоставления служебной строки доставки при передаче заказа.
-      </p>
+      <p className="manager-contact-help">{
+        t("manager.enterTheUuidOrDeliveryItem")
+      }</p>
     </div>
   );
 }
@@ -218,6 +221,7 @@ function parseOptionalMoney(value) {
 }
 
 export function DeliveryZonesSettings({ settings, set }) {
+  const { t } = useLocalization();
   const zones = Array.isArray(settings.deliveryZones) ? settings.deliveryZones : [];
 
   const updateZones = (next) => set("deliveryZones", next);
@@ -249,7 +253,7 @@ export function DeliveryZonesSettings({ settings, set }) {
 
   return (
     <div className="manager-contact-settings">
-      <h3>Зоны доставки</h3>
+      <h3>{t("manager.deliveryZones")}</h3>
       <p>
         Для каждого адреса клиента можно выбрать зону. Пустые поля берут глобальные
         значения: бесплатно от {FREE_DELIVERY_MIN_TOTAL} ₽, доставка {PAID_DELIVERY_FEE} ₽.
@@ -260,7 +264,7 @@ export function DeliveryZonesSettings({ settings, set }) {
             <strong className="delivery-zone-title">{zone.name}</strong>
             <div className="delivery-zone-actions">
               <span className={zone.enabled === false ? "badge yellow" : "badge green"}>
-                {zone.enabled === false ? "Отключена" : "Активна"}
+                {zone.enabled === false ? t("manager.disabled") : t("manager.active2")}
               </span>
               <button
                 type="button"
@@ -268,24 +272,24 @@ export function DeliveryZonesSettings({ settings, set }) {
                 data-zone-id={zone.id}
                 onClick={() => toggleZone(zone.id)}
               >
-                {zone.enabled === false ? "Включить" : "Отключить"}
+                {zone.enabled === false ? t("shared.action.enable") : t("shared.action.disable")}
               </button>
             </div>
           </div>
           <div className="form-grid delivery-zone-fields">
-            <label className="field" htmlFor={`delivery-zone-name-${zone.id}`}>
-              Название
-              <input
+            <label className="field" htmlFor={`delivery-zone-name-${zone.id}`}>{
+              t("shared.field.name")
+              }<input
                 id={`delivery-zone-name-${zone.id}`}
                 name={`deliveryZoneName-${zone.id}`}
                 value={zone.name ?? ""}
-                placeholder="Например: Мурино"
+                placeholder={t("manager.forExampleMurino")}
                 onChange={(event) => patchZone(zone.id, { name: event.target.value })}
               />
             </label>
-            <label className="field" htmlFor={`delivery-zone-free-${zone.id}`}>
-              Бесплатная доставка от, ₽
-              <input
+            <label className="field" htmlFor={`delivery-zone-free-${zone.id}`}>{
+              t("manager.freeDeliveryFrom")
+              }<input
                 id={`delivery-zone-free-${zone.id}`}
                 name={`deliveryZoneFreeFrom-${zone.id}`}
                 type="number"
@@ -299,9 +303,9 @@ export function DeliveryZonesSettings({ settings, set }) {
               />
               <small>По умолчанию: {FREE_DELIVERY_MIN_TOTAL} ₽</small>
             </label>
-            <label className="field" htmlFor={`delivery-zone-fee-${zone.id}`}>
-              Стоимость доставки, ₽
-              <input
+            <label className="field" htmlFor={`delivery-zone-fee-${zone.id}`}>{
+              t("manager.deliveryFee")
+              }<input
                 id={`delivery-zone-fee-${zone.id}`}
                 name={`deliveryZoneFee-${zone.id}`}
                 type="number"
@@ -318,18 +322,18 @@ export function DeliveryZonesSettings({ settings, set }) {
           </div>
         </div>
       ))}
-      <button type="button" className="secondary-button" onClick={addZone}>
-        Добавить зону
-      </button>
-      <p className="manager-contact-help">
-        Изменения сохраняются вместе с настройками кабинета. Удаление зон не
-        выполняется — отключите зону, если она больше не нужна.
-      </p>
+      <button type="button" className="secondary-button" onClick={addZone}>{
+        t("manager.addZone")
+      }</button>
+      <p className="manager-contact-help">{
+        t("manager.changesAreSavedWithCabinetSettings")
+      }</p>
     </div>
   );
 }
 
 export function ManagerSettings({ settings, setSettings, authUser }) {
+  const { t } = useLocalization();
   const isAdmin = authUser?.role === "admin";
   const set = (key, value) => setSettings((current) => ({ ...current, [key]: value }));
 
@@ -337,40 +341,36 @@ export function ManagerSettings({ settings, setSettings, authUser }) {
     <section className="panel" style={{ marginTop: 0 }}>
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Правила</p>
-          <h2>Настройки кабинета</h2>
-          <p>Изменения сохраняются автоматически и применяются сразу.</p>
+          <p className="eyebrow">{t("manager.rules")}</p>
+          <h2>{t("manager.cabinetSettings")}</h2>
+          <p>{t("manager.changesAreSavedAutomaticallyAndApply")}</p>
         </div>
       </div>
 
       <details className="manager-help-details">
-        <summary>Автоматическое сопоставление номенклатуры</summary>
-        <p>
-          Clover сохраняет только точные совпадения и несколько наиболее похожих
-          вариантов для несвязанных товаров. Название на сайте может отличаться от 1С:
-          в заказ передаётся ID 1С. Полная номенклатура и база клиентов в Clover не
-          сохраняются. Неоднозначные варианты выбирает менеджер во вкладке «Товары».
-        </p>
+        <summary>{t("manager.automaticNomenclatureMatching")}</summary>
+        <p>{
+          t("manager.cloverStoresOnlyExactMatchesAnd")
+        }</p>
       </details>
 
       <div className="manager-contact-settings">
-        <h3>Контакты менеджера для клиентов</h3>
-        <p>
-          В личном кабинете появится кнопка «Ваш менеджер». При наведении
-          или нажатии клиент увидит ФИО, телефон и кнопки связи.
-        </p>
+        <h3>{t("manager.managerContactsForClients")}</h3>
+        <p>{
+          t("manager.theCabinetWillShowAYour")
+        }</p>
         <div className="form-grid">
-          <label className="field">
-            ФИО менеджера
-            <input
+          <label className="field">{
+            t("manager.managerFullName")
+            }<input
               value={settings.managerFullName || ""}
-              placeholder="Например: Иванов Иван Иванович"
+              placeholder={t("manager.forExampleIvanovIvanIvanovich")}
               onChange={(event) => set("managerFullName", event.target.value)}
             />
           </label>
-          <label className="field">
-            Телефон менеджера
-            <input
+          <label className="field">{
+            t("manager.managerPhone")
+            }<input
               inputMode="tel"
               value={formatRussianPhone(settings.managerPhone || "")}
               onFocus={(event) => {
@@ -385,27 +385,26 @@ export function ManagerSettings({ settings, setSettings, authUser }) {
               placeholder="+7 (___) ___-__-__"
             />
           </label>
-          <label className="field">
-            Ссылка на профиль MAX
-            <input
+          <label className="field">{
+            t("manager.maxProfileLink")
+            }<input
               value={settings.managerMax || ""}
-              placeholder="https://max.ru/u/... или max.ru/username"
+              placeholder={t("manager.httpsMaxRuUOrMax")}
               onChange={(event) => set("managerMax", event.target.value)}
             />
           </label>
-          <label className="field">
-            Telegram менеджера — необязательно
-            <input
+          <label className="field">{
+            t("manager.managerTelegramOptional")
+            }<input
               value={settings.managerTelegram || ""}
-              placeholder="@username или ссылка t.me"
+              placeholder={t("manager.usernameOrTMeLink")}
               onChange={(event) => set("managerTelegram", event.target.value)}
             />
           </label>
         </div>
-        <p className="manager-contact-help">
-          Для MAX вставьте ссылку на профиль, скопированную в приложении MAX.
-          Telegram показывается только после заполнения имени пользователя или ссылки.
-        </p>
+        <p className="manager-contact-help">{
+          t("manager.forMaxPasteTheProfileLink")
+        }</p>
       </div>
 
       <DeliveryOneCSettings settings={settings} set={set} />
@@ -414,23 +413,23 @@ export function ManagerSettings({ settings, setSettings, authUser }) {
       <PushSettings />
 
       <div className="settings-grid">
-        <ToggleSetting title="Показывать цены" description="Клиент увидит цены, заполненные в карточках товаров." value={settings.showPrices} onChange={(value) => set("showPrices", value)} />
-        <ToggleSetting title="Товары вне матрицы" description="Разрешить клиенту запрашивать отсутствующие позиции." value={settings.allowCustomItems} onChange={(value) => set("allowCustomItems", value)} />
-        <ToggleSetting title="Редактирование новых заказов" description="Клиент может менять заказ до принятия менеджером." value={settings.allowClientEdit} onChange={(value) => set("allowClientEdit", value)} />
-        <ToggleSetting title="Удаление новых заказов" description="Клиент может отправить заказ «Новый» в корзину менеджера." value={settings.allowClientDelete} onChange={(value) => set("allowClientDelete", value)} />
-        <ToggleSetting title="Повтор заказа" description="Показывать кнопку для быстрого повторения заказа." value={settings.allowRepeatOrder} onChange={(value) => set("allowRepeatOrder", value)} />
-        <ToggleSetting title="Обязательный профиль" description="Запретить заказ без данных организации." value={settings.requireProfile} onChange={(value) => set("requireProfile", value)} />
-        <ToggleSetting title="Обязательный адрес" description="Запретить заказ без сохранённого адреса." value={settings.requireAddress} onChange={(value) => set("requireAddress", value)} />
-        <ToggleSetting title="Корзина менеджера" description="Менеджер может перемещать заказы в корзину до передачи в 1С и восстанавливать их." value={settings.managerCanDeleteOrders} onChange={(value) => set("managerCanDeleteOrders", value)} />
-        <ToggleSetting title="Избранные товары" description="Клиент может отмечать часто используемые товары." value={settings.showFavorites} onChange={(value) => set("showFavorites", value)} />
-        <ToggleSetting title="Автосохранение черновика" description="Незавершённый новый заказ сохраняется в браузере." value={settings.enableDrafts} onChange={(value) => set("enableDrafts", value)} />
+        <ToggleSetting title={t("manager.showPrices")} description={t("manager.theClientWillSeePricesFilled")} value={settings.showPrices} onChange={(value) => set("showPrices", value)} />
+        <ToggleSetting title={t("manager.productsOutsideTheMatrix")} description={t("manager.allowTheClientToRequestMissing")} value={settings.allowCustomItems} onChange={(value) => set("allowCustomItems", value)} />
+        <ToggleSetting title={t("manager.editingNewOrders")} description={t("manager.theClientCanChangeTheOrder")} value={settings.allowClientEdit} onChange={(value) => set("allowClientEdit", value)} />
+        <ToggleSetting title={t("manager.deletingNewOrders")} description={t("manager.theClientCanMoveANew")} value={settings.allowClientDelete} onChange={(value) => set("allowClientDelete", value)} />
+        <ToggleSetting title={t("client.order.repeat")} description={t("manager.showAButtonForQuicklyRepeating")} value={settings.allowRepeatOrder} onChange={(value) => set("allowRepeatOrder", value)} />
+        <ToggleSetting title={t("manager.requiredProfile")} description={t("manager.blockOrdersWithoutOrganizationDetails")} value={settings.requireProfile} onChange={(value) => set("requireProfile", value)} />
+        <ToggleSetting title={t("manager.requiredAddress")} description={t("manager.blockOrdersWithoutASavedAddress")} value={settings.requireAddress} onChange={(value) => set("requireAddress", value)} />
+        <ToggleSetting title={t("manager.managerTrash")} description={t("manager.aManagerCanMoveOrdersTo")} value={settings.managerCanDeleteOrders} onChange={(value) => set("managerCanDeleteOrders", value)} />
+        <ToggleSetting title={t("manager.favoriteProducts")} description={t("manager.theClientCanMarkFrequentlyUsed")} value={settings.showFavorites} onChange={(value) => set("showFavorites", value)} />
+        <ToggleSetting title={t("manager.draftAutosave")} description={t("manager.anUnfinishedNewOrderIsSaved")} value={settings.enableDrafts} onChange={(value) => set("enableDrafts", value)} />
       </div>
       <ManagerPromotionPanel />
       <PasswordSecurityPanel
         allowPasswordChange={!isAdmin}
         passwordChangeHint={
           isAdmin
-            ? "Смену пароля администратора выполняйте в «Ещё → Доступы → Менеджеры» → ваша карточка → «Управление». Здесь можно добавить Face ID, отпечаток или завершить другие сессии."
+            ? t("manager.changeTheAdministratorPasswordInMore")
             : ""
         }
       />

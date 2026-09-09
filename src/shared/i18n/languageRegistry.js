@@ -92,3 +92,29 @@ export function getEnabledLocales(enabledLanguages) {
   }
   return enabled;
 }
+
+/** Internal non-RU codes stored in translation_values.language_code. */
+export const TARGET_INTERNAL_LOCALES = Object.freeze([
+  "en",
+  "uz",
+  "ky",
+  "tg",
+  "zh-CN",
+  "ar",
+]);
+
+/**
+ * Validation boundary: supported public or internal target locale.
+ * Never folds unknown/fr/ru into a usable target.
+ */
+export function isSupportedTargetLocale(value) {
+  if (typeof value !== "string") return false;
+  if (!isSupportedPublicLocale(value)) return false;
+  const internal = recognizedInternalCode(value);
+  return TARGET_INTERNAL_LOCALES.includes(internal);
+}
+
+export function canonicalizeTargetLocale(value) {
+  if (!isSupportedTargetLocale(value)) return "";
+  return recognizedInternalCode(value);
+}

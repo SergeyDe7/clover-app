@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Календарь даты доставки: воскресенья и слишком ранние дни недоступны.
 import { useMemo, useState } from "react";
 import {
@@ -8,7 +9,9 @@ import {
   validateDeliveryDate,
 } from "../../shared/deliveryDateRules";
 
-const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+function weekdayLabels(t) {
+  return [t("client.mo"), t("client.tu"), t("client.we"), t("client.th"), t("client.fr"), t("client.sa"), t("client.su")];
+}
 
 function monthTitle(year, monthIndex) {
   const label = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" }).format(
@@ -36,6 +39,7 @@ function buildMonthCells(year, monthIndex) {
 }
 
 export function DeliveryDateCalendar({ value, earliestIso, onPick }) {
+  const { t } = useLocalization();
   const initial = parseLocalIsoDate(value) || parseLocalIsoDate(earliestIso) || new Date();
   const [cursor, setCursor] = useState({
     year: initial.getFullYear(),
@@ -66,20 +70,20 @@ export function DeliveryDateCalendar({ value, earliestIso, onPick }) {
   return (
     <div className="delivery-calendar">
       <div className="delivery-calendar-nav">
-        <button type="button" className="header-button" disabled={!canGoPrev} onClick={() => shiftMonth(-1)} aria-label="Предыдущий месяц">
+        <button type="button" className="header-button" disabled={!canGoPrev} onClick={() => shiftMonth(-1)} aria-label={t("client.previousMonth")}>
           ←
         </button>
         <strong>{monthTitle(cursor.year, cursor.month)}</strong>
-        <button type="button" className="header-button" onClick={() => shiftMonth(1)} aria-label="Следующий месяц">
+        <button type="button" className="header-button" onClick={() => shiftMonth(1)} aria-label={t("client.nextMonth")}>
           →
         </button>
       </div>
       <div className="delivery-calendar-weekdays" aria-hidden="true">
-        {WEEKDAYS.map((label) => (
-          <span key={label} className={label === "Вс" ? "is-sunday-label" : undefined}>{label}</span>
+        {weekdayLabels(t).map((label, index) => (
+          <span key={index} className={index === 6 ? "is-sunday-label" : undefined}>{label}</span>
         ))}
       </div>
-      <div className="delivery-calendar-grid" role="grid" aria-label="Календарь доставки">
+      <div className="delivery-calendar-grid" role="grid" aria-label={t("client.deliveryCalendar")}>
         {cells.map((date, index) => {
           if (!date) {
             return <span key={`e-${index}`} className="delivery-calendar-cell is-empty" />;
@@ -126,9 +130,9 @@ export function DeliveryDateCalendar({ value, earliestIso, onPick }) {
           );
         })}
       </div>
-      <p className="delivery-calendar-note muted small">
-        Воскресенье недоступно для доставки.
-      </p>
+      <p className="delivery-calendar-note muted small">{
+        t("client.sundayIsNotAvailableForDelivery")
+      }</p>
     </div>
   );
 }

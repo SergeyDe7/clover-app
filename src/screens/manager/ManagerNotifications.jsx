@@ -1,15 +1,16 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Раздел менеджера: центр уведомлений.
 import { writeManagerMoreTab, formatDateTime } from "../../shared/appHelpers";
 
 const MANAGER_NOTIFICATION_META = {
-  new_order: { label: "Новый заказ", tab: "orders" },
-  order_changed: { label: "Заказ изменён", tab: "orders" },
-  order_deleted: { label: "Заказ удалён", tab: "orders" },
-  custom_item: { label: "Нужен новый товар", tab: "orders" },
-  reconciliation_request: { label: "Акт сверки", tab: "acts" },
-  client_registration: { label: "Новый клиент", tab: "clients" },
+  new_order: { labelKey: "client.order.new", tab: "orders" },
+  order_changed: { labelKey: "manager.orderChanged", tab: "orders" },
+  order_deleted: { labelKey: "manager.orderDeleted", tab: "orders" },
+  custom_item: { labelKey: "manager.newProductNeeded", tab: "orders" },
+  reconciliation_request: { labelKey: "client.nav.reconciliation", tab: "acts" },
+  client_registration: { labelKey: "manager.newClient", tab: "clients" },
   onec_error: { label: "Не удалось передать в 1С", tab: "exchange" },
-  test: { label: "Тест", tab: "more", moreTab: "settings" },
+  test: { labelKey: "manager.test", tab: "more", moreTab: "settings" },
 };
 
 export function managerNotificationTab(notification) {
@@ -46,7 +47,7 @@ export function notificationOrderDateTime(orderDate, createdAt) {
 }
 
 /** Разбор title/body уведомления о заказе в поля шаблона. */
-export function parseManagerNotification(item) {
+export function parseManagerNotification(item, t) {
   const title = String(item?.title || "").trim();
   const body = String(item?.body || "").trim();
   const type = String(item?.type || "");
@@ -67,7 +68,7 @@ export function parseManagerNotification(item) {
       deliveryDate: labeledDelivery,
       orderDate: notificationOrderDateTime(labeledOrderDate, item?.createdAt),
       orderNumber: labeledNumber.replace(/^№\s*/, ""),
-      detail: changed ? "Изменён" : "",
+      detail: changed ? (t ? t("manager.changed") : t("manager.changed")) : "",
       headline: "",
       hideFooterTime: true,
     };
@@ -147,21 +148,22 @@ export function ManagerOrderSummaryLines({
   detail = "",
   className = "",
 }) {
-  return (
+  const { t } = useLocalization();
+    return (
     <div className={["manager-order-summary", className].filter(Boolean).join(" ")}>
       {clientName ? <div className="manager-order-client manager-notification-client">{clientName}</div> : null}
       {detail ? <div className="manager-order-summary-line muted">{detail}</div> : null}
       {amount !== "" && amount != null ? (
-        <div className="manager-order-summary-line manager-order-sum-line">Сумма: {amount}</div>
+        <div className="manager-order-summary-line manager-order-sum-line">{t("shared.amount")}: {amount}</div>
       ) : null}
       {positions !== "" && positions != null ? (
-        <div className="manager-order-summary-line">Кол-во позиций: {positions}</div>
+        <div className="manager-order-summary-line">{t("shared.numberOfItems")}: {positions}</div>
       ) : null}
       {deliveryDate !== "" && deliveryDate != null ? (
-        <div className="manager-order-summary-line">Дата доставки: {deliveryDate}</div>
+        <div className="manager-order-summary-line">{t("checkout.deliveryDate")}: {deliveryDate}</div>
       ) : null}
       {orderDate !== "" && orderDate != null ? (
-        <div className="manager-order-summary-line">Дата заказа: {orderDate}</div>
+        <div className="manager-order-summary-line">{t("shared.orderDate")}: {orderDate}</div>
       ) : null}
       {orderNumber !== "" && orderNumber != null ? (
         <div className="manager-order-summary-line manager-order-number">№ {orderNumber}</div>
@@ -171,8 +173,10 @@ export function ManagerOrderSummaryLines({
 }
 
 function NotificationCard({ item, onOpen, onRead }) {
-  const parsed = parseManagerNotification(item);
-  const label = MANAGER_NOTIFICATION_META[item.type]?.label || "Событие";
+  const { t } = useLocalization();
+  const parsed = parseManagerNotification(item, t);
+  const meta = MANAGER_NOTIFICATION_META[item.type];
+  const label = meta?.labelKey ? t(meta.labelKey) : (meta?.label || "Событие");
   const hasOrderSummary = Boolean(
     parsed.clientName || parsed.amount || parsed.positions || parsed.deliveryDate || parsed.orderDate || parsed.orderNumber
   );
@@ -203,14 +207,15 @@ function NotificationCard({ item, onOpen, onRead }) {
         )}
       </div>
       <div className="manager-notification-actions">
-        <button className="primary-button" type="button" onClick={() => onOpen(item)}>Открыть</button>
-        <button className="secondary-button" type="button" onClick={() => onRead(item)}>Прочитано</button>
+        <button className="primary-button" type="button" onClick={() => onOpen(item)}>{t("shared.action.open")}</button>
+        <button className="secondary-button" type="button" onClick={() => onRead(item)}>{t("manager.read")}</button>
       </div>
     </article>
   );
 }
 
 export function ManagerNotificationBell({ notifications = [], open, onToggle, onOpen, onRead, onReadAll }) {
+  const { t } = useLocalization();
   const unread = notifications.filter((item) => !item.readAt);
   return (
     <div className="manager-bell">
@@ -218,11 +223,11 @@ export function ManagerNotificationBell({ notifications = [], open, onToggle, on
         className="secondary-button manager-bell-trigger"
         type="button"
         aria-expanded={open}
-        aria-label={unread.length ? `Уведомления: ${unread.length}` : "Уведомления"}
+        aria-label={unread.length ? `Уведомления: ${unread.length}` : t("manager.notifications.title")}
         onClick={onToggle}
       >
-        <span className="manager-bell-label-full">Уведомления</span>
-        <span className="manager-bell-label-short">Увед.</span>
+        <span className="manager-bell-label-full">{t("manager.notifications.title")}</span>
+        <span className="manager-bell-label-short">{t("manager.notif")}</span>
         {unread.length > 0 && <span className="manager-bell-count">{unread.length}</span>}
       </button>
       {open && (
@@ -230,9 +235,9 @@ export function ManagerNotificationBell({ notifications = [], open, onToggle, on
           <div className="manager-notification-header">
             <strong>Уведомления{unread.length ? ` · ${unread.length}` : ""}</strong>
             {unread.length > 0 && (
-              <button className="secondary-button" type="button" onClick={onReadAll}>
-                Всё прочитано
-              </button>
+              <button className="secondary-button" type="button" onClick={onReadAll}>{
+                t("manager.markAllRead")
+              }</button>
             )}
           </div>
           {unread.length ? (
@@ -247,7 +252,7 @@ export function ManagerNotificationBell({ notifications = [], open, onToggle, on
               ))}
             </div>
           ) : (
-            <div className="empty-box manager-notification-empty">Новых уведомлений нет.</div>
+            <div className="empty-box manager-notification-empty">{t("manager.noNewNotifications")}</div>
           )}
         </div>
       )}

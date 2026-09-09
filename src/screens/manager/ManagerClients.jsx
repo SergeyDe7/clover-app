@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Раздел менеджера: клиенты, матрицы товаров и связи с 1С.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -84,6 +85,7 @@ function generateAccessPassword(length = 10) {
 }
 
 function OneCClientPicker({ client, link, onChange }) {
+  const { t } = useLocalization();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState(client.companyName || "");
   const [items, setItems] = useState([]);
@@ -155,20 +157,20 @@ function OneCClientPicker({ client, link, onChange }) {
       <div className="one-c-link-editor-head">
         <div>
           <span className={link.oneCId ? "badge green" : "badge yellow"}>
-            {link.oneCId ? "Связан с 1С" : "Будет определён при заказе"}
+            {link.oneCId ? t("manager.linkedTo1c") : t("manager.willBeSetWhenOrdering")}
           </span>
           <p className="muted small" style={{ marginTop: 8 }}>
             {link.oneCId
-              ? `${link.oneCName || "Контрагент 1С"} · ${link.oneCCode || "без кода"}`
-              : "Clover передаст название, телефон и email. Если 1С вернёт ID контрагента, связь сохранится автоматически."}
+              ? `${link.oneCName || t("manager.text20")} · ${link.oneCCode || "без кода"}`
+              : t("manager.cloverWillSendTheNamePhone")}
           </p>
         </div>
         <div className="inline-actions">
           <button className="secondary-button" type="button" onClick={loadCandidates}>
-            {link.oneCId ? "Изменить контрагента" : "Выбрать контрагента 1С"}
+            {link.oneCId ? t("manager.changeCounterparty") : t("manager.chooseA1cCounterparty")}
           </button>
           {link.oneCId && (
-            <button className="secondary-button" type="button" onClick={clearLink}>Убрать связь</button>
+            <button className="secondary-button" type="button" onClick={clearLink}>{t("manager.unlink")}</button>
           )}
         </div>
       </div>
@@ -179,7 +181,7 @@ function OneCClientPicker({ client, link, onChange }) {
             <input
               type="search"
               value={search}
-              placeholder="Название, ИНН, телефон, email или код"
+              placeholder={t("manager.nameTaxIdPhoneEmailOr")}
               onChange={(event) => setSearch(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -189,9 +191,9 @@ function OneCClientPicker({ client, link, onChange }) {
               }}
             />
             <button className="secondary-button" type="button" disabled={loading} onClick={runSearch}>
-              {loading ? "Поиск..." : "Найти"}
+              {loading ? t("manager.search.ellipsis") : t("shared.action.find")}
             </button>
-            <button className="secondary-button" type="button" onClick={() => setOpen(false)}>Закрыть</button>
+            <button className="secondary-button" type="button" onClick={() => setOpen(false)}>{t("shared.action.close")}</button>
           </div>
           {error && <div className="sync-error">{error}</div>}
           <div className="one-c-products-list one-c-picker-list">
@@ -213,15 +215,15 @@ function OneCClientPicker({ client, link, onChange }) {
                     disabled={loading || Boolean(linkedElsewhere)}
                     onClick={() => selectClient(item)}
                   >
-                    {linkedToCurrent ? "Выбрано" : linkedElsewhere ? "Уже связан" : "Выбрать"}
+                    {linkedToCurrent ? t("manager.selected") : linkedElsewhere ? t("manager.alreadyLinked") : t("shared.action.choose")}
                   </button>
                 </article>
               );
             })}
             {!loading && !items.length && (
-              <div className="empty-box">
-                Контрагент ещё не загружен. Заказ всё равно передаст данные клиента в 1С, а точная связь сохранится автоматически после подтверждения 1С.
-              </div>
+              <div className="empty-box">{
+                t("manager.theCounterpartyIsNotLoadedYet")
+              }</div>
             )}
           </div>
         </div>
@@ -238,7 +240,7 @@ export function normalizeManagerClientAddresses(addresses = []) {
         if (!address) return null;
         return {
           id: `legacy-address-${index}`,
-          label: index === 0 ? "Основной адрес" : `Адрес ${index + 1}`,
+          label: index === 0 ? "Основной" : `Адрес ${index + 1}`,
           address,
           isDefault: index === 0,
           deliveryZoneId: "",
@@ -304,6 +306,7 @@ function ManagerClientEditor({
   onClose,
   deliveryZones = [],
 }) {
+  const { t } = useLocalization();
   const [form, setForm] = useState(() => createManagerClientForm(client));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -380,7 +383,7 @@ function ManagerClientEditor({
               {
                 id: "contact-primary",
                 name: current.contactName || "",
-                label: "Основной",
+                label: t("shared.address.primary"),
                 phone: current.phone || "",
                 isPrimary: true,
               },
@@ -443,15 +446,15 @@ function ManagerClientEditor({
     }));
 
     if (!companyName && !contactName) {
-      setError("Укажите название компании или имя клиента.");
+      setError(t("manager.enterTheCompanyNameOrThe"));
       return;
     }
     if (!email) {
-      setError("Укажите email клиента.");
+      setError(t("manager.enterTheClientEmail"));
       return;
     }
     if (addresses.some((item) => !item.label || !item.address)) {
-      setError("Заполните название и полный адрес во всех строках.");
+      setError(t("manager.fillInTheNameAndFull"));
       return;
     }
 
@@ -469,7 +472,7 @@ function ManagerClientEditor({
           isPrimary: false,
           label:
             !item.label || item.label === "Основной" || item.label === "Дополнительный"
-              ? "Дополнительный"
+              ? t("shared.address.extra")
               : item.label,
         }));
       const contacts = normalizeProfileContacts({
@@ -483,7 +486,7 @@ function ManagerClientEditor({
               existingContacts.find((item) => item.isPrimary)?.label &&
               existingContacts.find((item) => item.isPrimary)?.label !== "Дополнительный"
                 ? existingContacts.find((item) => item.isPrimary).label
-                : "Основной",
+                : t("shared.address.primary"),
             phone,
             isPrimary: true,
           },
@@ -501,7 +504,7 @@ function ManagerClientEditor({
         addresses,
         managerNote,
       });
-      setMessage("Данные клиента сохранены в Clover.");
+      setMessage(t("manager.clientDetailsWereSavedInClover"));
       await onReload();
     } catch (saveError) {
       setError(saveError.message || "Не удалось сохранить данные клиента.");
@@ -514,8 +517,8 @@ function ManagerClientEditor({
     const password = passwordDraft.trim();
     if (password.length < 6) {
       await appAlert({
-        title: "Короткий пароль",
-        message: "Пароль должен быть не короче 6 символов.",
+        title: t("manager.passwordTooShort"),
+        message: t("shared.passwordMustBeAtLeast6"),
         tone: "warn",
       });
       return;
@@ -541,43 +544,43 @@ function ManagerClientEditor({
     <section className="client-profile-panel" id={`client-profile-${client.id}`}>
       <div className="client-profile-panel-head">
         <div>
-          <p className="eyebrow">Профиль</p>
-          <h3>Данные клиента</h3>
-          <p className="muted small">
-            Телефон, email, контрагент 1С, адреса и заметка менеджера
-          </p>
+          <p className="eyebrow">{t("client.nav.profile")}</p>
+          <h3>{t("manager.clientDetails")}</h3>
+          <p className="muted small">{
+            t("manager.phoneEmail1cCounterpartyAddressesAnd")
+          }</p>
         </div>
         {onClose && (
-          <button className="secondary-button" type="button" onClick={onClose}>
-            Закрыть
-          </button>
+          <button className="secondary-button" type="button" onClick={onClose}>{
+            t("shared.action.close")
+          }</button>
         )}
       </div>
       <div className="form-grid" style={{ marginTop: 14 }}>
-        <label className="field">
-          Компания или торговая точка
-          <input
+        <label className="field">{
+          t("manager.companyOrStore")
+          }<input
             value={form.companyName}
             onChange={(event) => setProfileField("companyName", event.target.value)}
           />
         </label>
-        <label className="field">
-          Контактное лицо
-          <input
+        <label className="field">{
+          t("auth.register.contact")
+          }<input
             value={form.contactName}
             onChange={(event) => setProfileField("contactName", event.target.value)}
           />
         </label>
-        <label className="field">
-          Телефон
-          <input
+        <label className="field">{
+          t("auth.register.phone")
+          }<input
             value={form.phone}
             onChange={(event) => setProfileField("phone", event.target.value)}
           />
         </label>
-        <label className="field">
-          Email для входа клиента
-          <input
+        <label className="field">{
+          t("manager.clientSignInEmail")
+          }<input
             type="email"
             value={form.email}
             onChange={(event) => setProfileField("email", event.target.value)}
@@ -586,11 +589,10 @@ function ManagerClientEditor({
       </div>
 
       <div style={{ marginTop: 16 }}>
-        <strong>Контрагент 1С</strong>
-        <p className="muted small" style={{ marginTop: 4 }}>
-          Нужен, чтобы заказы этого клиента создавались в 1С. Для заказов с сайта
-          без регистрации используется служебный контрагент витрины.
-        </p>
+        <strong>{t("manager.text20")}</strong>
+        <p className="muted small" style={{ marginTop: 4 }}>{
+          t("manager.requiredSoThisClientSOrders")
+        }</p>
         <OneCClientPicker
           client={client}
           link={link || EMPTY_LINK}
@@ -601,15 +603,15 @@ function ManagerClientEditor({
       <div className="profile-contacts-block" style={{ marginTop: 14 }}>
         <div className="profile-contacts-head">
           <div>
-            <strong>Доп. номера</strong>
+            <strong>{t("manager.extraNumbers")}</strong>
             <p className="muted small">
               Кроме основного телефона выше можно добавить ещё номера для связи. До {MAX_PROFILE_CONTACTS} контактов всего.
             </p>
           </div>
           {form.contacts.length < MAX_PROFILE_CONTACTS ? (
-            <button className="secondary-button" type="button" onClick={addExtraPhone}>
-              + Доп. номер
-            </button>
+            <button className="secondary-button" type="button" onClick={addExtraPhone}>{
+              t("manager.extraNumber")
+            }</button>
           ) : null}
         </div>
         {extraClientContacts(form.contacts).length ? (
@@ -617,29 +619,29 @@ function ManagerClientEditor({
             {extraClientContacts(form.contacts).map((item, index) => (
               <div className="profile-contact-card" key={item.id || `${item.phone}-${index}`}>
                 <div className="profile-contact-card-top">
-                  <span className="badge yellow">{item.label || "Дополнительный"}</span>
+                  <span className="badge yellow">{item.label || t("shared.address.extra")}</span>
                   <button
                     className="danger-button"
                     type="button"
                     onClick={() => removeExtraContact(item.id)}
-                  >
-                    Удалить
-                  </button>
+                  >{
+                    t("shared.action.delete")
+                  }</button>
                 </div>
                 <div className="form-grid">
-                  <label className="field">
-                    Подпись
-                    <input
+                  <label className="field">{
+                    t("manager.label")
+                    }<input
                       value={item.name || ""}
-                      placeholder="Например: склад, бухгалтер"
+                      placeholder={t("manager.forExampleWarehouseAccountant")}
                       onChange={(event) =>
                         updateExtraContact(item.id, { name: event.target.value })
                       }
                     />
                   </label>
-                  <label className="field">
-                    Телефон
-                    <input
+                  <label className="field">{
+                    t("auth.register.phone")
+                    }<input
                       type="tel"
                       inputMode="tel"
                       autoComplete="tel"
@@ -663,46 +665,46 @@ function ManagerClientEditor({
             ))}
           </div>
         ) : (
-          <p className="muted small" style={{ marginTop: 8 }}>
-            Дополнительных номеров пока нет.
-          </p>
+          <p className="muted small" style={{ marginTop: 8 }}>{
+            t("manager.noExtraNumbersYet")
+          }</p>
         )}
       </div>
 
       <div className="manager-client-addresses">
         <div className="manager-client-addresses-heading">
-          <strong>Адреса доставки</strong>
-          <button className="secondary-button" type="button" onClick={addAddress}>
-            + Добавить адрес
-          </button>
+          <strong>{t("manager.deliveryAddresses")}</strong>
+          <button className="secondary-button" type="button" onClick={addAddress}>{
+            t("client.action.addAddress")
+          }</button>
         </div>
         {form.addresses.map((item) => (
           <div className="manager-client-address-row" key={item.id}>
-            <label className="field">
-              Название
-              <input
+            <label className="field">{
+              t("shared.field.name")
+              }<input
                 value={item.label}
-                placeholder="Например: Основной магазин"
+                placeholder={t("manager.forExampleMainStore")}
                 onChange={(event) => updateAddress(item.id, { label: event.target.value })}
               />
             </label>
-            <label className="field manager-client-address-field">
-              Полный адрес
-              <input
+            <label className="field manager-client-address-field">{
+              t("shared.fullAddress")
+              }<input
                 value={item.address}
-                placeholder="Город, улица, дом, помещение"
+                placeholder={t("shared.cityStreetBuildingPremises")}
                 onChange={(event) => updateAddress(item.id, { address: event.target.value })}
               />
             </label>
-            <label className="field">
-              Зона доставки
-              <select
+            <label className="field">{
+              t("manager.deliveryZone")
+              }<select
                 value={item.deliveryZoneId || ""}
                 onChange={(event) =>
                   updateAddress(item.id, { deliveryZoneId: event.target.value })
                 }
               >
-                <option value="">По умолчанию</option>
+                <option value="">{t("manager.default")}</option>
                 {(Array.isArray(deliveryZones) ? deliveryZones : [])
                   .filter((zone) => zone && zone.enabled !== false)
                   .map((zone) => (
@@ -718,48 +720,48 @@ function ManagerClientEditor({
                 name={`default-address-${client.id}`}
                 checked={Boolean(item.isDefault)}
                 onChange={() => updateAddress(item.id, { isDefault: true })}
-              />
-              Основной
-            </label>
+              />{
+              t("shared.address.primary")
+            }</label>
             <button
               className="danger-button"
               type="button"
               onClick={() => removeAddress(item.id)}
-            >
-              Удалить
-            </button>
+            >{
+              t("shared.action.delete")
+            }</button>
           </div>
         ))}
         {!form.addresses.length && (
-          <div className="empty-box">Адресов пока нет.</div>
+          <div className="empty-box">{t("client.address.empty")}</div>
         )}
       </div>
 
-      <label className="field" style={{ marginTop: 14 }}>
-        Комментарий менеджера
-        <textarea
+      <label className="field" style={{ marginTop: 14 }}>{
+        t("client.managerComment")
+        }<textarea
           rows="4"
           maxLength="2000"
-          placeholder="Например: звонить перед доставкой, принимает товар до 16:00"
+          placeholder={t("manager.forExampleCallBeforeDeliveryAccepts")}
           value={form.managerNote}
           onChange={(event) => setProfileField("managerNote", event.target.value)}
         />
-        <small>Виден только менеджерам Clover. Клиенту и в 1С не передаётся.</small>
+        <small>{t("manager.visibleOnlyToCloverManagersNot")}</small>
       </label>
 
-      <div className="matrix-catalog-note" style={{ marginTop: 14 }}>
-        Изменения используются в новых заказах Clover. Данные контрагента в 1С автоматически не перезаписываются. При изменении email клиент будет входить по новому адресу.
-      </div>
+      <div className="matrix-catalog-note" style={{ marginTop: 14 }}>{
+        t("manager.changesApplyToNewCloverOrders")
+      }</div>
 
       <div className="client-password-block" style={{ marginTop: 18 }}>
-        <strong>Сменить пароль</strong>
+        <strong>{t("shared.changePassword2")}</strong>
         <p className="muted small" style={{ marginTop: 4 }}>
           Логин остаётся {client.email}. Матрица и заказы не меняются.
         </p>
         <div className="form-grid" style={{ marginTop: 10 }}>
-          <label className="field">
-            Новый пароль
-            <input
+          <label className="field">{
+            t("auth.reset.title")
+            }<input
               type="text"
               autoComplete="new-password"
               value={passwordDraft}
@@ -775,16 +777,16 @@ function ManagerClientEditor({
             type="button"
             disabled={passwordBusy}
             onClick={() => setPasswordDraft(generateAccessPassword())}
-          >
-            Сгенерировать пароль
-          </button>
+          >{
+            t("manager.generatePassword")
+          }</button>
           <button
             className="primary-button"
             type="button"
             disabled={passwordBusy}
             onClick={() => void savePassword()}
           >
-            {passwordBusy ? "Сохраняем..." : "Сохранить пароль"}
+            {passwordBusy ? t("shared.status.savingDots") : t("auth.reset.submit")}
           </button>
         </div>
       </div>
@@ -793,7 +795,7 @@ function ManagerClientEditor({
       {message && <div className="sync-success" style={{ marginTop: 12 }}>{message}</div>}
       <div className="form-actions" style={{ marginTop: 14 }}>
         <button className="primary-button" type="button" disabled={saving} onClick={save}>
-          {saving ? "Сохраняем..." : "Сохранить данные клиента"}
+          {saving ? t("shared.status.savingDots") : t("manager.saveClientDetails")}
         </button>
       </div>
     </section>
@@ -801,6 +803,7 @@ function ManagerClientEditor({
 }
 
 function ClientCardMenu({ open, onToggle, onClose, items = [] }) {
+  const { t } = useLocalization();
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -826,7 +829,7 @@ function ClientCardMenu({ open, onToggle, onClose, items = [] }) {
       <button
         className="client-card-menu-trigger"
         type="button"
-        aria-label="Действия с клиентом"
+        aria-label={t("manager.clientActions")}
         aria-expanded={open}
         onClick={onToggle}
       >
@@ -867,6 +870,7 @@ export function ManagerClients({
   catalogPricesVersion = "",
   onReload,
 }) {
+  const { t } = useLocalization();
   const [deliveryZones, setDeliveryZones] = useState([]);
   const [search, setSearch] = useState("");
   const [matrixSearch, setMatrixSearch] = useState("");
@@ -1129,7 +1133,7 @@ export function ManagerClients({
       await api.setClientApproval(client.id, status);
       await onReload();
     } catch (error) {
-      await appAlert({ title: "Ошибка доступа", message: error.message, tone: "danger" });
+      await appAlert({ title: t("manager.accessError"), message: error.message, tone: "danger" });
     } finally {
       setApprovalBusyId("");
     }
@@ -1144,8 +1148,8 @@ export function ManagerClients({
     const password = provisionForm.password.trim();
     if (!companyName || !contactName || !phone || !email || password.length < 6) {
       await appAlert({
-        title: "Проверьте поля",
-        message: "Заполните все поля. Пароль — не короче 6 символов.",
+        title: t("manager.checkTheFields"),
+        message: t("manager.fillInAllFieldsThePassword"),
         tone: "warn",
       });
       return;
@@ -1213,7 +1217,7 @@ export function ManagerClients({
       [clientId]: {
         status: "dirty",
         message:
-          "Есть несохранённые изменения. Нажмите «Сохранить матрицу», иначе после F5 они пропадут.",
+          t("manager.youHaveUnsavedChangesTapSave"),
       },
     }));
   };
@@ -1244,9 +1248,9 @@ export function ManagerClients({
   const deleteCatalogProduct = async (product) => {
     if (!product?.id) return;
     const ok = await appConfirm({
-      title: "Удалить товар из каталога?",
-      message: `«${product.name || "товар"}» будет удалён из каталога Clover, с витрины сайта и из матриц всех клиентов. Заказы с этим товаром не меняются.`,
-      confirmLabel: "Удалить",
+      title: t("manager.deleteTheProductFromTheCatalog"),
+      message: `«${product.name || t("storefront.product")}» будет удалён из каталога Clover, с витрины сайта и из матриц всех клиентов. Заказы с этим товаром не меняются.`,
+      confirmLabel: t("shared.action.delete"),
       tone: "danger",
     });
     if (!ok) return;
@@ -1335,7 +1339,7 @@ export function ManagerClients({
   const saveClientMatrix = async (clientId, link) => {
     setMatrixSaveState((current) => ({
       ...current,
-      [clientId]: { status: "saving", message: "Сохраняем матрицу..." },
+      [clientId]: { status: "saving", message: t("manager.savingTheMatrix") },
     }));
 
     const nextLink = {
@@ -1442,7 +1446,7 @@ export function ManagerClients({
       dirtyClientLinkIdsRef?.current?.delete(clientId);
       setMatrixSaveState((current) => ({
         ...current,
-        [clientId]: { status: "saved", message: "Матрица сохранена." },
+        [clientId]: { status: "saved", message: t("manager.matrixSaved") },
       }));
       try {
         const preview = await api.getClientMatrixPrices(clientId);
@@ -1465,33 +1469,30 @@ export function ManagerClients({
   };
 
   return (
-    <PanelErrorBoundary label="Ошибка раздела «Клиенты»">
+    <PanelErrorBoundary label={t("manager.clientsSectionError")}>
     <section>
       <div className="toolbar two manager-clients-toolbar">
         <div className="manager-search-block">
           <input
             type="search"
-            placeholder="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
+            placeholder={t("manager.searchByClientOrderTaxId")}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            aria-label="Поиск по клиенту, заказу, ИНН, телефону, адресу и email"
+            aria-label={t("manager.searchByClientOrderTaxId")}
           />
         </div>
         <div className="mini-card">
-          <span className="mini-label">Клиентов</span>
+          <span className="mini-label">{t("manager.clients")}</span>
           <strong>{clients.length}</strong>
         </div>
       </div>
 
       <div className="approval-box" style={{ marginTop: 12 }}>
         <div>
-          <strong>Создать доступ для клиента</strong>
-          <p>
-            Создайте логин и пароль сами — без письма и подтверждения почты.
-            Логин и пароль сразу сохраняются в «Ещё → Доступы».
-            Матрицу настраиваете в карточке; при смене менеджера достаточно
-            сменить пароль у того же клиента.
-          </p>
+          <strong>{t("manager.createClientAccess")}</strong>
+          <p>{
+            t("manager.createTheLoginAndPasswordYourself")
+          }</p>
         </div>
         <div className="inline-actions">
           <button
@@ -1507,7 +1508,7 @@ export function ManagerClients({
               }
             }}
           >
-            {provisionOpen ? "Скрыть форму" : "Создать доступ для клиента"}
+            {provisionOpen ? t("manager.hideForm") : t("manager.createClientAccess")}
           </button>
         </div>
       </div>
@@ -1515,9 +1516,9 @@ export function ManagerClients({
       {provisionOpen ? (
         <form className="client-profile-panel" onSubmit={createClientAccess} style={{ marginTop: 12 }}>
           <div className="form-grid">
-            <label className="field">
-              Компания
-              <input
+            <label className="field">{
+              t("checkout.company")
+              }<input
                 value={provisionForm.companyName}
                 onChange={(event) =>
                   setProvisionForm((current) => ({
@@ -1529,9 +1530,9 @@ export function ManagerClients({
                 disabled={provisionBusy}
               />
             </label>
-            <label className="field">
-              Контактное лицо
-              <input
+            <label className="field">{
+              t("auth.register.contact")
+              }<input
                 value={provisionForm.contactName}
                 onChange={(event) =>
                   setProvisionForm((current) => ({
@@ -1543,9 +1544,9 @@ export function ManagerClients({
                 disabled={provisionBusy}
               />
             </label>
-            <label className="field">
-              Телефон
-              <input
+            <label className="field">{
+              t("auth.register.phone")
+              }<input
                 type="tel"
                 value={provisionForm.phone}
                 onChange={(event) =>
@@ -1558,9 +1559,9 @@ export function ManagerClients({
                 disabled={provisionBusy}
               />
             </label>
-            <label className="field">
-              Логин (email)
-              <input
+            <label className="field">{
+              t("manager.loginEmail")
+              }<input
                 type="email"
                 value={provisionForm.email}
                 onChange={(event) =>
@@ -1573,9 +1574,9 @@ export function ManagerClients({
                 disabled={provisionBusy}
               />
             </label>
-            <label className="field">
-              Пароль
-              <input
+            <label className="field">{
+              t("auth.login.password")
+              }<input
                 type="text"
                 autoComplete="new-password"
                 value={provisionForm.password}
@@ -1602,11 +1603,11 @@ export function ManagerClients({
                   password: generateAccessPassword(),
                 }))
               }
-            >
-              Сгенерировать пароль
-            </button>
+            >{
+              t("manager.generatePassword")
+            }</button>
             <button className="primary-button" type="submit" disabled={provisionBusy}>
-              {provisionBusy ? "Создаём..." : "Создать и выдать доступ"}
+              {provisionBusy ? t("manager.creating") : t("manager.createAndGrantAccess")}
             </button>
           </div>
         </form>
@@ -1735,11 +1736,11 @@ export function ManagerClients({
                       }
                     >
                       {link.matched1C
-                        ? "Связан с 1С"
-                        : "Не сопоставлен"}
+                        ? t("manager.linkedTo1c")
+                        : t("manager.notMatched")}
                     </span>
                     <h3>
-                      {client.companyName || "Клиент без названия"}
+                      {client.companyName || t("manager.untitledClient")}
                     </h3>
                     <p className="muted small">{client.email}</p>
                     {(() => {
@@ -1762,7 +1763,7 @@ export function ManagerClients({
                           {contacts.map((item) => (
                             <p className="muted small client-card-contact-row" key={item.id}>
                               <span className={item.isPrimary ? "badge green" : "badge yellow"}>
-                                {item.isPrimary ? "Основной" : item.label || "Дополнительный"}
+                                {item.isPrimary ? t("shared.address.primary") : item.label || t("shared.address.extra")}
                               </span>
                               <span>
                                 {[item.name, item.phone].filter(Boolean).join(" · ") || "—"}
@@ -1788,7 +1789,7 @@ export function ManagerClients({
                           ? [
                               {
                                 id: "profile",
-                                label: "Данные клиента",
+                                label: t("manager.clientDetails"),
                                 onSelect: () => {
                                   setProfileOpenId(client.id);
                                   window.setTimeout(() => {
@@ -1802,7 +1803,7 @@ export function ManagerClients({
                           : []),
                         {
                           id: "matrix",
-                          label: "Матрица",
+                          label: t("client.matrix.short"),
                           onSelect: () => {
                             restoredOpenClient.current = true;
                             setOpenClientId(client.id);
@@ -1814,16 +1815,16 @@ export function ManagerClients({
                           ? [
                               {
                                 id: "block",
-                                label: "Заблокировать доступ",
+                                label: t("manager.blockAccess"),
                                 danger: true,
                                 disabled: approvalBusyId === client.id,
                                 onSelect: async () => {
                                   const ok = await appConfirm({
-                                    title: "Заблокировать доступ?",
+                                    title: t("manager.blockAccess2"),
                                     message:
-                                      "Заблокировать доступ этому клиенту? Он не сможет войти в Clover, пока вы снова не разрешите доступ.",
-                                    confirmLabel: "Заблокировать",
-                                    cancelLabel: "Отмена",
+                                      t("manager.blockThisClientSAccessThey"),
+                                    confirmLabel: t("manager.block"),
+                                    cancelLabel: t("shared.modal.cancel"),
                                     tone: "danger",
                                   });
                                   if (ok) {
@@ -1838,7 +1839,7 @@ export function ManagerClients({
                           ? [
                               {
                                 id: "allow",
-                                label: "Разрешить доступ",
+                                label: t("manager.allowAccess"),
                                 disabled:
                                   approvalBusyId === client.id ||
                                   !client.emailVerified,
@@ -1850,16 +1851,16 @@ export function ManagerClients({
                           ? [
                               {
                                 id: "delete",
-                                label: "Удалить клиента",
+                                label: t("manager.deleteClient"),
                                 danger: true,
                                 onSelect: async () => {
                                   const ok = await appConfirm({
-                                    title: "Удалить клиента?",
+                                    title: t("manager.deleteTheClient"),
                                     message: `Удалить «${
-                                      client.companyName || client.email || "клиента"
+                                      client.companyName || client.email || t("manager.client2")
                                     }»?\n\nБудут удалены аккаунт, матрица, журнал доступов и связанные заказы. Это необратимо.`,
-                                    confirmLabel: "Удалить клиента",
-                                    cancelLabel: "Отмена",
+                                    confirmLabel: t("manager.deleteClient"),
+                                    cancelLabel: t("shared.modal.cancel"),
                                     tone: "danger",
                                   });
                                   if (!ok) return;
@@ -1877,15 +1878,15 @@ export function ManagerClients({
                                     }
                                     await onReload();
                                     await appAlert({
-                                      title: "Клиент удалён",
-                                      message: result.message || "Аккаунт клиента удалён.",
+                                      title: t("manager.clientDeleted"),
+                                      message: result.message || t("manager.theClientAccountHasBeenDeleted"),
                                       tone: "success",
                                     });
                                   } catch (deleteError) {
                                     await appAlert({
                                       title: "Не удалось удалить",
                                       message:
-                                        deleteError.message || "Ошибка удаления клиента.",
+                                        deleteError.message || t("manager.failedToDeleteTheClient"),
                                       tone: "danger",
                                     });
                                   }
@@ -1900,11 +1901,11 @@ export function ManagerClients({
 
                 <div className="client-metrics">
                   <article>
-                    <span>Заказов</span>
+                    <span>{t("manager.orders")}</span>
                     <strong>{client.orders.length}</strong>
                   </article>
                   <article>
-                    <span>Активных</span>
+                    <span>{t("manager.active3")}</span>
                     <strong>
                       {
                         client.orders.filter(
@@ -1917,7 +1918,7 @@ export function ManagerClients({
                     </strong>
                   </article>
                   <article>
-                    <span>Товаров в матрице</span>
+                    <span>{t("manager.productsInTheMatrix")}</span>
                     <strong>
                       {link.matrixMode === "all"
                         ? products.filter((item) => item.active !== false).length
@@ -1925,7 +1926,7 @@ export function ManagerClients({
                     </strong>
                   </article>
                   <article>
-                    <span>Персональных цен</span>
+                    <span>{t("manager.personalPrices")}</span>
                     <strong>{personalPriceCount}</strong>
                   </article>
                 </div>
@@ -1933,11 +1934,11 @@ export function ManagerClients({
                 {client.isRegistered !== false && client.approvalStatus === "pending" && (
                   <div className="approval-box">
                     <div>
-                      <strong>Новая регистрация</strong>
+                      <strong>{t("manager.newRegistration")}</strong>
                       <p>
                         {client.emailVerified
-                          ? "Почта подтверждена — можно разрешить вход в Clover."
-                          : "Сначала клиент должен подтвердить электронную почту."}
+                          ? t("manager.emailIsConfirmedYouCanAllow")
+                          : t("manager.theClientMustConfirmTheEmail")}
                       </p>
                     </div>
                     <div className="inline-actions">
@@ -1946,29 +1947,29 @@ export function ManagerClients({
                         type="button"
                         disabled={approvalBusyId === client.id || !client.emailVerified}
                         onClick={() => setApproval(client, "approved")}
-                      >
-                        Разрешить вход
-                      </button>
+                      >{
+                        t("manager.allowSignIn")
+                      }</button>
                       <button
                         className="danger-button"
                         type="button"
                         disabled={approvalBusyId === client.id}
                         onClick={async () => {
                           const ok = await appConfirm({
-                            title: "Отклонить регистрацию?",
+                            title: t("manager.rejectRegistration"),
                             message:
-                              "Отклонить регистрацию? Клиент не сможет войти, пока доступ не разрешат снова.",
-                            confirmLabel: "Отклонить",
-                            cancelLabel: "Отмена",
+                              t("manager.rejectRegistrationTheClientCannotSign"),
+                            confirmLabel: t("manager.reject"),
+                            cancelLabel: t("shared.modal.cancel"),
                             tone: "danger",
                           });
                           if (ok) {
                             setApproval(client, "rejected");
                           }
                         }}
-                      >
-                        Отклонить
-                      </button>
+                      >{
+                        t("manager.reject")
+                      }</button>
                     </div>
                   </div>
                 )}
@@ -1976,8 +1977,8 @@ export function ManagerClients({
                 {client.isRegistered !== false && client.approvalStatus === "rejected" && (
                   <div className="approval-box approval-box-rejected">
                     <div>
-                      <strong>Вход заблокирован</strong>
-                      <p>Клиент не может авторизоваться в Clover.</p>
+                      <strong>{t("manager.signInBlocked")}</strong>
+                      <p>{t("manager.theClientCannotSignInTo")}</p>
                     </div>
                     <div className="inline-actions">
                       <button
@@ -1985,9 +1986,9 @@ export function ManagerClients({
                         type="button"
                         disabled={approvalBusyId === client.id || !client.emailVerified}
                         onClick={() => setApproval(client, "approved")}
-                      >
-                        Разрешить вход
-                      </button>
+                      >{
+                        t("manager.allowSignIn")
+                      }</button>
                     </div>
                   </div>
                 )}
@@ -2014,13 +2015,13 @@ export function ManagerClients({
                 ) : null}
 
                 {client.isRegistered === false && (
-                  <div className="matrix-catalog-note" style={{ marginTop: 15 }}>
-                    Это клиент из старого заказа без отдельного аккаунта Clover. Его данные в заказе сохранены, но карточка станет редактируемой после регистрации клиента.
-                  </div>
+                  <div className="matrix-catalog-note" style={{ marginTop: 15 }}>{
+                    t("manager.thisIsAClientFromAn")
+                  }</div>
                 )}
 
                 {matrixWindowOpen && (
-                  <PanelErrorBoundary label="Ошибка блока матрицы клиента">
+                  <PanelErrorBoundary label={t("manager.clientMatrixBlockError")}>
                   {(() => {
                     const pricingLabel =
                       link.defaultPricingMode === "purchase_markup"
@@ -2029,14 +2030,14 @@ export function ManagerClients({
                             ? ` · ${link.oneCPriceTypeName}`
                             : "")
                         : link.defaultPricingMode === "one_c_price_type"
-                          ? link.oneCPriceTypeName || "Вид цен 1С"
-                          : "Базовая цена Clover";
+                          ? link.oneCPriceTypeName || t("manager.text")
+                          : t("manager.cloverBasePrice");
                     const modeLabel =
                       link.matrixMode === "all"
-                        ? "Все товары"
+                        ? t("manager.allProducts")
                         : link.matrixMode === "selected"
-                          ? "Выбранные товары"
-                          : "Матрица не готова";
+                          ? t("manager.selectedProducts")
+                          : t("manager.matrixIsNotReady");
 
                     return (
                       <>
@@ -2060,9 +2061,9 @@ export function ManagerClients({
                           >
                             <div className="matrix-window-head">
                               <div>
-                                <p className="eyebrow">Матрица</p>
+                                <p className="eyebrow">{t("client.matrix.short")}</p>
                                 <h3 id={`matrix-window-title-${client.id}`}>
-                                  {client.companyName || "Клиент без названия"}
+                                  {client.companyName || t("manager.untitledClient")}
                                 </h3>
                               </div>
                               <div className="matrix-window-head-actions">
@@ -2079,16 +2080,16 @@ export function ManagerClients({
                                       products: matrixExportProducts,
                                     });
                                   }}
-                                >
-                                  Скачать Excel
-                                </button>
+                                >{
+                                  t("manager.downloadExcel")
+                                }</button>
                                 <button
                                   className="secondary-button"
                                   type="button"
                                   onClick={() => setMatrixWindowClientId("")}
-                                >
-                                  Закрыть
-                                </button>
+                                >{
+                                  t("shared.action.close")
+                                }</button>
                               </div>
                             </div>
                             <div className="matrix-window-body">
@@ -2098,7 +2099,7 @@ export function ManagerClients({
                       <span className="muted small">{pricingLabel}</span>
                       {link.oneCId ? (
                         <span className="muted small">
-                          1С: {link.oneCName || link.oneCCode || "связан"}
+                          1С: {link.oneCName || link.oneCCode || t("manager.linked")}
                         </span>
                       ) : null}
                     </div>
@@ -2116,9 +2117,9 @@ export function ManagerClients({
                   )}
 
                   <div className="form-grid" style={{ marginTop: 12 }}>
-                    <label className="field">
-                      Личный менеджер
-                      <select
+                    <label className="field">{
+                      t("manager.personalManager")
+                      }<select
                         value={String(link.personalManagerId || "")}
                         onChange={(event) =>
                           updateLink(client.id, {
@@ -2126,7 +2127,7 @@ export function ManagerClients({
                           })
                         }
                       >
-                        <option value="">Не назначен (общий контакт)</option>
+                        <option value="">{t("manager.notAssignedSharedContact")}</option>
                         {managerOptions.map((item) => (
                           <option key={item.id} value={item.id}>
                             {item.label}
@@ -2140,28 +2141,26 @@ export function ManagerClients({
                   </div>
 
                   <details className="client-matrix-settings" open={link.matrixMode === "pending"}>
-                      <summary>1С и цены</summary>
-                      <p className="muted small" style={{ marginTop: 0 }}>
-                        Режим матрицы, вид цен и наценка. Контрагента 1С выбирают
-                        в «Данные клиента».
-                        После «Обновить цены» в 1С ЛК клиента подтягивает каталог автоматически.
-                      </p>
+                      <summary>{t("manager.text21")}</summary>
+                      <p className="muted small" style={{ marginTop: 0 }}>{
+                        t("manager.matrixModePriceTypeAndMarkup")
+                      }</p>
                       {link.oneCId ? (
                         <p className="muted small">
-                          Контрагент 1С: {link.oneCName || link.oneCCode || "связан"}
+                          Контрагент 1С: {link.oneCName || link.oneCCode || t("manager.linked")}
                         </p>
                       ) : (
-                        <p className="muted small">
-                          Контрагент 1С не выбран — откройте «Данные клиента».
-                        </p>
+                        <p className="muted small">{
+                          t("manager.text22")
+                        }</p>
                       )}
 
                       <div className="form-grid" style={{ marginTop: 14 }}>
-                        <label className="field">
-                          Точное название в 1С — необязательно
-                          <input
+                        <label className="field">{
+                          t("manager.exactNameIn1cOptional")
+                          }<input
                             value={link.oneCMatchName || ""}
-                            placeholder={client.companyName || "Название контрагента"}
+                            placeholder={client.companyName || t("manager.counterpartyName")}
                             onChange={(event) =>
                               updateLink(client.id, {
                                 oneCMatchName: event.target.value,
@@ -2170,9 +2169,9 @@ export function ManagerClients({
                           />
                         </label>
 
-                        <label className="field">
-                          ИНН для точного сопоставления
-                          <input
+                        <label className="field">{
+                          t("manager.tinForExactMatching")
+                          }<input
                             value={link.oneCMatchInn || ""}
                             inputMode="numeric"
                             onChange={(event) =>
@@ -2183,9 +2182,9 @@ export function ManagerClients({
                           />
                         </label>
 
-                        <label className="field">
-                          Код контрагента в 1С — необязательно
-                          <input
+                        <label className="field">{
+                          t("manager.counterpartyCodeIn1cOptional")
+                          }<input
                             value={link.oneCMatchCode || ""}
                             onChange={(event) =>
                               updateLink(client.id, {
@@ -2195,9 +2194,9 @@ export function ManagerClients({
                           />
                         </label>
 
-                        <label className="field">
-                          Режим товарной матрицы
-                          <select
+                        <label className="field">{
+                          t("manager.productMatrixMode")
+                          }<select
                             value={link.matrixMode}
                             onChange={(event) =>
                               updateLink(client.id, {
@@ -2205,15 +2204,15 @@ export function ManagerClients({
                               })
                             }
                           >
-                            <option value="pending">Матрица подготавливается</option>
-                            <option value="selected">Только выбранные товары</option>
-                            <option value="all">Все активные товары</option>
+                            <option value="pending">{t("manager.matrixIsBeingPrepared")}</option>
+                            <option value="selected">{t("manager.selectedProductsOnly")}</option>
+                            <option value="all">{t("manager.allActiveProducts")}</option>
                           </select>
                         </label>
 
-                        <label className="field">
-                          Полный каталог для клиента
-                          <select
+                        <label className="field">{
+                          t("manager.fullCatalogForTheClient")
+                          }<select
                             value={link.allowFullCatalog ? "yes" : "no"}
                             onChange={(event) =>
                               updateLink(client.id, {
@@ -2221,16 +2220,16 @@ export function ManagerClients({
                               })
                             }
                           >
-                            <option value="no">Скрыт — только матрица</option>
-                            <option value="yes">Разрешить просмотр</option>
+                            <option value="no">{t("manager.hiddenMatrixOnly")}</option>
+                            <option value="yes">{t("manager.allowViewing")}</option>
                           </select>
                         </label>
                       </div>
 
                       <div className="client-pricing-panel" style={{ marginTop: 14 }}>
-                        <label className="field">
-                          Категория цен 1С (вид цен)
-                          <select
+                        <label className="field">{
+                          t("manager.text23")
+                          }<select
                             value={link.oneCPriceTypeId || ""}
                             onChange={(event) => {
                               const nextId = event.target.value;
@@ -2255,21 +2254,21 @@ export function ManagerClients({
                               });
                             }}
                           >
-                            <option value="">Не задана</option>
+                            <option value="">{t("manager.notSet")}</option>
                             {(oneCPriceTypes || []).map((item) => (
                               <option key={item.id} value={item.id}>
-                                {item.name || "Без названия"}
+                                {item.name || t("manager.untitled")}
                               </option>
                             ))}
                           </select>
-                          <small>
-                            Для наценки обычно выбирают вид «Закупочная цена».
-                          </small>
+                          <small>{
+                            t("manager.forMarkupThePurchasePriceType")
+                          }</small>
                         </label>
 
-                        <label className="field">
-                          Цена по умолчанию для матрицы
-                          <select
+                        <label className="field">{
+                          t("manager.defaultMatrixPrice")
+                          }<select
                             value={link.defaultPricingMode || "base"}
                             onChange={(event) => {
                               const mode = event.target.value;
@@ -2281,30 +2280,30 @@ export function ManagerClients({
                               });
                             }}
                           >
-                            <option value="base">Базовая цена Clover</option>
-                            <option value="purchase_markup">
-                              Категория/закупка + наценка %
-                            </option>
+                            <option value="base">{t("manager.cloverBasePrice")}</option>
+                            <option value="purchase_markup">{
+                              t("manager.categoryPurchaseMarkup")
+                            }</option>
                             <option
                               value="one_c_price_type"
                               disabled={
                                 !link.oneCPriceTypeId &&
                                 !(oneCPriceTypes || []).length
                               }
-                            >
-                              Категория цен 1С без наценки
-                            </option>
+                            >{
+                              t("manager.text24")
+                            }</option>
                           </select>
-                          <small>
-                            «+ наценка %»: цена вида или закупка × (1 + %/100), с копейками.
-                          </small>
+                          <small>{
+                            t("manager.markupPriceTypeOrPurchase1")
+                          }</small>
                         </label>
 
                         {(link.defaultPricingMode === "purchase_markup" ||
                           Number(link.defaultMarkupPercent) > 0) && (
-                          <label className="field client-markup-field">
-                            Наценка для клиента, %
-                            <input
+                          <label className="field client-markup-field">{
+                            t("manager.clientMarkup")
+                            }<input
                               type="number"
                               min="0"
                               max="10000"
@@ -2322,33 +2321,33 @@ export function ManagerClients({
                                 });
                               }}
                             />
-                            <small>
-                              Пример: 65,47 ₽ + 5% → 68,74 ₽. Затем «Сохранить матрицу».
-                            </small>
+                            <small>{
+                              t("manager.example654756874")
+                            }</small>
                           </label>
                         )}
                       </div>
 
-                      <label className="field matrix-manager-note">
-                        Заметка по матрице
-                        <textarea
+                      <label className="field matrix-manager-note">{
+                        t("manager.matrixNote")
+                        }<textarea
                           rows="2"
                           value={link.managerNote}
-                          placeholder="Кратко: особенности матрицы или связи с 1С"
+                          placeholder={t("manager.brieflyMatrixNotesOr1cLink")}
                           onChange={(event) =>
                             updateLink(client.id, {
                               managerNote: event.target.value,
                             })
                           }
                         />
-                        <small>Только для менеджеров</small>
+                        <small>{t("manager.managersOnly")}</small>
                       </label>
                     </details>
 
                   {link.matrixMode === "pending" ? (
-                    <div className="matrix-catalog-note pending" style={{ marginTop: 14 }}>
-                      Выберите режим матрицы выше, затем сохраните матрицу.
-                    </div>
+                    <div className="matrix-catalog-note pending" style={{ marginTop: 14 }}>{
+                      t("manager.chooseTheMatrixModeAboveThen")
+                    }</div>
                   ) : (
                     <div className="client-matrix-products">
                       <div className="matrix-add-compact">
@@ -2416,7 +2415,7 @@ export function ManagerClients({
                         <input
                           type="search"
                           className="client-matrix-search-input"
-                          placeholder="Поиск товара в матрице"
+                          placeholder={t("manager.searchProductsInTheMatrix")}
                           value={matrixSearch}
                           onChange={(event) =>
                             setMatrixSearch(event.target.value)
@@ -2424,15 +2423,15 @@ export function ManagerClients({
                         />
                         {link.oneCPriceTypeName || link.oneCPriceTypeId ? (
                           <span className="client-matrix-price-chip">
-                            {link.oneCPriceTypeName || "Вид цен 1С"}
+                            {link.oneCPriceTypeName || t("manager.text")}
                             {link.defaultPricingMode === "purchase_markup"
                               ? ` · +${normalizePercentInput(getDefaultMarkupDraft(client.id, link))}%`
                               : ""}
                           </span>
                         ) : (
-                          <span className="client-matrix-price-chip muted">
-                            Категория цен не задана
-                          </span>
+                          <span className="client-matrix-price-chip muted">{
+                            t("manager.priceCategoryIsNotSet")
+                          }</span>
                         )}
                         {matrixPricesStatus[client.id]?.status === "ok" &&
                           Number(matrixPricesStatus[client.id]?.missingPrices) >
@@ -2443,9 +2442,9 @@ export function ManagerClients({
                           </span>
                         )}
                         {matrixPricesStatus[client.id]?.status === "loading" && (
-                          <span className="client-matrix-price-chip muted">
-                            Загрузка цен…
-                          </span>
+                          <span className="client-matrix-price-chip muted">{
+                            t("manager.loadingPrices")
+                          }</span>
                         )}
                         {matrixPricesStatus[client.id]?.status === "error" && (
                           <button
@@ -2465,7 +2464,7 @@ export function ManagerClients({
                               });
                             }}
                           >
-                            {matrixPricesStatus[client.id]?.message || "Ошибка цен"} · повторить
+                            {matrixPricesStatus[client.id]?.message || t("manager.priceError")} · повторить
                           </button>
                         )}
                       </div>
@@ -2481,9 +2480,9 @@ export function ManagerClients({
                           Индивидуальных исключений: {personalPriceCount}
                         </span>
                         {link.matrixMode === "selected" ? (
-                          <span className="muted small">
-                            Галочка — выбор для удаления из матрицы. Снятие галочки товар не убирает.
-                          </span>
+                          <span className="muted small">{
+                            t("manager.theCheckboxSelectsItemsToRemove")
+                          }</span>
                         ) : null}
                       </div>
                       {link.matrixMode === "selected" && (
@@ -2504,9 +2503,9 @@ export function ManagerClients({
                                 ]).map(String),
                               }));
                             }}
-                          >
-                            Выбрать все
-                          </button>
+                          >{
+                            t("shared.action.selectAll")
+                          }</button>
                           <button
                             className="secondary-button"
                             type="button"
@@ -2516,9 +2515,9 @@ export function ManagerClients({
                                 [client.id]: [],
                               }));
                             }}
-                          >
-                            Снять все
-                          </button>
+                          >{
+                            t("shared.action.clearAll")
+                          }</button>
                           <button
                             className="secondary-button"
                             type="button"
@@ -2545,9 +2544,9 @@ export function ManagerClients({
                                 matrixProductIds: nextIds,
                               });
                             }}
-                          >
-                            Удалить выбранные из матрицы
-                          </button>
+                          >{
+                            t("manager.removeSelectedFromTheMatrix")
+                          }</button>
                         </div>
                       )}
 
@@ -2598,7 +2597,7 @@ export function ManagerClients({
                                     type="checkbox"
                                     checked={picked}
                                     disabled={link.matrixMode === "all"}
-                                    title="Отметить, чтобы удалить из матрицы этого клиента. Снятие галочки товар из матрицы не убирает."
+                                    title={t("manager.checkToRemoveFromThisClient")}
                                     onChange={(event) => {
                                       // Галочка в списке матрицы — выбор для удаления, а не членство. Снятие не убирает товар из матрицы.
                                       setMatrixPickIds((current) => ({
@@ -2627,9 +2626,9 @@ export function ManagerClients({
                                   className="secondary-button matrix-edit-product-btn"
                                   type="button"
                                   onClick={() => setEditorProduct(product)}
-                                >
-                                  Изменить товар
-                                </button>
+                                >{
+                                  t("manager.editProduct")
+                                }</button>
                               </div>
 
                               <div className="matrix-editor-units">
@@ -2691,8 +2690,8 @@ export function ManagerClients({
                                             <small>
                                               {costKind === "one_c_price_type"
                                                 ? link.oneCPriceTypeName ||
-                                                  "Категория 1С"
-                                                : "Закупка"}
+                                                  t("manager.text3")
+                                                : t("manager.purchasing")}
                                               : {formatMoney(costPrice)}
                                             </small>
                                             <strong>
@@ -2701,9 +2700,9 @@ export function ManagerClients({
                                             </strong>
                                           </>
                                         ) : (
-                                          <strong className="danger-text">
-                                            Нет цены категории
-                                          </strong>
+                                          <strong className="danger-text">{
+                                            t("manager.noCategoryPrice")
+                                          }</strong>
                                         )}
                                       </div>
                                     );
@@ -2767,13 +2766,13 @@ export function ManagerClients({
                                       <small>
                                         {link.oneCPriceTypeId
                                           ? link.oneCPriceTypeName ||
-                                            "Категория цен 1С"
-                                          : "Базовая цена Clover"}
+                                            t("manager.text4")
+                                          : t("manager.cloverBasePrice")}
                                       </small>
                                       <strong>
                                         {hasDisplay
                                           ? formatMoney(displayPrice)
-                                          : "Нет цены"}
+                                          : t("manager.noPrice")}
                                       </strong>
                                     </div>
                                   );
@@ -2781,9 +2780,9 @@ export function ManagerClients({
                               </div>
 
                               <div className="matrix-price-mode">
-                                <label className="matrix-price-field">
-                                  Способ расчёта
-                                  <select
+                                <label className="matrix-price-field">{
+                                  t("manager.calculationMethod")
+                                  }<select
                                     value={priceMode}
                                     onChange={(event) =>
                                       updatePersonalPrice(
@@ -2797,19 +2796,19 @@ export function ManagerClients({
                                       )
                                     }
                                   >
-                                    <option value="inherit">По матрице</option>
-                                    <option value="manual">
-                                      Фиксированная цена вручную
-                                    </option>
-                                    <option value="purchase_markup">
-                                      Индивидуальный процент
-                                    </option>
+                                    <option value="inherit">{t("manager.byMatrix")}</option>
+                                    <option value="manual">{
+                                      t("manager.fixedPriceManually")
+                                    }</option>
+                                    <option value="purchase_markup">{
+                                      t("manager.individualPercent")
+                                    }</option>
                                   </select>
                                 </label>
                                 {priceMode === "purchase_markup" && (
-                                  <label className="matrix-price-field">
-                                    Индивидуальная наценка, %
-                                    <input
+                                  <label className="matrix-price-field">{
+                                    t("manager.individualMarkup")
+                                    }<input
                                       type="number"
                                       min="0"
                                       max="10000"
@@ -2898,16 +2897,16 @@ export function ManagerClients({
                         ["busy", "review"].includes(
                           excelImportState[client.id]?.status
                         )
-                          ? "Дождитесь загрузки товаров из Excel"
+                          ? t("manager.waitUntilProductsFinishLoadingFrom")
                           : undefined
                       }
                       onClick={() => saveClientMatrix(client.id, link)}
                     >
                       {matrixSaveState[client.id]?.status === "saving"
-                        ? "Сохраняем..."
+                        ? t("shared.status.savingDots")
                         : matrixSaveState[client.id]?.status === "saved"
-                          ? "Сохранено"
-                          : "Сохранить матрицу"}
+                          ? t("shared.status.saved")
+                          : t("manager.saveMatrix")}
                     </button>
                   </div>
                             </div>
@@ -2926,7 +2925,7 @@ export function ManagerClients({
           })}
         </div>
       ) : (
-        <div className="empty-box">Клиенты не найдены.</div>
+        <div className="empty-box">{t("manager.noClientsFound")}</div>
       )}
       {editorProduct !== undefined && (
         <ProductEditor

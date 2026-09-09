@@ -1,3 +1,4 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { useEffect, useState } from "react";
 import {
   cartDeliveryFee,
@@ -22,6 +23,7 @@ const EMPTY = {
 };
 
 export function CheckoutPage() {
+  const { t } = useLocalization();
   const [items, setItems] = useState(getCartItems);
   const [form, setForm] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
@@ -33,18 +35,17 @@ export function CheckoutPage() {
   if (done) {
     return (
       <div className="sf-checkout">
-        <h1>Заказ принят</h1>
-        <p>
-          Номер заказа <strong>{done.number}</strong>. Мы свяжемся с вами для
-          подтверждения.
-        </p>
+        <h1>{t("checkout.accepted")}</h1>
+        <p>{
+          t("storefront.orderNumber") }<strong>{done.number}</strong>{t("storefront.weWillContactYouToConfirm")
+        }</p>
         <button
           type="button"
           className="sf-btn sf-btn-primary"
           onClick={() => navigateStorefront({ name: "catalog" })}
-        >
-          Вернуться в каталог
-        </button>
+        >{
+          t("checkout.backToCatalog")
+        }</button>
       </div>
     );
   }
@@ -52,15 +53,15 @@ export function CheckoutPage() {
   if (!items.length) {
     return (
       <div className="sf-checkout sf-empty">
-        <h1>Оформление</h1>
-        <p className="sf-muted">Корзина пуста.</p>
+        <h1>{t("checkout.titleShort")}</h1>
+        <p className="sf-muted">{t("storefront.theCartIsEmpty")}</p>
         <button
           type="button"
           className="sf-btn sf-btn-primary"
           onClick={() => navigateStorefront({ name: "catalog" })}
-        >
-          В каталог
-        </button>
+        >{
+          t("storefront.nav.toCatalog")
+        }</button>
       </div>
     );
   }
@@ -98,12 +99,12 @@ export function CheckoutPage() {
   return (
     <div className="sf-checkout">
       <div className="sf-section-head">
-        <h1>Оформление заказа</h1>
-        <p>Регистрация не нужна — укажите контакты для связи.</p>
+        <h1>{t("checkout.title")}</h1>
+        <p>{t("storefront.noRegistrationNeededEnterContactDetails")}</p>
       </div>
       <form className="sf-checkout-form" onSubmit={onSubmit}>
         <label className="sf-field">
-          <span>Контактное лицо *</span>
+          <span>{t("checkout.contactRequired")}</span>
           <input
             className="sf-input"
             required
@@ -113,7 +114,7 @@ export function CheckoutPage() {
           />
         </label>
         <label className="sf-field">
-          <span>Компания</span>
+          <span>{t("checkout.company")}</span>
           <input
             className="sf-input"
             value={form.companyName}
@@ -121,7 +122,7 @@ export function CheckoutPage() {
           />
         </label>
         <label className="sf-field">
-          <span>Телефон *</span>
+          <span>{t("checkout.phoneRequired")}</span>
           <input
             className="sf-input"
             required
@@ -140,7 +141,7 @@ export function CheckoutPage() {
           />
         </label>
         <label className="sf-field sf-field-wide">
-          <span>Адрес доставки *</span>
+          <span>{t("checkout.address")}</span>
           <input
             className="sf-input"
             required
@@ -150,7 +151,7 @@ export function CheckoutPage() {
           />
         </label>
         <label className="sf-field sf-field-wide">
-          <span>Комментарий</span>
+          <span>{t("checkout.comment")}</span>
           <textarea
             className="sf-input"
             rows={3}
@@ -169,14 +170,14 @@ export function CheckoutPage() {
           >
             {deliveryFee > 0
               ? `Доставка по СПб — ${formatMoney(PAID_DELIVERY_FEE)} (заказ менее ${formatMoney(FREE_DELIVERY_MIN_TOTAL)})`
-              : "Доставка по СПб — бесплатно"}
+              : t("storefront.deliveryInSpbIsFree")}
           </p>
-          <p>
-            Итого: <strong>{formatMoney(grandTotal)}</strong>
+          <p>{
+            t("storefront.total") }<strong>{formatMoney(grandTotal)}</strong>
           </p>
-          <p className="sf-muted">
-            Заказ уйдёт менеджеру и может быть передан в 1С из ЛК.
-          </p>
+          <p className="sf-muted">{
+            t("storefront.theOrderGoesToTheManager")
+          }</p>
         </div>
         {error ? <p className="sf-error sf-field-wide">{error}</p> : null}
         <div className="sf-checkout-actions sf-field-wide">
@@ -184,11 +185,11 @@ export function CheckoutPage() {
             type="button"
             className="sf-btn sf-btn-ghost"
             onClick={() => navigateStorefront({ name: "cart" })}
-          >
-            Назад в корзину
-          </button>
+          >{
+            t("checkout.backToCart")
+          }</button>
           <button type="submit" className="sf-btn sf-btn-primary" disabled={busy}>
-            {busy ? "Отправка…" : "Отправить заказ"}
+            {busy ? t("shared.status.sending") : t("checkout.submitOrder")}
           </button>
         </div>
       </form>

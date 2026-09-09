@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Редактор заказа клиента: каталог, корзина и оформление.
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -42,7 +43,7 @@ import { appAlert, appConfirm } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
 
 function CatalogViewToggleIcon({ variant }) {
-  if (variant === "list") {
+    if (variant === "list") {
     return (
       <span className="view-toggle-icon" aria-hidden="true">
         <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -117,6 +118,7 @@ export function OrderEditor({
   onOpenCatalogAdd: _onOpenCatalogAdd,
   embedded = false,
 }) {
+  const { t } = useLocalization();
   const initialOrder = session.order || null;
   const savedDraft = session.mode === "new" && settings.enableDrafts ? safeRead(STORAGE.draft, null) : null;
   const initialSource = initialOrder || savedDraft || {};
@@ -493,7 +495,7 @@ export function OrderEditor({
     const check = validateDeliveryDate(value);
     if (!check.ok) {
       await appAlert({
-        title: "Дата недоступна",
+        title: t("client.dateUnavailable"),
         message: check.message,
         tone: "warn",
       });
@@ -506,7 +508,7 @@ export function OrderEditor({
   const handleCalendarPick = async (result) => {
     if (!result.ok) {
       await appAlert({
-        title: "Дата недоступна",
+        title: t("client.dateUnavailable"),
         message: result.message,
         tone: "warn",
       });
@@ -657,9 +659,9 @@ export function OrderEditor({
   const cartHasLines = selectedItems.length > 0 || customItems.length > 0;
   const canSubmitAddendum = Boolean(addendumTarget) && cartHasLines;
   const addendumDisabledReason = !addendumTarget
-    ? "Нет заказа со статусом «Новый» — дозаказ доступен до принятия менеджером."
+    ? t("client.thereIsNoOrderWithStatus")
     : !cartHasLines
-      ? "Добавьте товары в корзину."
+      ? t("client.addProductsToTheCart")
       : "";
 
   const draftSaveLockedRef = useRef(false);
@@ -766,10 +768,10 @@ export function OrderEditor({
   const clearCart = async () => {
     if (!selectedItems.length && !customItems.length) return;
     const ok = await appConfirm({
-      title: "Очистить корзину?",
-      message: "Все выбранные позиции будут удалены.",
-      confirmLabel: "Очистить",
-      cancelLabel: "Отмена",
+      title: t("checkout.clearCartConfirm"),
+      message: t("client.allSelectedItemsWillBeDeleted"),
+      confirmLabel: t("shared.action.clear"),
+      cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
     });
     if (!ok) return;
@@ -782,8 +784,8 @@ export function OrderEditor({
   const openCartForCheckout = () => {
     if (!selectedItems.length && !customItems.length) {
       void appAlert({
-        title: "Корзина пуста",
-        message: "Добавьте хотя бы один товар из каталога.",
+        title: t("storefront.cart.empty"),
+        message: t("client.addAtLeastOneCatalogProduct"),
         tone: "warn",
       });
       return;
@@ -794,8 +796,8 @@ export function OrderEditor({
   const submitOrder = async () => {
     if (!selectedItems.length && !customItems.length) {
       await appAlert({
-        title: "Корзина пуста",
-        message: "Добавьте хотя бы один товар.",
+        title: t("storefront.cart.empty"),
+        message: t("client.addAtLeastOneProduct"),
         tone: "warn",
       });
       return;
@@ -827,10 +829,10 @@ export function OrderEditor({
     if (!checkoutAddress) {
       focusMissingFields(false, true);
       await appAlert({
-        title: "Укажите адрес доставки",
+        title: t("checkout.needAddress"),
         message: addresses.length > 1
-          ? "У вас несколько адресов. Выберите, куда доставить заказ."
-          : "Выберите адрес из списка или добавьте новый.",
+          ? t("client.youHaveSeveralAddressesChooseWhere")
+          : t("client.chooseAnAddressFromTheList"),
         tone: "warn",
       });
       return;
@@ -853,14 +855,14 @@ export function OrderEditor({
     if (submitDeliveryFee > previousFee) {
       const needMore = Math.max(0, submitTariff.freeFrom - total);
       const ok = await appConfirm({
-        title: "Платная доставка",
+        title: t("client.paidDelivery"),
         message:
           `Сумма заказа меньше ${formatMoney(submitTariff.freeFrom)}. ` +
           `Доставка — ${formatMoney(submitTariff.fee)}. ` +
           `Добавьте товаров ещё на ${formatMoney(needMore)} для бесплатной доставки ` +
           `либо оформите заказ с платной доставкой.`,
         confirmLabel: `Оформить (+${formatMoney(submitTariff.fee)})`,
-        cancelLabel: "Вернуться к заказу",
+        cancelLabel: t("client.backToTheOrder"),
         tone: "warn",
       });
       if (!ok) return;
@@ -885,7 +887,7 @@ export function OrderEditor({
         deliveryNote:
           submitDeliveryFee > 0
             ? `Доставка по СПб платная: ${submitTariff.fee} ₽ (заказ менее ${submitTariff.freeFrom} ₽)`
-            : "Доставка по СПб бесплатная",
+            : t("client.freeDeliveryInSpb"),
       })
     )
       .then(() => {
@@ -900,8 +902,8 @@ export function OrderEditor({
   const submitAddendum = async () => {
     if (!canSubmitAddendum || !addendumTarget) {
       await appAlert({
-        title: "Дозаказ недоступен",
-        message: addendumDisabledReason || "Нельзя добавить позиции в текущий заказ.",
+        title: t("auth.addendumUnavailable"),
+        message: addendumDisabledReason || t("client.itemsCannotBeAddedToThe"),
         tone: "warn",
       });
       return;
@@ -909,12 +911,12 @@ export function OrderEditor({
 
     const orderLabel = addendumTarget.number
       ? `№${addendumTarget.number}`
-      : "текущий";
+      : t("client.current");
     const confirmed = await appConfirm({
-      title: "Дозаказ",
+      title: t("client.addendum"),
       message: `Добавить ${cartHasLines ? `${selectedItems.length + customItems.length} поз.` : "позиции"} в заказ ${orderLabel}? Дата, адрес и комментарий заказа не изменятся.`,
-      confirmLabel: "Добавить в заказ",
-      cancelLabel: "Отмена",
+      confirmLabel: t("checkout.addToOrder"),
+      cancelLabel: t("shared.modal.cancel"),
       tone: "info",
     });
     if (!confirmed) return;
@@ -1354,14 +1356,14 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                 <div>
                   <h1>
                     {session.mode === "edit"
-                      ? "Редактирование заказа"
+                      ? t("client.order.editing")
                       : session.mode === "repeat"
-                        ? "Повтор заказа"
-                        : "Новый заказ"}
+                        ? t("client.order.repeat")
+                        : t("client.order.new")}
                   </h1>
                 </div>
                 <div className="mini-card">
-                  <span className="mini-label">Позиций</span>
+                  <span className="mini-label">{t("shared.field.positions")}</span>
                   <strong>{cartCount}</strong>
                 </div>
               </div>
@@ -1388,46 +1390,46 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                           className={favoritesOnly ? "category-button active" : "category-button"}
                           type="button"
                           onClick={() => setFavoritesOnly((value) => !value)}
-                          aria-label="Избранное"
-                          title="Избранное"
+                          aria-label={t("client.favorites.short")}
+                          title={t("client.favorites.short")}
                         >
-                          <span className="fav-label-full">★ Избранное</span>
+                          <span className="fav-label-full">{t("client.favorites")}</span>
                           <span className="fav-label-short">★</span>
                         </button>
                       )}
-                      <div className="catalog-view-toggle" role="group" aria-label="Вид каталога">
+                      <div className="catalog-view-toggle" role="group" aria-label={t("client.catalogView")}>
                         <button
                           type="button"
                           className={catalogView === "cards" ? "active" : ""}
                           aria-pressed={catalogView === "cards"}
-                          title="С фото"
-                          aria-label="С фото"
+                          title={t("client.filter.withPhoto")}
+                          aria-label={t("client.filter.withPhoto")}
                           onClick={() => {
                             setCatalogView("cards");
                             safeWrite(STORAGE.catalogView, "cards");
                           }}
                         >
                           <CatalogViewToggleIcon variant="cards" />
-                          <span className="view-toggle-label">Фото</span>
+                          <span className="view-toggle-label">{t("client.photo")}</span>
                         </button>
                         <button
                           type="button"
                           className={catalogView === "list" ? "active" : ""}
                           aria-pressed={catalogView === "list"}
-                          title="Список"
-                          aria-label="Список"
+                          title={t("client.view.list")}
+                          aria-label={t("client.view.list")}
                           onClick={() => {
                             setCatalogView("list");
                             safeWrite(STORAGE.catalogView, "list");
                           }}
                         >
                           <CatalogViewToggleIcon variant="list" />
-                          <span className="view-toggle-label">Список</span>
+                          <span className="view-toggle-label">{t("client.view.list")}</span>
                         </button>
                       </div>
                       {embedded ? (
                         <div className="mini-card client-order-positions-chip">
-                          <span className="mini-label">Позиций</span>
+                          <span className="mini-label">{t("shared.field.positions")}</span>
                           <strong>{cartCount}</strong>
                         </div>
                       ) : null}
@@ -1459,11 +1461,9 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
             })()}
 
             {catalogPolicy.matrixMode === "pending" && (
-              <div className="matrix-catalog-note pending">
-                В матрице пока нет закреплённых товаров. Добавьте позиции
-                через «Добавить товары из каталога» — они сохранятся
-                автоматически. Заказ оформляется из этой матрицы.
-              </div>
+              <div className="matrix-catalog-note pending">{
+                t("client.noPinnedProductsInTheMatrix")
+              }</div>
             )}
 
             <div className="catalog-products">
@@ -1495,9 +1495,9 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                           target="_blank"
                           rel="noreferrer"
                           download={product.certificateName || undefined}
-                        >
-                          Сертификат
-                        </a>
+                        >{
+                          t("shared.media.certificate")
+                        }</a>
                       ) : (
                         <span className="product-card-top-spacer" aria-hidden="true" />
                       )}
@@ -1508,7 +1508,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                         {product.imageUrl ? (
                           <img className="product-image" src={productImageSrc(product)} alt={product.name} loading="lazy" />
                         ) : (
-                          <span className="product-image-placeholder">Фото товара пока не загружено</span>
+                          <span className="product-image-placeholder">{t("client.productPhotoIsNotUploadedYet")}</span>
                         )}
                       </div>
                     )}
@@ -1517,7 +1517,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                     <p className="product-price">
                       {settings.showPrices && price > 0
                         ? <>{formatMoney(price)} <small>/ {UNIT_CONFIG[unit].shortLabel}</small></>
-                        : "Цена уточняется"}
+                        : t("shared.price.pending")}
                     </p>
                     <div className="product-card-controls">
                       <div className={`unit-choice${orderedSaleUnits(product).length === 1 ? " unit-choice-single" : ""}`}>
@@ -1536,7 +1536,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                         })}
                       </div>
                       <div className="quantity-control">
-                        <button type="button" onClick={() => changeQuantity(product.id, -1, orderStep)} aria-label="Уменьшить">−</button>
+                        <button type="button" onClick={() => changeQuantity(product.id, -1, orderStep)} aria-label={t("shared.qty.decrease")}>−</button>
                         <div className="quantity-input-wrap">
                           <input
                             className="quantity-input"
@@ -1551,13 +1551,13 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                           />
                           <small>{quantityInputUnitLabel(unit, multiplier)}</small>
                         </div>
-                        <button type="button" onClick={() => changeQuantity(product.id, 1, orderStep)} aria-label="Увеличить">+</button>
+                        <button type="button" onClick={() => changeQuantity(product.id, 1, orderStep)} aria-label={t("shared.qty.increase")}>+</button>
                       </div>
                     </div>
                   </article>
                 );
               })}
-              {!filtered.length && <div className="empty-box">Товары не найдены.</div>}
+              {!filtered.length && <div className="empty-box">{t("client.noProductsFound")}</div>}
             </section>
             </div>
           </div>
@@ -1565,24 +1565,24 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
           {(() => {
             const cartBody = (
               <>
-                <h2>Корзина</h2>
+                <h2>{t("storefront.nav.cart")}</h2>
                 {!selectedItems.length && !customItems.length ? (
                   <EmptyState
-                    title="Пока пусто"
-                    message="Выберите товары в каталоге, затем откройте корзину для оформления."
+                    title={t("shared.empty.blank")}
+                    message={t("client.selectProductsInTheCatalogThen")}
                   />
                 ) : (
                   <>
                     <div className="summary-total" style={{ marginTop: 0 }}>
-                      <span>Позиций</span>
+                      <span>{t("shared.field.positions")}</span>
                       <strong>{cartCount}</strong>
                     </div>
                     <div className="summary-total">
-                      <span>Итого</span>
+                      <span>{t("checkout.total")}</span>
                       <strong>
                         {settings.showPrices && grandTotal > 0
                           ? formatMoney(grandTotal)
-                          : "уточняется"}
+                          : t("shared.price.pendingShort")}
                       </strong>
                     </div>
                     {settings.showPrices && total > 0 ? (
@@ -1593,27 +1593,27 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                       >
                         {deliveryFee > 0
                           ? `В заказе позиция «Доставка» — ${formatMoney(deliveryTariff.fee)}. До бесплатной ещё ${formatMoney(Math.max(0, deliveryTariff.freeFrom - total))}.`
-                          : "Доставка по СПб — бесплатно."}
+                          : t("client.deliveryInSpbIsFree")}
                       </p>
                     ) : null}
-                    <p className="summary-note">
-                      Дата, адрес и комментарий — в корзине перед оформлением.
-                    </p>
+                    <p className="summary-note">{
+                      t("client.dateAddressAndCommentAreIn")
+                    }</p>
                     <div className="order-summary-actions">
                       <button
                         className="secondary-button"
                         type="button"
                         onClick={() => void clearCart()}
-                      >
-                        Очистить корзину
-                      </button>
+                      >{
+                        t("checkout.clearCart")
+                      }</button>
                       <button
                         className="primary-button open-cart-button"
                         type="button"
                         onClick={openCartForCheckout}
-                      >
-                        Перейти в корзину
-                      </button>
+                      >{
+                        t("client.goToCart")
+                      }</button>
                       {session.mode !== "edit" ? addendumButton : null}
                     </div>
                   </>
@@ -1648,46 +1648,46 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
           })()}
         </div>
 
-        <div className="mobile-checkout-bar" aria-label="Корзина">
+        <div className="mobile-checkout-bar" aria-label={t("storefront.nav.cart")}>
           <div className="mobile-checkout-bar-info">
             <strong>{cartCount} поз.</strong>
-            <span>{settings.showPrices && grandTotal > 0 ? formatMoney(grandTotal) : "Сумма уточняется"}</span>
+            <span>{settings.showPrices && grandTotal > 0 ? formatMoney(grandTotal) : t("client.amountPending")}</span>
           </div>
           <button
             className="mobile-checkout-bar-button"
             type="button"
             onClick={openCartForCheckout}
-          >
-            Корзина
-          </button>
+          >{
+            t("storefront.nav.cart")
+          }</button>
         </div>
 
         {cartSheetOpen && typeof document !== "undefined"
           ? createPortal(
-          <div className="cart-sheet" role="dialog" aria-modal="true" aria-label="Корзина заказа">
+          <div className="cart-sheet" role="dialog" aria-modal="true" aria-label={t("client.orderCart")}>
             <button
               className="cart-sheet-backdrop"
               type="button"
-              aria-label="Закрыть корзину"
+              aria-label={t("client.closeCart")}
               onClick={() => setCartSheetOpen(false)}
             />
             <div className="cart-sheet-panel">
               <div className="cart-sheet-head">
                 <div>
-                  <strong>Корзина</strong>
-                  <p className="muted small">{cartCount ? `${cartCount} поз.` : "Пока пусто"}</p>
+                  <strong>{t("storefront.nav.cart")}</strong>
+                  <p className="muted small">{cartCount ? `${cartCount} поз.` : t("shared.empty.blank")}</p>
                 </div>
-                <button className="header-button" type="button" onClick={() => setCartSheetOpen(false)}>
-                  Закрыть
-                </button>
+                <button className="header-button" type="button" onClick={() => setCartSheetOpen(false)}>{
+                  t("shared.action.close")
+                }</button>
               </div>
 
               <div className="cart-sheet-scroll">
               {!cartCount ? (
                 <EmptyState
-                  title="Корзина пуста"
-                  message="Добавьте товары из каталога — они появятся здесь для быстрой правки."
-                  actionLabel="К каталогу"
+                  title={t("storefront.cart.empty")}
+                  message={t("client.addCatalogProductsTheyWillAppear")}
+                  actionLabel={t("storefront.nav.backToCatalog")}
                   onAction={() => {
                     setCartSheetOpen(false);
                     window.setTimeout(() => {
@@ -1733,7 +1733,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                             })()}
                           </div>
                           <div className="quantity-control cart-sheet-qty">
-                            <button type="button" onClick={() => changeQuantity(item.productId, -1, item.orderStep)} aria-label="Уменьшить">−</button>
+                            <button type="button" onClick={() => changeQuantity(item.productId, -1, item.orderStep)} aria-label={t("shared.qty.decrease")}>−</button>
                             <div className="quantity-input-wrap">
                               <input
                                 className="quantity-input"
@@ -1747,7 +1747,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                               />
                               <small>{quantityInputUnitLabel(item.unit, item.multiplier)}</small>
                             </div>
-                            <button type="button" onClick={() => changeQuantity(item.productId, 1, item.orderStep)} aria-label="Увеличить">+</button>
+                            <button type="button" onClick={() => changeQuantity(item.productId, 1, item.orderStep)} aria-label={t("shared.qty.increase")}>+</button>
                           </div>
                         </div>
                       </div>
@@ -1762,7 +1762,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                         </div>
                         <div className="cart-sheet-item-actions">
                           <div className="quantity-control cart-sheet-qty">
-                            <button type="button" onClick={() => changeCustomQuantity(item.id, -1)} aria-label="Уменьшить">−</button>
+                            <button type="button" onClick={() => changeCustomQuantity(item.id, -1)} aria-label={t("shared.qty.decrease")}>−</button>
                             <div className="quantity-input-wrap">
                               <input
                                 className="quantity-input"
@@ -1781,7 +1781,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                               />
                               <small>{item.unit || "шт."}</small>
                             </div>
-                            <button type="button" onClick={() => changeCustomQuantity(item.id, 1)} aria-label="Увеличить">+</button>
+                            <button type="button" onClick={() => changeCustomQuantity(item.id, 1)} aria-label={t("shared.qty.increase")}>+</button>
                           </div>
                         </div>
                       </div>
@@ -1791,8 +1791,8 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                     <div className="cart-sheet-item cart-sheet-item--delivery" key="clover-delivery-spb">
                       <div className="cart-sheet-item-head">
                         <div className="cart-sheet-item-main">
-                          <strong>{settings.deliveryOneCName || "Доставка"}</strong>
-                          <small>Доставка по СПб · 1 шт.</small>
+                          <strong>{settings.deliveryOneCName || t("checkout.delivery")}</strong>
+                          <small>{t("client.deliveryInSpb1Pc")}</small>
                         </div>
                         <div className="cart-sheet-item-actions">
                           <strong>{formatMoney(deliveryFee)}</strong>
@@ -1807,7 +1807,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                 className={`field delivery-date-field cart-sheet-date${missingFields.date ? " is-invalid" : ""}`}
                 ref={cartDateFieldRef}
               >
-                <span>Дата доставки</span>
+                <span>{t("checkout.deliveryDate")}</span>
                 <button
                   className={`delivery-date-trigger${deliveryDateParts ? " is-selected" : ""}${missingFields.date ? " is-invalid" : ""}`}
                   type="button"
@@ -1821,51 +1821,51 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                         <strong>{deliveryDateParts.weekday}</strong>
                         <small>{deliveryDateParts.monthYear}</small>
                       </span>
-                      <span className="delivery-date-action">Изменить</span>
+                      <span className="delivery-date-action">{t("shared.action.edit")}</span>
                     </>
                   ) : (
                     <>
                       <span className="delivery-date-day is-empty" aria-hidden="true">—</span>
                       <span className="delivery-date-text">
-                        <strong>Выберите дату</strong>
-                        <small>Когда привезти заказ</small>
+                        <strong>{t("client.chooseADate")}</strong>
+                        <small>{t("client.whenToDeliverTheOrder")}</small>
                       </span>
-                      <span className="delivery-date-action">Календарь</span>
+                      <span className="delivery-date-action">{t("client.calendar")}</span>
                     </>
                   )}
                 </button>
                 {missingFields.date && (
-                  <p className="field-error-hint">Укажите дату доставки</p>
+                  <p className="field-error-hint">{t("client.setTheDeliveryDate")}</p>
                 )}
               </div>
 
               <label
                 className={`field cart-sheet-address${missingFields.address ? " is-invalid" : ""}`}
                 ref={cartAddressFieldRef}
-              >
-                Адрес доставки
-                <select
+              >{
+                t("client.address.title")
+                }<select
                   value={addressId}
                   onChange={(e) => updateAddressId(e.target.value)}
                   aria-invalid={missingFields.address}
                 >
-                  <option value="">Выберите адрес</option>
+                  <option value="">{t("client.chooseAnAddress")}</option>
                   {addresses.map((item) => (
                     <option value={item.id} key={item.id}>
-                      {item.label}{item.isDefault ? " — основной" : ""} · {item.address}
+                      {item.label}{item.isDefault ? t("client.primary") : ""} · {item.address}
                     </option>
                   ))}
                 </select>
                 {missingFields.address && (
-                  <span className="field-error-hint">Укажите адрес доставки</span>
+                  <span className="field-error-hint">{t("checkout.needAddress")}</span>
                 )}
               </label>
 
-              <label className="field cart-sheet-comment" style={{ marginTop: 10 }}>
-                Комментарий к заказу
-                <textarea
+              <label className="field cart-sheet-comment" style={{ marginTop: 10 }}>{
+                t("client.orderComment")
+                }<textarea
                   rows="3"
-                  placeholder="Например: позвонить перед доставкой"
+                  placeholder={t("client.forExampleCallBeforeDelivery")}
                   value={clientComment}
                   onChange={(e) => setClientComment(e.target.value)}
                 />
@@ -1874,7 +1874,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
 
               <div className="cart-sheet-footer">
                 <div className="cart-sheet-total">
-                  <span>Итого</span>
+                  <span>{t("checkout.total")}</span>
                   <strong>{settings.showPrices && grandTotal > 0 ? formatMoney(grandTotal) : `${cartCount} поз.`}</strong>
                 </div>
                 {settings.showPrices && total > 0 ? (
@@ -1885,14 +1885,14 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                   >
                     {deliveryFee > 0
                       ? `В заказе позиция «Доставка» — ${formatMoney(deliveryTariff.fee)}. Добавьте ещё на ${formatMoney(Math.max(0, deliveryTariff.freeFrom - total))} для бесплатной.`
-                      : "Доставка по Санкт-Петербургу — бесплатно."}
+                      : t("client.deliveryInSaintPetersburgIsFree")}
                   </p>
                 ) : null}
-                <button className="secondary-button" type="button" onClick={() => void clearCart()}>
-                  Очистить корзину
-                </button>
+                <button className="secondary-button" type="button" onClick={() => void clearCart()}>{
+                  t("checkout.clearCart")
+                }</button>
                 <button className="save-order-button" type="button" onClick={submitOrder}>
-                  {session.mode === "edit" ? "Сохранить изменения" : "Оформить заказ"}
+                  {session.mode === "edit" ? t("shared.action.saveChanges") : t("storefront.nav.checkout")}
                 </button>
                 {session.mode !== "edit" ? addendumButton : null}
               </div>
@@ -1904,19 +1904,19 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
 
         {datePickerOpen && typeof document !== "undefined"
           ? createPortal(
-          <div className="delivery-date-sheet" role="dialog" aria-modal="true" aria-label="Дата доставки">
+          <div className="delivery-date-sheet" role="dialog" aria-modal="true" aria-label={t("checkout.deliveryDate")}>
             <button
               className="delivery-date-sheet-backdrop"
               type="button"
-              aria-label="Закрыть выбор даты"
+              aria-label={t("client.closeDatePicker")}
               onClick={closeDatePickerToCart}
             />
             <div className="delivery-date-sheet-panel">
               <div className="delivery-date-sheet-head">
-                <strong>Дата доставки</strong>
-                <button className="header-button" type="button" onClick={closeDatePickerToCart}>
-                  Готово
-                </button>
+                <strong>{t("checkout.deliveryDate")}</strong>
+                <button className="header-button" type="button" onClick={closeDatePickerToCart}>{
+                  t("shared.status.done")
+                }</button>
               </div>
               {deliveryDateParts && (
                 <div className="delivery-date-preview">
@@ -1946,9 +1946,9 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
 
   return (
     <main className="clover-app">
-      <Header title={session.mode === "edit" ? "Редактирование заказа" : session.mode === "repeat" ? "Повтор заказа" : "Новый заказ"}>
+      <Header title={session.mode === "edit" ? t("client.order.editing") : session.mode === "repeat" ? t("client.order.repeat") : t("client.order.new")}>
         <ManagerContact settings={settings} />
-        <button className="header-button" type="button" onClick={onClose}>← Назад</button>
+        <button className="header-button" type="button" onClick={onClose}>{t("shared.action.back")}</button>
       </Header>
       {catalogBody}
     </main>

@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../serverApi";
 import {
@@ -9,12 +10,12 @@ import {
 import { EMPTY_LINK } from "../../shared/appHelpers";
 import { parseMatrixExcelFile } from "../../shared/matrixExcelImport";
 
-function statusLabel(status) {
-  if (status === "exact") return "Точное имя";
-  if (status === "code") return "По коду";
-  if (status === "fuzzy") return "Похожее";
-  if (status === "empty") return "Пусто";
-  return "Не найдено";
+function statusLabel(status, t) {
+  if (status === "exact") return t("manager.exactName");
+  if (status === "code") return t("manager.byCode");
+  if (status === "fuzzy") return t("manager.similar");
+  if (status === "empty") return t("shared.empty.short");
+  return t("shared.empty.notFound");
 }
 
 function excelTargetAlreadyPresent(row, target) {
@@ -89,6 +90,7 @@ export function MatrixExcelReview({
   initialFile = null,
   target = "matrix",
 }) {
+  const { t } = useLocalization();
   const isStorefront = target === "storefront";
   const isCatalog = target === "catalog";
   const skipClient = isStorefront || isCatalog;
@@ -128,7 +130,7 @@ export function MatrixExcelReview({
     setSummary(null);
     setRows(null);
     setImportDone(false);
-    setImportState({ status: "busy", message: "Читаем Excel…" });
+    setImportState({ status: "busy", message: t("manager.readingExcel") });
     try {
       const parsed = await parseMatrixExcelFile(file);
       const matchResult = await api.matchOneCImportRows(parsed.rows || []);
@@ -143,7 +145,7 @@ export function MatrixExcelReview({
           products,
         })
       );
-      setImportState({ status: "review", message: "Сопоставление Excel" });
+      setImportState({ status: "review", message: t("manager.excelMatching") });
     } catch (pickError) {
       setError(pickError.message);
       setImportState({ status: "idle" });
@@ -270,17 +272,17 @@ export function MatrixExcelReview({
         setImportState({
           status: "done",
           message: isStorefront
-            ? "Товары уже на витрине"
+            ? t("manager.productsAlreadyOnTheStorefront")
             : isCatalog
-              ? "Товары уже в каталоге"
-              : "Товары уже в матрице",
+              ? t("manager.productsAlreadyInTheCatalog")
+              : t("manager.productsAlreadyInTheMatrix"),
         });
         setError(
           isStorefront
-            ? "Новых позиций нет — все отмеченные уже на витрине."
+            ? t("manager.noNewItemsAllCheckedOnes3")
             : isCatalog
-              ? "Новых позиций нет — все отмеченные уже в каталоге Clover."
-              : "Новых позиций нет — все отмеченные уже в матрице."
+              ? t("manager.noNewItemsAllCheckedOnes")
+              : t("manager.noNewItemsAllCheckedOnes2")
         );
         onAdded?.([]);
       }
@@ -417,7 +419,7 @@ export function MatrixExcelReview({
       }
 
       setImportDone(true);
-      setImportState({ status: "done", message: "Товары из Excel загружены" });
+      setImportState({ status: "done", message: t("manager.productsLoadedFromExcel") });
       const parts = [];
       if (addedNames.length) {
         parts.push(
@@ -443,7 +445,7 @@ export function MatrixExcelReview({
       onAdded?.(addedNames);
     } catch (addError) {
       setError(addError.message);
-      setImportState({ status: "review", message: "Ошибка загрузки Excel" });
+      setImportState({ status: "review", message: t("manager.excelLoadError") });
     } finally {
       setBusy(false);
     }
@@ -457,15 +459,15 @@ export function MatrixExcelReview({
         {!skipChooser || error || busy ? (
           <strong>
             {isStorefront
-              ? "Excel на витрину"
+              ? t("manager.excelToStorefront")
               : isCatalog
-                ? "Excel в каталог Clover"
+                ? t("manager.excelIntoTheCloverCatalog")
                 : "Excel"}
           </strong>
         ) : null}
         {error && <div className="sync-error" style={{ marginTop: 8 }}>{error}</div>}
         {busy ? (
-          <p className="muted small" style={{ marginTop: 8 }}>Читаем файл…</p>
+          <p className="muted small" style={{ marginTop: 8 }}>{t("manager.readingTheFile")}</p>
         ) : null}
         {skipChooser && !error ? (
           <input
@@ -483,7 +485,7 @@ export function MatrixExcelReview({
             disabled={busy}
             onClick={() => fileRef.current?.click()}
           >
-            {busy ? "Читаем файл…" : skipChooser ? "Выбрать другой файл" : "Выбрать файл Excel"}
+            {busy ? t("manager.readingTheFile") : skipChooser ? t("manager.chooseAnotherFile") : t("manager.chooseAnExcelFile")}
           </button>
           <button
             className="secondary-button"
@@ -493,9 +495,9 @@ export function MatrixExcelReview({
               setImportState({ status: "idle" });
               (onBack || onCancel)?.();
             }}
-          >
-            Отмена
-          </button>
+          >{
+            t("shared.modal.cancel")
+          }</button>
           <input
             ref={fileRef}
             type="file"
@@ -512,7 +514,7 @@ export function MatrixExcelReview({
   // Окно сопоставления и редактирования.
   return (
     <div className="bulk-photo-panel matrix-excel-review" style={{ marginTop: 10 }}>
-      <strong>{fileName ? `Excel: ${fileName}` : "Сопоставление с 1С"}</strong>
+      <strong>{fileName ? `Excel: ${fileName}` : t("manager.matchingWith1c")}</strong>
       {summary && (
         <div className="matrix-summary" style={{ marginTop: 8 }}>
           <span>Строк: {summary.total}</span>
@@ -522,10 +524,10 @@ export function MatrixExcelReview({
           <span>Без пары: {summary.miss}</span>
           <span>
             {isStorefront
-              ? "Уже на витрине"
+              ? t("manager.alreadyOnStorefront")
               : isCatalog
-                ? "Уже в каталоге"
-                : "Уже в матрице"}
+                ? t("manager.alreadyInCatalog")
+                : t("manager.alreadyInMatrix")}
             :{" "}
             {isStorefront
               ? (rows || []).filter((row) => row.alreadyOnStorefront).length
@@ -588,23 +590,23 @@ export function MatrixExcelReview({
               <div className="matrix-excel-source">
                 <strong>{row.name || "—"}</strong>
                 <span className="muted small">
-                  {row.code ? `Код из файла: ${row.code}` : "Без кода"} ·{" "}
-                  {statusLabel(row.status)}
+                  {row.code ? `Код из файла: ${row.code}` : t("manager.noCode")} ·{" "}
+                  {statusLabel(row.status, t)}
                   {row.score ? ` (${Math.round(row.score * 100)}%)` : ""}
                   {row.alreadyInMatrix ? (
-                    <span className="badge yellow" style={{ marginLeft: 6 }}>
-                      В матрице
-                    </span>
+                    <span className="badge yellow" style={{ marginLeft: 6 }}>{
+                      t("manager.inTheMatrix")
+                    }</span>
                   ) : null}
                   {row.alreadyInClover && !row.alreadyInMatrix ? (
-                    <span className="badge green" style={{ marginLeft: 6 }}>
-                      В каталоге Clover
-                    </span>
+                    <span className="badge green" style={{ marginLeft: 6 }}>{
+                      t("manager.inTheCloverCatalog")
+                    }</span>
                   ) : null}
                   {row.alreadyOnStorefront ? (
-                    <span className="badge green" style={{ marginLeft: 6 }}>
-                      На витрине
-                    </span>
+                    <span className="badge green" style={{ marginLeft: 6 }}>{
+                      t("manager.storefront.on")
+                    }</span>
                   ) : null}
                 </span>
               </div>
@@ -616,7 +618,7 @@ export function MatrixExcelReview({
                     chooseCandidate(row.rowIndex, event.target.value)
                   }
                 >
-                  <option value="">— не сопоставлено —</option>
+                  <option value="">{t("manager.notMatched2")}</option>
                   {options.map((item) => (
                     <option key={item.id} value={String(item.id)}>
                       {item.name}
@@ -628,21 +630,21 @@ export function MatrixExcelReview({
                   ))}
                 </select>
                 {isStorefront && row.alreadyOnStorefront ? (
-                  <span className="muted small">
-                    Уже на витрине — дубликат не добавляется
-                  </span>
+                  <span className="muted small">{
+                    t("manager.alreadyOnTheStorefrontDuplicateIs")
+                  }</span>
                 ) : isCatalog && row.alreadyInClover ? (
-                  <span className="muted small">
-                    Уже в каталоге Clover — дубликат не добавляется
-                  </span>
+                  <span className="muted small">{
+                    t("manager.alreadyInTheCloverCatalogDuplicate")
+                  }</span>
                 ) : !skipClient && row.alreadyInMatrix ? (
-                  <span className="muted small">
-                    Уже в матрице клиента — дубликат не добавляется
-                  </span>
+                  <span className="muted small">{
+                    t("manager.alreadyInTheClientMatrixDuplicate")
+                  }</span>
                 ) : row.alreadyInClover ? (
-                  <span className="muted small">
-                    Уже в каталоге Clover — будет использован существующий товар, без дубля
-                  </span>
+                  <span className="muted small">{
+                    t("manager.alreadyInTheCloverCatalogThe")
+                  }</span>
                 ) : row.match?.cloverLink?.productId ? (
                   <span className="muted small">
                     Уже в Clover:{" "}
@@ -652,7 +654,7 @@ export function MatrixExcelReview({
                 <div className="matrix-excel-search">
                   <input
                     type="search"
-                    placeholder="Уточнить поиск в 1С"
+                    placeholder={t("manager.refine1cSearch")}
                     value={row.search}
                     disabled={busy || importDone}
                     onChange={(event) =>
@@ -671,7 +673,7 @@ export function MatrixExcelReview({
                     disabled={busy || importDone || row.searchLoading}
                     onClick={() => void searchOneC(row.rowIndex)}
                   >
-                    {row.searchLoading ? "…" : "Найти"}
+                    {row.searchLoading ? "…" : t("shared.action.find")}
                   </button>
                 </div>
                 {row.searchOpen && !importDone && (
@@ -740,7 +742,7 @@ export function MatrixExcelReview({
                       </button>
                     ))}
                     {!row.searchLoading && !(row.searchItems || []).length && (
-                      <span className="muted small">Ничего не найдено</span>
+                      <span className="muted small">{t("manager.nothingFound")}</span>
                     )}
                   </div>
                 )}
@@ -758,11 +760,11 @@ export function MatrixExcelReview({
           onClick={() => void addSelected()}
         >
           {importDone
-            ? "Добавлено"
+            ? t("manager.added")
             : busy
               ? progress.total
                 ? `Добавляем… ${progress.done}/${progress.total}`
-                : "Добавляем…"
+                : t("client.adding")
               : isCatalog
                 ? `Добавить в каталог (${selectedCount})`
                 : `Добавить товары (${selectedCount})`}
@@ -781,9 +783,9 @@ export function MatrixExcelReview({
               }))
             );
           }}
-        >
-          Отметить все новые
-        </button>
+        >{
+          t("manager.selectAllNew")
+        }</button>
         <button
           className="secondary-button"
           type="button"
@@ -800,7 +802,7 @@ export function MatrixExcelReview({
             onCancel?.();
           }}
         >
-          {importDone ? "Закрыть" : "Отмена"}
+          {importDone ? t("shared.action.close") : t("shared.modal.cancel")}
         </button>
       </div>
     </div>
