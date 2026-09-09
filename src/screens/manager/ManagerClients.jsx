@@ -32,6 +32,7 @@ import {
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { addressLabel } from "../../shared/i18n/displayLabels";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 import { MatrixOneCProductAdd } from "./MatrixOneCProductAdd";
 import { MatrixCloverCatalogAdd } from "./MatrixCloverCatalogAdd";
 import { ProductEditor } from "./ProductEditor";
@@ -508,7 +509,7 @@ function ManagerClientEditor({
       setMessage(t("manager.clientDetailsWereSavedInClover"));
       await onReload();
     } catch (saveError) {
-      setError(saveError.message || "Не удалось сохранить данные клиента.");
+      setError(errorDisplayMessage(saveError, t, "manager.error.clientSaveFailed"));
     } finally {
       setSaving(false);
     }
@@ -532,8 +533,8 @@ function ManagerClientEditor({
       setPasswordDraft("");
     } catch (saveError) {
       await appAlert({
-        title: "Не удалось сменить пароль",
-        message: saveError.message,
+        title: t("manager.error.passwordChangeFailed"),
+        message: errorDisplayMessage(saveError, t, "manager.error.passwordChangeFailed"),
         tone: "danger",
       });
     } finally {
@@ -1077,7 +1078,7 @@ export function ManagerClients({
           ...current,
           [openClientId]: {
             status: "error",
-            message: error.message || "Не удалось загрузить цены",
+            message: errorDisplayMessage(error, t, "manager.error.pricesLoadFailed"),
           },
         }));
       }
@@ -1098,7 +1099,7 @@ export function ManagerClients({
       window.clearTimeout(timer);
       window.clearInterval(poll);
     };
-  }, [openClientId, matrixPricesKey, catalogPricesVersion, setProducts]);
+  }, [openClientId, matrixPricesKey, catalogPricesVersion, setProducts, t]);
 
   // Снимок состава матрицы: при смене клиента — замена, при правках — только рост.
   // Иначе снятие галочки сразу перезаписывает снимок и строка пропадает из списка.
@@ -1182,8 +1183,8 @@ export function ManagerClients({
       }
     } catch (error) {
       await appAlert({
-        title: "Не удалось создать клиента",
-        message: error.message,
+        title: t("manager.error.clientCreateFailed"),
+        message: errorDisplayMessage(error, t, "manager.error.clientCreateFailed"),
         tone: "danger",
       });
     } finally {
@@ -1239,8 +1240,8 @@ export function ManagerClients({
       restoreWindowScroll(pageY);
     } catch (error) {
       void appAlert({
-        title: "Не удалось сохранить",
-        message: t("manager.products.saveFailedNamed", { message: error.message }),
+        title: t("shared.error.saveFailed"),
+        message: t("manager.products.saveFailedNamed", { message: errorDisplayMessage(error, t) }),
         tone: "danger",
       });
     }
@@ -1266,8 +1267,8 @@ export function ManagerClients({
       setEditorProduct(undefined);
     } catch (error) {
       void appAlert({
-        title: "Не удалось удалить",
-        message: error.message || "Не удалось удалить товар.",
+        title: t("shared.error.deleteFailed"),
+        message: errorDisplayMessage(error, t, "manager.error.productDeleteFailed"),
         tone: "danger",
       });
     }
@@ -1465,7 +1466,7 @@ export function ManagerClients({
         ...current,
         [clientId]: {
           status: "error",
-          message: error.message || "Не удалось сохранить матрицу.",
+          message: errorDisplayMessage(error, t, "manager.error.matrixSaveFailed"),
         },
       }));
     }
@@ -1893,9 +1894,9 @@ export function ManagerClients({
                                     });
                                   } catch (deleteError) {
                                     await appAlert({
-                                      title: "Не удалось удалить",
+                                      title: t("shared.error.deleteFailed"),
                                       message:
-                                        deleteError.message || t("manager.failedToDeleteTheClient"),
+                                        errorDisplayMessage(deleteError, t, "manager.failedToDeleteTheClient"),
                                       tone: "danger",
                                     });
                                   }

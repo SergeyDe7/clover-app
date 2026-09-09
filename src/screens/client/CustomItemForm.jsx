@@ -3,6 +3,7 @@ import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useState } from "react";
 import { CustomRequestPhoto } from "../../shared/SharedPanels";
 import { makeId } from "../../shared/appHelpers";
+import { codedError, errorDisplayMessage, isKnownErrorCode } from "../../shared/i18n/errorDisplay.js";
 
 const CUSTOM_REQUEST_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
@@ -13,7 +14,7 @@ const CUSTOM_REQUEST_PHOTO_MAX_DIMENSION = 1600;
 export function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Не удалось прочитать фотографию."));
+    reader.onerror = () => reject(codedError("PHOTO_READ_FAILED", "Failed to read the photograph."));
     reader.onload = () => resolve(String(reader.result || ""));
     reader.readAsDataURL(file);
   });
@@ -22,7 +23,7 @@ export function readFileAsDataUrl(file) {
 export function loadBrowserImage(source) {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.onerror = () => reject(new Error("Файл не удалось распознать как фотографию."));
+    image.onerror = () => reject(codedError("PHOTO_UNRECOGNIZED", "The file is not a photograph."));
     image.onload = () => resolve(image);
     image.src = source;
   });
@@ -94,7 +95,11 @@ export function CustomItemForm({ onAdd }) {
       const photo = await prepareCustomRequestPhoto(file, t);
       setForm((current) => ({ ...current, photo }));
     } catch (error) {
-      setPhotoError(error.message || "Не удалось прикрепить фотографию.");
+      setPhotoError(
+        isKnownErrorCode(error?.code)
+          ? errorDisplayMessage(error, t, "shared.error.photoAttachFailed")
+          : error.message || t("shared.error.photoAttachFailed")
+      );
     } finally {
       setPhotoBusy(false);
     }

@@ -14392,6 +14392,446 @@ export const SEEDS = {
     "tg": "Статус тағйир ёфт: {from} → {to} (1C: {state})",
     "zh-CN": "状态已更改：{from} → {to}（1C：{state}）",
     "ar": "تغيرت الحالة: {from} → {to} (1C: {state})"
+  },
+  "shared.error.timeout": {
+    "en": "The server is temporarily unavailable. Please try again.",
+    "uz": "Server vaqtincha mavjud emas. Qayta urinib ko‘ring.",
+    "ky": "Сервер убактылуу жеткиликсиз. Кайра аракет кылыңыз.",
+    "tg": "Сервер муваққатан дастрас нест. Бори дигар кӯшиш кунед.",
+    "zh-CN": "服务器暂时不可用。请再试一次。",
+    "ar": "الخادم غير متاح مؤقتًا. حاول مرة أخرى."
+  },
+  "shared.error.network": {
+    "en": "Could not reach the server. Check your internet connection and try again.",
+    "uz": "Server bilan bog‘lanib bo‘lmadi. Internetni tekshirib, qayta urinib ko‘ring.",
+    "ky": "Сервер менен байланышуу мүмкүн болбоду. Интернетти текшерип, кайра аракет кылыңыз.",
+    "tg": "Бо сервер пайваст шудан муяссар нашуд. Интернетро санҷед ва бори дигар кӯшиш кунед.",
+    "zh-CN": "无法连接服务器。请检查网络后重试。",
+    "ar": "تعذر الاتصال بالخادم. تحقق من الإنترنت وحاول مرة أخرى."
+  },
+  "shared.error.apiUnavailable": {
+    "en": "The API server is unavailable now. Refresh the page in a minute or contact a manager.",
+    "uz": "API serveri hozir mavjud emas. Bir daqiqadan so‘ng sahifani yangilang yoki menejerga murojaat qiling.",
+    "ky": "API сервери азыр жеткиликсиз. Бир мүнөттөн кийин баракты жаңыртыңыз же менеджерге кайрылыңыз.",
+    "tg": "Сервери API ҳоло дастрас нест. Пас аз як дақиқа саҳифаро навсозӣ кунед ё ба менеҷер муроҷиат кунед.",
+    "zh-CN": "API 服务器当前不可用。请一分钟后刷新页面或联系经理。",
+    "ar": "خادم واجهة البرمجة غير متاح الآن. حدّث الصفحة بعد دقيقة أو تواصل مع المدير."
+  },
+  "shared.error.requestTooLarge": {
+    "en": "The request is too large for the server. Refresh the page and save the product again.",
+    "uz": "So‘rov server uchun juda katta. Sahifani yangilang va mahsulotni qayta saqlang.",
+    "ky": "Сурам сервер үчүн өтө чоң. Баракты жаңыртып, товарды кайра сактаңыз.",
+    "tg": "Дархост барои сервер хеле калон аст. Саҳифаро навсозӣ кунед ва молро бори дигар захира кунед.",
+    "zh-CN": "请求对服务器来说太大。请刷新页面并重新保存商品。",
+    "ar": "الطلب أكبر مما يتحمله الخادم. حدّث الصفحة واحفظ المنتج مرة أخرى."
+  },
+  "shared.error.invalidResponse": {
+    "en": "Could not read the server response. Refresh the page or sign in again.",
+    "uz": "Server javobini o‘qib bo‘lmadi. Sahifani yangilang yoki qayta kiring.",
+    "ky": "Сервердин жообун окуу мүмкүн болбоду. Баракты жаңыртыңыз же кайра кириңиз.",
+    "tg": "Ҷавоби серверро хондан муяссар нашуд. Саҳифаро навсозӣ кунед ё бори дигар ворид шавед.",
+    "zh-CN": "无法读取服务器响应。请刷新页面或重新登录。",
+    "ar": "تعذر قراءة رد الخادم. حدّث الصفحة أو سجّل الدخول مرة أخرى."
+  },
+  "shared.error.noResponse": {
+    "en": "The server did not respond. Sign in again or try later.",
+    "uz": "Server javob bermadi. Qayta kiring yoki keyinroq urinib ko‘ring.",
+    "ky": "Сервер жооп берген жок. Кайра кириңиз же кийинчерээк аракет кылыңыз.",
+    "tg": "Сервер ҷавоб надод. Бори дигар ворид шавед ё дертар кӯшиш кунед.",
+    "zh-CN": "服务器没有响应。请重新登录或稍后再试。",
+    "ar": "لم يرد الخادم. سجّل الدخول مرة أخرى أو حاول لاحقًا."
+  },
+  "shared.error.requestFailed": {
+    "en": "The request failed. Please try later.",
+    "uz": "So‘rov bajarilmadi. Keyinroq urinib ko‘ring.",
+    "ky": "Сурам аткарылган жок. Кийинчерээк аракет кылыңыз.",
+    "tg": "Дархост иҷро нашуд. Дертар кӯшиш кунед.",
+    "zh-CN": "请求失败。请稍后再试。",
+    "ar": "فشل الطلب. حاول لاحقًا."
+  },
+  "shared.error.loadFailed": {
+    "en": "Could not load",
+    "uz": "Yuklab bo‘lmadi",
+    "ky": "Жүктөлгөн жок",
+    "tg": "Бор карда нашуд",
+    "zh-CN": "无法加载",
+    "ar": "تعذر التحميل"
+  },
+  "shared.error.saveFailed": {
+    "en": "Could not save",
+    "uz": "Saqlab bo‘lmadi",
+    "ky": "Сакталган жок",
+    "tg": "Захира нашуд",
+    "zh-CN": "无法保存",
+    "ar": "تعذر الحفظ"
+  },
+  "shared.error.deleteFailed": {
+    "en": "Could not delete",
+    "uz": "O‘chirib bo‘lmadi",
+    "ky": "Өчүрүлгөн жок",
+    "tg": "Нест карда нашуд",
+    "zh-CN": "无法删除",
+    "ar": "تعذر الحذف"
+  },
+  "shared.error.addFailed": {
+    "en": "Could not add",
+    "uz": "Qo‘shib bo‘lmadi",
+    "ky": "Кошулган жок",
+    "tg": "Илова карда нашуд",
+    "zh-CN": "无法添加",
+    "ar": "تعذر الإضافة"
+  },
+  "shared.error.sendFailed": {
+    "en": "Could not send",
+    "uz": "Yuborib bo‘lmadi",
+    "ky": "Жөнөтүлгөн жок",
+    "tg": "Фиристода нашуд",
+    "zh-CN": "无法发送",
+    "ar": "تعذر الإرسال"
+  },
+  "shared.error.downloadFailed": {
+    "en": "Could not download",
+    "uz": "Yuklab olib bo‘lmadi",
+    "ky": "Жүктөп алуу мүмкүн болбоду",
+    "tg": "Боргирӣ карда нашуд",
+    "zh-CN": "无法下载",
+    "ar": "تعذر التنزيل"
+  },
+  "shared.error.copyFailed": {
+    "en": "Could not copy to the clipboard.",
+    "uz": "Buferga nusxa olinmadi.",
+    "ky": "Алмашуу буферине көчүрүлгөн жок.",
+    "tg": "Ба буфер нусха бардошта нашуд.",
+    "zh-CN": "无法复制到剪贴板。",
+    "ar": "تعذر النسخ إلى الحافظة."
+  },
+  "shared.error.restoreFailed": {
+    "en": "Could not restore",
+    "uz": "Tiklash imkoni bo‘lmadi",
+    "ky": "Калыбына келтирилген жок",
+    "tg": "Барқарор карда нашуд",
+    "zh-CN": "无法恢复",
+    "ar": "تعذر الاستعادة"
+  },
+  "shared.error.panelShowFailed": {
+    "en": "Could not show this block",
+    "uz": "Blokni ko‘rsatib bo‘lmadi",
+    "ky": "Блокту көрсөтүү мүмкүн болбоду",
+    "tg": "Блокро нишон додан муяссар нашуд",
+    "zh-CN": "无法显示此区块",
+    "ar": "تعذر عرض هذه الكتلة"
+  },
+  "shared.error.passkeyAddFailed": {
+    "en": "Could not add the passkey.",
+    "uz": "Kirish kalitini qo‘shib bo‘lmadi.",
+    "ky": "Кирүү ачкычы кошулган жок.",
+    "tg": "Калиди дастрасӣ илова карда нашуд.",
+    "zh-CN": "无法添加通行密钥。",
+    "ar": "تعذر إضافة مفتاح المرور."
+  },
+  "shared.error.photoAttachFailed": {
+    "en": "Could not attach the photo.",
+    "uz": "Fotosuratni biriktib bo‘lmadi.",
+    "ky": "Сүрөт тиркелген жок.",
+    "tg": "Акс замима карда нашуд.",
+    "zh-CN": "无法附上照片。",
+    "ar": "تعذر إرفاق الصورة."
+  },
+  "shared.error.photoReadFailed": {
+    "en": "Could not read the photo.",
+    "uz": "Fotosuratni o‘qib bo‘lmadi.",
+    "ky": "Сүрөт окулган жок.",
+    "tg": "Акс хонда нашуд.",
+    "zh-CN": "无法读取照片。",
+    "ar": "تعذر قراءة الصورة."
+  },
+  "shared.error.photoPrepareFailed": {
+    "en": "The browser could not prepare the photo.",
+    "uz": "Brauzer fotosuratni tayyorlay olmadi.",
+    "ky": "Браузер сүрөттү даярдай алган жок.",
+    "tg": "Браузер аксро омода карда натавонист.",
+    "zh-CN": "浏览器无法处理这张照片。",
+    "ar": "تعذر على المتصفح تجهيز الصورة."
+  },
+  "shared.error.photoUnrecognized": {
+    "en": "The file could not be recognized as a photo.",
+    "uz": "Fayl fotosurat sifatida tanilmadi.",
+    "ky": "Файл сүрөт катары таанылган жок.",
+    "tg": "Файл ҳамчун акс шинохта нашуд.",
+    "zh-CN": "无法将该文件识别为照片。",
+    "ar": "تعذر التعرف على الملف كصورة."
+  },
+  "shared.error.photoRequired": {
+    "en": "Choose a product photo.",
+    "uz": "Mahsulot fotosuratini tanlang.",
+    "ky": "Товардын сүрөтүн тандаңыз.",
+    "tg": "Акси молро интихоб кунед.",
+    "zh-CN": "请选择商品照片。",
+    "ar": "اختر صورة المنتج."
+  },
+  "shared.error.photoType": {
+    "en": "Only JPG, PNG, or WEBP images are allowed.",
+    "uz": "Faqat JPG, PNG yoki WEBP rasmlarga ruxsat beriladi.",
+    "ky": "Жалгыз JPG, PNG же WEBP сүрөттөрүнө уруксат берилет.",
+    "tg": "Танҳо тасвирҳои JPG, PNG ё WEBP иҷозат дода мешаванд.",
+    "zh-CN": "仅允许 JPG、PNG 或 WEBP 图片。",
+    "ar": "يُسمح فقط بصور JPG أو PNG أو WEBP."
+  },
+  "shared.error.photoMaxSize": {
+    "en": "The maximum file size is 5 MB.",
+    "uz": "Faylning maksimal hajmi 5 MB.",
+    "ky": "Файлдын максималдуу өлчөмү 5 МБ.",
+    "tg": "Андозаи максималии файл 5 МБ аст.",
+    "zh-CN": "最大文件大小为 5 MB。",
+    "ar": "الحد الأقصى لحجم الملف هو 5 ميغابايت."
+  },
+  "shared.error.photoStillTooLarge": {
+    "en": "The photo is still too large after processing. Choose a smaller image.",
+    "uz": "Qayta ishlagandan keyin ham fotosurat juda katta. Kichikroq rasm tanlang.",
+    "ky": "Иштетилгенден кийин да сүрөт өтө чоң. Кичирээк сүрөт тандаңыз.",
+    "tg": "Пас аз коркард ҳам акс хеле калон аст. Тасвири хурдтар интихоб кунед.",
+    "zh-CN": "处理后照片仍然过大。请选择更小的图片。",
+    "ar": "لا تزال الصورة كبيرة بعد المعالجة. اختر صورة أصغر."
+  },
+  "shared.error.excelNoNameRows": {
+    "en": "No rows with a name were found. Expected columns “Name”/“Product” and optionally “Code”.",
+    "uz": "Nomi bor qator topilmadi. “Nomi”/“Mahsulot” va ixtiyoriy “Kod” ustunlari kutiladi.",
+    "ky": "Аты бар сап табылган жок. «Аталышы»/«Товар» жана кошумча «Код» тилкелери күтүлөт.",
+    "tg": "Ягон сатр бо ном ёфт нашуд. Сутунҳои «Ном»/«Мол» ва ихтиёрӣ «Рамз» интизор мераванд.",
+    "zh-CN": "未找到带名称的行。需要“名称”/“商品”列，可选“代码”列。",
+    "ar": "لم يُعثر على أي صف فيه اسم. الأعمدة المتوقعة هي «الاسم»/«المنتج» واختياريًا «الرمز»."
+  },
+  "shared.push.restoreHint": {
+    "en": "Tap “Enable notifications” to restore push on this device.",
+    "uz": "Ushbu qurilmada push-ni tiklash uchun “Bildirishnomalarni yoqish” tugmasini bosing.",
+    "ky": "Бул түзмөктө push калыбына келтирүү үчүн «Билдирмелерди күйгүзүү» баскычын басыңыз.",
+    "tg": "Барои барқарор кардани push дар ин дастгоҳ «Фаъол кардани огоҳиҳо»-ро пахш кунед.",
+    "zh-CN": "点击“启用通知”以在此设备上恢复推送。",
+    "ar": "اضغط «تفعيل الإشعارات» لاستعادة التنبيهات على هذا الجهاز."
+  },
+  "auth.error.faceIdLoginFailed": {
+    "en": "Face ID sign-in failed. If you added a key earlier, enter your email or add Face ID again in the profile.",
+    "uz": "Face ID orqali kirib bo‘lmadi. Kalitni oldin qo‘shgan bo‘lsangiz, pochta kiriting yoki profilida Face ID-ni qayta qo‘shing.",
+    "ky": "Face ID менен кирүү мүмкүн болбоду. Ачкычты мурда кошкон болсоңуз, почтаны жазыңыз же профилден Face ID-ни кайра кошуңуз.",
+    "tg": "Бо Face ID ворид шудан муяссар нашуд. Агар калидро пештар илова карда бошед, почтаро нависед ё Face ID-ро дар профил аз нав илова кунед.",
+    "zh-CN": "Face ID 登录失败。如果之前添加过密钥，请输入邮箱或在个人资料中重新添加 Face ID。",
+    "ar": "فشل تسجيل الدخول بـ Face ID. إذا أضفت مفتاحًا سابقًا، أدخل البريد أو أضف Face ID من جديد في الملف الشخصي."
+  },
+  "manager.error.vaultLoadFailed": {
+    "en": "Could not load access records.",
+    "uz": "Kirish yozuvlarini yuklab bo‘lmadi.",
+    "ky": "Кирүү жазуулары жүктөлгөн жок.",
+    "tg": "Сабтҳои дастрасӣ бор карда нашуданд.",
+    "zh-CN": "无法加载访问记录。",
+    "ar": "تعذر تحميل سجلات الوصول."
+  },
+  "manager.error.backupReadFailed": {
+    "en": "Could not read the backup file.",
+    "uz": "Zahira faylini o‘qib bo‘lmadi.",
+    "ky": "Камдык көчүрмө файлы окулган жок.",
+    "tg": "Файли нусхаи эҳтиётиро хондан муяссар нашуд.",
+    "zh-CN": "无法读取备份文件。",
+    "ar": "تعذر قراءة ملف النسخة الاحتياطية."
+  },
+  "manager.error.clientSaveFailed": {
+    "en": "Could not save the client data.",
+    "uz": "Mijoz ma’lumotlarini saqlab bo‘lmadi.",
+    "ky": "Кардардын маалыматы сакталган жок.",
+    "tg": "Маълумоти муштарӣ захира нашуд.",
+    "zh-CN": "无法保存客户数据。",
+    "ar": "تعذر حفظ بيانات العميل."
+  },
+  "manager.error.passwordChangeFailed": {
+    "en": "Could not change the password",
+    "uz": "Parolni almashtirib bo‘lmadi",
+    "ky": "Сырсөз алмаштырылган жок",
+    "tg": "Парол иваз карда нашуд",
+    "zh-CN": "无法更改密码",
+    "ar": "تعذر تغيير كلمة المرور"
+  },
+  "manager.error.pricesLoadFailed": {
+    "en": "Could not load prices",
+    "uz": "Narxlarni yuklab bo‘lmadi",
+    "ky": "Баалар жүктөлгөн жок",
+    "tg": "Нархҳо бор карда нашуданд",
+    "zh-CN": "无法加载价格",
+    "ar": "تعذر تحميل الأسعار"
+  },
+  "manager.error.clientCreateFailed": {
+    "en": "Could not create the client",
+    "uz": "Mijoz yaratib bo‘lmadi",
+    "ky": "Кардар түзүлгөн жок",
+    "tg": "Муштарӣ эҷод карда нашуд",
+    "zh-CN": "无法创建客户",
+    "ar": "تعذر إنشاء العميل"
+  },
+  "manager.error.matrixSaveFailed": {
+    "en": "Could not save the matrix.",
+    "uz": "Matritsani saqlab bo‘lmadi.",
+    "ky": "Матрица сакталган жок.",
+    "tg": "Матрица захира нашуд.",
+    "zh-CN": "无法保存矩阵。",
+    "ar": "تعذر حفظ المصفوفة."
+  },
+  "manager.error.productDeleteFailed": {
+    "en": "Could not delete the product.",
+    "uz": "Mahsulotni o‘chirib bo‘lmadi.",
+    "ky": "Товар өчүрүлгөн жок.",
+    "tg": "Мол нест карда нашуд.",
+    "zh-CN": "无法删除商品。",
+    "ar": "تعذر حذف المنتج."
+  },
+  "manager.error.productsDeleteFailed": {
+    "en": "Could not delete the selected products.",
+    "uz": "Tanlangan mahsulotlarni o‘chirib bo‘lmadi.",
+    "ky": "Тандалган товарлар өчүрүлгөн жок.",
+    "tg": "Молҳои интихобшуда нест карда нашуданд.",
+    "zh-CN": "无法删除所选商品。",
+    "ar": "تعذر حذف المنتجات المحددة."
+  },
+  "manager.error.oneCCancelFailed": {
+    "en": "Could not cancel the 1C transfer",
+    "uz": "1C ga yuborishni bekor qilib bo‘lmadi",
+    "ky": "1С өткөрүү жокко чыгарылган жок",
+    "tg": "Интиқол ба 1С бекор карда нашуд",
+    "zh-CN": "无法取消 1C 传输",
+    "ar": "تعذر إلغاء النقل إلى 1C"
+  },
+  "manager.error.oneCSendFailed": {
+    "en": "Could not send to 1C",
+    "uz": "1C ga yuborib bo‘lmadi",
+    "ky": "1Ске өткөрүлгөн жок",
+    "tg": "Ба 1С фиристода нашуд",
+    "zh-CN": "无法发送到 1C",
+    "ar": "تعذر الإرسال إلى 1C"
+  },
+  "manager.error.priceExportFailed": {
+    "en": "Could not export the price list",
+    "uz": "Narxlar ro‘yxatini yuklab bo‘lmadi",
+    "ky": "Прайс жүктөлгөн жок",
+    "tg": "Рӯйхати нархҳо содир карда нашуд",
+    "zh-CN": "无法导出价目表",
+    "ar": "تعذر تصدير قائمة الأسعار"
+  },
+  "manager.error.channelsCheckFailed": {
+    "en": "Could not check the channels",
+    "uz": "Kanallarni tekshirib bo‘lmadi",
+    "ky": "Каналдар текшерилген жок",
+    "tg": "Каналҳо санҷида нашуданд",
+    "zh-CN": "无法检查通道",
+    "ar": "تعذر فحص القنوات"
+  },
+  "manager.error.storefrontProductsSaveFailed": {
+    "en": "Could not save the products",
+    "uz": "Mahsulotlarni saqlab bo‘lmadi",
+    "ky": "Товарлар сакталган жок",
+    "tg": "Молҳо захира нашуданд",
+    "zh-CN": "无法保存商品",
+    "ar": "تعذر حفظ المنتجات"
+  },
+  "manager.error.slideLoadFailed": {
+    "en": "Could not load the slide",
+    "uz": "Slaydni yuklab bo‘lmadi",
+    "ky": "Слайд жүктөлгөн жок",
+    "tg": "Слайд бор карда нашуд",
+    "zh-CN": "无法加载幻灯片",
+    "ar": "تعذر تحميل الشريحة"
+  },
+  "manager.error.mapLoadFailed": {
+    "en": "Could not load the map",
+    "uz": "Xaritani yuklab bo‘lmadi",
+    "ky": "Карта жүктөлгөн жок",
+    "tg": "Харита бор карда нашуд",
+    "zh-CN": "无法加载地图",
+    "ar": "تعذر تحميل الخريطة"
+  },
+  "manager.error.descriptionsUpdateFailed": {
+    "en": "Could not update the descriptions",
+    "uz": "Tavsiflarni yangilab bo‘lmadi",
+    "ky": "Сүрөттөмөлөр жаңыртылган жок",
+    "tg": "Тавсифҳо навсозӣ нашуданд",
+    "zh-CN": "无法更新描述",
+    "ar": "تعذر تحديث الأوصاف"
+  },
+  "manager.error.promoImageLoadFailed": {
+    "en": "Could not load the promotion image",
+    "uz": "Aksiya rasmini yuklab bo‘lmadi",
+    "ky": "Акциянын сүрөтү жүктөлгөн жок",
+    "tg": "Расми аксия бор карда нашуд",
+    "zh-CN": "无法加载促销图片",
+    "ar": "تعذر تحميل صورة العرض"
+  },
+  "manager.error.enrichFailed": {
+    "en": "Could not enrich",
+    "uz": "To‘ldirib bo‘lmadi",
+    "ky": "Толукталган жок",
+    "tg": "Пурра карда нашуд",
+    "zh-CN": "无法补全",
+    "ar": "تعذر الإكمال"
+  },
+  "manager.error.managerCreateFailed": {
+    "en": "Could not create the manager.",
+    "uz": "Menejer yaratib bo‘lmadi.",
+    "ky": "Менеджер түзүлгөн жок.",
+    "tg": "Менеҷер эҷод карда нашуд.",
+    "zh-CN": "无法创建经理。",
+    "ar": "تعذر إنشاء المدير."
+  },
+  "manager.settings.newsTitleDefault": {
+    "en": "Clover news",
+    "uz": "Clover yangiligi",
+    "ky": "Clover жаңылыгы",
+    "tg": "Хабари Clover",
+    "zh-CN": "Clover 新闻",
+    "ar": "خبر Clover"
+  },
+  "manager.settings.emailToggleHint": {
+    "en": "email: turn on “Send to email” and refresh the page",
+    "uz": "email: «Emailga yuborish» tumblerini yoqing va sahifani yangilang",
+    "ky": "email: «Emailге жөнөтүү» тумблерин күйгүзүп, баракты жаңыртыңыз",
+    "tg": "email: тумблери «Ба email фиристодан»-ро фаъол кунед ва саҳифаро навсозӣ кунед",
+    "zh-CN": "email：打开“发送到邮箱”并刷新页面",
+    "ar": "email: فعّل مفتاح «إرسال إلى البريد» وحدّث الصفحة"
+  },
+  "storefront.error.catalogLoadFailed": {
+    "en": "Could not load the catalog.",
+    "uz": "Katalogni yuklab bo‘lmadi.",
+    "ky": "Каталог жүктөлгөн жок.",
+    "tg": "Каталог бор карда нашуд.",
+    "zh-CN": "无法加载目录。",
+    "ar": "تعذر تحميل الكتالوج."
+  },
+  "storefront.error.promosLoadFailed": {
+    "en": "Could not load promotions.",
+    "uz": "Aksiyalarni yuklab bo‘lmadi.",
+    "ky": "Акциялар жүктөлгөн жок.",
+    "tg": "Аксияҳо бор карда нашуданд.",
+    "zh-CN": "无法加载促销。",
+    "ar": "تعذر تحميل العروض."
+  },
+  "storefront.error.homeLoadFailed": {
+    "en": "Could not load the storefront.",
+    "uz": "Vitrinani yuklab bo‘lmadi.",
+    "ky": "Витрина жүктөлгөн жок.",
+    "tg": "Витрина бор карда нашуд.",
+    "zh-CN": "无法加载店面。",
+    "ar": "تعذر تحميل الواجهة."
+  },
+  "storefront.error.contactsLoadFailed": {
+    "en": "Could not load contacts.",
+    "uz": "Kontaktlarni yuklab bo‘lmadi.",
+    "ky": "Контакттар жүктөлгөн жок.",
+    "tg": "Тамосҳо бор карда нашуданд.",
+    "zh-CN": "无法加载联系方式。",
+    "ar": "تعذر تحميل جهات الاتصال."
+  },
+  "storefront.error.checkoutFailed": {
+    "en": "Could not place the order.",
+    "uz": "Buyurtmani rasmiylashtirib bo‘lmadi.",
+    "ky": "Заказ таризделген жок.",
+    "tg": "Фармоиш қайд карда нашуд.",
+    "zh-CN": "无法提交订单。",
+    "ar": "تعذر إتمام الطلب."
   }
 };
 

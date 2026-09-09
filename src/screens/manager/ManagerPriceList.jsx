@@ -1,4 +1,5 @@
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 import { useEffect, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
@@ -46,8 +47,8 @@ export function ManagerPriceList({ settings }) {
       URL.revokeObjectURL(url);
     } catch (error) {
       appAlert({
-        title: "Не удалось выгрузить прайс",
-        message: error.message || t("manager.pdfGenerationError"),
+        title: t("manager.error.priceExportFailed"),
+        message: errorDisplayMessage(error, t, "manager.pdfGenerationError"),
         tone: "danger",
       });
     } finally {

@@ -1,4 +1,5 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../../../shared/i18n/errorDisplay.js";
 import { useEffect, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
 import { storefrontHref } from "../mode.js";
@@ -34,14 +35,14 @@ export function AktsiiPage() {
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err.message || "Не удалось загрузить акции.");
+          setError(errorDisplayMessage(err, t, "storefront.error.promosLoadFailed"));
           setPromotions([]);
         }
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   const list = Array.isArray(promotions) ? promotions : null;
   const empty = list && list.length === 0;

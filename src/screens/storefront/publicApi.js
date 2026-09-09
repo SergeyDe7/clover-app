@@ -15,6 +15,7 @@ async function request(path, options = {}) {
   } catch {
     const error = new Error("Не удалось связаться с сервером.");
     error.status = 0;
+    error.code = "NETWORK";
     throw error;
   }
 
@@ -24,13 +25,14 @@ async function request(path, options = {}) {
     try {
       payload = JSON.parse(raw);
     } catch {
-      payload = { error: "Некорректный ответ сервера." };
+      payload = { error: "Некорректный ответ сервера.", code: "INVALID_RESPONSE" };
     }
   }
 
   if (!response.ok) {
     const error = new Error(payload.error || "Ошибка запроса.");
     error.status = response.status;
+    error.code = payload.code || "REQUEST_FAILED";
     error.payload = payload;
     throw error;
   }

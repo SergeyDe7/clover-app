@@ -154,7 +154,7 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
       } catch {
         await appAlert({
           title: t("manager.fileError"),
-          message: "Не удалось прочитать файл резервной копии.",
+          message: t("manager.error.backupReadFailed"),
           tone: "danger",
         });
       }

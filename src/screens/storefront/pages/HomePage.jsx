@@ -1,4 +1,5 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../../../shared/i18n/errorDisplay.js";
 import { useEffect, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
 import { GroupTile } from "../components/GroupTile.jsx";
@@ -62,7 +63,7 @@ export function HomePage() {
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err.message || "Не удалось загрузить витрину.");
+          setError(errorDisplayMessage(err, t, "storefront.error.homeLoadFailed"));
           setHero((prev) => ({
             ...prev,
             slides: STOREFRONT_DEFAULT_HERO_SLIDES,
@@ -74,7 +75,7 @@ export function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   return (
     <div className="sf-home">

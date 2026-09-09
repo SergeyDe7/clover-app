@@ -50,3 +50,17 @@ export {
 
 export { RU_DICTIONARY, UI_CATALOG, UI_CATALOG_BY_KEY, getCatalogEntry, hasCatalogKey } from "./uiCatalog.js";
 export { translationStoreToDictionaries } from "./translationStoreProjection.js";
+export {
+  DEFAULT_ERROR_DISPLAY_KEY,
+  DOMAIN_ERROR_CODES,
+  DOMAIN_ERROR_KEY_BY_CODE,
+  ERROR_DISPLAY_KEY_BY_CODE,
+  PUSH_RESTORE_HINT_KEY,
+  TRANSPORT_ERROR_CODES,
+  TRANSPORT_ERROR_KEY_BY_CODE,
+  codedError,
+  displayKeyForErrorCode,
+  errorDisplayMessage,
+  isKnownErrorCode,
+  resolveTransportCode,
+} from "./errorDisplay.js";

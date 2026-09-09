@@ -1,4 +1,5 @@
 import { useLocalization } from "../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage, isKnownErrorCode } from "../shared/i18n/errorDisplay.js";
 import { useState } from "react";
 import "./CustomProductForm.css";
 
@@ -23,7 +24,7 @@ function readPhoto(file, t) {
       return;
     }
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Не удалось прочитать фотографию."));
+    reader.onerror = () => reject(Object.assign(new Error("Failed to read the photograph."), { code: "PHOTO_READ_FAILED" }));
     reader.onload = () => resolve({
       name: file.name || t("shared.productPhoto"),
       type: file.type,
@@ -56,7 +57,11 @@ function CustomProductForm({ onAdd }) {
     try {
       updateField("photo", await readPhoto(file, t));
     } catch (error) {
-      setPhotoError(error.message || "Не удалось прикрепить фотографию.");
+      setPhotoError(
+        isKnownErrorCode(error?.code)
+          ? errorDisplayMessage(error, t, "shared.error.photoAttachFailed")
+          : error.message || t("shared.error.photoAttachFailed")
+      );
     }
   };
 

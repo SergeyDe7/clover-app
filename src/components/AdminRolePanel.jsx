@@ -3,6 +3,7 @@ import { api } from "../serverApi";
 import { appAlert, appConfirm } from "../shared/AppModal";
 import { STAFF_FEATURE_OPTIONS, STAFF_FEATURE_IDS, formatDateTime } from "../shared/appHelpers";
 import { useLocalization } from "../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../shared/i18n/errorDisplay.js";
 
 function generateAccessPassword(length = 10) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -136,7 +137,7 @@ export function AdminRolePanel({ currentUser }) {
     if (!ok) {
       await appAlert({
         title: t("shared.notCopied"),
-        message: "Не удалось скопировать в буфер обмена.",
+        message: t("shared.error.copyFailed"),
         tone: "warn",
       });
       return;
@@ -197,7 +198,7 @@ export function AdminRolePanel({ currentUser }) {
       setFormKey((value) => value + 1);
       await load();
     } catch (err) {
-      const message = err.message || "Не удалось создать менеджера.";
+      const message = errorDisplayMessage(err, t, "manager.error.managerCreateFailed");
       setError(message);
       await appAlert({ title: t("shared.notCreated"), message, tone: "danger" });
     } finally {

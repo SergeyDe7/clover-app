@@ -3,8 +3,7 @@ import { api } from "../serverApi";
 /** Bound wait for serviceWorker.ready so push resync cannot hang app recovery. */
 export const PUSH_READY_TIMEOUT_MS = 4000;
 
-export const PUSH_RESTORE_HINT =
-  "Нажмите «Включить уведомления», чтобы восстановить push на этом устройстве.";
+export const PUSH_RESTORE_HINT = "shared.push.restoreHint";
 
 let pushSyncInFlight = null;
 

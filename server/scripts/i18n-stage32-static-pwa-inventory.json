@@ -1,0 +1,51 @@
+[
+  {
+    "path": "public/offline.html",
+    "literal": "Clover — нет связи",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "Static pre-runtime PWA surface has no locale context until Stage 6/7."
+  },
+  {
+    "path": "public/offline.html",
+    "literal": "Нет связи",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "Static pre-runtime PWA surface has no locale context until Stage 6/7."
+  },
+  {
+    "path": "public/offline.html",
+    "literal": "Проверьте интернет и попробуйте снова. Clover откроется, как только сеть вернётся.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "Static pre-runtime PWA surface has no locale context until Stage 6/7."
+  },
+  {
+    "path": "public/offline.html",
+    "literal": "Повторить",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "Static pre-runtime PWA surface has no locale context until Stage 6/7."
+  },
+  {
+    "path": "public/manifest.webmanifest",
+    "literal": "Clover — личный кабинет",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "Static pre-runtime PWA surface has no locale context until Stage 6/7."
+  },
+  {
+    "path": "public/manifest.webmanifest",
+    "literal": "Заказы, статусы, документы и связь с менеджером",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "Static pre-runtime PWA surface has no locale context until Stage 6/7."
+  },
+  {
+    "path": "public/sw.js",
+    "literal": "Новое уведомление",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "Static pre-runtime PWA surface has no locale context until Stage 6/7."
+  }
+]

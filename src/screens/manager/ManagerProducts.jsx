@@ -13,6 +13,7 @@ import {
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { visibilityFilterLabel } from "../../shared/i18n/displayLabels";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 import { productImageSrc } from "../../shared/productPhoto";
 import { ProductEditor } from "./ProductEditor";
 import { MatrixExcelReview } from "./MatrixExcelImport";
@@ -324,8 +325,8 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
       restoreWindowScroll(pageY);
     } catch (error) {
       void appAlert({
-        title: "Не удалось сохранить",
-        message: t("manager.products.saveFailedNamed", { message: error.message }),
+        title: t("shared.error.saveFailed"),
+        message: t("manager.products.saveFailedNamed", { message: errorDisplayMessage(error, t) }),
         tone: "danger",
       });
     }
@@ -354,8 +355,8 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
       setEditorProduct(undefined);
     } catch (error) {
       void appAlert({
-        title: "Не удалось удалить",
-        message: error.message || "Не удалось удалить товар.",
+        title: t("shared.error.deleteFailed"),
+        message: errorDisplayMessage(error, t, "manager.error.productDeleteFailed"),
         tone: "danger",
       });
     }
@@ -431,8 +432,8 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
       }
     } catch (error) {
       void appAlert({
-        title: "Не удалось удалить",
-        message: error.message || "Не удалось удалить выбранные товары.",
+        title: t("shared.error.deleteFailed"),
+        message: errorDisplayMessage(error, t, "manager.error.productsDeleteFailed"),
         tone: "danger",
       });
     } finally {

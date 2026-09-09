@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { codedError } from "./i18n/errorDisplay.js";
 import { uiText } from "./i18n/translationRuntime.js";
 
 const NAME_HEADERS = [
@@ -99,8 +100,9 @@ export async function parseMatrixExcelFile(file) {
   }
 
   if (!parsed.length) {
-    throw new Error(
-      "Не найдено ни одной строки с названием. Ожидаются колонки «Название»/«Товар» и опционально «Код»."
+    throw codedError(
+      "EXCEL_NO_NAME_ROWS",
+      "No named rows found. Expected Name/Product columns and optional Code."
     );
   }
 

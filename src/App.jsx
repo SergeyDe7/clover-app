@@ -34,6 +34,7 @@ import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
 import { appAlert, appConfirm } from "./shared/AppModal";
 import { canTrashOrder, isAdminHardDeleteStatus } from "./shared/orderTrash";
 import { orderStatusLabel } from "./shared/i18n/displayLabels";
+import { errorDisplayMessage } from "./shared/i18n/errorDisplay.js";
 import {
   canOrderAcceptAddendum,
   mergeOrderCatalogItems,
@@ -277,10 +278,7 @@ function LoginView({ onAuth, authBusy, authError }) {
       if (name === "NotAllowedError") {
         setLocalError(t("auth.passkeyCancelled"));
       } else {
-        setLocalError(
-          error.message
-          || "Не удалось войти по Face ID. Если ключ добавляли раньше — укажите почту или добавьте Face ID заново в профиле."
-        );
+        setLocalError(errorDisplayMessage(error, t, "auth.error.faceIdLoginFailed"));
       }
     } finally {
       setPasskeyBusy(false);
@@ -1377,8 +1375,8 @@ function App() {
       return data;
     } catch (error) {
       await appAlert({
-        title: "Не удалось добавить",
-        message: error.message || t("auth.productWasNotAddedToThe"),
+        title: t("shared.error.addFailed"),
+        message: errorDisplayMessage(error, t, "auth.productWasNotAddedToThe"),
         tone: "danger",
       });
       throw error;
@@ -1845,7 +1843,11 @@ function App() {
       if (Array.isArray(result?.trashedOrders)) setTrashedOrders(result.trashedOrders);
       setSyncError("");
     } catch (error) {
-      await appAlert({ title: "Не удалось восстановить", message: error.message, tone: "danger" });
+      await appAlert({
+        title: t("shared.error.restoreFailed"),
+        message: errorDisplayMessage(error, t, "shared.error.restoreFailed"),
+        tone: "danger",
+      });
     }
   };
 
@@ -1876,7 +1878,11 @@ function App() {
       if (Array.isArray(result?.trashedOrders)) setTrashedOrders(result.trashedOrders);
       setSyncError("");
     } catch (error) {
-      await appAlert({ title: "Не удалось удалить", message: error.message, tone: "danger" });
+      await appAlert({
+        title: t("shared.error.deleteFailed"),
+        message: errorDisplayMessage(error, t, "shared.error.deleteFailed"),
+        tone: "danger",
+      });
     }
   };
 

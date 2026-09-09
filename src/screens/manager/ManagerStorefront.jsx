@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
 import { visibilityFilterLabel } from "../../shared/i18n/displayLabels";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber, matchesCatalogPrefixSearch, productCatalogSearchHaystack, formatRussianPhone, getRussianPhoneLocalDigits } from "../../shared/appHelpers";
 import { StorefrontProductAdd } from "./StorefrontProductAdd";
 import {
@@ -305,8 +306,8 @@ export function ManagerStorefront({
       }
     } catch (error) {
       await appAlert({
-        title: "Не удалось сохранить",
-        message: error.message || t("manager.saveError"),
+        title: t("shared.error.saveFailed"),
+        message: errorDisplayMessage(error, t, "manager.saveError"),
         tone: "danger",
       });
     } finally {
@@ -327,8 +328,8 @@ export function ManagerStorefront({
       return saved;
     } catch (error) {
       await appAlert({
-        title: "Не удалось сохранить товары",
-        message: error.message || t("manager.saveError"),
+        title: t("manager.error.storefrontProductsSaveFailed"),
+        message: errorDisplayMessage(error, t, "manager.saveError"),
         tone: "danger",
       });
       return null;
@@ -789,8 +790,8 @@ export function ManagerStorefront({
                   })
                   .catch((error) =>
                     appAlert({
-                      title: "Не удалось загрузить слайд",
-                      message: error.message || t("manager.loadError"),
+                      title: t("manager.error.slideLoadFailed"),
+                      message: errorDisplayMessage(error, t, "manager.loadError"),
                       tone: "danger",
                     })
                   )
@@ -945,8 +946,8 @@ export function ManagerStorefront({
                       })
                       .catch((error) =>
                         appAlert({
-                          title: "Не удалось загрузить карту",
-                          message: error.message || t("manager.loadError"),
+                          title: t("manager.error.mapLoadFailed"),
+                          message: errorDisplayMessage(error, t, "manager.loadError"),
                           tone: "danger",
                         })
                       )
@@ -1087,8 +1088,8 @@ export function ManagerStorefront({
                   });
                 } catch (error) {
                   await appAlert({
-                    title: "Не удалось обновить описания",
-                    message: error.message || t("manager.enrichmentQueueError"),
+                    title: t("manager.error.descriptionsUpdateFailed"),
+                    message: errorDisplayMessage(error, t, "manager.enrichmentQueueError"),
                     tone: "danger",
                   });
                 } finally {

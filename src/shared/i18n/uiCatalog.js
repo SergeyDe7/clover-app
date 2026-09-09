@@ -12603,6 +12603,391 @@ const RAW_CATALOG = [
     "namespace": "ui",
     "surface": "shared",
     "critical": true
+  },
+  {
+    "key": "shared.error.timeout",
+    "sourceRu": "Сервер временно недоступен. Попробуйте ещё раз.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.network",
+    "sourceRu": "Не удалось связаться с сервером. Проверьте интернет и попробуйте снова.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.apiUnavailable",
+    "sourceRu": "Сервер API сейчас недоступен. Обновите страницу через минуту или обратитесь к менеджеру.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.requestTooLarge",
+    "sourceRu": "Запрос слишком большой для сервера. Обновите страницу и сохраните товар ещё раз.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.invalidResponse",
+    "sourceRu": "Не удалось прочитать ответ сервера. Обновите страницу или войдите снова.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.noResponse",
+    "sourceRu": "Сервер не ответил. Войдите снова или попробуйте позже.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.requestFailed",
+    "sourceRu": "Не удалось выполнить запрос. Попробуйте позже.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.loadFailed",
+    "sourceRu": "Не удалось загрузить",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.saveFailed",
+    "sourceRu": "Не удалось сохранить",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.deleteFailed",
+    "sourceRu": "Не удалось удалить",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.addFailed",
+    "sourceRu": "Не удалось добавить",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.sendFailed",
+    "sourceRu": "Не удалось отправить",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.downloadFailed",
+    "sourceRu": "Не удалось скачать",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.copyFailed",
+    "sourceRu": "Не удалось скопировать в буфер обмена.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.restoreFailed",
+    "sourceRu": "Не удалось восстановить",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.panelShowFailed",
+    "sourceRu": "Не удалось показать блок",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.passkeyAddFailed",
+    "sourceRu": "Не удалось добавить ключ доступа.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.photoAttachFailed",
+    "sourceRu": "Не удалось прикрепить фотографию.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.photoReadFailed",
+    "sourceRu": "Не удалось прочитать фотографию.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.photoPrepareFailed",
+    "sourceRu": "Браузер не смог подготовить фотографию.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.photoUnrecognized",
+    "sourceRu": "Файл не удалось распознать как фотографию.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.photoRequired",
+    "sourceRu": "Выберите фотографию товара.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.photoType",
+    "sourceRu": "Разрешены только изображения JPG, PNG или WEBP.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.photoMaxSize",
+    "sourceRu": "Максимальный размер файла — 5 МБ.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.photoStillTooLarge",
+    "sourceRu": "После обработки фото всё ещё слишком большое. Выберите снимок меньшего размера.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.error.excelNoNameRows",
+    "sourceRu": "Не найдено ни одной строки с названием. Ожидаются колонки «Название»/«Товар» и опционально «Код».",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.push.restoreHint",
+    "sourceRu": "Нажмите «Включить уведомления», чтобы восстановить push на этом устройстве.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "auth.error.faceIdLoginFailed",
+    "sourceRu": "Не удалось войти по Face ID. Если ключ добавляли раньше — укажите почту или добавьте Face ID заново в профиле.",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "manager.error.vaultLoadFailed",
+    "sourceRu": "Не удалось загрузить доступы.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.backupReadFailed",
+    "sourceRu": "Не удалось прочитать файл резервной копии.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.clientSaveFailed",
+    "sourceRu": "Не удалось сохранить данные клиента.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.passwordChangeFailed",
+    "sourceRu": "Не удалось сменить пароль",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.pricesLoadFailed",
+    "sourceRu": "Не удалось загрузить цены",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.clientCreateFailed",
+    "sourceRu": "Не удалось создать клиента",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.matrixSaveFailed",
+    "sourceRu": "Не удалось сохранить матрицу.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.productDeleteFailed",
+    "sourceRu": "Не удалось удалить товар.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.productsDeleteFailed",
+    "sourceRu": "Не удалось удалить выбранные товары.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.oneCCancelFailed",
+    "sourceRu": "Не удалось отменить передачу",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.oneCSendFailed",
+    "sourceRu": "Не удалось передать в 1С",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.priceExportFailed",
+    "sourceRu": "Не удалось выгрузить прайс",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.channelsCheckFailed",
+    "sourceRu": "Не удалось проверить каналы",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.storefrontProductsSaveFailed",
+    "sourceRu": "Не удалось сохранить товары",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.slideLoadFailed",
+    "sourceRu": "Не удалось загрузить слайд",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.mapLoadFailed",
+    "sourceRu": "Не удалось загрузить карту",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.descriptionsUpdateFailed",
+    "sourceRu": "Не удалось обновить описания",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.promoImageLoadFailed",
+    "sourceRu": "Не удалось загрузить картинку акции",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.enrichFailed",
+    "sourceRu": "Не удалось дополнить",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.error.managerCreateFailed",
+    "sourceRu": "Не удалось создать менеджера.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.settings.newsTitleDefault",
+    "sourceRu": "Новость Clover",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.settings.emailToggleHint",
+    "sourceRu": "email: включите тумблер «Отправлять на email» и обновите страницу",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "storefront.error.catalogLoadFailed",
+    "sourceRu": "Не удалось загрузить каталог.",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.error.promosLoadFailed",
+    "sourceRu": "Не удалось загрузить акции.",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.error.homeLoadFailed",
+    "sourceRu": "Не удалось загрузить витрину.",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.error.contactsLoadFailed",
+    "sourceRu": "Не удалось загрузить контакты.",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.error.checkoutFailed",
+    "sourceRu": "Не удалось оформить заказ.",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
   }
 ];
 

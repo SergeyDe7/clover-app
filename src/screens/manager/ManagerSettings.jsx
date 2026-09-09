@@ -1,4 +1,5 @@
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 // Раздел менеджера: настройки кабинета, уведомления и роли.
 import { useEffect, useState } from "react";
 import { api } from "../../serverApi";
@@ -9,7 +10,7 @@ import { FREE_DELIVERY_MIN_TOTAL, PAID_DELIVERY_FEE } from "../../config/orderCo
 
 function ManagerPromotionPanel() {
   const { t } = useLocalization();
-  const [title, setTitle] = useState("Новость Clover");
+  const [title, setTitle] = useState(() => t("manager.settings.newsTitleDefault"));
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const send = async () => {
@@ -96,7 +97,7 @@ function ManagerNotificationSettings({ settings, set }) {
         return `${channel}: ${reasonRu(item.channel, item.reason, item.error)}`;
       });
       if (!settings.managerNotifyEmail && !delivery.some((item) => item.channel === "email")) {
-        parts.unshift("email: включите тумблер «Отправлять на email» и обновите страницу");
+        parts.unshift(t("manager.settings.emailToggleHint"));
       }
       const emailOk = delivery.some((item) => item.channel === "email" && (item.sent === true || Number(item.sent) > 0));
       const summary = parts.length ? parts.join("; ") : t("manager.anInternalNotificationWasCreatedExternal");
@@ -106,7 +107,7 @@ function ManagerNotificationSettings({ settings, set }) {
       }) : summary);
       setStatus(result.status || null);
     } catch (error) {
-      setMessage(error.message || "Не удалось проверить каналы");
+      setMessage(errorDisplayMessage(error, t, "manager.error.channelsCheckFailed"));
     } finally {
       setBusy(false);
     }

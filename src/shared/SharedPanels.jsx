@@ -7,6 +7,7 @@ import { startPasskeyRegistration } from "../utils/webauthn";
 import { api, setApiToken } from "../serverApi";
 import { formatDateTime } from "./appHelpers";
 import { historyActorLabel, orderHistoryLabel } from "./i18n/displayLabels";
+import { errorDisplayMessage } from "./i18n/errorDisplay.js";
 import { appConfirm } from "./AppModal";
 import {
   installPushSyncListeners,
@@ -32,11 +33,11 @@ export class PanelErrorBoundary extends Component {
   render() {
     if (this.state.error) {
       return (
-        <div className="sync-error" style={{ marginTop: 12 }}>
-          <strong>{this.props.label || "Не удалось показать блок"}.</strong>
-          <div style={{ marginTop: 8 }}>{String(this.state.error?.message || this.state.error)}</div>
-          <PanelErrorRetry onRetry={() => this.setState({ error: null })} />
-        </div>
+        <PanelErrorFallback
+          label={this.props.label}
+          error={this.state.error}
+          onRetry={() => this.setState({ error: null })}
+        />
       );
     }
     return this.props.children;
@@ -78,6 +79,17 @@ export function OrderTimeline({ order }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function PanelErrorFallback({ label, error, onRetry }) {
+  const { t } = useLocalization();
+  return (
+    <div className="sync-error" style={{ marginTop: 12 }}>
+      <strong>{label || t("shared.error.panelShowFailed")}.</strong>
+      <div style={{ marginTop: 8 }}>{errorDisplayMessage(error, t)}</div>
+      <PanelErrorRetry onRetry={onRetry} />
     </div>
   );
 }
@@ -334,7 +346,7 @@ export function PasswordSecurityPanel({
       setMessage(result.message || t("shared.passkeyAdded"));
       await loadPasskeys();
     } catch (registrationError) {
-      setError(registrationError.message || "Не удалось добавить ключ доступа.");
+      setError(errorDisplayMessage(registrationError, t, "shared.error.passkeyAddFailed"));
     } finally {
       setPasskeyBusy(false);
     }
@@ -511,11 +523,11 @@ export function PushSettings() {
             browserEndpoint: endpoint,
             serverSubscriptions: result.subscriptions,
           });
-          if (hint) setMessage(hint);
+          if (hint) setMessage(t("shared.push.restoreHint"));
         }
       }
     } catch (error) {
-      setMessage(error.message);
+      setMessage(errorDisplayMessage(error, t));
     }
   };
 

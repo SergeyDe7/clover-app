@@ -31,6 +31,7 @@ import {
   requestStatusLabel,
   roleLabel,
 } from "../../shared/i18n/displayLabels";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 
 const CUSTOM_STATUSES = [
   "Новый запрос",
@@ -296,8 +297,8 @@ export function ManagerOrders({
       await onReload();
     } catch (error) {
       await appAlert({
-        title: action === "cancel" ? "Не удалось отменить передачу" : "Не удалось передать в 1С",
-        message: error.message,
+        title: action === "cancel" ? t("manager.error.oneCCancelFailed") : t("manager.error.oneCSendFailed"),
+        message: errorDisplayMessage(error, t),
         tone: "danger",
       });
       await onReload();

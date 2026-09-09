@@ -1,4 +1,5 @@
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 // Модалка редактирования товара каталога: поля, ед. измерения, фото, связь с 1С.
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -388,7 +389,7 @@ export function ProductEditor({
     } catch (error) {
       await appAlert({
         title: t("manager.loadError2"),
-        message: error.message,
+        message: errorDisplayMessage(error, t, "manager.loadError2"),
         tone: "danger",
       });
     } finally {
@@ -827,8 +828,8 @@ export function ProductEditor({
                     });
                   } catch (error) {
                     await appAlert({
-                      title: "Не удалось дополнить",
-                      message: error.message,
+                      title: t("manager.error.enrichFailed"),
+                      message: errorDisplayMessage(error, t, "manager.error.enrichFailed"),
                       tone: "danger",
                     });
                   } finally {
