@@ -1600,7 +1600,6 @@ body:has(.clover-app) {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow-x: clip;
 }
 
 .manager-languages-header {
@@ -1774,7 +1773,6 @@ body:has(.clover-app) {
 .manager-languages-table-wrap {
   width: 100%;
   min-width: 0;
-  overflow-x: hidden;
 }
 
 .manager-languages-table {
@@ -1837,6 +1835,7 @@ body:has(.clover-app) {
 .manager-languages-target {
   display: block;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
   min-height: 4.6em;
   padding: 8px 10px;
@@ -1845,6 +1844,7 @@ body:has(.clover-app) {
   background: var(--clover-surface);
   color: var(--clover-text);
   line-height: 1.4;
+  overflow-wrap: anywhere;
   resize: vertical;
   box-sizing: border-box;
 }
@@ -1948,6 +1948,8 @@ body:has(.clover-app) {
   .manager-languages-table tbody {
     display: block;
     width: 100%;
+    max-width: 100%;
+    table-layout: auto;
   }
 
   .manager-languages-table tr {
@@ -1968,18 +1970,35 @@ body:has(.clover-app) {
   }
 
   .manager-languages-table td {
-    width: auto;
     min-width: 0;
+    max-width: 100%;
     padding: 8px 0;
     border-bottom: 0;
   }
 
-  .manager-languages-table td:nth-child(1) { grid-area: source; }
-  .manager-languages-table td:nth-child(2) { grid-area: target; }
-  .manager-languages-table td:nth-child(3) { grid-area: status; }
-  .manager-languages-table td:nth-child(4) { grid-area: editor; }
-  .manager-languages-table td:nth-child(5) { grid-area: updated; }
-  .manager-languages-table td:nth-child(6) { grid-area: actions; }
+  .manager-languages-table th:nth-child(1),
+  .manager-languages-table td:nth-child(1),
+  .manager-languages-table th:nth-child(2),
+  .manager-languages-table td:nth-child(2),
+  .manager-languages-table th:nth-child(3),
+  .manager-languages-table td:nth-child(3),
+  .manager-languages-table th:nth-child(4),
+  .manager-languages-table td:nth-child(4),
+  .manager-languages-table th:nth-child(5),
+  .manager-languages-table td:nth-child(5),
+  .manager-languages-table th:nth-child(6),
+  .manager-languages-table td:nth-child(6) {
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .manager-languages-table td:nth-child(1) { grid-area: source; justify-self: stretch; }
+  .manager-languages-table td:nth-child(2) { grid-area: target; justify-self: stretch; }
+  .manager-languages-table td:nth-child(3) { grid-area: status; justify-self: stretch; }
+  .manager-languages-table td:nth-child(4) { grid-area: editor; justify-self: stretch; }
+  .manager-languages-table td:nth-child(5) { grid-area: updated; justify-self: stretch; }
+  .manager-languages-table td:nth-child(6) { grid-area: actions; justify-self: stretch; }
 
   .manager-languages-table td[data-label]:not([data-label=""])::before {
     display: block;
