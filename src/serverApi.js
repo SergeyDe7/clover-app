@@ -484,17 +484,17 @@ export const api = {
     return request(`/admin/product-translations/${encodeURIComponent(productId)}`);
   },
 
-  saveProductTranslation(productId, language, field, value) {
+  saveProductTranslation(productId, language, field, value, expectedSourceHash) {
     return request(
       `/admin/product-translations/${encodeURIComponent(productId)}/${encodeURIComponent(language)}/${encodeURIComponent(field)}`,
-      { method: "PUT", body: { value } }
+      { method: "PUT", body: { value, expectedSourceHash } }
     );
   },
 
-  resetProductTranslation(productId, language, field) {
+  resetProductTranslation(productId, language, field, expectedSourceHash) {
     return request(
       `/admin/product-translations/${encodeURIComponent(productId)}/${encodeURIComponent(language)}/${encodeURIComponent(field)}/reset-auto`,
-      { method: "POST", body: {} }
+      { method: "POST", body: { expectedSourceHash } }
     );
   },
 

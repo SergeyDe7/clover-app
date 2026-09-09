@@ -1,45 +1,66 @@
 /**
- * Controlled offline AUTO import. Refuses production/worktree DBs unless
- * CLOVER_ALLOW_PRODUCT_AUTO_IMPORT=YES is set with an explicit DB_PATH.
+ * Controlled offline AUTO import.
+ * Exactly one of --dry-run or --apply is required.
+ * Production apply also requires DB_PATH + CLOVER_ALLOW_PRODUCT_AUTO_IMPORT=YES.
  */
-import { readFileSync } from "node:fs";
 import path from "node:path";
 
 const PRODUCTION_DATA = path.resolve("/opt/clover/clover-app/server/data");
-const workRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
-const WORKTREE_DATA = path.resolve(workRoot, "server/data");
 
-function rejectUnsafePath(candidate) {
-  const resolved = path.resolve(candidate);
-  if (resolved === PRODUCTION_DATA || resolved.startsWith(`${PRODUCTION_DATA}${path.sep}`)) {
-    throw new Error(`Refusing production DB path: ${resolved}`);
+function parseArgs(argv) {
+  const out = { file: "", dryRun: false, apply: false };
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i];
+    if (token === "--dry-run") out.dryRun = true;
+    else if (token === "--apply") out.apply = true;
+    else if (token === "--file") {
+      out.file = String(argv[i + 1] || "");
+      i += 1;
+    } else if (!token.startsWith("--") && !out.file) {
+      out.file = token;
+    }
   }
-  if (resolved === WORKTREE_DATA || resolved.startsWith(`${WORKTREE_DATA}${path.sep}`)) {
-    throw new Error(`Refusing worktree DB path: ${resolved}`);
-  }
+  return out;
+}
+
+const args = parseArgs(process.argv.slice(2));
+if (!args.file) {
+  console.error("Usage: node import-product-auto-translations.mjs --file <manifest.json> --dry-run|--apply");
+  process.exit(2);
+}
+if (args.dryRun === args.apply) {
+  console.error("Exactly one of --dry-run or --apply is required.");
+  process.exit(2);
 }
 
 const dbPath = process.env.DB_PATH;
 if (!dbPath) {
-  console.error("DB_PATH is required. Refusing implicit production/worktree database.");
-  process.exit(2);
-}
-if (process.env.CLOVER_ALLOW_PRODUCT_AUTO_IMPORT !== "YES") {
-  try {
-    rejectUnsafePath(dbPath);
-  } catch (error) {
-    console.error(error.message);
-    process.exit(2);
-  }
-}
-
-const artifactPath = process.argv[2];
-if (!artifactPath) {
-  console.error("Usage: node import-product-auto-translations.mjs <artifact.json>");
+  console.error("DB_PATH is required.");
   process.exit(2);
 }
 
-const artifact = JSON.parse(readFileSync(artifactPath, "utf8"));
-const { importProductAutoArtifact } = await import("../src/productLocalizationStore.js");
-const result = importProductAutoArtifact(artifact, "offline-auto-import");
-console.log(JSON.stringify({ ok: true, ...result, dbPath: path.resolve(dbPath) }, null, 2));
+const resolvedDb = path.resolve(dbPath);
+const isProductionDb =
+  resolvedDb === path.join(PRODUCTION_DATA, "clover.sqlite") ||
+  resolvedDb.startsWith(`${PRODUCTION_DATA}${path.sep}`);
+
+if (args.apply && isProductionDb && process.env.CLOVER_ALLOW_PRODUCT_AUTO_IMPORT !== "YES") {
+  console.error("Production apply requires CLOVER_ALLOW_PRODUCT_AUTO_IMPORT=YES.");
+  process.exit(2);
+}
+
+const {
+  applyProductAutoImport,
+  dryRunProductAutoImport,
+  loadAutoImportManifest,
+} = await import("../src/productAutoImport.js");
+
+const loaded = loadAutoImportManifest(path.resolve(args.file));
+if (args.dryRun) {
+  const report = dryRunProductAutoImport(loaded);
+  console.log(JSON.stringify({ ok: true, writes: 0, ...report }, null, 2));
+  process.exit(0);
+}
+
+const result = applyProductAutoImport(loaded, "offline-auto-import");
+console.log(JSON.stringify({ ok: true, ...result, dbPath: resolvedDb }, null, 2));

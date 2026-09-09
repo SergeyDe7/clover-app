@@ -49,6 +49,7 @@ export function ManagerLanguages() {
   const [drafts, setDrafts] = useState({});
   const [glossary, setGlossary] = useState([]);
   const [glossaryForm, setGlossaryForm] = useState({
+    id: "",
     sourceRu: "",
     targetValue: "",
     context: "",
@@ -177,7 +178,13 @@ export function ManagerLanguages() {
     try {
       const productRef = row.kind === "product" ? parseProductTranslationRowId(row.id) : null;
       if (productRef) {
-        await api.saveProductTranslation(productRef.productId, targetLanguage, productRef.field, savedValue);
+        await api.saveProductTranslation(
+          productRef.productId,
+          targetLanguage,
+          productRef.field,
+          savedValue,
+          row.sourceHash || ""
+        );
       } else {
         await api.saveLocalizationTranslation(row.id, targetLanguage, savedValue);
       }
@@ -185,7 +192,12 @@ export function ManagerLanguages() {
       setMessage(t("admin.languages.saved"));
       await load();
     } catch (error) {
-      setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
+      if (error?.code === "SOURCE_STALE" || error?.status === 409) {
+        setMessage(t("admin.productTranslations.sourceStale"));
+        await load();
+      } else {
+        setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
+      }
     } finally {
       setBusy(false);
     }
@@ -202,7 +214,12 @@ export function ManagerLanguages() {
     try {
       const productRef = row.kind === "product" ? parseProductTranslationRowId(row.id) : null;
       if (productRef) {
-        await api.resetProductTranslation(productRef.productId, targetLanguage, productRef.field);
+        await api.resetProductTranslation(
+          productRef.productId,
+          targetLanguage,
+          productRef.field,
+          row.sourceHash || ""
+        );
       } else {
         await api.resetLocalizationTranslation(row.id, targetLanguage);
       }
@@ -210,7 +227,12 @@ export function ManagerLanguages() {
       setDrafts((current) => clearTranslationDraft(current, row.id, targetLanguage));
       await load();
     } catch (error) {
-      setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
+      if (error?.code === "SOURCE_STALE" || error?.status === 409) {
+        setMessage(t("admin.productTranslations.sourceStale"));
+        await load();
+      } else {
+        setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
+      }
     } finally {
       setBusy(false);
     }
@@ -223,7 +245,7 @@ export function ManagerLanguages() {
         ...glossaryForm,
         language: safeLanguage,
       });
-      setGlossaryForm({ sourceRu: "", targetValue: "", context: "", protected: false });
+      setGlossaryForm({ id: "", sourceRu: "", targetValue: "", context: "", protected: false });
       setMessage(t("admin.glossary.saved"));
       await load();
     } catch (error) {
@@ -393,8 +415,20 @@ export function ManagerLanguages() {
                 <span>{t("admin.glossary.protected")}</span>
               </label>
               <button type="button" className="primary-button" disabled={busy} onClick={saveGlossary}>
-                {t("admin.glossary.add")}
+                {glossaryForm.id ? t("admin.languages.save") : t("admin.glossary.add")}
               </button>
+              {glossaryForm.id ? (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={() =>
+                    setGlossaryForm({ id: "", sourceRu: "", targetValue: "", context: "", protected: false })
+                  }
+                >
+                  {t("admin.glossary.cancel")}
+                </button>
+              ) : null}
             </div>
             {glossary.length === 0 ? (
               <p className="manager-languages-empty">{t("admin.glossary.empty")}</p>
@@ -418,6 +452,22 @@ export function ManagerLanguages() {
                         <td>{entry.context || "—"}</td>
                         <td>{entry.protected ? "✓" : "—"}</td>
                         <td>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            disabled={busy}
+                            onClick={() =>
+                              setGlossaryForm({
+                                id: entry.id,
+                                sourceRu: entry.sourceRu || "",
+                                targetValue: entry.targetValue || "",
+                                context: entry.context || "",
+                                protected: Boolean(entry.protected),
+                              })
+                            }
+                          >
+                            {t("admin.glossary.edit")}
+                          </button>
                           <button
                             type="button"
                             className="secondary-button"

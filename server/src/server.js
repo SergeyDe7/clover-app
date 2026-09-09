@@ -118,7 +118,6 @@ import {
 import {
   deleteProductLocalization,
   getProductTranslationWorkspace,
-  importProductAutoArtifact,
   listGlossaryEntries,
   removeGlossaryEntry,
   resetProductTranslationToAuto,
@@ -4782,7 +4781,8 @@ app.put(
         req.params.language,
         req.params.field,
         req.body?.value,
-        req.user?.email || req.user?.id || ""
+        req.user?.email || req.user?.id || "",
+        req.body?.expectedSourceHash
       );
       auditFromRequest(req, "localization.product.manual.save", {
         productId: req.params.productId,
@@ -4807,7 +4807,8 @@ app.post(
         req.params.productId,
         req.params.language,
         req.params.field,
-        req.user?.email || req.user?.id || ""
+        req.user?.email || req.user?.id || "",
+        req.body?.expectedSourceHash
       );
       auditFromRequest(req, "localization.product.auto.reset", {
         productId: req.params.productId,
@@ -4869,28 +4870,6 @@ app.delete(
       const result = removeGlossaryEntry(req.params.id);
       auditFromRequest(req, "localization.glossary.delete", { id: result.id });
       res.json({ ok: true, id: result.id });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-app.post(
-  "/api/admin/product-translations/import-auto",
-  authRequired,
-  roleRequired("admin"),
-  (req, res, next) => {
-    try {
-      const result = importProductAutoArtifact(
-        req.body || {},
-        req.user?.email || req.user?.id || "auto-import"
-      );
-      auditFromRequest(req, "localization.product.auto.import", {
-        runId: result.runId,
-        imported: result.imported,
-        skipped: result.skipped,
-      });
-      res.json({ ok: true, ...result });
     } catch (error) {
       next(error);
     }
@@ -7855,7 +7834,10 @@ app.use((error, req, res, _next) => {
   console.error(error);
 
   if (Number.isInteger(error?.status) && error.status >= 400 && error.status < 600) {
-    return res.status(error.status).json({ error: error.message });
+    return res.status(error.status).json({
+      error: error.message,
+      ...(error.code ? { code: error.code } : {}),
+    });
   }
 
   if (error instanceof z.ZodError) {

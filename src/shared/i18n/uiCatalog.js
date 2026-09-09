@@ -13240,6 +13240,34 @@ const RAW_CATALOG = [
     "namespace": "ui",
     "surface": "admin",
     "critical": true
+  },
+  {
+    "key": "admin.productTranslations.sourceStale",
+    "sourceRu": "Русский источник изменился. Черновик сохранён — обновите экран и проверьте текст.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.productTranslations.notApplicable",
+    "sourceRu": "Нет русского источника — перевод не создаётся.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.edit",
+    "sourceRu": "Изменить",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.cancel",
+    "sourceRu": "Отмена",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
   }
 ];
 

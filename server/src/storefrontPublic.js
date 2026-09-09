@@ -58,8 +58,16 @@ import {
   normalizeStorefrontPromotions,
 } from "../../src/shared/storefrontPromotions.js";
 import { normalizeStorefrontInfoPages } from "../../src/shared/storefrontInfoPages.js";
-import { projectLocalizedProductDisplay } from "./productLocalizationStore.js";
+import {
+  buildProductTranslationCellMap,
+  projectLocalizedProductDisplay,
+} from "./productLocalizationStore.js";
 import { readLocalizationSettings } from "./localizationStore.js";
+import { canonicalProductId } from "../../src/shared/i18n/productLocalization.js";
+import {
+  exactTranslationTargetInternal,
+  toPublicLocaleCode,
+} from "../../src/shared/i18n/languageRegistry.js";
 
 const STOREFRONT_GUEST_EMAIL = "storefront-guest@clover.local";
 
@@ -458,13 +466,14 @@ function buildStorefrontPrices(product, oneCItem, storeSettings, costPriceTypeId
   return { prices, priceSources };
 }
 
-function applyPublicProductLocalization(publicProduct, canonical, language) {
+function applyPublicProductLocalization(publicProduct, canonical, language, enabledLanguages, cellMap) {
   if (!language || !publicProduct || !canonical) return publicProduct;
-  const settings = readLocalizationSettings();
+  const cells = cellMap?.get(canonicalProductId(canonical.id)) || {};
   const projected = projectLocalizedProductDisplay(
     canonical,
     language,
-    settings.enabledLanguages
+    enabledLanguages,
+    cells
   );
   if (!projected || projected === canonical) return publicProduct;
   const details = publicProduct.details && typeof publicProduct.details === "object"
@@ -550,6 +559,16 @@ function listStorefrontProducts(storeSettings, language) {
   const priceTypes = getGlobalState("oneCPriceTypes", []);
   const byId = oneCByIdMap(oneCProducts);
   const costPriceTypeId = findPurchasePriceTypeId(priceTypes);
+  const settings = readLocalizationSettings();
+  const enabledLanguages = settings.enabledLanguages || ["ru"];
+  let cellMap = null;
+  const requested = String(language || "").trim();
+  if (requested && requested !== "ru") {
+    const publicCode = toPublicLocaleCode(requested);
+    if (enabledLanguages.includes(publicCode) && exactTranslationTargetInternal(requested)) {
+      cellMap = buildProductTranslationCellMap(requested);
+    }
+  }
 
   return (Array.isArray(products) ? products : [])
     .filter((product) => product?.active !== false)
@@ -561,7 +580,13 @@ function listStorefrontProducts(storeSettings, language) {
     .map((product) => {
       const oneCItem = byId.get(String(product.oneCId || "")) || null;
       const publicProduct = toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId);
-      return applyPublicProductLocalization(publicProduct, product, language);
+      return applyPublicProductLocalization(
+        publicProduct,
+        product,
+        language,
+        enabledLanguages,
+        cellMap
+      );
     })
     .filter((product) => product.name);
 }

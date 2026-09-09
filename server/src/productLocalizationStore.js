@@ -4,6 +4,7 @@ import {
   runInTransaction,
   listProductTranslationRows,
   listProductTranslationRowsForProduct,
+  listProductTranslationRowsForLanguage,
   getProductTranslationRow,
   upsertProductTranslationRow,
   deleteProductTranslationRows,
@@ -34,9 +35,11 @@ import {
   normalizeGlossaryPhrase,
 } from "../../src/shared/i18n/productLocalization.js";
 import {
+  PRODUCT_GLOSSARY_CONTEXTS,
   applyGlossaryPhrases,
   validateProductTranslationSemantics,
 } from "./productLocalizationSemantics.js";
+import { projectLocalizedProductDisplay } from "../../src/shared/i18n/productDisplayProjection.js";
 
 const FORBIDDEN_AUTHORITY_KEYS = Object.freeze([
   "price",
@@ -237,6 +240,7 @@ export function buildProductWorkspaceRows(products = listCanonicalProducts()) {
         entityId: productId,
         fieldKey: field,
         sourceRu,
+        sourceHash: currentHash,
         critical: field === "name",
         languages: byLanguage,
       });
@@ -277,12 +281,22 @@ function glossaryForLanguage(internal) {
   return listGlossaryRows().filter((row) => row.languageCode === internal);
 }
 
+function requireCurrentSourceHash(currentHash, expectedSourceHash) {
+  if (String(expectedSourceHash || "") !== String(currentHash || "")) {
+    const error = new Error("Canonical Russian source changed. Reload before saving.");
+    error.status = 409;
+    error.code = "SOURCE_STALE";
+    throw error;
+  }
+}
+
 function validateWrite({ product, field, sourceRu, value, language }) {
   const check = validateProductTranslationSemantics({
     sourceRu,
     targetValue: value,
     product,
     glossaryEntries: glossaryForLanguage(language),
+    context: PRODUCT_GLOSSARY_CONTEXTS[field] || "",
   });
   if (!check.ok) {
     const error = new Error(check.message);
@@ -292,7 +306,14 @@ function validateWrite({ product, field, sourceRu, value, language }) {
   }
 }
 
-export function saveProductManualTranslation(productId, language, field, value, actor = "") {
+export function saveProductManualTranslation(
+  productId,
+  language,
+  field,
+  value,
+  actor = "",
+  expectedSourceHash = ""
+) {
   const internal = requireTargetLocale(language);
   const fieldKey = requireField(field);
   const text = typeof value === "string" ? value : "";
@@ -314,6 +335,7 @@ export function saveProductManualTranslation(productId, language, field, value, 
     }
     validateWrite({ product, field: fieldKey, sourceRu, value: text, language: internal });
     const currentHash = sourceHash(sourceRu);
+    requireCurrentSourceHash(currentHash, expectedSourceHash);
     const existing = getProductTranslationRow(id, internal, fieldKey) || emptyStoredRow(id, internal, fieldKey);
     const unchanged =
       existing.manualValue === text &&
@@ -337,7 +359,13 @@ export function saveProductManualTranslation(productId, language, field, value, 
   });
 }
 
-export function resetProductTranslationToAuto(productId, language, field, actor = "") {
+export function resetProductTranslationToAuto(
+  productId,
+  language,
+  field,
+  actor = "",
+  expectedSourceHash = ""
+) {
   const internal = requireTargetLocale(language);
   const fieldKey = requireField(field);
   return runInTransaction(() => {
@@ -345,6 +373,7 @@ export function resetProductTranslationToAuto(productId, language, field, actor 
     const id = canonicalProductId(product.id);
     const sourceRu = productFieldSource(product, fieldKey);
     const currentHash = sourceRu ? sourceHash(sourceRu) : "";
+    requireCurrentSourceHash(currentHash, expectedSourceHash);
     const existing = getProductTranslationRow(id, internal, fieldKey);
     if (!existing || !String(existing.manualValue || "").trim()) {
       return {
@@ -386,6 +415,7 @@ export function upsertProductAutoTranslation(item, actor = "auto-import") {
     targetValue: text,
     product,
     glossaryEntries: glossaryForLanguage(internal),
+    context: PRODUCT_GLOSSARY_CONTEXTS[fieldKey] || "",
   });
   if (!check.ok) {
     return { changed: false, skipped: check.code };
@@ -410,87 +440,84 @@ export function upsertProductAutoTranslation(item, actor = "auto-import") {
   return { changed: true, skipped: "" };
 }
 
-export function importProductAutoArtifact(artifact, actor = "auto-import") {
-  if (!artifact || artifact.format !== "clover-product-auto-import" || Number(artifact.formatVersion) !== 1) {
-    const error = new Error("Unsupported product AUTO import artifact.");
-    error.status = 400;
-    error.code = "INVALID_ARTIFACT";
-    throw error;
-  }
-  const items = Array.isArray(artifact.items) ? artifact.items : [];
-  return runInTransaction(() => {
-    const results = [];
-    for (const item of items) {
-      results.push(upsertProductAutoTranslation(item, actor));
-    }
-    return {
-      runId: String(artifact.runId || ""),
-      imported: results.filter((item) => item.changed).length,
-      skipped: results.filter((item) => !item.changed).length,
-      results,
-    };
-  });
-}
-
 export function generateAutoCandidate(product, language, field) {
   const internal = requireTargetLocale(language);
   const fieldKey = requireField(field);
   const sourceRu = productFieldSource(product, fieldKey);
-  return applyGlossaryPhrases(sourceRu, glossaryForLanguage(internal));
+  return applyGlossaryPhrases(
+    sourceRu,
+    glossaryForLanguage(internal),
+    PRODUCT_GLOSSARY_CONTEXTS[fieldKey] || ""
+  );
 }
+
+export function buildProductTranslationCellMap(languageCode) {
+  const internal = requireTargetLocale(languageCode);
+  const map = new Map();
+  for (const row of listProductTranslationRowsForLanguage(internal)) {
+    if (!map.has(row.productId)) map.set(row.productId, {});
+    map.get(row.productId)[row.fieldKey] = row;
+  }
+  return map;
+}
+
+export { projectLocalizedProductDisplay };
 
 export function deleteProductLocalization(productId) {
   return deleteProductTranslationRows(canonicalProductId(productId));
 }
 
-export function projectLocalizedProductDisplay(product, language, enabledLanguages = ["ru"]) {
-  if (!product || typeof product !== "object") return product;
-  const requested = String(language || "").trim();
-  if (!requested || requested === "ru") return product;
-  let internal = "";
-  try {
-    internal = requireTargetLocale(requested);
-  } catch {
-    return product;
-  }
-  const publicCode = toPublicLocaleCode(internal);
-  const enabled = Array.isArray(enabledLanguages) ? enabledLanguages : ["ru"];
-  if (!enabled.includes(publicCode)) return product;
-
-  const overlay = { ...product };
-  const details =
-    product.storefrontDetails && typeof product.storefrontDetails === "object"
-      ? { ...product.storefrontDetails }
-      : { description: "", composition: "", characteristics: "" };
-  for (const field of PRODUCT_TRANSLATION_FIELDS) {
-    const sourceRu = productFieldSource(product, field);
-    const currentHash = sourceRu ? sourceHash(sourceRu) : "";
-    const row = getProductTranslationRow(canonicalProductId(product.id), internal, field);
-    const derived = deriveProductFieldState(row, currentHash);
-    if (!derived.value) continue;
-    if (field === "name") overlay.name = derived.value;
-    else details[field] = derived.value;
-  }
-  overlay.storefrontDetails = details;
-  return overlay;
-}
-
 export function productCompletenessItems(products = listCanonicalProducts()) {
   const items = [];
   for (const row of buildProductWorkspaceRows(products)) {
-    if (row.critical !== true) continue;
     for (const [language, cell] of Object.entries(row.languages || {})) {
       items.push({
         domain: "products",
         language,
         state: cell.stale ? "STALE" : cell.state,
         stale: cell.stale,
-        critical: true,
+        critical: row.critical === true,
         value: cell.value,
+        fieldKey: row.fieldKey,
       });
     }
   }
   return items;
+}
+
+function emptyFieldReport() {
+  return { total: 0, current: 0, stale: 0, missing: 0 };
+}
+
+export function productFieldCompletenessByLanguage(products = listCanonicalProducts()) {
+  const reports = {};
+  for (const code of PUBLIC_LOCALE_CODES) {
+    if (code === "ru") continue;
+    reports[code] = {
+      name: emptyFieldReport(),
+      description: emptyFieldReport(),
+      composition: emptyFieldReport(),
+      characteristics: emptyFieldReport(),
+    };
+  }
+  for (const row of buildProductWorkspaceRows(products)) {
+    for (const [language, cell] of Object.entries(row.languages || {})) {
+      const bucket = reports[language]?.[row.fieldKey];
+      if (!bucket) continue;
+      bucket.total += 1;
+      if (cell.stale) bucket.stale += 1;
+      else if (!String(cell.value || "").trim() || cell.state === "MISSING") bucket.missing += 1;
+      else bucket.current += 1;
+    }
+  }
+  for (const report of Object.values(reports)) {
+    report.criticalComplete =
+      report.name.total > 0 && report.name.current === report.name.total && report.name.stale === 0;
+    report.detailReady = ["description", "composition", "characteristics"].every(
+      (field) => report[field].current === report[field].total && report[field].stale === 0
+    );
+  }
+  return reports;
 }
 
 export function listGlossaryEntries(filters = {}) {

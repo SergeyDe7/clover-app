@@ -37,6 +37,7 @@ import {
 import {
   buildProductWorkspaceRows,
   productCompletenessItems,
+  productFieldCompletenessByLanguage,
 } from "./productLocalizationStore.js";
 
 function nowIso() {
@@ -122,9 +123,13 @@ function completenessItems(store) {
 
 export function completenessByLanguage(store = readTranslationStore()) {
   const items = completenessItems(store);
+  const productFields = productFieldCompletenessByLanguage();
   const reports = {};
   for (const code of PUBLIC_LOCALE_CODES) {
-    reports[code] = computeLanguageCompleteness(code, items);
+    reports[code] = {
+      ...computeLanguageCompleteness(code, items),
+      productFields: productFields[code] || null,
+    };
   }
   return reports;
 }

@@ -411,6 +411,19 @@ export function listProductTranslationRowsForProduct(productId) {
     .all(String(productId || ""));
 }
 
+export function listProductTranslationRowsForLanguage(languageCode) {
+  return db
+    .prepare(
+      `SELECT product_id AS productId, language_code AS languageCode, field_key AS fieldKey,
+              auto_value AS autoValue, auto_source_hash AS autoSourceHash,
+              manual_value AS manualValue, manual_source_hash AS manualSourceHash,
+              updated_at AS updatedAt, updated_by AS updatedBy
+       FROM product_translations
+       WHERE language_code = ?`
+    )
+    .all(String(languageCode || ""));
+}
+
 export function getProductTranslationRow(productId, languageCode, fieldKey) {
   return (
     db

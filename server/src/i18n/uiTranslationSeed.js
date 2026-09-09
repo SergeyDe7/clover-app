@@ -15120,6 +15120,38 @@ export const SEEDS = {
     "tg": "Ин сабти луғат нест карда шавад?",
     "zh-CN": "删除这条词典记录？",
     "ar": "حذف مدخل المعجم هذا؟"
+  },
+  "admin.productTranslations.sourceStale": {
+    "en": "The Russian source changed. Your draft is kept — reload and review it.",
+    "uz": "Ruscha manba o‘zgardi. Qoralama saqlanadi — yangilang va tekshiring.",
+    "ky": "Орусча булак өзгөрдү. Долбоор сакталды — экранды жаңыртып текшериңиз.",
+    "tg": "Манбаи русӣ тағйир ёфт. Лоиҳа нигоҳ дошта шуд — навсозӣ кунед ва санҷед.",
+    "zh-CN": "俄语原文已更改。草稿已保留，请刷新后核对。",
+    "ar": "تغير المصدر الروسي. تم الاحتفاظ بالمسودة — حدّث الصفحة وراجعها."
+  },
+  "admin.productTranslations.notApplicable": {
+    "en": "No Russian source — translation is not applicable.",
+    "uz": "Ruscha manba yo‘q — tarjima yaratilmaydi.",
+    "ky": "Орусча булак жок — котормо түзүлбөйт.",
+    "tg": "Манбаи русӣ нест — тарҷума сохта намешавад.",
+    "zh-CN": "没有俄语原文，不可创建翻译。",
+    "ar": "لا يوجد مصدر روسي — لا تُنشأ ترجمة."
+  },
+  "admin.glossary.edit": {
+    "en": "Edit",
+    "uz": "Tahrirlash",
+    "ky": "Оңдоо",
+    "tg": "Таҳрир",
+    "zh-CN": "编辑",
+    "ar": "تعديل"
+  },
+  "admin.glossary.cancel": {
+    "en": "Cancel",
+    "uz": "Bekor qilish",
+    "ky": "Жокко чыгаруу",
+    "tg": "Бекор кардан",
+    "zh-CN": "取消",
+    "ar": "إلغاء"
   }
 };
 
