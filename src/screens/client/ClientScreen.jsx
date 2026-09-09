@@ -9,6 +9,8 @@ import {
   OrderThankYouOverlay,
 } from "../../shared/SharedPanels";
 import { StickyCabinetChrome } from "../../shared/StickyCabinetChrome";
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { orderHistoryFilterLabel, orderStatusLabel, requestStatusLabel } from "../../shared/i18n/displayLabels";
 import {
   CLIENT_TABS,
   CLIENT_CABINET_SECTIONS,
@@ -89,6 +91,7 @@ function ClientDashboard({
   profileComplete,
 }) {
   const isNarrow = useIsNarrow();
+  const { t } = useLocalization();
   const [tab, setTab] = useState("matrix");
   const [cabinetSection, setCabinetSection] = useState(readClientCabinetSection);
   const [filter, setFilter] = useState("Активные");
@@ -221,12 +224,12 @@ function ClientDashboard({
           key={id}
           onClick={() => selectTab(id)}
         >
-          {label}
+          {t(label)}
           {id === "orders" && active.length > 0 ? ` (${active.length})` : ""}
           {id === "reconciliation" && readyActsBadge > 0 ? (
             <span
               className="client-nav-count"
-              aria-label={`Готовых актов: ${readyActsBadge}`}
+              aria-label={t("client.acts.readyCount", { count: readyActsBadge })}
             >
               {readyActsBadge}
             </span>
@@ -265,12 +268,12 @@ function ClientDashboard({
     <section className="panel client-orders-panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">История</p>
-          <h2>Мои заказы</h2>
+          <p className="eyebrow">{t("shared.section.history")}</p>
+          <h2>{t("client.nav.orders")}</h2>
           <p>
-            Активных: {active.length}
+            {t("client.orders.activeCount", { count: active.length })}
             {active[0]
-              ? ` · ближайшая доставка ${formatDate(active[0].firstDeliveryDate)}`
+              ? t("client.orders.nextDelivery", { date: formatDate(active[0].firstDeliveryDate) })
               : ""}
           </p>
         </div>
@@ -285,7 +288,7 @@ function ClientDashboard({
             key={status}
             onClick={() => setFilter(status)}
           >
-            {status}
+            {orderHistoryFilterLabel(status, t)}
           </button>
         ))}
       </div>
@@ -297,7 +300,7 @@ function ClientDashboard({
             const canEdit =
               settings.allowClientEdit && order.status === "Новый";
             const canDelete =
-              settings.allowClientDelete && canTrashOrder(order, "client").ok;
+              settings.allowClientDelete && canTrashOrder(order, "client", t).ok;
             return (
               <article
                 className="order-card"
@@ -307,41 +310,41 @@ function ClientDashboard({
                 <div className="order-card-header">
                   <div>
                     <span className={`badge ${statusClass(order.status)}`}>
-                      {order.status}
+                      {orderStatusLabel(order.status, t)}
                     </span>
-                    <h3>Заказ № {order.number}</h3>
-                    <p>Создан: {formatDateTime(order.createdAt)}</p>
+                    <h3>{t("client.order.numberHeading", { number: order.number })}</h3>
+                    <p>{t("client.order.createdAt", { datetime: formatDateTime(order.createdAt) })}</p>
                   </div>
                   <div className="nowrap">
                     <strong className="success-text">
                       {settings.showPrices && total > 0
                         ? formatMoney(total)
-                        : `${getPositionCount(order)} поз.`}
+                        : t("client.orders.positionCount", { count: getPositionCount(order) })}
                     </strong>
                   </div>
                 </div>
                 <div className="order-meta">
                   <div>
-                    <span>Дата доставки</span>
+                    <span>{t("checkout.deliveryDate")}</span>
                     <strong>{formatDate(order.firstDeliveryDate)}</strong>
                   </div>
                   <div>
-                    <span>Адрес</span>
+                    <span>{t("shared.field.address")}</span>
                     <strong>{order.address}</strong>
                   </div>
                   <div>
-                    <span>Позиций</span>
+                    <span>{t("shared.field.positions")}</span>
                     <strong>{getPositionCount(order)}</strong>
                   </div>
                   <div>
-                    <span>Обновлён</span>
+                    <span>{t("client.updated")}</span>
                     <strong>
                       {formatDateTime(order.updatedAt || order.createdAt)}
                     </strong>
                   </div>
                 </div>
                 <details className="order-details">
-                  <summary>Посмотреть состав заказа</summary>
+                  <summary>{t("client.viewOrderContents")}</summary>
                   <div className="order-products">
                     {(order.items || []).map((item) => (
                       <div
@@ -357,7 +360,7 @@ function ClientDashboard({
                           {UNIT_CONFIG[item.unit]?.shortLabel || item.unit}
                           <small>
                             {item.multiplier > 1
-                              ? `${item.quantity * item.multiplier} шт. всего`
+                              ? t("client.orders.pieceTotal", { count: item.quantity * item.multiplier })
                               : ""}
                           </small>
                         </strong>
@@ -374,12 +377,12 @@ function ClientDashboard({
                         />
                         <span>
                           <span className="badge yellow">
-                            {item.requestStatus || "Новый запрос"}
+                            {requestStatusLabel(item.requestStatus || "Новый запрос", t)}
                           </span>
                           {item.name}
                           <small>{item.details}</small>
                           {item.managerComment && (
-                            <small>Менеджер: {item.managerComment}</small>
+                            <small>{t("client.order.managerCommentPrefix", { comment: item.managerComment })}</small>
                           )}
                         </span>
                         <strong>
@@ -389,7 +392,7 @@ function ClientDashboard({
                               ? formatMoney(
                                   Number(item.unitPrice) * item.quantity
                                 )
-                              : "Цена уточняется"}
+                              : t("shared.price.pending")}
                           </small>
                         </strong>
                       </div>
@@ -399,13 +402,13 @@ function ClientDashboard({
                     <div className="order-comments">
                       {order.clientComment && (
                         <div className="comment-box">
-                          <strong>Ваш комментарий</strong>
+                          <strong>{t("client.yourComment")}</strong>
                           <p>{order.clientComment}</p>
                         </div>
                       )}
                       {order.managerComment && (
                         <div className="comment-box">
-                          <strong>Комментарий менеджера</strong>
+                          <strong>{t("client.managerComment")}</strong>
                           <p>{order.managerComment}</p>
                         </div>
                       )}
@@ -419,27 +422,27 @@ function ClientDashboard({
                       className="secondary-button"
                       type="button"
                       onClick={() => onEdit(order)}
-                    >
-                      Редактировать
-                    </button>
+                    >{
+                      t("client.edit")
+                    }</button>
                   )}
                   {settings.allowRepeatOrder && (
                     <button
                       className="secondary-button"
                       type="button"
                       onClick={() => onRepeat(order)}
-                    >
-                      Повторить заказ
-                    </button>
+                    >{
+                      t("client.reorder")
+                    }</button>
                   )}
                   {canDelete && (
                     <button
                       className="danger-button"
                       type="button"
                       onClick={() => onDelete(order)}
-                    >
-                      Удалить
-                    </button>
+                    >{
+                      t("shared.action.delete")
+                    }</button>
                   )}
                 </div>
               </article>
@@ -448,13 +451,13 @@ function ClientDashboard({
         </div>
       ) : (
         <EmptyState
-          title={filter === "Активные" ? "Пока нет заказов" : "Заказы не найдены"}
+          title={filter === "Активные" ? t("client.noOrdersYet") : t("client.noOrdersFound")}
           message={
             filter === "Активные"
-              ? "Создайте первый заказ — он появится здесь."
-              : "По этому фильтру заказов нет. Попробуйте другой статус."
+              ? t("client.createTheFirstOrderItWill")
+              : t("client.thereAreNoOrdersForThis")
           }
-          actionLabel="Новый заказ"
+          actionLabel={t("client.order.new")}
           onAction={openNewOrder}
         />
       )}
@@ -463,9 +466,9 @@ function ClientDashboard({
         className="client-new-order-fab"
         type="button"
         onClick={openNewOrder}
-      >
-        + Новый заказ
-      </button>
+      >{
+        t("client.action.newOrder")
+      }</button>
     </section>
   );
 
@@ -480,7 +483,7 @@ function ClientDashboard({
 
   const cabinetMobile = (
     <div className="client-cabinet-stack">
-      <nav className="client-cabinet-nav" aria-label="Разделы настроек">
+      <nav className="client-cabinet-nav" aria-label={t("client.settingsSections")}>
         {CLIENT_CABINET_SECTIONS.map(([id, label]) => (
           <button
             key={id}
@@ -492,7 +495,7 @@ function ClientDashboard({
             }
             onClick={() => selectCabinetSection(id)}
           >
-            {label}
+            {t(label)}
           </button>
         ))}
       </nav>
@@ -516,14 +519,14 @@ function ClientDashboard({
         <Header
           title={
             profile.contactName
-              ? `Здравствуйте, ${profile.contactName}!`
-              : "Личный кабинет клиента"
+              ? t("client.profile.helloNamed", { name: profile.contactName })
+              : t("client.clientPersonalCabinet")
           }
           subtitle={profile.companyName}
           onLogout={onLogout}
           nav={
             !isNarrow ? (
-              <nav className="client-nav" aria-label="Разделы кабинета">
+              <nav className="client-nav" aria-label={t("client.cabinetSections")}>
                 {navButtons}
               </nav>
             ) : null
@@ -550,34 +553,54 @@ function ClientDashboard({
               <div className="warning-box client-home-gate">
                 {!profileComplete && settings.requireProfile && (
                   <p>
-                    Сначала заполните профиль организации в{" "}
-                    <button
-                      className="linkish"
-                      type="button"
-                      onClick={() => {
-                        selectTab("cabinet");
-                        if (isNarrow) selectCabinetSection("settings");
-                      }}
-                    >
-                      Настройках
-                    </button>
-                    .
+                    {(() => {
+                      const token = "\u0001";
+                      const [before, after = ""] = t("client.gate.fillOrgProfileInSettings", {
+                        settings: token,
+                      }).split(token);
+                      return (
+                        <>
+                          {before}
+                          <button
+                            className="linkish"
+                            type="button"
+                            onClick={() => {
+                              selectTab("cabinet");
+                              if (isNarrow) selectCabinetSection("settings");
+                            }}
+                          >
+                            {t("client.settings")}
+                          </button>
+                          {after}
+                        </>
+                      );
+                    })()}
                   </p>
                 )}
                 {settings.requireAddress && !addresses.length && (
                   <p>
-                    Добавьте адрес доставки в{" "}
-                    <button
-                      className="linkish"
-                      type="button"
-                      onClick={() => {
-                        selectTab("cabinet");
-                        if (isNarrow) selectCabinetSection("addresses");
-                      }}
-                    >
-                      Настройках
-                    </button>
-                    .
+                    {(() => {
+                      const token = "\u0001";
+                      const [before, after = ""] = t("client.gate.addDeliveryAddressInSettings", {
+                        settings: token,
+                      }).split(token);
+                      return (
+                        <>
+                          {before}
+                          <button
+                            className="linkish"
+                            type="button"
+                            onClick={() => {
+                              selectTab("cabinet");
+                              if (isNarrow) selectCabinetSection("addresses");
+                            }}
+                          >
+                            {t("client.settings")}
+                          </button>
+                          {after}
+                        </>
+                      );
+                    })()}
                   </p>
                 )}
               </div>
@@ -615,10 +638,9 @@ function ClientDashboard({
                 }
               />
             ) : (
-              <div className="empty-box">
-                Оформление заказа станет доступно после заполнения обязательных
-                данных.
-                <div>
+              <div className="empty-box">{
+                t("client.checkoutWillBecomeAvailableAfterRequired")
+                }<div>
                   <button
                     className="primary-button"
                     type="button"
@@ -626,9 +648,9 @@ function ClientDashboard({
                       selectTab("cabinet");
                       if (isNarrow) selectCabinetSection("settings");
                     }}
-                  >
-                    Открыть настройки
-                  </button>
+                  >{
+                    t("client.openSettings")
+                  }</button>
                 </div>
               </div>
             )}
@@ -661,7 +683,7 @@ function ClientDashboard({
       <OrderThankYouOverlay
         open={thankYouOpen}
         onDone={finishOrderThankYou}
-        confirmLabel="На главную"
+        confirmLabel={t("storefront.nav.homeLink")}
       />
     </main>
   );

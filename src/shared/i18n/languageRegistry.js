@@ -34,13 +34,13 @@ const INTERNAL_TO_PUBLIC = Object.freeze({
 });
 
 export const LANGUAGE_REGISTRY = Object.freeze({
-  ru: { internalCode: "ru", publicCode: "ru", direction: "ltr", alwaysEnabled: true },
-  en: { internalCode: "en", publicCode: "en", direction: "ltr", alwaysEnabled: false },
-  uz: { internalCode: "uz", publicCode: "uz", direction: "ltr", alwaysEnabled: false },
-  ky: { internalCode: "ky", publicCode: "ky", direction: "ltr", alwaysEnabled: false },
-  tg: { internalCode: "tg", publicCode: "tg", direction: "ltr", alwaysEnabled: false },
-  "zh-CN": { internalCode: "zh-CN", publicCode: "zh", direction: "ltr", alwaysEnabled: false },
-  ar: { internalCode: "ar", publicCode: "ar", direction: "rtl", alwaysEnabled: false },
+  ru: Object.freeze({ internalCode: "ru", publicCode: "ru", direction: "ltr", alwaysEnabled: true }),
+  en: Object.freeze({ internalCode: "en", publicCode: "en", direction: "ltr", alwaysEnabled: false }),
+  uz: Object.freeze({ internalCode: "uz", publicCode: "uz", direction: "ltr", alwaysEnabled: false }),
+  ky: Object.freeze({ internalCode: "ky", publicCode: "ky", direction: "ltr", alwaysEnabled: false }),
+  tg: Object.freeze({ internalCode: "tg", publicCode: "tg", direction: "ltr", alwaysEnabled: false }),
+  "zh-CN": Object.freeze({ internalCode: "zh-CN", publicCode: "zh", direction: "ltr", alwaysEnabled: false }),
+  ar: Object.freeze({ internalCode: "ar", publicCode: "ar", direction: "rtl", alwaysEnabled: false }),
 });
 
 function asLocaleInput(value) {
@@ -91,4 +91,57 @@ export function getEnabledLocales(enabledLanguages) {
     if (!enabled.includes(publicCode)) enabled.push(publicCode);
   }
   return enabled;
+}
+
+/** Internal non-RU codes stored in translation_values.language_code. */
+export const TARGET_INTERNAL_LOCALES = Object.freeze([
+  "en",
+  "uz",
+  "ky",
+  "tg",
+  "zh-CN",
+  "ar",
+]);
+
+/** Exact public non-RU codes accepted by admin workspace GET. */
+export const PUBLIC_TARGET_LOCALE_CODES = Object.freeze(["en", "uz", "ky", "tg", "zh", "ar"]);
+
+/**
+ * Exact save/reset path spellings. Chinese accepts public zh and internal zh-CN only.
+ * Aliases such as ZH_cn / zh_cn / ZH-CN are not accepted.
+ */
+export const TRANSLATION_TARGET_INPUT_CODES = Object.freeze(["en", "uz", "ky", "tg", "zh", "zh-CN", "ar"]);
+
+export function isExactPublicLocaleCode(value) {
+  return typeof value === "string" && PUBLIC_LOCALE_CODES.includes(value);
+}
+
+export function isExactPublicTargetLocale(value) {
+  return typeof value === "string" && PUBLIC_TARGET_LOCALE_CODES.includes(value);
+}
+
+export function isExactTranslationTargetLocale(value) {
+  return typeof value === "string" && TRANSLATION_TARGET_INPUT_CODES.includes(value);
+}
+
+export function exactTranslationTargetInternal(value) {
+  if (!isExactTranslationTargetLocale(value)) return "";
+  if (value === "zh-CN") return "zh-CN";
+  return PUBLIC_TO_INTERNAL[value] || "";
+}
+
+/**
+ * General recognizer after Stage 1 canonicalization.
+ * Not the Stage 3.1 admin/persistence input boundary.
+ */
+export function isSupportedTargetLocale(value) {
+  if (typeof value !== "string") return false;
+  if (!isSupportedPublicLocale(value)) return false;
+  const internal = recognizedInternalCode(value);
+  return TARGET_INTERNAL_LOCALES.includes(internal);
+}
+
+export function canonicalizeTargetLocale(value) {
+  if (!isSupportedTargetLocale(value)) return "";
+  return recognizedInternalCode(value);
 }

@@ -81,9 +81,9 @@ const categoryReady = computeLanguageCompleteness("en", [
     value: "Gloves",
   },
 ]);
-assert.equal(categoryReady.complete, true);
+assert.equal(categoryReady.complete, false);
 assert.equal(categoryReady.domains.categories.complete, true);
-assert.equal(categoryReady.domains.interface.complete, true);
+assert.equal(categoryReady.domains.interface.complete, false);
 assert.equal(computeLanguageCompleteness("ru", []).complete, true);
 
 const rejectedEnable = applyEnabledLanguages(["ru"], ["ru", "en"], {
@@ -109,12 +109,13 @@ assert.deepEqual(
   TRANSLATION_WORKSPACE_VIEWS.map(([id]) => id),
   ["interface", "categories", "seo", "glossary", "untranslated"]
 );
-assert.match(languagesSrc, /Языки и переводы/);
+assert.match(languagesSrc, /useLocalization|Языки и переводы|admin\.languages\.title/);
 for (const [, title] of TRANSLATION_WORKSPACE_VIEWS) {
-  assert.match(languagesSrc, new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(
+    readSrc("src/shared/i18n/localizationSettings.js"),
+    new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+  );
 }
-assert.match(languagesSrc, /только непереведённые/);
-assert.match(languagesSrc, /Русский/);
 assert.doesNotMatch(languagesSrc, /auto-translate|OpenAI|deepl/i);
 
 const manualStore = {
@@ -184,7 +185,7 @@ assert.equal(
 );
 assert.equal(staffHasFeatureRoles({ role: "client" }, "languages"), false);
 
-assert.match(helpersSrc, /\["languages", "Языки и переводы"\]/);
+assert.match(helpersSrc, /\["languages", "(?:Языки и переводы|manager\.nav\.languages)"\]/);
 assert.match(screenSrc, /tab === "languages"/);
 assert.match(screenSrc, /ManagerLanguages/);
 assert.match(rolesSrc, /id === "languages"/);

@@ -1,3 +1,4 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { useEffect, useState } from "react";
 import {
   formatRussianPhone,
@@ -26,7 +27,8 @@ function mailtoHref(email) {
 }
 
 function ContactsMap({ point, customImage, embedSrc, mapsUrl }) {
-  const geoZoom = Boolean(point) && !customImage;
+  const { t } = useLocalization();
+    const geoZoom = Boolean(point) && !customImage;
   const [zoom, setZoom] = useState(() =>
     geoZoom ? clampYandexZoom(point.zoom) : 1
   );
@@ -47,10 +49,10 @@ function ContactsMap({ point, customImage, embedSrc, mapsUrl }) {
           style={geoZoom ? undefined : { transform: `scale(${zoom})` }}
         >
           {image ? (
-            <img src={image} alt="Карта с адресом" width="650" height="450" />
+            <img src={image} alt={t("storefront.mapWithAddress")} width="650" height="450" />
           ) : (
             <iframe
-              title="Яндекс.Карты"
+              title={t("storefront.yandexMaps")}
               src={frameSrc}
               width="650"
               height="450"
@@ -64,7 +66,7 @@ function ContactsMap({ point, customImage, embedSrc, mapsUrl }) {
       <div className="sf-contacts-map-zoom">
         <button
           type="button"
-          aria-label="Увеличить карту"
+          aria-label={t("storefront.zoomInMap")}
           disabled={zoom >= max}
           onClick={() =>
             setZoom((value) => Math.min(max, value + step))
@@ -74,7 +76,7 @@ function ContactsMap({ point, customImage, embedSrc, mapsUrl }) {
         </button>
         <button
           type="button"
-          aria-label="Уменьшить карту"
+          aria-label={t("storefront.zoomOutMap")}
           disabled={zoom <= min}
           onClick={() =>
             setZoom((value) => Math.max(min, value - step))
@@ -89,9 +91,9 @@ function ContactsMap({ point, customImage, embedSrc, mapsUrl }) {
           href={mapsUrl}
           target="_blank"
           rel="noreferrer"
-        >
-          Открыть в Яндекс.Картах
-        </a>
+        >{
+          t("storefront.openInYandexMaps")
+        }</a>
       ) : null}
     </div>
   );
@@ -107,6 +109,7 @@ function Fact({ label, children }) {
 }
 
 export function ContactsPage() {
+  const { t } = useLocalization();
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const [site, setSite] = useState({
@@ -168,12 +171,12 @@ export function ContactsPage() {
   return (
     <div className="sf-contacts-page">
       <header className="sf-section-head">
-        <h1>Контакты</h1>
+        <h1>{t("storefront.nav.contacts")}</h1>
       </header>
       {error ? <p className="sf-error">{error}</p> : null}
-      {!ready && !error ? <p className="sf-muted">Загружаем контакты…</p> : null}
+      {!ready && !error ? <p className="sf-muted">{t("storefront.loadingContacts")}</p> : null}
       {ready && !error && !hasAny ? (
-        <p className="sf-muted">Контакты пока не указаны.</p>
+        <p className="sf-muted">{t("storefront.contactsAreNotSetYet")}</p>
       ) : null}
       {ready && hasAny ? (
         <div className="sf-contacts-sheet">
@@ -182,21 +185,21 @@ export function ContactsPage() {
               className="sf-contacts-col"
               aria-labelledby="sf-contacts-reach-title"
             >
-              <h2 id="sf-contacts-reach-title">Связаться</h2>
+              <h2 id="sf-contacts-reach-title">{t("storefront.contact")}</h2>
               {phoneLinks.phone ? (
-                <Fact label="Телефон">
+                <Fact label={t("auth.register.phone")}>
                   <a href={phoneLinks.phone}>{phoneValue}</a>
-                  <a className="sf-btn sf-btn-primary sf-btn-sm" href={phoneLinks.phone}>
-                    Позвонить
-                  </a>
+                  <a className="sf-btn sf-btn-primary sf-btn-sm" href={phoneLinks.phone}>{
+                    t("storefront.call")
+                  }</a>
                 </Fact>
               ) : null}
               {mailHref ? (
-                <Fact label="Почта">
+                <Fact label={t("shared.field.emailShort")}>
                   <a href={mailHref}>{site.contactEmail}</a>
-                  <a className="sf-btn sf-btn-ghost sf-btn-sm" href={mailHref}>
-                    Написать
-                  </a>
+                  <a className="sf-btn sf-btn-ghost sf-btn-sm" href={mailHref}>{
+                    t("storefront.write")
+                  }</a>
                 </Fact>
               ) : null}
             </section>
@@ -206,19 +209,19 @@ export function ContactsPage() {
               className="sf-contacts-col sf-contacts-place"
               aria-labelledby="sf-contacts-place-title"
             >
-              <h2 id="sf-contacts-place-title">Как нас найти</h2>
+              <h2 id="sf-contacts-place-title">{t("storefront.howToFindUs")}</h2>
               {site.contactAddress ? (
-                <Fact label="Адрес">
+                <Fact label={t("shared.field.address")}>
                   <strong>{site.contactAddress}</strong>
                 </Fact>
               ) : null}
               {site.contactHours ? (
-                <Fact label="Режим работы">
+                <Fact label={t("storefront.workingHours")}>
                   <strong className="sf-contacts-pre">{site.contactHours}</strong>
                 </Fact>
               ) : null}
               {site.contactNote ? (
-                <Fact label="Как проехать">
+                <Fact label={t("storefront.howToGetThere")}>
                   <strong className="sf-contacts-pre">{site.contactNote}</strong>
                 </Fact>
               ) : null}

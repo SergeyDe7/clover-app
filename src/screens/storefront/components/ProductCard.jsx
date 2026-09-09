@@ -1,3 +1,4 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { useEffect, useMemo, useState } from "react";
 import { formatMoney, navigateStorefront } from "./StoreHeader.jsx";
 import {
@@ -12,6 +13,7 @@ import {
 } from "./StorefrontUnitChoice.jsx";
 
 export function ProductCard({ product }) {
+  const { t } = useLocalization();
   const units = useMemo(() => orderedSaleUnits(product), [product]);
   const [unit, setUnit] = useState(() => units[0] || "piece");
 
@@ -53,11 +55,11 @@ export function ProductCard({ product }) {
           </button>
         </h3>
         {product.code ? (
-          <p className="sf-product-code">Арт. {product.code}</p>
+          <p className="sf-product-code">{t("shared.article.prefix", { article: product.code })}</p>
         ) : null}
         <strong className="sf-product-price">
           <span className="sf-product-price-value">
-            {price > 0 ? formatMoney(price) : "Цена по запросу"}
+            {price > 0 ? formatMoney(price) : t("storefront.price.onRequest")}
           </span>
           <span className="sf-unit"> / {unitLabel}</span>
         </strong>

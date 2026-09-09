@@ -1,13 +1,14 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../../serverApi";
 import { MatrixExcelReview } from "./MatrixExcelImport";
 import { mergeProductsFromCatalogResponse } from "./matrixMembership";
 
-const SHEET_TITLES = {
-  choose: "Добавить на витрину",
-  manual: "Поиск в 1С",
-  excel: "Загрузка Excel",
+const SHEET_TITLE_KEYS = {
+  choose: "manager.storefront.add",
+  manual: "manager.searchIn1c",
+  excel: "manager.excelUpload",
 };
 
 function useMobileSheet() {
@@ -38,6 +39,7 @@ function useMobileSheet() {
  * Имя на витрине = имя Clover/матрицы (из Excel или уже существующего товара).
  */
 export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
+  const { t } = useLocalization();
   const [step, setStep] = useState("closed");
   const [search, setSearch] = useState("");
   const [items, setItems] = useState([]);
@@ -139,7 +141,7 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
       return !clover?.showOnStorefront;
     });
     if (!list.length) {
-      setError("Выбранные позиции уже на витрине.");
+      setError(t("manager.selectedItemsAreAlreadyOnThe"));
       return;
     }
 
@@ -179,11 +181,11 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
       setNotice(
         addedNames.length
           ? addedNames.length === 1
-            ? `На витрину: «${addedNames[0]}».`
-            : `На витрину: ${addedNames.length} поз.`
-          : "Новых позиций нет."
+            ? t("manager.storefront.addedNamed", { name: addedNames[0] })
+            : t("manager.storefront.addedCountShort", { count: addedNames.length })
+          : t("manager.noNewItems")
       );
-      if (skipped) setError(`Уже на витрине, пропущено: ${skipped}.`);
+      if (skipped) setError(t("manager.storefront.skippedAlready", { count: skipped }));
       await runSearch(search);
     } catch (addError) {
       setError(addError.message);
@@ -200,10 +202,10 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
 
   const renderChooseStep = () => (
     <>
-      <strong>Как добавить товары на витрину?</strong>
-      <p className="muted small" style={{ marginTop: 6 }}>
-        Вручную — поиск в выгрузке 1С. Excel — названия как в матрице, пары с 1С.
-      </p>
+      <strong>{t("manager.howToAddProductsToThe")}</strong>
+      <p className="muted small" style={{ marginTop: 6 }}>{
+        t("manager.manuallySearchThe1cExportExcel")
+      }</p>
       <div className="matrix-add-actions storefront-add-sheet-actions">
         <button
           className="primary-button"
@@ -213,36 +215,35 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
             setSearch("");
             setSelectedIds(new Set());
           }}
-        >
-          Вручную
-        </button>
+        >{
+          t("manager.manually")
+        }</button>
         <button
           className="secondary-button"
           type="button"
           onClick={() => setStep("excel")}
-        >
-          Загрузить Excel
-        </button>
-        <button className="secondary-button" type="button" onClick={closeAll}>
-          Отмена
-        </button>
+        >{
+          t("manager.uploadExcel")
+        }</button>
+        <button className="secondary-button" type="button" onClick={closeAll}>{
+          t("shared.modal.cancel")
+        }</button>
       </div>
     </>
   );
 
   const renderManualStep = () => (
     <>
-      <strong>Поиск по выгрузке 1С → витрина</strong>
+      <strong>{t("manager.search1cExportStorefront")}</strong>
       <p className="muted small" style={{ marginTop: 6, marginBottom: 8 }}>
-        Если товар уже есть в Clover, на витрине останется его имя из матрицы.
-        Новый товар получит имя из 1С (его можно потом поменять в карточке).
-        {catalogTotal ? ` В выгрузке: ${catalogTotal}.` : ""}
+        {t("manager.storefront.ifExistsKeepMatrixName")}
+        {catalogTotal ? t("manager.storefront.exportTotal", { count: catalogTotal }) : ""}
       </p>
       <div className="one-c-products-search">
         <input
           ref={searchInputRef}
           type="search"
-          placeholder="Название или код из 1С"
+          placeholder={t("manager.nameOr1cCode")}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           onKeyDown={(event) => {
@@ -258,14 +259,14 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
           disabled={loading}
           onClick={() => void runSearch(search)}
         >
-          {loading ? "Поиск..." : "Найти"}
+          {loading ? t("manager.search.ellipsis") : t("shared.action.find")}
         </button>
-        <button className="secondary-button" type="button" onClick={() => setStep("choose")}>
-          Назад
-        </button>
-        <button className="secondary-button" type="button" onClick={closeAll}>
-          Отмена
-        </button>
+        <button className="secondary-button" type="button" onClick={() => setStep("choose")}>{
+          t("storefront.back")
+        }</button>
+        <button className="secondary-button" type="button" onClick={closeAll}>{
+          t("shared.modal.cancel")
+        }</button>
       </div>
       {error && <div className="sync-error">{error}</div>}
       {notice && (
@@ -275,7 +276,7 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
       )}
       <div className="matrix-add-actions storefront-add-summary">
         <span className="muted small">
-          Найдено: {total}. К добавлению: {selectedItems.length}.
+          {t("manager.storefront.foundToAdd", { found: total, add: selectedItems.length })}
         </span>
         <button
           className="primary-button"
@@ -284,13 +285,13 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
           onClick={() => void addItems(selectedItems)}
         >
           {loading
-            ? "Добавляем..."
-            : `Добавить на витрину (${selectedItems.length})`}
+            ? t("manager.adding")
+            : t("manager.storefront.addCount", { count: selectedItems.length })}
         </button>
       </div>
       <div className="one-c-products-list one-c-picker-list storefront-add-picker-list">
         {loading && !items.length ? (
-          <div className="empty-box">Ищем в выгрузке 1С…</div>
+          <div className="empty-box">{t("manager.searchingThe1cExport")}</div>
         ) : null}
         {items.map((item) => {
           const clover = productsByOneCId.get(String(item.id));
@@ -327,22 +328,22 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
                 />
                 <div style={{ minWidth: 0 }}>
                   <strong>{item.name}</strong>
-                  <span>Код: {item.code || "—"}</span>
+                  <span>{t("manager.codeValue", { code: item.code || "—" })}</span>
                   {alreadyOn ? (
                     <span className="muted small">
-                      <span className="badge green" style={{ marginRight: 6 }}>
-                        На витрине
-                      </span>
-                      {clover?.name ? `как «${clover.name}»` : "повторно добавить нельзя"}
+                      <span className="badge green" style={{ marginRight: 6 }}>{
+                        t("manager.storefront.on")
+                      }</span>
+                      {clover?.name ? t("manager.storefront.asNamed", { name: clover.name }) : t("manager.cannotBeAddedAgain")}
                     </span>
                   ) : clover ? (
                     <span className="muted small">
-                      В Clover/матрице: «{clover.name}» — это имя пойдёт на витрину
+                      {t("manager.storefront.inCloverMatrixName", { name: clover.name })}
                     </span>
                   ) : (
-                    <span className="muted small">
-                      Новый для Clover — имя с 1С, можно изменить позже
-                    </span>
+                    <span className="muted small">{
+                      t("manager.newToCloverNameFrom1c")
+                    }</span>
                   )}
                 </div>
               </label>
@@ -352,13 +353,13 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
                 disabled={loading || alreadyOn}
                 onClick={() => void addItems([item])}
               >
-                {alreadyOn ? "На витрине" : "На витрину"}
+                {alreadyOn ? t("manager.storefront.on") : t("manager.storefront.to")}
               </button>
             </article>
           );
         })}
         {!loading && !items.length && (
-          <div className="empty-box">В выгрузке 1С по запросу ничего нет.</div>
+          <div className="empty-box">{t("manager.nothingInThe1cExportFor")}</div>
         )}
       </div>
     </>
@@ -375,10 +376,10 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
       onAdded={(addedNames = []) => {
         setNotice(
           addedNames.length === 1
-            ? `На витрину: «${addedNames[0]}».`
+            ? t("manager.storefront.addedNamed", { name: addedNames[0] })
             : addedNames.length
-              ? `На витрину из Excel: ${addedNames.length} поз.`
-              : "Новых позиций нет — всё уже на витрине."
+              ? t("manager.storefront.addedFromExcel", { count: addedNames.length })
+              : t("manager.noNewItemsEverythingIsAlready")
         );
         onAfterAdd?.({ addedNames, source: "excel" });
         setStep("closed");
@@ -418,22 +419,22 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
             className="cart-sheet storefront-add-sheet"
             role="dialog"
             aria-modal="true"
-            aria-label={SHEET_TITLES[step] || "Добавить на витрину"}
+            aria-label={t(SHEET_TITLE_KEYS[step] || "manager.storefront.add")}
           >
             <button
               className="cart-sheet-backdrop"
               type="button"
-              aria-label="Закрыть"
+              aria-label={t("shared.action.close")}
               onClick={closeAll}
             />
             <div className="cart-sheet-panel storefront-add-sheet-panel">
               <div className="cart-sheet-head">
                 <div>
-                  <strong>{SHEET_TITLES[step] || "Добавить на витрину"}</strong>
+                  <strong>{t(SHEET_TITLE_KEYS[step] || "manager.storefront.add")}</strong>
                 </div>
-                <button className="header-button" type="button" onClick={closeAll}>
-                  Закрыть
-                </button>
+                <button className="header-button" type="button" onClick={closeAll}>{
+                  t("shared.action.close")
+                }</button>
               </div>
               <div className="cart-sheet-scroll storefront-add-sheet-scroll">
                 {renderStepPanel()}
@@ -457,9 +458,9 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
             setStep("choose");
           }}
           disabled={loading || step !== "closed"}
-        >
-          Добавить из 1С / Excel
-        </button>
+        >{
+          t("manager.addFrom1cExcel")
+        }</button>
         {notice && step === "closed" && (
           <div className="matrix-save-message saved storefront-onec-add-notice">
             {notice}

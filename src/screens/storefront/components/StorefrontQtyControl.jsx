@@ -1,3 +1,4 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { useEffect, useState } from "react";
 import {
   fromQuantityInputValue,
@@ -46,6 +47,7 @@ export function StorefrontQtyControl({
   unitSize = 1,
   compact = false,
 }) {
+  const { t } = useLocalization();
   const step = Math.max(1, Math.floor(Number(orderStep) || 1));
   const multiplier = Math.max(1, Math.floor(Number(unitSize) || 1));
   const inputStep = quantityInputStep(multiplier, step);
@@ -127,7 +129,7 @@ export function StorefrontQtyControl({
       <button
         type="button"
         className="sf-qty-btn"
-        aria-label="Уменьшить"
+        aria-label={t("shared.qty.decrease")}
         disabled={cartQty <= 0 && (fromQuantityInputValue(draft, multiplier, step) || step) <= step}
         onClick={() => bump(-1)}
       >
@@ -140,12 +142,15 @@ export function StorefrontQtyControl({
           min={inputStep}
           step={inputStep}
           inputMode="numeric"
-          aria-label={`Количество, ${qtyUnitLabel}`}
+          aria-label={t("storefront.qty.ariaWithUnit", { unit: qtyUnitLabel })}
           title={
             multiplier > 1
-              ? `В ${storefrontUnitLabel(unit)}: ${multiplier} шт`
+              ? t("storefront.qty.inUnitPieces", {
+                  unit: storefrontUnitLabel(unit),
+                  count: multiplier,
+                })
               : step > 1
-                ? `Кратно ${step}`
+                ? t("storefront.qty.multipleOf", { step })
                 : undefined
           }
           value={draft}
@@ -162,7 +167,7 @@ export function StorefrontQtyControl({
       <button
         type="button"
         className="sf-qty-btn"
-        aria-label="Увеличить"
+        aria-label={t("shared.qty.increase")}
         onClick={() => bump(1)}
       >
         +

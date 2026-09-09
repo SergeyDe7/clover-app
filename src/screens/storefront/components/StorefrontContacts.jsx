@@ -1,3 +1,4 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { storefrontHref } from "../mode.js";
 
 /** Compact contacts tool — known-good presentation from 055c69f. */
@@ -15,13 +16,14 @@ function IconPhone() {
 }
 
 export function StorefrontContacts() {
+  const { t } = useLocalization();
   const href = storefrontHref({ name: "contacts" });
 
   return (
     <a
       className="sf-header-tool sf-contacts-mobile"
       href={href}
-      aria-label="Контакты"
+      aria-label={t("storefront.nav.contacts")}
       onClick={(event) => {
         event.preventDefault();
         window.history.pushState({}, "", href);
@@ -29,7 +31,7 @@ export function StorefrontContacts() {
       }}
     >
       <IconPhone />
-      <span className="sf-header-tool-label">Контакты</span>
+      <span className="sf-header-tool-label">{t("storefront.nav.contacts")}</span>
     </a>
   );
 }

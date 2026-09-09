@@ -1,6 +1,8 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
+import { visibilityFilterLabel } from "../../shared/i18n/displayLabels";
 import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber, matchesCatalogPrefixSearch, productCatalogSearchHaystack, formatRussianPhone, getRussianPhoneLocalDigits } from "../../shared/appHelpers";
 import { StorefrontProductAdd } from "./StorefrontProductAdd";
 import {
@@ -62,6 +64,7 @@ export function ManagerStorefront({
   products = [],
   setProducts,
 }) {
+  const { t } = useLocalization();
   const [busy, setBusy] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [productBusy, setProductBusy] = useState(false);
@@ -264,8 +267,8 @@ export function ManagerStorefront({
       const draftPromos = clonePromotions(draft.storefrontPromotions);
       if (draftPromos.some((item) => !String(item.title || "").trim())) {
         await appAlert({
-          title: "Заполните акции",
-          message: "У каждой акции нужен заголовок. Пустые записи не сохраняются.",
+          title: t("manager.fillInThePromotions"),
+          message: t("manager.everyPromotionNeedsATitleEmpty"),
           tone: "danger",
         });
         return;
@@ -294,16 +297,16 @@ export function ManagerStorefront({
       const mapsInput = String(draft.storefrontContactMapsUrl || "").trim();
       if (mapsInput && !normalizeYandexMapsUrl(mapsInput)) {
         await appAlert({
-          title: "Ссылка на карту не сохранена",
+          title: t("manager.mapLinkWasNotSaved"),
           message:
-            "Нужна ссылка Яндекс.Карт: скопируйте адрес из браузера (yandex.ru/maps или n.maps.yandex.ru).",
+            t("manager.aYandexMapsLinkIsRequired"),
           tone: "danger",
         });
       }
     } catch (error) {
       await appAlert({
         title: "Не удалось сохранить",
-        message: error.message || "Ошибка сохранения.",
+        message: error.message || t("manager.saveError"),
         tone: "danger",
       });
     } finally {
@@ -325,7 +328,7 @@ export function ManagerStorefront({
     } catch (error) {
       await appAlert({
         title: "Не удалось сохранить товары",
-        message: error.message || "Ошибка сохранения.",
+        message: error.message || t("manager.saveError"),
         tone: "danger",
       });
       return null;
@@ -367,8 +370,8 @@ export function ManagerStorefront({
     if (!touched) {
       setProductNotice(
         checked
-          ? "Выбранные позиции уже на витрине."
-          : "Среди выбранных нет позиций на витрине."
+          ? t("manager.selectedItemsAreAlreadyOnThe")
+          : t("manager.noneOfTheSelectedItemsAre")
       );
       window.setTimeout(() => setProductNotice(""), 4500);
       clearSelection();
@@ -377,8 +380,8 @@ export function ManagerStorefront({
     const saved = await persistProducts(
       next,
       checked
-        ? `На витрину добавлено: ${touched}.`
-        : `С витрины снято: ${touched}.`
+        ? t("manager.storefront.addedCount", { count: touched })
+        : t("manager.storefront.removedCount", { count: touched })
     );
     if (saved) clearSelection();
   };
@@ -450,7 +453,7 @@ export function ManagerStorefront({
     });
     const saved = await persistProducts(
       next,
-      "Карточка товара на витрине обновлена."
+      t("manager.storefrontProductCardUpdated")
     );
     if (saved) closeEditor();
   };
@@ -467,9 +470,9 @@ export function ManagerStorefront({
     ].filter((value) => String(value || "").trim()).length;
     const manual = item.storefrontPricing?.source === "manual";
     const parts = [];
-    if (filled) parts.push(`описание ${filled}/3`);
-    else parts.push("описание не заполнено");
-    if (manual) parts.push("своя цена");
+    if (filled) parts.push(t("manager.storefront.descriptionFilled", { filled }));
+    else parts.push(t("manager.descriptionIsEmpty"));
+    if (manual) parts.push(t("manager.ownPrice"));
     return parts.join(" · ");
   };
 
@@ -477,21 +480,20 @@ export function ManagerStorefront({
     <section className="panel">
       <div className="panel-header">
         <div>
-          <h2>Витрина сайта</h2>
-          <p>
-            Редактирование публичного сайта (clover-spb.ru / превью /vitrina).
-            Доступно только администратору.
-          </p>
+          <h2>{t("manager.websiteStorefront")}</h2>
+          <p>{
+            t("manager.editingThePublicSiteCloverSpb")
+          }</p>
         </div>
       </div>
 
       <div className="manager-contact-settings storefront-settings-card">
-        <h3>Цены на сайте</h3>
-        <p className="storefront-settings-hint">
-          Как считать цену на витрине. В ЛК у клиентов — персональные цены матрицы.
-        </p>
+        <h3>{t("manager.websitePrices")}</h3>
+        <p className="storefront-settings-hint">{
+          t("manager.howToCalculateTheStorefrontPrice")
+        }</p>
 
-        <div className="storefront-pricing-modes" role="radiogroup" aria-label="Режим цен витрины">
+        <div className="storefront-pricing-modes" role="radiogroup" aria-label={t("manager.storefrontPriceMode")}>
           <label className="storefront-check">
             <input
               type="radio"
@@ -499,7 +501,7 @@ export function ManagerStorefront({
               checked={draft.storefrontPricingMode !== "purchase_markup"}
               onChange={() => setField("storefrontPricingMode", "price_type")}
             />
-            <span>Вид цен 1С</span>
+            <span>{t("manager.oneC.priceType")}</span>
           </label>
           <label className="storefront-check">
             <input
@@ -508,14 +510,14 @@ export function ManagerStorefront({
               checked={draft.storefrontPricingMode === "purchase_markup"}
               onChange={() => setField("storefrontPricingMode", "purchase_markup")}
             />
-            <span>Закупочная + %</span>
+            <span>{t("manager.purchase")}</span>
           </label>
         </div>
 
         {draft.storefrontPricingMode === "purchase_markup" ? (
           <>
             <label className="storefront-price-field">
-              <span>Наценка, %</span>
+              <span>{t("manager.markup2")}</span>
               <input
                 type="text"
                 inputMode="decimal"
@@ -540,20 +542,19 @@ export function ManagerStorefront({
                 }}
               />
             </label>
-            <p className="storefront-settings-hint">
-              База — закупочная цена из выгрузки 1С (и вид «Закупочная», если он
-              свежее). Итог: закупка × (1 + % / 100), округление вверх как в ЛК.
-            </p>
+            <p className="storefront-settings-hint">{
+              t("manager.baseIsThePurchasePriceFrom")
+            }</p>
           </>
         ) : (
           <>
             <label className="storefront-price-field">
-              <span>Вид цен витрины</span>
+              <span>{t("manager.storefrontPriceType")}</span>
               <select
                 value={draft.storefrontPriceTypeId || ""}
                 onChange={onPriceTypeChange}
               >
-                <option value="">Не выбран</option>
+                <option value="">{t("manager.notSelected")}</option>
                 {types.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
@@ -562,7 +563,7 @@ export function ManagerStorefront({
               </select>
             </label>
             <label className="storefront-price-field" style={{ marginTop: 12 }}>
-              <span>Запасная наценка, %, если вида цен нет</span>
+              <span>{t("manager.fallbackMarkupIfThereIsNo")}</span>
               <input
                 type="text"
                 inputMode="decimal"
@@ -586,10 +587,9 @@ export function ManagerStorefront({
                 }}
               />
             </label>
-            <p className="storefront-settings-hint">
-              Сначала берётся выбранный вид цен 1С. Если его нет у товара —
-              цена = закупка / «Закупочная» × (1 + запасная наценка / 100).
-            </p>
+            <p className="storefront-settings-hint">{
+              t("manager.firstTheSelected1cPriceType")
+            }</p>
           </>
         )}
 
@@ -601,33 +601,31 @@ export function ManagerStorefront({
               setField("storefrontShowOnlyLinked", event.target.checked)
             }
           />
-          <span>Только товары, связанные с 1С</span>
+          <span>{t("manager.onlyProductsLinkedTo1c")}</span>
         </label>
       </div>
 
       <div className="manager-contact-settings" style={{ marginTop: 20 }}>
-        <h3>Контрагент 1С для заказов с сайта</h3>
-        <p className="storefront-settings-hint">
-          Гостевые заказы без регистрации уходят в 1С на одного контрагента.
-          Контакт покупателя остаётся в комментарии заказа. В 1С у этого
-          контрагента должен быть договор «Основной договор».
-        </p>
+        <h3>{t("manager.storefront.oneC.counterparty.title")}</h3>
+        <p className="storefront-settings-hint">{
+          t("manager.guestOrdersWithoutRegistrationGoTo")
+        }</p>
         <div className="form-grid">
-          <label className="field field-wide">
-            Название в 1С
-            <input
+          <label className="field field-wide">{
+            t("manager.nameIn1c2")
+            }<input
               value={draft.storefrontOneCClientName || ""}
-              placeholder="Интернет магазин Clover"
+              placeholder={t("manager.cloverOnlineStore")}
               onChange={(event) =>
                 setField("storefrontOneCClientName", event.target.value)
               }
             />
           </label>
-          <label className="field field-wide">
-            ID контрагента 1С (необязательно)
-            <input
+          <label className="field field-wide">{
+            t("manager.storefront.oneC.counterparty.id")
+            }<input
               value={draft.storefrontOneCClientId || ""}
-              placeholder="если известен GUID из выгрузки"
+              placeholder={t("manager.ifTheGuidFromTheExport")}
               onChange={(event) =>
                 setField("storefrontOneCClientId", event.target.value)
               }
@@ -637,11 +635,11 @@ export function ManagerStorefront({
       </div>
 
       <div className="manager-contact-settings" style={{ marginTop: 20 }}>
-        <h3>Текст и слайды на главной</h3>
+        <h3>{t("manager.homeTextAndSlides")}</h3>
         <div className="form-grid">
-          <label className="field field-wide">
-            Заголовок
-            <input
+          <label className="field field-wide">{
+            t("shared.field.title")
+            }<input
               value={draft.storefrontHeroTitle || ""}
               placeholder={STOREFRONT_HERO_TITLE}
               onChange={(event) =>
@@ -649,9 +647,9 @@ export function ManagerStorefront({
               }
             />
           </label>
-          <label className="field field-wide">
-            Подзаголовок
-            <textarea
+          <label className="field field-wide">{
+            t("manager.subtitle")
+            }<textarea
               rows={3}
               value={draft.storefrontHeroLead || ""}
               placeholder={STOREFRONT_HERO_LEAD}
@@ -660,9 +658,9 @@ export function ManagerStorefront({
               }
             />
           </label>
-          <label className="field">
-            Смена слайда, секунд
-            <input
+          <label className="field">{
+            t("manager.slideChangeSeconds")
+            }<input
               type="number"
               min={2}
               max={60}
@@ -679,12 +677,9 @@ export function ManagerStorefront({
             />
           </label>
         </div>
-        <p className="storefront-settings-hint">
-          Картинки в правом окне главной. Можно менять порядок, удалять и
-          загружать свои. Чтобы прорекламировать товар — укажите артикул или
-          ссылку /product/… : по клику на баннер откроется карточка. Пустой
-          список снова покажет три примера.
-        </p>
+        <p className="storefront-settings-hint">{
+          t("manager.imagesInTheRightPaneOn")
+        }</p>
         <div className="storefront-hero-slide-list">
           {cloneHeroSlides(draft.storefrontHeroSlides).map((slide, index) => (
             <div key={`${slide.src}-${index}`} className="storefront-hero-slide-row">
@@ -692,7 +687,7 @@ export function ManagerStorefront({
               <div className="storefront-hero-slide-fields">
                 <input
                   value={slide.alt || ""}
-                  placeholder="Подпись, необязательно"
+                  placeholder={t("manager.captionOptional")}
                   onChange={(event) =>
                     updateHeroSlides((list) =>
                       list.map((item, itemIndex) =>
@@ -705,7 +700,7 @@ export function ManagerStorefront({
                 />
                 <input
                   value={slide.href || ""}
-                  placeholder="Артикул или /product/…"
+                  placeholder={t("manager.skuOrProduct")}
                   onChange={(event) =>
                     updateHeroSlides((list) =>
                       list.map((item, itemIndex) =>
@@ -718,7 +713,7 @@ export function ManagerStorefront({
                 />
                 <input
                   value={slide.buttonLabel || ""}
-                  placeholder="Текст кнопки, например «Смотреть товар»"
+                  placeholder={t("manager.buttonTextForExampleViewProduct")}
                   onChange={(event) =>
                     updateHeroSlides((list) =>
                       list.map((item, itemIndex) =>
@@ -757,16 +752,16 @@ export function ManagerStorefront({
                       list.filter((_, itemIndex) => itemIndex !== index)
                     )
                   }
-                >
-                  Удалить
-                </button>
+                >{
+                  t("shared.action.delete")
+                }</button>
               </div>
             </div>
           ))}
         </div>
         <div className="form-actions" style={{ marginTop: 0 }}>
           <label className="secondary-button">
-            {heroBusy ? "Загрузка…" : "Добавить картинку"}
+            {heroBusy ? t("shared.status.loadingEllipsis") : t("manager.addAnImage")}
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
@@ -795,7 +790,7 @@ export function ManagerStorefront({
                   .catch((error) =>
                     appAlert({
                       title: "Не удалось загрузить слайд",
-                      message: error.message || "Ошибка загрузки.",
+                      message: error.message || t("manager.loadError"),
                       tone: "danger",
                     })
                   )
@@ -812,9 +807,9 @@ export function ManagerStorefront({
                 STOREFRONT_DEFAULT_HERO_SLIDES.map((slide) => ({ ...slide }))
               )
             }
-          >
-            Вернуть примеры
-          </button>
+          >{
+            t("manager.restoreExamples")
+          }</button>
         </div>
       </div>
 
@@ -824,15 +819,14 @@ export function ManagerStorefront({
       />
 
       <div className="manager-contact-settings" style={{ marginTop: 20 }}>
-        <h3>Контакты на витрине</h3>
-        <p className="storefront-settings-hint">
-          Кнопка «Контакты» открывает страницу с телефоном, почтой, адресом,
-          режимом работы и картой. Пустые поля на сайте скрываются.
-        </p>
+        <h3>{t("manager.storefrontContacts")}</h3>
+        <p className="storefront-settings-hint">{
+          t("manager.theContactsButtonOpensAPage")
+        }</p>
         <div className="form-grid">
-          <label className="field">
-            Телефон
-            <input
+          <label className="field">{
+            t("auth.register.phone")
+            }<input
               inputMode="tel"
               autoComplete="tel"
               value={draft.storefrontContactPhone || ""}
@@ -853,9 +847,9 @@ export function ManagerStorefront({
               }
             />
           </label>
-          <label className="field">
-            Почта
-            <input
+          <label className="field">{
+            t("shared.field.emailShort")
+            }<input
               type="email"
               autoComplete="email"
               value={draft.storefrontContactEmail || ""}
@@ -865,19 +859,19 @@ export function ManagerStorefront({
               }
             />
           </label>
-          <label className="field field-wide">
-            Адрес
-            <input
+          <label className="field field-wide">{
+            t("shared.field.address")
+            }<input
               value={draft.storefrontContactAddress || ""}
-              placeholder="Санкт-Петербург, …"
+              placeholder={t("manager.saintPetersburg")}
               onChange={(event) =>
                 setField("storefrontContactAddress", event.target.value)
               }
             />
           </label>
-          <label className="field field-wide">
-            Режим работы
-            <textarea
+          <label className="field field-wide">{
+            t("storefront.workingHours")
+            }<textarea
               rows={3}
               value={draft.storefrontContactHours || ""}
               placeholder={"Пн–Пт 9:00–18:00\nСб 10:00–16:00\nВс выходной"}
@@ -886,45 +880,43 @@ export function ManagerStorefront({
               }
             />
           </label>
-          <label className="field field-wide">
-            Как проехать — необязательно
-            <textarea
+          <label className="field field-wide">{
+            t("manager.howToGetThereOptional")
+            }<textarea
               rows={2}
               value={draft.storefrontContactNote || ""}
-              placeholder="Ориентир, подъезд, домофон"
+              placeholder={t("manager.landmarkEntranceIntercom")}
               onChange={(event) =>
                 setField("storefrontContactNote", event.target.value)
               }
             />
           </label>
-          <label className="field field-wide">
-            Ссылка на Яндекс.Карты
-            <input
+          <label className="field field-wide">{
+            t("manager.yandexMapsLink")
+            }<input
               value={draft.storefrontContactMapsUrl || ""}
-              placeholder="https://yandex.ru/maps/… или n.maps.yandex.ru/…"
+              placeholder={t("manager.httpsYandexRuMapsOrN")}
               onChange={(event) =>
                 setField("storefrontContactMapsUrl", event.target.value)
               }
             />
             {String(draft.storefrontContactMapsUrl || "").trim() &&
             !normalizeYandexMapsUrl(draft.storefrontContactMapsUrl) ? (
-              <p className="storefront-settings-hint" style={{ color: "#a14a32" }}>
-                Не похоже на ссылку Яндекс.Карт. Вставьте адрес страницы карты
-                из браузера.
-              </p>
+              <p className="storefront-settings-hint" style={{ color: "#a14a32" }}>{
+                t("manager.thisDoesNotLookLikeA")
+              }</p>
             ) : null}
           </label>
-          <div className="field field-wide">
-            Картинка карты с точкой
-            <p className="storefront-settings-hint" style={{ margin: "6px 0 10px" }}>
-              Можно загрузить свой снимок. Если оставить пустым, сайт сам
-              покажет карту Яндекса с меткой по ссылке выше.
-            </p>
+          <div className="field field-wide">{
+            t("manager.mapImageWithAPin")
+            }<p className="storefront-settings-hint" style={{ margin: "6px 0 10px" }}>{
+              t("manager.youCanUploadYourOwnSnapshot")
+            }</p>
             {draft.storefrontContactMapImageUrl ? (
               <p style={{ margin: "0 0 10px" }}>
                 <img
                   src={draft.storefrontContactMapImageUrl}
-                  alt="Карта"
+                  alt={t("manager.map")}
                   loading="lazy"
                   style={{ maxWidth: 320, borderRadius: 12 }}
                 />
@@ -932,7 +924,7 @@ export function ManagerStorefront({
             ) : null}
             <div className="form-actions" style={{ marginTop: 0 }}>
               <label className="secondary-button">
-                {mapBusy ? "Загрузка…" : "Загрузить картинку"}
+                {mapBusy ? t("shared.status.loadingEllipsis") : t("manager.uploadAnImage")}
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
@@ -954,7 +946,7 @@ export function ManagerStorefront({
                       .catch((error) =>
                         appAlert({
                           title: "Не удалось загрузить карту",
-                          message: error.message || "Ошибка загрузки.",
+                          message: error.message || t("manager.loadError"),
                           tone: "danger",
                         })
                       )
@@ -967,9 +959,9 @@ export function ManagerStorefront({
                   className="secondary-button"
                   type="button"
                   onClick={() => setField("storefrontContactMapImageUrl", "")}
-                >
-                  Убрать картинку
-                </button>
+                >{
+                  t("manager.removeImage")
+                }</button>
               ) : null}
             </div>
           </div>
@@ -988,26 +980,27 @@ export function ManagerStorefront({
           disabled={busy || settingsSaved}
           onClick={() => void save()}
         >
-          {busy ? "Сохранение…" : settingsSaved ? "Сохранено" : "Сохранить витрину"}
+          {busy ? t("shared.status.savingProgress") : settingsSaved ? t("shared.status.saved") : t("manager.saveStorefront")}
         </button>
         <a
           className="secondary-button"
           href="/"
           target="_blank"
           rel="noreferrer"
-        >
-          Открыть превью
-        </a>
+        >{
+          t("manager.openPreview")
+        }</a>
       </div>
 
       <div className="manager-contact-settings" style={{ marginTop: 28 }}>
-        <h3>Товары на витрине</h3>
+        <h3>{t("manager.productsOnTheStorefront")}</h3>
         <p className="storefront-settings-hint">
-          На сайте имя товара = как в матрице Clover (не сырое название 1С).
-          Можно выбрать из каталога ниже или добавить из 1С / Excel, даже если
-          позиции ещё нет ни у одного клиента. Сейчас на витрине:{" "}
-          <strong>{onStorefrontCount}</strong> из {activeProducts.length}.
-          Выбрано: <strong>{selectedCount}</strong>.
+          {t("manager.storefront.nameEqualsMatrixHint")}{" "}
+          {t("manager.storefront.nowOnStorefrontSelected", {
+            onStorefront: onStorefrontCount,
+            total: activeProducts.length,
+            selected: selectedCount,
+          })}
         </p>
         <StorefrontProductAdd
           products={products}
@@ -1021,23 +1014,23 @@ export function ManagerStorefront({
           <div className="matrix-save-message saved storefront-pick-notice">{productNotice}</div>
         ) : null}
         <div className="form-grid storefront-catalog-filters" style={{ marginBottom: 12 }}>
-          <label className="field">
-            Поиск по каталогу Clover
-            <input
+          <label className="field">{
+            t("manager.searchCloverCatalog")
+            }<input
               value={productQuery}
-              placeholder="Название, артикул, категория"
+              placeholder={t("manager.nameSkuCategory")}
               onChange={(event) => setProductQuery(event.target.value)}
             />
           </label>
-          <label className="field">
-            На витрине
-            <select
+          <label className="field">{
+            t("manager.storefront.on")
+            }<select
               value={storefrontFilter}
               onChange={(event) => setStorefrontFilter(event.target.value)}
             >
-              <option>Все</option>
-              <option>На витрине</option>
-              <option>Не на витрине</option>
+              <option value="Все">{visibilityFilterLabel("Все", t)}</option>
+              <option value="На витрине">{visibilityFilterLabel("На витрине", t)}</option>
+              <option value="Не на витрине">{visibilityFilterLabel("Не на витрине", t)}</option>
             </select>
           </label>
         </div>
@@ -1047,33 +1040,33 @@ export function ManagerStorefront({
             type="button"
             disabled={productBusy || filteredProducts.length === 0}
             onClick={selectAllFiltered}
-          >
-            Выбрать все
-          </button>
+          >{
+            t("shared.action.selectAll")
+          }</button>
           <button
             className="secondary-button"
             type="button"
             disabled={productBusy || selectedCount === 0}
             onClick={clearSelection}
-          >
-            Снять выбор
-          </button>
+          >{
+            t("shared.action.clearSelection")
+          }</button>
           <button
             className="primary-button"
             type="button"
             disabled={productBusy || selectedCount === 0}
             onClick={() => void applySelectionToStorefront(true)}
-          >
-            Добавить на витрину
-          </button>
+          >{
+            t("manager.storefront.add")
+          }</button>
           <button
             className="secondary-button"
             type="button"
             disabled={productBusy || selectedCount === 0}
             onClick={() => void applySelectionToStorefront(false)}
-          >
-            Убрать с витрины
-          </button>
+          >{
+            t("manager.removeFromStorefront")
+          }</button>
           <button
             className="secondary-button"
             type="button"
@@ -1086,16 +1079,16 @@ export function ManagerStorefront({
                     forceCopy: true,
                   });
                   await appAlert({
-                    title: "Очередь запущена",
+                    title: t("manager.queueStarted"),
                     message:
                       result.message ||
-                      `Обновление описаний: ${result.queued || 0} товар(ов). Старые тексты сохраняются до замены.`,
+                      t("manager.storefront.enrichQueued", { count: result.queued || 0 }),
                     tone: "success",
                   });
                 } catch (error) {
                   await appAlert({
                     title: "Не удалось обновить описания",
-                    message: error.message || "Ошибка очереди enrichment.",
+                    message: error.message || t("manager.enrichmentQueueError"),
                     tone: "danger",
                   });
                 } finally {
@@ -1103,13 +1096,13 @@ export function ManagerStorefront({
                 }
               })();
             }}
-          >
-            Обновить описания
-          </button>
+          >{
+            t("manager.refreshDescriptions")
+          }</button>
         </div>
         <div className="storefront-product-pick-list">
           {filteredProducts.length === 0 ? (
-            <p className="storefront-settings-hint">Нет товаров по фильтру.</p>
+            <p className="storefront-settings-hint">{t("manager.noProductsMatchTheFilter")}</p>
           ) : (
             filteredProducts.map((item) => {
               const open = String(editingId) === String(item.id);
@@ -1136,19 +1129,19 @@ export function ManagerStorefront({
                         <strong>{item.name}</strong>
                         <span className="storefront-product-meta">
                           {onStorefront ? (
-                            <span className="badge green" style={{ marginRight: 6 }}>
-                              На витрине
-                            </span>
+                            <span className="badge green" style={{ marginRight: 6 }}>{
+                              t("manager.storefront.on")
+                            }</span>
                           ) : (
-                            <span className="badge yellow" style={{ marginRight: 6 }}>
-                              Не на витрине
-                            </span>
+                            <span className="badge yellow" style={{ marginRight: 6 }}>{
+                              t("manager.storefront.off")
+                            }</span>
                           )}
                           {[productArticle(item), item.category].filter(Boolean).join(" · ") ||
                             "—"}
                           {" · "}
                           {detailsPreview(item)}
-                          {item.imageUrl ? " · фото есть" : " · без фото"}
+                          {item.imageUrl ? t("manager.hasPhoto") : t("manager.noPhoto")}
                         </span>
                       </span>
                     </label>
@@ -1158,18 +1151,18 @@ export function ManagerStorefront({
                       disabled={productBusy}
                       onClick={() => (open ? closeEditor() : openEditor(item))}
                     >
-                      {open ? "Свернуть" : "Карточка"}
+                      {open ? t("shared.action.collapse") : t("manager.card")}
                     </button>
                   </div>
                   {open ? (
                     <div className="storefront-product-card-editor">
                       <div className="form-grid">
-                        <label className="field field-wide">
-                          Описание
-                          <textarea
+                        <label className="field field-wide">{
+                          t("shared.field.description")
+                          }<textarea
                             rows={3}
                             value={editDraft.description}
-                            placeholder="Кратко о товаре для витрины"
+                            placeholder={t("manager.shortStorefrontProductBlurb")}
                             disabled={productBusy}
                             onChange={(event) =>
                               setEditDraft((prev) => ({
@@ -1179,12 +1172,12 @@ export function ManagerStorefront({
                             }
                           />
                         </label>
-                        <label className="field field-wide">
-                          Состав
-                          <textarea
+                        <label className="field field-wide">{
+                          t("manager.contents")
+                          }<textarea
                             rows={2}
                             value={editDraft.composition}
-                            placeholder="Состав / материалы"
+                            placeholder={t("manager.compositionMaterials")}
                             disabled={productBusy}
                             onChange={(event) =>
                               setEditDraft((prev) => ({
@@ -1194,12 +1187,12 @@ export function ManagerStorefront({
                             }
                           />
                         </label>
-                        <label className="field field-wide">
-                          Характеристики
-                          <textarea
+                        <label className="field field-wide">{
+                          t("manager.specifications")
+                          }<textarea
                             rows={3}
                             value={editDraft.characteristics}
-                            placeholder="Размеры, плотность, упаковка и т.п."
+                            placeholder={t("manager.sizesDensityPackagingEtc")}
                             disabled={productBusy}
                             onChange={(event) =>
                               setEditDraft((prev) => ({
@@ -1209,9 +1202,9 @@ export function ManagerStorefront({
                             }
                           />
                         </label>
-                        <label className="field field-wide">
-                          Цена на сайте
-                          <select
+                        <label className="field field-wide">{
+                          t("manager.websitePrice")
+                          }<select
                             value={editDraft.pricingSource}
                             disabled={productBusy}
                             onChange={(event) => {
@@ -1240,12 +1233,12 @@ export function ManagerStorefront({
                               });
                             }}
                           >
-                            <option value="inherit">
-                              Как в настройках витрины
-                            </option>
-                            <option value="manual">
-                              Своя цена для этого товара
-                            </option>
+                            <option value="inherit">{
+                              t("manager.asInStorefrontSettings")
+                            }</option>
+                            <option value="manual">{
+                              t("manager.customPriceForThisProduct")
+                            }</option>
                           </select>
                         </label>
                         {editDraft.pricingSource === "manual"
@@ -1279,9 +1272,9 @@ export function ManagerStorefront({
                       </div>
                       {editDraft.pricingSource === "manual" &&
                       draft.storefrontPricingMode === "purchase_markup" ? (
-                        <p className="storefront-settings-hint" style={{ marginTop: 8 }}>
-                          Перекрывает расчёт «закупочная + %» только на сайте.
-                        </p>
+                        <p className="storefront-settings-hint" style={{ marginTop: 8 }}>{
+                          t("manager.overridesThePurchaseCalculationOnThe")
+                        }</p>
                       ) : null}
                       <div className="form-actions" style={{ marginTop: 10 }}>
                         <button
@@ -1290,16 +1283,16 @@ export function ManagerStorefront({
                           disabled={productBusy}
                           onClick={() => void saveProductCard(item.id)}
                         >
-                          {productBusy ? "Сохранение…" : "Сохранить карточку"}
+                          {productBusy ? t("shared.status.savingProgress") : t("manager.saveCard")}
                         </button>
                         <button
                           className="secondary-button"
                           type="button"
                           disabled={productBusy}
                           onClick={closeEditor}
-                        >
-                          Отмена
-                        </button>
+                        >{
+                          t("shared.modal.cancel")
+                        }</button>
                       </div>
                     </div>
                   ) : null}

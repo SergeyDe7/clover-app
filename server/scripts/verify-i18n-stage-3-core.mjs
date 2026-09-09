@@ -91,34 +91,32 @@ assert.equal(runtimeMod.MISSING_TRANSLATION_FALLBACK_RU, MISSING_TRANSLATION_FAL
 const { createLocalizationRuntime, translate } = runtimeMod;
 
 assert.equal(Object.isFrozen(RU_DICTIONARY), true);
-assert.deepEqual({ ...RU_DICTIONARY }, { ...FOUNDATIONAL_RU });
 for (const [key, value] of Object.entries(FOUNDATIONAL_RU)) {
   assert.equal(RU_DICTIONARY[key], value);
   assert.equal(Object.hasOwn(RU_DICTIONARY, key), true);
 }
+assert.ok(Object.keys(RU_DICTIONARY).length >= Object.keys(FOUNDATIONAL_RU).length);
 
-assert.match(
+assert.doesNotMatch(
   appModalSrc,
   /export async function appConfirm\(\{[\s\S]*?title = "Подтвердите действие"/
 );
-assert.match(
+assert.doesNotMatch(
   appModalSrc,
   /export async function appConfirm\(\{[\s\S]*?confirmLabel = "Подтвердить"/
 );
-assert.match(
-  appModalSrc,
-  /export async function appConfirm\(\{[\s\S]*?cancelLabel = "Отмена"/
-);
-assert.match(
-  appModalSrc,
-  /export async function appAlert\(\{[\s\S]*?title = "Внимание"/
-);
-assert.match(
-  appModalSrc,
-  /export async function appAlert\(\{[\s\S]*?confirmLabel = "Понятно"/
-);
-assert.match(appModalSrc, /expandable\.summary \|\| "Подробности"/);
-assert.match(appModalSrc, /dialog\.expandable\.summary \|\| "Состав заказа"/);
+assert.match(appModalSrc, /const HOST_UNAVAILABLE_RU = Object\.freeze/);
+assert.match(appModalSrc, /confirmTitle: "Подтвердите действие"/);
+assert.match(appModalSrc, /function isOmitted\(value\) \{/);
+assert.match(appModalSrc, /if \(value == null\) return true;/);
+assert.match(appModalSrc, /trimmed\.toLowerCase\(\) === "null"/);
+assert.match(appModalSrc, /isOmitted\(dialog\.title\)/);
+assert.match(appModalSrc, /t\("shared\.modal\.confirmTitle"\)/);
+assert.match(appModalSrc, /t\("shared\.modal\.confirm"\)/);
+assert.match(appModalSrc, /t\("shared\.modal\.cancel"\)/);
+assert.match(appModalSrc, /t\("shared\.modal\.alertTitle"\)/);
+assert.match(appModalSrc, /t\("shared\.modal\.ok"\)/);
+assert.match(appModalSrc, /HOST_UNAVAILABLE_RU\.orderContents/);
 assert.equal(RU_DICTIONARY["shared.modal.confirmTitle"], "Подтвердите действие");
 assert.equal(RU_DICTIONARY["shared.modal.confirm"], "Подтвердить");
 assert.equal(RU_DICTIONARY["shared.modal.cancel"], "Отмена");

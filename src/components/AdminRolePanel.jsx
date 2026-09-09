@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../serverApi";
 import { appAlert, appConfirm } from "../shared/AppModal";
 import { STAFF_FEATURE_OPTIONS, STAFF_FEATURE_IDS, formatDateTime } from "../shared/appHelpers";
+import { useLocalization } from "../shared/i18n/LocalizationProvider";
 
 function generateAccessPassword(length = 10) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -76,6 +77,7 @@ export function AdminRolePanel({ currentUser }) {
   const [revealed, setRevealed] = useState({});
   const [copiedKey, setCopiedKey] = useState("");
   const [draftContacts, setDraftContacts] = useState(null);
+  const { t } = useLocalization();
 
   const load = async () => {
     setError("");
@@ -91,7 +93,7 @@ export function AdminRolePanel({ currentUser }) {
       setCanManageStaff(false);
       setAdminCount(0);
       if (err.status === 401) {
-        setError("Сессия устарела. Выйдите и войдите снова, затем нажмите «Обновить список».");
+        setError(t("shared.theSessionExpiredSignOutAnd"));
       } else {
         setError(err.message);
       }
@@ -133,7 +135,7 @@ export function AdminRolePanel({ currentUser }) {
     const ok = await copyText(value);
     if (!ok) {
       await appAlert({
-        title: "Не скопировано",
+        title: t("shared.notCopied"),
         message: "Не удалось скопировать в буфер обмена.",
         tone: "warn",
       });
@@ -151,11 +153,11 @@ export function AdminRolePanel({ currentUser }) {
     setNotice("");
     try {
       await api.setUserRole(userId, role);
-      setNotice(`Роль обновлена: ${role}`);
+      setNotice(t("admin.staff.roleUpdated", { role }));
       await load();
     } catch (err) {
       setError(err.message);
-      await appAlert({ title: "Ошибка", message: err.message, tone: "danger" });
+      await appAlert({ title: t("shared.status.error"), message: err.message, tone: "danger" });
     } finally {
       setBusyId("");
     }
@@ -174,15 +176,15 @@ export function AdminRolePanel({ currentUser }) {
     };
 
     if (!nextEmail) {
-      const message = "Укажите email менеджера.";
+      const message = t("shared.enterTheManagerEmail");
       setError(message);
-      await appAlert({ title: "Не создан", message, tone: "danger" });
+      await appAlert({ title: t("shared.notCreated"), message, tone: "danger" });
       return;
     }
     if (nextPassword.length < 6) {
-      const message = "Пароль должен быть не короче 6 символов.";
+      const message = t("shared.passwordMustBeAtLeast6");
       setError(message);
-      await appAlert({ title: "Не создан", message, tone: "danger" });
+      await appAlert({ title: t("shared.notCreated"), message, tone: "danger" });
       return;
     }
 
@@ -191,13 +193,13 @@ export function AdminRolePanel({ currentUser }) {
     setNotice("");
     try {
       await api.createManager(nextEmail, nextPassword, contact);
-      setNotice(`Менеджер ${nextEmail} создан. Пароль сохранён в журнале.`);
+      setNotice(t("admin.staff.managerCreated", { email: nextEmail }));
       setFormKey((value) => value + 1);
       await load();
     } catch (err) {
       const message = err.message || "Не удалось создать менеджера.";
       setError(message);
-      await appAlert({ title: "Не создан", message, tone: "danger" });
+      await appAlert({ title: t("shared.notCreated"), message, tone: "danger" });
     } finally {
       setCreating(false);
     }
@@ -210,11 +212,11 @@ export function AdminRolePanel({ currentUser }) {
     setNotice("");
     try {
       await api.setStaffContacts(user.id, draftContacts);
-      setNotice("Контакты менеджера сохранены.");
+      setNotice(t("shared.managerContactsSaved"));
       await load();
     } catch (err) {
       setError(err.message);
-      await appAlert({ title: "Ошибка", message: err.message, tone: "danger" });
+      await appAlert({ title: t("shared.status.error"), message: err.message, tone: "danger" });
     } finally {
       setBusyId("");
     }
@@ -223,11 +225,11 @@ export function AdminRolePanel({ currentUser }) {
   const toggleAccess = async (user) => {
     const disable = !user.disabled;
     const ok = await appConfirm({
-      title: disable ? "Закрыть доступ?" : "Открыть доступ?",
+      title: disable ? t("shared.closeAccess2") : t("shared.openAccess2"),
       message: disable
-        ? `${user.email} не сможет войти в кабинет, пока доступ закрыт.`
-        : `${user.email} снова сможет войти.`,
-      confirmLabel: disable ? "Закрыть доступ" : "Открыть",
+        ? t("admin.staff.accessClosedNamed", { email: user.email })
+        : t("admin.staff.accessOpenedNamed", { email: user.email }),
+      confirmLabel: disable ? t("shared.closeAccess") : t("shared.action.open"),
       tone: disable ? "danger" : "default",
     });
     if (!ok) return;
@@ -235,11 +237,11 @@ export function AdminRolePanel({ currentUser }) {
     setError("");
     try {
       const result = await api.setStaffAccess(user.id, disable);
-      setNotice(result.message || (disable ? "Доступ закрыт." : "Доступ открыт."));
+      setNotice(result.message || (disable ? t("shared.accessIsClosed") : t("shared.accessIsOpen")));
       await load();
     } catch (err) {
       setError(err.message);
-      await appAlert({ title: "Ошибка", message: err.message, tone: "danger" });
+      await appAlert({ title: t("shared.status.error"), message: err.message, tone: "danger" });
     } finally {
       setBusyId("");
     }
@@ -247,9 +249,9 @@ export function AdminRolePanel({ currentUser }) {
 
   const savePassword = async (user) => {
     if (draftPassword.length < 6) {
-      const message = "Пароль должен быть не короче 6 символов.";
+      const message = t("shared.passwordMustBeAtLeast6");
       setError(message);
-      await appAlert({ title: "Пароль", message, tone: "danger" });
+      await appAlert({ title: t("auth.login.password"), message, tone: "danger" });
       return;
     }
     setBusyId(user.id);
@@ -259,10 +261,10 @@ export function AdminRolePanel({ currentUser }) {
       setDraftPassword("");
       setRevealed((current) => ({ ...current, [user.id]: true }));
       await load();
-      setNotice(result.message || "Пароль обновлён.");
+      setNotice(result.message || t("shared.passwordUpdated"));
     } catch (err) {
       setError(err.message);
-      await appAlert({ title: "Ошибка", message: err.message, tone: "danger" });
+      await appAlert({ title: t("shared.status.error"), message: err.message, tone: "danger" });
     } finally {
       setBusyId("");
     }
@@ -280,12 +282,12 @@ export function AdminRolePanel({ currentUser }) {
     setError("");
     try {
       const result = await api.setStaffPermissions(user.id, payload);
-      setNotice(result.message || "Права обновлены.");
+      setNotice(result.message || t("shared.permissionsUpdated"));
       await load();
-      await appAlert({ title: "Права сохранены", message: result.message || "Готово.", tone: "success" });
+      await appAlert({ title: t("shared.permissionsSaved"), message: result.message || t("shared.status.donePeriod"), tone: "success" });
     } catch (err) {
       setError(err.message);
-      await appAlert({ title: "Ошибка", message: err.message, tone: "danger" });
+      await appAlert({ title: t("shared.status.error"), message: err.message, tone: "danger" });
     } finally {
       setBusyId("");
     }
@@ -293,9 +295,9 @@ export function AdminRolePanel({ currentUser }) {
 
   const removeManager = async (user) => {
     const ok = await appConfirm({
-      title: "Удалить менеджера?",
-      message: `${user.email} будет удалён безвозвратно.`,
-      confirmLabel: "Удалить",
+      title: t("shared.deleteTheManager"),
+      message: t("admin.staff.deleteForeverNamed", { email: user.email }),
+      confirmLabel: t("shared.action.delete"),
       tone: "danger",
     });
     if (!ok) return;
@@ -304,11 +306,11 @@ export function AdminRolePanel({ currentUser }) {
     try {
       const result = await api.deleteStaffUser(user.id);
       if (String(expandedId) === String(user.id)) setExpandedId("");
-      setNotice(result.message || "Менеджер удалён.");
+      setNotice(result.message || t("shared.managerDeleted"));
       await load();
     } catch (err) {
       setError(err.message);
-      await appAlert({ title: "Ошибка", message: err.message, tone: "danger" });
+      await appAlert({ title: t("shared.status.error"), message: err.message, tone: "danger" });
     } finally {
       setBusyId("");
     }
@@ -318,13 +320,11 @@ export function AdminRolePanel({ currentUser }) {
     <div className="panel" style={{ marginTop: 0 }}>
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Доступы · Менеджеры</p>
-          <h3>Управление менеджерами</h3>
-          <p>
-            Создание, закрытие доступа, смена пароля, права по разделам и удаление.
-            Пароли менеджеров сохраняются в этом журнале (как у клиентов).
-            Доступно только администратору.
-          </p>
+          <p className="eyebrow">{t("admin.accessManagers")}</p>
+          <h3>{t("admin.managerAdministration")}</h3>
+          <p>{
+            t("admin.createAccountsRevokeAccessChangePasswords")
+          }</p>
         </div>
       </div>
 
@@ -338,8 +338,8 @@ export function AdminRolePanel({ currentUser }) {
           style={{ marginTop: 14 }}
           onSubmit={createManager}
         >
-          <h3>Создать менеджера</h3>
-          <p className="muted small">Пароль не короче 6 символов. После создания сохраняется в журнале ниже.</p>
+          <h3>{t("shared.createManager")}</h3>
+          <p className="muted small">{t("admin.passwordMustBeAtLeast6")}</p>
           <div className="form-grid">
             <label className="field">
               Email
@@ -352,21 +352,21 @@ export function AdminRolePanel({ currentUser }) {
                 placeholder="manager@example.ru"
               />
             </label>
-            <label className="field">
-              Пароль
-              <input
+            <label className="field">{
+              t("auth.login.password")
+              }<input
                 type="text"
                 name="managerPassword"
                 autoComplete="new-password"
                 required
                 minLength={6}
                 defaultValue=""
-                placeholder="минимум 6 символов"
+                placeholder={t("shared.atLeast6Characters")}
               />
             </label>
-            <label className="field">
-              ФИО
-              <input
+            <label className="field">{
+              t("admin.fullName")
+              }<input
                 type="text"
                 name="managerFullName"
                 autoComplete="off"
@@ -374,9 +374,9 @@ export function AdminRolePanel({ currentUser }) {
                 placeholder="Иван Иванов"
               />
             </label>
-            <label className="field">
-              Телефон
-              <input
+            <label className="field">{
+              t("auth.register.phone")
+              }<input
                 type="tel"
                 name="managerPhone"
                 autoComplete="off"
@@ -391,7 +391,7 @@ export function AdminRolePanel({ currentUser }) {
                 name="managerMax"
                 autoComplete="off"
                 defaultValue=""
-                placeholder="ник или ссылка"
+                placeholder={t("shared.usernameOrLink")}
               />
             </label>
             <label className="field">
@@ -415,31 +415,31 @@ export function AdminRolePanel({ currentUser }) {
                 const input = form?.querySelector('input[name="managerPassword"]');
                 if (input) input.value = generateAccessPassword();
               }}
-            >
-              Сгенерировать пароль
-            </button>
+            >{
+              t("manager.generatePassword")
+            }</button>
             <button className="primary-button" type="submit" disabled={creating}>
-              {creating ? "Создание…" : "Создать менеджера"}
+              {creating ? t("shared.creating") : t("shared.createManager")}
             </button>
           </div>
         </form>
       )}
 
       {!canManageStaff && (
-        <p className="muted" style={{ marginTop: 12 }}>
-          Недостаточно прав для управления менеджерами.
-        </p>
+        <p className="muted" style={{ marginTop: 12 }}>{
+          t("admin.youDoNotHaveRightsTo")
+        }</p>
       )}
 
       <p className="muted small" style={{ marginTop: 18 }}>
-        Администраторов сейчас: {adminCount}
-        {canManageStaff ? ` · ${savedPasswordCount} с паролем в журнале` : null}
+        {t("admin.staff.adminsNowCount", { count: adminCount })}
+        {canManageStaff ? t("admin.staff.passwordJournalCount", { count: savedPasswordCount }) : null}
       </p>
 
       <div className="exchange-actions" style={{ marginTop: 10 }}>
-        <button className="secondary-button" type="button" onClick={() => void load()}>
-          Обновить список
-        </button>
+        <button className="secondary-button" type="button" onClick={() => void load()}>{
+          t("admin.refreshList")
+        }</button>
       </div>
 
       <div className="stack" style={{ marginTop: 12, gap: 12 }}>
@@ -461,38 +461,38 @@ export function AdminRolePanel({ currentUser }) {
                         user.role === "admin" ? "staff-role-badge is-admin" : "staff-role-badge is-manager"
                       }
                     >
-                      {user.role === "admin" ? "Админ" : "Менеджер"}
+                      {user.role === "admin" ? t("shared.role.admin") : t("shared.role.manager")}
                     </span>
-                    {isSelf ? <span className="staff-meta-chip">вы</span> : null}
-                    {user.disabled ? <span className="staff-meta-chip is-warn">доступ закрыт</span> : null}
+                    {isSelf ? <span className="staff-meta-chip">{t("admin.you")}</span> : null}
+                    {user.disabled ? <span className="staff-meta-chip is-warn">{t("admin.accessClosed")}</span> : null}
                     {canManageStaff ? (
                       <span className={user.hasPassword ? "badge green" : "badge yellow"}>
-                        {user.hasPassword ? "Пароль сохранён" : "Нет пароля"}
+                        {user.hasPassword ? t("shared.passwordSaved") : t("shared.noPassword")}
                       </span>
                     ) : null}
                   </div>
                 </div>
                 <div className="staff-card-actions">
                   {canManageRoles && (
-                    <div className="staff-role-seg" role="group" aria-label="Роль">
+                    <div className="staff-role-seg" role="group" aria-label={t("shared.field.role")}>
                       <button
                         className={user.role === "manager" ? "is-active" : ""}
                         type="button"
                         aria-pressed={user.role === "manager"}
                         disabled={busyId === user.id || user.role === "manager"}
                         onClick={() => changeRole(user.id, "manager")}
-                      >
-                        Менеджер
-                      </button>
+                      >{
+                        t("shared.role.manager")
+                      }</button>
                       <button
                         className={user.role === "admin" ? "is-active" : ""}
                         type="button"
                         aria-pressed={user.role === "admin"}
                         disabled={busyId === user.id || user.role === "admin"}
                         onClick={() => changeRole(user.id, "admin")}
-                      >
-                        Админ
-                      </button>
+                      >{
+                        t("shared.role.admin")
+                      }</button>
                     </div>
                   )}
                   {canManageStaff && (
@@ -503,7 +503,7 @@ export function AdminRolePanel({ currentUser }) {
                       aria-expanded={isExpanded}
                       onClick={() => setExpandedId(isExpanded ? "" : user.id)}
                     >
-                      {isExpanded ? "Свернуть" : "Управление"}
+                      {isExpanded ? t("shared.action.collapse") : t("shared.management")}
                     </button>
                   )}
                 </div>
@@ -512,7 +512,7 @@ export function AdminRolePanel({ currentUser }) {
               {canManageStaff ? (
                 <div className="access-vault-fields" style={{ marginTop: 12 }}>
                   <div className="access-vault-field">
-                    <span>Логин</span>
+                    <span>{t("auth.login.email")}</span>
                     <code>{user.login || user.email || "—"}</code>
                     <button
                       className="secondary-button"
@@ -520,17 +520,17 @@ export function AdminRolePanel({ currentUser }) {
                       disabled={!user.login && !user.email}
                       onClick={() => void handleCopy(loginKey, user.login || user.email)}
                     >
-                      {copiedKey === loginKey ? "Скопировано" : "Копировать"}
+                      {copiedKey === loginKey ? t("shared.action.copied") : t("shared.action.copy")}
                     </button>
                   </div>
                   <div className="access-vault-field">
-                    <span>Пароль</span>
+                    <span>{t("auth.login.password")}</span>
                     <code>
                       {user.hasPassword
                         ? showPassword
                           ? user.password
                           : "••••••••••"
-                        : "не сохранён"}
+                        : t("shared.notSaved")}
                     </code>
                     <div className="access-vault-field-actions">
                       {user.hasPassword ? (
@@ -545,43 +545,49 @@ export function AdminRolePanel({ currentUser }) {
                               }))
                             }
                           >
-                            {showPassword ? "Скрыть" : "Показать"}
+                            {showPassword ? t("shared.action.hide") : t("shared.action.show")}
                           </button>
                           <button
                             className="secondary-button"
                             type="button"
                             onClick={() => void handleCopy(passKey, user.password)}
                           >
-                            {copiedKey === passKey ? "Скопировано" : "Копировать"}
+                            {copiedKey === passKey ? t("shared.action.copied") : t("shared.action.copy")}
                           </button>
                           <button
                             className="secondary-button"
                             type="button"
                             onClick={() => setExpandedId(String(user.id))}
-                          >
-                            Сменить
-                          </button>
+                          >{
+                            t("manager.change")
+                          }</button>
                         </>
                       ) : (
                         <button
                           className="secondary-button"
                           type="button"
                           onClick={() => setExpandedId(String(user.id))}
-                        >
-                          Задать пароль
-                        </button>
+                        >{
+                          t("manager.setPassword")
+                        }</button>
                       )}
                     </div>
                   </div>
                   {user.passwordUpdatedAt ? (
                     <small className="muted">
-                      Обновлён {formatDateTime(user.passwordUpdatedAt)}
-                      {user.passwordUpdatedBy ? ` · ${user.passwordUpdatedBy}` : ""}
+                      {user.passwordUpdatedBy
+                        ? t("admin.staff.passwordUpdatedAtBy", {
+                            stamp: formatDateTime(user.passwordUpdatedAt),
+                            who: user.passwordUpdatedBy,
+                          })
+                        : t("admin.staff.passwordUpdatedAt", {
+                            stamp: formatDateTime(user.passwordUpdatedAt),
+                          })}
                     </small>
                   ) : (
-                    <small className="muted">
-                      Старые пароли до появления журнала восстановить нельзя — задайте новый.
-                    </small>
+                    <small className="muted">{
+                      t("admin.passwordsFromBeforeThisLogCannot")
+                    }</small>
                   )}
                 </div>
               ) : null}
@@ -589,16 +595,15 @@ export function AdminRolePanel({ currentUser }) {
               {isExpanded && canManageStaff && (
                 <div className="staff-edit-panel">
                   <div className="staff-edit-section">
-                    <div className="staff-edit-section-title">Контакты для клиентов</div>
-                    <p className="muted small" style={{ marginTop: 0 }}>
-                      Эти данные подставляются в кнопку «Связаться с менеджером»,
-                      если менеджер назначен клиенту как личный.
-                    </p>
+                    <div className="staff-edit-section-title">{t("admin.contactsForClients")}</div>
+                    <p className="muted small" style={{ marginTop: 0 }}>{
+                      t("admin.theseDetailsFillTheContactManager")
+                    }</p>
                     {draftContacts ? (
                       <div className="form-grid">
-                        <label className="field">
-                          ФИО
-                          <input
+                        <label className="field">{
+                          t("admin.fullName")
+                          }<input
                             type="text"
                             value={draftContacts.fullName}
                             onChange={(event) =>
@@ -609,9 +614,9 @@ export function AdminRolePanel({ currentUser }) {
                             }
                           />
                         </label>
-                        <label className="field">
-                          Телефон
-                          <input
+                        <label className="field">{
+                          t("auth.register.phone")
+                          }<input
                             type="tel"
                             value={draftContacts.phone}
                             onChange={(event) =>
@@ -656,15 +661,15 @@ export function AdminRolePanel({ currentUser }) {
                         type="button"
                         disabled={busyId === user.id || !draftContacts}
                         onClick={() => void saveContacts(user)}
-                      >
-                        Сохранить контакты
-                      </button>
+                      >{
+                        t("admin.saveContacts")
+                      }</button>
                     </div>
                   </div>
 
                   {!isSelf ? (
                     <div className="staff-edit-section">
-                      <div className="staff-edit-section-title">Доступ к аккаунту</div>
+                      <div className="staff-edit-section-title">{t("admin.accountAccess")}</div>
                       <div className="staff-edit-actions">
                         <button
                           className="secondary-button"
@@ -672,39 +677,39 @@ export function AdminRolePanel({ currentUser }) {
                           disabled={busyId === user.id}
                           onClick={() => void toggleAccess(user)}
                         >
-                          {user.disabled ? "Открыть доступ" : "Закрыть доступ"}
+                          {user.disabled ? t("shared.openAccess") : t("shared.closeAccess")}
                         </button>
                         <button
                           className="secondary-button staff-edit-danger"
                           type="button"
                           disabled={busyId === user.id}
                           onClick={() => void removeManager(user)}
-                        >
-                          Удалить
-                        </button>
+                        >{
+                          t("shared.action.delete")
+                        }</button>
                       </div>
                     </div>
                   ) : null}
 
                   <div className="staff-edit-section">
                     <div className="staff-edit-section-title">
-                      {isSelf ? "Ваш пароль" : "Пароль"}
+                      {isSelf ? t("shared.yourPassword") : t("auth.login.password")}
                     </div>
                     {isSelf ? (
-                      <p className="muted small">
-                        Задайте или смените пароль администратора здесь. В «Настройках» смена пароля недоступна.
-                      </p>
+                      <p className="muted small">{
+                        t("admin.setOrChangeTheAdministratorPassword")
+                      }</p>
                     ) : null}
                     <div className="staff-edit-password">
                       <label className="field">
-                        {user.hasPassword ? "Новый пароль" : "Пароль"}
+                        {user.hasPassword ? t("auth.reset.title") : t("auth.login.password")}
                         <input
                           type="text"
                           autoComplete="new-password"
                           minLength={6}
                           value={draftPassword}
                           onChange={(event) => setDraftPassword(event.target.value)}
-                          placeholder="минимум 6 символов"
+                          placeholder={t("shared.atLeast6Characters")}
                         />
                       </label>
                       <button
@@ -712,16 +717,16 @@ export function AdminRolePanel({ currentUser }) {
                         type="button"
                         disabled={busyId === user.id}
                         onClick={() => setDraftPassword(generateAccessPassword())}
-                      >
-                        Сгенерировать
-                      </button>
+                      >{
+                        t("manager.generate")
+                      }</button>
                       <button
                         className="primary-button"
                         type="button"
                         disabled={busyId === user.id || draftPassword.length < 6}
                         onClick={() => void savePassword(user)}
                       >
-                        {user.hasPassword ? "Сменить пароль" : "Сохранить пароль"}
+                        {user.hasPassword ? t("shared.changePassword2") : t("auth.reset.submit")}
                       </button>
                     </div>
                   </div>
@@ -730,11 +735,11 @@ export function AdminRolePanel({ currentUser }) {
                     <div className="staff-edit-section staff-feature-block">
                       <div className="staff-feature-head">
                         <div>
-                          <div className="staff-edit-section-title">Разделы кабинета</div>
+                          <div className="staff-edit-section-title">{t("client.cabinetSections")}</div>
                           {user.role !== "admin" ? (
-                            <p className="muted small">
-                              Выберите, что менеджер видит в кабинете.
-                            </p>
+                            <p className="muted small">{
+                              t("admin.chooseWhatTheManagerSeesIn")
+                            }</p>
                           ) : null}
                         </div>
                         {user.role !== "admin" ? (
@@ -748,15 +753,15 @@ export function AdminRolePanel({ currentUser }) {
                         ) : null}
                       </div>
                       {user.role === "admin" ? (
-                        <p className="muted small staff-feature-admin-note">
-                          У администратора полный доступ ко всем разделам.
-                        </p>
+                        <p className="muted small staff-feature-admin-note">{
+                          t("admin.theAdministratorHasFullAccessTo")
+                        }</p>
                       ) : (
                         <>
                           <div
                             className="staff-feature-list"
                             role="group"
-                            aria-label="Разрешённые разделы"
+                            aria-label={t("shared.allowedSections")}
                           >
                             <label
                               className={`staff-feature-item is-all${
@@ -782,8 +787,8 @@ export function AdminRolePanel({ currentUser }) {
                                 }}
                               />
                               <span>
-                                <strong>Все разделы</strong>
-                                <em>полный доступ к кабинету</em>
+                                <strong>{t("admin.allSections")}</strong>
+                                <em>{t("admin.fullCabinetAccess")}</em>
                               </span>
                             </label>
                             <div className="staff-feature-grid">
@@ -820,7 +825,7 @@ export function AdminRolePanel({ currentUser }) {
                                         });
                                       }}
                                     />
-                                    <span>{label}</span>
+                                    <span>{t(label)}</span>
                                   </label>
                                 );
                               })}
@@ -836,9 +841,9 @@ export function AdminRolePanel({ currentUser }) {
                                   draftPermissions.tabs.length === 0)
                               }
                               onClick={() => void savePermissions(user)}
-                            >
-                              Сохранить права
-                            </button>
+                            >{
+                              t("admin.savePermissions")
+                            }</button>
                           </div>
                         </>
                       )}

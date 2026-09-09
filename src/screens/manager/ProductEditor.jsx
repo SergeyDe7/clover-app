@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Модалка редактирования товара каталога: поля, ед. измерения, фото, связь с 1С.
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -81,6 +82,7 @@ export function ProductEditor({
   onDelete,
   onProductLiveUpdate,
 }) {
+  const { t } = useLocalization();
   const isNew = !product;
   const [form, setForm] = useState(
     product || {
@@ -184,7 +186,7 @@ export function ProductEditor({
       setOneCTotal(Number(result.total) || 0);
       if (!needle) {
         setOneCNotice(
-          "Полная выгрузка 1С. Свободные позиции сверху. Введите название или код и нажмите «Найти»."
+          t("manager.full1cExportFreeItemsAre")
         );
       }
     } catch (error) {
@@ -241,13 +243,13 @@ export function ProductEditor({
         catalogItems = fallback.items || [];
         total = Number(fallback.total) || catalogItems.length;
         setOneCNotice(
-          `По «${hintQuery}» точных совпадений нет. Показан каталог 1С (${total}). Уточните слова и нажмите «Найти».`
+          t("manager.products.oneC.noExactShownCatalog", { query: hintQuery, total })
         );
       } else {
         setOneCNotice(
           total
-            ? `Найдено в выгрузке 1С: ${total}. Свободные сверху. Можно править строку поиска и жать «Найти» / «Весь каталог».`
-            : "В выгрузке 1С пока пусто — сначала «Отправить товары» из VLAVKA."
+            ? t("manager.products.oneC.foundInExport", { total })
+            : t("manager.the1cExportIsEmptyFirst")
         );
       }
 
@@ -290,7 +292,7 @@ export function ProductEditor({
     setOneCOpen(false);
     setOneCError("");
     setOneCNotice(
-      `Позиция 1С выбрана. Категория: «${nextProduct.category}». Проверьте единицы и цены, затем «Сохранить товар».`
+      t("manager.products.oneC.selectedCategory", { category: nextProduct.category })
     );
   };
 
@@ -306,10 +308,13 @@ export function ProductEditor({
     const linkedElsewhere = Boolean(item.cloverLink?.productId);
     if (linkedElsewhere) {
       const ok = await appConfirm({
-        title: "Позиция уже связана",
-        message: `«${item.name}» уже связана с товаром «${item.cloverLink.productName || item.cloverLink.productId}». Перепривязать к текущему товару?`,
-        confirmLabel: "Перепривязать",
-        cancelLabel: "Отмена",
+        title: t("manager.itemAlreadyLinked"),
+        message: t("manager.products.oneC.relinkConfirm", {
+          name: item.name,
+          linkedName: item.cloverLink.productName || item.cloverLink.productId,
+        }),
+        confirmLabel: t("manager.relink"),
+        cancelLabel: t("shared.modal.cancel"),
         tone: "warn",
       });
       if (!ok) return;
@@ -324,7 +329,7 @@ export function ProductEditor({
         ...current,
         oneCSearchQuery: oneCSearch || current.name,
       }));
-      setOneCNotice("Запрос будет сохранён вместе с новым товаром.");
+      setOneCNotice(t("manager.theRequestWillBeSavedTogether"));
       return;
     }
     setOneCLoading(true);
@@ -341,7 +346,7 @@ export function ProductEditor({
         oneCSearchQuery: oneCSearch || form.name,
       });
       setForm(updatedProduct);
-      setOneCNotice(result.message || "Запрос сохранён.");
+      setOneCNotice(result.message || t("manager.requestSaved"));
       await onSave(updatedProduct);
     } catch (error) {
       setOneCError(error.message);
@@ -382,7 +387,7 @@ export function ProductEditor({
       });
     } catch (error) {
       await appAlert({
-        title: "Ошибка загрузки",
+        title: t("manager.loadError2"),
         message: error.message,
         tone: "danger",
       });
@@ -394,10 +399,12 @@ export function ProductEditor({
   const deleteImage = async () => {
     if (!productId || !form.imageUrl) return;
     const ok = await appConfirm({
-      title: "Удалить фото?",
-      message: `Удалить фотографию товара «${form.name || "товар"}»?`,
-      confirmLabel: "Удалить",
-      cancelLabel: "Отмена",
+      title: t("manager.deleteThePhoto"),
+      message: t("manager.products.deletePhotoNamed", {
+        name: form.name || t("storefront.product"),
+      }),
+      confirmLabel: t("shared.action.delete"),
+      cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
     });
     if (!ok) return;
@@ -408,7 +415,7 @@ export function ProductEditor({
       applyLiveProduct({ ...form, ...result.product });
     } catch (error) {
       await appAlert({
-        title: "Ошибка удаления",
+        title: t("manager.deleteError"),
         message: error.message,
         tone: "danger",
       });
@@ -424,13 +431,13 @@ export function ProductEditor({
       const result = await api.uploadProductCertificate(productId, file);
       applyLiveProduct({ ...form, ...result.product });
       await appAlert({
-        title: "Сертификат сохранён",
-        message: "Файл сертификата загружен на сервер.",
+        title: t("manager.certificateSaved"),
+        message: t("manager.certificateFileUploadedToTheServer"),
         tone: "success",
       });
     } catch (error) {
       await appAlert({
-        title: "Ошибка загрузки",
+        title: t("manager.loadError2"),
         message: error.message,
         tone: "danger",
       });
@@ -442,10 +449,12 @@ export function ProductEditor({
   const deleteCertificate = async () => {
     if (!productId || !form.certificateUrl) return;
     const ok = await appConfirm({
-      title: "Удалить сертификат?",
-      message: `Удалить сертификат товара «${form.name || "товар"}»?`,
-      confirmLabel: "Удалить",
-      cancelLabel: "Отмена",
+      title: t("manager.deleteTheCertificate"),
+      message: t("manager.products.deleteCertificateNamed", {
+        name: form.name || t("storefront.product"),
+      }),
+      confirmLabel: t("shared.action.delete"),
+      cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
     });
     if (!ok) return;
@@ -456,7 +465,7 @@ export function ProductEditor({
       applyLiveProduct({ ...form, ...result.product });
     } catch (error) {
       await appAlert({
-        title: "Ошибка удаления",
+        title: t("manager.deleteError"),
         message: error.message,
         tone: "danger",
       });
@@ -470,8 +479,8 @@ export function ProductEditor({
     if (!form.name.trim() || !form.category.trim()) return;
     if (needsSubcategory && !String(form.subcategory || "").trim()) {
       void appAlert({
-        title: "Выберите подкатегорию",
-        message: `Для группы «${categoryKey}» нужно указать подкатегорию.`,
+        title: t("manager.chooseASubcategory"),
+        message: t("manager.products.subcategoryRequired", { category: categoryKey }),
       });
       return;
     }
@@ -505,8 +514,8 @@ export function ProductEditor({
         <div className="product-editor-scroll">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">Каталог</p>
-            <h2>{isNew ? "Новый товар" : "Редактирование товара"}</h2>
+            <p className="eyebrow">{t("storefront.nav.catalog")}</p>
+            <h2>{isNew ? t("manager.newProduct") : t("manager.editingTheProduct")}</h2>
           </div>
           <button className="icon-button" type="button" onClick={onClose}>
             ×
@@ -516,21 +525,21 @@ export function ProductEditor({
         <section className="product-editor-photo">
           <div className="product-editor-photo-preview">
             {form.imageUrl ? (
-              <img src={productImageSrc(form)} alt={form.name || "Фото товара"} loading="lazy" />
+              <img src={productImageSrc(form)} alt={form.name || t("shared.productPhoto")} loading="lazy" />
             ) : (
-              <span>Нет фото</span>
+              <span>{t("shared.media.noPhoto")}</span>
             )}
           </div>
           <div className="product-editor-photo-actions">
-            <p className="eyebrow">Фото товара</p>
+            <p className="eyebrow">{t("shared.productPhoto")}</p>
             {productId ? (
               <>
                 <label className="image-upload-label">
                   {imageBusy
-                    ? "Загрузка..."
+                    ? t("shared.status.loadingDots")
                     : form.imageUrl
-                      ? "Заменить фото"
-                      : "Добавить фото"}
+                      ? t("manager.replacePhoto")
+                      : t("manager.addPhoto")}
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
@@ -548,22 +557,22 @@ export function ProductEditor({
                     type="button"
                     disabled={imageBusy}
                     onClick={() => void deleteImage()}
-                  >
-                    Удалить фото
-                  </button>
+                  >{
+                    t("shared.deletePhoto")
+                  }</button>
                 ) : null}
-                <small className="muted">JPG, PNG или WEBP до 5 МБ. Автоматически: квадрат 800×800, белый фон, JPEG.</small>
+                <small className="muted">{t("manager.jpgPngOrWebpUpTo")}</small>
               </>
             ) : (
-              <small className="muted">
-                Сначала сохраните товар — затем можно будет добавить фото.
-              </small>
+              <small className="muted">{
+                t("manager.saveTheProductFirstThenYou")
+              }</small>
             )}
           </div>
         </section>
 
         <section className="product-editor-files">
-          <p className="eyebrow" style={{ margin: 0 }}>Сертификат</p>
+          <p className="eyebrow" style={{ margin: 0 }}>{t("shared.media.certificate")}</p>
           {productId ? (
             <div className="product-editor-files-row">
               {form.certificateUrl ? (
@@ -573,17 +582,17 @@ export function ProductEditor({
                   target="_blank"
                   rel="noreferrer"
                 >
-                  {form.certificateName || "Открыть сертификат"}
+                  {form.certificateName || t("manager.openCertificate")}
                 </a>
               ) : (
-                <small className="muted">Файл ещё не загружен</small>
+                <small className="muted">{t("manager.fileIsNotUploadedYet")}</small>
               )}
               <label className="image-upload-label">
                 {certificateBusy
-                  ? "Загрузка..."
+                  ? t("shared.status.loadingDots")
                   : form.certificateUrl
-                    ? "Заменить"
-                    : "Загрузить сертификат"}
+                    ? t("shared.action.replace")
+                    : t("manager.uploadACertificate")}
                 <input
                   type="file"
                   accept="application/pdf,image/jpeg,image/png,image/webp,.pdf"
@@ -601,16 +610,16 @@ export function ProductEditor({
                   type="button"
                   disabled={certificateBusy}
                   onClick={() => void deleteCertificate()}
-                >
-                  Удалить
-                </button>
+                >{
+                  t("shared.action.delete")
+                }</button>
               ) : null}
-              <small className="muted">PDF, JPG, PNG или WEBP до 10 МБ.</small>
+              <small className="muted">{t("manager.pdfJpgPngOrWebpUp")}</small>
             </div>
           ) : (
-            <small className="muted">
-              Сначала сохраните товар — затем можно загрузить сертификат.
-            </small>
+            <small className="muted">{
+              t("manager.saveTheProductFirstThenYou2")
+            }</small>
           )}
         </section>
 
@@ -623,19 +632,20 @@ export function ProductEditor({
               salePricesByType: form.salePricesByType,
               salePriceReceivedAt: form.salePriceReceivedAt || "",
               oneCPriceTypes,
+              t,
             });
             const available = hasPurchasePrice(card.cost);
             return (
               <>
                 <div className="purchase-price-card-head">
                   <div>
-                    <p className="eyebrow">Цена из 1С</p>
+                    <p className="eyebrow">{t("manager.priceFrom1c")}</p>
                     <h3>{card.title}</h3>
                   </div>
                   <small>
                     {card.updatedAt
-                      ? `Обновлено: ${formatDateTime(card.updatedAt)}`
-                      : "Цена из 1С ещё не получена"}
+                      ? t("manager.products.updatedAt", { datetime: formatDateTime(card.updatedAt) })
+                      : t("manager.products.oneC.pricePending")}
                   </small>
                 </div>
                 <div className="purchase-price-single">
@@ -643,7 +653,7 @@ export function ProductEditor({
                   <small>
                     {available
                       ? `${card.sourceLabel} · ${UNIT_CONFIG[card.unit]?.label || "шт"}`
-                      : "Нет цены из 1С"}
+                      : t("manager.no1cPrice")}
                   </small>
                 </div>
               </>
@@ -652,17 +662,17 @@ export function ProductEditor({
         </section>
 
         <div className="form-grid">
-          <label className="field">
-            Название товара
-            <input
+          <label className="field">{
+            t("shared.productName")
+            }<input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               required
             />
           </label>
-          <label className="field">
-            Категория
-            <select
+          <label className="field">{
+            t("manager.category")
+            }<select
               value={form.category || ""}
               onChange={(e) => {
                 const category = e.target.value;
@@ -687,9 +697,9 @@ export function ProductEditor({
               required
             >
               {!form.category ? (
-                <option value="" disabled>
-                  Выберите категорию
-                </option>
+                <option value="" disabled>{
+                  t("manager.chooseACategory")
+                }</option>
               ) : null}
               {categoryOptions.map((name) => (
                 <option key={name} value={name}>
@@ -699,9 +709,9 @@ export function ProductEditor({
             </select>
           </label>
           {subcategoryOptions.length > 0 ? (
-            <label className="field">
-              Подкатегория
-              <select
+            <label className="field">{
+              t("manager.subcategory")
+              }<select
                 value={form.subcategory || ""}
                 onChange={(e) => {
                   const subcategory = e.target.value;
@@ -721,8 +731,8 @@ export function ProductEditor({
               >
                 <option value="">
                   {needsSubcategory
-                    ? "Выберите подкатегорию"
-                    : "Без подкатегории"}
+                    ? t("manager.chooseASubcategory")
+                    : t("manager.noSubcategory")}
                 </option>
                 {subcategoryOptions.map((name) => (
                   <option key={name} value={name}>
@@ -733,15 +743,15 @@ export function ProductEditor({
             </label>
           ) : null}
           {facetOptions.length > 0 ? (
-            <label className="field">
-              Уточнение
-              <select
+            <label className="field">{
+              t("storefront.clarification")
+              }<select
                 value={form.facet || ""}
                 onChange={(e) =>
                   setForm({ ...form, facet: e.target.value })
                 }
               >
-                <option value="">Без уточнения</option>
+                <option value="">{t("manager.noSpecification")}</option>
                 {facetOptions.map((name) => (
                   <option key={name} value={name}>
                     {name}
@@ -750,29 +760,29 @@ export function ProductEditor({
               </select>
             </label>
           ) : null}
-          <label className="field">
-            Артикул 1С
-            <input
+          <label className="field">{
+            t("manager.products.oneC.article")
+            }<input
               value={form.oneCCode || ""}
               readOnly
-              placeholder="Появится после связи с 1С"
+              placeholder={t("manager.willAppearAfterLinkingTo1c")}
             />
           </label>
-          <label className="field">
-            Показывать клиентам
-            <select
+          <label className="field">{
+            t("manager.showToClients")
+            }<select
               value={form.active ? "yes" : "no"}
               onChange={(e) =>
                 setForm({ ...form, active: e.target.value === "yes" })
               }
             >
-              <option value="yes">Да</option>
-              <option value="no">Нет</option>
+              <option value="yes">{t("shared.action.yes")}</option>
+              <option value="no">{t("shared.action.no")}</option>
             </select>
           </label>
-          <label className="field">
-            На витрине сайта
-            <select
+          <label className="field">{
+            t("manager.onTheWebsiteStorefront")
+            }<select
               value={form.showOnStorefront ? "yes" : "no"}
               onChange={(e) =>
                 setForm({
@@ -781,8 +791,8 @@ export function ProductEditor({
                 })
               }
             >
-              <option value="no">Нет</option>
-              <option value="yes">Да</option>
+              <option value="no">{t("shared.action.no")}</option>
+              <option value="yes">{t("shared.action.yes")}</option>
             </select>
           </label>
         </div>
@@ -790,8 +800,8 @@ export function ProductEditor({
         <section className="storefront-details-editor">
           <div className="one-c-link-editor-head">
             <div>
-              <p className="eyebrow">Витрина сайта</p>
-              <h3>Описание для покупателей</h3>
+              <p className="eyebrow">{t("manager.websiteStorefront")}</p>
+              <h3>{t("manager.descriptionForBuyers")}</h3>
             </div>
             {productId ? (
               <button
@@ -809,10 +819,10 @@ export function ProductEditor({
                       onProductLiveUpdate?.(result.product);
                     }
                     await appAlert({
-                      title: result.changed ? "Карточка дополнена" : "Без изменений",
+                      title: result.changed ? t("manager.cardEnriched") : t("manager.noChanges"),
                       message:
                         result.message ||
-                        "Пустые поля заполнены из открытых источников.",
+                        t("manager.emptyFieldsWereFilledFromPublic"),
                       tone: result.changed ? "success" : "default",
                     });
                   } catch (error) {
@@ -826,21 +836,20 @@ export function ProductEditor({
                   }
                 }}
               >
-                {enrichBusy ? "Ищем…" : "Дополнить из интернета"}
+                {enrichBusy ? t("manager.searching") : t("manager.enrichFromTheInternet")}
               </button>
             ) : null}
           </div>
-          <p className="muted small" style={{ marginTop: 0 }}>
-            Эти тексты видны на публичной карточке товара (/vitrina, clover-spb.ru).
-            При добавлении из 1С пустые поля и фото подтягиваются автоматически.
-          </p>
+          <p className="muted small" style={{ marginTop: 0 }}>{
+            t("manager.theseTextsAppearOnThePublic")
+          }</p>
           <div className="form-grid">
-            <label className="field field-wide">
-              Описание
-              <textarea
+            <label className="field field-wide">{
+              t("shared.field.description")
+              }<textarea
                 rows={3}
                 value={form.storefrontDetails?.description || ""}
-                placeholder="Кратко о товаре для витрины"
+                placeholder={t("manager.shortStorefrontProductBlurb")}
                 onChange={(event) =>
                   setForm({
                     ...form,
@@ -852,12 +861,12 @@ export function ProductEditor({
                 }
               />
             </label>
-            <label className="field field-wide">
-              Состав
-              <textarea
+            <label className="field field-wide">{
+              t("manager.contents")
+              }<textarea
                 rows={2}
                 value={form.storefrontDetails?.composition || ""}
-                placeholder="Состав / материалы"
+                placeholder={t("manager.compositionMaterials")}
                 onChange={(event) =>
                   setForm({
                     ...form,
@@ -869,12 +878,12 @@ export function ProductEditor({
                 }
               />
             </label>
-            <label className="field field-wide">
-              Характеристики
-              <textarea
+            <label className="field field-wide">{
+              t("manager.specifications")
+              }<textarea
                 rows={3}
                 value={form.storefrontDetails?.characteristics || ""}
-                placeholder="Размеры, плотность, упаковка и т.п."
+                placeholder={t("manager.sizesDensityPackagingEtc")}
                 onChange={(event) =>
                   setForm({
                     ...form,
@@ -888,9 +897,9 @@ export function ProductEditor({
             </label>
           </div>
           <div className="form-grid" style={{ marginTop: 12 }}>
-            <label className="field field-wide">
-              Цена на сайте
-              <select
+            <label className="field field-wide">{
+              t("manager.websitePrice")
+              }<select
                 value={form.storefrontPricing?.source === "manual" ? "manual" : "inherit"}
                 onChange={(event) => {
                   const source = event.target.value === "manual" ? "manual" : "inherit";
@@ -909,14 +918,16 @@ export function ProductEditor({
                   setForm({ ...form, storefrontPricing: next });
                 }}
               >
-                <option value="inherit">Как в настройках витрины (закупка+% или вид цен)</option>
-                <option value="manual">Своя цена для этого товара</option>
+                <option value="inherit">{t("manager.asInStorefrontSettingsPurchaseOr")}</option>
+                <option value="manual">{t("manager.customPriceForThisProduct")}</option>
               </select>
             </label>
             {form.storefrontPricing?.source === "manual"
               ? (form.saleUnits || ["piece"]).map((unit) => (
                   <label className="field" key={`sf-price-${unit}`}>
-                    Цена на сайте, {UNIT_CONFIG[unit]?.label || unit}
+                    {t("manager.products.websitePriceUnit", {
+                      unit: UNIT_CONFIG[unit]?.label || unit,
+                    })}
                     <input
                       type="number"
                       min="0"
@@ -948,63 +959,60 @@ export function ProductEditor({
               : null}
           </div>
           {form.storefrontPricing?.source === "manual" ? (
-            <p className="muted small">
-              Своя цена перекрывает расчёт «закупочная + %» (и вид цен 1С) только
-              на витрине сайта. В ЛК клиентов не влияет.
-            </p>
+            <p className="muted small">{
+              t("manager.aCustomPriceOverridesPurchaseAnd")
+            }</p>
           ) : null}
         </section>
 
         <section className="one-c-link-editor">
           <div className="one-c-link-editor-head">
             <div>
-              <p className="eyebrow">Связь с 1С</p>
-              <h3>Точная номенклатура 1С</h3>
+              <p className="eyebrow">{t("manager.products.oneC.link")}</p>
+              <h3>{t("manager.exact1cNomenclature")}</h3>
             </div>
             <button className="secondary-button" type="button" onClick={openOneCSearch}>
-              {form.oneCId ? "Изменить товар 1С" : "Выбрать из загруженных 1С"}
+              {form.oneCId ? t("manager.change1cProduct") : t("manager.chooseFromLoaded1cItems")}
             </button>
           </div>
 
           {form.oneCId ? (
             <div className="one-c-link-selected">
               <div>
-                <strong>{form.oneCName || "Выбранный товар 1С"}</strong>
+                <strong>{form.oneCName || t("manager.selected1cProduct")}</strong>
                 <span>
-                  Артикул 1С: {form.oneCCode || "—"}
+                  {t("manager.products.oneCArticleCode", { code: form.oneCCode || "—" })}
                 </span>
               </div>
               <button
                 className="secondary-button"
                 type="button"
                 onClick={clearOneCProduct}
-              >
-                Убрать связь
-              </button>
+              >{
+                t("manager.unlink")
+              }</button>
             </div>
           ) : (
             <div className="one-c-link-empty one-c-match-hints">
-              <p>
-                Название для сайта может отличаться от названия в 1С. Выберите
-                позицию из полной выгрузки 1С или укажите код / точное
-                название — после выгрузки Clover сможет связать автоматически.
-              </p>
+              <p>{
+                t("manager.theSiteNameMayDifferFrom")
+              }</p>
               <div className="form-grid one-c-match-fields">
-                <label className="field">
-                  Код товара в 1С
-                  <input
+                <label className="field">{
+                  t("manager.productCodeIn1c")
+                  }<input
                     value={form.oneCMatchCode || ""}
-                    placeholder="Например, НФ-00000742"
+                    placeholder={t("manager.forExampleNf00000742")}
                     onChange={(event) =>
                       setForm({ ...form, oneCMatchCode: event.target.value })
                     }
                   />
                 </label>
-                <label className="field">
-                  Точное название в 1С
-                  <input
+                <label className="field">{
+                  t("manager.exactNameIn1c")
+                  }<input
                     value={form.oneCMatchName || ""}
-                    placeholder="Как позиция называется внутри 1С"
+                    placeholder={t("manager.howTheItemIsNamedIn")}
                     onChange={(event) =>
                       setForm({ ...form, oneCMatchName: event.target.value })
                     }
@@ -1023,7 +1031,7 @@ export function ProductEditor({
               <div className="one-c-products-search">
                 <input
                   type="search"
-                  placeholder="Поиск по выгрузке 1С: название, код или ID"
+                  placeholder={t("manager.searchThe1cExportNameCode")}
                   value={oneCSearch}
                   onChange={(event) => setOneCSearch(event.target.value)}
                   onKeyDown={(event) => {
@@ -1040,7 +1048,7 @@ export function ProductEditor({
                   disabled={oneCLoading}
                   onClick={() => searchOneCProducts(oneCSearch)}
                 >
-                  {oneCLoading ? "Поиск..." : "Найти"}
+                  {oneCLoading ? t("manager.search.ellipsis") : t("shared.action.find")}
                 </button>
                 <button
                   className="secondary-button"
@@ -1050,23 +1058,25 @@ export function ProductEditor({
                     setOneCSearch("");
                     void searchOneCProducts("");
                   }}
-                >
-                  Весь каталог
-                </button>
+                >{
+                  t("manager.entireCatalog")
+                }</button>
                 <button
                   className="secondary-button"
                   type="button"
                   onClick={() => setOneCOpen(false)}
-                >
-                  Закрыть
-                </button>
+                >{
+                  t("shared.action.close")
+                }</button>
               </div>
 
               {oneCError && <div className="sync-error">{oneCError}</div>}
               {oneCNotice && <div className="sync-success">{oneCNotice}</div>}
               <p className="muted small">
-                В выгрузке 1С: {oneCTotal}. В списке сейчас: {oneCResults.length}.
-                Свободные сверху; уже связанные можно перепривязать.
+                {t("manager.products.oneCExportListHint", {
+                  total: oneCTotal,
+                  shown: oneCResults.length,
+                })}
               </p>
 
               <div className="one-c-products-list one-c-picker-list">
@@ -1082,17 +1092,18 @@ export function ProductEditor({
                       <div>
                         <strong>{item.name}</strong>
                         <span>
-                          Артикул 1С: {item.code || "—"}
+                          {t("manager.products.oneCArticleCode", { code: item.code || "—" })}
                         </span>
                         {Number(item.score) > 0 && (
                           <span className="muted small">
-                            Совпадение: {Math.round(Number(item.score) * 100)}%
+                            {t("manager.matchPercent", { percent: Math.round(Number(item.score) * 100) })}
                           </span>
                         )}
                         {linkedElsewhere && (
                           <span className="warning-text">
-                            Уже связан с товаром Clover:{" "}
-                            {item.cloverLink.productName}
+                            {t("manager.products.alreadyLinkedToProduct", {
+                              name: item.cloverLink.productName,
+                            })}
                           </span>
                         )}
                       </div>
@@ -1106,24 +1117,24 @@ export function ProductEditor({
                         onClick={() => void selectOneCProduct(item)}
                       >
                         {selected || linkedToCurrent
-                          ? "Выбрано"
+                          ? t("manager.selected")
                           : linkedElsewhere
-                            ? "Перепривязать"
-                            : "Выбрать"}
+                            ? t("manager.relink")
+                            : t("shared.action.choose")}
                       </button>
                     </article>
                   );
                 })}
                 {!oneCLoading && !oneCResults.length && (
                   <div className="empty-box">
-                    <p>В текущей выгрузке 1С подходящих позиций нет.</p>
+                    <p>{t("manager.noMatchingItemsInTheCurrent")}</p>
                     <button
                       className="primary-button"
                       type="button"
                       onClick={requestOneCSearch}
-                    >
-                      Сохранить запрос для следующей выгрузки из 1С
-                    </button>
+                    >{
+                      t("manager.saveTheRequestForTheNext")
+                    }</button>
                   </div>
                 )}
               </div>
@@ -1146,9 +1157,9 @@ export function ProductEditor({
                   {UNIT_CONFIG[unit].label}
                 </label>
                 {unit === "piece" ? (
-                  <label className="field">
-                    Кратность, шт.
-                    <input
+                  <label className="field">{
+                    t("manager.multiplePcs")
+                    }<input
                       type="number"
                       min="1"
                       step="1"
@@ -1180,9 +1191,9 @@ export function ProductEditor({
                     />
                   </label>
                 ) : unitConvertsOneToOneToPieces(unit) ? null : (
-                  <label className="field">
-                    Внутри, шт.
-                    <input
+                  <label className="field">{
+                    t("manager.insidePcs")
+                    }<input
                       type="number"
                       min="1"
                       value={form[sizeField]}
@@ -1213,9 +1224,9 @@ export function ProductEditor({
                     />
                   </label>
                 )}
-                <label className="field">
-                  Цена за единицу продажи
-                  <input
+                <label className="field">{
+                  t("manager.pricePerSaleUnit")
+                  }<input
                     type="number"
                     min="0"
                     step="0.01"
@@ -1250,21 +1261,21 @@ export function ProductEditor({
         </div>
         </div>
         <div className="form-actions">
-          <button className="secondary-button" type="button" onClick={onClose}>
-            Отмена
-          </button>
+          <button className="secondary-button" type="button" onClick={onClose}>{
+            t("shared.modal.cancel")
+          }</button>
           {!isNew && typeof onDelete === "function" ? (
             <button
               className="danger-button"
               type="button"
               onClick={() => onDelete(product)}
-            >
-              Удалить из каталога
-            </button>
+            >{
+              t("manager.deleteFromCatalog")
+            }</button>
           ) : null}
-          <button className="primary-button" type="submit">
-            Сохранить товар
-          </button>
+          <button className="primary-button" type="submit">{
+            t("manager.saveProduct")
+          }</button>
         </div>
       </form>
     </div>

@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Панель персональной матрицы товаров клиента.
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -27,6 +28,7 @@ export function ClientMatrixPanel({
   setFavorites,
   onCreateOrder,
 }) {
+  const { t } = useLocalization();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Все");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -113,9 +115,9 @@ export function ClientMatrixPanel({
               className={favoritesOnly ? "category-button active" : "category-button"}
               type="button"
               onClick={() => setFavoritesOnly((value) => !value)}
-            >
-              ★ Избранное
-            </button>
+            >{
+              t("client.favorites")
+            }</button>
           )}
         </div>
         <div className="category-list">
@@ -126,7 +128,7 @@ export function ClientMatrixPanel({
               key={item}
               onClick={() => setCategory(item)}
             >
-              {item}
+              {item === "Все" ? t("shared.filter.all") : item}
             </button>
           ))}
         </div>
@@ -138,25 +140,25 @@ export function ClientMatrixPanel({
     <section className="panel client-matrix-panel" ref={panelRef}>
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Персональный каталог</p>
-          <h2>Матрица товаров</h2>
-          <p>Товары, закреплённые за вами менеджером. Категории — как при оформлении заказа.</p>
+          <p className="eyebrow">{t("client.personalCatalog")}</p>
+          <h2>{t("client.productMatrix")}</h2>
+          <p>{t("client.productsAssignedToYouByThe")}</p>
         </div>
-        <button className="primary-button" type="button" onClick={onCreateOrder}>
-          + Новый заказ
-        </button>
+        <button className="primary-button" type="button" onClick={onCreateOrder}>{
+          t("client.action.newOrder")
+        }</button>
       </div>
 
       {catalogPolicy?.matrixMode === "pending" ? (
         <div className="matrix-catalog-note pending">
-          <strong>Матрица ещё готовится</strong>
-          <br />
-          Менеджер закрепит постоянные товары и цены. Пока список может быть пустым.
-        </div>
+          <strong>{t("client.theMatrixIsStillBeingPrepared")}</strong>
+          <br />{
+          t("client.theManagerWillPinRegularProducts")
+        }</div>
       ) : (
         <p className="client-matrix-meta">
-          В матрице: <strong>{activeProducts.length}</strong> поз.
-          {activeCategory !== "Все" ? ` · категория «${activeCategory}»: ${filtered.length}` : ""}
+          {t("client.matrix.activePositions", { count: activeProducts.length })}
+          {activeCategory !== "Все" ? t("client.matrix.categoryCount", { name: activeCategory, count: filtered.length }) : ""}
         </p>
       )}
 
@@ -185,9 +187,9 @@ export function ClientMatrixPanel({
                     target="_blank"
                     rel="noreferrer"
                     download={product.certificateName || undefined}
-                  >
-                    Сертификат
-                  </a>
+                  >{
+                    t("shared.media.certificate")
+                  }</a>
                 ) : (
                   <span className="product-card-top-spacer" aria-hidden="true" />
                 )}
@@ -211,18 +213,18 @@ export function ClientMatrixPanel({
                 {product.imageUrl ? (
                   <img className="product-image" src={productImageSrc(product)} alt={product.name} loading="lazy" />
                 ) : (
-                  <span className="product-image-placeholder">Нет фото</span>
+                  <span className="product-image-placeholder">{t("shared.media.noPhoto")}</span>
                 )}
               </div>
               <h2>{product.name}</h2>
-              <p className="product-code">Арт. {productArticle(product) || "—"}</p>
+              <p className="product-code">{t("shared.article.prefix", { article: productArticle(product) || "—" })}</p>
               <p className="product-price">
                 {settings?.showPrices && price > 0 ? (
                   <>
                     {formatMoney(price)} <small>/ {unitMeta.shortLabel || unit}</small>
                   </>
                 ) : (
-                  "Цена уточняется"
+                  t("shared.price.pending")
                 )}
               </p>
               <div className="product-card-controls">
@@ -243,8 +245,11 @@ export function ClientMatrixPanel({
                 </div>
                 <p className="unit-hint">
                   {multiplier > 1
-                    ? `1 ${unitMeta.label.toLowerCase()} = ${multiplier} шт.`
-                    : "Количество считается поштучно"}
+                    ? t("client.matrix.unitEqualsPieces", {
+                        unit: unitMeta.label.toLowerCase(),
+                        multiplier,
+                      })
+                    : t("client.quantityIsCountedInPieces")}
                 </p>
               </div>
             </article>
@@ -253,10 +258,10 @@ export function ClientMatrixPanel({
         {!filtered.length && (
           <div className="empty-box">
             {catalogPolicy?.matrixMode === "pending"
-              ? "Менеджер ещё не закрепил товары в вашей матрице. Когда матрица будет готова, позиции появятся здесь."
+              ? t("client.aManagerHasNotYetPinned")
               : activeProducts.length
-                ? "В этой категории товаров нет."
-                : "В вашей матрице пока нет товаров. Попросите менеджера добавить позиции."}
+                ? t("client.thereAreNoProductsInThis")
+                : t("client.yourMatrixHasNoProductsYet")}
           </div>
         )}
       </section>

@@ -1595,6 +1595,19 @@ body:has(.clover-app) {
   color: var(--clover-l3-active-text) !important;
 }
 
+.manager-languages-target {
+  width: 100%;
+  min-width: 12rem;
+  min-height: 3.2rem;
+  resize: vertical;
+}
+
+.manager-languages-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .category-button.active {
   background: var(--clover-l2-active-bg) !important;
   border-color: var(--clover-l2-active-border) !important;

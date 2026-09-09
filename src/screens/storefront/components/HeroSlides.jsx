@@ -1,3 +1,4 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { useEffect, useState } from "react";
 import {
   STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
@@ -37,6 +38,7 @@ function heroRouteFromHref(href) {
 }
 
 export function HeroSlides({ slides, intervalSec }) {
+  const { t } = useLocalization();
   const list =
     Array.isArray(slides) && slides.length
       ? slides
@@ -52,7 +54,7 @@ export function HeroSlides({ slides, intervalSec }) {
   const linkLabel =
     current?.buttonLabel ||
     current?.alt ||
-    "Инструкция по установке приложения";
+    t("storefront.appInstallGuide");
 
   useEffect(() => {
     setIndex((currentIndex) => (currentIndex < list.length ? currentIndex : 0));
@@ -86,7 +88,7 @@ export function HeroSlides({ slides, intervalSec }) {
     <div
       className={`sf-hero-visual${href ? " has-slide-link" : ""}`}
       aria-roledescription="carousel"
-      aria-label="Слайды на главной"
+      aria-label={t("storefront.homeSlides")}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -123,13 +125,13 @@ export function HeroSlides({ slides, intervalSec }) {
         </a>
       ) : null}
       {list.length > 1 ? (
-        <div className="sf-hero-dots" role="tablist" aria-label="Слайды">
+        <div className="sf-hero-dots" role="tablist" aria-label={t("storefront.slides")}>
           {list.map((slide, slideIndex) => (
             <button
               key={slide.src}
               type="button"
               role="tab"
-              aria-label={`Слайд ${slideIndex + 1}`}
+              aria-label={t("storefront.hero.slideAria", { index: slideIndex + 1 })}
               aria-selected={slideIndex === index}
               className={slideIndex === index ? "is-active" : ""}
               onClick={() => setIndex(slideIndex)}

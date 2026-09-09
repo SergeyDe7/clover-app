@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Панель профиля организации клиента.
 import { useEffect, useState } from "react";
 import {
@@ -9,6 +10,7 @@ import {
   isClientProfileComplete,
   syncContactRoleLabel,
 } from "../../shared/appHelpers";
+import { contactLabel, contactRoleLabel } from "../../shared/i18n/displayLabels";
 
 const MAX_PROFILE_CONTACTS = 5;
 
@@ -19,6 +21,7 @@ function ensureEditableContacts(profile) {
 }
 
 export function ProfilePanel({ profile, onChange }) {
+  const { t } = useLocalization();
   const [editing, setEditing] = useState(false);
   const [companyName, setCompanyName] = useState(profile.companyName || "");
   const [contacts, setContacts] = useState(() => ensureEditableContacts(profile));
@@ -96,13 +99,13 @@ export function ProfilePanel({ profile, onChange }) {
     <section className="panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Данные клиента</p>
-          <h2>Профиль организации</h2>
-          <p>Эти данные сохраняются в новых заказах и видны менеджеру.</p>
+          <p className="eyebrow">{t("manager.clientDetails")}</p>
+          <h2>{t("shared.organizationProfile")}</h2>
+          <p>{t("client.thisDataIsSavedInNew")}</p>
         </div>
         {!editing && (
           <button className="primary-button" type="button" onClick={() => setEditing(true)}>
-            {complete ? "Изменить" : "+ Заполнить профиль"}
+            {complete ? t("shared.action.edit") : t("client.action.fillProfile")}
           </button>
         )}
       </div>
@@ -110,17 +113,17 @@ export function ProfilePanel({ profile, onChange }) {
       {!editing && complete && (
         <div className="profile-summary profile-summary-contacts">
           <article>
-            <span>Организация</span>
+            <span>{t("shared.organization")}</span>
             <strong>{viewProfile.companyName}</strong>
           </article>
           <article>
-            <span>Почта</span>
+            <span>{t("shared.field.emailShort")}</span>
             <strong>{viewProfile.email}</strong>
           </article>
           {viewProfile.contacts.map((contact) => (
             <article key={contact.id} className={contact.isPrimary ? "is-primary" : ""}>
               <span>
-                {contact.label || (contact.isPrimary ? "Основной контакт" : "Доп. контакт")}
+                {contactLabel(contact.label, t) || (contact.isPrimary ? t("client.primaryContact") : t("client.extraContact"))}
               </span>
               <strong>{contact.name || "—"}</strong>
               <em>{contact.phone || "—"}</em>
@@ -132,36 +135,35 @@ export function ProfilePanel({ profile, onChange }) {
       {editing && (
         <form className="profile-form" onSubmit={save}>
           <div className="form-grid profile-org-email-grid">
-            <label className="field">
-              Название организации
-              <input
+            <label className="field">{
+              t("auth.register.company")
+              }<input
                 value={companyName}
                 onChange={(event) => setCompanyName(event.target.value)}
                 required
               />
             </label>
-            <label className="field">
-              Электронная почта
-              <input value={String(profile.email || "")} readOnly disabled />
+            <label className="field">{
+              t("auth.register.email")
+              }<input value={String(profile.email || "")} readOnly disabled />
             </label>
-            <p className="muted small field-hint field-hint-email">
-              Электронная почта — логин аккаунта, изменить нельзя.
-            </p>
+            <p className="muted small field-hint field-hint-email">{
+              t("shared.emailIsTheAccountLoginAnd")
+            }</p>
           </div>
 
           <div className="profile-contacts-block">
             <div className="profile-contacts-head">
               <div>
-                <strong>Контакты</strong>
+                <strong>{t("storefront.nav.contacts")}</strong>
                 <p className="muted small">
-                  Укажите ФИО, роль в компании и телефон. Основной контакт — для связи по заказам.
-                  Можно добавить до {MAX_PROFILE_CONTACTS} контактов.
+                  {t("client.profile.contactsHint", { max: MAX_PROFILE_CONTACTS })}
                 </p>
               </div>
               {contacts.length < MAX_PROFILE_CONTACTS ? (
-                <button className="secondary-button" type="button" onClick={addContact}>
-                  + Доп. контакт
-                </button>
+                <button className="secondary-button" type="button" onClick={addContact}>{
+                  t("client.extraContact2")
+                }</button>
               ) : null}
             </div>
 
@@ -182,47 +184,47 @@ export function ProfilePanel({ profile, onChange }) {
                         name="profile-primary-contact"
                         checked={Boolean(contact.isPrimary)}
                         onChange={() => setPrimaryContact(contact.id)}
-                      />
-                      Основной
-                    </label>
-                    <span className="muted small">Контакт {index + 1}</span>
+                      />{
+                      t("shared.address.primary")
+                    }</label>
+                    <span className="muted small">{t("client.profile.contactNumbered", { n: index + 1 })}</span>
                     {contacts.length > 1 ? (
                       <button
                         className="secondary-button staff-edit-danger"
                         type="button"
                         onClick={() => removeContact(contact.id)}
-                      >
-                        Удалить
-                      </button>
+                      >{
+                        t("shared.action.delete")
+                      }</button>
                     ) : null}
                   </div>
 
                   <div className="form-grid">
-                    <label className="field">
-                      ФИО контакта
-                      <input
+                    <label className="field">{
+                      t("client.contactFullName")
+                      }<input
                         value={contact.name}
-                        placeholder="Например: Иван Иванов"
+                        placeholder={t("client.forExampleIvanIvanov")}
                         onChange={(event) =>
                           updateContact(contact.id, { name: event.target.value })
                         }
                         required={contact.isPrimary}
                       />
                     </label>
-                    <label className="field">
-                      Роль в компании
-                      <input
+                    <label className="field">{
+                      t("client.roleInTheCompany")
+                      }<input
                         value={contact.label}
-                        placeholder="Например: директор, склад, закупки"
+                        placeholder={t("client.forExampleDirectorWarehousePurchasing")}
                         onChange={(event) =>
                           updateContact(contact.id, { label: event.target.value })
                         }
                         list="profile-contact-labels"
                       />
                     </label>
-                    <label className="field field-wide">
-                      Телефон
-                      <input
+                    <label className="field field-wide">{
+                      t("auth.register.phone")
+                      }<input
                         type="tel"
                         inputMode="tel"
                         autoComplete="tel"
@@ -247,12 +249,12 @@ export function ProfilePanel({ profile, onChange }) {
               ))}
             </div>
             <datalist id="profile-contact-labels">
-              <option value="Директор" />
-              <option value="Бухгалтер" />
-              <option value="Склад" />
-              <option value="Закупки" />
-              <option value="Приём товара" />
-              <option value="Менеджер" />
+              <option value="Директор" label={contactRoleLabel("Директор", t)} />
+              <option value="Бухгалтер" label={contactRoleLabel("Бухгалтер", t)} />
+              <option value="Склад" label={contactRoleLabel("Склад", t)} />
+              <option value="Закупки" label={contactRoleLabel("Закупки", t)} />
+              <option value="Приём товара" label={contactRoleLabel("Приём товара", t)} />
+              <option value="Менеджер" label={contactRoleLabel("Менеджер", t)} />
             </datalist>
           </div>
 
@@ -265,12 +267,12 @@ export function ProfilePanel({ profile, onChange }) {
                 setContacts(ensureEditableContacts(profile));
                 setEditing(false);
               }}
-            >
-              Отмена
-            </button>
-            <button className="primary-button" type="submit">
-              Сохранить профиль
-            </button>
+            >{
+              t("shared.modal.cancel")
+            }</button>
+            <button className="primary-button" type="submit">{
+              t("shared.saveProfile")
+            }</button>
           </div>
         </form>
       )}

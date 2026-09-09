@@ -1,3 +1,6 @@
+import { uiText } from "./i18n/translationRuntime.js";
+import { orderStatusLabel } from "./i18n/displayLabels.js";
+
 /** Статусы, которые обычный менеджер не удаляет (принят / в работе / выполнен). */
 export const ORDER_TRASH_BLOCKED_STATUSES = [
   "Принят",
@@ -51,12 +54,12 @@ function exchangeStatusOf(order) {
  *   (уже переданный `sent` можно убрать из Clover).
  * Админ: дополнительно может убрать «Выполнен» (документ в 1С не меняется).
  */
-export function canTrashOrder(order, role = "manager") {
+export function canTrashOrder(order, role = "manager", t) {
   if (!order?.id) {
-    return { ok: false, code: "NOT_FOUND", error: "Заказ не найден." };
+    return { ok: false, code: "NOT_FOUND", error: uiText(t, "shared.order.notFound") };
   }
   if (isOrderTrashed(order)) {
-    return { ok: false, code: "ALREADY_TRASHED", error: "Заказ уже в корзине." };
+    return { ok: false, code: "ALREADY_TRASHED", error: uiText(t, "shared.order.alreadyTrashed") };
   }
 
   const status = String(order.status || "Новый");
@@ -70,8 +73,10 @@ export function canTrashOrder(order, role = "manager") {
         ok: false,
         code: "ORDER_ACCEPTED",
         error: isAdminHardDeleteStatus(status)
-          ? "Выполненный заказ может удалить только администратор."
-          : `Заказ со статусом «${status}» удалить нельзя (принят или обработан в 1С).`,
+          ? uiText(t, "shared.order.completedAdminOnly")
+          : uiText(t, "shared.order.cannotTrashByStatus", {
+              status: orderStatusLabel(status, t),
+            }),
       };
     }
   }
@@ -82,7 +87,7 @@ export function canTrashOrder(order, role = "manager") {
     return {
       ok: false,
       code: "EXCHANGE_ACTIVE",
-      error: "Заказ уже в обмене с 1С. Удаление запрещено.",
+      error: uiText(t, "shared.order.exchangeBlocked"),
     };
   }
 
@@ -90,19 +95,19 @@ export function canTrashOrder(order, role = "manager") {
     return {
       ok: false,
       code: "CLIENT_ONLY_NEW",
-      error: "Клиент может удалить только заказ со статусом «Новый».",
+      error: uiText(t, "shared.order.clientOnlyNew"),
     };
   }
 
   return { ok: true };
 }
 
-export function canRestoreOrder(order) {
+export function canRestoreOrder(order, t) {
   if (!order?.id) {
-    return { ok: false, code: "NOT_FOUND", error: "Заказ не найден." };
+    return { ok: false, code: "NOT_FOUND", error: uiText(t, "shared.order.notFound") };
   }
   if (!isOrderTrashed(order)) {
-    return { ok: false, code: "NOT_TRASHED", error: "Заказ не в корзине." };
+    return { ok: false, code: "NOT_TRASHED", error: uiText(t, "shared.order.notInTrash") };
   }
   return { ok: true };
 }
@@ -111,9 +116,9 @@ export function canRestoreOrder(order) {
  * Удалить навсегда.
  * Обычно только из корзины; админ может сразу стереть «Выполнен» без корзины.
  */
-export function canPurgeOrder(order, role = "manager") {
+export function canPurgeOrder(order, role = "manager", t) {
   if (!order?.id) {
-    return { ok: false, code: "NOT_FOUND", error: "Заказ не найден." };
+    return { ok: false, code: "NOT_FOUND", error: uiText(t, "shared.order.notFound") };
   }
   const trashed = isOrderTrashed(order);
   const adminHardDelete =
@@ -122,14 +127,14 @@ export function canPurgeOrder(order, role = "manager") {
     return {
       ok: false,
       code: "NOT_TRASHED",
-      error: "Удалить навсегда можно только заказ из корзины.",
+      error: uiText(t, "shared.order.purgeFromTrashOnly"),
     };
   }
   if (isAdminHardDeleteStatus(order.status) && role !== "admin") {
     return {
       ok: false,
       code: "ADMIN_ONLY",
-      error: "Удалить выполненный заказ навсегда может только администратор.",
+      error: uiText(t, "shared.order.purgeCompletedAdminOnly"),
     };
   }
   return { ok: true };

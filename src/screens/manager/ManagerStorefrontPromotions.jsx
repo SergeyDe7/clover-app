@@ -1,8 +1,9 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
+import { promoStatusLabel } from "../../shared/i18n/displayLabels.js";
 import {
-  PROMO_STATUS_LABEL,
   STOREFRONT_MAX_PROMOTIONS,
   promotionStatus,
 } from "../../shared/storefrontPromotions.js";
@@ -78,6 +79,7 @@ export function ManagerStorefrontPromotions({
   promotions,
   onChange,
 }) {
+  const { t } = useLocalization();
   const [promoBusy, setPromoBusy] = useState(false);
   const list = clonePromotions(promotions);
 
@@ -93,12 +95,10 @@ export function ManagerStorefrontPromotions({
 
   return (
     <div className="manager-contact-settings" style={{ marginTop: 20 }}>
-      <h3>Акции</h3>
-      <p className="storefront-settings-hint">
-        Информационный блок для витрины и страницы /aktsii. Не меняет цены,
-        корзину, заказы и доставку. Просроченные акции остаются здесь, но скрыты
-        на сайте.
-      </p>
+      <h3>{t("storefront.nav.promos")}</h3>
+      <p className="storefront-settings-hint">{
+        t("manager.infoBlockForTheStorefrontAnd")
+      }</p>
 
       <div className="storefront-promo-list">
         {list.map((promo) => {
@@ -109,40 +109,40 @@ export function ManagerStorefrontPromotions({
                 {promo.imageUrl ? (
                   <img src={promo.imageUrl} alt="" loading="lazy" />
                 ) : (
-                  <div className="storefront-promo-preview-empty">Нет фото</div>
+                  <div className="storefront-promo-preview-empty">{t("shared.media.noPhoto")}</div>
                 )}
                 <span className={`storefront-promo-status is-${status}`}>
-                  {PROMO_STATUS_LABEL[status] || status}
+                  {promoStatusLabel(status, t)}
                 </span>
               </div>
 
               <div className="storefront-promo-fields">
-                <label className="field field-wide">
-                  Заголовок
-                  <input
+                <label className="field field-wide">{
+                  t("shared.field.title")
+                  }<input
                     value={promo.title}
-                    placeholder="Название акции"
+                    placeholder={t("manager.promotionTitle")}
                     onChange={(event) =>
                       patchPromo(promo.id, { title: event.target.value })
                     }
                   />
                 </label>
-                <label className="field field-wide">
-                  Краткий текст
-                  <input
+                <label className="field field-wide">{
+                  t("manager.shortText")
+                  }<input
                     value={promo.shortText}
-                    placeholder="Короткое описание для списка и главной"
+                    placeholder={t("manager.shortDescriptionForListsAndHome")}
                     onChange={(event) =>
                       patchPromo(promo.id, { shortText: event.target.value })
                     }
                   />
                 </label>
-                <label className="field field-wide">
-                  Полное описание
-                  <textarea
+                <label className="field field-wide">{
+                  t("manager.fullDescription")
+                  }<textarea
                     rows={4}
                     value={promo.fullDescription}
-                    placeholder="Подробный текст на странице акций"
+                    placeholder={t("manager.fullTextOnThePromotionsPage")}
                     onChange={(event) =>
                       patchPromo(promo.id, {
                         fullDescription: event.target.value,
@@ -151,29 +151,29 @@ export function ManagerStorefrontPromotions({
                   />
                 </label>
                 <div className="form-grid">
-                  <label className="field">
-                    Ссылка
-                    <input
+                  <label className="field">{
+                    t("manager.link")
+                    }<input
                       value={promo.link}
-                      placeholder="/catalog или https://…"
+                      placeholder={t("manager.catalogOrHttps")}
                       onChange={(event) =>
                         patchPromo(promo.id, { link: event.target.value })
                       }
                     />
                   </label>
-                  <label className="field">
-                    Текст кнопки
-                    <input
+                  <label className="field">{
+                    t("manager.buttonText")
+                    }<input
                       value={promo.buttonText}
-                      placeholder="Подробнее"
+                      placeholder={t("storefront.more")}
                       onChange={(event) =>
                         patchPromo(promo.id, { buttonText: event.target.value })
                       }
                     />
                   </label>
-                  <label className="field">
-                    Начало
-                    <input
+                  <label className="field">{
+                    t("manager.start")
+                    }<input
                       type="datetime-local"
                       value={toDatetimeLocalValue(promo.startsAt)}
                       onChange={(event) =>
@@ -183,9 +183,9 @@ export function ManagerStorefrontPromotions({
                       }
                     />
                   </label>
-                  <label className="field">
-                    Окончание
-                    <input
+                  <label className="field">{
+                    t("manager.end")
+                    }<input
                       type="datetime-local"
                       value={toDatetimeLocalValue(promo.endsAt)}
                       onChange={(event) =>
@@ -195,9 +195,9 @@ export function ManagerStorefrontPromotions({
                       }
                     />
                   </label>
-                  <label className="field">
-                    Порядок
-                    <input
+                  <label className="field">{
+                    t("manager.order")
+                    }<input
                       type="number"
                       min={0}
                       max={9999}
@@ -221,9 +221,9 @@ export function ManagerStorefrontPromotions({
                       onChange={(event) =>
                         patchPromo(promo.id, { enabled: event.target.checked })
                       }
-                    />
-                    Включена
-                  </label>
+                    />{
+                    t("manager.enabled")
+                  }</label>
                   <label className="checkbox-field">
                     <input
                       type="checkbox"
@@ -233,15 +233,15 @@ export function ManagerStorefrontPromotions({
                           showOnHome: event.target.checked,
                         })
                       }
-                    />
-                    На главной
-                  </label>
+                    />{
+                    t("manager.onTheHomePage")
+                  }</label>
                 </div>
               </div>
 
               <div className="storefront-promo-actions">
                 <label className="secondary-button">
-                  {promoBusy ? "Загрузка…" : "Картинка"}
+                  {promoBusy ? t("shared.status.loadingEllipsis") : t("manager.image")}
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
@@ -262,7 +262,7 @@ export function ManagerStorefrontPromotions({
                         .catch((error) =>
                           appAlert({
                             title: "Не удалось загрузить картинку акции",
-                            message: error.message || "Ошибка загрузки.",
+                            message: error.message || t("manager.loadError"),
                             tone: "danger",
                           })
                         )
@@ -275,9 +275,9 @@ export function ManagerStorefrontPromotions({
                   className="secondary-button"
                   onClick={() => patchPromo(promo.id, { imageUrl: "" })}
                   disabled={!promo.imageUrl}
-                >
-                  Убрать фото
-                </button>
+                >{
+                  t("manager.removePhoto")
+                }</button>
                 <button
                   type="button"
                   className="secondary-button"
@@ -286,9 +286,9 @@ export function ManagerStorefrontPromotions({
                       items.filter((item) => item.id !== promo.id)
                     )
                   }
-                >
-                  Удалить
-                </button>
+                >{
+                  t("shared.action.delete")
+                }</button>
               </div>
             </div>
           );
@@ -306,9 +306,9 @@ export function ManagerStorefrontPromotions({
               emptyPromotion(items.length ? items[items.length - 1].sortOrder + 10 : 10),
             ])
           }
-        >
-          Создать акцию
-        </button>
+        >{
+          t("manager.createPromo")
+        }</button>
       </div>
     </div>
   );

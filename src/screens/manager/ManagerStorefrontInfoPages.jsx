@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useState } from "react";
 import {
   STOREFRONT_INFO_PAGES,
@@ -9,18 +10,18 @@ import {
 } from "../../shared/storefrontInfoPages.js";
 
 const BLOCK_TYPE_OPTIONS = [
-  { value: "lead", label: "Лид" },
-  { value: "p", label: "Абзац" },
-  { value: "h2", label: "Подзаголовок" },
-  { value: "list", label: "Список" },
-  { value: "route", label: "Ссылка на страницу" },
+  { value: "lead", labelKey: "manager.lead" },
+  { value: "p", labelKey: "manager.paragraph" },
+  { value: "h2", labelKey: "manager.subtitle" },
+  { value: "list", labelKey: "client.view.list" },
+  { value: "route", labelKey: "manager.pageLink" },
 ];
 
 const ROUTE_OPTIONS = [
-  { value: "home", label: "Главная" },
-  { value: "catalog", label: "Каталог" },
-  { value: "aktsii", label: "Акции" },
-  { value: "contacts", label: "Контакты" },
+  { value: "home", labelKey: "storefront.nav.home" },
+  { value: "catalog", labelKey: "storefront.nav.catalog" },
+  { value: "aktsii", labelKey: "storefront.nav.promos" },
+  { value: "contacts", labelKey: "storefront.nav.contacts" },
   ...STOREFRONT_INFO_PAGES.map((page) => ({
     value: `info:${page.slug}`,
     label: page.heading,
@@ -55,7 +56,8 @@ function emptyBlock(type) {
 }
 
 export function ManagerStorefrontInfoPages({ pages, onChange }) {
-  const [selectedSlug, setSelectedSlug] = useState(STOREFRONT_INFO_PAGES[0].slug);
+  const { t } = useLocalization();
+    const [selectedSlug, setSelectedSlug] = useState(STOREFRONT_INFO_PAGES[0].slug);
   const selected = STOREFRONT_INFO_PAGES.find((page) => page.slug === selectedSlug)
     || STOREFRONT_INFO_PAGES[0];
   const view = readEditorStorefrontInfoPage(selected.slug, pages);
@@ -91,14 +93,13 @@ export function ManagerStorefrontInfoPages({ pages, onChange }) {
 
   return (
     <div className="manager-contact-settings" style={{ marginTop: 20 }}>
-      <h3>Информационные страницы</h3>
-      <p className="storefront-settings-hint">
-        Редактирование текстов и SEO данных страниц «О нас», «Доставка»,
-        «Оплата» и других информационных разделов сайта.
-      </p>
+      <h3>{t("manager.infoPages")}</h3>
+      <p className="storefront-settings-hint">{
+        t("manager.editingTextsAndSeoForAbout")
+      }</p>
 
       <div className="storefront-info-layout">
-        <div className="storefront-info-nav" role="tablist" aria-label="Информационные страницы">
+        <div className="storefront-info-nav" role="tablist" aria-label={t("manager.infoPages")}>
           {STOREFRONT_INFO_PAGES.map((page) => (
             <button
               key={page.slug}
@@ -118,26 +119,25 @@ export function ManagerStorefrontInfoPages({ pages, onChange }) {
         </div>
 
         <div className="storefront-info-editor">
-          <p className="storefront-info-url">
-            Публичный адрес: <code>{publicUrl}</code>
+          <p className="storefront-info-url">{
+            t("manager.publicUrl") }<code>{publicUrl}</code>
           </p>
 
           {legal ? (
-            <p className="storefront-info-legal-warning">
-              Изменение этого текста сразу отобразится на публичном сайте.
-              Проверьте юридическую формулировку перед сохранением.
-            </p>
+            <p className="storefront-info-legal-warning">{
+              t("manager.changingThisTextAppearsOnThe")
+            }</p>
           ) : null}
 
           {legal && view.updatedAt ? (
             <p className="storefront-settings-hint">
-              Последнее сохранение: {new Date(view.updatedAt).toLocaleString("ru-RU")}
+              {t("manager.storefront.lastSave", { datetime: new Date(view.updatedAt).toLocaleString("ru-RU") })}
             </p>
           ) : null}
 
-          <label className="field field-wide">
-            Заголовок страницы (H1)
-            <input
+          <label className="field field-wide">{
+            t("manager.pageHeadingH1")
+            }<input
               value={view.heading}
               onChange={(event) => patchPage({ heading: event.target.value })}
             />
@@ -162,9 +162,9 @@ export function ManagerStorefrontInfoPages({ pages, onChange }) {
             {view.blocks.map((block, index) => (
               <div key={`block-${selected.slug}-${index}`} className="storefront-info-block">
                 <div className="storefront-info-block-toolbar">
-                  <label className="field">
-                    Тип блока
-                    <select
+                  <label className="field">{
+                    t("manager.blockType")
+                    }<select
                       value={block.type}
                       onChange={(event) =>
                         patchBlock(index, emptyBlock(event.target.value))
@@ -172,7 +172,7 @@ export function ManagerStorefrontInfoPages({ pages, onChange }) {
                     >
                       {BLOCK_TYPE_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>
-                          {option.label}
+                          {t(option.labelKey)}
                         </option>
                       ))}
                     </select>
@@ -183,17 +183,17 @@ export function ManagerStorefrontInfoPages({ pages, onChange }) {
                       className="secondary-button"
                       disabled={index === 0}
                       onClick={() => moveBlock(index, -1)}
-                    >
-                      Вверх
-                    </button>
+                    >{
+                      t("manager.up")
+                    }</button>
                     <button
                       type="button"
                       className="secondary-button"
                       disabled={index === view.blocks.length - 1}
                       onClick={() => moveBlock(index, 1)}
-                    >
-                      Вниз
-                    </button>
+                    >{
+                      t("manager.down")
+                    }</button>
                     <button
                       type="button"
                       className="secondary-button"
@@ -202,16 +202,16 @@ export function ManagerStorefrontInfoPages({ pages, onChange }) {
                           blocks: view.blocks.filter((_, idx) => idx !== index),
                         })
                       }
-                    >
-                      Удалить
-                    </button>
+                    >{
+                      t("shared.action.delete")
+                    }</button>
                   </div>
                 </div>
 
                 {block.type === "list" ? (
-                  <label className="field field-wide">
-                    Пункты списка (каждый с новой строки)
-                    <textarea
+                  <label className="field field-wide">{
+                    t("manager.listItemsOnePerLine")
+                    }<textarea
                       rows={6}
                       value={(block.items || []).join("\n")}
                       onChange={(event) =>
@@ -223,18 +223,18 @@ export function ManagerStorefrontInfoPages({ pages, onChange }) {
                   </label>
                 ) : block.type === "route" ? (
                   <div className="form-grid">
-                    <label className="field">
-                      Текст ссылки
-                      <input
+                    <label className="field">{
+                      t("manager.linkText")
+                      }<input
                         value={block.label || ""}
                         onChange={(event) =>
                           patchBlock(index, { label: event.target.value })
                         }
                       />
                     </label>
-                    <label className="field">
-                      Страница
-                      <select
+                    <label className="field">{
+                      t("manager.page")
+                      }<select
                         value={routeSelectValue(block.route)}
                         onChange={(event) =>
                           patchBlock(index, {
@@ -244,16 +244,16 @@ export function ManagerStorefrontInfoPages({ pages, onChange }) {
                       >
                         {ROUTE_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
-                            {option.label}
+                            {option.labelKey ? t(option.labelKey) : option.label}
                           </option>
                         ))}
                       </select>
                     </label>
                   </div>
                 ) : (
-                  <label className="field field-wide">
-                    Текст
-                    <textarea
+                  <label className="field field-wide">{
+                    t("manager.field.bodyText")
+                    }<textarea
                       rows={block.type === "h2" ? 2 : 4}
                       value={block.text || ""}
                       onChange={(event) =>
@@ -273,12 +273,12 @@ export function ManagerStorefrontInfoPages({ pages, onChange }) {
               onClick={() =>
                 patchPage({ blocks: [...view.blocks, emptyBlock("p")] })
               }
-            >
-              Добавить абзац
-            </button>
-            <button type="button" className="secondary-button" onClick={resetSelected}>
-              Вернуть текст по умолчанию
-            </button>
+            >{
+              t("manager.addParagraph")
+            }</button>
+            <button type="button" className="secondary-button" onClick={resetSelected}>{
+              t("manager.restoreDefaultText")
+            }</button>
           </div>
         </div>
       </div>

@@ -1,35 +1,32 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../serverApi";
-import { appAlert } from "../../shared/AppModal";
-const TRANSLATION_WORKSPACE_VIEWS = [
-  ["interface", "Интерфейс"],
-  ["categories", "Категории и подкатегории"],
-  ["seo", "SEO / FAQ / страницы"],
-  ["glossary", "Словарь номенклатуры"],
-  ["untranslated", "Непереведённое"],
-];
-
-const LANGUAGE_LABELS = {
-  ru: "Русский",
-  en: "Английский",
-  uz: "Узбекский",
-  ky: "Киргизский",
-  tg: "Таджикский",
-  zh: "Китайский (упрощённый)",
-  ar: "Арабский",
-};
+import { appAlert, appConfirm } from "../../shared/AppModal";
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import {
+  TRANSLATION_WORKSPACE_VIEWS,
+} from "../../shared/i18n/localizationSettings.js";
+import {
+  clearTranslationDraft,
+  markDraftClean,
+  mergeWorkspaceDrafts,
+  readDraftValue,
+  setDraftValue,
+  shouldApplyWorkspaceResponse,
+} from "../../shared/i18n/translationDrafts.js";
 
 const TARGET_LOCALES = ["en", "uz", "ky", "tg", "zh", "ar"];
 
-function stateLabel(state) {
-  if (state === "MANUAL") return "MANUAL";
-  if (state === "AUTO") return "AUTO";
-  if (state === "STALE") return "устарело";
-  if (state === "FALLBACK_RU") return "FALLBACK_RU";
-  return "MISSING";
+function formatStamp(value) {
+  if (!value) return "—";
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return String(value);
+  }
 }
 
 export function ManagerLanguages() {
+  const { t } = useLocalization();
   const [settings, setSettings] = useState(null);
   const [completeness, setCompleteness] = useState({});
   const [locales, setLocales] = useState([]);
@@ -40,30 +37,76 @@ export function ManagerLanguages() {
   const [untranslatedOnly, setUntranslatedOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [drafts, setDrafts] = useState({});
+  const requestGenerationRef = useRef(0);
+  const languageRef = useRef("en");
 
   const safeLanguage = TARGET_LOCALES.includes(language) ? language : "en";
+  languageRef.current = safeLanguage;
+
+  const languageLabels = {
+    ru: t("admin.languages.label.ru"),
+    en: t("admin.languages.label.en"),
+    uz: t("admin.languages.label.uz"),
+    ky: t("admin.languages.label.ky"),
+    tg: t("admin.languages.label.tg"),
+    zh: t("admin.languages.label.zh"),
+    ar: t("admin.languages.label.ar"),
+  };
+
+  const viewTitles = {
+    interface: t("admin.languages.view.interface"),
+    categories: t("admin.languages.view.categories"),
+    seo: t("admin.languages.view.seo"),
+    glossary: t("admin.languages.view.glossary"),
+    untranslated: t("admin.languages.view.untranslated"),
+  };
 
   const load = useCallback(async () => {
+    const requestGeneration = ++requestGenerationRef.current;
+    const requestLanguage = safeLanguage;
     try {
       const payload = await api.getLocalizationSettings();
-      setSettings(payload.settings || null);
-      setCompleteness(payload.completeness || {});
-      setLocales(Array.isArray(payload.locales) ? payload.locales : []);
       const workspace = await api.getLocalizationTranslations({
         view,
         query,
-        language: safeLanguage,
+        language: requestLanguage,
         untranslatedOnly,
       });
-      setRows(Array.isArray(workspace.rows) ? workspace.rows : []);
+      if (
+        !shouldApplyWorkspaceResponse({
+          requestGeneration,
+          currentGeneration: requestGenerationRef.current,
+          requestLanguage,
+          currentLanguage: languageRef.current,
+        })
+      ) {
+        return;
+      }
+      setSettings(payload.settings || null);
+      setCompleteness(payload.completeness || {});
+      setLocales(Array.isArray(payload.locales) ? payload.locales : []);
+      const nextRows = Array.isArray(workspace.rows) ? workspace.rows : [];
+      setRows(nextRows);
+      setDrafts((current) => mergeWorkspaceDrafts(current, nextRows, requestLanguage));
       setMessage("");
     } catch (error) {
+      if (
+        !shouldApplyWorkspaceResponse({
+          requestGeneration,
+          currentGeneration: requestGenerationRef.current,
+          requestLanguage,
+          currentLanguage: languageRef.current,
+        })
+      ) {
+        return;
+      }
       setSettings({ enabledLanguages: ["ru"], catalogVersion: 0 });
       setCompleteness({});
       setRows([]);
-      setMessage(error.message || "Не удалось загрузить переводы.");
+      setMessage(error.message || t("admin.languages.loadFailed"));
     }
-  }, [view, query, safeLanguage, untranslatedOnly]);
+  }, [view, query, untranslatedOnly, safeLanguage, t]);
 
   useEffect(() => {
     load();
@@ -85,17 +128,53 @@ export function ManagerLanguages() {
       setCompleteness(result.completeness || completeness);
       if (Array.isArray(result.rejected) && result.rejected.includes(code)) {
         await appAlert({
-          title: "Язык нельзя включить",
-          message: "Критичные переводы для этого языка ещё не готовы.",
+          title: t("admin.languages.enableBlockedTitle"),
+          message: t("admin.languages.enableBlocked"),
           tone: "warn",
         });
       }
     } catch (error) {
       await appAlert({
-        title: "Не удалось сохранить языки",
+        title: t("admin.languages.saveFailed"),
         message: error.message,
         tone: "danger",
       });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveRow = async (row) => {
+    const targetLanguage = languageRef.current;
+    const savedValue = readDraftValue(drafts, row.id, targetLanguage, "");
+    setBusy(true);
+    try {
+      await api.saveLocalizationTranslation(row.id, targetLanguage, savedValue);
+      setDrafts((current) => markDraftClean(current, row.id, targetLanguage, savedValue));
+      setMessage(t("admin.languages.saved"));
+      await load();
+    } catch (error) {
+      setMessage(error.message || t("admin.languages.saveFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resetRow = async (row) => {
+    const targetLanguage = languageRef.current;
+    const confirmed = await appConfirm({
+      title: t("admin.languages.resetAuto"),
+      message: t("admin.languages.resetConfirm"),
+    });
+    if (!confirmed) return;
+    setBusy(true);
+    try {
+      await api.resetLocalizationTranslation(row.id, targetLanguage);
+      setMessage(t("admin.languages.resetDone"));
+      setDrafts((current) => clearTranslationDraft(current, row.id, targetLanguage));
+      await load();
+    } catch (error) {
+      setMessage(error.message || t("admin.languages.saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -114,8 +193,8 @@ export function ManagerLanguages() {
   return (
     <section className="manager-languages" aria-labelledby="manager-languages-title">
       <header>
-        <h2 id="manager-languages-title">Языки и переводы</h2>
-        <p>Публично можно включить только готовый язык. Русский всегда включён.</p>
+        <h2 id="manager-languages-title">{t("manager.nav.languages")}</h2>
+        <p>{t("admin.languages.lead")}</p>
       </header>
 
       <div className="form-grid" style={{ marginBottom: 18 }}>
@@ -127,20 +206,20 @@ export function ManagerLanguages() {
           return (
             <article className="setting-card" key={code}>
               <div>
-                <h3>{LANGUAGE_LABELS[code] || code}</h3>
+                <h3>{languageLabels[code] || code}</h3>
                 <p>
                   {locked
-                    ? "Источник и запасной язык. Отключить нельзя."
+                    ? t("admin.languages.sourceLocked")
                     : report.complete
-                      ? "Критичные переводы готовы."
-                      : "Не готов: не хватает критичных переводов."}
+                      ? t("admin.languages.ready")
+                      : t("admin.languages.notReady")}
                 </p>
               </div>
               <button
                 className={on ? "toggle active" : "toggle"}
                 type="button"
                 disabled={busy || locked}
-                aria-label={LANGUAGE_LABELS[code] || code}
+                aria-label={languageLabels[code] || code}
                 aria-disabled={locked ? "true" : undefined}
                 onClick={() => toggleLanguage(code, !on)}
               >
@@ -151,35 +230,35 @@ export function ManagerLanguages() {
         })}
       </div>
 
-      <nav className="manager-more-nav" aria-label="Разделы переводов">
-        {TRANSLATION_WORKSPACE_VIEWS.map(([id, title]) => (
+      <nav className="manager-more-nav" aria-label={t("admin.languages.views")}>
+        {TRANSLATION_WORKSPACE_VIEWS.map(([id]) => (
           <button
             key={id}
             className={view === id ? "category-button active" : "category-button"}
             type="button"
             onClick={() => setView(id)}
           >
-            {title}
+            {viewTitles[id] || id}
           </button>
         ))}
       </nav>
 
       <div className="form-grid" style={{ marginBottom: 16 }}>
         <label className="field">
-          Поиск
+          {t("storefront.search.placeholder")}
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onBlur={load}
-            placeholder="Русский текст или ключ"
+            placeholder={t("admin.languages.searchPlaceholder")}
           />
         </label>
         <label className="field">
-          Язык
+          {t("admin.languages.language")}
           <select value={safeLanguage} onChange={(event) => setLanguage(event.target.value)}>
             {TARGET_LOCALES.map((code) => (
               <option key={code} value={code}>
-                {LANGUAGE_LABELS[code]}
+                {languageLabels[code]}
               </option>
             ))}
           </select>
@@ -190,34 +269,68 @@ export function ManagerLanguages() {
             checked={untranslatedOnly}
             onChange={(event) => setUntranslatedOnly(event.target.checked)}
           />
-          только непереведённые
+          {t("admin.languages.untranslatedOnly")}
         </label>
       </div>
 
       {message ? <p>{message}</p> : null}
 
       {rows.length === 0 ? (
-        <p>Переводов пока нет. Русский интерфейс продолжает работать.</p>
+        <p>{t("admin.languages.empty")}</p>
       ) : (
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table manager-languages-table">
             <thead>
               <tr>
-                <th>Русский</th>
-                <th>{LANGUAGE_LABELS[safeLanguage]}</th>
-                <th>Статус</th>
-                <th>Редактор</th>
+                <th>{t("admin.languages.label.ru")}</th>
+                <th>{languageLabels[safeLanguage]}</th>
+                <th>{t("admin.languages.status")}</th>
+                <th>{t("admin.languages.editor")}</th>
+                <th>{t("admin.languages.updatedAt")}</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => {
                 const cell = row.languages?.[safeLanguage] || {};
+                const stateKey =
+                  cell.stale
+                    ? "admin.languages.state.stale"
+                    : cell.state === "AUTO"
+                      ? "admin.languages.state.auto"
+                      : cell.state === "MANUAL"
+                        ? "admin.languages.state.manual"
+                        : "admin.languages.state.missing";
                 return (
-                  <tr key={row.id || row.fieldKey}>
+                  <tr key={`${row.id || row.fieldKey}:${safeLanguage}`}>
                     <td>{row.sourceRu || "—"}</td>
-                    <td>{cell.value || "—"}</td>
-                    <td>{stateLabel(cell.state)}</td>
+                    <td>
+                      <textarea
+                        className="manager-languages-target"
+                        rows={2}
+                        value={readDraftValue(drafts, row.id, safeLanguage, cell.value || "")}
+                        onChange={(event) =>
+                          setDrafts((current) =>
+                            setDraftValue(current, row.id, safeLanguage, event.target.value, true)
+                          )
+                        }
+                      />
+                    </td>
+                    <td>
+                      {t(stateKey)}
+                    </td>
                     <td>{cell.updatedBy || "—"}</td>
+                    <td>{formatStamp(cell.updatedAt)}</td>
+                    <td>
+                      <div className="manager-languages-actions">
+                        <button type="button" className="primary-button" disabled={busy} onClick={() => saveRow(row)}>
+                          {t("admin.languages.save")}
+                        </button>
+                        <button type="button" className="secondary-button" disabled={busy} onClick={() => resetRow(row)}>
+                          {t("admin.languages.resetAuto")}
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}

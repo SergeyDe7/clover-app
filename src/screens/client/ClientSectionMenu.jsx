@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 
 /**
  * Телефон: одна кнопка разделов ЛК (Заказ / Мои заказы / …).
@@ -13,16 +14,17 @@ export function ClientSectionMenu({
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
+  const { t } = useLocalization();
   const SHORT_LABELS = {
-    matrix: "Матрица",
-    catalog: "Каталог",
-    orders: "Заказы",
-    reconciliation: "Сверка",
-    cabinet: "Настройки",
+    matrix: t("client.matrix.short"),
+    catalog: t("storefront.nav.catalog"),
+    orders: t("manager.nav.orders"),
+    reconciliation: t("client.reconciliation"),
+    cabinet: t("manager.nav.settings"),
   };
   const active = tabs.find(([id]) => id === activeId) || tabs[0];
   const activeLabel =
-    SHORT_LABELS[active?.[0]] || active?.[1] || "Меню";
+    SHORT_LABELS[active?.[0]] || active?.[1] || t("shared.nav.menu");
   const totalBadge = Number(ordersBadge) + Number(actsBadge);
 
   useEffect(() => {
@@ -92,9 +94,9 @@ export function ClientSectionMenu({
                   setOpen(false);
                 }}
               >
-                <span>{label}</span>
+                <span>{t(label)}</span>
                 {badge > 0 ? (
-                  <span className="client-nav-count" aria-label={`Уведомлений: ${badge}`}>
+                  <span className="client-nav-count" aria-label={t("client.nav.notificationsCount", { count: badge })}>
                     {badge}
                   </span>
                 ) : null}

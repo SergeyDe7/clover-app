@@ -1,3 +1,4 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { storefrontHref } from "../mode.js";
 import {
   STOREFRONT_INFO_PAGES,
@@ -5,6 +6,7 @@ import {
 } from "../../../shared/storefrontInfoPages.js";
 
 export function StoreFooter({ current, infoPages }) {
+  const { t } = useLocalization();
   function go(route) {
     window.history.pushState({}, "", storefrontHref(route));
     window.dispatchEvent(new PopStateEvent("popstate"));
@@ -27,9 +29,9 @@ export function StoreFooter({ current, infoPages }) {
   return (
     <footer className="sf-footer">
       <div className="sf-footer-primary">
-        <p className="sf-footer-copy">© КЛЕВЕР</p>
+        <p className="sf-footer-copy">{t("storefront.footer.copyright")}</p>
       </div>
-      <nav className="sf-footer-nav sf-footer-info" aria-label="Информация">
+      <nav className="sf-footer-nav sf-footer-info" aria-label={t("shared.section.info")}>
         {STOREFRONT_INFO_PAGES.map((page) => {
           const resolved = resolveStorefrontInfoPage(page.slug, infoPages);
           return link(

@@ -1,17 +1,20 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Раздел менеджера: резервные копии.
 import { useEffect, useState } from "react";
 import { api } from "../../serverApi";
 import { formatDateTime } from "../../shared/appHelpers";
+import { backupReasonLabel } from "../../shared/i18n/displayLabels";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 
-function formatFileSize(value) {
+function formatFileSize(value, t) {
   const bytes = Number(value) || 0;
-  if (bytes < 1024) return `${bytes} Б`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
+  if (bytes < 1024) return t("shared.fileSize.bytes", { bytes });
+  if (bytes < 1024 * 1024) return t("shared.fileSize.kilobytes", { value: Math.round(bytes / 1024) });
+  return t("shared.fileSize.megabytes", { value: (bytes / 1024 / 1024).toFixed(1) });
 }
 
 export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onReload }) {
+  const { t } = useLocalization();
   const [backups, setBackups] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -39,12 +42,12 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
       });
       await loadBackups();
       await appAlert({
-        title: "Копия создана",
-        message: "Резервная копия создана на сервере.",
+        title: t("manager.copyCreated"),
+        message: t("manager.backupCreatedOnTheServer"),
         tone: "success",
       });
     } catch (createError) {
-      await appAlert({ title: "Ошибка", message: createError.message, tone: "danger" });
+      await appAlert({ title: t("shared.status.error"), message: createError.message, tone: "danger" });
     } finally {
       setBusy(false);
     }
@@ -52,11 +55,11 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
 
   const cleanupBackups = async () => {
     const ok = await appConfirm({
-      title: "Очистить старые копии?",
+      title: t("manager.clearOldCopies"),
       message:
-        "Удалить автоматические копии старше 30 дней и оставить не больше 50 копий? Ручные свежие копии сохранятся.",
-      confirmLabel: "Очистить",
-      cancelLabel: "Отмена",
+        t("manager.deleteAutomaticCopiesOlderThan30"),
+      confirmLabel: t("shared.action.clear"),
+      cancelLabel: t("shared.modal.cancel"),
       tone: "warn",
     });
     if (!ok) {
@@ -71,14 +74,14 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
       });
       await loadBackups();
       await appAlert({
-        title: "Очистка завершена",
+        title: t("manager.cleanupFinished"),
         message: result.removed?.length
-          ? `Удалено старых копий: ${result.removed.length}.`
-          : "Старых копий для удаления нет.",
+          ? t("manager.backup.removedOld", { count: result.removed.length })
+          : t("manager.thereAreNoOldCopiesTo"),
         tone: "success",
       });
     } catch (cleanupError) {
-      await appAlert({ title: "Ошибка очистки", message: cleanupError.message, tone: "danger" });
+      await appAlert({ title: t("manager.cleanupError"), message: cleanupError.message, tone: "danger" });
     } finally {
       setBusy(false);
     }
@@ -95,7 +98,7 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
       link.click();
       URL.revokeObjectURL(url);
     } catch (downloadError) {
-      await appAlert({ title: "Ошибка скачивания", message: downloadError.message, tone: "danger" });
+      await appAlert({ title: t("manager.downloadError"), message: downloadError.message, tone: "danger" });
     } finally {
       setBusy(false);
     }
@@ -103,10 +106,10 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
 
   const restoreBackup = async (item) => {
     const ok = await appConfirm({
-      title: "Восстановить данные?",
-      message: `Восстановить данные из копии «${item.fileName}»? Перед восстановлением сервер автоматически создаст страховочную копию.`,
-      confirmLabel: "Восстановить",
-      cancelLabel: "Отмена",
+      title: t("manager.restoreTheData"),
+      message: t("manager.backup.restoreConfirmNamed", { fileName: item.fileName }),
+      confirmLabel: t("shared.action.restore"),
+      cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
     });
     if (!ok) {
@@ -119,12 +122,12 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
       await onReload();
       await loadBackups();
       await appAlert({
-        title: "Восстановлено",
-        message: "Данные восстановлены. Кабинет обновлён.",
+        title: t("manager.restored"),
+        message: t("manager.dataRestoredTheCabinetWasRefreshed"),
         tone: "success",
       });
     } catch (restoreError) {
-      await appAlert({ title: "Ошибка восстановления", message: restoreError.message, tone: "danger" });
+      await appAlert({ title: t("manager.restoreError"), message: restoreError.message, tone: "danger" });
     } finally {
       setBusy(false);
     }
@@ -147,10 +150,10 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
     reader.onload = async () => {
       try {
         onImport(JSON.parse(String(reader.result)));
-        await appAlert({ title: "Загружено", message: "JSON-копия загружена.", tone: "success" });
+        await appAlert({ title: t("manager.uploaded"), message: t("manager.jsonCopyLoaded"), tone: "success" });
       } catch {
         await appAlert({
-          title: "Ошибка файла",
+          title: t("manager.fileError"),
           message: "Не удалось прочитать файл резервной копии.",
           tone: "danger",
         });
@@ -161,23 +164,23 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
   };
 
   return <section className="panel" style={{ marginTop: 0 }}>
-    <div className="panel-heading"><div><p className="eyebrow">Защита данных</p><h2>Полные резервные копии</h2><p>Копии включают клиентов, заказы, матрицы, настройки, пароли и фотографии товаров. Они хранятся только на вашем компьютере.</p></div><div className="inline-actions"><button className="secondary-button" type="button" disabled={busy} onClick={cleanupBackups}>Очистить старые</button><button className="primary-button" type="button" disabled={busy} onClick={createBackup}>{busy ? "Подождите..." : "Создать полную копию"}</button></div></div>
+    <div className="panel-heading"><div><p className="eyebrow">{t("manager.dataProtection")}</p><h2>{t("manager.fullBackups")}</h2><p>{t("manager.copiesIncludeClientsOrdersMatricesSettings")}</p></div><div className="inline-actions"><button className="secondary-button" type="button" disabled={busy} onClick={cleanupBackups}>{t("manager.cleanUpOldOnes")}</button><button className="primary-button" type="button" disabled={busy} onClick={createBackup}>{busy ? t("manager.pleaseWait") : t("manager.createAFullCopy")}</button></div></div>
     <div className="profile-summary">
-      <article><span>Серверных копий</span><strong>{backups.length}</strong></article><article><span>Товаров</span><strong>{data.products.length}</strong></article><article><span>Заказов</span><strong>{data.orders.length}</strong></article><article><span>Связей с клиентами</span><strong>{Object.keys(data.clientLinks).length}</strong></article>
+      <article><span>{t("manager.serverCopies")}</span><strong>{backups.length}</strong></article><article><span>{t("manager.products")}</span><strong>{data.products.length}</strong></article><article><span>{t("manager.orders")}</span><strong>{data.orders.length}</strong></article><article><span>{t("manager.clientLinks")}</span><strong>{Object.keys(data.clientLinks).length}</strong></article>
     </div>
-    <div className="server-safe-note">Clover автоматически создаёт полную копию при первом запуске каждого дня, перед полным сбросом и перед восстановлением. Перед восстановлением всегда создаётся страховочная копия.</div>
+    <div className="server-safe-note">{t("manager.cloverAutomaticallyMakesAFullCopy")}</div>
     {error && <div className="auth-error" style={{ marginTop: 14 }}>{error}</div>}
     <div className="backup-list">
       {backups.map((item) => <article className="backup-row" key={item.fileName}>
-        <div><h3>{item.reason}</h3><p>{formatDateTime(item.createdAt)} · {formatFileSize(item.size)} · {item.includesPhotos ? `полная копия, фото: ${item.photoCount || 0}` : "старая JSON-копия без фото"}<br />{item.fileName}</p></div>
-        <div className="inline-actions"><button className="secondary-button" type="button" disabled={busy} onClick={() => downloadBackup(item)}>Скачать</button><button className="secondary-button" type="button" disabled={busy} onClick={() => restoreBackup(item)}>Восстановить</button></div>
+        <div><h3>{backupReasonLabel(item.reason, t)}</h3><p>{formatDateTime(item.createdAt)} · {formatFileSize(item.size, t)} · {item.includesPhotos ? t("manager.backup.fullCopyPhotos", { count: item.photoCount || 0 }) : t("manager.oldJsonCopyWithoutPhotos")}<br />{item.fileName}</p></div>
+        <div className="inline-actions"><button className="secondary-button" type="button" disabled={busy} onClick={() => downloadBackup(item)}>{t("manager.download")}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => restoreBackup(item)}>{t("shared.action.restore")}</button></div>
       </article>)}
-      {!backups.length && !error && <div className="empty-box">Копии пока не созданы.</div>}
+      {!backups.length && !error && <div className="empty-box">{t("manager.noCopiesCreatedYet")}</div>}
     </div>
     <details style={{ marginTop: 22 }}>
-      <summary style={{ cursor: "pointer", color: "#4f8d4b", fontWeight: 800 }}>Дополнительная переносимая JSON-копия</summary>
-      <p className="muted small">Эта копия не содержит аккаунты и пароли. Она нужна только для переноса каталога, заказов и настроек.</p>
-      <div className="backup-actions"><button className="secondary-button" type="button" onClick={exportData}>Скачать JSON-копию</button><label className="import-label">Загрузить JSON-копию<input type="file" accept="application/json" onChange={importFile} /></label><button className="danger-button" type="button" onClick={onClearOrders}>Удалить все заказы</button><button className="danger-button" type="button" onClick={onResetAll}>Полный сброс</button></div>
+      <summary style={{ cursor: "pointer", color: "#4f8d4b", fontWeight: 800 }}>{t("manager.extraPortableJsonCopy")}</summary>
+      <p className="muted small">{t("manager.thisCopyDoesNotIncludeAccounts")}</p>
+      <div className="backup-actions"><button className="secondary-button" type="button" onClick={exportData}>{t("manager.downloadJsonCopy")}</button><label className="import-label">{t("manager.uploadJsonCopy")}<input type="file" accept="application/json" onChange={importFile} /></label><button className="danger-button" type="button" onClick={onClearOrders}>{t("manager.deleteAllOrders")}</button><button className="danger-button" type="button" onClick={onResetAll}>{t("manager.fullReset")}</button></div>
     </details>
   </section>;
 }

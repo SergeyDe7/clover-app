@@ -1,3 +1,4 @@
+import { useLocalization } from "./i18n/LocalizationProvider";
 // Shared UX: empty states, soft banners, list skeletons.
 import cloverMark from "../assets/clover-mark.png";
 
@@ -31,6 +32,7 @@ export function SoftBanner({
   tone = "info",
   compact = false,
 }) {
+  const { t } = useLocalization();
   const safeTone = ["info", "warn", "danger", "success"].includes(tone) ? tone : "info";
   return (
     <div
@@ -51,7 +53,7 @@ export function SoftBanner({
           <button
             className="ux-banner-dismiss"
             type="button"
-            aria-label="Скрыть"
+            aria-label={t("shared.action.hide")}
             onClick={onDismiss}
           >
             ×
@@ -101,10 +103,11 @@ function SkeletonRow({ variant }) {
 }
 
 export function ListSkeleton({ rows = 4, variant = "orders" }) {
+  const { t } = useLocalization();
   const count = Math.max(1, Math.min(12, Number(rows) || 4));
   const safeVariant = ["orders", "catalog", "cards"].includes(variant) ? variant : "orders";
   return (
-    <div className={`ux-skeleton ux-skeleton-${safeVariant}`} aria-busy="true" aria-label="Загрузка">
+    <div className={`ux-skeleton ux-skeleton-${safeVariant}`} aria-busy="true" aria-label={t("shared.status.loading")}>
       {Array.from({ length: count }, (_, index) => (
         <SkeletonRow key={index} variant={safeVariant} />
       ))}

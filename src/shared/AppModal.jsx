@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import cloverLogo from "../assets/clover-logo.png";
+import { useLocalization } from "./i18n/LocalizationProvider";
 
 let pushDialog = null;
 let hostGeneration = 0;
@@ -34,20 +35,45 @@ function ensureHost() {
  * @param {{ summary?: string, lines?: string[] }} [options.expandable] — раскрываемый блок (например состав заказа)
  * @returns {Promise<boolean>}
  */
+const HOST_UNAVAILABLE_RU = Object.freeze({
+  confirmTitle: "Подтвердите действие",
+  confirm: "Подтвердить",
+  cancel: "Отмена",
+  alertTitle: "Внимание",
+  ok: "Понятно",
+  details: "Подробности",
+  orderContents: "Состав заказа",
+});
+
+function isOmitted(value) {
+  if (value == null) return true;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.toLowerCase() === "null") return true;
+  }
+  return false;
+}
+
+function nonEmptyText(value, fallback) {
+  const text = value == null ? "" : String(value);
+  return text.trim() ? text : fallback;
+}
+
 export async function appConfirm({
-  title = "Подтвердите действие",
+  title,
   message = "",
-  confirmLabel = "Подтвердить",
-  cancelLabel = "Отмена",
+  confirmLabel,
+  cancelLabel,
   tone = "default",
   expandable = null,
 } = {}) {
   const host = await ensureHost();
   if (!host) {
+    const resolvedTitle = isOmitted(title) ? HOST_UNAVAILABLE_RU.confirmTitle : title;
     const expandText = expandable?.lines?.length
-      ? `\n\n${expandable.summary || "Состав"}:\n${expandable.lines.join("\n")}`
+      ? `\n\n${expandable.summary || HOST_UNAVAILABLE_RU.orderContents}:\n${expandable.lines.join("\n")}`
       : "";
-    return window.confirm([title, message].filter(Boolean).join("\n\n") + expandText);
+    return window.confirm([resolvedTitle, message].filter(Boolean).join("\n\n") + expandText);
   }
   return host({
     mode: "confirm",
@@ -66,18 +92,19 @@ export async function appConfirm({
  * @returns {Promise<void>}
  */
 export async function appAlert({
-  title = "Внимание",
+  title,
   message = "",
-  confirmLabel = "Понятно",
+  confirmLabel,
   tone = "default",
   expandable = null,
 } = {}) {
   const host = await ensureHost();
   if (!host) {
+    const resolvedTitle = isOmitted(title) ? HOST_UNAVAILABLE_RU.alertTitle : title;
     const expandText = expandable?.lines?.length
-      ? `\n\n${expandable.summary || "Подробности"}:\n${expandable.lines.join("\n")}`
+      ? `\n\n${expandable.summary || HOST_UNAVAILABLE_RU.details}:\n${expandable.lines.join("\n")}`
       : "";
-    window.alert([title, message].filter(Boolean).join("\n\n") + expandText);
+    window.alert([resolvedTitle, message].filter(Boolean).join("\n\n") + expandText);
     return;
   }
   await host({
@@ -99,6 +126,7 @@ function toneCardClass(tone) {
 }
 
 export function AppModalHost() {
+  const { t } = useLocalization();
   const [dialog, setDialog] = useState(null);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined" || !window.matchMedia) return false;
@@ -179,6 +207,34 @@ export function AppModalHost() {
   if (!dialog || typeof document === "undefined") return null;
 
   const isConfirm = dialog.mode === "confirm";
+  const resolvedTitle = nonEmptyText(
+    isOmitted(dialog.title)
+      ? isConfirm
+        ? t("shared.modal.confirmTitle")
+        : t("shared.modal.alertTitle")
+      : dialog.title,
+    isConfirm ? HOST_UNAVAILABLE_RU.confirmTitle : HOST_UNAVAILABLE_RU.alertTitle
+  );
+  const resolvedConfirmLabel = nonEmptyText(
+    isOmitted(dialog.confirmLabel)
+      ? isConfirm
+        ? t("shared.modal.confirm")
+        : t("shared.modal.ok")
+      : dialog.confirmLabel,
+    isConfirm ? HOST_UNAVAILABLE_RU.confirm : HOST_UNAVAILABLE_RU.ok
+  );
+  const resolvedCancelLabel = nonEmptyText(
+    isOmitted(dialog.cancelLabel) ? t("shared.modal.cancel") : dialog.cancelLabel,
+    HOST_UNAVAILABLE_RU.cancel
+  );
+  const resolvedExpandableSummary = nonEmptyText(
+    isOmitted(dialog.expandable?.summary)
+      ? isConfirm
+        ? t("shared.modal.orderContents")
+        : t("shared.modal.details")
+      : dialog.expandable.summary,
+    isConfirm ? HOST_UNAVAILABLE_RU.orderContents : HOST_UNAVAILABLE_RU.details
+  );
   const confirmClass =
     dialog.tone === "danger"
       ? "danger-button order-thankyou-button"
@@ -263,14 +319,14 @@ export function AppModalHost() {
           />
         </div>
         <h2 id="app-modal-title" className="order-thankyou-title">
-          {dialog.title}
+          {resolvedTitle}
         </h2>
         {dialog.message ? (
           <p className="order-thankyou-text">{dialog.message}</p>
         ) : null}
         {Array.isArray(dialog.expandable?.lines) && dialog.expandable.lines.length > 0 ? (
           <details className="app-modal-expandable">
-            <summary>{dialog.expandable.summary || "Состав заказа"}</summary>
+            <summary>{resolvedExpandableSummary}</summary>
             <ul className="app-modal-expandable-list">
               {dialog.expandable.lines.map((line, index) => (
                 <li key={`${index}-${line}`}>{line}</li>
@@ -285,7 +341,7 @@ export function AppModalHost() {
               type="button"
               onClick={() => close(false)}
             >
-              {dialog.cancelLabel || "Отмена"}
+              {resolvedCancelLabel}
             </button>
           ) : null}
           <button
@@ -294,7 +350,7 @@ export function AppModalHost() {
             autoFocus
             onClick={() => close(isConfirm ? true : undefined)}
           >
-            {dialog.confirmLabel || (isConfirm ? "Подтвердить" : "Понятно")}
+            {resolvedConfirmLabel}
           </button>
         </div>
       </div>

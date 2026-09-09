@@ -3,10 +3,19 @@ export {
   FALLBACK_LOCALE,
   LANGUAGE_REGISTRY,
   PUBLIC_LOCALE_CODES,
+  PUBLIC_TARGET_LOCALE_CODES,
+  TARGET_INTERNAL_LOCALES,
+  TRANSLATION_TARGET_INPUT_CODES,
   canonicalizeLocale,
+  canonicalizeTargetLocale,
+  exactTranslationTargetInternal,
   getEnabledLocales,
+  isExactPublicLocaleCode,
+  isExactPublicTargetLocale,
+  isExactTranslationTargetLocale,
   isLanguageEnabled,
   isSupportedPublicLocale,
+  isSupportedTargetLocale,
   toPublicLocaleCode,
 } from "./languageRegistry.js";
 
@@ -38,3 +47,6 @@ export {
   saveSettingsPreservingTranslations,
   upsertManualTranslation,
 } from "./localizationSettings.js";
+
+export { RU_DICTIONARY, UI_CATALOG, UI_CATALOG_BY_KEY, getCatalogEntry, hasCatalogKey } from "./uiCatalog.js";
+export { translationStoreToDictionaries } from "./translationStoreProjection.js";

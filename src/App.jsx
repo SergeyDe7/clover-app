@@ -1,3 +1,4 @@
+import { useLocalization } from "./shared/i18n/LocalizationProvider";
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import cloverLogo from "./assets/clover-logo.png";
@@ -32,6 +33,7 @@ import {
 import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
 import { appAlert, appConfirm } from "./shared/AppModal";
 import { canTrashOrder, isAdminHardDeleteStatus } from "./shared/orderTrash";
+import { orderStatusLabel } from "./shared/i18n/displayLabels";
 import {
   canOrderAcceptAddendum,
   mergeOrderCatalogItems,
@@ -58,6 +60,7 @@ function prefetchCabinetScreens() {
 }
 
 function LoginView({ onAuth, authBusy, authError }) {
+  const { t } = useLocalization();
   const params = new URLSearchParams(window.location.search);
   const verifyToken = params.get("verify") || "";
   const resetToken = params.get("reset") || "";
@@ -179,7 +182,7 @@ function LoginView({ onAuth, authBusy, authError }) {
     api.verifyEmail(verifyToken)
       .then((result) => {
         if (cancelled) return;
-        setMessage(result.message || "Электронная почта подтверждена.");
+        setMessage(result.message || t("auth.verify.confirmed"));
         window.history.replaceState({}, "", window.location.pathname);
         setMode("login");
       })
@@ -190,7 +193,7 @@ function LoginView({ onAuth, authBusy, authError }) {
         if (!cancelled) setVerificationBusy(false);
       });
     return () => { cancelled = true; };
-  }, [verifyToken]);
+  }, [verifyToken, t]);
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -217,7 +220,7 @@ function LoginView({ onAuth, authBusy, authError }) {
       }
       if (mode === "reset") {
         if (form.password !== form.confirmPassword) {
-          throw new Error("Пароли не совпадают.");
+          throw new Error(t("auth.reset.mismatch"));
         }
         const result = await api.resetPassword(resetToken, form.password);
         setMessage(result.message);
@@ -235,7 +238,7 @@ function LoginView({ onAuth, authBusy, authError }) {
         password: form.password,
       });
       if (mode === "register" && result) {
-        setMessage(result.message || "Регистрация создана.");
+        setMessage(result.message || t("auth.register.created"));
         setDevelopmentLink(result.developmentLink || "");
         setMode("login");
       }
@@ -259,7 +262,7 @@ function LoginView({ onAuth, authBusy, authError }) {
     setLocalError("");
     setMessage("");
     if (!("PublicKeyCredential" in window)) {
-      setLocalError("Это устройство или браузер не поддерживает вход по Face ID или ключу доступа.");
+      setLocalError(t("auth.passkeyUnsupported"));
       return;
     }
     setPasskeyBusy(true);
@@ -272,7 +275,7 @@ function LoginView({ onAuth, authBusy, authError }) {
     } catch (error) {
       const name = String(error?.name || "");
       if (name === "NotAllowedError") {
-        setLocalError("Вход по Face ID отменён.");
+        setLocalError(t("auth.passkeyCancelled"));
       } else {
         setLocalError(
           error.message
@@ -288,60 +291,60 @@ function LoginView({ onAuth, authBusy, authError }) {
     return (
       <main className="page login-page" ref={pageRef}>
         <section className="login-card">
-          <img className="logo" src={cloverLogo} alt="Логотип Clover" width="280" height="189" />
-          <h1>Подтверждаем почту</h1>
-          <p className="subtitle">Проверяем ссылку регистрации…</p>
+          <img className="logo" src={cloverLogo} alt={t("auth.login.logoAlt")} width="280" height="189" />
+          <h1>{t("auth.verify.title")}</h1>
+          <p className="subtitle">{t("auth.verify.subtitle")}</p>
         </section>
       </main>
     );
   }
 
   const title = mode === "register"
-    ? "Создание аккаунта"
+    ? t("auth.register.title")
     : mode === "forgot"
-      ? "Восстановление пароля"
+      ? t("auth.forgot.title")
       : mode === "reset"
-        ? "Новый пароль"
-        : "Личный кабинет";
+        ? t("auth.reset.title")
+        : t("auth.login.title");
 
   return (
     <>
     <style>{APP_STYLES}</style>
     <main className="page login-page" ref={pageRef}>
       <section className="login-card">
-        <img className="logo" src={cloverLogo} alt="Логотип Clover" width="280" height="189" />
+        <img className="logo" src={cloverLogo} alt={t("auth.login.logoAlt")} width="280" height="189" />
         <h1>{title}</h1>
         {mode !== "login" && (
           <p className="subtitle">
             {mode === "register"
-              ? "Регистрация доступна только клиентам. Роль определится автоматически при входе."
+              ? t("auth.register.hint")
               : mode === "forgot"
-                ? "Укажите почту — мы отправим ссылку для установки нового пароля."
-                : "Придумайте новый пароль длиной не менее 6 символов."}
+                ? t("auth.forgot.hint")
+                : t("auth.reset.hint")}
           </p>
         )}
 
         <form className="login-form" onSubmit={submit}>
           {mode === "register" && (
             <>
-              <label htmlFor="companyName">Название организации</label>
+              <label htmlFor="companyName">{t("auth.register.company")}</label>
               <input id="companyName" value={form.companyName} onChange={(event) => updateField("companyName", event.target.value)} required disabled={authBusy} />
-              <label htmlFor="contactName">Контактное лицо</label>
+              <label htmlFor="contactName">{t("auth.register.contact")}</label>
               <input id="contactName" value={form.contactName} onChange={(event) => updateField("contactName", event.target.value)} required disabled={authBusy} />
-              <label htmlFor="phone">Телефон</label>
+              <label htmlFor="phone">{t("auth.register.phone")}</label>
               <input id="phone" type="tel" inputMode="tel" autoComplete="tel" maxLength="18" value={form.phone} onChange={(event) => updateField("phone", formatRussianPhone(event.target.value))} required disabled={authBusy} />
             </>
           )}
 
           {mode !== "reset" && (
             <>
-              {mode !== "login" && <label htmlFor="email">Электронная почта</label>}
+              {mode !== "login" && <label htmlFor="email">{t("auth.register.email")}</label>}
               <input
                 id="email"
                 type="email"
                 autoComplete={mode === "login" ? "username webauthn" : "email"}
-                placeholder={mode === "login" ? "Логин" : undefined}
-                aria-label={mode === "login" ? "Логин" : undefined}
+                placeholder={mode === "login" ? t("auth.login.email") : undefined}
+                aria-label={mode === "login" ? t("auth.login.email") : undefined}
                 value={form.email}
                 onChange={(event) => updateField("email", event.target.value)}
                 required
@@ -353,15 +356,15 @@ function LoginView({ onAuth, authBusy, authError }) {
           {!["forgot"].includes(mode) && (
             <>
               {mode !== "login" && (
-                <label htmlFor="password">{mode === "reset" ? "Новый пароль" : "Пароль"}</label>
+                <label htmlFor="password">{mode === "reset" ? t("auth.reset.title") : t("auth.login.password")}</label>
               )}
               <div className="password-field">
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  placeholder={mode === "login" ? "Пароль" : undefined}
-                  aria-label={mode === "login" ? "Пароль" : undefined}
+                  placeholder={mode === "login" ? t("auth.login.password") : undefined}
+                  aria-label={mode === "login" ? t("auth.login.password") : undefined}
                   minLength={mode === "login" ? 1 : 6}
                   value={form.password}
                   onChange={(event) => updateField("password", event.target.value)}
@@ -373,7 +376,7 @@ function LoginView({ onAuth, authBusy, authError }) {
                   type="button"
                   disabled={authBusy}
                   aria-pressed={showPassword}
-                  aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+                  aria-label={showPassword ? t("auth.login.hidePassword") : t("auth.login.showPassword")}
                   onClick={() => setShowPassword((value) => !value)}
                 >
                   {passwordToggleIcon}
@@ -384,7 +387,7 @@ function LoginView({ onAuth, authBusy, authError }) {
 
           {mode === "reset" && (
             <>
-              <label htmlFor="confirmPassword">Повторите новый пароль</label>
+              <label htmlFor="confirmPassword">{t("auth.reset.confirm")}</label>
               <div className="password-field">
                 <input
                   id="confirmPassword"
@@ -401,7 +404,7 @@ function LoginView({ onAuth, authBusy, authError }) {
                   type="button"
                   disabled={authBusy}
                   aria-pressed={showPassword}
-                  aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+                  aria-label={showPassword ? t("auth.login.hidePassword") : t("auth.login.showPassword")}
                   onClick={() => setShowPassword((value) => !value)}
                 >
                   {passwordToggleIcon}
@@ -411,40 +414,40 @@ function LoginView({ onAuth, authBusy, authError }) {
           )}
 
           <button type="submit" disabled={authBusy}>
-            {authBusy ? "Подождите…" : mode === "register" ? "Зарегистрироваться" : mode === "forgot" ? "Отправить ссылку" : mode === "reset" ? "Сохранить пароль" : "Войти"}
+            {authBusy ? t("auth.login.wait") : mode === "register" ? t("auth.register.submit") : mode === "forgot" ? t("auth.forgot.submit") : mode === "reset" ? t("auth.reset.submit") : t("auth.login.submit")}
           </button>
         </form>
 
         {mode === "login" && (
           <button className="passkey-login-button" type="button" disabled={authBusy || passkeyBusy} onClick={loginWithPasskey}>
-            {passkeyBusy ? "Подтверждаем…" : "Войти по Face ID / отпечатку"}
+            {passkeyBusy ? t("auth.login.passkeyBusy") : t("auth.login.passkey")}
           </button>
         )}
 
         {(localError || authError) && <div className="auth-error">{localError || authError}</div>}
         {message && <div className="auth-success">{message}</div>}
         {mode === "login" && message && (
-          <button type="button" disabled={authBusy || !form.email} onClick={() => void resend()}>
-            Отправить письмо подтверждения ещё раз
-          </button>
+          <button type="button" disabled={authBusy || !form.email} onClick={() => void resend()}>{
+            t("auth.verify.resend")
+          }</button>
         )}
         {developmentLink && (
-          <div className="test-note">
-            Тестовая ссылка для локальной настройки: <a href={developmentLink}>открыть</a>
+          <div className="test-note">{
+            t("auth.devLink") }<a href={developmentLink}>{t("auth.devOpen")}</a>
           </div>
         )}
 
         <div className="registration auth-links">
           {mode === "login" && (
             <div className="login-manager-cta">
-              <p className="login-manager-cta-text">
-                Доступ в личный кабинет Вы можете получить у менеджера
-              </p>
+              <p className="login-manager-cta-text">{
+                t("auth.accessHint")
+              }</p>
               <ManagerContact settings={managerContact} variant="inline" />
             </div>
           )}
           {mode !== "login" && mode !== "reset" && (
-            <button type="button" onClick={() => switchMode("login")}>Вернуться ко входу</button>
+            <button type="button" onClick={() => switchMode("login")}>{t("auth.backToLogin")}</button>
           )}
         </div>
       </section>
@@ -578,9 +581,10 @@ function mergeOrdersFromServer(previous, incoming, { clientMode = false } = {}) 
 }
 
 function App() {
+  const { t } = useLocalization();
   useEffect(() => {
-    document.title = "Личный кабинет | КЛЕВЕР";
-  }, []);
+    document.title = t("auth.documentTitle");
+  }, [t]);
   const [role, setRole] = useState("client");
   const [authUser, setAuthUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getApiToken()));
@@ -976,7 +980,7 @@ function App() {
         setSyncError("");
       } catch (error) {
         setSyncError(
-          `${error.message}. Данные останутся на экране, но сервер пока их не сохранил.`
+          t("auth.sync.keptOnScreen", { message: error.message })
         );
       }
     }, delay);
@@ -1273,8 +1277,8 @@ function App() {
   const validateNewOrder = () => {
     if (settings.requireProfile && !profileComplete) {
       void appAlert({
-        title: "Профиль не заполнен",
-        message: "Сначала заполните профиль организации.",
+        title: t("client.profile.incompleteTitle"),
+        message: t("client.profile.incomplete"),
         tone: "warn",
       });
       return false;
@@ -1282,8 +1286,8 @@ function App() {
 
     if (settings.requireAddress && !addresses.length) {
       void appAlert({
-        title: "Нет адреса",
-        message: "Сначала добавьте адрес доставки.",
+        title: t("client.address.missingTitle"),
+        message: t("client.address.missing"),
         tone: "warn",
       });
       return false;
@@ -1339,8 +1343,8 @@ function App() {
   const openEdit = (order) => {
     if (order.status !== "Новый") {
       void appAlert({
-        title: "Редактирование недоступно",
-        message: "Редактировать можно только новый заказ.",
+        title: t("client.order.editBlockedTitle"),
+        message: t("client.order.editBlocked"),
         tone: "warn",
       });
       return;
@@ -1374,7 +1378,7 @@ function App() {
     } catch (error) {
       await appAlert({
         title: "Не удалось добавить",
-        message: error.message || "Товар не добавлен в матрицу.",
+        message: error.message || t("auth.productWasNotAddedToThe"),
         tone: "danger",
       });
       throw error;
@@ -1384,8 +1388,8 @@ function App() {
   const saveOrder = (payload) => {
     if (!hydrated || !authUser) {
       void appAlert({
-        title: "Данные не загружены",
-        message: "Данные с сервера ещё не загружены. Обновите страницу и повторите заказ.",
+        title: t("auth.dataNotLoaded"),
+        message: t("auth.serverDataHasNotLoadedYet"),
         tone: "warn",
       });
       return Promise.reject(new Error("not_hydrated"));
@@ -1400,9 +1404,9 @@ function App() {
       const target = orders.find((order) => String(order.id) === addendumToOrderId);
       if (!target || !canOrderAcceptAddendum(target, settings)) {
         void appAlert({
-          title: "Дозаказ недоступен",
+          title: t("auth.addendumUnavailable"),
           message:
-            "Добавить позиции можно только в последний заказ со статусом «Новый», пока менеджер его не принял.",
+            t("auth.itemsCanBeAddedOnlyTo"),
           tone: "warn",
         });
         return Promise.reject(new Error("addendum_unavailable"));
@@ -1541,9 +1545,9 @@ function App() {
             // оставляем откат к previousOrders
           }
         }
-        const message = `${error.message} Заказ не сохранён на сервере — менеджер его не увидит.`;
+        const message = t("auth.order.notSavedOnServer", { message: error.message });
         setSyncError(message);
-        void appAlert({ title: "Заказ не сохранён", message, tone: "danger" });
+        void appAlert({ title: t("auth.orderNotSaved"), message, tone: "danger" });
         throw error;
       });
   };
@@ -1551,15 +1555,15 @@ function App() {
   const deleteClientOrder = async (order) => {
     if (!settings.allowClientDelete) {
       await appAlert({
-        title: "Удаление недоступно",
-        message: "Удаление заказов сейчас отключено.",
+        title: t("auth.deletionUnavailable"),
+        message: t("auth.orderDeletionIsCurrentlyDisabled"),
         tone: "warn",
       });
       return;
     }
-    const gate = canTrashOrder(order, "client");
+    const gate = canTrashOrder(order, "client", t);
     if (!gate.ok) {
-      await appAlert({ title: "Нельзя удалить", message: gate.error, tone: "warn" });
+      await appAlert({ title: t("auth.cannotDelete"), message: gate.error, tone: "warn" });
       return;
     }
 
@@ -1579,9 +1583,9 @@ function App() {
         setSyncError("");
       } catch (error) {
         pendingDeletedOrderIdsRef.current.delete(orderId);
-        const message = `${error.message}. Заказ не удалён на сервере.`;
+        const message = t("auth.order.notDeletedOnServer", { message: error.message });
         setSyncError(message);
-        void appAlert({ title: "Удаление не выполнено", message, tone: "danger" });
+        void appAlert({ title: t("auth.deletionWasNotCompleted"), message, tone: "danger" });
         try {
           const data = await api.bootstrap();
           skipNextOrdersSyncRef.current = true;
@@ -1632,7 +1636,7 @@ function App() {
             );
           }
           setSyncError(error.message);
-          void appAlert({ title: "Ошибка обновления", message: error.message, tone: "danger" });
+          void appAlert({ title: t("auth.updateError"), message: error.message, tone: "danger" });
         }
       })();
       return;
@@ -1693,8 +1697,10 @@ function App() {
           if (!blocked.length && !failed.length) {
             if (!updatedCount && unchanged.length) {
               void appAlert({
-                title: "Без изменений",
-                message: `Все выбранные заказы уже в статусе «${patch.status}».`,
+                title: t("manager.noChanges"),
+                message: t("manager.orders.alreadyAllStatus", {
+                  status: orderStatusLabel(patch.status, t),
+                }),
               });
             }
             return;
@@ -1704,22 +1710,20 @@ function App() {
             ...failed.map((item) => `${item.orderId}: ${item.error || item.code}`),
           ];
           void appAlert({
-            title: "Статус обновлён частично",
-            message: [
-              `Обновлено: ${updatedCount}.`,
-              unchanged.length ? `Уже в этом статусе: ${unchanged.length}.` : "",
-              `Нельзя сменить: ${details.length}.`,
-            ]
-              .filter(Boolean)
-              .join(" "),
+            title: t("auth.statusUpdatedPartially"),
+            message: t("manager.orders.bulkPartialResult", {
+              updated: updatedCount,
+              unchanged: unchanged.length,
+              blocked: details.length,
+            }),
             tone: "warn",
             expandable: details.length
-              ? { summary: `Подробности (${details.length})`, lines: details }
+              ? { summary: t("manager.orders.detailsCount", { count: details.length }), lines: details }
               : null,
           });
         } catch (error) {
           setSyncError(error.message);
-          void appAlert({ title: "Ошибка обновления", message: error.message, tone: "danger" });
+          void appAlert({ title: t("auth.updateError"), message: error.message, tone: "danger" });
         }
       })();
       return;
@@ -1759,26 +1763,26 @@ function App() {
 
     if (!settings.managerCanDeleteOrders && !hardDeleteCompleted) {
       await appAlert({
-        title: "Корзина отключена",
-        message: "Удаление заказов менеджером сейчас отключено в настройках.",
+        title: t("auth.trashIsDisabled"),
+        message: t("auth.managerOrderDeletionIsCurrentlyDisabled"),
         tone: "warn",
       });
       return;
     }
 
-    const gate = canTrashOrder(order, staffRole);
+    const gate = canTrashOrder(order, staffRole, t);
     if (!gate.ok) {
-      await appAlert({ title: "Нельзя удалить", message: gate.error, tone: "warn" });
+      await appAlert({ title: t("auth.cannotDelete"), message: gate.error, tone: "warn" });
       return;
     }
 
     if (hardDeleteCompleted) {
       const ok = await appConfirm({
-        title: `Удалить заказ № ${order.number} навсегда?`,
+        title: t("auth.order.deleteForeverTitle", { number: order.number }),
         message:
-          "Заказ исчезнет из Clover у клиента и в кабинете. Документ в 1С не меняется и не удаляется. Восстановить будет нельзя без резервной копии.",
-        confirmLabel: "Удалить навсегда",
-        cancelLabel: "Отмена",
+          t("auth.theOrderWillDisappearFromClover"),
+        confirmLabel: t("shared.action.deleteForever"),
+        cancelLabel: t("shared.modal.cancel"),
         tone: "danger",
       });
       if (!ok) return;
@@ -1809,11 +1813,11 @@ function App() {
         setSyncError("");
       } catch (error) {
         const message = hardDeleteCompleted
-          ? `${error.message}. Заказ не удалён.`
-          : `${error.message}. Заказ не перемещён в корзину.`;
+          ? t("auth.order.notDeleted", { message: error.message })
+          : t("auth.order.notMovedToTrash", { message: error.message });
         setSyncError(message);
         void appAlert({
-          title: hardDeleteCompleted ? "Удаление" : "Корзина",
+          title: hardDeleteCompleted ? t("auth.deletion") : t("storefront.nav.cart"),
           message,
           tone: "danger",
         });
@@ -1828,10 +1832,10 @@ function App() {
 
   const restoreManagerOrder = async (order) => {
     const ok = await appConfirm({
-      title: `Восстановить заказ № ${order.number}?`,
-      message: "Заказ снова появится в списке активных и станет виден клиенту.",
-      confirmLabel: "Восстановить",
-      cancelLabel: "Отмена",
+      title: t("auth.order.restoreTitle", { number: order.number }),
+      message: t("auth.theOrderWillReturnToThe"),
+      confirmLabel: t("shared.action.restore"),
+      cancelLabel: t("shared.modal.cancel"),
     });
     if (!ok) return;
     try {
@@ -1849,19 +1853,19 @@ function App() {
     const staffRole = authUser?.role === "admin" ? "admin" : "manager";
     if (isAdminHardDeleteStatus(order?.status) && staffRole !== "admin") {
       await appAlert({
-        title: "Недостаточно прав",
-        message: "Удалить выполненный заказ навсегда может только администратор.",
+        title: t("auth.notEnoughPermissions"),
+        message: t("auth.onlyAnAdministratorCanPermanentlyDelete"),
         tone: "warn",
       });
       return;
     }
     const ok = await appConfirm({
-      title: `Удалить заказ № ${order.number} навсегда?`,
+      title: t("auth.order.deleteForeverTitle", { number: order.number }),
       message: isAdminHardDeleteStatus(order?.status)
-        ? "Восстановить будет нельзя без резервной копии. Документ в 1С не меняется."
-        : "Восстановить будет нельзя без резервной копии. Это действие необратимо.",
-      confirmLabel: "Удалить навсегда",
-      cancelLabel: "Отмена",
+        ? t("auth.thisCannotBeRestoredWithoutA")
+        : t("auth.thisCannotBeRestoredWithoutA2"),
+      confirmLabel: t("shared.action.deleteForever"),
+      cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
     });
     if (!ok) return;
@@ -1878,10 +1882,10 @@ function App() {
 
   const createProductFromCustom = async (order, customItem) => {
     const ok = await appConfirm({
-      title: "Создать товар в каталоге?",
-      message: `Товар «${customItem.name}» будет добавлен в каталог Clover.`,
-      confirmLabel: "Создать",
-      cancelLabel: "Отмена",
+      title: t("auth.createTheProductInTheCatalog"),
+      message: t("auth.product.addToCatalogNamed", { name: customItem.name }),
+      confirmLabel: t("shared.action.create"),
+      cancelLabel: t("shared.modal.cancel"),
     });
     if (!ok) return;
 
@@ -1972,10 +1976,10 @@ function App() {
 
   const clearOrders = async () => {
     const ok = await appConfirm({
-      title: "Удалить все заказы?",
-      message: "Все заказы будут удалены. Это действие нельзя отменить из этого окна.",
-      confirmLabel: "Удалить",
-      cancelLabel: "Отмена",
+      title: t("auth.deleteAllOrders"),
+      message: t("auth.allOrdersWillBeDeletedYou"),
+      confirmLabel: t("shared.action.delete"),
+      cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
     });
     if (ok) {
@@ -1985,10 +1989,10 @@ function App() {
 
   const resetAll = async () => {
     const ok = await appConfirm({
-      title: "Сбросить серверные данные?",
-      message: "Сбросить серверные данные Clover? Аккаунт менеджера сохранится.",
-      confirmLabel: "Сбросить",
-      cancelLabel: "Отмена",
+      title: t("auth.resetServerData"),
+      message: t("auth.resetCloverServerDataTheManager"),
+      confirmLabel: t("shared.action.reset"),
+      cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
     });
     if (!ok) {
@@ -1999,12 +2003,12 @@ function App() {
       await api.resetAll();
       await loadBootstrap();
       await appAlert({
-        title: "Готово",
-        message: "Серверные данные сброшены.",
+        title: t("shared.status.done"),
+        message: t("auth.serverDataWasReset"),
         tone: "success",
       });
     } catch (error) {
-      await appAlert({ title: "Ошибка сброса", message: error.message, tone: "danger" });
+      await appAlert({ title: t("auth.resetError"), message: error.message, tone: "danger" });
     }
   };
 
@@ -2012,7 +2016,7 @@ function App() {
     return (
       <>
         <style>{APP_STYLES}</style>
-        <main className="loading-page loading-page-quiet clover-app" aria-busy="true" aria-label="Загрузка">
+        <main className="loading-page loading-page-quiet clover-app" aria-busy="true" aria-label={t("shared.status.loading")}>
           <div className="loading-quiet-bar" aria-hidden="true" />
           {getApiToken() ? <ListSkeleton rows={5} variant="orders" /> : null}
         </main>
@@ -2118,8 +2122,8 @@ function App() {
   const systemBanner = isOffline && !offlineBannerHidden
     ? {
         tone: "warn",
-        title: "Нет связи",
-        message: "Можно смотреть уже загруженные данные.",
+        title: t("auth.noLink"),
+        message: t("auth.youCanViewDataThatIs"),
         actionLabel: null,
         onAction: null,
         onDismiss: () => setOfflineBannerHidden(true),
@@ -2127,18 +2131,18 @@ function App() {
     : !isOffline && syncError
       ? {
           tone: "danger",
-          title: "Проблема связи",
+          title: t("auth.connectionIssue"),
           message: syncError,
-          actionLabel: "Повторить",
+          actionLabel: t("shared.action.retry"),
           onAction: () => loadBootstrap(),
           onDismiss: () => setSyncError(""),
         }
       : !isOffline && updateAvailable
         ? {
             tone: "info",
-            title: "Доступна новая версия",
-            message: "Обновите страницу, чтобы получить изменения.",
-            actionLabel: "Обновить",
+            title: t("auth.aNewVersionIsAvailable"),
+            message: t("auth.reloadThePageToGetThe"),
+            actionLabel: t("shared.action.refresh"),
             onAction: () => window.location.reload(),
             onDismiss: null,
           }

@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../serverApi";
 import { EMPTY_LINK } from "../../shared/appHelpers";
@@ -34,6 +35,7 @@ export function MatrixOneCProductAdd({
   onExcelImportStateChange,
   onPanelChange,
 }) {
+  const { t } = useLocalization();
   // closed | choose | manual | excel
   const [step, setStep] = useState("closed");
   const [search, setSearch] = useState("");
@@ -141,7 +143,7 @@ export function MatrixOneCProductAdd({
       (item) => !isOneCItemInClientMatrix(item, membership)
     );
     if (!list.length) {
-      setError("Выбранные позиции уже есть в матрице — дубликаты не добавляются.");
+      setError(t("manager.selectedItemsAreAlreadyInThe"));
       return;
     }
 
@@ -203,14 +205,17 @@ export function MatrixOneCProductAdd({
       if (addedNames.length) {
         setNotice(
           addedNames.length === 1
-            ? `Добавлено в матрицу: «${addedNames[0]}».`
-            : `Добавлено в матрицу: ${addedNames.length} поз. (${addedNames.slice(0, 3).join(", ")}${addedNames.length > 3 ? "…" : ""}).`
+            ? t("manager.matrix.addedNamed", { name: addedNames[0] })
+            : t("manager.matrix.addedCountPreview", {
+                count: addedNames.length,
+                preview: `${addedNames.slice(0, 3).join(", ")}${addedNames.length > 3 ? "…" : ""}`,
+              })
         );
       } else {
-        setNotice("Новых позиций нет — всё уже было в матрице.");
+        setNotice(t("manager.noNewItemsEverythingWasAlready"));
       }
       if (skippedDuplicates) {
-        setError(`Пропущено дубликатов (уже в матрице): ${skippedDuplicates}.`);
+        setError(t("manager.matrix.skippedDuplicates", { count: skippedDuplicates }));
       }
       // Обновим выдачу с учётом новой матрицы.
       await runSearch(search);
@@ -234,9 +239,9 @@ export function MatrixOneCProductAdd({
         type="button"
         onClick={openChooser}
         disabled={loading || step !== "closed"}
-      >
-        Добавить из 1С
-      </button>
+      >{
+        t("manager.addFrom1c")
+      }</button>
       {notice && step === "closed" && (
         <div className="matrix-save-message saved">
           {notice}
@@ -246,9 +251,9 @@ export function MatrixOneCProductAdd({
       {step === "choose" && (
         <div className="one-c-picker matrix-add-panel">
           <div className="matrix-add-actions">
-            <button className="primary-button" type="button" onClick={openManual}>
-              Вручную
-            </button>
+            <button className="primary-button" type="button" onClick={openManual}>{
+              t("manager.manually")
+            }</button>
             <button
               className="secondary-button"
               type="button"
@@ -256,9 +261,9 @@ export function MatrixOneCProductAdd({
             >
               Excel
             </button>
-            <button className="secondary-button" type="button" onClick={closeAll}>
-              Отмена
-            </button>
+            <button className="secondary-button" type="button" onClick={closeAll}>{
+              t("shared.modal.cancel")
+            }</button>
           </div>
         </div>
       )}
@@ -283,10 +288,10 @@ export function MatrixOneCProductAdd({
           onAdded={(addedNames = []) => {
             setNotice(
               addedNames.length === 1
-                ? `Добавлено в матрицу: «${addedNames[0]}». Цены подтянутся после обмена с 1С.`
+                ? t("manager.matrix.addedNamedPricesLater", { name: addedNames[0] })
                 : addedNames.length
-                  ? `Добавлено в матрицу из Excel: ${addedNames.length} поз. Цены подтянутся после обмена с 1С («Обновить цены»).`
-                  : "Новых позиций нет — всё уже было в матрице."
+                  ? t("manager.matrix.addedFromExcelPricesLater", { count: addedNames.length })
+                  : t("manager.noNewItemsEverythingWasAlready")
             );
             onAfterAdd?.({ addedNames, source: "excel" });
           }}
@@ -299,7 +304,7 @@ export function MatrixOneCProductAdd({
             <input
               ref={searchInputRef}
               type="search"
-              placeholder="Название или код из 1С"
+              placeholder={t("manager.nameOr1cCode")}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               onKeyDown={(event) => {
@@ -315,7 +320,7 @@ export function MatrixOneCProductAdd({
               disabled={loading}
               onClick={() => void runSearch(search)}
             >
-              {loading ? "Поиск..." : "Найти"}
+              {loading ? t("manager.search.ellipsis") : t("shared.action.find")}
             </button>
             <button
               className="secondary-button"
@@ -325,15 +330,15 @@ export function MatrixOneCProductAdd({
                 setSearch("");
                 void runSearch("");
               }}
-            >
-              Весь каталог
-            </button>
-            <button className="secondary-button" type="button" onClick={() => setStep("choose")}>
-              Назад
-            </button>
-            <button className="secondary-button" type="button" onClick={closeAll}>
-              Отмена
-            </button>
+            >{
+              t("manager.entireCatalog")
+            }</button>
+            <button className="secondary-button" type="button" onClick={() => setStep("choose")}>{
+              t("storefront.back")
+            }</button>
+            <button className="secondary-button" type="button" onClick={closeAll}>{
+              t("shared.modal.cancel")
+            }</button>
           </div>
           {error && <div className="sync-error">{error}</div>}
           {notice && (
@@ -343,8 +348,11 @@ export function MatrixOneCProductAdd({
           )}
           <div className="matrix-add-actions">
             <span className="muted small">
-              1С: {catalogTotal || "—"} · найдено: {total} · к добавлению:{" "}
-              {selectedItems.length}
+              {t("manager.matrix.oneCFoundToAdd", {
+                catalog: catalogTotal || "—",
+                found: total,
+                add: selectedItems.length,
+              })}
             </span>
             <button
               className="primary-button"
@@ -352,7 +360,7 @@ export function MatrixOneCProductAdd({
               disabled={loading || selectedItems.length === 0}
               onClick={() => void addItems(selectedItems)}
             >
-              {loading ? "Добавляем..." : `Добавить (${selectedItems.length})`}
+              {loading ? t("manager.adding") : t("manager.matrix.addCount", { count: selectedItems.length })}
             </button>
           </div>
           <div className="one-c-products-list one-c-picker-list">
@@ -391,16 +399,17 @@ export function MatrixOneCProductAdd({
                     />
                     <div>
                       <strong>{item.name}</strong>
-                      <span>Код: {item.code || "—"}</span>
+                      <span>{t("manager.codeValue", { code: item.code || "—" })}</span>
                       {alreadyInMatrix ? (
-                        <span className="muted small">Уже в матрице — дубликат не добавляется</span>
+                        <span className="muted small">{t("manager.alreadyInTheMatrixDuplicateIs")}</span>
                       ) : alreadyInClover ? (
                         <span className="muted small">
-                          Уже в Clover:{" "}
-                          {item.cloverLink.productName || `ID ${item.cloverLink.productId}`}
+                          {t("manager.alreadyInCloverNamed", {
+                            name: item.cloverLink.productName || `ID ${item.cloverLink.productId}`,
+                          })}
                         </span>
                       ) : (
-                        <span className="muted small">Только в 1С — будет создан в Clover</span>
+                        <span className="muted small">{t("manager.onlyIn1cWillBeCreated")}</span>
                       )}
                     </div>
                   </label>
@@ -411,10 +420,10 @@ export function MatrixOneCProductAdd({
                     onClick={() => void addItems([item])}
                   >
                     {alreadyInMatrix
-                      ? "Уже в матрице"
+                      ? t("manager.alreadyInMatrix")
                       : alreadyInClover
-                        ? "В матрицу"
-                        : "Добавить"}
+                        ? t("client.matrix.add")
+                        : t("shared.action.add")}
                   </button>
                 </article>
               );
@@ -422,8 +431,8 @@ export function MatrixOneCProductAdd({
             {!loading && !items.length && (
               <div className="empty-box">
                 {catalogTotal === 0
-                  ? "Выгрузка 1С пуста. Сначала «Отправить товары» из VLAVKA."
-                  : "В выгрузке 1С по этому запросу ничего нет. Уточните название/код или нажмите «Весь каталог»."}
+                  ? t("manager.the1cExportIsEmptyFirst2")
+                  : t("manager.nothingInThe1cExportMatches")}
               </div>
             )}
           </div>

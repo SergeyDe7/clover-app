@@ -1,9 +1,22 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import {
   cabinetLoginUrl,
   navigateToCabinetLogin,
 } from "../../../config/urls.js";
 import { storefrontHref } from "../mode.js";
 import { navigateStorefront } from "../components/StoreHeader.jsx";
+
+function HostLinkedText({ text, host, onHostClick }) {
+  const parts = String(text).split(host);
+  if (parts.length < 2) return text;
+  return (
+    <>
+      {parts[0]}
+      <a href="/" onClick={onHostClick}>{host}</a>
+      {parts.slice(1).join(host)}
+    </>
+  );
+}
 
 function Step({ n, title, children }) {
   return (
@@ -32,119 +45,105 @@ function PlatformCard({ title, badge, children }) {
 }
 
 export function InstallAppPage() {
+  const { t } = useLocalization();
   return (
     <div className="sf-install-page">
       <header className="sf-section-head">
-        <p className="sf-install-eyebrow">Мобильное приложение Clover</p>
-        <h1>Как установить на телефон</h1>
-        <p className="sf-muted sf-install-lead">
-          Clover работает как PWA: не нужен App Store или Google Play. Добавьте сайт на
-          экран — и откройте личный кабинет одним касанием.
-        </p>
+        <p className="sf-install-eyebrow">{t("storefront.cloverMobileApp")}</p>
+        <h1>{t("storefront.howToInstallOnAPhone")}</h1>
+        <p className="sf-muted sf-install-lead">{
+          t("storefront.cloverWorksAsAPwaNo")
+        }</p>
       </header>
 
       <div className="sf-install-grid">
-        <PlatformCard title="iPhone и iPad" badge="iOS">
-          <Step n="1" title="Откройте Safari">
+        <PlatformCard title={t("storefront.iphoneAndIpad")} badge="iOS">
+          <Step n="1" title={t("storefront.openSafari")}>
             <p>
-              Перейдите на{" "}
-              <a href="/" onClick={(e) => { e.preventDefault(); navigateStorefront("home"); }}>
-                clover-spb.ru
-              </a>{" "}
-              в браузере Safari. В Chrome и других браузерах на iOS установка на экран
-              недоступна.
+              <HostLinkedText
+                text={t("storefront.install.iosOpenSafari", { host: "clover-spb.ru" })}
+                host="clover-spb.ru"
+                onHostClick={(e) => { e.preventDefault(); navigateStorefront("home"); }}
+              />
             </p>
           </Step>
-          <Step n="2" title="Нажмите «Поделиться»">
-            <p>
-              Внизу экрана нажмите кнопку с квадратом и стрелкой вверх (Поделиться).
-            </p>
+          <Step n="2" title={t("storefront.tapShare")}>
+            <p>{
+              t("storefront.atTheBottomOfTheScreen")
+            }</p>
           </Step>
-          <Step n="3" title="На экран «Домой»">
-            <p>
-              Пролистайте меню и выберите «На экран Домой» → «Добавить». Иконка Clover
-              появится на рабочем столе.
-            </p>
+          <Step n="3" title={t("storefront.addToHomeScreen")}>
+            <p>{
+              t("storefront.scrollTheMenuAndChooseAdd")
+            }</p>
           </Step>
         </PlatformCard>
 
         <PlatformCard title="Android" badge="Android">
-          <Step n="1" title="Откройте Chrome">
+          <Step n="1" title={t("storefront.openChrome")}>
             <p>
-              Зайдите на{" "}
-              <a href="/" onClick={(e) => { e.preventDefault(); navigateStorefront("home"); }}>
-                clover-spb.ru
-              </a>{" "}
-              в Google Chrome (желательно последняя версия из Play Store). Samsung Internet
-              тоже подойдёт: меню → «Добавить на главный экран».
+              <HostLinkedText
+                text={t("storefront.install.androidOpenChrome", { host: "clover-spb.ru" })}
+                host="clover-spb.ru"
+                onHostClick={(e) => { e.preventDefault(); navigateStorefront("home"); }}
+              />
             </p>
           </Step>
-          <Step n="2" title="Меню браузера">
-            <p>
-              Нажмите ⋮ в правом верхнем углу и выберите «Установить приложение»,
-              «Добавить на главный экран» или «Установить сайт как приложение».
-            </p>
+          <Step n="2" title={t("storefront.browserMenu")}>
+            <p>{
+              t("storefront.tapInTheTopRightAnd")
+            }</p>
           </Step>
-          <Step n="3" title="Подтвердите установку">
-            <p>Нажмите «Установить» или «Добавить» — ярлык Clover появится среди приложений.</p>
+          <Step n="3" title={t("storefront.confirmInstallation")}>
+            <p>{t("storefront.tapInstallOrAddTheClover")}</p>
           </Step>
-          <Step n="4" title="Если появилось «Google Play Защита»">
-            <p>
-              На Samsung и других телефонах при установке может всплыть окно «Подозрительное
-              приложение заблокировано». Это <strong>не вирус</strong> — так Android проверяет
-              сайты, установленные не из Play Store.
-            </p>
-            <p className="sf-install-step-gap">
-              Нажмите <strong>«Подробнее»</strong> → <strong>«Всё равно установить»</strong>.
-              Если видите только «OK» — обновите Chrome и повторите шаг 2.
-            </p>
+          <Step n="4" title={t("storefront.ifYouSeeGooglePlayProtect")}>
+            <p>{
+              t("storefront.onSamsungAndOtherPhonesAn") }<strong>{t("storefront.notAVirus")}</strong>{ t("storefront.howAndroidChecksSitesInstalledOutside")
+            }</p>
+            <p className="sf-install-step-gap">{
+              t("storefront.tap") }<strong>{t("storefront.moreDetails")}</strong> → <strong>{t("storefront.installAnyway")}</strong>{t("storefront.ifYouOnlySeeOkUpdate")
+            }</p>
           </Step>
         </PlatformCard>
 
-        <PlatformCard title="Компьютер" badge="Windows / macOS">
-          <Step n="1" title="Chrome или Edge">
-            <p>Откройте clover-spb.ru в Chrome, Edge или другом современном браузере.</p>
+        <PlatformCard title={t("storefront.computer")} badge="Windows / macOS">
+          <Step n="1" title={t("storefront.chromeOrEdge")}>
+            <p>{t("storefront.openCloverSpbRuInChrome")}</p>
           </Step>
-          <Step n="2" title="Значок установки">
-            <p>
-              В адресной строке справа появится значок «Установить» или «⊕». Нажмите его
-              и подтвердите установку.
-            </p>
+          <Step n="2" title={t("storefront.installIcon")}>
+            <p>{
+              t("storefront.anInstallOrIconAppearsOn")
+            }</p>
           </Step>
-          <Step n="3" title="Отдельное окно">
-            <p>
-              Clover откроется как отдельное приложение — удобно держать рядом с другими
-              окнами.
-            </p>
+          <Step n="3" title={t("storefront.separateWindow")}>
+            <p>{
+              t("storefront.cloverOpensAsASeparateApp")
+            }</p>
           </Step>
         </PlatformCard>
       </div>
 
       <aside className="sf-install-alert" role="note">
-        <h2>Безопасность установки</h2>
-        <p>
-          Clover — это ваш личный кабинет на сайте <strong>clover-spb.ru</strong>, а не
-          приложение из Google Play. Предупреждение Play Protect означает лишь то, что
-          установка идёт через браузер. Официальный адрес — только clover-spb.ru; не
-          ставьте копии с других сайтов.
-        </p>
+        <h2>{t("storefront.installSafety")}</h2>
+        <p>{
+          t("storefront.cloverIsYourPersonalCabinetOn") }<strong>clover-spb.ru</strong>{t("storefront.notAnAppFromGooglePlay")
+        }</p>
       </aside>
 
       <aside className="sf-install-note">
-        <h2>После установки</h2>
-        <p>
-          Войдите в личный кабинет — заказы, матрица товаров и статусы доставки будут под
-          рукой. Уведомления о заказах работают в установленном приложении. Первое открытие
-          может занять несколько секунд — дальше приложение загружается быстрее.
-        </p>
+        <h2>{t("storefront.afterInstallation")}</h2>
+        <p>{
+          t("storefront.signInToTheCabinetOrders")
+        }</p>
         <div className="sf-install-actions">
           <a
             className="sf-btn sf-btn-primary"
             href={cabinetLoginUrl("/")}
             onClick={navigateToCabinetLogin}
-          >
-            Войти в ЛК
-          </a>
+          >{
+            t("storefront.signInToCabinet")
+          }</a>
           <a
             className="sf-btn sf-btn-ghost"
             href={storefrontHref("home")}
@@ -152,9 +151,9 @@ export function InstallAppPage() {
               e.preventDefault();
               navigateStorefront("home");
             }}
-          >
-            На главную
-          </a>
+          >{
+            t("storefront.nav.homeLink")
+          }</a>
         </div>
       </aside>
     </div>

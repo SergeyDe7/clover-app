@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Виджет контакта менеджера в шапке кабинета клиента и на экране входа.
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -9,22 +10,23 @@ import {
 } from "../../shared/appHelpers";
 
 function ContactBody({ fullName, phoneLinks, phoneValue, hasAnyContact, maxLink, telegramLink }) {
-  return (
+  const { t } = useLocalization();
+    return (
     <>
-      <p className="eyebrow">Ваш менеджер</p>
-      <h3>{fullName || "Менеджер Clover"}</h3>
+      <p className="eyebrow">{t("client.yourManager")}</p>
+      <h3>{fullName || t("client.cloverManager")}</h3>
       {phoneLinks.phone ? (
         <a className="manager-contact-phone" href={phoneLinks.phone}>{phoneValue}</a>
       ) : (
-        <p className="manager-contact-note">Телефон пока не указан.</p>
+        <p className="manager-contact-note">{t("client.phoneIsNotSetYet")}</p>
       )}
       {hasAnyContact && (phoneLinks.phone || maxLink || telegramLink) ? (
         <div className="manager-contact-actions">
-          {phoneLinks.phone && <a className="primary" href={phoneLinks.phone}>Позвонить</a>}
+          {phoneLinks.phone && <a className="primary" href={phoneLinks.phone}>{t("storefront.call")}</a>}
           {maxLink && (
-            <a className={phoneLinks.phone ? "" : "primary"} href={maxLink} target="_blank" rel="noreferrer">
-              Открыть MAX
-            </a>
+            <a className={phoneLinks.phone ? "" : "primary"} href={maxLink} target="_blank" rel="noreferrer">{
+              t("client.openMax")
+            }</a>
           )}
           {telegramLink && (
             <a
@@ -32,13 +34,13 @@ function ContactBody({ fullName, phoneLinks, phoneValue, hasAnyContact, maxLink,
               href={telegramLink}
               target="_blank"
               rel="noreferrer"
-            >
-              Открыть Telegram
-            </a>
+            >{
+              t("client.openTelegram")
+            }</a>
           )}
         </div>
       ) : (
-        <div className="manager-contact-empty">Контакты менеджера ещё не заполнены.</div>
+        <div className="manager-contact-empty">{t("client.managerContactsAreNotFilledIn")}</div>
       )}
     </>
   );
@@ -47,6 +49,7 @@ function ContactBody({ fullName, phoneLinks, phoneValue, hasAnyContact, maxLink,
 const SHEET_MQ = "(max-width: 700px)";
 
 export function ManagerContact({ settings, variant = "popover" }) {
+  const { t } = useLocalization();
   const [open, setOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState(() =>
     typeof window !== "undefined" && window.matchMedia
@@ -124,20 +127,20 @@ export function ManagerContact({ settings, variant = "popover" }) {
             <button
               type="button"
               className="manager-contact-backdrop"
-              aria-label="Закрыть"
+              aria-label={t("shared.action.close")}
               onClick={() => setOpen(false)}
             />
             <div
               className="manager-contact-popover manager-contact-popover--portal-open"
               role="dialog"
               aria-modal="true"
-              aria-label="Связаться с менеджером"
+              aria-label={t("client.contact.manager")}
             >
               <div className="manager-contact-popover-head">
                 <button
                   type="button"
                   className="manager-contact-close"
-                  aria-label="Закрыть"
+                  aria-label={t("shared.action.close")}
                   onClick={() => setOpen(false)}
                 >
                   ×
@@ -175,8 +178,8 @@ export function ManagerContact({ settings, variant = "popover" }) {
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
         >
-          <span className="manager-contact-label-full">Связаться с менеджером</span>
-          <span className="manager-contact-label-short">Менеджер</span>
+          <span className="manager-contact-label-full">{t("client.contact.manager")}</span>
+          <span className="manager-contact-label-short">{t("shared.role.manager")}</span>
         </button>
         {/* Desktop inline: expand in place. Mobile: portaled sheet above. */}
         {!usePortalSheet && open ? (
@@ -200,21 +203,21 @@ export function ManagerContact({ settings, variant = "popover" }) {
         <button
           type="button"
           className="manager-contact-backdrop"
-          aria-label="Закрыть"
+          aria-label={t("shared.action.close")}
           onClick={() => setOpen(false)}
         />
       ) : null}
       <div
         className="manager-contact-popover"
         role="dialog"
-        aria-label="Связаться с менеджером"
+        aria-label={t("client.contact.manager")}
         aria-hidden={!open}
       >
         <div className="manager-contact-popover-head">
           <button
             type="button"
             className="manager-contact-close"
-            aria-label="Закрыть"
+            aria-label={t("shared.action.close")}
             onClick={() => setOpen(false)}
           >
             ×
@@ -251,8 +254,8 @@ export function ManagerContact({ settings, variant = "popover" }) {
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        <span className="manager-contact-label-full">Связаться с менеджером</span>
-        <span className="manager-contact-label-short">Менеджер</span>
+        <span className="manager-contact-label-full">{t("client.contact.manager")}</span>
+        <span className="manager-contact-label-short">{t("shared.role.manager")}</span>
       </button>
       {desktopPopover}
       {portalSheet}

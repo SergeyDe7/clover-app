@@ -1,3 +1,4 @@
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Форма запроса товара вне матрицы клиента + подготовка фотографии.
 import { useState } from "react";
 import { CustomRequestPhoto } from "../../shared/SharedPanels";
@@ -27,12 +28,12 @@ export function loadBrowserImage(source) {
   });
 }
 
-async function prepareCustomRequestPhoto(file) {
+async function prepareCustomRequestPhoto(file, t) {
   if (!CUSTOM_REQUEST_PHOTO_TYPES.includes(file?.type)) {
-    throw new Error("Можно прикрепить JPG, PNG или WEBP.");
+    throw new Error(t("shared.youCanAttachJpgPngOr"));
   }
   if (file.size > CUSTOM_REQUEST_PHOTO_MAX_SOURCE_BYTES) {
-    throw new Error("Фотография слишком большая. Максимальный исходный размер — 12 МБ.");
+    throw new Error(t("client.thePhotoIsTooLargeThe"));
   }
 
   const source = await readFileAsDataUrl(file);
@@ -48,17 +49,17 @@ async function prepareCustomRequestPhoto(file) {
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("Браузер не смог подготовить фотографию.");
+  if (!context) throw new Error(t("client.theBrowserCouldNotPrepareThe"));
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
   context.drawImage(image, 0, 0, width, height);
   const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
   if (dataUrl.length > 6 * 1024 * 1024) {
-    throw new Error("После обработки фотография всё ещё слишком большая. Выберите снимок меньшего размера.");
+    throw new Error(t("client.afterProcessingThePhotoIsStill"));
   }
 
   return {
-    name: file.name || "Фото товара.jpg",
+    name: file.name || t("client.productPhotoJpg"),
     type: "image/jpeg",
     size: Math.round((dataUrl.length * 3) / 4),
     width,
@@ -68,6 +69,7 @@ async function prepareCustomRequestPhoto(file) {
 }
 
 export function CustomItemForm({ onAdd }) {
+  const { t } = useLocalization();
   const initial = { name: "", quantity: "1", unit: "шт.", details: "", photo: null };
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(initial);
@@ -89,7 +91,7 @@ export function CustomItemForm({ onAdd }) {
     setPhotoBusy(true);
     setPhotoError("");
     try {
-      const photo = await prepareCustomRequestPhoto(file);
+      const photo = await prepareCustomRequestPhoto(file, t);
       setForm((current) => ({ ...current, photo }));
     } catch (error) {
       setPhotoError(error.message || "Не удалось прикрепить фотографию.");
@@ -121,39 +123,45 @@ export function CustomItemForm({ onAdd }) {
 
   return (
     <section className="custom-product-box">
-      <span className="badge green">Не нашли нужный товар?</span>
-      <h3>Добавьте запрос менеджеру</h3>
-      <p className="muted small">Укажите название, количество и важные характеристики. При необходимости приложите фотографию.</p>
+      <span className="badge green">{t("shared.canTFindTheProductYou")}</span>
+      <h3>{t("shared.sendARequestToTheManager")}</h3>
+      <p className="muted small">{t("client.enterTheNameQuantityAndKey")}</p>
       {!open ? (
-        <button className="primary-button" type="button" onClick={() => setOpen(true)}>+ Добавить отсутствующий товар</button>
+        <button className="primary-button" type="button" onClick={() => setOpen(true)}>{t("shared.addAMissingProduct")}</button>
       ) : (
         <form className="custom-product-form" onSubmit={submit}>
-          <label className="field">Название товара
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <label className="field">{t("shared.productName")
+            }<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           </label>
           <div className="custom-row">
-            <label className="field">Количество
-              <input type="number" min="1" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} required />
+            <label className="field">{t("shared.field.qty")
+              }<input type="number" min="1" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} required />
             </label>
-            <label className="field">Единица
-              <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
-                <option>шт.</option><option>уп.</option><option>пач.</option><option>кг</option><option>л</option><option>рулон</option><option>кор.</option>
+            <label className="field">{t("shared.field.unit")
+              }<select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
+                <option value="шт.">шт.</option>
+                <option value="уп.">уп.</option>
+                <option value="пач.">пач.</option>
+                <option value="кг">кг</option>
+                <option value="л">л</option>
+                <option value="рулон">рулон</option>
+                <option value="кор.">кор.</option>
               </select>
             </label>
           </div>
-          <label className="field">Марка или характеристики
-            <textarea rows="3" value={form.details} onChange={(e) => setForm({ ...form, details: e.target.value })} />
+          <label className="field">{t("shared.brandOrSpecifications")
+            }<textarea rows="3" value={form.details} onChange={(e) => setForm({ ...form, details: e.target.value })} />
           </label>
-          <label className="field request-photo-picker">Фото товара — необязательно
-            <input
+          <label className="field request-photo-picker">{t("shared.productPhotoOptional")
+            }<input
               type="file"
               accept="image/jpeg,image/png,image/webp"
               disabled={photoBusy}
               onChange={selectPhoto}
             />
-            <small>JPG, PNG или WEBP. Clover уменьшит фотографию перед сохранением.</small>
+            <small>{t("client.jpgPngOrWebpCloverWill")}</small>
           </label>
-          {photoBusy && <div className="request-photo-status">Подготавливаем фотографию…</div>}
+          {photoBusy && <div className="request-photo-status">{t("client.preparingThePhoto")}</div>}
           {photoError && <div className="request-photo-error">{photoError}</div>}
           {form.photo?.dataUrl && (
             <div className="request-photo-preview">
@@ -165,15 +173,15 @@ export function CustomItemForm({ onAdd }) {
                   className="danger-button"
                   type="button"
                   onClick={() => setForm((current) => ({ ...current, photo: null }))}
-                >
-                  Удалить фото
-                </button>
+                >{
+                  t("shared.deletePhoto")
+                }</button>
               </div>
             </div>
           )}
           <div className="form-actions">
-            <button className="secondary-button" type="button" onClick={() => { setOpen(false); resetForm(); }}>Отмена</button>
-            <button className="primary-button" type="submit" disabled={photoBusy}>Добавить в заказ</button>
+            <button className="secondary-button" type="button" onClick={() => { setOpen(false); resetForm(); }}>{t("shared.modal.cancel")}</button>
+            <button className="primary-button" type="submit" disabled={photoBusy}>{t("checkout.addToOrder")}</button>
           </div>
         </form>
       )}

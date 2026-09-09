@@ -1,3 +1,4 @@
+import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { useEffect, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
 import { GroupTile } from "../components/GroupTile.jsx";
@@ -24,6 +25,7 @@ function navigatePromoLink(link) {
 }
 
 export function HomePage() {
+  const { t } = useLocalization();
   const [error, setError] = useState("");
   const [hero, setHero] = useState({
     title: "",
@@ -76,9 +78,9 @@ export function HomePage() {
 
   return (
     <div className="sf-home">
-      <section className="sf-hero sf-hero-compact" aria-label="Компания КЛЕВЕР">
+      <section className="sf-hero sf-hero-compact" aria-label={t("storefront.cloverCompany")}>
         <div className="sf-hero-copy">
-          <p className="sf-hero-brand">КЛЕВЕР</p>
+          <p className="sf-hero-brand">{t("storefront.brand.wordmark")}</p>
           <h1>{hero.title || STOREFRONT_HERO_TITLE}</h1>
           <p className="sf-hero-lead">{hero.lead || STOREFRONT_HERO_LEAD}</p>
         </div>
@@ -90,9 +92,9 @@ export function HomePage() {
       </section>
 
       {homePromotions.length > 0 ? (
-        <section className="sf-section sf-home-promos" aria-label="Акции">
+        <section className="sf-section sf-home-promos" aria-label={t("storefront.nav.promos")}>
           <div className="sf-section-head">
-            <h2>Акции</h2>
+            <h2>{t("storefront.nav.promos")}</h2>
             <a
               className="sf-section-more"
               href={storefrontHref({ name: "aktsii" })}
@@ -101,9 +103,9 @@ export function HomePage() {
                 window.history.pushState({}, "", storefrontHref({ name: "aktsii" }));
                 window.dispatchEvent(new PopStateEvent("popstate"));
               }}
-            >
-              Все акции
-            </a>
+            >{
+              t("storefront.allPromos")
+            }</a>
           </div>
           <ul className="sf-home-promo-list">
             {homePromotions.map((promo) => (
@@ -120,7 +122,7 @@ export function HomePage() {
                       className="sf-btn sf-btn-ghost sf-btn-sm"
                       onClick={() => navigatePromoLink(promo.link)}
                     >
-                      {promo.buttonText || "Подробнее"}
+                      {promo.buttonText || t("storefront.more")}
                     </button>
                   ) : null}
                 </div>
@@ -132,7 +134,7 @@ export function HomePage() {
 
       <section className="sf-section sf-groups-section">
         <div className="sf-section-head">
-          <h2>Популярные категории</h2>
+          <h2>{t("storefront.popularCategories")}</h2>
         </div>
         {error ? <p className="sf-error">{error}</p> : null}
         <div className="sf-group-grid">
@@ -140,7 +142,7 @@ export function HomePage() {
             <GroupTile key={name} name={name} />
           ))}
           {!ready && !error ? (
-            <p className="sf-muted">Категории загружаются…</p>
+            <p className="sf-muted">{t("storefront.loadingCategories")}</p>
           ) : null}
         </div>
       </section>

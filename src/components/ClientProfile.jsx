@@ -1,3 +1,4 @@
+import { useLocalization } from "../shared/i18n/LocalizationProvider";
 import { useEffect, useState } from "react";
 import "./ClientProfile.css";
 
@@ -9,6 +10,7 @@ const EMPTY_PROFILE = {
 };
 
 function ClientProfile({ profile, onChange }) {
+  const { t } = useLocalization();
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState(profile);
 
@@ -57,11 +59,11 @@ function ClientProfile({ profile, onChange }) {
     <section className="client-profile">
       <div className="client-profile-heading">
         <div>
-          <p className="small-title">Данные клиента</p>
-          <h2>Профиль организации</h2>
-          <p>
-            Эти данные менеджер увидит вместе с заказом.
-          </p>
+          <p className="small-title">{t("manager.clientDetails")}</p>
+          <h2>{t("shared.organizationProfile")}</h2>
+          <p>{
+            t("shared.theManagerWillSeeThisInformation")
+          }</p>
         </div>
 
         {!isEditing && (
@@ -73,7 +75,7 @@ function ClientProfile({ profile, onChange }) {
               setIsEditing(true);
             }}
           >
-            {isFilled ? "Изменить" : "+ Заполнить профиль"}
+            {isFilled ? t("shared.action.edit") : t("client.action.fillProfile")}
           </button>
         )}
       </div>
@@ -81,22 +83,22 @@ function ClientProfile({ profile, onChange }) {
       {!isEditing && isFilled && (
         <div className="profile-summary">
           <article>
-            <span>Организация</span>
+            <span>{t("shared.organization")}</span>
             <strong>{profile.companyName}</strong>
           </article>
 
           <article>
-            <span>Контактное лицо</span>
+            <span>{t("auth.register.contact")}</span>
             <strong>{profile.contactName}</strong>
           </article>
 
           <article>
-            <span>Телефон</span>
+            <span>{t("auth.register.phone")}</span>
             <strong>{profile.phone}</strong>
           </article>
 
           <article>
-            <span>Электронная почта</span>
+            <span>{t("auth.register.email")}</span>
             <strong>{profile.email}</strong>
           </article>
         </div>
@@ -104,20 +106,20 @@ function ClientProfile({ profile, onChange }) {
 
       {!isEditing && !isFilled && (
         <div className="profile-empty">
-          <p>
-            Заполните профиль перед созданием первого заказа.
-          </p>
+          <p>{
+            t("shared.fillInTheProfileBeforeCreating")
+          }</p>
         </div>
       )}
 
       {isEditing && (
         <form className="client-profile-form" onSubmit={handleSubmit}>
           <div className="profile-form-grid">
-            <label>
-              Название организации
-              <input
+            <label>{
+              t("auth.register.company")
+              }<input
                 type="text"
-                placeholder="Например: ООО Ромашка"
+                placeholder={t("shared.forExampleRomashkaLlc")}
                 value={form.companyName}
                 onChange={(event) =>
                   updateField("companyName", event.target.value)
@@ -126,11 +128,11 @@ function ClientProfile({ profile, onChange }) {
               />
             </label>
 
-            <label>
-              Контактное лицо
-              <input
+            <label>{
+              t("auth.register.contact")
+              }<input
                 type="text"
-                placeholder="Имя сотрудника"
+                placeholder={t("shared.employeeName")}
                 value={form.contactName}
                 onChange={(event) =>
                   updateField("contactName", event.target.value)
@@ -139,9 +141,9 @@ function ClientProfile({ profile, onChange }) {
               />
             </label>
 
-            <label>
-              Телефон
-              <input
+            <label>{
+              t("auth.register.phone")
+              }<input
                 type="tel"
                 placeholder="+7 999 000-00-00"
                 value={form.phone}
@@ -152,19 +154,19 @@ function ClientProfile({ profile, onChange }) {
               />
             </label>
 
-            <label>
-              Электронная почта
-              <input
+            <label>{
+              t("auth.register.email")
+              }<input
                 type="email"
                 placeholder="company@mail.ru"
                 value={profile.email || ""}
                 readOnly
-                title="Логин аккаунта — изменить нельзя"
+                title={t("shared.accountLoginCannotBeChanged")}
                 aria-readonly="true"
               />
-              <span className="small-title" style={{ display: "block", marginTop: 6 }}>
-                Электронная почта — логин аккаунта, изменить нельзя.
-              </span>
+              <span className="small-title" style={{ display: "block", marginTop: 6 }}>{
+                t("shared.emailIsTheAccountLoginAnd")
+              }</span>
             </label>
           </div>
 
@@ -176,16 +178,16 @@ function ClientProfile({ profile, onChange }) {
                 setForm(profile);
                 setIsEditing(false);
               }}
-            >
-              Отмена
-            </button>
+            >{
+              t("shared.modal.cancel")
+            }</button>
 
             <button
               className="profile-save-button"
               type="submit"
-            >
-              Сохранить профиль
-            </button>
+            >{
+              t("shared.saveProfile")
+            }</button>
           </div>
         </form>
       )}

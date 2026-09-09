@@ -4,12 +4,27 @@
 // Вс: заказы принимаются до 23:59 с доставкой на понедельник.
 // Доставка «на сегодня» недоступна.
 
+import { uiText } from "./i18n/translationRuntime.js";
+
 export const DELIVERY_CUTOFF_HOUR = 18;
 
+export const DELIVERY_DATE_MESSAGE_KEYS = Object.freeze({
+  sunday: "client.delivery.closedSunday",
+  beforeCutoff: "client.delivery.nextWorkingDay",
+  afterCutoff: "client.delivery.afterCutoff",
+  invalid: "client.delivery.dateRequired",
+});
+
+export function deliveryDateMessage(code, t) {
+  const key = DELIVERY_DATE_MESSAGE_KEYS[code] || DELIVERY_DATE_MESSAGE_KEYS.invalid;
+  return uiText(t, key);
+}
+
+/** @deprecated display-only fallback; prefer deliveryDateMessage(code, t). */
 export const DELIVERY_DATE_MESSAGES = {
-  sunday: "В этот день доставка не осуществляется.",
-  beforeCutoff: "Доставку можно оформить только на следующий рабочий день.",
-  afterCutoff: "После 18:00 доставку можно оформить только на послезавтра в рабочий день.",
+  sunday: deliveryDateMessage("sunday"),
+  beforeCutoff: deliveryDateMessage("beforeCutoff"),
+  afterCutoff: deliveryDateMessage("afterCutoff"),
 };
 
 /** YYYY-MM-DD в локальной таймзоне. */
@@ -90,13 +105,13 @@ export function getEarliestDeliveryDateIso(now = new Date()) {
 /**
  * @returns {{ ok: true } | { ok: false, code: 'invalid'|'sunday'|'too_early', message: string }}
  */
-export function validateDeliveryDate(value, now = new Date()) {
+export function validateDeliveryDate(value, now = new Date(), t) {
   const date = parseLocalIsoDate(value);
   if (!date) {
-    return { ok: false, code: "invalid", message: "Укажите дату доставки." };
+    return { ok: false, code: "invalid", message: deliveryDateMessage("invalid", t) };
   }
   if (isDeliveryClosedDay(date)) {
-    return { ok: false, code: "sunday", message: DELIVERY_DATE_MESSAGES.sunday };
+    return { ok: false, code: "sunday", message: deliveryDateMessage("sunday", t) };
   }
   const earliest = getEarliestDeliveryDate(now);
   const selectedDay = startOfLocalDay(date);
@@ -105,8 +120,8 @@ export function validateDeliveryDate(value, now = new Date()) {
       ok: false,
       code: "too_early",
       message: isAfterDeliveryCutoff(now)
-        ? DELIVERY_DATE_MESSAGES.afterCutoff
-        : DELIVERY_DATE_MESSAGES.beforeCutoff,
+        ? deliveryDateMessage("afterCutoff", t)
+        : deliveryDateMessage("beforeCutoff", t),
     };
   }
   return { ok: true };
