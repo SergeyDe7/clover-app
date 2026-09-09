@@ -3,6 +3,7 @@
 
 import { assignCloverTaxonomy, canonicalizeProductCategory } from "../screens/storefront/productGroups.js";
 import { uiText } from "./i18n/translationRuntime.js";
+import { exchangeStatusLabel as exchangeStatusCodeLabel } from "./i18n/displayLabels.js";
 
 export const MANAGER_ACTIVE_TAB_KEY = "clover-manager-active-tab-v1";
 
@@ -900,8 +901,9 @@ export function exchangeContourLabel(database) {
 
 export function exchangeStatusLabel(exchange = {}, t) {
   const state = normalizeOrderExchange(exchange);
-  const base = EXCHANGE_STATUS_LABELS[state.status] || EXCHANGE_STATUS_LABELS.not_sent;
-  if (!["ready", "sending", "sent"].includes(state.status)) return base;
+  if (!["ready", "sending", "sent"].includes(state.status)) {
+    return exchangeStatusCodeLabel(state.status, t);
+  }
   const contour = exchangeContourLabel(state.database);
   if (state.status === "ready") return uiText(t, "manager.exchange.queuedContour", { contour });
   if (state.status === "sending") return uiText(t, "manager.exchange.sendingContour", { contour });

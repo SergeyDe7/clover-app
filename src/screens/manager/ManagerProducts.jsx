@@ -149,11 +149,11 @@ function OneCProductsPanel({
           className={`one-c-products-stat-clickable${visibility === "Связанные с 1С" ? " is-active" : ""}`}
           role="button"
           tabIndex={0}
-          onClick={() => selectLinkFilter(t("manager.linkedTo1c2"))}
+          onClick={() => selectLinkFilter("Связанные с 1С")}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
-              selectLinkFilter(t("manager.linkedTo1c2"));
+              selectLinkFilter("Связанные с 1С");
             }
           }}
         >
@@ -164,11 +164,11 @@ function OneCProductsPanel({
           className={`one-c-products-stat-clickable${visibility === "Без связи с 1С" ? " is-active" : ""}`}
           role="button"
           tabIndex={0}
-          onClick={() => selectLinkFilter(t("manager.notLinkedTo1c"))}
+          onClick={() => selectLinkFilter("Без связи с 1С")}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
-              selectLinkFilter(t("manager.notLinkedTo1c"));
+              selectLinkFilter("Без связи с 1С");
             }
           }}
         >
@@ -179,11 +179,11 @@ function OneCProductsPanel({
           className={`one-c-products-stat-clickable${visibility === "Есть варианты" ? " is-active" : ""}`}
           role="button"
           tabIndex={0}
-          onClick={() => selectLinkFilter(t("manager.hasVariants"))}
+          onClick={() => selectLinkFilter("Есть варианты")}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
-              selectLinkFilter(t("manager.hasVariants"));
+              selectLinkFilter("Есть варианты");
             }
           }}
         >

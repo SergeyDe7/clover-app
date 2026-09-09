@@ -3,6 +3,7 @@ import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useEffect, useState } from "react";
 import { api } from "../../serverApi";
 import { formatDateTime } from "../../shared/appHelpers";
+import { backupReasonLabel } from "../../shared/i18n/displayLabels";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 
 function formatFileSize(value, t) {
@@ -171,7 +172,7 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
     {error && <div className="auth-error" style={{ marginTop: 14 }}>{error}</div>}
     <div className="backup-list">
       {backups.map((item) => <article className="backup-row" key={item.fileName}>
-        <div><h3>{item.reason}</h3><p>{formatDateTime(item.createdAt)} · {formatFileSize(item.size, t)} · {item.includesPhotos ? t("manager.backup.fullCopyPhotos", { count: item.photoCount || 0 }) : t("manager.oldJsonCopyWithoutPhotos")}<br />{item.fileName}</p></div>
+        <div><h3>{backupReasonLabel(item.reason, t)}</h3><p>{formatDateTime(item.createdAt)} · {formatFileSize(item.size, t)} · {item.includesPhotos ? t("manager.backup.fullCopyPhotos", { count: item.photoCount || 0 }) : t("manager.oldJsonCopyWithoutPhotos")}<br />{item.fileName}</p></div>
         <div className="inline-actions"><button className="secondary-button" type="button" disabled={busy} onClick={() => downloadBackup(item)}>{t("manager.download")}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => restoreBackup(item)}>{t("shared.action.restore")}</button></div>
       </article>)}
       {!backups.length && !error && <div className="empty-box">{t("manager.noCopiesCreatedYet")}</div>}

@@ -5,9 +5,11 @@ import { api } from "../../serverApi";
 import {
   downloadBlobFile,
   formatDateTime,
-  reconciliationPeriodLabel,
-  RECONCILIATION_STATUS_LABELS,
 } from "../../shared/appHelpers";
+import {
+  reconciliationPeriodDisplayLabel,
+  reconciliationStatusLabel,
+} from "../../shared/i18n/displayLabels";
 import { appAlert } from "../../shared/AppModal";
 import { OrderThankYouOverlay } from "../../shared/SharedPanels";
 
@@ -138,9 +140,9 @@ export function ReconciliationPanel({ requests = [], onReload }) {
             <article className="reconciliation-row" key={item.id}>
               <div>
                 <span className={`badge ${item.status === "ready" ? "green" : item.status === "rejected" ? "red" : "yellow"}`}>
-                  {RECONCILIATION_STATUS_LABELS[item.status] || item.status}
+                  {reconciliationStatusLabel(item.status, t)}
                 </span>
-                <h3>{reconciliationPeriodLabel(item)}</h3>
+                <h3>{reconciliationPeriodDisplayLabel(item, t)}</h3>
                 <p>
                   {formatDateTime(item.createdAt)}
                   {item.managerComment ? ` · ${item.managerComment}` : ""}

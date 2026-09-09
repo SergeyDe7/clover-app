@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { projectRoot } from "./readFrontendUiSource.mjs";
@@ -12,13 +13,23 @@ import {
   getSeedTranslation,
   listSeedKeys,
 } from "../src/i18n/uiTranslationSeed.js";
-import { scanSource, GENERIC_KEY } from "./i18n-stage31-ast-scan.mjs";
+import { scanSource, GENERIC_KEY, AUTHORITY_CALLEE_NAMES } from "./i18n-stage31-ast-scan.mjs";
 import {
   clearTranslationDraft,
+  markDraftClean,
   mergeWorkspaceDrafts,
+  readDraftValue,
+  setDraftValue,
   shouldApplyWorkspaceResponse,
   translationDraftKey,
 } from "../../src/shared/i18n/translationDrafts.js";
+import {
+  backupReasonLabel,
+  DISPLAY_PROJECTION_MAPS,
+  orderHistoryLabel,
+  reconciliationPeriodDisplayLabel,
+  reconciliationStatusLabel,
+} from "../../src/shared/i18n/displayLabels.js";
 import { LANGUAGE_REGISTRY } from "../../src/shared/i18n/languageRegistry.js";
 import { UI_CATALOG_BY_KEY, getCatalogEntry, hasCatalogKey } from "../../src/shared/i18n/uiCatalog.js";
 
@@ -251,6 +262,12 @@ for (const item of SEED_SCRIPT_EXCEPTIONS) {
 }
 const unjustifiedScript = scriptHits.filter((item) => !scriptAllow.has(`${item.key}|${item.locale}`));
 assert.deepEqual(unjustifiedScript, [], `unjustified script mismatches: ${JSON.stringify(unjustifiedScript.slice(0, 8))}`);
+const exactFound = new Set(exactRu.map((item) => `${item.key}|${item.locale}`));
+const staleExact = SEED_EXACT_RU_ALLOWLIST.filter((item) => !exactFound.has(`${item.key}|${item.locale}`));
+assert.deepEqual(staleExact, [], `stale exact-RU allowlist rows: ${JSON.stringify(staleExact.slice(0, 8))}`);
+const scriptFound = new Set(scriptHits.map((item) => `${item.key}|${item.locale}`));
+const staleScript = SEED_SCRIPT_EXCEPTIONS.filter((item) => !scriptFound.has(`${item.key}|${item.locale}`));
+assert.deepEqual(staleScript, [], `stale script exception rows: ${JSON.stringify(staleScript.slice(0, 8))}`);
 
 const audited = listAuditedFiles();
 const usedKeys = new Set();
@@ -379,12 +396,11 @@ const safeOption = scanSource(
 );
 assert.equal(safeOption.optionWithoutValue.length, 0);
 
-const draftsEn = {};
-const draftsUz = mergeWorkspaceDrafts(draftsEn, [{ id: "e1", languages: { en: { value: "Hello" } } }], "en");
-draftsUz[translationDraftKey("e1", "en")] = "Hello dirty";
-const afterUz = mergeWorkspaceDrafts(draftsUz, [{ id: "e1", languages: { uz: { value: "Salom" } } }], "uz");
-assert.equal(afterUz[translationDraftKey("e1", "en")], "Hello dirty");
-assert.equal(afterUz[translationDraftKey("e1", "uz")], "Salom");
+const draftsEn = mergeWorkspaceDrafts({}, [{ id: "e1", languages: { en: { value: "Hello" } } }], "en");
+const draftsDirtyEn = setDraftValue(draftsEn, "e1", "en", "Hello dirty", true);
+const afterUz = mergeWorkspaceDrafts(draftsDirtyEn, [{ id: "e1", languages: { uz: { value: "Salom" } } }], "uz");
+assert.equal(readDraftValue(afterUz, "e1", "en"), "Hello dirty");
+assert.equal(readDraftValue(afterUz, "e1", "uz"), "Salom");
 assert.equal(
   shouldApplyWorkspaceResponse({
     requestGeneration: 1,
@@ -404,7 +420,7 @@ assert.equal(
   true
 );
 const cleared = clearTranslationDraft(afterUz, "e1", "uz");
-assert.equal(cleared[translationDraftKey("e1", "en")], "Hello dirty");
+assert.equal(readDraftValue(cleared, "e1", "en"), "Hello dirty");
 assert.equal(cleared[translationDraftKey("e1", "uz")], undefined);
 
 const unbounded = scanSource(`export function F({t, key}){ return t(key); }`, "unbounded.jsx");
@@ -464,6 +480,175 @@ const jsxSafe = scanSource(
 );
 assert.equal(jsxSafe.jsxTexts.filter((row) => /[А-Яа-яЁё]/.test(row.text)).length, 0);
 
+const CATALOG_KEY_RE = /(?:shared|auth|storefront|client|manager|admin)\.[a-zA-Z0-9.]+/;
+
+function catalogKeysFromGit(sha) {
+  const src = execFileSync("git", ["show", `${sha}:src/shared/i18n/uiCatalog.js`], {
+    cwd: projectRoot,
+    encoding: "utf8",
+  });
+  return new Set([...src.matchAll(/"key":\s*"([^"]+)"/g)].map((match) => match[1]));
+}
+
+function deltaSets(oldSet, newSet) {
+  const added = [...newSet].filter((key) => !oldSet.has(key)).sort();
+  const removed = [...oldSet].filter((key) => !newSet.has(key)).sort();
+  const unchanged = [...oldSet].filter((key) => newSet.has(key)).sort();
+  assert.equal(
+    oldSet.size + added.length - removed.length,
+    newSet.size,
+    `catalog arithmetic failed old=${oldSet.size} added=${added.length} removed=${removed.length} new=${newSet.size}`
+  );
+  return { added, removed, unchanged };
+}
+
+function extractTupleCatalogKeys(src, exportName) {
+  const match = src.match(new RegExp(`(?:export\\s+)?const\\s+${exportName}\\s*=\\s*\\[([\\s\\S]*?)\\n\\];`));
+  if (!match) return [];
+  return [...match[1].matchAll(/,\s*["']((?:shared|auth|storefront|client|manager|admin)\.[a-zA-Z0-9.]+)["']/g)].map(
+    (row) => row[1]
+  );
+}
+
+function extractObjectCatalogKeys(src, exportName) {
+  const match = src.match(new RegExp(`(?:export\\s+)?const\\s+${exportName}\\s*=\\s*\\{([\\s\\S]*?)\\n\\};`));
+  if (!match) return [];
+  return [...match[1].matchAll(/:\s*["']((?:shared|auth|storefront|client|manager|admin)\.[a-zA-Z0-9.]+)["']/g)].map(
+    (row) => row[1]
+  );
+}
+
+const appHelpersSrc = readRel("src/shared/appHelpers.js");
+const TUPLE_MAP_OWNERS = {
+  CLIENT_TABS: extractTupleCatalogKeys(appHelpersSrc, "CLIENT_TABS"),
+  CLIENT_CABINET_SECTIONS: extractTupleCatalogKeys(appHelpersSrc, "CLIENT_CABINET_SECTIONS"),
+  MANAGER_TABS: extractTupleCatalogKeys(appHelpersSrc, "MANAGER_TABS"),
+  MANAGER_MORE_TABS: extractTupleCatalogKeys(appHelpersSrc, "MANAGER_MORE_TABS"),
+  STAFF_FEATURE_OPTIONS: extractTupleCatalogKeys(appHelpersSrc, "STAFF_FEATURE_OPTIONS"),
+};
+for (const [name, keys] of Object.entries(TUPLE_MAP_OWNERS)) {
+  assert.ok(keys.length > 0, `missing tuple map ${name}`);
+  for (const key of keys) {
+    assert.equal(catalogKeys.has(key), true, `${name} has unknown catalog key ${key}`);
+  }
+}
+
+function proveFiniteDynamicT(rel, src, row) {
+  const text = String(row.text || "");
+  if (rel === "src/shared/i18n/translationRuntime.js") return true;
+  if (rel.endsWith("displayLabels.js") && /\bt\(\s*(key|known)\s*[,)]/.test(text)) {
+    const mapValues = Object.values(DISPLAY_PROJECTION_MAPS).flatMap((map) => Object.values(map));
+    return mapValues.every((key) => catalogKeys.has(key));
+  }
+  if (/AUDIT_ACTION_LABELS\s*\[/.test(text)) {
+    const keys = extractObjectCatalogKeys(
+      readRel("src/screens/manager/ManagerAudit.jsx"),
+      "AUDIT_ACTION_LABELS"
+    );
+    return keys.length > 0 && keys.every((key) => catalogKeys.has(key));
+  }
+  const member = text.match(/\bt\(\s*([A-Z][A-Z0-9_]*)\s*\[/);
+  if (member) {
+    const localKeys = extractObjectCatalogKeys(src, member[1]);
+    const importedKeys =
+      member[1] === "AUDIT_ACTION_LABELS"
+        ? extractObjectCatalogKeys(readRel("src/screens/manager/ManagerAudit.jsx"), "AUDIT_ACTION_LABELS")
+        : [];
+    const keys = localKeys.length ? localKeys : importedKeys;
+    if (keys.length > 0) return keys.every((key) => catalogKeys.has(key));
+  }
+  if (/\bt\(\s*label\s*\)/.test(text)) {
+    if (rel.endsWith("ClientSectionMenu.jsx")) {
+      return TUPLE_MAP_OWNERS.CLIENT_TABS.every((key) => catalogKeys.has(key));
+    }
+    return Object.keys(TUPLE_MAP_OWNERS).some((name) => src.includes(name));
+  }
+  if (/\bt\(\s*stateKey\s*\)/.test(text)) {
+    const assigned = [
+      ...src.matchAll(
+        /const stateKey\s*=[\s\S]{0,400}?["']((?:shared|auth|storefront|client|manager|admin)\.[a-zA-Z0-9.]+)["']/g
+      ),
+    ].map((m) => m[1]);
+    return assigned.length > 0 && assigned.every((key) => catalogKeys.has(key));
+  }
+  if (/\bt\(\s*(?:option|meta)\.labelKey\s*\)/.test(text) || /\bt\(\s*meta\?\.labelKey\s*\)/.test(text)) {
+    const keys = [...src.matchAll(/labelKey:\s*["']((?:shared|auth|storefront|client|manager|admin)\.[a-zA-Z0-9.]+)["']/g)].map(
+      (m) => m[1]
+    );
+    return keys.length > 0 && keys.every((key) => catalogKeys.has(key));
+  }
+  if (/\bt\(\s*SHEET_TITLE_KEYS\s*\[/.test(text)) {
+    const keys = extractObjectCatalogKeys(src, "SHEET_TITLE_KEYS");
+    return keys.length > 0 && keys.every((key) => catalogKeys.has(key));
+  }
+  return false;
+}
+
+const TEMPLATE_EXCEPTIONS = [
+  {
+    path: "src/App.jsx",
+    pattern: "Статус изменён: ${}",
+    expectedCount: 1,
+    classification: "CANONICAL_BUSINESS_VALUE",
+    reason: "persisted order-history label construction; UI display uses orderHistoryLabel",
+  },
+  {
+    path: "src/App.jsx",
+    pattern: "Статус массово изменён: ${}",
+    expectedCount: 1,
+    classification: "CANONICAL_BUSINESS_VALUE",
+    reason: "persisted bulk order-history label construction; UI display uses orderHistoryLabel",
+  },
+  {
+    path: "src/screens/client/OrderEditor.jsx",
+    pattern: "Доставка по СПб платная:",
+    expectedCount: 1,
+    classification: "CANONICAL_BUSINESS_VALUE",
+    reason: "canonical paid-delivery note written into the order payload; identity remains BASE RU",
+  },
+  {
+    path: "src/screens/manager/ManagerClients.jsx",
+    pattern: "Адрес ${}",
+    expectedCount: 2,
+    classification: "CANONICAL_BUSINESS_VALUE",
+    reason: "constructs canonical numbered address labels; visible UI uses addressLabel",
+  },
+  {
+    path: "src/shared/appHelpers.js",
+    pattern: "Не удалось сохранить ${}",
+    expectedCount: 1,
+    classification: "STAGE32_ERROR_PWA",
+    reason: "generic save-error string reserved for Stage 3.2 error pipeline",
+  },
+  {
+    path: "src/shared/productCatalogOrder.js",
+    pattern: "мл",
+    expectedCount: 1,
+    classification: "TECHNICAL_IDENTIFIER",
+    reason: "UOM millilitre detector regex, not user-visible system chrome",
+  },
+  {
+    path: "src/screens/storefront/pages/ProductPage.jsx",
+    pattern: "| КЛЕВЕР",
+    expectedCount: 1,
+    classification: "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    reason: "storefront product document.title brand suffix owned by later SEO stage",
+  },
+  {
+    path: "src/screens/storefront/pages/ProductPage.jsx",
+    pattern: "Купить «${}» в каталоге компании КЛЕВЕР.",
+    expectedCount: 1,
+    classification: "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    reason: "storefront product meta description template owned by later SEO stage",
+  },
+];
+
+const CONCAT_EXCEPTIONS = [];
+
+function normalizeTemplateRaw(raw) {
+  return String(raw || "").replace(/\$\{\}/g, "${}");
+}
+
 const astUnknown = [];
 const astUnbounded = [];
 const astGeneric = [];
@@ -473,46 +658,29 @@ const astHooks = [];
 const astTemplates = [];
 const astJsxTexts = [];
 const astConcat = [];
+const astParseErrors = [];
+const astForeign = [];
+const templateHits = new Map(TEMPLATE_EXCEPTIONS.map((item) => [`${item.path}\0${item.pattern}`, 0]));
+
 for (const rel of audited) {
   if (!/\.jsx?$/i.test(rel)) continue;
   if (rel.startsWith("src/shared/i18n/") && rel !== "src/shared/i18n/displayLabels.js") continue;
-  const src = readRel(rel);
+  let src = readRel(rel);
+  if (src.startsWith("#!")) src = src.replace(/^#!.*\n/, "");
   const findings = scanSource(src, rel);
-  if (findings.parseError && rel.endsWith(".js") && src.includes("#!/")) continue;
+  if (findings.parseError) {
+    astParseErrors.push(`${rel}:${findings.parseError}`);
+    continue;
+  }
+  astConcat.push(...findings.concatenations.map((row) => `${rel}:${row.line}:${row.text}`));
+  astForeign.push(...(findings.foreignActivation || []).map((row) => `${rel}:${row.kind}:${row.line}`));
   for (const call of findings.tCalls) {
     usedKeys.add(call.key);
     if (!catalogKeys.has(call.key)) astUnknown.push(`${rel}:${call.key}`);
   }
-  if (findings.unboundedT.length) {
-    const mapValues = [
-      ...src.matchAll(
-        /["'][a-zA-Z0-9._-]+["']\s*:\s*["']((?:shared|auth|storefront|client|manager|admin)\.[a-zA-Z0-9.]+)["']/g
-      ),
-    ].map((m) => m[1]);
-    if (rel === "src/shared/i18n/translationRuntime.js") {
-      // runtime t(key) implementation
-    } else if (
-      rel.endsWith("displayLabels.js") ||
-      rel.endsWith("ManagerExchange.jsx") ||
-      rel.endsWith("ManagerNotifications.jsx") ||
-      rel.endsWith("StorefrontProductAdd.jsx") ||
-      rel.endsWith("ManagerAudit.jsx") ||
-      rel.endsWith("ManagerScreen.jsx") ||
-      rel.endsWith("ClientScreen.jsx") ||
-      rel.endsWith("ClientSectionMenu.jsx") ||
-      rel.endsWith("AdminRolePanel.jsx") ||
-      rel.endsWith("ManagerLanguages.jsx") ||
-      rel.endsWith("ManagerStorefrontInfoPages.jsx")
-    ) {
-      for (const key of mapValues) {
-        if (!catalogKeys.has(key)) astUnknown.push(`${rel}:map:${key}`);
-      }
-    } else if (!mapValues.length && !/t\([A-Za-z.]+ \|\| ["']/.test(src) && !/t\(stateKey\)/.test(src) && !/t\(label\)/.test(src) && !/t\(labelKey\)/.test(src) && !/t\(option\.labelKey\)/.test(src)) {
-      astUnbounded.push(`${rel}:${findings.unboundedT[0].line}`);
-    } else {
-      for (const key of mapValues) {
-        if (!catalogKeys.has(key)) astUnknown.push(`${rel}:map:${key}`);
-      }
+  for (const row of findings.unboundedT) {
+    if (!proveFiniteDynamicT(rel, src, row)) {
+      astUnbounded.push(`${rel}:${row.line}:${row.text}`);
     }
   }
   astGeneric.push(...findings.genericKeys.map((row) => `${rel}:${row.key}`));
@@ -521,21 +689,19 @@ for (const rel of audited) {
   astHooks.push(...findings.hookMissingT.map((row) => `${rel}:${row.hook}:${row.line}`));
   for (const tpl of findings.templates) {
     if (!/[А-Яа-яЁё]/.test(tpl.raw)) continue;
-    const allowed =
-      /@media|display:\s*|font-family|border-collapse/.test(tpl.text) ||
-      /Адрес \$\{/.test(tpl.raw) ||
-      rel.endsWith("productCatalogOrder.js") ||
-      (rel.endsWith("appHelpers.js") && /console\.error/.test(String(tpl.text || "")) || /сохранить/.test(tpl.raw)) ||
-      (rel.endsWith("ProductPage.jsx") && /КЛЕВЕР/.test(tpl.raw)) ||
-      (rel.endsWith("App.jsx") && /Статус (изменён|массово)/.test(tpl.raw)) ||
-      (rel.endsWith("OrderEditor.jsx") && /Доставка по СПб/.test(tpl.raw));
-    if (!allowed) astTemplates.push(`${rel}:${tpl.line}:${tpl.raw.slice(0, 80)}`);
+    if (/@media|display:\s*|font-family|border-collapse/.test(tpl.text)) continue;
+    const raw = normalizeTemplateRaw(tpl.raw);
+    const exception = TEMPLATE_EXCEPTIONS.find(
+      (item) => item.path === rel && item.pattern && (raw.includes(item.pattern) || raw === item.pattern)
+    );
+    if (exception) {
+      const key = `${exception.path}\0${exception.pattern}`;
+      templateHits.set(key, (templateHits.get(key) || 0) + 1);
+      continue;
+    }
+    astTemplates.push(`${rel}:${tpl.line}:${tpl.raw.slice(0, 80)}`);
   }
-  if (
-    !rel.endsWith("seo.js") &&
-    !rel.endsWith("infoPageContent.js") &&
-    !rel.endsWith("infoPages.js")
-  ) {
+  if (!rel.endsWith("seo.js") && !rel.endsWith("infoPageContent.js") && !rel.endsWith("infoPages.js")) {
     for (const row of findings.jsxTexts) {
       if (!/[А-Яа-яЁё]/.test(row.text)) continue;
       if (/^(шт\.|уп\.|пач\.|кг|л|рулон|кор\.|пикс\.)$/.test(row.text)) continue;
@@ -543,6 +709,8 @@ for (const rel of audited) {
     }
   }
 }
+
+assert.deepEqual(astParseErrors, [], `AST parse errors must fail verification:\n${astParseErrors.join("\n")}`);
 assert.deepEqual(astUnknown.slice(0, 15), [], `unregistered AST t() keys: ${astUnknown.slice(0, 10).join(", ")}`);
 assert.deepEqual(astUnbounded, [], `unbounded dynamic t(): ${astUnbounded.join(", ")}`);
 assert.deepEqual(astGeneric, [], `generic keys used: ${astGeneric.join(", ")}`);
@@ -551,7 +719,40 @@ assert.deepEqual(astOptions, [], `option without canonical value: ${astOptions.j
 assert.deepEqual(astHooks, [], `missing t hook deps: ${astHooks.join(", ")}`);
 assert.deepEqual(astTemplates.slice(0, 20), [], `dynamic system templates remain:\n${astTemplates.slice(0, 12).join("\n")}`);
 assert.deepEqual(astJsxTexts.slice(0, 40), [], `RU JSXText remains:\n${astJsxTexts.slice(0, 25).join("\n")}`);
-assert.deepEqual(astConcat.slice(0, 20), [], `RU concatenations remain:\n${astConcat.slice(0, 12).join("\n")}`);
+
+const concatLeftover = [];
+const concatHits = new Map(CONCAT_EXCEPTIONS.map((item) => [`${item.path}\0${item.pattern}`, 0]));
+for (const row of astConcat) {
+  const [rel, line, ...rest] = row.split(":");
+  const text = rest.join(":");
+  const exception = CONCAT_EXCEPTIONS.find((item) => item.path === rel && text.includes(item.pattern));
+  if (exception) {
+    const key = `${exception.path}\0${exception.pattern}`;
+    concatHits.set(key, (concatHits.get(key) || 0) + 1);
+    continue;
+  }
+  concatLeftover.push(row);
+}
+assert.deepEqual(concatLeftover.slice(0, 20), [], `RU concatenations remain:\n${concatLeftover.slice(0, 12).join("\n")}`);
+for (const item of TEMPLATE_EXCEPTIONS) {
+  if (!item.pattern) continue;
+  const actual = templateHits.get(`${item.path}\0${item.pattern}`) || 0;
+  assert.equal(actual, item.expectedCount, `stale template exception ${item.path} ${item.pattern}: ${actual}!=${item.expectedCount}`);
+}
+for (const item of CONCAT_EXCEPTIONS) {
+  const actual = concatHits.get(`${item.path}\0${item.pattern}`) || 0;
+  assert.equal(actual, item.expectedCount, `stale concat exception ${item.path} ${item.pattern}`);
+}
+
+const productionRel = audited.filter((rel) => !rel.startsWith("src/shared/i18n/") && /\.jsx?$/i.test(rel));
+for (const rel of productionRel) {
+  const findings = scanSource(readRel(rel), rel);
+  if ((findings.foreignActivation || []).length) {
+    astForeign.push(...findings.foreignActivation.map((row) => `${rel}:${row.kind}:${row.line}`));
+  }
+}
+const productionForeign = astForeign.filter((row) => !row.includes("fixture"));
+assert.deepEqual(productionForeign, [], `production foreign-runtime activation:\n${productionForeign.join("\n")}`);
 
 const featureSrc = audited
   .filter((rel) => !rel.startsWith("src/shared/i18n/"))
@@ -560,9 +761,12 @@ const featureSrc = audited
 assert.doesNotMatch(featureSrc, /LanguageSelector/);
 assert.doesNotMatch(featureSrc, /preferred_language/);
 assert.doesNotMatch(featureSrc, /allowForeignRuntime\s*=\s*true/);
+assert.doesNotMatch(featureSrc, /allowForeignRuntime:\s*true/);
 assert.doesNotMatch(featureSrc, /PUBLIC_LANGUAGE_PREFIXES_ENABLED\s*=\s*true/);
 assert.doesNotMatch(featureSrc, /dir\s*=\s*["']rtl["']/);
 assert.doesNotMatch(featureSrc, /uiTranslationSeed/);
+assert.match(readRel("src/main.jsx"), /<LocalizationProvider>/);
+assert.doesNotMatch(readRel("src/main.jsx"), /allowForeignRuntime/);
 
 for (const rel of audited) {
   if (rel.startsWith("src/shared/i18n/")) continue;
@@ -571,16 +775,287 @@ for (const rel of audited) {
   assert.doesNotMatch(src, /LocalizationProvider\.jsx/, `${rel} imports LocalizationProvider.jsx`);
 }
 
-const pkgFiles = [
-  "package.json",
-  "package-lock.json",
-  "server/package.json",
-  "server/package-lock.json",
-];
-for (const rel of pkgFiles) {
-  const src = readRel(rel);
-  assert.ok(src.includes("{"), rel);
+const BASE_SHA = "059ab7ffd591250a9359185c2de32b4b29c93aa2";
+execFileSync(
+  "git",
+  ["diff", "--quiet", BASE_SHA, "--", "package.json", "package-lock.json", "server/package.json", "server/package-lock.json"],
+  { cwd: projectRoot, stdio: "pipe" }
+);
+
+const managerProductsSrc = readRel("src/screens/manager/ManagerProducts.jsx");
+assert.doesNotMatch(
+  managerProductsSrc,
+  /selectLinkFilter\(\s*t\(/,
+  "ManagerProducts: selectLinkFilter(t(...)) must not enter filter authority"
+);
+assert.match(managerProductsSrc, /selectLinkFilter\("Связанные с 1С"\)/);
+assert.match(managerProductsSrc, /selectLinkFilter\("Без связи с 1С"\)/);
+assert.match(managerProductsSrc, /selectLinkFilter\("Есть варианты"\)/);
+
+const clientScreenSrc = readRel("src/screens/client/ClientScreen.jsx");
+assert.match(clientScreenSrc, /onClick=\{\(\) => setFilter\(status\)\}/);
+assert.match(clientScreenSrc, /orderHistoryFilterLabel\(status,\s*t\)/);
+assert.match(clientScreenSrc, /orderStatusLabel\(order\.status,\s*t\)/);
+
+const reconClientSrc = readRel("src/screens/client/ReconciliationPanel.jsx");
+const reconManagerSrc = readRel("src/screens/manager/ManagerReconciliation.jsx");
+assert.doesNotMatch(reconClientSrc, /RECONCILIATION_STATUS_LABELS\[item\.status\]/);
+assert.doesNotMatch(reconManagerSrc, /RECONCILIATION_STATUS_LABELS\[item\.status\]/);
+assert.match(reconClientSrc, /reconciliationStatusLabel\(item\.status,\s*t\)/);
+assert.match(reconManagerSrc, /reconciliationStatusLabel\(item\.status,\s*t\)/);
+assert.match(reconClientSrc, /reconciliationPeriodDisplayLabel\(/);
+assert.match(reconManagerSrc, /reconciliationPeriodDisplayLabel\(/);
+
+assert.equal(orderHistoryLabel("Заказ создан", (key) => `T:${key}`), "T:shared.orderCreated");
+assert.equal(
+  orderHistoryLabel("Заказ создан с сайта", (key) => `T:${key}`),
+  "T:shared.orderHistory.createdFromSite"
+);
+assert.equal(
+  orderHistoryLabel("Клиент добавил позиции (дозаказ)", (key) => `T:${key}`),
+  "T:shared.orderHistory.clientAddendum"
+);
+assert.equal(
+  orderHistoryLabel("Клиент изменил состав или условия заказа", (key) => `T:${key}`),
+  "T:shared.orderHistory.clientEdit"
+);
+assert.equal(
+  orderHistoryLabel("Передача в 1С отменена: заказ обработан вручную", (key) => `T:${key}`),
+  "T:shared.orderHistory.exchangeCancelledManual"
+);
+assert.match(
+  orderHistoryLabel("Статус изменён: Новый → Принят", (key, params = {}) => `${key}:${params.from || ""}/${params.to || ""}`),
+  /shared\.orderHistory\.statusChanged/
+);
+assert.match(
+  orderHistoryLabel("Статус изменён: Новый → Принят (1С: Проведен)", (key, params = {}) => `${key}:${params.from || ""}/${params.to || ""}/${params.state || ""}`),
+  /shared\.orderHistory\.statusChangedOneC/
+);
+assert.equal(orderHistoryLabel("Комментарий клиента: срочно", (key) => `T:${key}`), "Комментарий клиента: срочно");
+assert.equal(reconciliationStatusLabel("processing", (key) => `T:${key}`), "T:shared.reconciliation.status.processing");
+assert.equal(reconciliationStatusLabel("historic-x", (key) => `T:${key}`), "historic-x");
+assert.equal(
+  reconciliationPeriodDisplayLabel({ periodType: "q1", year: 2026 }, (key) => `T:${key}`),
+  "T:shared.reconciliation.period.q1 2026"
+);
+assert.equal(
+  backupReasonLabel("Ручная копия из кабинета менеджера", (key) => `T:${key}`),
+  "T:manager.manualCopyFromTheManagerCabinet"
+);
+assert.equal(backupReasonLabel("Пользовательская причина", (key) => `T:${key}`), "Пользовательская причина");
+
+const backupSrc = readRel("src/screens/manager/ManagerBackup.jsx");
+assert.match(backupSrc, /reason:\s*"Ручная копия из кабинета менеджера"/);
+assert.match(backupSrc, /backupReasonLabel\(item\.reason,\s*t\)/);
+
+const bezKoda = allowlist.find(
+  (item) => item.path === "src/screens/manager/ManagerClients.jsx" && item.literal === "без кода"
+);
+assert.equal(bezKoda, undefined, "без кода must not remain as a residual allowlist row");
+assert.match(readRel("src/screens/manager/ManagerClients.jsx"), /t\("manager\.clients\.noCode"\)/);
+
+const appModalSrc = readRel("src/shared/AppModal.jsx");
+assert.match(
+  appModalSrc,
+  /isConfirm[\s\S]{0,220}?shared\.modal\.orderContents[\s\S]{0,220}?shared\.modal\.details/
+);
+assert.match(appModalSrc, /value == null/);
+assert.match(appModalSrc, /trimmed\.toLowerCase\(\) === "null"/);
+
+const managerOrdersSrc = readRel("src/screens/manager/ManagerOrders.jsx");
+assert.match(managerOrdersSrc, /canTrashOrder\(order,\s*staffRole,\s*t\)/);
+assert.match(managerOrdersSrc, /canPurgeOrder\(order,\s*staffRole,\s*t\)/);
+assert.match(managerOrdersSrc, /roleLabel\(order\.deletedBy\.role,\s*t\)/);
+
+let optionalTThrew = false;
+try {
+  const t = undefined;
+  const changed = true;
+  void (changed ? (typeof t === "function" ? t("manager.changed") : "Изменён") : "");
+} catch {
+  optionalTThrew = true;
 }
+assert.equal(optionalTThrew, false, "missing t must not throw");
+assert.doesNotMatch(
+  readRel("src/screens/manager/ManagerNotifications.jsx"),
+  /t \? t\("manager.changed"\) : t\("manager.changed"\)/
+);
+assert.match(
+  readRel("src/screens/manager/ManagerNotifications.jsx"),
+  /typeof t === "function" \? t\("manager.changed"\) : "Изменён"/
+);
+
+const draftRowsA = [{ id: "e1", languages: { en: { value: "A" } } }];
+const draftRowsB = [{ id: "e1", languages: { en: { value: "B" } } }];
+const draftRowsD = [{ id: "e1", languages: { en: { value: "D" } } }];
+const enKey = translationDraftKey("e1", "en");
+const uzKey = translationDraftKey("e1", "uz");
+const cleanDrafts = mergeWorkspaceDrafts({}, draftRowsA, "en");
+assert.equal(readDraftValue(cleanDrafts, "e1", "en"), "A");
+assert.equal(cleanDrafts[enKey].dirty, false);
+const refreshedClean = mergeWorkspaceDrafts(cleanDrafts, draftRowsB, "en");
+assert.equal(readDraftValue(refreshedClean, "e1", "en"), "B");
+const dirty = setDraftValue(mergeWorkspaceDrafts({}, draftRowsB, "en"), "e1", "en", "C", true);
+const preservedDirty = mergeWorkspaceDrafts(dirty, draftRowsB, "en");
+assert.equal(readDraftValue(preservedDirty, "e1", "en"), "C");
+const savedClean = markDraftClean(preservedDirty, "e1", "en", "C");
+assert.equal(savedClean[enKey].dirty, false);
+assert.equal(readDraftValue(mergeWorkspaceDrafts(savedClean, draftRowsD, "en"), "e1", "en"), "D");
+const independent = setDraftValue(setDraftValue({}, "e1", "en", "C", true), "e1", "uz", "U", true);
+const afterUzRefresh = mergeWorkspaceDrafts(independent, [{ id: "e1", languages: { uz: { value: "Z" } } }], "uz");
+assert.equal(readDraftValue(afterUzRefresh, "e1", "en"), "C");
+assert.equal(readDraftValue(afterUzRefresh, "e1", "uz"), "U");
+const afterReset = clearTranslationDraft(afterUzRefresh, "e1", "en");
+assert.equal(Object.hasOwn(afterReset, enKey), false);
+assert.equal(Object.hasOwn(afterReset, uzKey), true);
+assert.equal(
+  shouldApplyWorkspaceResponse({
+    requestGeneration: 1,
+    currentGeneration: 2,
+    requestLanguage: "en",
+    currentLanguage: "uz",
+  }),
+  false
+);
+assert.equal(
+  shouldApplyWorkspaceResponse({
+    requestGeneration: 2,
+    currentGeneration: 2,
+    requestLanguage: "uz",
+    currentLanguage: "uz",
+  }),
+  true
+);
+
+assert.doesNotMatch(
+  readRel("src/screens/client/ClientCatalogAddPanel.jsx"),
+  /group\.name === ["']Прочее["']\s*\?/
+);
+assert.match(
+  readRel("src/screens/client/ClientMatrixPanel.jsx"),
+  /item === ["']Все["']\s*\?\s*t\("shared\.filter\.all"\)/
+);
+
+const unverifiedProjection = allowlist.filter(
+  (item) =>
+    /Display-only projection exists where the string is shown/i.test(item.reason) ||
+    /Display projection exists where the string is shown/i.test(item.reason)
+);
+assert.equal(unverifiedProjection.length, 0, "unverified projection prose remains");
+
+const projectionNames = [
+  "orderStatusLabel",
+  "requestStatusLabel",
+  "exchangeStatusLabel",
+  "visibilityFilterLabel",
+  "orderHistoryFilterLabel",
+  "orderHistoryLabel",
+  "historyActorLabel",
+  "reconciliationStatusLabel",
+  "reconciliationPeriodDisplayLabel",
+  "backupReasonLabel",
+  "contactLabel",
+  "contactRoleLabel",
+  "addressLabel",
+  "roleLabel",
+  "promoStatusLabel",
+  "translationEditorStateLabel",
+];
+for (const item of allowlist) {
+  if (item.classification !== "CANONICAL_BUSINESS_VALUE") continue;
+  const claimsProjection = /Display projection:/i.test(item.reason);
+  if (!claimsProjection) continue;
+  const named = projectionNames.filter((name) => item.reason.includes(name));
+  assert.ok(named.length > 0, `projection claim without named helper: ${item.path} ${item.literal}`);
+  const src = existsSync(path.join(projectRoot, item.path)) ? readRel(item.path) : "";
+  const helperSrc = readRel("src/shared/i18n/displayLabels.js");
+  for (const name of named) {
+    assert.match(helperSrc, new RegExp(`export function ${name}\\(`));
+    if (item.path.startsWith("src/") && src) {
+      assert.equal(
+        src.includes(name) || helperSrc.includes(name),
+        true,
+        `claimed ${name} not referenced from ${item.path}`
+      );
+    }
+  }
+}
+
+assert.equal(AUTHORITY_CALLEE_NAMES.has("selectLinkFilter"), true);
+const linkFilterScan = scanSource(
+  `export function F({t, selectLinkFilter}){ selectLinkFilter(t("manager.linkedTo1c2")); }`,
+  "unsafe-link-filter.jsx"
+);
+assert.ok(linkFilterScan.authorityUnsafe.length >= 1, "selectLinkFilter(t(...)) must be detected");
+const safeLink = scanSource(
+  `export function F({t, selectLinkFilter}){ return <button onClick={() => selectLinkFilter("Связанные с 1С")}>{t("manager.linkedTo1c2")}</button>; }`,
+  "safe-link-filter.jsx"
+);
+assert.equal(safeLink.authorityUnsafe.length, 0);
+for (const name of ["setFilter", "setVisibility", "setStatus", "setMode", "setTab"]) {
+  const scan = scanSource(`export function F({t, ${name}}){ ${name}(t("shared.filter.all")); }`, `unsafe-${name}.jsx`);
+  assert.ok(scan.authorityUnsafe.length >= 1, `${name}(t(...)) must be detected`);
+}
+const unsafeOptionValue = scanSource(
+  `export function F({t}){ return <option value={t("shared.filter.all")}>x</option>; }`,
+  "unsafe-option-value.jsx"
+);
+assert.ok(unsafeOptionValue.optionTranslatedValue.length >= 1);
+const safeCanonicalOption = scanSource(
+  `export function F({t}){ return <option value="Новый">{t("manager.orderStatus.new")}</option>; }`,
+  "safe-option.jsx"
+);
+assert.equal(safeCanonicalOption.optionTranslatedValue.length, 0);
+
+const concatFixture = scanSource(
+  `export function F(){ return "Удалить заказ № " + "12" + " навсегда?"; }`,
+  "unsafe-concat.jsx"
+);
+assert.ok(concatFixture.concatenations.length >= 1, "scanner must detect RU concatenation fixture");
+
+const brokenParse = scanSource("export function F({t){ return t('x'); }", "broken.jsx");
+assert.ok(brokenParse.parseError, "parse errors must be recorded");
+
+const foreignPropScan = scanSource(
+  `export function F(){ return createLocalizationRuntime({ allowForeignRuntime: true, locale: "en" }); }`,
+  "unsafe-foreign-prop.jsx"
+);
+assert.ok(foreignPropScan.foreignActivation.length >= 1, "property-form allowForeignRuntime: true must be scanned");
+const foreignJsx = scanSource(
+  `export function F(){ return <LocalizationProvider allowForeignRuntime />; }`,
+  "unsafe-foreign-jsx.jsx"
+);
+assert.ok(foreignJsx.foreignActivation.length >= 1);
+const foreignSpread = scanSource(
+  `export function F(cfg){ return createLocalizationRuntime({ ...cfg }); }`,
+  "unsafe-foreign-spread.jsx"
+);
+assert.ok(foreignSpread.foreignActivation.length >= 1);
+
+assert.doesNotMatch(readFileSync(new URL(import.meta.url).pathname, "utf8"), /rel\.endsWith\("ManagerExchange\.jsx"\)/);
+
+const keysA = catalogKeysFromGit("ee7334f080fa17f7fe37c538f6ea8706aadb1f96");
+const keysB = catalogKeysFromGit("d5f8a908d290ccd292743c17ed83bc8681231f8c");
+const keysC = new Set(UI_CATALOG.map((entry) => entry.key));
+const deltaAB = deltaSets(keysA, keysB);
+const deltaBC = deltaSets(keysB, keysC);
+const deltaAC = deltaSets(keysA, keysC);
+console.log(`catalog.ee7334f=${keysA.size}`);
+console.log(`catalog.d5f8a90=${keysB.size}`);
+console.log(`catalog.final=${keysC.size}`);
+console.log(`catalog.AtoB.added=${deltaAB.added.length}`);
+console.log(`catalog.AtoB.removed=${deltaAB.removed.length}`);
+console.log(`catalog.AtoB.unchanged=${deltaAB.unchanged.length}`);
+console.log(`catalog.BtoC.added=${deltaBC.added.length}`);
+console.log(`catalog.BtoC.removed=${deltaBC.removed.length}`);
+console.log(`catalog.BtoC.unchanged=${deltaBC.unchanged.length}`);
+console.log(`catalog.AtoC.added=${deltaAC.added.length}`);
+console.log(`catalog.AtoC.removed=${deltaAC.removed.length}`);
+console.log(`catalog.AtoC.unchanged=${deltaAC.unchanged.length}`);
+if (deltaBC.added.length) console.log(`catalog.BtoC.addedKeys=${deltaBC.added.join(",")}`);
+
+const stage31Residual = allowlist.filter((item) => item.classification === "STAGE31_SYSTEM_UI");
+assert.equal(stage31Residual.length, 0);
 
 console.log("verify-i18n-stage-3-system-ui: ok");
 console.log(`catalog.total=${UI_CATALOG.length}`);

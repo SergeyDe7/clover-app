@@ -36,6 +36,10 @@ const AUTHORITY_CALLEE_NAMES = new Set([
   "setMode",
   "setSort",
   "setVisibility",
+  "setCategory",
+  "setActiveCategory",
+  "selectLinkFilter",
+  "selectGroup",
   "onSave",
   "saveOrder",
   "createOrder",
@@ -96,6 +100,7 @@ export function scanSource(code, filename = "fixture.jsx") {
     concatenations: [],
     jsxTexts: [],
     hookMissingT: [],
+    foreignActivation: [],
     parseError: "",
   };
 
@@ -215,6 +220,44 @@ export function scanSource(code, filename = "fixture.jsx") {
                       }
                     },
                     JSXOpeningElement(node) {
+                      if (node.name?.type === "JSXIdentifier" && node.name.name === "LocalizationProvider") {
+                        for (const attr of node.attributes || []) {
+                          if (attr.type === "JSXSpreadAttribute") {
+                            findings.foreignActivation.push({
+                              kind: "jsx-spread",
+                              line: locOf(node),
+                              text: snippet(node),
+                            });
+                          }
+                          if (
+                            attr.type === "JSXAttribute" &&
+                            attr.name?.name === "allowForeignRuntime" &&
+                            attr.value !== false
+                          ) {
+                            const raw = attr.value == null ? true : staticString(attr.value.expression || attr.value);
+                            if (raw !== "false" && raw !== false) {
+                              findings.foreignActivation.push({
+                                kind: "jsx-prop",
+                                line: locOf(node),
+                                text: snippet(node),
+                              });
+                            }
+                          }
+                          if (
+                            attr.type === "JSXAttribute" &&
+                            (attr.name?.name === "locale" || attr.name?.name === "language")
+                          ) {
+                            const loc = staticString(attr.value?.expression || attr.value);
+                            if (loc && loc !== "ru") {
+                              findings.foreignActivation.push({
+                                kind: "jsx-locale",
+                                line: locOf(node),
+                                text: snippet(node),
+                              });
+                            }
+                          }
+                        }
+                      }
                       if (node.name?.type !== "JSXIdentifier" || node.name.name !== "option") return;
                       const valueAttr = (node.attributes || []).find(
                         (attr) =>
@@ -265,6 +308,46 @@ export function scanSource(code, filename = "fixture.jsx") {
                     VariableDeclarator(node) {
                       collectTFromPattern(node.id, new Set());
                     },
+                    Property(node) {
+                      if (objectKeyName(node.key) !== "allowForeignRuntime") return;
+                      const value = staticString(node.value);
+                      if (node.value?.type === "Literal" && node.value.value === true) {
+                        findings.foreignActivation.push({
+                          kind: "object-prop",
+                          line: locOf(node),
+                          text: snippet(node),
+                        });
+                      } else if (value === "true") {
+                        findings.foreignActivation.push({
+                          kind: "object-prop",
+                          line: locOf(node),
+                          text: snippet(node),
+                        });
+                      } else if (node.value && node.value.type !== "Literal") {
+                        findings.foreignActivation.push({
+                          kind: "dynamic-allowForeignRuntime",
+                          line: locOf(node),
+                          text: snippet(node),
+                        });
+                      }
+                    },
+                    SpreadElement(node) {
+                      const parent = node.parent;
+                      if (parent?.type === "ObjectExpression") {
+                        const call = parent.parent;
+                        if (
+                          call?.type === "CallExpression" &&
+                          call.callee?.type === "Identifier" &&
+                          call.callee.name === "createLocalizationRuntime"
+                        ) {
+                          findings.foreignActivation.push({
+                            kind: "runtime-spread",
+                            line: locOf(node),
+                            text: snippet(call),
+                          });
+                        }
+                      }
+                    },
                   };
                 },
               },
@@ -286,4 +369,4 @@ export function catalogKeyFromTCall(call) {
   return call?.key || "";
 }
 
-export { GENERIC_KEY, AUTHORITY_PROP_NAMES };
+export { GENERIC_KEY, AUTHORITY_PROP_NAMES, AUTHORITY_CALLEE_NAMES };

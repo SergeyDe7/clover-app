@@ -10,7 +10,7 @@ import {
 } from "../../shared/SharedPanels";
 import { StickyCabinetChrome } from "../../shared/StickyCabinetChrome";
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
-import { requestStatusLabel } from "../../shared/i18n/displayLabels";
+import { orderHistoryFilterLabel, orderStatusLabel, requestStatusLabel } from "../../shared/i18n/displayLabels";
 import {
   CLIENT_TABS,
   CLIENT_CABINET_SECTIONS,
@@ -288,7 +288,7 @@ function ClientDashboard({
             key={status}
             onClick={() => setFilter(status)}
           >
-            {status}
+            {orderHistoryFilterLabel(status, t)}
           </button>
         ))}
       </div>
@@ -300,7 +300,7 @@ function ClientDashboard({
             const canEdit =
               settings.allowClientEdit && order.status === "Новый";
             const canDelete =
-              settings.allowClientDelete && canTrashOrder(order, "client").ok;
+              settings.allowClientDelete && canTrashOrder(order, "client", t).ok;
             return (
               <article
                 className="order-card"
@@ -310,7 +310,7 @@ function ClientDashboard({
                 <div className="order-card-header">
                   <div>
                     <span className={`badge ${statusClass(order.status)}`}>
-                      {order.status}
+                      {orderStatusLabel(order.status, t)}
                     </span>
                     <h3>{t("client.order.numberHeading", { number: order.number })}</h3>
                     <p>{t("client.order.createdAt", { datetime: formatDateTime(order.createdAt) })}</p>

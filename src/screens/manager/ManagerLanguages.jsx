@@ -7,9 +7,11 @@ import {
 } from "../../shared/i18n/localizationSettings.js";
 import {
   clearTranslationDraft,
+  markDraftClean,
   mergeWorkspaceDrafts,
+  readDraftValue,
+  setDraftValue,
   shouldApplyWorkspaceResponse,
-  translationDraftKey,
 } from "../../shared/i18n/translationDrafts.js";
 
 const TARGET_LOCALES = ["en", "uz", "ky", "tg", "zh", "ar"];
@@ -144,10 +146,11 @@ export function ManagerLanguages() {
 
   const saveRow = async (row) => {
     const targetLanguage = languageRef.current;
-    const draftKey = translationDraftKey(row.id, targetLanguage);
+    const savedValue = readDraftValue(drafts, row.id, targetLanguage, "");
     setBusy(true);
     try {
-      await api.saveLocalizationTranslation(row.id, targetLanguage, drafts[draftKey] ?? "");
+      await api.saveLocalizationTranslation(row.id, targetLanguage, savedValue);
+      setDrafts((current) => markDraftClean(current, row.id, targetLanguage, savedValue));
       setMessage(t("admin.languages.saved"));
       await load();
     } catch (error) {
@@ -290,7 +293,6 @@ export function ManagerLanguages() {
             <tbody>
               {rows.map((row) => {
                 const cell = row.languages?.[safeLanguage] || {};
-                const draftKey = translationDraftKey(row.id, safeLanguage);
                 const stateKey =
                   cell.stale
                     ? "admin.languages.state.stale"
@@ -306,12 +308,11 @@ export function ManagerLanguages() {
                       <textarea
                         className="manager-languages-target"
                         rows={2}
-                        value={drafts[draftKey] ?? cell.value ?? ""}
+                        value={readDraftValue(drafts, row.id, safeLanguage, cell.value || "")}
                         onChange={(event) =>
-                          setDrafts((current) => ({
-                            ...current,
-                            [draftKey]: event.target.value,
-                          }))
+                          setDrafts((current) =>
+                            setDraftValue(current, row.id, safeLanguage, event.target.value, true)
+                          )
                         }
                       />
                     </td>

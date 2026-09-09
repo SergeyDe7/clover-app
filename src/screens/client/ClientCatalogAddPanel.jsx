@@ -289,7 +289,7 @@ export function ClientCatalogAddPanel({
                         type="button"
                         onClick={() => selectGroup(group.name)}
                       >
-                        {group.name === "Прочее" ? t("client.other") : group.name}
+                        {group.name}
                       </button>
                       {hasChildren ? (
                         <button

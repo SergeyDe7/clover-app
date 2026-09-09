@@ -439,6 +439,13 @@ const RAW_CATALOG = [
     "critical": true
   },
   {
+    "key": "client.nav.cabinet",
+    "sourceRu": "Настройки",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
     "key": "client.nav.addresses",
     "sourceRu": "Адреса",
     "namespace": "ui",
@@ -12455,6 +12462,146 @@ const RAW_CATALOG = [
     "sourceRu": "Ещё непросмотренных: {count}",
     "namespace": "ui",
     "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "shared.orderHistory.clientAddendum",
+    "sourceRu": "Клиент добавил позиции (дозаказ)",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.orderHistory.clientEdit",
+    "sourceRu": "Клиент изменил состав или условия заказа",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.orderHistory.statusChanged",
+    "sourceRu": "Статус изменён: {from} → {to}",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.orderHistory.statusBulkChanged",
+    "sourceRu": "Статус массово изменён: {from} → {to}",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.reconciliation.status.processing",
+    "sourceRu": "Готовится",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.reconciliation.status.ready",
+    "sourceRu": "Готов",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.reconciliation.period.q1",
+    "sourceRu": "1 квартал",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.reconciliation.period.q2",
+    "sourceRu": "2 квартал",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.reconciliation.period.q3",
+    "sourceRu": "3 квартал",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.reconciliation.period.q4",
+    "sourceRu": "4 квартал",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.reconciliation.period.all",
+    "sourceRu": "За весь период",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.reconciliation.period.custom",
+    "sourceRu": "Определённый период",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "manager.backup.reason.manualDefault",
+    "sourceRu": "Ручная резервная копия",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.backup.reason.beforeRestore",
+    "sourceRu": "Автоматическая копия перед восстановлением",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.backup.reason.beforeReset",
+    "sourceRu": "Автоматическая копия перед полным сбросом",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.backup.reason.dailyStart",
+    "sourceRu": "Автоматическая полная копия при первом запуске за день",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.noCode",
+    "sourceRu": "без кода",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "shared.orderHistory.createdFromSite",
+    "sourceRu": "Заказ создан с сайта",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.orderHistory.exchangeCancelledManual",
+    "sourceRu": "Передача в 1С отменена: заказ обработан вручную",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.orderHistory.statusChangedOneC",
+    "sourceRu": "Статус изменён: {from} → {to} (1С: {state})",
+    "namespace": "ui",
+    "surface": "shared",
     "critical": true
   }
 ];

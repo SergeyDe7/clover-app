@@ -162,7 +162,7 @@ function OneCClientPicker({ client, link, onChange }) {
           </span>
           <p className="muted small" style={{ marginTop: 8 }}>
             {link.oneCId
-              ? `${link.oneCName || t("manager.clients.oneCCounterparty")} · ${link.oneCCode || "без кода"}`
+              ? `${link.oneCName || t("manager.clients.oneCCounterparty")} · ${link.oneCCode || t("manager.clients.noCode")}`
               : t("manager.cloverWillSendTheNamePhone")}
           </p>
         </div>

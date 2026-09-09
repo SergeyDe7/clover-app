@@ -29,6 +29,7 @@ import {
   exchangeStatusLabel as exchangeStatusDisplay,
   orderStatusLabel,
   requestStatusLabel,
+  roleLabel,
 } from "../../shared/i18n/displayLabels";
 
 const CUSTOM_STATUSES = [
@@ -682,7 +683,7 @@ export function ManagerOrders({
           {visible.map((order) => {
         const exchange = normalizeOrderExchange(order.exchange);
         const busy = busyOrderId === order.id;
-        const trashGate = canTrashOrder(order, staffRole);
+        const trashGate = canTrashOrder(order, staffRole, t);
         const hardDeleteCompleted =
           staffRole === "admin" && isAdminHardDeleteStatus(order.status);
         const canShowDelete =
@@ -701,7 +702,7 @@ export function ManagerOrders({
             />
             <div className="manager-order-main">
               <div className="manager-order-title-row">
-                <h3 className="manager-order-client">{order.customerName || "Клиент"}</h3>
+                <h3 className="manager-order-client">{order.customerName || t("shared.role.client")}</h3>
                 <strong className="manager-order-sum success-text">
                   {settings.showPrices && getOrderTotal(order) > 0
                     ? formatMoney(getOrderTotal(order))
@@ -737,7 +738,7 @@ export function ManagerOrders({
                       t("shared.action.restore")
                     }</button>
                     {(() => {
-                      const purgeGate = canPurgeOrder(order, staffRole);
+                      const purgeGate = canPurgeOrder(order, staffRole, t);
                       return (
                         <button
                           className="danger-button manager-order-inline-action"
@@ -876,7 +877,7 @@ export function ManagerOrders({
             {inTrash && order.deletedAt && (
               <div className="exchange-message manager-order-exchange-note">
                 {t("manager.orders.inTrashSince", { datetime: formatDateTime(order.deletedAt) })}
-                {order.deletedBy?.role ? t("manager.orders.deletedByRole", { role: order.deletedBy.role }) : ""}
+                {order.deletedBy?.role ? t("manager.orders.deletedByRole", { role: roleLabel(order.deletedBy.role, t) }) : ""}
               </div>
             )}
             {!inTrash && exchange.message && (

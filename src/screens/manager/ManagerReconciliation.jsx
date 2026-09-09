@@ -2,7 +2,11 @@ import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Раздел менеджера: акты сверки.
 import { useState } from "react";
 import { api } from "../../serverApi";
-import { reconciliationPeriodLabel, RECONCILIATION_STATUS_LABELS, formatDateTime } from "../../shared/appHelpers";
+import { formatDateTime } from "../../shared/appHelpers";
+import {
+  reconciliationPeriodDisplayLabel,
+  reconciliationStatusLabel,
+} from "../../shared/i18n/displayLabels";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { OrderThankYouOverlay } from "../../shared/SharedPanels";
 
@@ -66,11 +70,11 @@ export function ManagerReconciliation({
       title: t("manager.deleteTheStatement"),
       message: item.fileName
         ? t("manager.acts.deleteConfirmWithPdf", {
-            period: reconciliationPeriodLabel(item),
+            period: reconciliationPeriodDisplayLabel(item, t),
             client: clientLabel,
           })
         : t("manager.acts.deleteConfirm", {
-            period: reconciliationPeriodLabel(item),
+            period: reconciliationPeriodDisplayLabel(item, t),
             client: clientLabel,
           }),
       confirmLabel: t("shared.action.delete"),
@@ -123,10 +127,10 @@ export function ManagerReconciliation({
             <article className="manager-reconciliation-row" key={item.id}>
               <div className="manager-reconciliation-info">
                 <span className={`badge ${item.status === "ready" ? "green" : item.status === "rejected" ? "red" : "yellow"}`}>
-                  {RECONCILIATION_STATUS_LABELS[item.status] || item.status}
+                  {reconciliationStatusLabel(item.status, t)}
                 </span>
                 <h3>{item.client?.companyName || item.client?.email || t("shared.role.client")}</h3>
-                <p>{reconciliationPeriodLabel(item)} · {formatDateTime(item.createdAt)}</p>
+                <p>{reconciliationPeriodDisplayLabel(item, t)} · {formatDateTime(item.createdAt)}</p>
                 {item.clientComment && <p>{t("manager.clientComment")} {item.clientComment}</p>}
                 {alreadySent && (
                   <p className="muted small">{t("manager.acts.sentFile", { fileName: item.fileName })}</p>

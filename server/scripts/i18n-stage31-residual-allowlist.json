@@ -11,35 +11,35 @@
     "literal": "Заказ создан",
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Заказ создан\". Display-only projection exists where the string is shown in UI."
+    "reason": "Display projection: orderHistoryLabel in SharedPanels/OrderTimeline. Persisted history label remains canonical."
   },
   {
     "path": "src/App.jsx",
     "literal": "Клиент",
     "count": 5,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Клиент\". Display-only projection exists where the string is shown in UI."
+    "reason": "Canonical history actor fallback written to order.history. Display projection: historyActorLabel."
   },
   {
     "path": "src/App.jsx",
     "literal": "Клиент добавил позиции (дозаказ)",
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Клиент добавил позиции (дозаказ)\". Display-only projection exists where the string is shown in UI."
+    "reason": "Display projection: orderHistoryLabel. Persisted history label remains canonical."
   },
   {
     "path": "src/App.jsx",
     "literal": "Клиент изменил состав или условия заказа",
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Клиент изменил состав или условия заказа\". Display-only projection exists where the string is shown in UI."
+    "reason": "Display projection: orderHistoryLabel. Persisted history label remains canonical."
   },
   {
     "path": "src/App.jsx",
     "literal": "Менеджер",
     "count": 2,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Менеджер\". Display-only projection exists where the string is shown in UI."
+    "reason": "Canonical history actor written to order.history. Display projection: historyActorLabel."
   },
   {
     "path": "src/App.jsx",
@@ -170,16 +170,16 @@
   {
     "path": "src/screens/client/ClientCatalogAddPanel.jsx",
     "literal": "Прочее",
-    "count": 2,
-    "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Прочее\". Display-only projection exists where the string is shown in UI."
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Real product category name remains verbatim until Stage 5. Not Stage 3.1 system chrome."
   },
   {
     "path": "src/screens/client/ClientMatrixPanel.jsx",
     "literal": "Все",
-    "count": 5,
+    "count": 6,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "Filter/control identity \"Все\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
+    "reason": "Canonical synthetic category-filter identity remains \"Все\". Visible label uses t(\"shared.filter.all\")."
   },
   {
     "path": "src/screens/client/ClientScreen.jsx",
@@ -312,7 +312,7 @@
     "literal": "Доставка по СПб бесплатная",
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Доставка по СПб бесплатная\". Display-only projection exists where the string is shown in UI."
+    "reason": "Canonical delivery-note payload identity. Display projection is not used; value is persisted order text (BASE)."
   },
   {
     "path": "src/screens/client/OrderEditor.jsx",
@@ -331,44 +331,44 @@
   {
     "path": "src/screens/client/ProfilePanel.jsx",
     "literal": "Бухгалтер",
-    "count": 1,
+    "count": 2,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "Default contact role labels stored on the client profile. Display may localize; stored identity stays BASE Russian."
+    "reason": "Canonical datalist option value remains BASE-compatible. Display projection: contactRoleLabel via the option label attribute."
   },
   {
     "path": "src/screens/client/ProfilePanel.jsx",
     "literal": "Директор",
-    "count": 1,
+    "count": 2,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "Default contact role labels stored on the client profile. Display may localize; stored identity stays BASE Russian."
+    "reason": "Canonical datalist option value remains BASE-compatible. Display projection: contactRoleLabel via the option label attribute."
   },
   {
     "path": "src/screens/client/ProfilePanel.jsx",
     "literal": "Закупки",
-    "count": 1,
+    "count": 2,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "Default contact role labels stored on the client profile. Display may localize; stored identity stays BASE Russian."
+    "reason": "Canonical datalist option value remains BASE-compatible. Display projection: contactRoleLabel via the option label attribute."
   },
   {
     "path": "src/screens/client/ProfilePanel.jsx",
     "literal": "Менеджер",
-    "count": 1,
+    "count": 2,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Менеджер\". Display-only projection exists where the string is shown in UI."
+    "reason": "Canonical datalist option value remains BASE-compatible. Display projection: contactRoleLabel via the option label attribute."
   },
   {
     "path": "src/screens/client/ProfilePanel.jsx",
     "literal": "Приём товара",
-    "count": 1,
+    "count": 2,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "Default contact role labels stored on the client profile. Display may localize; stored identity stays BASE Russian."
+    "reason": "Canonical datalist option value remains BASE-compatible. Display projection: contactRoleLabel via the option label attribute."
   },
   {
     "path": "src/screens/client/ProfilePanel.jsx",
     "literal": "Склад",
-    "count": 1,
+    "count": 2,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "Default contact role labels stored on the client profile. Display may localize; stored identity stays BASE Russian."
+    "reason": "Canonical datalist option value remains BASE-compatible. Display projection: contactRoleLabel via the option label attribute."
   },
   {
     "path": "src/screens/client/ReconciliationPanel.jsx",
@@ -424,14 +424,7 @@
     "literal": "Ручная копия из кабинета менеджера",
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Ручная копия из кабинета менеджера\". Display-only projection exists where the string is shown in UI."
-  },
-  {
-    "path": "src/screens/manager/ManagerClients.jsx",
-    "literal": "без кода",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+    "reason": "Canonical API reason payload. Display projection: backupReasonLabel at visible <h3>."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
@@ -445,7 +438,7 @@
     "literal": "Дополнительный",
     "count": 5,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Дополнительный\". Display-only projection exists where the string is shown in UI."
+    "reason": "Canonical contact/address identity for storage/comparison. Display projection: contactLabel/addressLabel where shown."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
@@ -508,14 +501,14 @@
     "literal": "Основной",
     "count": 4,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Основной\". Display-only projection exists where the string is shown in UI."
+    "reason": "Canonical contact identity for storage/comparison. Display projection: contactLabel where shown."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
     "literal": "Основной адрес",
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Основной адрес\". Display-only projection exists where the string is shown in UI."
+    "reason": "Canonical address identity. Display projection: addressLabel where shown."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
@@ -547,6 +540,13 @@
   },
   {
     "path": "src/screens/manager/ManagerNotifications.jsx",
+    "literal": "Изменён",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "BASE-safe RU display used only when parseManagerNotification is called without t. With t it uses manager.changed. Parser tokens remain canonical RU."
+  },
+  {
+    "path": "src/screens/manager/ManagerNotifications.jsx",
     "literal": "Кол-во позиций",
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
@@ -556,8 +556,8 @@
     "path": "src/screens/manager/ManagerNotifications.jsx",
     "literal": "не указана",
     "count": 1,
-    "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "Canonical labels parsed from server-generated notification bodies. Display projections localize field captions; parsers match BASE Russian payload text."
+    "classification": "TECHNICAL_IDENTIFIER",
+    "reason": "Parser token matching BASE notification body fallback; not rendered as visible chrome."
   },
   {
     "path": "src/screens/manager/ManagerNotifications.jsx",
@@ -579,13 +579,6 @@
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
     "reason": "Persisted/compared business status \"Добавлен в каталог\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
-  },
-  {
-    "path": "src/screens/manager/ManagerOrders.jsx",
-    "literal": "Клиент",
-    "count": 1,
-    "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Клиент\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
@@ -674,9 +667,9 @@
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Без связи с 1С",
-    "count": 4,
+    "count": 6,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "Filter/control identity \"Без связи с 1С\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
+    "reason": "Canonical filter identity passed to selectLinkFilter. Visible chrome uses t(); display projection: visibilityFilterLabel for other surfaces."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
@@ -688,9 +681,9 @@
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Есть варианты",
-    "count": 4,
+    "count": 6,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "Filter/control identity \"Есть варианты\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
+    "reason": "Canonical filter identity passed to selectLinkFilter. Visible chrome uses t(); display projection: visibilityFilterLabel for other surfaces."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
@@ -737,9 +730,9 @@
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Связанные с 1С",
-    "count": 4,
+    "count": 6,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "Filter/control identity \"Связанные с 1С\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
+    "reason": "Canonical filter identity passed to selectLinkFilter. Visible chrome uses t(); display projection: visibilityFilterLabel for other surfaces."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
@@ -767,7 +760,7 @@
     "literal": "Адрес из заказа",
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Адрес из заказа\". Display-only projection exists where the string is shown in UI."
+    "reason": "Canonical address identity. Display projection: addressLabel."
   },
   {
     "path": "src/screens/manager/ManagerScreen.jsx",
@@ -788,7 +781,7 @@
     "literal": "Доставка",
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Доставка\". Display-only projection exists where the string is shown in UI."
+    "reason": "Canonical shipping-mode identity used for settings comparison, not a Stage 3.1 chrome sentence."
   },
   {
     "path": "src/screens/manager/ManagerSettings.jsx",
@@ -823,7 +816,7 @@
     "literal": "Интернет магазин Clover",
     "count": 2,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Интернет магазин Clover\". Display-only projection exists where the string is shown in UI."
+    "reason": "Canonical default 1C storefront client name stored in settings; displayed as persisted business identity."
   },
   {
     "path": "src/screens/manager/ManagerStorefront.jsx",
@@ -878,8 +871,8 @@
     "path": "src/screens/manager/ManagerStorefrontInfoPages.jsx",
     "literal": "Связаться с нами",
     "count": 1,
-    "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Связаться с нами\". Display-only projection exists where the string is shown in UI."
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Info-page heading/content owned by later category/page/SEO stage."
   },
   {
     "path": "src/screens/manager/ManagerStorefrontPromotions.jsx",
@@ -913,8 +906,8 @@
     "path": "src/screens/manager/ProductEditor.jsx",
     "literal": "Прочее",
     "count": 2,
-    "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Прочее\". Display-only projection exists where the string is shown in UI."
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Real product category name remains verbatim until Stage 5. Not Stage 3.1 system chrome."
   },
   {
     "path": "src/screens/manager/ProductEditor.jsx",
@@ -1193,8 +1186,8 @@
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Связаться с нами",
     "count": 3,
-    "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Связаться с нами\". Display-only projection exists where the string is shown in UI."
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Info-page heading/content owned by later category/page/SEO stage."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
@@ -1214,8 +1207,8 @@
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Доставка",
     "count": 2,
-    "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Доставка\". Display-only projection exists where the string is shown in UI."
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Storefront info-page title owned by later page/SEO stage."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
@@ -1362,14 +1355,7 @@
     "literal": "Заказ создан",
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Заказ создан\". Display-only projection exists where the string is shown in UI."
-  },
-  {
-    "path": "src/shared/SharedPanels.jsx",
-    "literal": "Клиент",
-    "count": 1,
-    "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Клиент\". Display-only projection exists where the string is shown in UI."
+    "reason": "Synthetic missing-history fallback canonical label. Display projection: orderHistoryLabel."
   },
   {
     "path": "src/shared/SharedPanels.jsx",
@@ -1586,7 +1572,7 @@
     "literal": "Дополнительный",
     "count": 2,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Дополнительный\". Display-only projection exists where the string is shown in UI."
+    "reason": "Canonical contact identity helpers. Display projection: contactLabel at UI boundaries."
   },
   {
     "path": "src/shared/appHelpers.js",
@@ -1831,7 +1817,7 @@
     "literal": "Основной",
     "count": 2,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Основной\". Display-only projection exists where the string is shown in UI."
+    "reason": "Canonical contact identity helpers. Display projection: contactLabel at UI boundaries."
   },
   {
     "path": "src/shared/appHelpers.js",
@@ -1971,7 +1957,7 @@
     "literal": "Прочее",
     "count": 1,
     "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "BASE canonical persisted or compared identity \"Прочее\". Display-only projection exists where the string is shown in UI."
+    "reason": "Canonical category fallback identity used by taxonomy helpers until Stage 5. Not Stage 3.1 chrome."
   },
   {
     "path": "src/shared/appHelpers.js",

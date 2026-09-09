@@ -145,6 +145,7 @@ const { TARGET_INTERNAL_LOCALES } = await import(
   pathToFileURL(path.join(workRoot, "src/shared/i18n/languageRegistry.js")).href
 );
 
+const beforeSeedVersion = storeMod.readLocalizationSettings().catalogVersion;
 const first = storeMod.initializeLocalizationCatalog();
 assert.equal(first.dirty, true);
 const store1 = storeMod.readTranslationStore();
@@ -157,8 +158,9 @@ assert.equal(store1.values.some((v) => v.languageCode === "zh-CN"), true);
 assert.equal(store1.values.some((v) => v.languageCode === "zh"), false);
 
 const settings1 = storeMod.readLocalizationSettings();
-assert.ok(settings1.catalogVersion >= 1);
-const versionAfterFirst = settings1.catalogVersion;
+const afterSeedVersion = settings1.catalogVersion;
+assert.equal(afterSeedVersion, beforeSeedVersion + 1, "first seed must be exact +1");
+const versionAfterFirst = afterSeedVersion;
 const freshCompleteness = storeMod.completenessByLanguage(store1);
 for (const code of ["en", "uz", "ky", "tg", "zh", "ar"]) {
   const report = freshCompleteness[code];
@@ -180,7 +182,8 @@ assert.equal(second.dirty, false);
 const store2 = storeMod.readTranslationStore();
 assert.deepEqual(store2.entries.map((e) => e.id).sort(), ids);
 assert.equal(store2.entries.map((e) => e.updatedAt).join("|"), stamps);
-assert.equal(storeMod.readLocalizationSettings().catalogVersion, versionAfterFirst);
+const afterRestartVersion = storeMod.readLocalizationSettings().catalogVersion;
+assert.equal(afterRestartVersion, afterSeedVersion, "identical restart must be exact +0");
 
 const uiEntry = store2.entries.find((e) => e.fieldKey === "shared.modal.confirm");
 assert.ok(uiEntry);
@@ -222,9 +225,11 @@ assert.equal(staleRow.languages.en.stale, true);
 const completeness = storeMod.completenessByLanguage(staleStore);
 assert.equal(completeness.en.complete, false);
 
+const beforeResave = storeMod.readLocalizationSettings().catalogVersion;
 const resave = storeMod.saveManualTranslation(uiEntry.id, "en", "Confirm now", "admin@clover.ru");
 assert.equal(resave.changed, true);
 assert.equal(resave.value.sourceHash, staleHash);
+assert.equal(storeMod.readLocalizationSettings().catalogVersion, beforeResave + 1, "stale MANUAL resave must be exact +1");
 assert.equal(storeMod.listWorkspaceRows({ view: "interface", language: "zh" })[0].languages.zh !== undefined, true);
 
 dbMod.db.prepare("UPDATE translation_entries SET source_ru = ?, source_hash = ? WHERE id = ?").run(
@@ -241,13 +246,17 @@ const autoAfter = storeMod.readTranslationStore().values.find((v) => v.entryId =
 assert.equal(autoAfter.state, "AUTO");
 assert.notEqual(autoAfter.sourceHash, "stale-should-refresh-or-current");
 
-const resetBefore = storeMod.readLocalizationSettings().catalogVersion;
 storeMod.saveManualTranslation(autoEntry.id, "uz", "Qo'lda", "admin@clover.ru");
+const resetBefore = storeMod.readLocalizationSettings().catalogVersion;
 const reset = storeMod.resetTranslationToAuto(autoEntry.id, "uz", "admin@clover.ru");
 assert.equal(reset.changed, true);
 assert.equal(reset.value.state, "AUTO");
 assert.equal(reset.value.sourceHash, storeMod.readTranslationStore().entries.find((e) => e.id === autoEntry.id).sourceHash);
-assert.ok(storeMod.readLocalizationSettings().catalogVersion > resetBefore);
+assert.equal(
+  storeMod.readLocalizationSettings().catalogVersion,
+  resetBefore + 1,
+  "semantic reset must be exact +1"
+);
 
 const orphanId = randomUUID();
 dbMod.insertTranslationEntryRow({
@@ -313,12 +322,38 @@ try {
 assert.equal(mismatchFailed, true);
 assert.equal(storeMod.readLocalizationSettings().catalogVersion, versionBeforeReject);
 
-const enable = storeMod.writeLocalizationSettings({ enabledLanguages: ["ru", "en"] }, "admin");
-assert.equal(enable.settings.enabledLanguages.includes("en"), false);
-assert.equal(enable.rejected.includes("en"), true);
-assert.equal(enable.settings.catalogVersion, versionBeforeReject);
-const sameSettings = storeMod.writeLocalizationSettings({ enabledLanguages: ["ru"] }, "admin");
-assert.equal(sameSettings.settings.catalogVersion, versionBeforeReject);
+{
+  const current = storeMod.readLocalizationSettings();
+  dbMod.setGlobalState("localizationSettings", {
+    ...current,
+    enabledLanguages: ["ru", "en"],
+  });
+  assert.deepEqual(storeMod.readLocalizationSettings().enabledLanguages, ["ru", "en"]);
+  const beforeSemanticSettings = storeMod.readLocalizationSettings().catalogVersion;
+  const dropForeign = storeMod.writeLocalizationSettings({ enabledLanguages: ["ru"] }, "admin");
+  assert.deepEqual(dropForeign.settings.enabledLanguages, ["ru"]);
+  assert.equal(dropForeign.rejected.includes("en"), false);
+  assert.equal(
+    dropForeign.settings.catalogVersion,
+    beforeSemanticSettings + 1,
+    "semantic settings mutation must be exact +1"
+  );
+  const identicalSettings = storeMod.writeLocalizationSettings({ enabledLanguages: ["ru"] }, "admin");
+  assert.deepEqual(identicalSettings.settings.enabledLanguages, ["ru"]);
+  assert.equal(
+    identicalSettings.settings.catalogVersion,
+    dropForeign.settings.catalogVersion,
+    "identical settings must be exact +0"
+  );
+  const rejectedEnable = storeMod.writeLocalizationSettings({ enabledLanguages: ["ru", "en"] }, "admin");
+  assert.equal(rejectedEnable.settings.enabledLanguages.includes("en"), false);
+  assert.deepEqual(rejectedEnable.settings.enabledLanguages, ["ru"]);
+  assert.equal(
+    rejectedEnable.settings.catalogVersion,
+    dropForeign.settings.catalogVersion,
+    "rejected foreign enable must be exact +0"
+  );
+}
 
 assert.equal(storeMod.completenessByLanguage().ru.complete, true);
 const unsupported = (await import(pathToFileURL(path.join(workRoot, "src/shared/i18n/localizationSettings.js")).href))
@@ -357,26 +392,42 @@ assert.equal(Object.hasOwn(projected[autoVal.languageCode] || {}, snapshot.entri
 assert.equal(storeMod.readLocalizationSettings().enabledLanguages.includes("en"), false);
 
 {
-  let emptyNs = false;
-  try {
-    dbMod.db.prepare(
-      `INSERT INTO translation_entries(id, namespace, entity_type, entity_id, field_key, source_ru, source_hash, critical, created_at, updated_at)
-       VALUES ('ns-empty', '  ', '', '', 'k', 'Текст', 'abc', 0, 'now', 'now')`
-    ).run();
-  } catch {
-    emptyNs = true;
+  function assertConstraintRejects({ id, namespace, fieldKey, message }) {
+    let rejected = false;
+    try {
+      dbMod.db.prepare(
+        `INSERT INTO translation_entries(id, namespace, entity_type, entity_id, field_key, source_ru, source_hash, critical, created_at, updated_at)
+         VALUES (?, ?, '', '', ?, 'Текст', 'abc', 0, 'now', 'now')`
+      ).run(id, namespace, fieldKey);
+    } catch {
+      rejected = true;
+    }
+    assert.equal(rejected, true, message);
   }
-  assert.equal(emptyNs, true, "empty namespace must fail");
-  let emptyField = false;
-  try {
-    dbMod.db.prepare(
-      `INSERT INTO translation_entries(id, namespace, entity_type, entity_id, field_key, source_ru, source_hash, critical, created_at, updated_at)
-       VALUES ('fk-empty', 'ui', '', '', '  ', 'Текст', 'abc', 0, 'now', 'now')`
-    ).run();
-  } catch {
-    emptyField = true;
-  }
-  assert.equal(emptyField, true, "empty field_key must fail");
+  assertConstraintRejects({
+    id: "ns-empty-string",
+    namespace: "",
+    fieldKey: "k-empty-ns",
+    message: "namespace empty string must fail",
+  });
+  assertConstraintRejects({
+    id: "ns-whitespace",
+    namespace: "  ",
+    fieldKey: "k-ws-ns",
+    message: "namespace whitespace must fail",
+  });
+  assertConstraintRejects({
+    id: "fk-empty-string",
+    namespace: "ui",
+    fieldKey: "",
+    message: "field_key empty string must fail",
+  });
+  assertConstraintRejects({
+    id: "fk-whitespace",
+    namespace: "ui",
+    fieldKey: "  ",
+    message: "field_key whitespace must fail",
+  });
 }
 
 {
@@ -393,8 +444,14 @@ assert.equal(storeMod.readLocalizationSettings().enabledLanguages.includes("en")
 }
 
 {
+  const identResetBefore = storeMod.readLocalizationSettings().catalogVersion;
   const identReset = storeMod.resetTranslationToAuto(autoEntry.id, "uz", "admin@clover.ru");
   assert.equal(identReset.changed, false);
+  assert.equal(
+    storeMod.readLocalizationSettings().catalogVersion,
+    identResetBefore,
+    "identical reset must be exact +0"
+  );
 }
 
 {
@@ -441,10 +498,11 @@ assert.equal(storeMod.readLocalizationSettings().enabledLanguages.includes("en")
   assert.equal(hasRole("manager", ["admin"]), false);
   assert.equal(hasRole("client", ["admin"]), false);
   assert.equal(hasRole("", ["admin"]), false);
-  const versionBeforeDenied = storeMod.readLocalizationSettings().catalogVersion;
-  const rowCountBefore = storeMod.readTranslationStore().values.length;
-  void versionBeforeDenied;
-  void rowCountBefore;
+  const { runTranslationAuthHttpTest } = await import(
+    pathToFileURL(path.join(workRoot, "server/scripts/i18n-stage31-http-auth.mjs")).href
+  );
+  const httpAuth = await runTranslationAuthHttpTest({ workRoot });
+  assert.equal(httpAuth.host, "127.0.0.1");
 }
 
 {

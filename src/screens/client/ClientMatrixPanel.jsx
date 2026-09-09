@@ -128,7 +128,7 @@ export function ClientMatrixPanel({
               key={item}
               onClick={() => setCategory(item)}
             >
-              {item}
+              {item === "Все" ? t("shared.filter.all") : item}
             </button>
           ))}
         </div>

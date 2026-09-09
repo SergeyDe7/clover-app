@@ -68,7 +68,7 @@ export function parseManagerNotification(item, t) {
       deliveryDate: labeledDelivery,
       orderDate: notificationOrderDateTime(labeledOrderDate, item?.createdAt),
       orderNumber: labeledNumber.replace(/^№\s*/, ""),
-      detail: changed ? (t ? t("manager.changed") : t("manager.changed")) : "",
+      detail: changed ? (typeof t === "function" ? t("manager.changed") : "Изменён") : "",
       headline: "",
       hideFooterTime: true,
     };

@@ -6,7 +6,7 @@ import cloverLogo from "../assets/clover-logo.png";
 import { startPasskeyRegistration } from "../utils/webauthn";
 import { api, setApiToken } from "../serverApi";
 import { formatDateTime } from "./appHelpers";
-import { orderHistoryLabel } from "./i18n/displayLabels";
+import { historyActorLabel, orderHistoryLabel } from "./i18n/displayLabels";
 import { appConfirm } from "./AppModal";
 import {
   installPushSyncListeners,
@@ -54,7 +54,7 @@ export function OrderTimeline({ order }) {
         {
           id: `created-${order.id}`,
           label: "Заказ создан",
-          actor: order.customerContact || "Клиент",
+          actor: order.customerContact || t("shared.role.client"),
           createdAt: order.createdAt,
         },
       ];
@@ -73,7 +73,7 @@ export function OrderTimeline({ order }) {
           >
             <div style={{ fontWeight: 700 }}>{orderHistoryLabel(item.label, t)}</div>
             <small>
-              {formatDateTime(item.createdAt)} · {item.actor || t("shared.role.system")}
+              {formatDateTime(item.createdAt)} · {historyActorLabel(item.actor, t) || t("shared.role.system")}
             </small>
           </div>
         ))}

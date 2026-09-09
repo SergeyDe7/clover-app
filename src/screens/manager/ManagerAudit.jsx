@@ -3,6 +3,7 @@ import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useEffect, useState } from "react";
 import { api } from "../../serverApi";
 import { formatDateTime } from "../../shared/appHelpers";
+import { backupReasonLabel } from "../../shared/i18n/displayLabels";
 
 export const AUDIT_ACTION_LABELS = {
   "auth.register": "manager.clientRegistered",
@@ -78,7 +79,7 @@ function formatAuditDetails(item, t) {
           })
         : t("manager.productRemovedFromTheCatalog");
     case "backup.create": {
-      const reason = details.reason || t("manager.audit.backupFallback");
+      const reason = backupReasonLabel(details.reason, t) || t("manager.audit.backupFallback");
       return details.photoCount !== undefined
         ? t("manager.audit.backupWithPhotos", { reason, photoCount: details.photoCount })
         : reason;

@@ -10,7 +10,7 @@ import {
   isClientProfileComplete,
   syncContactRoleLabel,
 } from "../../shared/appHelpers";
-import { contactLabel } from "../../shared/i18n/displayLabels";
+import { contactLabel, contactRoleLabel } from "../../shared/i18n/displayLabels";
 
 const MAX_PROFILE_CONTACTS = 5;
 
@@ -249,12 +249,12 @@ export function ProfilePanel({ profile, onChange }) {
               ))}
             </div>
             <datalist id="profile-contact-labels">
-              <option value="Директор" />
-              <option value="Бухгалтер" />
-              <option value="Склад" />
-              <option value="Закупки" />
-              <option value="Приём товара" />
-              <option value="Менеджер" />
+              <option value="Директор" label={contactRoleLabel("Директор", t)} />
+              <option value="Бухгалтер" label={contactRoleLabel("Бухгалтер", t)} />
+              <option value="Склад" label={contactRoleLabel("Склад", t)} />
+              <option value="Закупки" label={contactRoleLabel("Закупки", t)} />
+              <option value="Приём товара" label={contactRoleLabel("Приём товара", t)} />
+              <option value="Менеджер" label={contactRoleLabel("Менеджер", t)} />
             </datalist>
           </div>
 

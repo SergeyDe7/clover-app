@@ -489,6 +489,14 @@ export const SEEDS = {
     "zh-CN": "对账单",
     "ar": "كشف المطابقة"
   },
+  "client.nav.cabinet": {
+    "en": "Settings",
+    "uz": "Sozlamalar",
+    "ky": "Жөндөөлөр",
+    "tg": "Танзимот",
+    "zh-CN": "设置",
+    "ar": "الإعدادات"
+  },
   "client.nav.addresses": {
     "en": "Addresses",
     "uz": "Manzillar",
@@ -14224,6 +14232,166 @@ export const SEEDS = {
     "tg": "Боз диданашуда: {count}",
     "zh-CN": "还有未查看：{count}",
     "ar": "المزيد غير المُشاهَد: {count}"
+  },
+  "shared.orderHistory.clientAddendum": {
+    "en": "The client added items (addendum)",
+    "uz": "Mijoz pozitsiyalar qo‘shdi (qo‘shimcha buyurtma)",
+    "ky": "Кардар позицияларды кошкон (кошумча заказ)",
+    "tg": "Мизоҷ мавқеъҳо илова кард (фармоиши иловагӣ)",
+    "zh-CN": "客户添加了商品（追加订单）",
+    "ar": "أضاف العميل بنوداً (طلب إضافي)"
+  },
+  "shared.orderHistory.clientEdit": {
+    "en": "The client changed the order contents or terms",
+    "uz": "Mijoz buyurtma tarkibi yoki shartlarini o‘zgartirdi",
+    "ky": "Кардар заказдын курамын же шарттарын өзгөрткөн",
+    "tg": "Мизоҷ таркиб ё шартҳои фармоишро тағйир дод",
+    "zh-CN": "客户更改了订单内容或条件",
+    "ar": "غيّر العميل محتويات الطلب أو شروطه"
+  },
+  "shared.orderHistory.statusChanged": {
+    "en": "Status changed: {from} → {to}",
+    "uz": "Holat o‘zgardi: {from} → {to}",
+    "ky": "Статус өзгөрдү: {from} → {to}",
+    "tg": "Статус тағйир ёфт: {from} → {to}",
+    "zh-CN": "状态已更改：{from} → {to}",
+    "ar": "تغيرت الحالة: {from} → {to}"
+  },
+  "shared.orderHistory.statusBulkChanged": {
+    "en": "Status changed in bulk: {from} → {to}",
+    "uz": "Holat ommaviy o‘zgartirildi: {from} → {to}",
+    "ky": "Статус топтом менен өзгөртүлдү: {from} → {to}",
+    "tg": "Статус ба таври оммавӣ тағйир ёфт: {from} → {to}",
+    "zh-CN": "已批量更改状态：{from} → {to}",
+    "ar": "تم تغيير الحالة بالجملة: {from} → {to}"
+  },
+  "shared.reconciliation.status.processing": {
+    "en": "Preparing",
+    "uz": "Tayyorlanmoqda",
+    "ky": "Даярдалууда",
+    "tg": "Омода мешавад",
+    "zh-CN": "正在准备",
+    "ar": "قيد التحضير"
+  },
+  "shared.reconciliation.status.ready": {
+    "en": "Ready",
+    "uz": "Tayyor",
+    "ky": "Даяр",
+    "tg": "Омода",
+    "zh-CN": "已就绪",
+    "ar": "جاهز"
+  },
+  "shared.reconciliation.period.q1": {
+    "en": "Q1",
+    "uz": "1-chorak",
+    "ky": "1-чейрек",
+    "tg": "чоряки 1",
+    "zh-CN": "第一季度",
+    "ar": "الربع الأول"
+  },
+  "shared.reconciliation.period.q2": {
+    "en": "Q2",
+    "uz": "2-chorak",
+    "ky": "2-чейрек",
+    "tg": "чоряки 2",
+    "zh-CN": "第二季度",
+    "ar": "الربع الثاني"
+  },
+  "shared.reconciliation.period.q3": {
+    "en": "Q3",
+    "uz": "3-chorak",
+    "ky": "3-чейрек",
+    "tg": "чоряки 3",
+    "zh-CN": "第三季度",
+    "ar": "الربع الثالث"
+  },
+  "shared.reconciliation.period.q4": {
+    "en": "Q4",
+    "uz": "4-chorak",
+    "ky": "4-чейрек",
+    "tg": "чоряки 4",
+    "zh-CN": "第四季度",
+    "ar": "الربع الرابع"
+  },
+  "shared.reconciliation.period.all": {
+    "en": "For the entire period",
+    "uz": "Butun davr uchun",
+    "ky": "Бүткүл мезгил үчүн",
+    "tg": "Барои тамоми давра",
+    "zh-CN": "整个期间",
+    "ar": "لكامل الفترة"
+  },
+  "shared.reconciliation.period.custom": {
+    "en": "Custom period",
+    "uz": "Belgilangan davr",
+    "ky": "Белгиленген мезгил",
+    "tg": "Давраи муайян",
+    "zh-CN": "指定期间",
+    "ar": "فترة محددة"
+  },
+  "manager.backup.reason.manualDefault": {
+    "en": "Manual backup",
+    "uz": "Qo‘lda zaxira nusxa",
+    "ky": "Кол менен резервдик көчүрмө",
+    "tg": "Нусхаи эҳтиётии дастӣ",
+    "zh-CN": "手动备份",
+    "ar": "نسخة احتياطية يدوية"
+  },
+  "manager.backup.reason.beforeRestore": {
+    "en": "Automatic copy before restore",
+    "uz": "Tiklashdan oldingi avtomatik nusxa",
+    "ky": "Калыбына келтирүүдөн мурунку автоматтык көчүрмө",
+    "tg": "Нусхаи худкор пеш аз барқарорсозӣ",
+    "zh-CN": "恢复前的自动备份",
+    "ar": "نسخة تلقائية قبل الاستعادة"
+  },
+  "manager.backup.reason.beforeReset": {
+    "en": "Automatic copy before full reset",
+    "uz": "To‘liq tiklashdan oldingi avtomatik nusxa",
+    "ky": "Толук баштапкы абалга келтирүүдөн мурунку автоматтык көчүрмө",
+    "tg": "Нусхаи худкор пеш аз барқароркунии пурра",
+    "zh-CN": "完全重置前的自动备份",
+    "ar": "نسخة تلقائية قبل إعادة الضبط الكامل"
+  },
+  "manager.backup.reason.dailyStart": {
+    "en": "Automatic full copy on the first start of the day",
+    "uz": "Kunning birinchi ishga tushishidagi avtomatik to‘liq nusxa",
+    "ky": "Күндүн биринчи иштетилгендеги автоматтык толук көчүрмө",
+    "tg": "Нусхаи пурраи худкор ҳангоми аввалин оғоз дар як рӯз",
+    "zh-CN": "当天首次启动时的自动完整备份",
+    "ar": "نسخة كاملة تلقائية عند أول تشغيل في اليوم"
+  },
+  "manager.clients.noCode": {
+    "en": "no code",
+    "uz": "kodsiz",
+    "ky": "кодсуз",
+    "tg": "бе рамз",
+    "zh-CN": "无代码",
+    "ar": "بدون رمز"
+  },
+  "shared.orderHistory.createdFromSite": {
+    "en": "Order created from the website",
+    "uz": "Buyurtma saytdan yaratildi",
+    "ky": "Заказ сайттан түзүлдү",
+    "tg": "Фармоиш аз сомона эҷод шуд",
+    "zh-CN": "订单已从网站创建",
+    "ar": "تم إنشاء الطلب من الموقع"
+  },
+  "shared.orderHistory.exchangeCancelledManual": {
+    "en": "1C transfer cancelled: the order was processed manually",
+    "uz": "1C ga yuborish bekor qilindi: buyurtma qo‘lda qayta ishlandi",
+    "ky": "1C өткөрүү жокко чыгарылды: заказ кол менен иштелди",
+    "tg": "Интиқол ба 1С бекор шуд: фармоиш дастӣ коркард шуд",
+    "zh-CN": "1C 传输已取消：订单已手动处理",
+    "ar": "أُلغي النقل إلى 1C: تمت معالجة الطلب يدوياً"
+  },
+  "shared.orderHistory.statusChangedOneC": {
+    "en": "Status changed: {from} → {to} (1C: {state})",
+    "uz": "Holat o‘zgardi: {from} → {to} (1C: {state})",
+    "ky": "Статус өзгөрдү: {from} → {to} (1C: {state})",
+    "tg": "Статус тағйир ёфт: {from} → {to} (1C: {state})",
+    "zh-CN": "状态已更改：{from} → {to}（1C：{state}）",
+    "ar": "تغيرت الحالة: {from} → {to} (1C: {state})"
   }
 };
 
@@ -14637,28 +14805,7 @@ export const SEED_EXACT_RU_ALLOWLIST = Object.freeze([
   }
 ]);
 
-export const SEED_SCRIPT_EXCEPTIONS = Object.freeze([
-  {
-    key: "storefront.footer.copyright",
-    locale: "ky",
-    reason: "brand copyright token © Clover is Latin in every locale",
-  },
-  {
-    key: "storefront.footer.copyright",
-    locale: "tg",
-    reason: "brand copyright token © Clover is Latin in every locale",
-  },
-  {
-    key: "storefront.footer.copyright",
-    locale: "zh-CN",
-    reason: "brand copyright token © Clover is Latin in every locale",
-  },
-  {
-    key: "storefront.footer.copyright",
-    locale: "ar",
-    reason: "brand copyright token © Clover is Latin in every locale",
-  },
-]);
+export const SEED_SCRIPT_EXCEPTIONS = Object.freeze([]);
 
 export function getSeedTranslation(key, locale) {
   const row = SEEDS[key];

@@ -46,7 +46,17 @@ const HOST_UNAVAILABLE_RU = Object.freeze({
 });
 
 function isOmitted(value) {
-  return value === undefined;
+  if (value == null) return true;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.toLowerCase() === "null") return true;
+  }
+  return false;
+}
+
+function nonEmptyText(value, fallback) {
+  const text = value == null ? "" : String(value);
+  return text.trim() ? text : fallback;
 }
 
 export async function appConfirm({
@@ -197,22 +207,34 @@ export function AppModalHost() {
   if (!dialog || typeof document === "undefined") return null;
 
   const isConfirm = dialog.mode === "confirm";
-  const resolvedTitle = isOmitted(dialog.title)
-    ? isConfirm
-      ? t("shared.modal.confirmTitle")
-      : t("shared.modal.alertTitle")
-    : dialog.title;
-  const resolvedConfirmLabel = isOmitted(dialog.confirmLabel)
-    ? isConfirm
-      ? t("shared.modal.confirm")
-      : t("shared.modal.ok")
-    : dialog.confirmLabel;
-  const resolvedCancelLabel = isOmitted(dialog.cancelLabel)
-    ? t("shared.modal.cancel")
-    : dialog.cancelLabel;
-  const resolvedExpandableSummary = isOmitted(dialog.expandable?.summary)
-    ? t("shared.modal.orderContents")
-    : dialog.expandable.summary;
+  const resolvedTitle = nonEmptyText(
+    isOmitted(dialog.title)
+      ? isConfirm
+        ? t("shared.modal.confirmTitle")
+        : t("shared.modal.alertTitle")
+      : dialog.title,
+    isConfirm ? HOST_UNAVAILABLE_RU.confirmTitle : HOST_UNAVAILABLE_RU.alertTitle
+  );
+  const resolvedConfirmLabel = nonEmptyText(
+    isOmitted(dialog.confirmLabel)
+      ? isConfirm
+        ? t("shared.modal.confirm")
+        : t("shared.modal.ok")
+      : dialog.confirmLabel,
+    isConfirm ? HOST_UNAVAILABLE_RU.confirm : HOST_UNAVAILABLE_RU.ok
+  );
+  const resolvedCancelLabel = nonEmptyText(
+    isOmitted(dialog.cancelLabel) ? t("shared.modal.cancel") : dialog.cancelLabel,
+    HOST_UNAVAILABLE_RU.cancel
+  );
+  const resolvedExpandableSummary = nonEmptyText(
+    isOmitted(dialog.expandable?.summary)
+      ? isConfirm
+        ? t("shared.modal.orderContents")
+        : t("shared.modal.details")
+      : dialog.expandable.summary,
+    isConfirm ? HOST_UNAVAILABLE_RU.orderContents : HOST_UNAVAILABLE_RU.details
+  );
   const confirmClass =
     dialog.tone === "danger"
       ? "danger-button order-thankyou-button"

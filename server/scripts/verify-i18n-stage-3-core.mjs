@@ -107,8 +107,10 @@ assert.doesNotMatch(
 );
 assert.match(appModalSrc, /const HOST_UNAVAILABLE_RU = Object\.freeze/);
 assert.match(appModalSrc, /confirmTitle: "Подтвердите действие"/);
-assert.match(appModalSrc, /function isOmitted\(value\) \{\s*return value === undefined;/);
-assert.match(appModalSrc, /resolvedTitle = isOmitted\(dialog\.title\)/);
+assert.match(appModalSrc, /function isOmitted\(value\) \{/);
+assert.match(appModalSrc, /if \(value == null\) return true;/);
+assert.match(appModalSrc, /trimmed\.toLowerCase\(\) === "null"/);
+assert.match(appModalSrc, /isOmitted\(dialog\.title\)/);
 assert.match(appModalSrc, /t\("shared\.modal\.confirmTitle"\)/);
 assert.match(appModalSrc, /t\("shared\.modal\.confirm"\)/);
 assert.match(appModalSrc, /t\("shared\.modal\.cancel"\)/);
