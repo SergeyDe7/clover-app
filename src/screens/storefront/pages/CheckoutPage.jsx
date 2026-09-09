@@ -161,7 +161,10 @@ export function CheckoutPage() {
         </label>
         <div className="sf-checkout-summary sf-field-wide">
           <p>
-            Товары: {items.length} поз. · {formatMoney(goodsTotal)}
+            {t("checkout.summary.goodsCountAmount", {
+              count: items.length,
+              amount: formatMoney(goodsTotal),
+            })}
           </p>
           <p
             className={`sf-delivery-note${
@@ -169,7 +172,10 @@ export function CheckoutPage() {
             }`}
           >
             {deliveryFee > 0
-              ? `Доставка по СПб — ${formatMoney(PAID_DELIVERY_FEE)} (заказ менее ${formatMoney(FREE_DELIVERY_MIN_TOTAL)})`
+              ? t("storefront.checkout.paidDeliverySpb", {
+                  fee: formatMoney(PAID_DELIVERY_FEE),
+                  freeFrom: formatMoney(FREE_DELIVERY_MIN_TOTAL),
+                })
               : t("storefront.deliveryInSpbIsFree")}
           </p>
           <p>{

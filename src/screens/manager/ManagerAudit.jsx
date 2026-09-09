@@ -26,57 +26,73 @@ export const AUDIT_ACTION_LABELS = {
   "server.reset": "manager.fullResetCompleted",
   "exchange.check": "manager.orderCheckedFor1c",
   "exchange.send.test": "manager.orderQueuedFor1c",
-  "exchange.send.error": "manager.text8",
-  "exchange.reset": "manager.text12",
+  "exchange.send.error": "manager.exchange.send.testError",
+  "exchange.reset": "manager.exchange.status.reset",
   "exchange.download.order": "manager.orderFileDownloadedFor1c",
   "exchange.download.batch": "manager.orderPackDownloadedFor1c",
-  "exchange.config.save": "manager.text15",
-  "exchange.connection.test": "manager.text10",
-  "exchange.connection.error": "manager.text7",
-  "exchange.catalog.preview": "manager.text11",
+  "exchange.config.save": "manager.exchange.config.saved",
+  "exchange.connection.test": "manager.exchange.connection.checked",
+  "exchange.connection.error": "manager.exchange.connection.error",
+  "exchange.catalog.preview": "manager.exchange.catalog.previewed",
   "exchange.catalog.error": "manager.failedToReadThe1cCatalog",
   "one-c.products.receive": "manager.nomenclatureReceivedFrom1c",
   "one-c.products.auto-link": "manager.productsWereMatchedWith1cAutomatically",
-  "exchange.send.draft": "manager.text13",
+  "exchange.send.draft": "manager.exchange.draft.created",
   "exchange.send.draft.error": "manager.failedToCreateA1cDraft",
 };
 
 function formatAuditDetails(item, t) {
   const details = item?.details || {};
+  const dash = "—";
 
   switch (item?.action) {
     case "orders.save":
-      return `Заказов сохранено: ${Number(details.count) || 0}`;
+      return t("shared.ordersSavedCount", { count: Number(details.count) || 0 });
     case "products.save":
-      return `Товаров в каталоге: ${Number(details.count) || 0}`;
+      return t("shared.productsInCatalogCount", { count: Number(details.count) || 0 });
     case "client.matrix.save":
-      return `Изменено клиентов: ${Number(details.clients) || 0}`;
+      return t("shared.clientsChangedCount", { count: Number(details.clients) || 0 });
     case "client.profile.manager_update":
-      return `Клиент: ${details.clientId || "—"} · адресов: ${Number(details.addresses) || 0}${details.changedEmail ? " · изменён email для входа" : ""}`;
+      return details.changedEmail
+        ? t("manager.audit.clientAddressesEmailChanged", {
+            clientId: details.clientId || dash,
+            addresses: Number(details.addresses) || 0,
+          })
+        : t("manager.audit.clientAddresses", {
+            clientId: details.clientId || dash,
+            addresses: Number(details.addresses) || 0,
+          });
     case "product.image.upload":
       return details.productName
-        ? `Товар: ${details.productName}`
+        ? t("shared.productName2", { name: details.productName })
         : t("manager.photoUploaded");
     case "product.image.delete":
       return details.productName
-        ? `Товар: ${details.productName}`
+        ? t("shared.productName2", { name: details.productName })
         : t("manager.photoDeleted");
     case "product.delete":
       return details.productName
-        ? `Товар: ${details.productName} · матриц: ${Number(details.matricesChanged) || 0}`
+        ? t("manager.audit.productMatrices", {
+            name: details.productName,
+            count: Number(details.matricesChanged) || 0,
+          })
         : t("manager.productRemovedFromTheCatalog");
-    case "backup.create":
-      return `${details.reason || "Резервная копия"}${
-        details.photoCount !== undefined
-          ? ` · фотографий: ${details.photoCount}`
-          : ""
-      }`;
+    case "backup.create": {
+      const reason = details.reason || t("manager.audit.backupFallback");
+      return details.photoCount !== undefined
+        ? t("manager.audit.backupWithPhotos", { reason, photoCount: details.photoCount })
+        : reason;
+    }
     case "backup.restore":
-      return `Файл: ${details.fileName || "копия"} · фотографий восстановлено: ${
-        Number(details.restoredPhotos) || 0
-      }`;
+      return t("manager.audit.backupRestored", {
+        fileName: details.fileName || t("manager.audit.backupCopyFallback"),
+        count: Number(details.restoredPhotos) || 0,
+      });
     case "backup.cleanup":
-      return `Удалено копий: ${Array.isArray(details.removed) ? details.removed.length : 0} · осталось: ${Number(details.remaining) || 0}`;
+      return t("manager.audit.backupCleanup", {
+        removed: Array.isArray(details.removed) ? details.removed.length : 0,
+        remaining: Number(details.remaining) || 0,
+      });
     case "settings.save":
       return t("manager.cabinetSettingsUpdated");
     case "auth.login":
@@ -86,35 +102,81 @@ function formatAuditDetails(item, t) {
     case "server.reset":
       return t("manager.dataWasResetAfterASafety");
     case "exchange.check":
-      return `Заказ № ${details.orderNumber || "—"} · ${details.ready ? "готов к передаче" : `ошибок: ${(details.issues || []).length}`}`;
+      return details.ready
+        ? t("manager.audit.orderReady", { number: details.orderNumber || dash })
+        : t("manager.audit.orderIssues", {
+            number: details.orderNumber || dash,
+            count: (details.issues || []).length,
+          });
     case "exchange.send.test":
-      return `Заказ № ${details.orderNumber || "—"} · Заказ покупателя: ${details.receipt || "—"}`;
+      return t("manager.audit.orderReceipt", {
+        number: details.orderNumber || dash,
+        receipt: details.receipt || dash,
+      });
     case "exchange.send.error":
-      return `Заказ № ${details.orderNumber || "—"} · ошибок: ${(details.issues || []).length}`;
+      return t("manager.audit.orderIssues", {
+        number: details.orderNumber || dash,
+        count: (details.issues || []).length,
+      });
     case "exchange.reset":
-      return `Заказ № ${details.orderNumber || "—"}`;
+      return t("shared.print.orderHeading", { number: details.orderNumber || dash });
     case "exchange.download.order":
-      return `Заказ № ${details.orderNumber || "—"} · формат: ${String(details.format || "json").toUpperCase()}`;
+      return t("manager.audit.orderFormat", {
+        number: details.orderNumber || dash,
+        format: String(details.format || "json").toUpperCase(),
+      });
     case "exchange.download.batch":
-      return `Формат: ${String(details.format || "json").toUpperCase()} · заказов: ${Number(details.count) || 0}`;
+      return t("manager.audit.batchFormat", {
+        format: String(details.format || "json").toUpperCase(),
+        count: Number(details.count) || 0,
+      });
     case "exchange.config.save":
-      return `Режим: ${details.mode === "real" ? "реальная 1С" : t("manager.simulator")} · адрес: ${details.baseUrlConfigured ? "заполнен" : "не заполнен"}`;
+      return t("manager.audit.exchangeConfig", {
+        mode: details.mode === "real" ? t("manager.audit.modeReal") : t("manager.simulator"),
+        address: details.baseUrlConfigured
+          ? t("manager.audit.addressFilled")
+          : t("manager.audit.addressEmpty"),
+      });
     case "exchange.connection.test":
-      return `${details.mode === "real" ? "Реальная 1С" : "Симулятор"} · ${details.configuration || "подключение проверено"}`;
+      return t("manager.audit.connectionOk", {
+        mode: details.mode === "real" ? t("manager.audit.modeRealTitle") : t("manager.audit.modeSimulatorTitle"),
+        detail: details.configuration || t("manager.audit.connectionChecked"),
+      });
     case "exchange.connection.error":
       return details.message || t("manager.connectionError");
     case "exchange.catalog.preview":
-      return `${details.type === "clients" ? t("manager.counterparties") : t("manager.nomenclature")} · записей: ${Number(details.count) || 0}`;
+      return t("manager.audit.catalogPreview", {
+        type: details.type === "clients" ? t("manager.counterparties") : t("manager.nomenclature"),
+        count: Number(details.count) || 0,
+      });
     case "exchange.catalog.error":
-      return `${details.type || "Справочник"} · ${details.message || "ошибка"}`;
+      return t("manager.audit.catalogError", {
+        type: details.type || t("manager.audit.directory"),
+        message: details.message || t("manager.audit.errorWord"),
+      });
     case "one-c.products.receive":
-      return `Получено: ${Number(details.received) || 0} · новых связей: ${Number(details.newlyLinked) || 0} · без совпадения: ${Number(details.unmatched) || 0}`;
+      return t("manager.audit.nomenclatureReceived", {
+        received: Number(details.received) || 0,
+        newlyLinked: Number(details.newlyLinked) || 0,
+        unmatched: Number(details.unmatched) || 0,
+      });
     case "one-c.products.auto-link":
-      return `Товаров Clover: ${Number(details.cloverTotal) || 0} · связанных: ${Number(details.linked) || 0} · новых связей: ${Number(details.newlyLinked) || 0}`;
+      return t("manager.audit.autoLinkSummary", {
+        cloverTotal: Number(details.cloverTotal) || 0,
+        linked: Number(details.linked) || 0,
+        newlyLinked: Number(details.newlyLinked) || 0,
+      });
     case "exchange.send.draft":
-      return `Заказ № ${details.orderNumber || "—"} · документ ${details.documentNumber || details.documentId || "создан"} · ${details.mode === "real" ? t("manager.nav.exchange") : t("manager.simulator")}`;
+      return t("manager.audit.draftCreated", {
+        number: details.orderNumber || dash,
+        document: details.documentNumber || details.documentId || t("manager.audit.documentCreated"),
+        mode: details.mode === "real" ? t("manager.nav.exchange") : t("manager.simulator"),
+      });
     case "exchange.send.draft.error":
-      return `Заказ № ${details.orderNumber || "—"} · ${details.message || "ошибка"}`;
+      return t("manager.audit.orderError", {
+        number: details.orderNumber || dash,
+        message: details.message || t("manager.audit.errorWord"),
+      });
     default:
       return "";
   }

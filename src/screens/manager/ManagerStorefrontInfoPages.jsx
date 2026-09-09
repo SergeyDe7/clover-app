@@ -48,7 +48,7 @@ function routeFromSelect(value) {
 function emptyBlock(type) {
   if (type === "list") return { type: "list", items: [""] };
   if (type === "route") {
-    return { type: "route", label: "Напишите нам", route: { name: "contacts" } };
+    return { type: "route", label: "Связаться с нами", route: { name: "contacts" } };
   }
   if (type === "h2") return { type: "h2", text: "" };
   if (type === "lead") return { type: "lead", text: "" };
@@ -131,7 +131,7 @@ export function ManagerStorefrontInfoPages({ pages, onChange }) {
 
           {legal && view.updatedAt ? (
             <p className="storefront-settings-hint">
-              Последнее сохранение: {new Date(view.updatedAt).toLocaleString("ru-RU")}
+              {t("manager.storefront.lastSave", { datetime: new Date(view.updatedAt).toLocaleString("ru-RU") })}
             </p>
           ) : null}
 
@@ -252,7 +252,7 @@ export function ManagerStorefrontInfoPages({ pages, onChange }) {
                   </div>
                 ) : (
                   <label className="field field-wide">{
-                    t("manager.text19")
+                    t("manager.field.bodyText")
                     }<textarea
                       rows={block.type === "h2" ? 2 : 4}
                       value={block.text || ""}

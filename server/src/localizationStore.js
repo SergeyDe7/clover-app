@@ -17,12 +17,13 @@ import {
   PUBLIC_LOCALE_CODES,
   TARGET_INTERNAL_LOCALES,
   canonicalizeTargetLocale,
+  isSupportedPublicLocale,
   isSupportedTargetLocale,
   toPublicLocaleCode,
 } from "../../src/shared/i18n/languageRegistry.js";
 import { sourceHash } from "../../src/shared/i18n/sourceHash.js";
 import { placeholdersMatch, isNonEmptyText } from "../../src/shared/i18n/placeholderValidation.js";
-import { UI_CATALOG, UI_CATALOG_BY_KEY } from "../../src/shared/i18n/uiCatalog.js";
+import { UI_CATALOG, hasCatalogKey } from "../../src/shared/i18n/uiCatalog.js";
 import { getSeedTranslation } from "./i18n/uiTranslationSeed.js";
 import {
   LOCALIZATION_SETTINGS_KEY,
@@ -130,57 +131,75 @@ function persistSettings(next) {
 }
 
 function bumpCatalogVersion(current, actor) {
-  const next = normalizeLocalizationSettings({
-    ...current,
-    catalogVersion: Number(current.catalogVersion || 0) + 1,
-    updatedAt: nowIso(),
-    updatedBy: actor || current.updatedBy || "",
-  });
-  persistSettings(next);
-  return next;
+  return persistSettings(
+    normalizeLocalizationSettings({
+      ...current,
+      catalogVersion: Number(current.catalogVersion || 0) + 1,
+      updatedAt: nowIso(),
+      updatedBy: actor || current.updatedBy || "",
+    })
+  );
 }
 
-function settingsEqual(a, b) {
-  const left = normalizeLocalizationSettings(a);
-  const right = normalizeLocalizationSettings(b);
-  return (
-    left.enabledLanguages.join("\0") === right.enabledLanguages.join("\0") &&
-    Number(left.catalogVersion) === Number(right.catalogVersion)
-  );
+function invalidLocaleError(message = "Unsupported localization language.") {
+  const error = new Error(message);
+  error.status = 400;
+  error.code = "UNSUPPORTED_LOCALE";
+  return error;
+}
+
+function requirePublicEnabledLanguages(value) {
+  if (!Array.isArray(value)) {
+    throw invalidLocaleError("enabledLanguages must be an array of public locale codes.");
+  }
+  for (const code of value) {
+    if (typeof code !== "string" || !code.trim()) {
+      throw invalidLocaleError("enabledLanguages must contain non-empty public locale codes.");
+    }
+    if (!PUBLIC_LOCALE_CODES.includes(code) || !isSupportedPublicLocale(code)) {
+      throw invalidLocaleError("Unsupported localization language.");
+    }
+  }
 }
 
 export function writeLocalizationSettings(patch = {}, actor = "") {
-  const current = readLocalizationSettings();
-  const translations = readTranslationStore();
-  const reports = completenessByLanguage(translations);
-  const applied = applyEnabledLanguages(
-    current.enabledLanguages,
-    patch.enabledLanguages ?? current.enabledLanguages,
-    reports
-  );
-  const requested = normalizeLocalizationSettings({
-    ...current,
-    enabledLanguages: applied.enabledLanguages,
-    updatedBy: actor,
-  });
-  if (requested.enabledLanguages.join("\0") === current.enabledLanguages.join("\0")) {
+  return runInTransaction(() => {
+    const current = readLocalizationSettings();
+    const translations = readTranslationStore();
+    const reports = completenessByLanguage(translations);
+    if (Object.prototype.hasOwnProperty.call(patch, "enabledLanguages")) {
+      requirePublicEnabledLanguages(patch.enabledLanguages);
+    }
+    const applied = applyEnabledLanguages(
+      current.enabledLanguages,
+      patch.enabledLanguages ?? current.enabledLanguages,
+      reports
+    );
+    const requested = normalizeLocalizationSettings({
+      ...current,
+      enabledLanguages: applied.enabledLanguages,
+      updatedBy: actor,
+    });
+    if (requested.enabledLanguages.join("\0") === current.enabledLanguages.join("\0")) {
+      return {
+        settings: current,
+        rejected: applied.rejected,
+        completeness: reports,
+      };
+    }
+    const saved = bumpCatalogVersion(
+      {
+        ...current,
+        enabledLanguages: requested.enabledLanguages,
+      },
+      actor
+    );
     return {
-      settings: current,
+      settings: saved,
       rejected: applied.rejected,
-      completeness: reports,
+      completeness: completenessByLanguage(),
     };
-  }
-  const saved = bumpCatalogVersion(
-    { ...current, enabledLanguages: requested.enabledLanguages },
-    actor
-  );
-  saved.enabledLanguages = requested.enabledLanguages;
-  persistSettings(saved);
-  return {
-    settings: saved,
-    rejected: applied.rejected,
-    completeness: completenessByLanguage(),
-  };
+  });
 }
 
 function syncCatalogBatch() {
@@ -284,15 +303,13 @@ export function initializeLocalizationCatalog() {
 }
 
 export function listWorkspaceRows(filters = {}) {
-  const languageRaw = filters.language;
-  if (typeof languageRaw === "string" && languageRaw.trim()) {
-    if (!isSupportedTargetLocale(languageRaw)) {
-      const error = new Error("Unsupported translation language.");
-      error.status = 400;
-      error.code = "UNSUPPORTED_LOCALE";
-      throw error;
+  if (Object.prototype.hasOwnProperty.call(filters, "language") && filters.language !== undefined) {
+    const languageRaw = filters.language;
+    if (typeof languageRaw !== "string" || !languageRaw.trim() || !isSupportedTargetLocale(languageRaw)) {
+      throw invalidLocaleError();
     }
   }
+  const languageRaw = filters.language;
   const store = currentCatalogItems(readTranslationStore());
   return filterTranslationRows(buildTranslationRows(store), {
     ...filters,
@@ -380,7 +397,7 @@ export function resetTranslationToAuto(entryId, language, actor = "") {
   const internal = requireTargetLocale(language);
   return runInTransaction(() => {
     const entry = requireCurrentUiEntry(entryId);
-    if (!UI_CATALOG_BY_KEY.has(entry.fieldKey)) {
+    if (!hasCatalogKey(entry.fieldKey)) {
       const error = new Error("Unknown catalog key cannot be reset from seed.");
       error.status = 409;
       error.code = "NO_SEED";
@@ -413,4 +430,3 @@ export function resetTranslationToAuto(entryId, language, actor = "") {
 
 void initialized;
 void DEFAULT_LOCALE;
-void settingsEqual;

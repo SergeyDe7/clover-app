@@ -46,7 +46,7 @@ export function ProductPage({ code }) {
     return () => {
       cancelled = true;
     };
-  }, [code]);
+  }, [code, t]);
 
   useEffect(() => {
     if (!product) return;
@@ -70,9 +70,12 @@ export function ProductPage({ code }) {
   const displayQty = toQuantityInputValue(qty, unitSize);
   const qtyHint =
     unitSize > 1
-      ? `В ${storefrontUnitLabel(unit)}: ${unitSize} шт`
+      ? t("storefront.qty.inUnitPieces", {
+          unit: storefrontUnitLabel(unit),
+          count: unitSize,
+        })
       : orderStep > 1
-        ? `кратно ${orderStep}`
+        ? t("storefront.qty.multipleOfLower", { step: orderStep })
         : "";
   const price = Number(product?.prices?.[unit]) || 0;
   const details = product?.details || {};
@@ -120,7 +123,7 @@ export function ProductPage({ code }) {
         <div className="sf-product-info">
           <p className="sf-product-cat">{product.category}</p>
           <h1>{product.name}</h1>
-          <p className="sf-product-code">Артикул {product.code}</p>
+          <p className="sf-product-code">{t("storefront.product.articleCode", { code: product.code })}</p>
 
           <div className="sf-price-block">
             <strong>{price > 0 ? formatMoney(price) : t("storefront.price.onRequest")}</strong>
@@ -143,9 +146,9 @@ export function ProductPage({ code }) {
             ) : null}
             <label className="sf-field">
               <span>
-                Количество
+                {t("storefront.product.quantity")}
                 {qtyHint ? ` (${qtyHint})` : ""}
-                {unitSize > 1 ? `, шт` : ` · ${storefrontUnitLabel(unit)}`}
+                {unitSize > 1 ? t("storefront.product.pieceSuffix") : t("storefront.product.unitSuffix", { unit: storefrontUnitLabel(unit) })}
               </span>
               <input
                 className="sf-input"

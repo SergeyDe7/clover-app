@@ -593,6 +593,34 @@ const RAW_CATALOG = [
     "critical": true
   },
   {
+    "key": "admin.languages.state.auto",
+    "sourceRu": "AUTO",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.state.manual",
+    "sourceRu": "MANUAL",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.state.missing",
+    "sourceRu": "MISSING",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.state.stale",
+    "sourceRu": "устарело",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
     "key": "admin.languages.saved",
     "sourceRu": "Перевод сохранён.",
     "namespace": "ui",
@@ -4905,126 +4933,126 @@ const RAW_CATALOG = [
     "critical": false
   },
   {
-    "key": "manager.text",
+    "key": "manager.oneC.priceType",
     "sourceRu": "Вид цен 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text10",
+    "key": "manager.exchange.connection.checked",
     "sourceRu": "Проверено подключение к 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text11",
+    "key": "manager.exchange.catalog.previewed",
     "sourceRu": "Просмотрен справочник 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text12",
+    "key": "manager.exchange.status.reset",
     "sourceRu": "Сброшен статус обмена с 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text13",
+    "key": "manager.exchange.draft.created",
     "sourceRu": "Создан черновик заказа в 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text14",
+    "key": "manager.exchange.match.linked",
     "sourceRu": "Сопоставление с 1С: клиенты и товары в очереди связаны.",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text15",
+    "key": "manager.exchange.config.saved",
     "sourceRu": "Сохранены настройки подключения к 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text16",
+    "key": "manager.exchange.prodDisabled",
     "sourceRu": "только 1С TEST (prod выключен)",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text17",
+    "key": "manager.orders.oneCStatusFilter",
     "sourceRu": "Фильтр статуса 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text18",
+    "key": "manager.products.oneC.pricePending",
     "sourceRu": "Цена из 1С ещё не получена",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text2",
+    "key": "manager.products.oneC.articleUnlinked",
     "sourceRu": "Артикул 1С: не связан",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text3",
+    "key": "manager.oneC.category",
     "sourceRu": "Категория 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text4",
+    "key": "manager.clients.oneCPriceCategory",
     "sourceRu": "Категория цен 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text5",
+    "key": "manager.exchange.connection.saved",
     "sourceRu": "Настройки подключения к 1С сохранены.",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text6",
+    "key": "manager.exchange.title",
     "sourceRu": "Обмен с 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text7",
+    "key": "manager.exchange.connection.error",
     "sourceRu": "Ошибка подключения к 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text8",
+    "key": "manager.exchange.send.testError",
     "sourceRu": "Ошибка тестовой передачи в 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text9",
+    "key": "manager.exchange.errorsToggle",
     "sourceRu": "Ошибки обмена с 1С",
     "namespace": "ui",
     "surface": "manager",
@@ -8076,7 +8104,7 @@ const RAW_CATALOG = [
     "critical": false
   },
   {
-    "key": "manager.label",
+    "key": "manager.clients.contactCaption",
     "sourceRu": "Подпись",
     "namespace": "ui",
     "surface": "manager",
@@ -9098,126 +9126,126 @@ const RAW_CATALOG = [
     "critical": false
   },
   {
-    "key": "manager.text19",
+    "key": "manager.field.bodyText",
     "sourceRu": "Текст",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text20",
+    "key": "manager.clients.oneCCounterparty",
     "sourceRu": "Контрагент 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text21",
+    "key": "manager.clients.oneCAndPrices",
     "sourceRu": "1С и цены",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text22",
+    "key": "manager.clients.oneCCounterpartyMissing",
     "sourceRu": "Контрагент 1С не выбран — откройте «Данные клиента».",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text23",
+    "key": "manager.clients.oneCPriceType",
     "sourceRu": "Категория цен 1С (вид цен)",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text24",
+    "key": "manager.clients.oneCPriceTypeNoMarkup",
     "sourceRu": "Категория цен 1С без наценки",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text25",
+    "key": "manager.exchange.linkStatus",
     "sourceRu": "Связь 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text26",
+    "key": "manager.exchange.user",
     "sourceRu": "Пользователь обмена 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text27",
+    "key": "manager.exchange.drafts",
     "sourceRu": "Черновики 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text28",
+    "key": "manager.exchange.matchWizard",
     "sourceRu": "Мастер сопоставления с 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text29",
+    "key": "manager.orders.oneCContour",
     "sourceRu": "Контур передачи в 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text30",
+    "key": "manager.products.oneCCatalog",
     "sourceRu": "Каталог 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text31",
+    "key": "manager.orders.oneCErrors",
     "sourceRu": "Ошибки 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text32",
+    "key": "manager.settings.deliveryNomenclature",
     "sourceRu": "Номенклатура доставки в 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text33",
+    "key": "manager.storefront.oneC.counterparty.title",
     "sourceRu": "Контрагент 1С для заказов с сайта",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text34",
+    "key": "manager.storefront.oneC.counterparty.id",
     "sourceRu": "ID контрагента 1С (необязательно)",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text35",
+    "key": "manager.products.oneC.article",
     "sourceRu": "Артикул 1С",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
   },
   {
-    "key": "manager.text36",
+    "key": "manager.products.oneC.link",
     "sourceRu": "Связь с 1С",
     "namespace": "ui",
     "surface": "manager",
@@ -9665,10 +9693,10 @@ const RAW_CATALOG = [
     "critical": false
   },
   {
-    "key": "shared.notificationsCount",
+    "key": "manager.notifications.countLabel",
     "sourceRu": "Уведомления: {count}",
     "namespace": "ui",
-    "surface": "shared",
+    "surface": "manager",
     "critical": false
   },
   {
@@ -10134,7 +10162,7 @@ const RAW_CATALOG = [
     "critical": false
   },
   {
-    "key": "storefront.text",
+    "key": "storefront.brand.wordmark",
     "sourceRu": "КЛЕВЕР",
     "namespace": "ui",
     "surface": "storefront",
@@ -10181,6 +10209,2253 @@ const RAW_CATALOG = [
     "namespace": "ui",
     "surface": "storefront",
     "critical": false
+  },
+  {
+    "key": "manager.orderStatus.new",
+    "sourceRu": "Новый",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.orderStatus.accepted",
+    "sourceRu": "Принят",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.orderStatus.manual",
+    "sourceRu": "Обработан вручную",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.orderStatus.picking",
+    "sourceRu": "Собирается",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.orderStatus.ready",
+    "sourceRu": "Готов к доставке",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.orderStatus.delivering",
+    "sourceRu": "Доставляется",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.orderStatus.done",
+    "sourceRu": "Выполнен",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.orderStatus.cancelled",
+    "sourceRu": "Отменён",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.customStatus.newRequest",
+    "sourceRu": "Новый запрос",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.customStatus.clarifying",
+    "sourceRu": "Уточняется",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.customStatus.agreed",
+    "sourceRu": "Согласован",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.customStatus.addedToCatalog",
+    "sourceRu": "Добавлен в каталог",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.customStatus.rejected",
+    "sourceRu": "Отклонён",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.exchangeStatus.notSent",
+    "sourceRu": "Не отправлен",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.exchangeStatus.queued",
+    "sourceRu": "В очереди на передачу в 1С",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.exchangeStatus.sending",
+    "sourceRu": "Передаётся в 1С",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.exchangeStatus.accepted",
+    "sourceRu": "Принят в 1С",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.exchangeStatus.draft",
+    "sourceRu": "Черновик создан в 1С",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.exchangeStatus.error",
+    "sourceRu": "Не удалось передать",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.notifications.titleWithCount",
+    "sourceRu": "Уведомления · {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.orders.selectOrder",
+    "sourceRu": "Выбрать заказ {number}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.statusAria",
+    "sourceRu": "Статус заказа {number}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.waitingOneCCount",
+    "sourceRu": "Ждут передачи в 1С: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.orders.queuedCount",
+    "sourceRu": "В очереди: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.orders.selectedCount",
+    "sourceRu": "Выбрано: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.orders.inTrashCount",
+    "sourceRu": "В корзине: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.acts.newRequestsCount",
+    "sourceRu": "Новых запросов: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "manager.products.selectNamed",
+    "sourceRu": "Выбрать «{name}»",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.deleteNamed",
+    "sourceRu": "«{name}» будет удалён из каталога Clover, с витрины сайта и из матриц всех клиентов. Заказы с этим товаром не меняются.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.deleteCountConfirm",
+    "sourceRu": "Точно удалить {count} товаров из каталога Clover?",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.deletePhotoNamed",
+    "sourceRu": "Удалить фотографию товара «{name}»?",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.deleteCertificateNamed",
+    "sourceRu": "Удалить сертификат товара «{name}»?",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.deleteNamed",
+    "sourceRu": "Удалить «{name}»?\n\nБудут удалены аккаунт, матрица, журнал доступов и связанные заказы. Это необратимо.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.failedToSend",
+    "sourceRu": "Не удалось передать в 1С",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "auth.order.deleteForeverTitle",
+    "sourceRu": "Удалить заказ № {number} навсегда?",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "auth.order.restoreTitle",
+    "sourceRu": "Восстановить заказ № {number}?",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "auth.product.addToCatalogNamed",
+    "sourceRu": "Товар «{name}» будет добавлен в каталог Clover.",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "client.acts.readyCount",
+    "sourceRu": "Готовых актов: {count}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.nav.notificationsCount",
+    "sourceRu": "Уведомлений: {count}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.catalog.hideSubcategories",
+    "sourceRu": "Скрыть подкатегории: {name}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.catalog.showSubcategories",
+    "sourceRu": "Показать подкатегории: {name}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "shared.media.openPhotoNamed",
+    "sourceRu": "Открыть фотографию: {name}",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "auth.sync.keptOnScreen",
+    "sourceRu": "{message}. Данные останутся на экране, но сервер пока их не сохранил.",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "auth.order.notSavedOnServer",
+    "sourceRu": "{message} Заказ не сохранён на сервере — менеджер его не увидит.",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "auth.order.notDeletedOnServer",
+    "sourceRu": "{message}. Заказ не удалён на сервере.",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "auth.order.notDeleted",
+    "sourceRu": "{message}. Заказ не удалён.",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "auth.order.notMovedToTrash",
+    "sourceRu": "{message}. Заказ не перемещён в корзину.",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "shared.address.deleteNamed",
+    "sourceRu": "Удалить адрес «{label}»?",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "admin.staff.roleUpdated",
+    "sourceRu": "Роль обновлена: {role}",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.staff.managerCreated",
+    "sourceRu": "Менеджер {email} создан. Пароль сохранён в журнале.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.staff.accessClosedNamed",
+    "sourceRu": "{email} не сможет войти в кабинет, пока доступ закрыт.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.staff.accessOpenedNamed",
+    "sourceRu": "{email} снова сможет войти.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.staff.deleteForeverNamed",
+    "sourceRu": "{email} будет удалён безвозвратно.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.staff.passwordJournalCount",
+    "sourceRu": " · {count} с паролем в журнале",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "client.matrix.categoryCount",
+    "sourceRu": " · категория «{name}»: {count}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.matrix.unitEqualsPieces",
+    "sourceRu": "1 {unit} = {multiplier} шт.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.orders.nextDelivery",
+    "sourceRu": " · ближайшая доставка {date}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.orders.positionCount",
+    "sourceRu": "{count} поз.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.orders.pieceTotal",
+    "sourceRu": "{count} шт. всего",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.profile.helloNamed",
+    "sourceRu": "Здравствуйте, {name}!",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.order.paidDelivery.confirm",
+    "sourceRu": "Сумма заказа меньше {freeFrom}. Доставка — {fee}. Добавьте товаров ещё на {needMore} для бесплатной доставки либо оформите заказ с платной доставкой.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.order.paidDelivery.confirmLabel",
+    "sourceRu": "Оформить (+{fee})",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.order.addendum.confirmWithCount",
+    "sourceRu": "Добавить {count} поз. в заказ {orderLabel}? Дата, адрес и комментарий заказа не изменятся.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.order.addendum.confirm",
+    "sourceRu": "Добавить позиции в заказ {orderLabel}? Дата, адрес и комментарий заказа не изменятся.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.order.addendum.titleNumber",
+    "sourceRu": "Добавить в заказ №{number}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "shared.article.prefix",
+    "sourceRu": "Арт. {article}",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "client.order.deliveryPaidNeedMore",
+    "sourceRu": "В заказе позиция «Доставка» — {fee}. До бесплатной ещё {needMore}.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.order.deliveryPaidAddMore",
+    "sourceRu": "В заказе позиция «Доставка» — {fee}. Добавьте ещё на {needMore} для бесплатной.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.acts.fileName",
+    "sourceRu": "Акт-сверки-{id}.pdf",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "manager.access.removePasswordNamed",
+    "sourceRu": "Пароль для «{name}» исчезнет из журнала. Аккаунт клиента не удалится.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.access.deleteNamedWithLogin",
+    "sourceRu": "Удалить «{name}» ({login})?\n\nБудут удалены аккаунт, матрица, журнал доступов и связанные заказы. Это необратимо.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.access.noLogin",
+    "sourceRu": "без логина",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.access.updatedAt",
+    "sourceRu": "Обновлён {datetime}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.clientAddresses",
+    "sourceRu": "Клиент: {clientId} · адресов: {addresses}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.clientAddressesEmailChanged",
+    "sourceRu": "Клиент: {clientId} · адресов: {addresses} · изменён email для входа",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.productMatrices",
+    "sourceRu": "Товар: {name} · матриц: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.backupFallback",
+    "sourceRu": "Резервная копия",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.backupWithPhotos",
+    "sourceRu": "{reason} · фотографий: {photoCount}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.backupRestored",
+    "sourceRu": "Файл: {fileName} · фотографий восстановлено: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.backupCopyFallback",
+    "sourceRu": "копия",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.backupCleanup",
+    "sourceRu": "Удалено копий: {removed} · осталось: {remaining}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.orderReady",
+    "sourceRu": "Заказ № {number} · готов к передаче",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.orderIssues",
+    "sourceRu": "Заказ № {number} · ошибок: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.orderReceipt",
+    "sourceRu": "Заказ № {number} · Заказ покупателя: {receipt}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.orderFormat",
+    "sourceRu": "Заказ № {number} · формат: {format}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.batchFormat",
+    "sourceRu": "Формат: {format} · заказов: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.exchangeConfig",
+    "sourceRu": "Режим: {mode} · адрес: {address}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.modeReal",
+    "sourceRu": "реальная 1С",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.addressFilled",
+    "sourceRu": "заполнен",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.addressEmpty",
+    "sourceRu": "не заполнен",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.connectionOk",
+    "sourceRu": "{mode} · {detail}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.modeRealTitle",
+    "sourceRu": "Реальная 1С",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.modeSimulatorTitle",
+    "sourceRu": "Симулятор",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.connectionChecked",
+    "sourceRu": "подключение проверено",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.catalogPreview",
+    "sourceRu": "{type} · записей: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.catalogError",
+    "sourceRu": "{type} · {message}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.directory",
+    "sourceRu": "Справочник",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.errorWord",
+    "sourceRu": "ошибка",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.nomenclatureReceived",
+    "sourceRu": "Получено: {received} · новых связей: {newlyLinked} · без совпадения: {unmatched}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.autoLinkSummary",
+    "sourceRu": "Товаров Clover: {cloverTotal} · связанных: {linked} · новых связей: {newlyLinked}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.draftCreated",
+    "sourceRu": "Заказ № {number} · документ {document} · {mode}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.documentCreated",
+    "sourceRu": "создан",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.audit.orderError",
+    "sourceRu": "Заказ № {number} · {message}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "shared.fileSize.bytes",
+    "sourceRu": "{bytes} Б",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.fileSize.kilobytes",
+    "sourceRu": "{value} КБ",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.fileSize.megabytes",
+    "sourceRu": "{value} МБ",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "manager.backup.removedOld",
+    "sourceRu": "Удалено старых копий: {count}.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.backup.restoreConfirmNamed",
+    "sourceRu": "Восстановить данные из копии «{fileName}»? Перед восстановлением сервер автоматически создаст страховочную копию.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.backup.fullCopyPhotos",
+    "sourceRu": "полная копия, фото: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.saveFailedNamed",
+    "sourceRu": "Не удалось сохранить товар: {message}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.fixedPriceMissing",
+    "sourceRu": "Для «{name}» выбрана фиксированная цена, но сумма не указана. Введите цену или верните «По матрице».",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.markupPercent",
+    "sourceRu": "Наценка {percent}%",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.matrixProductCount",
+    "sourceRu": "Товаров в матрице: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.matrixSelectedCount",
+    "sourceRu": "В матрице: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.categoryPricePlaceholder",
+    "sourceRu": "Категория: {price}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.catalogPricePlaceholder",
+    "sourceRu": "Цена: {price}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.prodEnabledDatabases",
+    "sourceRu": "prod включён · базы {databases}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.databaseName",
+    "sourceRu": " · база {database}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.extensionVersion",
+    "sourceRu": " · расширение {version}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.articleNamed",
+    "sourceRu": " · артикул {article}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.innNamed",
+    "sourceRu": " · ИНН {inn}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.unmatchedCounts",
+    "sourceRu": "Не сопоставлено клиентов: {clients} · товаров: {products}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.errorCount",
+    "sourceRu": "{count} ошибок",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.cancelTransferCount",
+    "sourceRu": "Будет отменена передача для {count} заказ(ов). Кнопка снова станет «Передать в 1С».",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.alreadyAllStatus",
+    "sourceRu": "Все выбранные заказы уже в статусе «{status}».",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.bulkUnavailable",
+    "sourceRu": "Статус «{status}» недоступен для выбранных заказов. Уже в этом статусе: {unchanged}. Нельзя сменить: {blocked}.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.bulkQueued",
+    "sourceRu": "К обновлению: {updated}. Уже в этом статусе: {unchanged}. Нельзя сменить: {blocked}.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.bulkPartialResult",
+    "sourceRu": "Обновлено: {updated}. Уже в этом статусе: {unchanged}. Нельзя сменить: {blocked}.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.detailsCount",
+    "sourceRu": "Подробности ({count})",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.deletedByRole",
+    "sourceRu": " · удалил: {role}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.customerOrderReceipt",
+    "sourceRu": " · Заказ покупателя {receipt}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.autoLinkedCount",
+    "sourceRu": "Автоматически связаны товары: {count}.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.deleteEntireCatalog",
+    "sourceRu": "Будет удалён весь каталог ({count} поз.): с витрины сайта и из матриц клиентов. Это не отмена Excel и не загрузка файла. Заказы не меняются.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.deleteSelectedCount",
+    "sourceRu": "Будет удалено из каталога Clover, с витрины сайта и из матриц клиентов: {count}. Заказы с этими товарами не меняются.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.addedToCatalogNamed",
+    "sourceRu": "В каталог: «{name}».",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.addedToCatalogFromExcel",
+    "sourceRu": "В каталог из Excel: {count} поз.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.oneCArticleCode",
+    "sourceRu": "Артикул 1С: {code}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.acts.deleteConfirm",
+    "sourceRu": "Запрос «{period}» для {client} будет удалён навсегда — и у менеджера, и в ЛК клиента.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.acts.deleteConfirmWithPdf",
+    "sourceRu": "Запрос «{period}» для {client} будет удалён навсегда — и у менеджера, и в ЛК клиента. PDF-файл тоже будет удалён с сервера.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.settings.sentCount",
+    "sourceRu": "Отправлено: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.settings.channelSent",
+    "sourceRu": "{channel}: отправлено",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.settings.mailSentTo",
+    "sourceRu": "Письмо ушло на {email}. {summary}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.settings.namedAddressFallback",
+    "sourceRu": "указанный адрес",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.settings.defaultValue",
+    "sourceRu": "По умолчанию: {value}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.addedCount",
+    "sourceRu": "На витрину добавлено: {count}.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.removedCount",
+    "sourceRu": "С витрины снято: {count}.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.descriptionFilled",
+    "sourceRu": "описание {filled}/3",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.enrichQueued",
+    "sourceRu": "Обновление описаний: {count} товар(ов). Старые тексты сохраняются до замены.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.matrix.addedCountSave",
+    "sourceRu": "В матрицу клиента добавлено: {count} поз. Нажмите «Сохранить матрицу».",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.matrix.listFromTotal",
+    "sourceRu": " из {total}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.importProgress",
+    "sourceRu": "Загружаем товары из Excel ({done}/{total})…",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.addedToStorefront",
+    "sourceRu": "На витрину: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.addedToCatalog",
+    "sourceRu": "В каталог: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.addedToMatrix",
+    "sourceRu": "В матрицу: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.reusedFromCatalog",
+    "sourceRu": "из каталога Clover без дублей: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.createdInCatalog",
+    "sourceRu": "новых в каталоге: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.skippedStorefront",
+    "sourceRu": "пропущено (уже на витрине/дубли): {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.skippedCatalog",
+    "sourceRu": "пропущено (уже в каталоге/дубли): {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.skippedMatrix",
+    "sourceRu": "пропущено (уже в матрице/дубли): {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.fileCode",
+    "sourceRu": "Код из файла: {code}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.addingProgress",
+    "sourceRu": "Добавляем… {done}/{total}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.addToCatalogCount",
+    "sourceRu": "Добавить в каталог ({count})",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.addProductsCount",
+    "sourceRu": "Добавить товары ({count})",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.matrix.addedNamed",
+    "sourceRu": "Добавлено в матрицу: «{name}».",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.matrix.addedCountPreview",
+    "sourceRu": "Добавлено в матрицу: {count} поз. ({preview}).",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.matrix.skippedDuplicates",
+    "sourceRu": "Пропущено дубликатов (уже в матрице): {count}.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.matrix.addedNamedPricesLater",
+    "sourceRu": "Добавлено в матрицу: «{name}». Цены подтянутся после обмена с 1С.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.matrix.addedFromExcelPricesLater",
+    "sourceRu": "Добавлено в матрицу из Excel: {count} поз. Цены подтянутся после обмена с 1С («Обновить цены»).",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.matrix.addCount",
+    "sourceRu": "Добавить ({count})",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.oneC.noExactShownCatalog",
+    "sourceRu": "По «{query}» точных совпадений нет. Показан каталог 1С ({total}). Уточните слова и нажмите «Найти».",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.oneC.foundInExport",
+    "sourceRu": "Найдено в выгрузке 1С: {total}. Свободные сверху. Можно править строку поиска и жать «Найти» / «Весь каталог».",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.oneC.selectedCategory",
+    "sourceRu": "Позиция 1С выбрана. Категория: «{category}». Проверьте единицы и цены, затем «Сохранить товар».",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.oneC.relinkConfirm",
+    "sourceRu": "«{name}» уже связана с товаром «{linkedName}». Перепривязать к текущему товару?",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.subcategoryRequired",
+    "sourceRu": "Для группы «{category}» нужно указать подкатегорию.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.updatedAt",
+    "sourceRu": "Обновлено: {datetime}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.priceTypeTitle",
+    "sourceRu": "Вид цен «{name}»",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.purchasePriceTitle",
+    "sourceRu": "Закупочная цена товара",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.priceFromUpdate",
+    "sourceRu": "Из «Обновить цены» (вид цен)",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.priceFromPurchaseExport",
+    "sourceRu": "Из выгрузки закупочных цен",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.purchaseFallbackName",
+    "sourceRu": "Закупочная",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.addedNamed",
+    "sourceRu": "На витрину: «{name}».",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.addedCountShort",
+    "sourceRu": "На витрину: {count} поз.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.skippedAlready",
+    "sourceRu": "Уже на витрине, пропущено: {count}.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.exportTotal",
+    "sourceRu": " В выгрузке: {count}.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.addCount",
+    "sourceRu": "Добавить на витрину ({count})",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.asNamed",
+    "sourceRu": "как «{name}»",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.addedFromExcel",
+    "sourceRu": "На витрину из Excel: {count} поз.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "storefront.nav.cartWithCount",
+    "sourceRu": "Корзина ({count})",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.nav.cartAriaCount",
+    "sourceRu": "Корзина: {count} поз.",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.hero.slideAria",
+    "sourceRu": "Слайд {index}",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.qty.ariaWithUnit",
+    "sourceRu": "Количество, {unit}",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.qty.inUnitPieces",
+    "sourceRu": "В {unit}: {count} шт",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.qty.multipleOf",
+    "sourceRu": "Кратно {step}",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.qty.multipleOfLower",
+    "sourceRu": "кратно {step}",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.unit.piecesInNamed",
+    "sourceRu": "{size} шт в «{label}»",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.cart.unitSizePieces",
+    "sourceRu": " · по {count} шт",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.cart.removeNamed",
+    "sourceRu": "Удалить {name}",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.cart.deliveryNeedMore",
+    "sourceRu": "Доставка {fee}. До бесплатной ещё {needMore}.",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.checkout.paidDeliverySpb",
+    "sourceRu": "Доставка по СПб — {fee} (заказ менее {freeFrom})",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.product.pieceSuffix",
+    "sourceRu": ", шт",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.product.unitSuffix",
+    "sourceRu": " · {unit}",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.queuedContour",
+    "sourceRu": "В очереди {contour}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.sendingContour",
+    "sourceRu": "Передаётся в {contour}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.acceptedContour",
+    "sourceRu": "Принят в {contour}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "shared.print.blockedTitle",
+    "sourceRu": "Печать заблокирована",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.print.blockedMessage",
+    "sourceRu": "Браузер заблокировал окно печати. Разрешите всплывающие окна для этого сайта.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.print.documentTitle",
+    "sourceRu": "Заказ {number}",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.print.orderHeading",
+    "sourceRu": "Заказ № {number}",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.print.systemLine",
+    "sourceRu": "Система Clover · {datetime}",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.print.clientLabel",
+    "sourceRu": "Клиент:",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.print.deliveryLabel",
+    "sourceRu": "Доставка:",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.print.colProduct",
+    "sourceRu": "Товар",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.print.outsideMatrix",
+    "sourceRu": "Товар вне матрицы · {details}",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.print.totalAmount",
+    "sourceRu": "Итого: {amount}",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.print.managerComment",
+    "sourceRu": "Комментарий менеджера:",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.print.externalId",
+    "sourceRu": "Внешний ID: {id}",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "manager.matrix.exportFileName",
+    "sourceRu": "матрица-{name}.xlsx",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "shared.order.cannotTrashByStatus",
+    "sourceRu": "Заказ со статусом «{status}» удалить нельзя (принят или обработан в 1С).",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "client.delivery.closedSunday",
+    "sourceRu": "В этот день доставка не осуществляется.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.delivery.nextWorkingDay",
+    "sourceRu": "Доставку можно оформить только на следующий рабочий день.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.delivery.afterCutoff",
+    "sourceRu": "После 18:00 доставку можно оформить только на послезавтра в рабочий день.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.delivery.dateRequired",
+    "sourceRu": "Укажите дату доставки.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "shared.order.notFound",
+    "sourceRu": "Заказ не найден.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.order.alreadyTrashed",
+    "sourceRu": "Заказ уже в корзине.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.order.completedAdminOnly",
+    "sourceRu": "Выполненный заказ может удалить только администратор.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.order.exchangeBlocked",
+    "sourceRu": "Заказ уже в обмене с 1С. Удаление запрещено.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.order.clientOnlyNew",
+    "sourceRu": "Клиент может удалить только заказ со статусом «Новый».",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.order.notInTrash",
+    "sourceRu": "Заказ не в корзине.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.order.purgeFromTrashOnly",
+    "sourceRu": "Удалить навсегда можно только заказ из корзины.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "shared.order.purgeCompletedAdminOnly",
+    "sourceRu": "Удалить выполненный заказ навсегда может только администратор.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "manager.promo.status.active",
+    "sourceRu": "Активна",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.promo.status.scheduled",
+    "sourceRu": "Запланирована",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.promo.status.completed",
+    "sourceRu": "Завершена",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.promo.status.disabled",
+    "sourceRu": "Выключена",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.addressNumbered",
+    "sourceRu": "Адрес {n}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": false
+  },
+  {
+    "key": "shared.passkey.accessKeyNumbered",
+    "sourceRu": "Ключ доступа {n}",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
+    "key": "client.order.numberHeading",
+    "sourceRu": "Заказ № {number}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "manager.order.numberHeading",
+    "sourceRu": "Заказ № {number}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "client.order.createdAt",
+    "sourceRu": "Создан: {datetime}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.orders.activeCount",
+    "sourceRu": "Активных: {count}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.order.managerCommentPrefix",
+    "sourceRu": "Менеджер: {comment}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.gate.fillOrgProfileInSettings",
+    "sourceRu": "Сначала заполните профиль организации в {settings}.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.gate.addDeliveryAddressInSettings",
+    "sourceRu": "Добавьте адрес доставки в {settings}.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.order.addendumInNumber",
+    "sourceRu": "в №{number}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.order.outsideMatrixUnit",
+    "sourceRu": "Товар вне матрицы · {unit}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.profile.contactsHint",
+    "sourceRu": "Укажите ФИО, роль в компании и телефон. Основной контакт — для связи по заказам. Можно добавить до {max} контактов.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.profile.contactNumbered",
+    "sourceRu": "Контакт {n}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.matrix.activePositions",
+    "sourceRu": "В матрице: {count} поз.",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.selectedOrdersCount",
+    "sourceRu": "Выбрано заказов: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.changeStatus",
+    "sourceRu": "Изменить статус",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.trash",
+    "sourceRu": "Корзина",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.oneCWithStatus",
+    "sourceRu": "1С: {status}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.orders.inTrashSince",
+    "sourceRu": "В корзине с {datetime}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.connectionTo1c",
+    "sourceRu": "Подключение к 1С · {status}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.secretInEnv",
+    "sourceRu": "Секрет в server/.env: {status}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.readStatus",
+    "sourceRu": "Чтение: {status}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.writeStatus",
+    "sourceRu": "Запись: {status}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.ordersContour",
+    "sourceRu": "Контур заказов: {status}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.orderCreatedMeta",
+    "sourceRu": "Создан {datetime} · доставка {date} · статус заказа: {status}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.documentLine",
+    "sourceRu": "Документ: {document} · {posted} · {mode}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.clientsUnlinkedCount",
+    "sourceRu": "Клиенты без связи с 1С: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.productsWithoutNomenclatureId",
+    "sourceRu": "Товары без ID номенклатуры: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.exchange.logOrderLine",
+    "sourceRu": "{datetime} · заказ № {number} · {user}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.codeAndInn",
+    "sourceRu": "Код: {code} · ИНН: {inn}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.matchPercent",
+    "sourceRu": "Совпадение: {percent}%",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.alreadyLinkedToClient",
+    "sourceRu": "Уже связан с клиентом Clover: {name}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.extraPhonesHint",
+    "sourceRu": "Кроме основного телефона выше можно добавить ещё номера для связи. До {max} контактов всего.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.loginStaysEmail",
+    "sourceRu": "Логин остаётся {email}. Матрица и заказы не меняются.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.ordersCount",
+    "sourceRu": "{count} заказов",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.oneCNamed",
+    "sourceRu": "1С: {name}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.counterparty1c",
+    "sourceRu": "Контрагент 1С: {name}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.missingPriceWaitRefresh",
+    "sourceRu": "Без цены: {count} — дождитесь «Обновить цены» в 1С",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.retryWithMessage",
+    "sourceRu": "{message} · повторить",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.personalExceptionsCount",
+    "sourceRu": "Индивидуальных исключений: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.markedCount",
+    "sourceRu": "Отмечено: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.priceForClient",
+    "sourceRu": "Клиенту: {price}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.sharedMarkupPercent",
+    "sourceRu": "Общая наценка клиента: {percent}%",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.oneCPriceUpdated",
+    "sourceRu": "Цена 1С обновлена: {datetime}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.clients.categoryUpdated",
+    "sourceRu": "Категория обновлена: {datetime}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.access.withPasswordCount",
+    "sourceRu": "{count} с паролем",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.access.clientsCount",
+    "sourceRu": "{count} клиентов",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.exportAt",
+    "sourceRu": "Выгрузка: {datetime}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.notInFreshCatalog",
+    "sourceRu": "Не в свежем каталоге: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.foundShownFirst",
+    "sourceRu": "Найдено: {total}. Показаны первые {shown}.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.linkedNamed",
+    "sourceRu": "Связан: {name}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.settings.paidDeliveryRule",
+    "sourceRu": "Для заказов менее {freeFrom} ₽ Clover добавляет доставку {fee} ₽; от {freeFrom} ₽ — бесплатно.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.settings.zoneEmptyFieldsHint",
+    "sourceRu": "Для каждого адреса клиента можно выбрать зону. Пустые поля берут глобальные значения: бесплатно от {freeFrom} ₽, доставка {fee} ₽.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.nameEqualsMatrixHint",
+    "sourceRu": "На сайте имя товара = как в матрице Clover (не сырое название 1С). Можно выбрать из каталога ниже или добавить из 1С / Excel, даже если позиции ещё нет ни у одного клиента.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.nowOnStorefrontSelected",
+    "sourceRu": "Сейчас на витрине: {onStorefront} из {total}. Выбрано: {selected}.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.lastSave",
+    "sourceRu": "Последнее сохранение: {datetime}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.matrix.inListCount",
+    "sourceRu": "В списке: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.matrix.toAddCount",
+    "sourceRu": "к добавлению: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.rowsCount",
+    "sourceRu": "Строк: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.exactCount",
+    "sourceRu": "Точных: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.byCodeCount",
+    "sourceRu": "По коду: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.similarCount",
+    "sourceRu": "Похожих: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.unmatchedCount",
+    "sourceRu": "Без пары: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.toAddCount",
+    "sourceRu": "К добавлению: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.excel.uploadProgress",
+    "sourceRu": "Загрузка: {done}/{total}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.alreadyInCloverNamed",
+    "sourceRu": "Уже в Clover: {name}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.matrix.oneCFoundToAdd",
+    "sourceRu": "1С: {catalog} · найдено: {found} · к добавлению: {add}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.codeValue",
+    "sourceRu": "Код: {code}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.websitePriceUnit",
+    "sourceRu": "Цена на сайте, {unit}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.oneCExportListHint",
+    "sourceRu": "В выгрузке 1С: {total}. В списке сейчас: {shown}. Свободные сверху; уже связанные можно перепривязать.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.products.alreadyLinkedToProduct",
+    "sourceRu": "Уже связан с товаром Clover: {name}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.ifExistsKeepMatrixName",
+    "sourceRu": "Если товар уже есть в Clover, на витрине останется его имя из матрицы. Новый товар получит имя из 1С (его можно потом поменять в карточке).",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.foundToAdd",
+    "sourceRu": "Найдено: {found}. К добавлению: {add}.",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.storefront.inCloverMatrixName",
+    "sourceRu": "В Clover/матрице: «{name}» — это имя пойдёт на витрину",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "storefront.cart.spbUnderAmount",
+    "sourceRu": "По СПб · заказ менее {amount}",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "checkout.summary.goodsCountAmount",
+    "sourceRu": "Товары: {count} поз. · {amount}",
+    "namespace": "checkout",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.install.iosOpenSafari",
+    "sourceRu": "Перейдите на {host} в браузере Safari. В Chrome и других браузерах на iOS установка на экран недоступна.",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.install.androidOpenChrome",
+    "sourceRu": "Зайдите на {host} в Google Chrome (желательно последняя версия из Play Store). Samsung Internet тоже подойдёт: меню → «Добавить на главный экран».",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.product.articleCode",
+    "sourceRu": "Артикул {code}",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.product.quantity",
+    "sourceRu": "Количество",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "admin.staff.adminsNowCount",
+    "sourceRu": "Администраторов сейчас: {count}",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.staff.passwordUpdatedAt",
+    "sourceRu": "Обновлён {stamp}",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.staff.passwordUpdatedAtBy",
+    "sourceRu": "Обновлён {stamp} · {who}",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "manager.priceList.filePriceFormula",
+    "sourceRu": "Цена в файле = закупка × (1 + {markup} / 100)",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.acts.attachPdfAndSend",
+    "sourceRu": "Прикрепите PDF акта из 1С и нажмите «Отправить».",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.acts.sentFile",
+    "sourceRu": "Отправлено: {fileName}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
+  },
+  {
+    "key": "manager.notice.moreUnseen",
+    "sourceRu": "Ещё непросмотренных: {count}",
+    "namespace": "ui",
+    "surface": "manager",
+    "critical": true
   }
 ];
 
@@ -10196,12 +12471,20 @@ export const UI_CATALOG = Object.freeze(
   )
 );
 
-export const UI_CATALOG_BY_KEY = Object.freeze(new Map(UI_CATALOG.map((entry) => [entry.key, entry])));
+const CATALOG_LOOKUP = new Map(UI_CATALOG.map((entry) => [entry.key, entry]));
+
+export const UI_CATALOG_BY_KEY = Object.freeze(
+  Object.fromEntries(UI_CATALOG.map((entry) => [entry.key, entry]))
+);
 
 export const RU_DICTIONARY = Object.freeze(
   Object.fromEntries(UI_CATALOG.map((entry) => [entry.key, entry.sourceRu]))
 );
 
 export function getCatalogEntry(key) {
-  return UI_CATALOG_BY_KEY.get(key) || null;
+  return CATALOG_LOOKUP.get(key) || null;
+}
+
+export function hasCatalogKey(key) {
+  return CATALOG_LOOKUP.has(key);
 }

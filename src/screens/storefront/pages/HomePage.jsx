@@ -80,7 +80,7 @@ export function HomePage() {
     <div className="sf-home">
       <section className="sf-hero sf-hero-compact" aria-label={t("storefront.cloverCompany")}>
         <div className="sf-hero-copy">
-          <p className="sf-hero-brand">{t("storefront.text")}</p>
+          <p className="sf-hero-brand">{t("storefront.brand.wordmark")}</p>
           <h1>{hero.title || STOREFRONT_HERO_TITLE}</h1>
           <p className="sf-hero-lead">{hero.lead || STOREFRONT_HERO_LEAD}</p>
         </div>

@@ -19,7 +19,7 @@ function ManagerPromotionPanel() {
       await appAlert({
         title: result.result?.enabled ? t("manager.sent") : t("manager.pushIsNotConfigured"),
         message: result.result?.enabled
-          ? `Отправлено: ${result.result.sent}`
+          ? t("manager.settings.sentCount", { count: result.result.sent })
           : t("manager.pushIsNotConfiguredOnThe"),
         tone: result.result?.enabled ? "success" : "warn",
       });
@@ -33,7 +33,7 @@ function ManagerPromotionPanel() {
   return (
     <div className="manager-contact-settings">
       <h3>{t("manager.pushAboutAPromoOrNew")}</h3>
-      <div className="form-grid"><label className="field">{t("shared.field.title")}<input value={title} onChange={(event) => setTitle(event.target.value)} /></label><label className="field field-wide">{t("manager.text19")}<textarea rows="3" value={body} onChange={(event) => setBody(event.target.value)} /></label></div>
+      <div className="form-grid"><label className="field">{t("shared.field.title")}<input value={title} onChange={(event) => setTitle(event.target.value)} /></label><label className="field field-wide">{t("manager.field.bodyText")}<textarea rows="3" value={body} onChange={(event) => setBody(event.target.value)} /></label></div>
       <div className="form-actions"><button className="primary-button" type="button" disabled={busy || !body.trim()} onClick={send}>{t("manager.sendToSubscribedClients")}</button></div>
     </div>
   );
@@ -92,7 +92,7 @@ function ManagerNotificationSettings({ settings, set }) {
       const delivery = result.result?.delivery || [];
       const parts = delivery.map((item) => {
         const channel = item.channel === "email" ? "email" : item.channel === "telegram" ? "Telegram" : item.channel === "push" ? "push" : t("manager.channel");
-        if (item.sent === true || Number(item.sent) > 0) return `${channel}: отправлено`;
+        if (item.sent === true || Number(item.sent) > 0) return t("manager.settings.channelSent", { channel });
         return `${channel}: ${reasonRu(item.channel, item.reason, item.error)}`;
       });
       if (!settings.managerNotifyEmail && !delivery.some((item) => item.channel === "email")) {
@@ -100,7 +100,10 @@ function ManagerNotificationSettings({ settings, set }) {
       }
       const emailOk = delivery.some((item) => item.channel === "email" && (item.sent === true || Number(item.sent) > 0));
       const summary = parts.length ? parts.join("; ") : t("manager.anInternalNotificationWasCreatedExternal");
-      setMessage(emailOk ? `Письмо ушло на ${status?.email?.recipient || settings.managerNotificationEmail || "указанный адрес"}. ${summary}` : summary);
+      setMessage(emailOk ? t("manager.settings.mailSentTo", {
+        email: status?.email?.recipient || settings.managerNotificationEmail || t("manager.settings.namedAddressFallback"),
+        summary,
+      }) : summary);
       setStatus(result.status || null);
     } catch (error) {
       setMessage(error.message || "Не удалось проверить каналы");
@@ -120,7 +123,7 @@ function ManagerNotificationSettings({ settings, set }) {
         <ToggleSetting title={t("manager.productsOutsideTheMatrix")} description={t("manager.notifySeparatelyAboutANewItem")} value={settings.managerNotifyCustomItems !== false} onChange={(value) => set("managerNotifyCustomItems", value)} />
         <ToggleSetting title={t("manager.statementRequests")} description={t("manager.notifyAboutANewRequestWith")} value={settings.managerNotifyReconciliation !== false} onChange={(value) => set("managerNotifyReconciliation", value)} />
         <ToggleSetting title={t("manager.newRegistrations")} description={t("manager.notifyAboutClientsWaitingForManager")} value={settings.managerNotifyRegistrations !== false} onChange={(value) => set("managerNotifyRegistrations", value)} />
-        <ToggleSetting title={t("manager.text9")} description={t("manager.notifyAboutOrderSendAndProcessing")} value={settings.managerNotifyOneCErrors !== false} onChange={(value) => set("managerNotifyOneCErrors", value)} />
+        <ToggleSetting title={t("manager.exchange.errorsToggle")} description={t("manager.notifyAboutOrderSendAndProcessing")} value={settings.managerNotifyOneCErrors !== false} onChange={(value) => set("managerNotifyOneCErrors", value)} />
         <ToggleSetting title={t("manager.pushToManagerDevices")} description={t("manager.sendNotificationsToTheInstalledClover")} value={settings.managerNotifyPush !== false} onChange={(value) => set("managerNotifyPush", value)} />
         <ToggleSetting title={t("manager.sendToEmail")} description={t("manager.anEmailAboutANewOrder")} value={Boolean(settings.managerNotifyEmail)} onChange={(value) => set("managerNotifyEmail", value)} />
         <ToggleSetting title={t("manager.sendToTelegramBot")} description={t("manager.theTokenIsStoredOnlyIn")} value={Boolean(settings.managerNotifyTelegram)} onChange={(value) => set("managerNotifyTelegram", value)} />
@@ -159,10 +162,12 @@ export function DeliveryOneCSettings({ settings, set }) {
 
   return (
     <div className="manager-contact-settings">
-      <h3>{t("manager.text32")}</h3>
+      <h3>{t("manager.settings.deliveryNomenclature")}</h3>
       <p>
-        Для заказов менее {freeDeliveryMinTotal} ₽ Clover добавляет доставку {paidDeliveryFee} ₽;
-        от {freeDeliveryMinTotal} ₽ — бесплатно.
+        {t("manager.settings.paidDeliveryRule", {
+          freeFrom: freeDeliveryMinTotal,
+          fee: paidDeliveryFee,
+        })}
       </p>
       <div className="form-grid">
         <label className="field" htmlFor="delivery-onec-name">{
@@ -170,7 +175,7 @@ export function DeliveryOneCSettings({ settings, set }) {
           }<input
             id="delivery-onec-name"
             name="deliveryOneCName"
-            value={settings.deliveryOneCName ?? t("checkout.delivery")}
+            value={settings.deliveryOneCName ?? "Доставка"}
             placeholder={t("checkout.delivery")}
             onChange={(event) => set("deliveryOneCName", event.target.value)}
           />
@@ -255,8 +260,10 @@ export function DeliveryZonesSettings({ settings, set }) {
     <div className="manager-contact-settings">
       <h3>{t("manager.deliveryZones")}</h3>
       <p>
-        Для каждого адреса клиента можно выбрать зону. Пустые поля берут глобальные
-        значения: бесплатно от {FREE_DELIVERY_MIN_TOTAL} ₽, доставка {PAID_DELIVERY_FEE} ₽.
+        {t("manager.settings.zoneEmptyFieldsHint", {
+          freeFrom: FREE_DELIVERY_MIN_TOTAL,
+          fee: PAID_DELIVERY_FEE,
+        })}
       </p>
       {zones.map((zone) => (
         <div className="delivery-zone-item" key={zone.id}>
@@ -296,12 +303,12 @@ export function DeliveryZonesSettings({ settings, set }) {
                 min="0"
                 step="1"
                 value={zone.freeFrom == null ? "" : zone.freeFrom}
-                placeholder={`По умолчанию: ${FREE_DELIVERY_MIN_TOTAL}`}
+                placeholder={t("manager.settings.defaultValue", { value: FREE_DELIVERY_MIN_TOTAL })}
                 onChange={(event) =>
                   patchZone(zone.id, { freeFrom: parseOptionalMoney(event.target.value) })
                 }
               />
-              <small>По умолчанию: {FREE_DELIVERY_MIN_TOTAL} ₽</small>
+              <small>{t("manager.settings.defaultValue", { value: `${FREE_DELIVERY_MIN_TOTAL} ₽` })}</small>
             </label>
             <label className="field" htmlFor={`delivery-zone-fee-${zone.id}`}>{
               t("manager.deliveryFee")
@@ -312,12 +319,12 @@ export function DeliveryZonesSettings({ settings, set }) {
                 min="0"
                 step="1"
                 value={zone.fee == null ? "" : zone.fee}
-                placeholder={`По умолчанию: ${PAID_DELIVERY_FEE}`}
+                placeholder={t("manager.settings.defaultValue", { value: PAID_DELIVERY_FEE })}
                 onChange={(event) =>
                   patchZone(zone.id, { fee: parseOptionalMoney(event.target.value) })
                 }
               />
-              <small>По умолчанию: {PAID_DELIVERY_FEE} ₽</small>
+              <small>{t("manager.settings.defaultValue", { value: `${PAID_DELIVERY_FEE} ₽` })}</small>
             </label>
           </div>
         </div>

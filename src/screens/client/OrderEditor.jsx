@@ -492,7 +492,7 @@ export function OrderEditor({
       setDeliveryDate("");
       return;
     }
-    const check = validateDeliveryDate(value);
+    const check = validateDeliveryDate(value, new Date(), t);
     if (!check.ok) {
       await appAlert({
         title: t("client.dateUnavailable"),
@@ -810,7 +810,7 @@ export function OrderEditor({
       setDatePickerOpen(true);
       return;
     }
-    const dateCheck = validateDeliveryDate(deliveryDate);
+    const dateCheck = validateDeliveryDate(deliveryDate, new Date(), t);
     if (!dateCheck.ok) {
       focusMissingFields(true, false);
       setDeliveryDate("");
@@ -856,12 +856,14 @@ export function OrderEditor({
       const needMore = Math.max(0, submitTariff.freeFrom - total);
       const ok = await appConfirm({
         title: t("client.paidDelivery"),
-        message:
-          `Сумма заказа меньше ${formatMoney(submitTariff.freeFrom)}. ` +
-          `Доставка — ${formatMoney(submitTariff.fee)}. ` +
-          `Добавьте товаров ещё на ${formatMoney(needMore)} для бесплатной доставки ` +
-          `либо оформите заказ с платной доставкой.`,
-        confirmLabel: `Оформить (+${formatMoney(submitTariff.fee)})`,
+        message: t("client.order.paidDelivery.confirm", {
+          freeFrom: formatMoney(submitTariff.freeFrom),
+          fee: formatMoney(submitTariff.fee),
+          needMore: formatMoney(needMore),
+        }),
+        confirmLabel: t("client.order.paidDelivery.confirmLabel", {
+          fee: formatMoney(submitTariff.fee),
+        }),
         cancelLabel: t("client.backToTheOrder"),
         tone: "warn",
       });
@@ -887,7 +889,7 @@ export function OrderEditor({
         deliveryNote:
           submitDeliveryFee > 0
             ? `Доставка по СПб платная: ${submitTariff.fee} ₽ (заказ менее ${submitTariff.freeFrom} ₽)`
-            : t("client.freeDeliveryInSpb"),
+            : "Доставка по СПб бесплатная",
       })
     )
       .then(() => {
@@ -914,7 +916,12 @@ export function OrderEditor({
       : t("client.current");
     const confirmed = await appConfirm({
       title: t("client.addendum"),
-      message: `Добавить ${cartHasLines ? `${selectedItems.length + customItems.length} поз.` : "позиции"} в заказ ${orderLabel}? Дата, адрес и комментарий заказа не изменятся.`,
+      message: cartHasLines
+        ? t("client.order.addendum.confirmWithCount", {
+            count: selectedItems.length + customItems.length,
+            orderLabel,
+          })
+        : t("client.order.addendum.confirm", { orderLabel }),
       confirmLabel: t("checkout.addToOrder"),
       cancelLabel: t("shared.modal.cancel"),
       tone: "info",
@@ -950,12 +957,12 @@ export function OrderEditor({
       className="addendum-order-button"
       type="button"
       disabled={!canSubmitAddendum}
-      title={addendumDisabledReason || `Добавить в заказ №${addendumTarget?.number || ""}`}
+      title={addendumDisabledReason || t("client.order.addendum.titleNumber", { number: addendumTarget?.number || "" })}
       onClick={() => void submitAddendum()}
     >
-      Дозаказ
+      {t("client.addendum")}
       {addendumTarget?.number ? (
-        <small>в №{addendumTarget.number}</small>
+        <small>{t("client.order.addendumInNumber", { number: addendumTarget.number })}</small>
       ) : null}
     </button>
   );
@@ -1513,7 +1520,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                       </div>
                     )}
                     <h2>{isList ? glueProductNameUnits(product.name) : product.name}</h2>
-                    <p className="product-code">{`Арт. ${productArticle(product)}`}</p>
+                    <p className="product-code">{t("shared.article.prefix", { article: productArticle(product) })}</p>
                     <p className="product-price">
                       {settings.showPrices && price > 0
                         ? <>{formatMoney(price)} <small>/ {UNIT_CONFIG[unit].shortLabel}</small></>
@@ -1592,7 +1599,10 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                         }`}
                       >
                         {deliveryFee > 0
-                          ? `В заказе позиция «Доставка» — ${formatMoney(deliveryTariff.fee)}. До бесплатной ещё ${formatMoney(Math.max(0, deliveryTariff.freeFrom - total))}.`
+                          ? t("client.order.deliveryPaidNeedMore", {
+                              fee: formatMoney(deliveryTariff.fee),
+                              needMore: formatMoney(Math.max(0, deliveryTariff.freeFrom - total)),
+                            })
                           : t("client.deliveryInSpbIsFree")}
                       </p>
                     ) : null}
@@ -1650,7 +1660,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
 
         <div className="mobile-checkout-bar" aria-label={t("storefront.nav.cart")}>
           <div className="mobile-checkout-bar-info">
-            <strong>{cartCount} поз.</strong>
+            <strong>{t("client.orders.positionCount", { count: cartCount })}</strong>
             <span>{settings.showPrices && grandTotal > 0 ? formatMoney(grandTotal) : t("client.amountPending")}</span>
           </div>
           <button
@@ -1675,7 +1685,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
               <div className="cart-sheet-head">
                 <div>
                   <strong>{t("storefront.nav.cart")}</strong>
-                  <p className="muted small">{cartCount ? `${cartCount} поз.` : t("shared.empty.blank")}</p>
+                  <p className="muted small">{cartCount ? t("client.orders.positionCount", { count: cartCount }) : t("shared.empty.blank")}</p>
                 </div>
                 <button className="header-button" type="button" onClick={() => setCartSheetOpen(false)}>{
                   t("shared.action.close")
@@ -1704,7 +1714,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                           <strong>{item.name}</strong>
                           {(item.multiplier > 1 || (settings.showPrices && item.lineTotal > 0)) ? (
                             <small>
-                              {item.multiplier > 1 ? `${item.quantity * item.multiplier} шт. всего` : ""}
+                              {item.multiplier > 1 ? t("client.orders.pieceTotal", { count: item.quantity * item.multiplier }) : ""}
                               {settings.showPrices && item.lineTotal > 0
                                 ? `${item.multiplier > 1 ? " · " : ""}${formatMoney(item.lineTotal)}`
                                 : ""}
@@ -1758,7 +1768,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                       <div className="cart-sheet-item-head">
                         <div className="cart-sheet-item-main">
                           <strong>{item.name}</strong>
-                          <small>Товар вне матрицы · {item.unit || "шт."}</small>
+                          <small>{t("client.order.outsideMatrixUnit", { unit: item.unit || "шт." })}</small>
                         </div>
                         <div className="cart-sheet-item-actions">
                           <div className="quantity-control cart-sheet-qty">
@@ -1875,7 +1885,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
               <div className="cart-sheet-footer">
                 <div className="cart-sheet-total">
                   <span>{t("checkout.total")}</span>
-                  <strong>{settings.showPrices && grandTotal > 0 ? formatMoney(grandTotal) : `${cartCount} поз.`}</strong>
+                  <strong>{settings.showPrices && grandTotal > 0 ? formatMoney(grandTotal) : t("client.orders.positionCount", { count: cartCount })}</strong>
                 </div>
                 {settings.showPrices && total > 0 ? (
                   <p
@@ -1884,7 +1894,10 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                     }`}
                   >
                     {deliveryFee > 0
-                      ? `В заказе позиция «Доставка» — ${formatMoney(deliveryTariff.fee)}. Добавьте ещё на ${formatMoney(Math.max(0, deliveryTariff.freeFrom - total))} для бесплатной.`
+                      ? t("client.order.deliveryPaidAddMore", {
+                          fee: formatMoney(deliveryTariff.fee),
+                          needMore: formatMoney(Math.max(0, deliveryTariff.freeFrom - total)),
+                        })
                       : t("client.deliveryInSaintPetersburgIsFree")}
                   </p>
                 ) : null}

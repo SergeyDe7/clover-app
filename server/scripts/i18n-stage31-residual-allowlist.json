@@ -3,2744 +3,2457 @@
     "path": "src/App.jsx",
     "literal": "Добавлен в каталог",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Добавлен в каталог\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/App.jsx",
     "literal": "Заказ создан",
     "count": 1,
-    "classification": "USER_CONTENT",
-    "reason": "Order history / payload text written into saved order records"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Заказ создан\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/App.jsx",
     "literal": "Клиент",
     "count": 5,
-    "classification": "USER_CONTENT",
-    "reason": "Order history / payload text written into saved order records"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Клиент\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/App.jsx",
     "literal": "Клиент добавил позиции (дозаказ)",
     "count": 1,
-    "classification": "USER_CONTENT",
-    "reason": "Order history / payload text written into saved order records"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Клиент добавил позиции (дозаказ)\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/App.jsx",
     "literal": "Клиент изменил состав или условия заказа",
     "count": 1,
-    "classification": "USER_CONTENT",
-    "reason": "Order history / payload text written into saved order records"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Клиент изменил состав или условия заказа\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/App.jsx",
     "literal": "Менеджер",
     "count": 2,
-    "classification": "USER_CONTENT",
-    "reason": "Order history / payload text written into saved order records"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Менеджер\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/App.jsx",
     "literal": "Не удалось войти по Face ID. Если ключ добавляли раньше — укажите почту или добавьте Face ID заново в профиле.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/App.jsx",
     "literal": "Не удалось восстановить",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/App.jsx",
     "literal": "Не удалось добавить",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/App.jsx",
     "literal": "Не удалось удалить",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/App.jsx",
     "literal": "Новый",
     "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Новый\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/App.jsx",
     "literal": "пач.",
     "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/App.jsx",
     "literal": "уп.",
     "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/App.jsx",
     "literal": "шт.",
     "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/components/AdminRolePanel.jsx",
     "literal": "Иван Иванов",
     "count": 1,
     "classification": "USER_CONTENT",
-    "reason": "Example personal name used as form placeholder data"
+    "reason": "Sample/placeholder person name, not system chrome."
   },
   {
     "path": "src/components/AdminRolePanel.jsx",
     "literal": "Не удалось скопировать в буфер обмена.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/components/AdminRolePanel.jsx",
     "literal": "Не удалось создать менеджера.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/components/CustomProductForm.jsx",
     "literal": "кг",
     "count": 2,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/components/CustomProductForm.jsx",
     "literal": "л",
     "count": 2,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/components/CustomProductForm.jsx",
     "literal": "Не удалось прикрепить фотографию.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/components/CustomProductForm.jsx",
     "literal": "Не удалось прочитать фотографию.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/components/CustomProductForm.jsx",
     "literal": "пач.",
     "count": 2,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/components/CustomProductForm.jsx",
     "literal": "уп.",
     "count": 2,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/components/CustomProductForm.jsx",
     "literal": "шт.",
     "count": 3,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
-    "path": "src/shared/AppModal.jsx",
-    "literal": "Внимание",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Stage 3A hardcoded fallback default parameter in AppModal"
-  },
-  {
-    "path": "src/shared/AppModal.jsx",
-    "literal": "Отмена",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Stage 3A hardcoded fallback default parameter in AppModal"
-  },
-  {
-    "path": "src/shared/AppModal.jsx",
-    "literal": "Подробности",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Stage 3A hardcoded fallback default parameter in AppModal"
-  },
-  {
-    "path": "src/shared/AppModal.jsx",
-    "literal": "Подтвердите действие",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Stage 3A hardcoded fallback default parameter in AppModal"
-  },
-  {
-    "path": "src/shared/AppModal.jsx",
-    "literal": "Подтвердить",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Stage 3A hardcoded fallback default parameter in AppModal"
-  },
-  {
-    "path": "src/shared/AppModal.jsx",
-    "literal": "Понятно",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Stage 3A hardcoded fallback default parameter in AppModal"
-  },
-  {
-    "path": "src/shared/AppModal.jsx",
-    "literal": "Состав",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Stage 3A hardcoded fallback default parameter in AppModal"
-  },
-  {
-    "path": "src/shared/AppModal.jsx",
-    "literal": "Состав заказа",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Stage 3A Host expandable fallback remains hardcoded RU; Host still resolves other labels via t()"
-  },
-  {
-    "path": "src/shared/SharedPanels.jsx",
-    "literal": "Клиент",
-    "count": 1,
-    "classification": "USER_CONTENT",
-    "reason": "Order history actor fallback from customer contact"
-  },
-  {
-    "path": "src/shared/SharedPanels.jsx",
-    "literal": "Не удалось добавить ключ доступа.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
-  },
-  {
-    "path": "src/shared/SharedPanels.jsx",
-    "literal": "Не удалось показать блок",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "1 квартал",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "1С",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "1С TEST",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "2 квартал",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "3 квартал",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "4 квартал",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Банка суповая 500 мл Перинт (50/400)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Белизна, 1 л (15)",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Браузер заблокировал окно печати. Разрешите всплывающие окна для этого сайта.",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Бумага А4 (5)",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Бутылка прозрачная круглая с пробкой 500 мл (100 шт.)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Бутылка прозрачная с пробкой 2 л (48 шт.)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Бытовая химия",
-    "count": 3,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "В очереди на передачу в 1С",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Вакуумный пакет 160×250 мм, 60 мкм (100 шт.)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Вакуумный пакет 200×300 мм, 60 мкм (100 шт.)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Вакуумный пакет 200×300 мм, 70 мкм (100 шт.)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Вакуумный пакет 300×400 мм, 70 мкм (100 шт.)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Вафельное полотно 40 см × 50 м, 110 г/м²",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Вафельное полотно 45 см × 60 м, 140 г/м² (5)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Ведро хозяйственное 10 л",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Все",
-    "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Выполнен",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Готов",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Готов к доставке",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Готовится",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Губка «Мега» для посуды КонтинентПак (5 шт.)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Губка для посуды металлическая (3 шт.) (32)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Дата не указана",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Дополнительный",
-    "count": 2,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Доставка:",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Доставляется",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "е",
-    "count": 2,
-    "classification": "NON_VISIBLE",
-    "reason": "Diacritic or taxonomy matcher token, not rendered chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "ё",
-    "count": 2,
-    "classification": "NON_VISIBLE",
-    "reason": "Diacritic or taxonomy matcher token, not rendered chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Единица",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "За весь период",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Закупочная",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "1C price-type / contract name used as identity"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Закупочная цена",
-    "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "1C price-type / contract name used as identity"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Закупочная цена товара",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Из «Обновить цены» (вид цен)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Из 1С",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Из выгрузки закупочных цен",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Канцтовары",
-    "count": 6,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Кассовая лента 57×12×27 (6/210)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Кассовая лента 80×12×80 (5/120)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Клиент:",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Количество",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Комментарий клиента:",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Комментарий менеджера:",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Контейнер бумажный OneClick 800 крафт, дно (50/300)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "кор.",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "коробка",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Крышка к банкам Перинт (50/800)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Крышка плоская к контейнеру OneClick 800 (50/300)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "м",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Diacritic or taxonomy matcher token, not rendered chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "метр",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "МОП плоский 40×13 см, ухо-карман, арт. BF30562",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Набор: щетка для пола и совок-ловушка с высокой ручкой",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не отправлен",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось передать",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось сохранить открытую карточку клиента",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось сохранить подраздел «Ещё»",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось сохранить подраздел кабинета",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось сохранить просмотренные акты сверки",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось сохранить раздел клиента",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось сохранить раздел менеджера",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Не удалось сохранить текущий вход",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Новые товары",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Новый",
-    "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Новый запрос",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Ножницы Workmate 188 мм, пластиковые прорезиненные черные ручки",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Обработан вручную",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Одноразовая продукция",
-    "count": 3,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Определённый период",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Основной",
-    "count": 2,
-    "classification": "USER_CONTENT",
-    "reason": "Stored address label written into client address records"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Отклонён",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Пакеты для мусора 240 л, 65 мкм, 100×140 (50 шт.)",
-    "count": 1,
-    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Category name fragment reserved for product/category i18n"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Пакеты для мусора 60 л (50 шт.) ПОЛИЭС (25)",
-    "count": 1,
-    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Category name fragment reserved for product/category i18n"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Пакеты и пленка",
-    "count": 8,
-    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Category name fragment reserved for product/category i18n"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "пар.",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "пара",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "пач.",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "пачка",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Пергамент для выпечки силиконизированный 38 см × 50 м, крафт (15)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Передаётся в 1С",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Перчатки",
-    "count": 4,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Перчатки нитриловые черные XL (100 шт.)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Перчатки BEN FATTO нитриловые черные L (100 шт.)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Перчатки BEN FATTO нитриловые черные XL (100 шт.)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Перчатки KOMFI резиновые сверхпрочные красно-белые M (12/144)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Печать заблокирована",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Пипидастр",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Пленка пищевая 250 м × 45 см (12)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Принят",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Принят в 1С",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
+    "path": "src/screens/client/ClientCatalogAddPanel.jsx",
     "literal": "Прочее",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Пульверизатор ручной черный 500 мл",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "рул.",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "рулон",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Ручка шариковая синяя STAFF (12)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Салфетка для стекол Эксперт 35×40 см HQ",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Санокс 750 мл (15)",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Система",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Собирается",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Степлер № 24/6",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Сумма",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Текстиль",
     "count": 2,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Товар",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Трубочки для коктейля с изгибом 5×210 мм, черные (250 шт.)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Трубочки для коктейля толстые черные 8×240 мм (250 шт.)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Трубочки для мартини черные 5×125 мм (400 шт.)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Уборка",
-    "count": 10,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "уп.",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "упаковка",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Упаковка",
-    "count": 6,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "ХЕЛП — средство для мытья посуды 5 л (4)",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Цена",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Черновик создан в 1С",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Швабра: рукоять 130 см + держатель мопов 40×11 см, арт. 636234",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "шт.",
-    "count": 4,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "штука",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Print/document helper text in a non-component module; t() cannot run here"
-  },
-  {
-    "path": "src/shared/appHelpers.js",
-    "literal": "Щетка-сметка бытовая 6-рядная 240×40 мм",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Demo/product catalog string in shared helper, not Stage 3.1 chrome"
-  },
-  {
-    "path": "src/shared/deliveryDateRules.js",
-    "literal": "В этот день доставка не осуществляется.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/deliveryDateRules.js",
-    "literal": "Доставку можно оформить только на следующий рабочий день.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/deliveryDateRules.js",
-    "literal": "После 18:00 доставку можно оформить только на послезавтра в рабочий день.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/deliveryDateRules.js",
-    "literal": "Укажите дату доставки.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "артикул",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Excel header matcher compared against imported file columns"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "В файле нет листов.",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Excel import helper message; t() cannot run in this non-component module"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "е",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Diacritic or taxonomy matcher token, not rendered chrome"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "ё",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Diacritic or taxonomy matcher token, not rendered chrome"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "Категория",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Excel header matcher compared against imported file columns"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "клиент",
-    "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Excel header matcher compared against imported file columns"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "код",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Excel header matcher compared against imported file columns"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "Код",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Excel header matcher compared against imported file columns"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "код 1с",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Excel header matcher compared against imported file columns"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "код1с",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Excel header matcher compared against imported file columns"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "Матрица",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Excel header matcher compared against imported file columns"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "название",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Excel header matcher compared against imported file columns"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "Название",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Excel header matcher compared against imported file columns"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "наименование",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Excel header matcher compared against imported file columns"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "Не найдено ни одной строки с названием. Ожидаются колонки «Название»/«Товар» и опционально «Код».",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Excel import helper message; t() cannot run in this non-component module"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "номенклатура",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Excel header matcher compared against imported file columns"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "продукт",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Excel header matcher compared against imported file columns"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "товар",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Excel header matcher compared against imported file columns"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "Файл не выбран.",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Excel import helper message; t() cannot run in this non-component module"
-  },
-  {
-    "path": "src/shared/matrixExcelImport.js",
-    "literal": "Файл пустой.",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Excel import helper message; t() cannot run in this non-component module"
-  },
-  {
-    "path": "src/shared/orderAddendum.js",
-    "literal": "Новый",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Выполнен",
-    "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Выполненный заказ может удалить только администратор.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Готов к доставке",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Доставляется",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Заказ не в корзине.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Заказ не найден.",
-    "count": 3,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Заказ уже в корзине.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Заказ уже в обмене с 1С. Удаление запрещено.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Клиент может удалить только заказ со статусом «Новый».",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Новый",
-    "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Обработан вручную",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Принят",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Собирается",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Удалить выполненный заказ навсегда может только администратор.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/orderTrash.js",
-    "literal": "Удалить навсегда можно только заказ из корзины.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/productCatalogOrder.js",
-    "literal": "бел",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Product-name taxonomy matcher, not chrome UI"
-  },
-  {
-    "path": "src/shared/productCatalogOrder.js",
-    "literal": "е",
-    "count": 2,
-    "classification": "NON_VISIBLE",
-    "reason": "Diacritic or taxonomy matcher token, not rendered chrome"
-  },
-  {
-    "path": "src/shared/productCatalogOrder.js",
-    "literal": "ё",
-    "count": 2,
-    "classification": "NON_VISIBLE",
-    "reason": "Diacritic or taxonomy matcher token, not rendered chrome"
-  },
-  {
-    "path": "src/shared/productCatalogOrder.js",
-    "literal": "крафт",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Product-name taxonomy matcher, not chrome UI"
-  },
-  {
-    "path": "src/shared/productCatalogOrder.js",
-    "literal": "прозрач",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Product-name taxonomy matcher, not chrome UI"
-  },
-  {
-    "path": "src/shared/productCatalogOrder.js",
-    "literal": "черн",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Product-name taxonomy matcher, not chrome UI"
-  },
-  {
-    "path": "src/shared/productPhoto.js",
-    "literal": "Браузер не смог подготовить фотографию.",
-    "count": 2,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/productPhoto.js",
-    "literal": "Выберите фотографию товара.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/productPhoto.js",
-    "literal": "Максимальный размер файла — 5 МБ.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/productPhoto.js",
-    "literal": "После обработки фото всё ещё слишком большое. Выберите снимок меньшего размера.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/productPhoto.js",
-    "literal": "Разрешены только изображения JPG, PNG или WEBP.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/productPhoto.js",
-    "literal": "Файл не удалось распознать как фотографию.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
-  },
-  {
-    "path": "src/shared/pushSync.js",
-    "literal": "Нажмите «Включить уведомления», чтобы восстановить push на этом устройстве.",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Validation/helper message reserved for the Stage 3.2 error pipeline; t() cannot run here"
-  },
-  {
-    "path": "src/shared/storefrontInfoPages.js",
-    "literal": "КЛЕВЕР",
-    "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Brand token preserved in public info-page helper"
-  },
-  {
-    "path": "src/shared/storefrontPromotions.js",
-    "literal": "Активна",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Promotion lifecycle status used as identity"
-  },
-  {
-    "path": "src/shared/storefrontPromotions.js",
-    "literal": "Выключена",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Promotion lifecycle status used as identity"
-  },
-  {
-    "path": "src/shared/storefrontPromotions.js",
-    "literal": "Завершена",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Promotion lifecycle status used as identity"
-  },
-  {
-    "path": "src/shared/storefrontPromotions.js",
-    "literal": "Запланирована",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Promotion lifecycle status used as identity"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Прочее\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/client/ClientMatrixPanel.jsx",
     "literal": "Все",
     "count": 5,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Все\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/client/ClientScreen.jsx",
     "literal": "Активные",
     "count": 5,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Активные\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/client/ClientScreen.jsx",
     "literal": "Все",
     "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Все\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/client/ClientScreen.jsx",
     "literal": "Выполнен",
     "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Выполнен\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/client/ClientScreen.jsx",
     "literal": "Новый",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Новый\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/client/ClientScreen.jsx",
     "literal": "Новый запрос",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Новый запрос\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/client/ClientScreen.jsx",
     "literal": "Отменён",
     "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Отменён\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/client/CustomItemForm.jsx",
     "literal": "кг",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/screens/client/CustomItemForm.jsx",
     "literal": "кор.",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/screens/client/CustomItemForm.jsx",
     "literal": "л",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/screens/client/CustomItemForm.jsx",
     "literal": "Не удалось прикрепить фотографию.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/client/CustomItemForm.jsx",
     "literal": "Не удалось прочитать фотографию.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/client/CustomItemForm.jsx",
     "literal": "Новый запрос",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Новый запрос\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/client/CustomItemForm.jsx",
     "literal": "пач.",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/screens/client/CustomItemForm.jsx",
     "literal": "рулон",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/screens/client/CustomItemForm.jsx",
     "literal": "уп.",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/screens/client/CustomItemForm.jsx",
     "literal": "Файл не удалось распознать как фотографию.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/client/CustomItemForm.jsx",
     "literal": "шт.",
-    "count": 2,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "count": 3,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/screens/client/OrderEditor.jsx",
     "literal": "Все",
     "count": 3,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Все\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
+  },
+  {
+    "path": "src/screens/client/OrderEditor.jsx",
+    "literal": "Доставка по СПб бесплатная",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Доставка по СПб бесплатная\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/client/OrderEditor.jsx",
     "literal": "Новый запрос",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
-  },
-  {
-    "path": "src/screens/client/OrderEditor.jsx",
-    "literal": "позиции",
-    "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Plural unit word used in cart math copy"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Новый запрос\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/client/OrderEditor.jsx",
     "literal": "шт.",
     "count": 2,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/screens/client/ProfilePanel.jsx",
     "literal": "Бухгалтер",
     "count": 1,
-    "classification": "USER_CONTENT",
-    "reason": "Datalist suggestion stored as user-entered contact role"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Default contact role labels stored on the client profile. Display may localize; stored identity stays BASE Russian."
   },
   {
     "path": "src/screens/client/ProfilePanel.jsx",
     "literal": "Директор",
     "count": 1,
-    "classification": "USER_CONTENT",
-    "reason": "Datalist suggestion stored as user-entered contact role"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Default contact role labels stored on the client profile. Display may localize; stored identity stays BASE Russian."
   },
   {
     "path": "src/screens/client/ProfilePanel.jsx",
     "literal": "Закупки",
     "count": 1,
-    "classification": "USER_CONTENT",
-    "reason": "Datalist suggestion stored as user-entered contact role"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Default contact role labels stored on the client profile. Display may localize; stored identity stays BASE Russian."
   },
   {
     "path": "src/screens/client/ProfilePanel.jsx",
     "literal": "Менеджер",
     "count": 1,
-    "classification": "USER_CONTENT",
-    "reason": "Datalist suggestion stored as user-entered contact role"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Менеджер\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/client/ProfilePanel.jsx",
     "literal": "Приём товара",
     "count": 1,
-    "classification": "USER_CONTENT",
-    "reason": "Datalist suggestion stored as user-entered contact role"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Default contact role labels stored on the client profile. Display may localize; stored identity stays BASE Russian."
   },
   {
     "path": "src/screens/client/ProfilePanel.jsx",
     "literal": "Склад",
     "count": 1,
-    "classification": "USER_CONTENT",
-    "reason": "Datalist suggestion stored as user-entered contact role"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Default contact role labels stored on the client profile. Display may localize; stored identity stays BASE Russian."
   },
   {
     "path": "src/screens/client/ReconciliationPanel.jsx",
     "literal": "Не удалось отправить",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/client/ReconciliationPanel.jsx",
     "literal": "Не удалось скачать",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
-  },
-  {
-    "path": "src/screens/manager/ManagerAccessVault.jsx",
-    "literal": "без логина",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Compact technical badge in manager tables, not a primary chrome label"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerAccessVault.jsx",
     "literal": "Не удалось загрузить доступы.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerAccessVault.jsx",
     "literal": "Не удалось скопировать в буфер обмена.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerAccessVault.jsx",
     "literal": "Не удалось сохранить",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerAccessVault.jsx",
     "literal": "Не удалось удалить",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
-  },
-  {
-    "path": "src/screens/manager/ManagerAudit.jsx",
-    "literal": " · изменён email для входа",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Non-chrome helper/regex residual after Stage 3.1 system UI migration"
-  },
-  {
-    "path": "src/screens/manager/ManagerAudit.jsx",
-    "literal": "готов к передаче",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Audit detail formatter residual in a helper; t() is passed only for catalogued phrases"
-  },
-  {
-    "path": "src/screens/manager/ManagerAudit.jsx",
-    "literal": "заполнен",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Non-chrome helper/regex residual after Stage 3.1 system UI migration"
-  },
-  {
-    "path": "src/screens/manager/ManagerAudit.jsx",
-    "literal": "копия",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Audit detail formatter residual in a helper; t() is passed only for catalogued phrases"
-  },
-  {
-    "path": "src/screens/manager/ManagerAudit.jsx",
-    "literal": "не заполнен",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Audit detail formatter residual in a helper; t() is passed only for catalogued phrases"
-  },
-  {
-    "path": "src/screens/manager/ManagerAudit.jsx",
-    "literal": "ошибка",
-    "count": 2,
-    "classification": "NON_VISIBLE",
-    "reason": "Audit detail formatter residual in a helper; t() is passed only for catalogued phrases"
-  },
-  {
-    "path": "src/screens/manager/ManagerAudit.jsx",
-    "literal": "подключение проверено",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Audit detail formatter residual in a helper; t() is passed only for catalogued phrases"
-  },
-  {
-    "path": "src/screens/manager/ManagerAudit.jsx",
-    "literal": "реальная 1С",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Audit detail formatter residual in a helper; t() is passed only for catalogued phrases"
-  },
-  {
-    "path": "src/screens/manager/ManagerAudit.jsx",
-    "literal": "Реальная 1С",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Audit detail formatter residual in a helper; t() is passed only for catalogued phrases"
-  },
-  {
-    "path": "src/screens/manager/ManagerAudit.jsx",
-    "literal": "Резервная копия",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Audit detail formatter residual in a helper; t() is passed only for catalogued phrases"
-  },
-  {
-    "path": "src/screens/manager/ManagerAudit.jsx",
-    "literal": "Симулятор",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Audit detail formatter residual in a helper; t() is passed only for catalogued phrases"
-  },
-  {
-    "path": "src/screens/manager/ManagerAudit.jsx",
-    "literal": "создан",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Non-chrome helper/regex residual after Stage 3.1 system UI migration"
-  },
-  {
-    "path": "src/screens/manager/ManagerAudit.jsx",
-    "literal": "Справочник",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Audit detail formatter residual in a helper; t() is passed only for catalogued phrases"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerBackup.jsx",
     "literal": "Не удалось прочитать файл резервной копии.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
+  },
+  {
+    "path": "src/screens/manager/ManagerBackup.jsx",
+    "literal": "Ручная копия из кабинета менеджера",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Ручная копия из кабинета менеджера\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
     "literal": "без кода",
     "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Compact technical badge in manager tables, not a primary chrome label"
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
     "literal": "Выполнен",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Выполнен\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
     "literal": "Дополнительный",
-    "count": 2,
-    "classification": "USER_CONTENT",
-    "reason": "Stored extra-address label written into client records"
+    "count": 5,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Дополнительный\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
     "literal": "Не удалось загрузить цены",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
     "literal": "Не удалось сменить пароль",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
     "literal": "Не удалось создать клиента",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
     "literal": "Не удалось сохранить",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
     "literal": "Не удалось сохранить данные клиента.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
     "literal": "Не удалось сохранить матрицу.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
     "literal": "Не удалось удалить",
     "count": 2,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
     "literal": "Не удалось удалить товар.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
     "literal": "Основной",
-    "count": 2,
-    "classification": "USER_CONTENT",
-    "reason": "Stored address label written into client address records"
+    "count": 4,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Основной\". Display-only projection exists where the string is shown in UI."
+  },
+  {
+    "path": "src/screens/manager/ManagerClients.jsx",
+    "literal": "Основной адрес",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Основной адрес\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/manager/ManagerClients.jsx",
     "literal": "Отменён",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Отменён\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/manager/ManagerExchange.jsx",
     "literal": "1С:УНФ",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "1C configuration or document type identifier"
+    "classification": "EXTERNAL_BUSINESS_CONTENT",
+    "reason": "1C/external product contour label shown verbatim from the integration, not a Stage 3.1 UI catalog string."
   },
   {
     "path": "src/screens/manager/ManagerNotifications.jsx",
     "literal": "Дата доставки",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Notification body parser label matched against stored RU templates"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical labels parsed from server-generated notification bodies. Display projections localize field captions; parsers match BASE Russian payload text."
   },
   {
     "path": "src/screens/manager/ManagerNotifications.jsx",
     "literal": "Дата заказа",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Notification body parser label matched against stored RU templates"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical labels parsed from server-generated notification bodies. Display projections localize field captions; parsers match BASE Russian payload text."
   },
   {
     "path": "src/screens/manager/ManagerNotifications.jsx",
     "literal": "Кол-во позиций",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Notification body parser label matched against stored RU templates"
-  },
-  {
-    "path": "src/screens/manager/ManagerNotifications.jsx",
-    "literal": "Не удалось передать в 1С",
-    "count": 1,
-    "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical labels parsed from server-generated notification bodies. Display projections localize field captions; parsers match BASE Russian payload text."
   },
   {
     "path": "src/screens/manager/ManagerNotifications.jsx",
     "literal": "не указана",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Legacy notification date sentinel compared in parser"
-  },
-  {
-    "path": "src/screens/manager/ManagerNotifications.jsx",
-    "literal": "Событие",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Fallback label already migrated at render; quoted residual in notification meta"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical labels parsed from server-generated notification bodies. Display projections localize field captions; parsers match BASE Russian payload text."
   },
   {
     "path": "src/screens/manager/ManagerNotifications.jsx",
     "literal": "Сумма",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Notification body parser label matched against stored RU templates"
-  },
-  {
-    "path": "src/screens/manager/ManagerOrders.jsx",
-    "literal": ") : order.status === \"Обработан вручную\" ? (",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Order/status identity used as business authority"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical labels parsed from server-generated notification bodies. Display projections localize field captions; parsers match BASE Russian payload text."
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
     "literal": "Все",
-    "count": 4,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "count": 5,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Все\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
     "literal": "Добавлен в каталог",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Добавлен в каталог\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
     "literal": "Клиент",
     "count": 1,
-    "classification": "USER_CONTENT",
-    "reason": "Fallback customer name in order list when contact is empty"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Клиент\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
     "literal": "Не удалось отменить передачу",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
     "literal": "Не удалось передать в 1С",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
     "literal": "Новый",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Новый\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
     "literal": "Новый запрос",
     "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Новый запрос\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
     "literal": "Обработан вручную",
     "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Обработан вручную\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
     "literal": "Отклонён",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Отклонён\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
     "literal": "Принят",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Принят\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
     "literal": "Согласован",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Согласован\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
     "literal": "Уточняется",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Уточняется\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
   },
   {
     "path": "src/screens/manager/ManagerOrders.jsx",
     "literal": "шт",
     "count": 2,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/screens/manager/ManagerPriceList.jsx",
     "literal": "Не удалось выгрузить прайс",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Активные",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "count": 3,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Активные\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Без связи с 1С",
-    "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Catalog/storefront filter identity compared in manager lists"
+    "count": 4,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Без связи с 1С\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Все",
-    "count": 6,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "count": 9,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Все\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Есть варианты",
-    "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Catalog/storefront filter identity compared in manager lists"
+    "count": 4,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Есть варианты\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "На витрине сайта",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Catalog/storefront filter identity compared in manager lists"
+    "count": 3,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"На витрине сайта\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Не на витрине",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Catalog/storefront filter identity compared in manager lists"
+    "count": 3,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Не на витрине\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Не удалось сохранить",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Не удалось удалить",
     "count": 2,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Не удалось удалить выбранные товары.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Не удалось удалить товар.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Связанные с 1С",
-    "count": 2,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Catalog/storefront filter identity compared in manager lists"
+    "count": 4,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Связанные с 1С\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/manager/ManagerProducts.jsx",
     "literal": "Скрытые",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Catalog/storefront filter identity compared in manager lists"
-  },
-  {
-    "path": "src/screens/manager/ManagerReconciliation.jsx",
-    "literal": " PDF-файл тоже будет удалён с сервера.",
-    "count": 1,
-    "classification": "NON_VISIBLE",
-    "reason": "Non-chrome helper/regex residual after Stage 3.1 system UI migration"
+    "count": 3,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Скрытые\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/manager/ManagerReconciliation.jsx",
     "literal": "Не удалось отправить",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerReconciliation.jsx",
     "literal": "Не удалось удалить",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
+  },
+  {
+    "path": "src/screens/manager/ManagerScreen.jsx",
+    "literal": "Адрес из заказа",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Адрес из заказа\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/manager/ManagerScreen.jsx",
     "literal": "Все",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Все\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/manager/ManagerScreen.jsx",
     "literal": "Новый",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Новый\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/screens/manager/ManagerSettings.jsx",
+    "literal": "Доставка",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Доставка\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/manager/ManagerSettings.jsx",
     "literal": "Не удалось проверить каналы",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerSettings.jsx",
     "literal": "Новость Clover",
     "count": 1,
-    "classification": "USER_CONTENT",
-    "reason": "Default promotion draft title stored as message content"
-  },
-  {
-    "path": "src/screens/manager/ManagerSettings.jsx",
-    "literal": "указанный адрес",
-    "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Helper/confirm detail reserved for Stage 3.2 messaging"
+    "reason": "Diagnostic/test notification or settings hint reserved with operational copy."
   },
   {
     "path": "src/screens/manager/ManagerSettings.jsx",
     "literal": "email: включите тумблер «Отправлять на email» и обновите страницу",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Helper/confirm detail reserved for Stage 3.2 messaging"
+    "reason": "Diagnostic/test notification or settings hint reserved with operational copy."
   },
   {
     "path": "src/screens/manager/ManagerStorefront.jsx",
     "literal": "Все",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Status or filter identity compared in application logic"
+    "count": 3,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Все\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
+  },
+  {
+    "path": "src/screens/manager/ManagerStorefront.jsx",
+    "literal": "Интернет магазин Clover",
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Интернет магазин Clover\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/manager/ManagerStorefront.jsx",
     "literal": "На витрине",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Catalog/storefront filter identity compared in manager lists"
+    "count": 3,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"На витрине\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/manager/ManagerStorefront.jsx",
     "literal": "Не на витрине",
-    "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Catalog/storefront filter identity compared in manager lists"
+    "count": 3,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Не на витрине\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
   {
     "path": "src/screens/manager/ManagerStorefront.jsx",
     "literal": "Не удалось загрузить карту",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerStorefront.jsx",
     "literal": "Не удалось загрузить слайд",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerStorefront.jsx",
     "literal": "Не удалось обновить описания",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerStorefront.jsx",
     "literal": "Не удалось сохранить",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerStorefront.jsx",
     "literal": "Не удалось сохранить товары",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
-  },
-  {
-    "path": "src/screens/manager/ManagerStorefront.jsx",
-    "literal": "Пн–Пт 9:00–18:00\\nСб 10:00–16:00\\nВс выходной",
-    "count": 1,
-    "classification": "USER_CONTENT",
-    "reason": "Default working-hours example content stored as site data"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ManagerStorefrontInfoPages.jsx",
-    "literal": "Напишите нам",
+    "literal": "Связаться с нами",
     "count": 1,
-    "classification": "USER_CONTENT",
-    "reason": "Default stored editorial link label for an info-page block"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Связаться с нами\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/manager/ManagerStorefrontPromotions.jsx",
     "literal": "Не удалось загрузить картинку акции",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ProductEditor.jsx",
     "literal": "Из 1С",
     "count": 1,
-    "classification": "TECHNICAL_IDENTIFIER",
-    "reason": "Catalog/storefront filter identity compared in manager lists"
+    "classification": "EXTERNAL_BUSINESS_CONTENT",
+    "reason": "1C/external product contour label shown verbatim from the integration, not a Stage 3.1 UI catalog string."
   },
   {
     "path": "src/screens/manager/ProductEditor.jsx",
     "literal": "Не удалось дополнить",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/manager/ProductEditor.jsx",
     "literal": "Новые товары",
     "count": 1,
-    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Default category name stored on products"
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
   },
   {
     "path": "src/screens/manager/ProductEditor.jsx",
     "literal": "Прочее",
-    "count": 1,
-    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Default category name stored on products"
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Прочее\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/manager/ProductEditor.jsx",
     "literal": "шт",
     "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/screens/manager/matrixMembership.js",
     "literal": "е",
     "count": 1,
     "classification": "NON_VISIBLE",
-    "reason": "Diacritic or taxonomy matcher token, not rendered chrome"
+    "reason": "Transliteration/search matching character, not visible chrome."
   },
   {
     "path": "src/screens/manager/matrixMembership.js",
     "literal": "ё",
     "count": 1,
     "classification": "NON_VISIBLE",
-    "reason": "Diacritic or taxonomy matcher token, not rendered chrome"
+    "reason": "Transliteration/search matching character, not visible chrome."
   },
   {
     "path": "src/screens/storefront/components/GroupTile.jsx",
     "literal": "Пакеты,",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Category name fragment reserved for product/category i18n"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/components/GroupTile.jsx",
     "literal": "Пакеты, упаковочные материалы",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Category name fragment reserved for product/category i18n"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/components/GroupTile.jsx",
     "literal": "упаковочные материалы",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Category name fragment reserved for product/category i18n"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/components/GroupTile.jsx",
     "literal": "Химия,",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Category name fragment reserved for product/category i18n"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/components/GroupTile.jsx",
     "literal": "Химия, чистящие средства",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Category name fragment reserved for product/category i18n"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/components/GroupTile.jsx",
     "literal": "чистящие средства",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Category name fragment reserved for product/category i18n"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/components/StorefrontQtyControl.jsx",
     "literal": "шт",
     "count": 1,
-    "classification": "FUTURE_PRODUCT",
-    "reason": "Unit of measure identity, not Stage 3.1 system UI"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/screens/storefront/pages/AktsiiPage.jsx",
     "literal": "Не удалось загрузить акции.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/storefront/pages/CatalogPage.jsx",
     "literal": "Не удалось загрузить каталог.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/storefront/pages/CheckoutPage.jsx",
     "literal": "Не удалось оформить заказ.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/storefront/pages/ContactsPage.jsx",
     "literal": "Не удалось загрузить контакты.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/storefront/pages/HomePage.jsx",
     "literal": "Не удалось загрузить витрину.",
     "count": 1,
     "classification": "STAGE32_ERROR_PWA",
-    "reason": "Reserved for Stage 3.2 error/PWA pipeline"
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Вас приветствует компания ООО «КЛЕВЕР».",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Вы можете забрать товар сами. Оформите заказ по телефону или письмом на почту — мы подготовим его в течение трёх часов.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Главными нашими преимуществами являются низкие цены, качественный товар, индивидуальный подход к каждому клиенту и огромное желание развиваться и стать лучшими в своём деле.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Editorial page/FAQ/SEO copy reserved for a later stage"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "График приёма и доставки заказов",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Доставка курьером осуществляется в течение рабочего дня.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Доставляем по Санкт-Петербургу. Стоимость доставки рассчитывается при оформлении заказа и зависит от адреса и суммы заказа.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Заказы, принятые в воскресенье в течение дня, доставляются во вторник.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Заказы, принятые в понедельник до 15:00, доставляются во вторник.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Заказы, принятые в пятницу до 15:00, доставляются в субботу.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Заказы, принятые в среду до 15:00, доставляются в четверг.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Заказы, принятые в субботу в течение дня, доставляются в понедельник.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Заказы, принятые в четверг до 15:00, доставляются в пятницу.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Заказы, принятые во вторник до 15:00, доставляются в среду.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Заказы, принятые после 15:00, приравниваются к приёму на следующий день до 15:00 и доставляются согласно графику.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Компания «КЛЕВЕР» — динамично развивающаяся компания в области хозяйственных товаров и бытовой химии. Наша компания была создана в 2015 году двумя основателями-энтузиастами Сергеем Дё и Сергеем Юн.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Editorial page/FAQ/SEO copy reserved for a later stage"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Контакты и адрес",
     "count": 2,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Контакты Оператора",
     "count": 2,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Курьер",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Мы предлагаем специальные цены и гибкие условия работы с оптовыми клиентами.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Мы ценим каждого клиента и идём навстречу. Если по какой-то причине товар вам не подошёл или вы хотите обменять его, мы готовы это сделать.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Оплата товара осуществляется по безналичному расчёту путём выставления счёта клиенту.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Отозвать согласие или уточнить порядок обработки персональных данных можно, обратившись к Оператору по контактам, указанным на сайте.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Пользователь имеет право в любое время запросить уточнение своих данных, их блокирование или удаление, направив соответствующее обращение в адрес Оператора. Использование сайта означает согласие пользователя с условиями настоящей Политики.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Editorial page/FAQ/SEO copy reserved for a later stage"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Самовывоз",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Связаться с нами",
     "count": 3,
-    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Связаться с нами\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Товар подлежит обмену и возврату, если сохранены целостность упаковки, коробки и товарный вид.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Чтобы обсудить условия сотрудничества и получить прайс, свяжитесь с нами удобным способом.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Доставка",
     "count": 2,
-    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Доставка\". Display-only projection exists where the string is shown in UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Доставка КЛЕВЕР по Санкт-Петербургу: график приёма и доставки заказов, доставка курьером и самовывоз.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "О нас",
     "count": 2,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "ООО «КЛЕВЕР» — производство и поставка хозяйственных товаров и бытовой химии в Санкт-Петербурге с 2015 года.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Оплата",
     "count": 2,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Оплата заказов в компании КЛЕВЕР: безналичный расчёт по счёту для организаций и индивидуальных предпринимателей.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Оптовикам",
     "count": 2,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Оптовые поставки хозяйственных товаров и бытовой химии от компании КЛЕВЕР: специальные цены и гибкие условия работы.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Политика обработки и защиты персональных данных пользователей сайта компании КЛЕВЕР.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Политика обработки персональных данных",
     "count": 2,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Согласие на обработку персональных данных",
     "count": 2,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Текст согласия на обработку персональных данных пользователей сайта компании КЛЕВЕР.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Условия возврата",
     "count": 2,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Условия обмена и возврата товара в компании КЛЕВЕР: когда товар подлежит возврату и что для этого нужно.",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Info-page / editorial / SEO copy reserved for later stages"
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/shared/AppModal.jsx",
+    "literal": "Внимание",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "AppModal Host-unavailable window.confirm/alert uses hardcoded RU only when React Host is missing; Host path localizes via t()."
+  },
+  {
+    "path": "src/shared/AppModal.jsx",
+    "literal": "Отмена",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "AppModal Host-unavailable window.confirm/alert uses hardcoded RU only when React Host is missing; Host path localizes via t()."
+  },
+  {
+    "path": "src/shared/AppModal.jsx",
+    "literal": "Подробности",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "AppModal Host-unavailable window.confirm/alert uses hardcoded RU only when React Host is missing; Host path localizes via t()."
+  },
+  {
+    "path": "src/shared/AppModal.jsx",
+    "literal": "Подтвердите действие",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "AppModal Host-unavailable window.confirm/alert uses hardcoded RU only when React Host is missing; Host path localizes via t()."
+  },
+  {
+    "path": "src/shared/AppModal.jsx",
+    "literal": "Подтвердить",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "AppModal Host-unavailable window.confirm/alert uses hardcoded RU only when React Host is missing; Host path localizes via t()."
+  },
+  {
+    "path": "src/shared/AppModal.jsx",
+    "literal": "Понятно",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "AppModal Host-unavailable window.confirm/alert uses hardcoded RU only when React Host is missing; Host path localizes via t()."
+  },
+  {
+    "path": "src/shared/AppModal.jsx",
+    "literal": "Состав заказа",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "AppModal Host-unavailable window.confirm/alert uses hardcoded RU only when React Host is missing; Host path localizes via t()."
+  },
+  {
+    "path": "src/shared/SharedPanels.jsx",
+    "literal": "Заказ создан",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Заказ создан\". Display-only projection exists where the string is shown in UI."
+  },
+  {
+    "path": "src/shared/SharedPanels.jsx",
+    "literal": "Клиент",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Клиент\". Display-only projection exists where the string is shown in UI."
+  },
+  {
+    "path": "src/shared/SharedPanels.jsx",
+    "literal": "Не удалось добавить ключ доступа.",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
+  },
+  {
+    "path": "src/shared/SharedPanels.jsx",
+    "literal": "Не удалось показать блок",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "1 квартал",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical period/exchange/price identity \"1 квартал\" stored or compared in business logic. Localized display uses a projection where shown."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "1С",
+    "count": 1,
+    "classification": "EXTERNAL_BUSINESS_CONTENT",
+    "reason": "1C/external product contour label shown verbatim from the integration, not a Stage 3.1 UI catalog string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "1С TEST",
+    "count": 1,
+    "classification": "EXTERNAL_BUSINESS_CONTENT",
+    "reason": "1C/external product contour label shown verbatim from the integration, not a Stage 3.1 UI catalog string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "2 квартал",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical period/exchange/price identity \"2 квартал\" stored or compared in business logic. Localized display uses a projection where shown."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "3 квартал",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical period/exchange/price identity \"3 квартал\" stored or compared in business logic. Localized display uses a projection where shown."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "4 квартал",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical period/exchange/price identity \"4 квартал\" stored or compared in business logic. Localized display uses a projection where shown."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Банка суповая 500 мл Перинт (50/400)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Белизна, 1 л (15)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Бумага А4 (5)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Бутылка прозрачная круглая с пробкой 500 мл (100 шт.)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Бутылка прозрачная с пробкой 2 л (48 шт.)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Бытовая химия",
+    "count": 3,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "В очереди на передачу в 1С",
+    "count": 1,
+    "classification": "EXTERNAL_BUSINESS_CONTENT",
+    "reason": "1C/external product contour label shown verbatim from the integration, not a Stage 3.1 UI catalog string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Вакуумный пакет 160×250 мм, 60 мкм (100 шт.)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Вакуумный пакет 200×300 мм, 60 мкм (100 шт.)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Вакуумный пакет 200×300 мм, 70 мкм (100 шт.)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Вакуумный пакет 300×400 мм, 70 мкм (100 шт.)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Вафельное полотно 40 см × 50 м, 110 г/м²",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Вафельное полотно 45 см × 60 м, 140 г/м² (5)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Ведро хозяйственное 10 л",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Все",
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Filter/control identity \"Все\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Выполнен",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Выполнен\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Готов",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical period/exchange/price identity \"Готов\" stored or compared in business logic. Localized display uses a projection where shown."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Готов к доставке",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Готов к доставке\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Готовится",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical period/exchange/price identity \"Готовится\" stored or compared in business logic. Localized display uses a projection where shown."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Губка «Мега» для посуды КонтинентПак (5 шт.)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Губка для посуды металлическая (3 шт.) (32)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Дата не указана",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical period/exchange/price identity \"Дата не указана\" stored or compared in business logic. Localized display uses a projection where shown."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Дополнительный",
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Дополнительный\". Display-only projection exists where the string is shown in UI."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Доставляется",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Доставляется\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "е",
+    "count": 2,
+    "classification": "NON_VISIBLE",
+    "reason": "Search/transliteration matching token, not visible chrome."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "ё",
+    "count": 2,
+    "classification": "NON_VISIBLE",
+    "reason": "Search/transliteration matching token, not visible chrome."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "За весь период",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical period/exchange/price identity \"За весь период\" stored or compared in business logic. Localized display uses a projection where shown."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Закупочная цена",
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical period/exchange/price identity \"Закупочная цена\" stored or compared in business logic. Localized display uses a projection where shown."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Из 1С",
+    "count": 1,
+    "classification": "EXTERNAL_BUSINESS_CONTENT",
+    "reason": "1C/external product contour label shown verbatim from the integration, not a Stage 3.1 UI catalog string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Канцтовары",
+    "count": 6,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Кассовая лента 57×12×27 (6/210)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Кассовая лента 80×12×80 (5/120)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Контейнер бумажный OneClick 800 крафт, дно (50/300)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "кор.",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "коробка",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Крышка к банкам Перинт (50/800)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Крышка плоская к контейнеру OneClick 800 (50/300)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "м",
+    "count": 1,
+    "classification": "NON_VISIBLE",
+    "reason": "Search/transliteration matching token, not visible chrome."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "метр",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "МОП плоский 40×13 см, ухо-карман, арт. BF30562",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Набор: щетка для пола и совок-ловушка с высокой ручкой",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Не отправлен",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical period/exchange/price identity \"Не отправлен\" stored or compared in business logic. Localized display uses a projection where shown."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Не удалось передать",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Не удалось сохранить открытую карточку клиента",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Не удалось сохранить подраздел «Ещё»",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Не удалось сохранить подраздел кабинета",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Не удалось сохранить просмотренные акты сверки",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Не удалось сохранить раздел клиента",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Не удалось сохранить раздел менеджера",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Не удалось сохранить текущий вход",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Новые товары",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Новый",
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Новый\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Новый запрос",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Новый запрос\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Ножницы Workmate 188 мм, пластиковые прорезиненные черные ручки",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Обработан вручную",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Обработан вручную\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Одноразовая продукция",
+    "count": 3,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Определённый период",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical period/exchange/price identity \"Определённый период\" stored or compared in business logic. Localized display uses a projection where shown."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Основной",
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Основной\". Display-only projection exists where the string is shown in UI."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Отклонён",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Отклонён\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Пакеты для мусора 240 л, 65 мкм, 100×140 (50 шт.)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Пакеты для мусора 60 л (50 шт.) ПОЛИЭС (25)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Пакеты и пленка",
+    "count": 8,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "пар.",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "пара",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "пач.",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "пачка",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Пергамент для выпечки силиконизированный 38 см × 50 м, крафт (15)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Передаётся в 1С",
+    "count": 1,
+    "classification": "EXTERNAL_BUSINESS_CONTENT",
+    "reason": "1C/external product contour label shown verbatim from the integration, not a Stage 3.1 UI catalog string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Перчатки",
+    "count": 4,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Перчатки нитриловые черные XL (100 шт.)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Перчатки BEN FATTO нитриловые черные L (100 шт.)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Перчатки BEN FATTO нитриловые черные XL (100 шт.)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Перчатки KOMFI резиновые сверхпрочные красно-белые M (12/144)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Пипидастр",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Пленка пищевая 250 м × 45 см (12)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Принят",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Принят\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Принят в 1С",
+    "count": 1,
+    "classification": "EXTERNAL_BUSINESS_CONTENT",
+    "reason": "1C/external product contour label shown verbatim from the integration, not a Stage 3.1 UI catalog string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Прочее",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "BASE canonical persisted or compared identity \"Прочее\". Display-only projection exists where the string is shown in UI."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Пульверизатор ручной черный 500 мл",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "рул.",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "рулон",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Ручка шариковая синяя STAFF (12)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Салфетка для стекол Эксперт 35×40 см HQ",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Санокс 750 мл (15)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Система",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical period/exchange/price identity \"Система\" stored or compared in business logic. Localized display uses a projection where shown."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Собирается",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Собирается\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Степлер № 24/6",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Текстиль",
+    "count": 2,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Трубочки для коктейля с изгибом 5×210 мм, черные (250 шт.)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Трубочки для коктейля толстые черные 8×240 мм (250 шт.)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Трубочки для мартини черные 5×125 мм (400 шт.)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Уборка",
+    "count": 10,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "уп.",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "упаковка",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Упаковка",
+    "count": 6,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "ХЕЛП — средство для мытья посуды 5 л (4)",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Черновик создан в 1С",
+    "count": 1,
+    "classification": "EXTERNAL_BUSINESS_CONTENT",
+    "reason": "1C/external product contour label shown verbatim from the integration, not a Stage 3.1 UI catalog string."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Швабра: рукоять 130 см + держатель мопов 40×11 см, арт. 636234",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "шт.",
+    "count": 4,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "штука",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/appHelpers.js",
+    "literal": "Щетка-сметка бытовая 6-рядная 240×40 мм",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "артикул",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "В файле нет листов.",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "е",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "ё",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "Категория",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "клиент",
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "код",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "Код",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "код 1с",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "код1с",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "Матрица",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "название",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "Название",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "наименование",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "Не найдено ни одной строки с названием. Ожидаются колонки «Название»/«Товар» и опционально «Код».",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Operational/error/PWA copy reserved for Stage 3.2 or shown as exception text without changing business identity."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "номенклатура",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "продукт",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "товар",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "Файл не выбран.",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "Файл пустой.",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Excel column alias used to parse files; identity stays BASE Russian headers."
+  },
+  {
+    "path": "src/shared/orderAddendum.js",
+    "literal": "Новый",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Новый\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/orderTrash.js",
+    "literal": "Выполнен",
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Выполнен\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/orderTrash.js",
+    "literal": "Готов к доставке",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Готов к доставке\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/orderTrash.js",
+    "literal": "Доставляется",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Доставляется\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/orderTrash.js",
+    "literal": "Новый",
+    "count": 2,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Новый\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/orderTrash.js",
+    "literal": "Обработан вручную",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Обработан вручную\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/orderTrash.js",
+    "literal": "Принят",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Принят\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/orderTrash.js",
+    "literal": "Собирается",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Persisted/compared business status \"Собирается\". Storage owner: order/request records. Display projection: orderStatusLabel/requestStatusLabel. Foreign UI must use the projection, not this raw string."
+  },
+  {
+    "path": "src/shared/productCatalogOrder.js",
+    "literal": "бел",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/productCatalogOrder.js",
+    "literal": "е",
+    "count": 2,
+    "classification": "NON_VISIBLE",
+    "reason": "Search/transliteration matching token, not visible chrome."
+  },
+  {
+    "path": "src/shared/productCatalogOrder.js",
+    "literal": "ё",
+    "count": 2,
+    "classification": "NON_VISIBLE",
+    "reason": "Search/transliteration matching token, not visible chrome."
+  },
+  {
+    "path": "src/shared/productCatalogOrder.js",
+    "literal": "крафт",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/productCatalogOrder.js",
+    "literal": "прозрач",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/productCatalogOrder.js",
+    "literal": "черн",
+    "count": 1,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Браузер не смог подготовить фотографию.",
+    "count": 2,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Operational/error/PWA copy reserved for Stage 3.2 or shown as exception text without changing business identity."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Выберите фотографию товара.",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Operational/error/PWA copy reserved for Stage 3.2 or shown as exception text without changing business identity."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Максимальный размер файла — 5 МБ.",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Operational/error/PWA copy reserved for Stage 3.2 or shown as exception text without changing business identity."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "После обработки фото всё ещё слишком большое. Выберите снимок меньшего размера.",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Operational/error/PWA copy reserved for Stage 3.2 or shown as exception text without changing business identity."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Разрешены только изображения JPG, PNG или WEBP.",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Operational/error/PWA copy reserved for Stage 3.2 or shown as exception text without changing business identity."
+  },
+  {
+    "path": "src/shared/productPhoto.js",
+    "literal": "Файл не удалось распознать как фотографию.",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Error/PWA/network copy reserved for Stage 3.2 pipeline."
+  },
+  {
+    "path": "src/shared/pushSync.js",
+    "literal": "Нажмите «Включить уведомления», чтобы восстановить push на этом устройстве.",
+    "count": 1,
+    "classification": "STAGE32_ERROR_PWA",
+    "reason": "Operational/error/PWA copy reserved for Stage 3.2 or shown as exception text without changing business identity."
+  },
+  {
+    "path": "src/shared/storefrontInfoPages.js",
+    "literal": "КЛЕВЕР",
+    "count": 2,
+    "classification": "FUTURE_PRODUCT",
+    "reason": "Product/catalog/business copy remaining in feature files, out of Stage 3.1 system-UI migration."
+  },
+  {
+    "path": "src/shared/storefrontPromotions.js",
+    "literal": "Активна",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Public RU display of canonical promo status codes. Manager UI uses promoStatusLabel(); identity is the English status code."
+  },
+  {
+    "path": "src/shared/storefrontPromotions.js",
+    "literal": "Выключена",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Public RU display of canonical promo status codes. Manager UI uses promoStatusLabel(); identity is the English status code."
+  },
+  {
+    "path": "src/shared/storefrontPromotions.js",
+    "literal": "Завершена",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Public RU display of canonical promo status codes. Manager UI uses promoStatusLabel(); identity is the English status code."
+  },
+  {
+    "path": "src/shared/storefrontPromotions.js",
+    "literal": "Запланирована",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Public RU display of canonical promo status codes. Manager UI uses promoStatusLabel(); identity is the English status code."
   }
 ]

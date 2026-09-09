@@ -104,8 +104,8 @@ export function CatalogGroupNav({
                   aria-expanded={isOpen}
                   aria-label={
                     isOpen
-                      ? `Скрыть подкатегории: ${group.name}`
-                      : `Показать подкатегории: ${group.name}`
+                      ? t("client.catalog.hideSubcategories", { name: group.name })
+                      : t("client.catalog.showSubcategories", { name: group.name })
                   }
                   onClick={(event) => {
                     event.preventDefault();

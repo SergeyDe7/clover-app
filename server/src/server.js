@@ -4659,19 +4659,23 @@ app.put(
   "/api/admin/localization",
   authRequired,
   roleRequired("admin"),
-  (req, res) => {
-    const result = writeLocalizationSettings(req.body || {}, req.user?.email || req.user?.id || "");
-    auditFromRequest(req, "localization.settings.save", {
-      enabledLanguages: result.settings.enabledLanguages,
-      rejected: result.rejected,
-      catalogVersion: result.settings.catalogVersion,
-    });
-    res.json({
-      ok: true,
-      settings: result.settings,
-      rejected: result.rejected,
-      completeness: result.completeness,
-    });
+  (req, res, next) => {
+    try {
+      const result = writeLocalizationSettings(req.body || {}, req.user?.email || req.user?.id || "");
+      auditFromRequest(req, "localization.settings.save", {
+        enabledLanguages: result.settings.enabledLanguages,
+        rejected: result.rejected,
+        catalogVersion: result.settings.catalogVersion,
+      });
+      res.json({
+        ok: true,
+        settings: result.settings,
+        rejected: result.rejected,
+        completeness: result.completeness,
+      });
+    } catch (error) {
+      next(error);
+    }
   }
 );
 

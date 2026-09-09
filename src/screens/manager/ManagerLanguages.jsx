@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import {
   TRANSLATION_WORKSPACE_VIEWS,
 } from "../../shared/i18n/localizationSettings.js";
+import {
+  clearTranslationDraft,
+  mergeWorkspaceDrafts,
+  shouldApplyWorkspaceResponse,
+  translationDraftKey,
+} from "../../shared/i18n/translationDrafts.js";
 
 const TARGET_LOCALES = ["en", "uz", "ky", "tg", "zh", "ar"];
 
@@ -30,8 +36,11 @@ export function ManagerLanguages() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [drafts, setDrafts] = useState({});
+  const requestGenerationRef = useRef(0);
+  const languageRef = useRef("en");
 
   const safeLanguage = TARGET_LOCALES.includes(language) ? language : "en";
+  languageRef.current = safeLanguage;
 
   const languageLabels = {
     ru: t("admin.languages.label.ru"),
@@ -52,35 +61,50 @@ export function ManagerLanguages() {
   };
 
   const load = useCallback(async () => {
+    const requestGeneration = ++requestGenerationRef.current;
+    const requestLanguage = safeLanguage;
     try {
       const payload = await api.getLocalizationSettings();
-      setSettings(payload.settings || null);
-      setCompleteness(payload.completeness || {});
-      setLocales(Array.isArray(payload.locales) ? payload.locales : []);
       const workspace = await api.getLocalizationTranslations({
         view,
         query,
-        language: safeLanguage,
+        language: requestLanguage,
         untranslatedOnly,
       });
+      if (
+        !shouldApplyWorkspaceResponse({
+          requestGeneration,
+          currentGeneration: requestGenerationRef.current,
+          requestLanguage,
+          currentLanguage: languageRef.current,
+        })
+      ) {
+        return;
+      }
+      setSettings(payload.settings || null);
+      setCompleteness(payload.completeness || {});
+      setLocales(Array.isArray(payload.locales) ? payload.locales : []);
       const nextRows = Array.isArray(workspace.rows) ? workspace.rows : [];
       setRows(nextRows);
-      setDrafts((current) => {
-        const next = { ...current };
-        for (const row of nextRows) {
-          const cell = row.languages?.[safeLanguage] || {};
-          if (next[row.id] === undefined) next[row.id] = cell.value || "";
-        }
-        return next;
-      });
+      setDrafts((current) => mergeWorkspaceDrafts(current, nextRows, requestLanguage));
       setMessage("");
     } catch (error) {
+      if (
+        !shouldApplyWorkspaceResponse({
+          requestGeneration,
+          currentGeneration: requestGenerationRef.current,
+          requestLanguage,
+          currentLanguage: languageRef.current,
+        })
+      ) {
+        return;
+      }
       setSettings({ enabledLanguages: ["ru"], catalogVersion: 0 });
       setCompleteness({});
       setRows([]);
       setMessage(error.message || t("admin.languages.loadFailed"));
     }
-  }, [view, query, safeLanguage, untranslatedOnly, t]);
+  }, [view, query, untranslatedOnly, safeLanguage, t]);
 
   useEffect(() => {
     load();
@@ -119,9 +143,11 @@ export function ManagerLanguages() {
   };
 
   const saveRow = async (row) => {
+    const targetLanguage = languageRef.current;
+    const draftKey = translationDraftKey(row.id, targetLanguage);
     setBusy(true);
     try {
-      await api.saveLocalizationTranslation(row.id, safeLanguage, drafts[row.id] ?? "");
+      await api.saveLocalizationTranslation(row.id, targetLanguage, drafts[draftKey] ?? "");
       setMessage(t("admin.languages.saved"));
       await load();
     } catch (error) {
@@ -132,6 +158,7 @@ export function ManagerLanguages() {
   };
 
   const resetRow = async (row) => {
+    const targetLanguage = languageRef.current;
     const confirmed = await appConfirm({
       title: t("admin.languages.resetAuto"),
       message: t("admin.languages.resetConfirm"),
@@ -139,13 +166,9 @@ export function ManagerLanguages() {
     if (!confirmed) return;
     setBusy(true);
     try {
-      await api.resetLocalizationTranslation(row.id, safeLanguage);
+      await api.resetLocalizationTranslation(row.id, targetLanguage);
       setMessage(t("admin.languages.resetDone"));
-      setDrafts((current) => {
-        const next = { ...current };
-        delete next[row.id];
-        return next;
-      });
+      setDrafts((current) => clearTranslationDraft(current, row.id, targetLanguage));
       await load();
     } catch (error) {
       setMessage(error.message || t("admin.languages.saveFailed"));
@@ -267,21 +290,33 @@ export function ManagerLanguages() {
             <tbody>
               {rows.map((row) => {
                 const cell = row.languages?.[safeLanguage] || {};
+                const draftKey = translationDraftKey(row.id, safeLanguage);
+                const stateKey =
+                  cell.stale
+                    ? "admin.languages.state.stale"
+                    : cell.state === "AUTO"
+                      ? "admin.languages.state.auto"
+                      : cell.state === "MANUAL"
+                        ? "admin.languages.state.manual"
+                        : "admin.languages.state.missing";
                 return (
-                  <tr key={row.id || row.fieldKey}>
+                  <tr key={`${row.id || row.fieldKey}:${safeLanguage}`}>
                     <td>{row.sourceRu || "—"}</td>
                     <td>
                       <textarea
                         className="manager-languages-target"
                         rows={2}
-                        value={drafts[row.id] ?? cell.value ?? ""}
+                        value={drafts[draftKey] ?? cell.value ?? ""}
                         onChange={(event) =>
-                          setDrafts((current) => ({ ...current, [row.id]: event.target.value }))
+                          setDrafts((current) => ({
+                            ...current,
+                            [draftKey]: event.target.value,
+                          }))
                         }
                       />
                     </td>
                     <td>
-                      {cell.stale ? t("admin.languages.stale") : cell.state || "MISSING"}
+                      {t(stateKey)}
                     </td>
                     <td>{cell.updatedBy || "—"}</td>
                     <td>{formatStamp(cell.updatedAt)}</td>

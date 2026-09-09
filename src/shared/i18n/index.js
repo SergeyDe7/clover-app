@@ -42,5 +42,5 @@ export {
   upsertManualTranslation,
 } from "./localizationSettings.js";
 
-export { RU_DICTIONARY, UI_CATALOG, UI_CATALOG_BY_KEY } from "./uiCatalog.js";
+export { RU_DICTIONARY, UI_CATALOG, UI_CATALOG_BY_KEY, getCatalogEntry, hasCatalogKey } from "./uiCatalog.js";
 export { translationStoreToDictionaries } from "./translationStoreProjection.js";

@@ -113,7 +113,7 @@ function ClientAccessPanel() {
   const handleRemove = async (item) => {
     const ok = await appConfirm({
       title: t("manager.removeFromTheAccessLog"),
-      message: `Пароль для «${item.companyName}» исчезнет из журнала. Аккаунт клиента не удалится.`,
+      message: t("manager.access.removePasswordNamed", { name: item.companyName }),
       confirmLabel: t("shared.action.remove"),
       cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
@@ -139,7 +139,10 @@ function ClientAccessPanel() {
     }
     const ok = await appConfirm({
       title: t("manager.deleteTheClient"),
-      message: `Удалить «${item.companyName}» (${item.login || item.email || "без логина"})?\n\nБудут удалены аккаунт, матрица, журнал доступов и связанные заказы. Это необратимо.`,
+      message: t("manager.access.deleteNamedWithLogin", {
+        name: item.companyName,
+        login: item.login || item.email || t("manager.access.noLogin"),
+      }),
       confirmLabel: t("manager.deleteClient"),
       cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
@@ -216,8 +219,8 @@ function ClientAccessPanel() {
           aria-label={t("manager.searchClientAccess")}
         />
         <div className="access-vault-stats">
-          <span>{savedCount} с паролем</span>
-          <span>{items.length} клиентов</span>
+          <span>{t("manager.access.withPasswordCount", { count: savedCount })}</span>
+          <span>{t("manager.access.clientsCount", { count: items.length })}</span>
         </div>
         <button className="secondary-button" type="button" onClick={load} disabled={loading}>
           {loading ? t("manager.updating") : t("shared.action.refresh")}
@@ -363,7 +366,7 @@ function ClientAccessPanel() {
                 <footer className="access-vault-card-foot">
                   <small>
                     {item.updatedAt
-                      ? `Обновлён ${formatDateTime(item.updatedAt)}`
+                      ? t("manager.access.updatedAt", { datetime: formatDateTime(item.updatedAt) })
                       : t("manager.setAPasswordHereOrIn")}
                     {item.updatedBy ? ` · ${item.updatedBy}` : ""}
                   </small>

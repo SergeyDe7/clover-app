@@ -43,7 +43,7 @@ export function ReconciliationPanel({ requests = [], onReload }) {
   const download = async (item) => {
     try {
       const blob = await api.downloadReconciliationFile(item.id);
-      downloadBlobFile(blob, item.fileName || `Акт-сверки-${item.id}.pdf`);
+      downloadBlobFile(blob, item.fileName || t("client.acts.fileName", { id: item.id }));
     } catch (error) {
       await appAlert({
         title: "Не удалось скачать",

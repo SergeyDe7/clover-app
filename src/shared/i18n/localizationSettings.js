@@ -10,11 +10,11 @@ import {
 export const LOCALIZATION_SETTINGS_KEY = "localizationSettings";
 
 export const TRANSLATION_WORKSPACE_VIEWS = Object.freeze([
-  ["interface", "Интерфейс", "ui"],
-  ["categories", "Категории и подкатегории", "category"],
-  ["seo", "SEO / FAQ / страницы", "seo"],
-  ["glossary", "Словарь номенклатуры", "glossary"],
-  ["untranslated", "Непереведённое", "untranslated"],
+  Object.freeze(["interface", "Интерфейс", "ui"]),
+  Object.freeze(["categories", "Категории и подкатегории", "category"]),
+  Object.freeze(["seo", "SEO / FAQ / страницы", "seo"]),
+  Object.freeze(["glossary", "Словарь номенклатуры", "glossary"]),
+  Object.freeze(["untranslated", "Непереведённое", "untranslated"]),
 ]);
 
 export const COMPLETENESS_DOMAINS = Object.freeze([

@@ -10,6 +10,7 @@ import {
   isClientProfileComplete,
   syncContactRoleLabel,
 } from "../../shared/appHelpers";
+import { contactLabel } from "../../shared/i18n/displayLabels";
 
 const MAX_PROFILE_CONTACTS = 5;
 
@@ -122,7 +123,7 @@ export function ProfilePanel({ profile, onChange }) {
           {viewProfile.contacts.map((contact) => (
             <article key={contact.id} className={contact.isPrimary ? "is-primary" : ""}>
               <span>
-                {contact.label || (contact.isPrimary ? t("client.primaryContact") : t("client.extraContact"))}
+                {contactLabel(contact.label, t) || (contact.isPrimary ? t("client.primaryContact") : t("client.extraContact"))}
               </span>
               <strong>{contact.name || "—"}</strong>
               <em>{contact.phone || "—"}</em>
@@ -156,8 +157,7 @@ export function ProfilePanel({ profile, onChange }) {
               <div>
                 <strong>{t("storefront.nav.contacts")}</strong>
                 <p className="muted small">
-                  Укажите ФИО, роль в компании и телефон. Основной контакт — для связи по заказам.
-                  Можно добавить до {MAX_PROFILE_CONTACTS} контактов.
+                  {t("client.profile.contactsHint", { max: MAX_PROFILE_CONTACTS })}
                 </p>
               </div>
               {contacts.length < MAX_PROFILE_CONTACTS ? (
@@ -187,7 +187,7 @@ export function ProfilePanel({ profile, onChange }) {
                       />{
                       t("shared.address.primary")
                     }</label>
-                    <span className="muted small">Контакт {index + 1}</span>
+                    <span className="muted small">{t("client.profile.contactNumbered", { n: index + 1 })}</span>
                     {contacts.length > 1 ? (
                       <button
                         className="secondary-button staff-edit-danger"

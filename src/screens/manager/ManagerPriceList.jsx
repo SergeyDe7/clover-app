@@ -91,7 +91,7 @@ export function ManagerPriceList({ settings }) {
             />
           </label>
           <p className="manager-price-list-formula muted">
-            Цена в файле = закупка × (1 + {markupNumber} / 100)
+            {t("manager.priceList.filePriceFormula", { markup: markupNumber })}
           </p>
           <button
             className="primary-button manager-price-list-download"

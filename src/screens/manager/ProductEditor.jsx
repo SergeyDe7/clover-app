@@ -87,7 +87,7 @@ export function ProductEditor({
   const [form, setForm] = useState(
     product || {
       name: "",
-      category: t("client.other"),
+      category: "Прочее",
       code: "",
       oneCId: "",
       oneCCode: "",
@@ -243,12 +243,12 @@ export function ProductEditor({
         catalogItems = fallback.items || [];
         total = Number(fallback.total) || catalogItems.length;
         setOneCNotice(
-          `По «${hintQuery}» точных совпадений нет. Показан каталог 1С (${total}). Уточните слова и нажмите «Найти».`
+          t("manager.products.oneC.noExactShownCatalog", { query: hintQuery, total })
         );
       } else {
         setOneCNotice(
           total
-            ? `Найдено в выгрузке 1С: ${total}. Свободные сверху. Можно править строку поиска и жать «Найти» / «Весь каталог».`
+            ? t("manager.products.oneC.foundInExport", { total })
             : t("manager.the1cExportIsEmptyFirst")
         );
       }
@@ -292,7 +292,7 @@ export function ProductEditor({
     setOneCOpen(false);
     setOneCError("");
     setOneCNotice(
-      `Позиция 1С выбрана. Категория: «${nextProduct.category}». Проверьте единицы и цены, затем «Сохранить товар».`
+      t("manager.products.oneC.selectedCategory", { category: nextProduct.category })
     );
   };
 
@@ -309,7 +309,10 @@ export function ProductEditor({
     if (linkedElsewhere) {
       const ok = await appConfirm({
         title: t("manager.itemAlreadyLinked"),
-        message: `«${item.name}» уже связана с товаром «${item.cloverLink.productName || item.cloverLink.productId}». Перепривязать к текущему товару?`,
+        message: t("manager.products.oneC.relinkConfirm", {
+          name: item.name,
+          linkedName: item.cloverLink.productName || item.cloverLink.productId,
+        }),
         confirmLabel: t("manager.relink"),
         cancelLabel: t("shared.modal.cancel"),
         tone: "warn",
@@ -397,7 +400,9 @@ export function ProductEditor({
     if (!productId || !form.imageUrl) return;
     const ok = await appConfirm({
       title: t("manager.deleteThePhoto"),
-      message: `Удалить фотографию товара «${form.name || t("storefront.product")}»?`,
+      message: t("manager.products.deletePhotoNamed", {
+        name: form.name || t("storefront.product"),
+      }),
       confirmLabel: t("shared.action.delete"),
       cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
@@ -445,7 +450,9 @@ export function ProductEditor({
     if (!productId || !form.certificateUrl) return;
     const ok = await appConfirm({
       title: t("manager.deleteTheCertificate"),
-      message: `Удалить сертификат товара «${form.name || t("storefront.product")}»?`,
+      message: t("manager.products.deleteCertificateNamed", {
+        name: form.name || t("storefront.product"),
+      }),
       confirmLabel: t("shared.action.delete"),
       cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
@@ -473,7 +480,7 @@ export function ProductEditor({
     if (needsSubcategory && !String(form.subcategory || "").trim()) {
       void appAlert({
         title: t("manager.chooseASubcategory"),
-        message: `Для группы «${categoryKey}» нужно указать подкатегорию.`,
+        message: t("manager.products.subcategoryRequired", { category: categoryKey }),
       });
       return;
     }
@@ -625,6 +632,7 @@ export function ProductEditor({
               salePricesByType: form.salePricesByType,
               salePriceReceivedAt: form.salePriceReceivedAt || "",
               oneCPriceTypes,
+              t,
             });
             const available = hasPurchasePrice(card.cost);
             return (
@@ -636,8 +644,8 @@ export function ProductEditor({
                   </div>
                   <small>
                     {card.updatedAt
-                      ? `Обновлено: ${formatDateTime(card.updatedAt)}`
-                      : t("manager.text18")}
+                      ? t("manager.products.updatedAt", { datetime: formatDateTime(card.updatedAt) })
+                      : t("manager.products.oneC.pricePending")}
                   </small>
                 </div>
                 <div className="purchase-price-single">
@@ -753,7 +761,7 @@ export function ProductEditor({
             </label>
           ) : null}
           <label className="field">{
-            t("manager.text35")
+            t("manager.products.oneC.article")
             }<input
               value={form.oneCCode || ""}
               readOnly
@@ -917,7 +925,9 @@ export function ProductEditor({
             {form.storefrontPricing?.source === "manual"
               ? (form.saleUnits || ["piece"]).map((unit) => (
                   <label className="field" key={`sf-price-${unit}`}>
-                    Цена на сайте, {UNIT_CONFIG[unit]?.label || unit}
+                    {t("manager.products.websitePriceUnit", {
+                      unit: UNIT_CONFIG[unit]?.label || unit,
+                    })}
                     <input
                       type="number"
                       min="0"
@@ -958,7 +968,7 @@ export function ProductEditor({
         <section className="one-c-link-editor">
           <div className="one-c-link-editor-head">
             <div>
-              <p className="eyebrow">{t("manager.text36")}</p>
+              <p className="eyebrow">{t("manager.products.oneC.link")}</p>
               <h3>{t("manager.exact1cNomenclature")}</h3>
             </div>
             <button className="secondary-button" type="button" onClick={openOneCSearch}>
@@ -971,7 +981,7 @@ export function ProductEditor({
               <div>
                 <strong>{form.oneCName || t("manager.selected1cProduct")}</strong>
                 <span>
-                  Артикул 1С: {form.oneCCode || "—"}
+                  {t("manager.products.oneCArticleCode", { code: form.oneCCode || "—" })}
                 </span>
               </div>
               <button
@@ -1063,8 +1073,10 @@ export function ProductEditor({
               {oneCError && <div className="sync-error">{oneCError}</div>}
               {oneCNotice && <div className="sync-success">{oneCNotice}</div>}
               <p className="muted small">
-                В выгрузке 1С: {oneCTotal}. В списке сейчас: {oneCResults.length}.
-                Свободные сверху; уже связанные можно перепривязать.
+                {t("manager.products.oneCExportListHint", {
+                  total: oneCTotal,
+                  shown: oneCResults.length,
+                })}
               </p>
 
               <div className="one-c-products-list one-c-picker-list">
@@ -1080,17 +1092,18 @@ export function ProductEditor({
                       <div>
                         <strong>{item.name}</strong>
                         <span>
-                          Артикул 1С: {item.code || "—"}
+                          {t("manager.products.oneCArticleCode", { code: item.code || "—" })}
                         </span>
                         {Number(item.score) > 0 && (
                           <span className="muted small">
-                            Совпадение: {Math.round(Number(item.score) * 100)}%
+                            {t("manager.matchPercent", { percent: Math.round(Number(item.score) * 100) })}
                           </span>
                         )}
                         {linkedElsewhere && (
                           <span className="warning-text">
-                            Уже связан с товаром Clover:{" "}
-                            {item.cloverLink.productName}
+                            {t("manager.products.alreadyLinkedToProduct", {
+                              name: item.cloverLink.productName,
+                            })}
                           </span>
                         )}
                       </div>

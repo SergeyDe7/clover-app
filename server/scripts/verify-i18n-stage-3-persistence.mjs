@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -8,11 +8,15 @@ import { DatabaseSync } from "node:sqlite";
 
 const PRODUCTION_DATA = path.resolve("/opt/clover/clover-app/server/data");
 const workRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
+const WORKTREE_DATA = path.resolve(workRoot, "server/data");
 
 function rejectProductionPath(candidate) {
   const resolved = path.resolve(candidate);
   if (resolved === PRODUCTION_DATA || resolved.startsWith(`${PRODUCTION_DATA}${path.sep}`)) {
     throw new Error(`Refusing production DB path: ${resolved}`);
+  }
+  if (resolved === WORKTREE_DATA || resolved.startsWith(`${WORKTREE_DATA}${path.sep}`)) {
+    throw new Error(`Refusing worktree DB path: ${resolved}`);
   }
 }
 
@@ -39,11 +43,28 @@ legacy.exec(`
     role TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS client_state (
+    user_id TEXT PRIMARY KEY,
+    profile_json TEXT NOT NULL DEFAULT '{}',
+    addresses_json TEXT NOT NULL DEFAULT '[]',
+    favorites_json TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
   CREATE TABLE IF NOT EXISTS app_state (
     key TEXT PRIMARY KEY,
     value_json TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS orders (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 `);
 legacy.prepare(
   `INSERT INTO users(id, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)`
@@ -58,6 +79,25 @@ legacy.prepare(
 legacy.prepare(
   `INSERT INTO app_state(key, value_json, updated_at) VALUES (?, ?, ?)`
 ).run("stage31Sentinel", JSON.stringify({ mark: "keep-me" }), "2026-01-01T00:00:00.000Z");
+legacy.prepare(
+  `INSERT INTO client_state(user_id, profile_json, addresses_json, favorites_json, updated_at)
+   VALUES (?, ?, ?, ?, ?)`
+).run(
+  "sentinel-user",
+  JSON.stringify({ companyName: "Sentinel Co" }),
+  JSON.stringify([{ label: "Основной адрес", address: "Невский 1" }]),
+  "[]",
+  "2026-01-01T00:00:00.000Z"
+);
+legacy.prepare(
+  `INSERT INTO orders(id, user_id, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+).run(
+  "sentinel-order",
+  "sentinel-user",
+  JSON.stringify({ number: "S-1", status: "Новый" }),
+  "2026-01-01T00:00:00.000Z",
+  "2026-01-01T00:00:00.000Z"
+);
 legacy.close();
 
 const dbMod = await import(pathToFileURL(path.join(workRoot, "server/src/db.js")).href);
@@ -73,6 +113,10 @@ const sentinelUser = dbMod.db.prepare("SELECT email FROM users WHERE id = ?").ge
 assert.equal(sentinelUser.email, "sentinel@clover.ru");
 const sentinelState = dbMod.db.prepare("SELECT value_json FROM app_state WHERE key = ?").get("stage31Sentinel");
 assert.equal(JSON.parse(sentinelState.value_json).mark, "keep-me");
+const sentinelClient = dbMod.db.prepare("SELECT profile_json FROM client_state WHERE user_id = ?").get("sentinel-user");
+assert.equal(JSON.parse(sentinelClient.profile_json).companyName, "Sentinel Co");
+const sentinelOrder = dbMod.db.prepare("SELECT payload_json FROM orders WHERE id = ?").get("sentinel-order");
+assert.equal(JSON.parse(sentinelOrder.payload_json).number, "S-1");
 
 const tables = new Set(dbMod.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((r) => r.name));
 assert.equal(tables.has("translation_entries"), true);
@@ -311,6 +355,104 @@ const projected = translationStoreToDictionaries(staleAuto);
 assert.equal(Object.hasOwn(projected[autoVal.languageCode] || {}, snapshot.entries.find((e) => e.id === autoVal.entryId)?.fieldKey || ""), false);
 
 assert.equal(storeMod.readLocalizationSettings().enabledLanguages.includes("en"), false);
+
+{
+  let emptyNs = false;
+  try {
+    dbMod.db.prepare(
+      `INSERT INTO translation_entries(id, namespace, entity_type, entity_id, field_key, source_ru, source_hash, critical, created_at, updated_at)
+       VALUES ('ns-empty', '  ', '', '', 'k', 'Текст', 'abc', 0, 'now', 'now')`
+    ).run();
+  } catch {
+    emptyNs = true;
+  }
+  assert.equal(emptyNs, true, "empty namespace must fail");
+  let emptyField = false;
+  try {
+    dbMod.db.prepare(
+      `INSERT INTO translation_entries(id, namespace, entity_type, entity_id, field_key, source_ru, source_hash, critical, created_at, updated_at)
+       VALUES ('fk-empty', 'ui', '', '', '  ', 'Текст', 'abc', 0, 'now', 'now')`
+    ).run();
+  } catch {
+    emptyField = true;
+  }
+  assert.equal(emptyField, true, "empty field_key must fail");
+}
+
+{
+  const { getSeedTranslation } = await import(
+    pathToFileURL(path.join(workRoot, "server/src/i18n/uiTranslationSeed.js")).href
+  );
+  const cancelEntry = storeMod.readTranslationStore().entries.find((e) => e.fieldKey === "shared.modal.cancel");
+  const autoExact = storeMod.readTranslationStore().values.find(
+    (v) => v.entryId === cancelEntry.id && v.languageCode === "en"
+  );
+  assert.equal(autoExact.state, "AUTO");
+  assert.equal(autoExact.value, getSeedTranslation("shared.modal.cancel", "en"));
+  assert.equal(autoExact.sourceHash, cancelEntry.sourceHash);
+}
+
+{
+  const identReset = storeMod.resetTranslationToAuto(autoEntry.id, "uz", "admin@clover.ru");
+  assert.equal(identReset.changed, false);
+}
+
+{
+  const versionBeforeLocale = storeMod.readLocalizationSettings().catalogVersion;
+  const localeCases = [
+    ["en", true],
+    ["zh", true],
+    ["zh-CN", true],
+    ["ZH_cn", true],
+    ["ru", false],
+    ["fr", false],
+    ["unknown", false],
+    ["", false],
+    [1, false],
+  ];
+  for (const [code, ok] of localeCases) {
+    let passed = true;
+    try {
+      storeMod.listWorkspaceRows({ view: "interface", language: code });
+    } catch {
+      passed = false;
+    }
+    assert.equal(passed, ok, `workspace language ${JSON.stringify(code)}`);
+  }
+  let settingsMutated = false;
+  try {
+    storeMod.writeLocalizationSettings({ enabledLanguages: ["ru", "fr"] }, "admin");
+    settingsMutated = true;
+  } catch (error) {
+    assert.equal(error.status, 400);
+  }
+  assert.equal(settingsMutated, false);
+  assert.equal(storeMod.readLocalizationSettings().catalogVersion, versionBeforeLocale);
+  const zhSave = storeMod.saveManualTranslation(uiEntry.id, "zh", "Confirm via public zh", "admin@clover.ru");
+  assert.equal(zhSave.value.languageCode, "zh-CN");
+}
+
+{
+  const serverSrc = readFileSync(path.join(workRoot, "server/src/server.js"), "utf8");
+  assert.match(serverSrc, /\/api\/admin\/translations\/:entryId\/:language[\s\S]{0,180}?roleRequired\("admin"\)/);
+  assert.match(serverSrc, /reset-auto[\s\S]{0,120}?roleRequired\("admin"\)/);
+  const { hasRole } = await import(pathToFileURL(path.join(workRoot, "server/src/roles.js")).href);
+  assert.equal(hasRole("admin", ["admin"]), true);
+  assert.equal(hasRole("manager", ["admin"]), false);
+  assert.equal(hasRole("client", ["admin"]), false);
+  assert.equal(hasRole("", ["admin"]), false);
+  const versionBeforeDenied = storeMod.readLocalizationSettings().catalogVersion;
+  const rowCountBefore = storeMod.readTranslationStore().values.length;
+  void versionBeforeDenied;
+  void rowCountBefore;
+}
+
+{
+  const resolved = path.resolve(dbMod.getDatabasePath());
+  assert.equal(resolved.startsWith(path.resolve(tempDir) + path.sep) || resolved === path.resolve(dbPath), true);
+  assert.equal(resolved.includes(`${path.sep}server${path.sep}data${path.sep}`), false);
+  rejectProductionPath(resolved);
+}
 
 rmSync(tempDir, { recursive: true, force: true });
 console.log("verify-i18n-stage-3-persistence: ok");

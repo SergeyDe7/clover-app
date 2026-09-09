@@ -9,7 +9,7 @@ const MANAGER_NOTIFICATION_META = {
   custom_item: { labelKey: "manager.newProductNeeded", tab: "orders" },
   reconciliation_request: { labelKey: "client.nav.reconciliation", tab: "acts" },
   client_registration: { labelKey: "manager.newClient", tab: "clients" },
-  onec_error: { label: "Не удалось передать в 1С", tab: "exchange" },
+  onec_error: { labelKey: "manager.exchange.failedToSend", tab: "exchange" },
   test: { labelKey: "manager.test", tab: "more", moreTab: "settings" },
 };
 
@@ -176,7 +176,7 @@ function NotificationCard({ item, onOpen, onRead }) {
   const { t } = useLocalization();
   const parsed = parseManagerNotification(item, t);
   const meta = MANAGER_NOTIFICATION_META[item.type];
-  const label = meta?.labelKey ? t(meta.labelKey) : (meta?.label || "Событие");
+  const label = meta?.labelKey ? t(meta.labelKey) : t("manager.event");
   const hasOrderSummary = Boolean(
     parsed.clientName || parsed.amount || parsed.positions || parsed.deliveryDate || parsed.orderDate || parsed.orderNumber
   );
@@ -223,7 +223,7 @@ export function ManagerNotificationBell({ notifications = [], open, onToggle, on
         className="secondary-button manager-bell-trigger"
         type="button"
         aria-expanded={open}
-        aria-label={unread.length ? `Уведомления: ${unread.length}` : t("manager.notifications.title")}
+        aria-label={unread.length ? t("manager.notifications.countLabel", { count: unread.length }) : t("manager.notifications.title")}
         onClick={onToggle}
       >
         <span className="manager-bell-label-full">{t("manager.notifications.title")}</span>
@@ -233,7 +233,7 @@ export function ManagerNotificationBell({ notifications = [], open, onToggle, on
       {open && (
         <div className="manager-bell-panel">
           <div className="manager-notification-header">
-            <strong>Уведомления{unread.length ? ` · ${unread.length}` : ""}</strong>
+            <strong>{unread.length ? t("manager.notifications.titleWithCount", { count: unread.length }) : t("manager.notifications.title")}</strong>
             {unread.length > 0 && (
               <button className="secondary-button" type="button" onClick={onReadAll}>{
                 t("manager.markAllRead")

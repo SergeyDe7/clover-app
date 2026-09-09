@@ -36,7 +36,7 @@ export function StorefrontUnitChoice({
             type="button"
             className={active ? "is-active" : ""}
             aria-pressed={active}
-            title={size > 1 ? `${size} шт в «${label}»` : undefined}
+            title={size > 1 ? t("storefront.unit.piecesInNamed", { size, label }) : undefined}
             onClick={() => {
               if (units.length === 1) return;
               if (item !== unit) onChange(item);

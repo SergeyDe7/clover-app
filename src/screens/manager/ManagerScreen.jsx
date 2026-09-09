@@ -144,7 +144,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
       ) {
         current.addresses.push({
           id: `order-address-${order.id || current.addresses.length}`,
-          label: t("manager.addressFromTheOrder"),
+          label: "Адрес из заказа",
           address: order.address,
           isDefault: current.addresses.length === 0,
         });
@@ -178,7 +178,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
               >
                 {t(label)}
                 {id === "acts" && newActsCount > 0 ? (
-                  <span className="manager-nav-count" aria-label={`Новых запросов: ${newActsCount}`}>
+                  <span className="manager-nav-count" aria-label={t("manager.acts.newRequestsCount", { count: newActsCount })}>
                     {newActsCount}
                   </span>
                 ) : null}
@@ -244,7 +244,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
                 <div className="manager-notification-time">{formatDateTime(managerNotice.createdAt)}</div>
               )}
               {managerNotice.pendingCount > 1 && (
-                <div className="muted small">Ещё непросмотренных: {managerNotice.pendingCount - 1}</div>
+                <div className="muted small">{t("manager.notice.moreUnseen", { count: managerNotice.pendingCount - 1 })}</div>
               )}
             </div>
             <div className="exchange-actions">
@@ -287,7 +287,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
               openOrdersWithKpiFilter("exchangeErrors");
             }}
           >
-            <span>{t("manager.text31")}</span>
+            <span>{t("manager.orders.oneCErrors")}</span>
             <strong>{exchangeErrors}</strong>
           </article>
           <article className="stat-card"><span>{t("manager.unread")}</span><strong>{unreadCount}</strong></article>

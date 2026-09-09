@@ -34,13 +34,13 @@ const INTERNAL_TO_PUBLIC = Object.freeze({
 });
 
 export const LANGUAGE_REGISTRY = Object.freeze({
-  ru: { internalCode: "ru", publicCode: "ru", direction: "ltr", alwaysEnabled: true },
-  en: { internalCode: "en", publicCode: "en", direction: "ltr", alwaysEnabled: false },
-  uz: { internalCode: "uz", publicCode: "uz", direction: "ltr", alwaysEnabled: false },
-  ky: { internalCode: "ky", publicCode: "ky", direction: "ltr", alwaysEnabled: false },
-  tg: { internalCode: "tg", publicCode: "tg", direction: "ltr", alwaysEnabled: false },
-  "zh-CN": { internalCode: "zh-CN", publicCode: "zh", direction: "ltr", alwaysEnabled: false },
-  ar: { internalCode: "ar", publicCode: "ar", direction: "rtl", alwaysEnabled: false },
+  ru: Object.freeze({ internalCode: "ru", publicCode: "ru", direction: "ltr", alwaysEnabled: true }),
+  en: Object.freeze({ internalCode: "en", publicCode: "en", direction: "ltr", alwaysEnabled: false }),
+  uz: Object.freeze({ internalCode: "uz", publicCode: "uz", direction: "ltr", alwaysEnabled: false }),
+  ky: Object.freeze({ internalCode: "ky", publicCode: "ky", direction: "ltr", alwaysEnabled: false }),
+  tg: Object.freeze({ internalCode: "tg", publicCode: "tg", direction: "ltr", alwaysEnabled: false }),
+  "zh-CN": Object.freeze({ internalCode: "zh-CN", publicCode: "zh", direction: "ltr", alwaysEnabled: false }),
+  ar: Object.freeze({ internalCode: "ar", publicCode: "ar", direction: "rtl", alwaysEnabled: false }),
 });
 
 function asLocaleInput(value) {

@@ -2,8 +2,8 @@ import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
+import { promoStatusLabel } from "../../shared/i18n/displayLabels.js";
 import {
-  PROMO_STATUS_LABEL,
   STOREFRONT_MAX_PROMOTIONS,
   promotionStatus,
 } from "../../shared/storefrontPromotions.js";
@@ -112,7 +112,7 @@ export function ManagerStorefrontPromotions({
                   <div className="storefront-promo-preview-empty">{t("shared.media.noPhoto")}</div>
                 )}
                 <span className={`storefront-promo-status is-${status}`}>
-                  {PROMO_STATUS_LABEL[status] || status}
+                  {promoStatusLabel(status, t)}
                 </span>
               </div>
 

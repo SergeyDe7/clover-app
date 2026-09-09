@@ -31,6 +31,7 @@ import {
   restoreWindowScroll,
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
+import { addressLabel } from "../../shared/i18n/displayLabels";
 import { MatrixOneCProductAdd } from "./MatrixOneCProductAdd";
 import { MatrixCloverCatalogAdd } from "./MatrixCloverCatalogAdd";
 import { ProductEditor } from "./ProductEditor";
@@ -161,7 +162,7 @@ function OneCClientPicker({ client, link, onChange }) {
           </span>
           <p className="muted small" style={{ marginTop: 8 }}>
             {link.oneCId
-              ? `${link.oneCName || t("manager.text20")} · ${link.oneCCode || "без кода"}`
+              ? `${link.oneCName || t("manager.clients.oneCCounterparty")} · ${link.oneCCode || "без кода"}`
               : t("manager.cloverWillSendTheNamePhone")}
           </p>
         </div>
@@ -204,10 +205,10 @@ function OneCClientPicker({ client, link, onChange }) {
                 <article key={item.id}>
                   <div>
                     <strong>{item.name}</strong>
-                    <span>Код: {item.code || "—"} · ИНН: {item.inn || "—"}</span>
+                    <span> {t("manager.clients.codeAndInn", { code: item.code || "—", inn: item.inn || "—" })}</span>
                     {(item.phone || item.email) && <span>{item.phone || ""} {item.email || ""}</span>}
-                    {Number(item.score) > 0 && <span className="muted small">Совпадение: {Math.round(Number(item.score) * 100)}%</span>}
-                    {linkedElsewhere && <span className="warning-text">Уже связан с клиентом Clover: {item.cloverLink.clientName}</span>}
+                    {Number(item.score) > 0 && <span className="muted small">{t("manager.matchPercent", { percent: Math.round(Number(item.score) * 100) })}</span>}
+                    {linkedElsewhere && <span className="warning-text">{t("manager.clients.alreadyLinkedToClient", { name: item.cloverLink.clientName })}</span>}
                   </div>
                   <button
                     className={linkedToCurrent ? "secondary-button" : "primary-button"}
@@ -240,7 +241,7 @@ export function normalizeManagerClientAddresses(addresses = []) {
         if (!address) return null;
         return {
           id: `legacy-address-${index}`,
-          label: index === 0 ? "Основной" : `Адрес ${index + 1}`,
+          label: index === 0 ? "Основной адрес" : `Адрес ${index + 1}`,
           address,
           isDefault: index === 0,
           deliveryZoneId: "",
@@ -383,7 +384,7 @@ function ManagerClientEditor({
               {
                 id: "contact-primary",
                 name: current.contactName || "",
-                label: t("shared.address.primary"),
+                label: "Основной",
                 phone: current.phone || "",
                 isPrimary: true,
               },
@@ -472,7 +473,7 @@ function ManagerClientEditor({
           isPrimary: false,
           label:
             !item.label || item.label === "Основной" || item.label === "Дополнительный"
-              ? t("shared.address.extra")
+              ? "Дополнительный"
               : item.label,
         }));
       const contacts = normalizeProfileContacts({
@@ -486,7 +487,7 @@ function ManagerClientEditor({
               existingContacts.find((item) => item.isPrimary)?.label &&
               existingContacts.find((item) => item.isPrimary)?.label !== "Дополнительный"
                 ? existingContacts.find((item) => item.isPrimary).label
-                : t("shared.address.primary"),
+                : "Основной",
             phone,
             isPrimary: true,
           },
@@ -589,7 +590,7 @@ function ManagerClientEditor({
       </div>
 
       <div style={{ marginTop: 16 }}>
-        <strong>{t("manager.text20")}</strong>
+        <strong>{t("manager.clients.oneCCounterparty")}</strong>
         <p className="muted small" style={{ marginTop: 4 }}>{
           t("manager.requiredSoThisClientSOrders")
         }</p>
@@ -605,7 +606,7 @@ function ManagerClientEditor({
           <div>
             <strong>{t("manager.extraNumbers")}</strong>
             <p className="muted small">
-              Кроме основного телефона выше можно добавить ещё номера для связи. До {MAX_PROFILE_CONTACTS} контактов всего.
+              {t("manager.clients.extraPhonesHint", { max: MAX_PROFILE_CONTACTS })}
             </p>
           </div>
           {form.contacts.length < MAX_PROFILE_CONTACTS ? (
@@ -619,7 +620,7 @@ function ManagerClientEditor({
             {extraClientContacts(form.contacts).map((item, index) => (
               <div className="profile-contact-card" key={item.id || `${item.phone}-${index}`}>
                 <div className="profile-contact-card-top">
-                  <span className="badge yellow">{item.label || t("shared.address.extra")}</span>
+                  <span className="badge yellow">{addressLabel(item.label || "Дополнительный", t)}</span>
                   <button
                     className="danger-button"
                     type="button"
@@ -630,7 +631,7 @@ function ManagerClientEditor({
                 </div>
                 <div className="form-grid">
                   <label className="field">{
-                    t("manager.label")
+                    t("manager.clients.contactCaption")
                     }<input
                       value={item.name || ""}
                       placeholder={t("manager.forExampleWarehouseAccountant")}
@@ -756,7 +757,7 @@ function ManagerClientEditor({
       <div className="client-password-block" style={{ marginTop: 18 }}>
         <strong>{t("shared.changePassword2")}</strong>
         <p className="muted small" style={{ marginTop: 4 }}>
-          Логин остаётся {client.email}. Матрица и заказы не меняются.
+          {t("manager.clients.loginStaysEmail", { email: client.email })}
         </p>
         <div className="form-grid" style={{ marginTop: 10 }}>
           <label className="field">{
@@ -1239,7 +1240,7 @@ export function ManagerClients({
     } catch (error) {
       void appAlert({
         title: "Не удалось сохранить",
-        message: `Не удалось сохранить товар: ${error.message}`,
+        message: t("manager.products.saveFailedNamed", { message: error.message }),
         tone: "danger",
       });
     }
@@ -1249,7 +1250,9 @@ export function ManagerClients({
     if (!product?.id) return;
     const ok = await appConfirm({
       title: t("manager.deleteTheProductFromTheCatalog"),
-      message: `«${product.name || t("storefront.product")}» будет удалён из каталога Clover, с витрины сайта и из матриц всех клиентов. Заказы с этим товаром не меняются.`,
+      message: t("manager.products.deleteNamed", {
+        name: product.name || t("storefront.product"),
+      }),
       confirmLabel: t("shared.action.delete"),
       tone: "danger",
     });
@@ -1381,7 +1384,7 @@ export function ManagerClients({
           [clientId]: {
             status: "error",
             message:
-              `Для «${product.name}» выбрана фиксированная цена, но сумма не указана. Введите цену или верните «По матрице».`,
+              t("manager.clients.fixedPriceMissing", { name: product.name }),
           },
         }));
         return;
@@ -1763,7 +1766,10 @@ export function ManagerClients({
                           {contacts.map((item) => (
                             <p className="muted small client-card-contact-row" key={item.id}>
                               <span className={item.isPrimary ? "badge green" : "badge yellow"}>
-                                {item.isPrimary ? t("shared.address.primary") : item.label || t("shared.address.extra")}
+                                {addressLabel(
+                                  item.isPrimary ? "Основной" : item.label || "Дополнительный",
+                                  t
+                                )}
                               </span>
                               <span>
                                 {[item.name, item.phone].filter(Boolean).join(" · ") || "—"}
@@ -1775,7 +1781,7 @@ export function ManagerClients({
                     })()}
                   </div>
                   <div className="client-card-header-actions">
-                    <strong>{client.orders.length} заказов</strong>
+                    <strong>{t("manager.clients.ordersCount", { count: client.orders.length })}</strong>
                     <ClientCardMenu
                       open={String(openMenuId) === String(client.id)}
                       onToggle={() =>
@@ -1856,9 +1862,12 @@ export function ManagerClients({
                                 onSelect: async () => {
                                   const ok = await appConfirm({
                                     title: t("manager.deleteTheClient"),
-                                    message: `Удалить «${
-                                      client.companyName || client.email || t("manager.client2")
-                                    }»?\n\nБудут удалены аккаунт, матрица, журнал доступов и связанные заказы. Это необратимо.`,
+                                    message: t("manager.clients.deleteNamed", {
+                                      name:
+                                        client.companyName ||
+                                        client.email ||
+                                        t("manager.client2"),
+                                    }),
                                     confirmLabel: t("manager.deleteClient"),
                                     cancelLabel: t("shared.modal.cancel"),
                                     tone: "danger",
@@ -2025,12 +2034,14 @@ export function ManagerClients({
                   {(() => {
                     const pricingLabel =
                       link.defaultPricingMode === "purchase_markup"
-                        ? `Наценка ${normalizePercentInput(getDefaultMarkupDraft(client.id, link))}%` +
+                        ? t("manager.clients.markupPercent", {
+                            percent: normalizePercentInput(getDefaultMarkupDraft(client.id, link)),
+                          }) +
                           (link.oneCPriceTypeName
                             ? ` · ${link.oneCPriceTypeName}`
                             : "")
                         : link.defaultPricingMode === "one_c_price_type"
-                          ? link.oneCPriceTypeName || t("manager.text")
+                          ? link.oneCPriceTypeName || t("manager.oneC.priceType")
                           : t("manager.cloverBasePrice");
                     const modeLabel =
                       link.matrixMode === "all"
@@ -2078,6 +2089,7 @@ export function ManagerClients({
                                     downloadClientMatrixExcel({
                                       clientName: client.companyName,
                                       products: matrixExportProducts,
+                                      t,
                                     });
                                   }}
                                 >{
@@ -2099,7 +2111,9 @@ export function ManagerClients({
                       <span className="muted small">{pricingLabel}</span>
                       {link.oneCId ? (
                         <span className="muted small">
-                          1С: {link.oneCName || link.oneCCode || t("manager.linked")}
+                          {t("manager.clients.oneCNamed", {
+                            name: link.oneCName || link.oneCCode || t("manager.linked"),
+                          })}
                         </span>
                       ) : null}
                     </div>
@@ -2141,17 +2155,19 @@ export function ManagerClients({
                   </div>
 
                   <details className="client-matrix-settings" open={link.matrixMode === "pending"}>
-                      <summary>{t("manager.text21")}</summary>
+                      <summary>{t("manager.clients.oneCAndPrices")}</summary>
                       <p className="muted small" style={{ marginTop: 0 }}>{
                         t("manager.matrixModePriceTypeAndMarkup")
                       }</p>
                       {link.oneCId ? (
                         <p className="muted small">
-                          Контрагент 1С: {link.oneCName || link.oneCCode || t("manager.linked")}
+                          {t("manager.clients.counterparty1c", {
+                            name: link.oneCName || link.oneCCode || t("manager.linked"),
+                          })}
                         </p>
                       ) : (
                         <p className="muted small">{
-                          t("manager.text22")
+                          t("manager.clients.oneCCounterpartyMissing")
                         }</p>
                       )}
 
@@ -2228,7 +2244,7 @@ export function ManagerClients({
 
                       <div className="client-pricing-panel" style={{ marginTop: 14 }}>
                         <label className="field">{
-                          t("manager.text23")
+                          t("manager.clients.oneCPriceType")
                           }<select
                             value={link.oneCPriceTypeId || ""}
                             onChange={(event) => {
@@ -2291,7 +2307,7 @@ export function ManagerClients({
                                 !(oneCPriceTypes || []).length
                               }
                             >{
-                              t("manager.text24")
+                              t("manager.clients.oneCPriceTypeNoMarkup")
                             }</option>
                           </select>
                           <small>{
@@ -2423,7 +2439,7 @@ export function ManagerClients({
                         />
                         {link.oneCPriceTypeName || link.oneCPriceTypeId ? (
                           <span className="client-matrix-price-chip">
-                            {link.oneCPriceTypeName || t("manager.text")}
+                            {link.oneCPriceTypeName || t("manager.oneC.priceType")}
                             {link.defaultPricingMode === "purchase_markup"
                               ? ` · +${normalizePercentInput(getDefaultMarkupDraft(client.id, link))}%`
                               : ""}
@@ -2437,8 +2453,9 @@ export function ManagerClients({
                           Number(matrixPricesStatus[client.id]?.missingPrices) >
                             0 && (
                           <span className="client-matrix-price-chip muted">
-                            Без цены: {matrixPricesStatus[client.id].missingPrices} — дождитесь
-                            «Обновить цены» в 1С
+                            {t("manager.clients.missingPriceWaitRefresh", {
+                              count: matrixPricesStatus[client.id].missingPrices,
+                            })}
                           </span>
                         )}
                         {matrixPricesStatus[client.id]?.status === "loading" && (
@@ -2464,7 +2481,9 @@ export function ManagerClients({
                               });
                             }}
                           >
-                            {matrixPricesStatus[client.id]?.message || t("manager.priceError")} · повторить
+                            {t("manager.clients.retryWithMessage", {
+                              message: matrixPricesStatus[client.id]?.message || t("manager.priceError"),
+                            })}
                           </button>
                         )}
                       </div>
@@ -2473,11 +2492,13 @@ export function ManagerClients({
                       <div className="matrix-summary">
                         <span>
                           {link.matrixMode === "all"
-                            ? `Товаров в матрице: ${products.filter((item) => item.active).length}`
-                            : `В матрице: ${matrixProductIds.length}`}
+                            ? t("manager.clients.matrixProductCount", {
+                                count: products.filter((item) => item.active).length,
+                              })
+                            : t("manager.clients.matrixSelectedCount", { count: matrixProductIds.length })}
                         </span>
                         <span>
-                          Индивидуальных исключений: {personalPriceCount}
+                          {t("manager.clients.personalExceptionsCount", { count: personalPriceCount })}
                         </span>
                         {link.matrixMode === "selected" ? (
                           <span className="muted small">{
@@ -2487,7 +2508,7 @@ export function ManagerClients({
                       </div>
                       {link.matrixMode === "selected" && (
                         <div className="matrix-pick-actions">
-                          <span>Отмечено: {pickedIds.length}</span>
+                          <span>{t("manager.markedCount", { count: pickedIds.length })}</span>
                           <button
                             className="secondary-button"
                             type="button"
@@ -2690,13 +2711,14 @@ export function ManagerClients({
                                             <small>
                                               {costKind === "one_c_price_type"
                                                 ? link.oneCPriceTypeName ||
-                                                  t("manager.text3")
+                                                  t("manager.oneC.category")
                                                 : t("manager.purchasing")}
                                               : {formatMoney(costPrice)}
                                             </small>
                                             <strong>
-                                              Клиенту:{" "}
-                                              {formatMoney(calculatedPrice)}
+                                              {t("manager.clients.priceForClient", {
+                                                price: formatMoney(calculatedPrice),
+                                              })}
                                             </strong>
                                           </>
                                         ) : (
@@ -2721,10 +2743,10 @@ export function ManagerClients({
                                           step="0.01"
                                           placeholder={
                                             typedPrice != null
-                                              ? `Категория: ${typedPrice}`
-                                              : `Цена: ${
-                                                  Number(product[priceField]) || 0
-                                                }`
+                                              ? t("manager.clients.categoryPricePlaceholder", { price: typedPrice })
+                                              : t("manager.clients.catalogPricePlaceholder", {
+                                                  price: Number(product[priceField]) || 0,
+                                                })
                                           }
                                           value={price[unit] ?? ""}
                                           onChange={(event) =>
@@ -2766,7 +2788,7 @@ export function ManagerClients({
                                       <small>
                                         {link.oneCPriceTypeId
                                           ? link.oneCPriceTypeName ||
-                                            t("manager.text4")
+                                            t("manager.clients.oneCPriceCategory")
                                           : t("manager.cloverBasePrice")}
                                       </small>
                                       <strong>
@@ -2851,22 +2873,24 @@ export function ManagerClients({
                                 {priceMode === "inherit" &&
                                   effectiveMode === "purchase_markup" && (
                                     <small className="price-update-time">
-                                      Общая наценка клиента: {markupPercent}%
+                                      {t("manager.clients.sharedMarkupPercent", { percent: markupPercent })}
                                     </small>
                                   )}
                                 {effectiveMode === "purchase_markup" && (
                                   <small className="price-update-time">
-                                    Цена 1С обновлена:{" "}
-                                    {formatDateTime(
-                                      product.salePriceReceivedAt ||
-                                        product.purchasePriceUpdatedAt
-                                    )}
+                                    {t("manager.clients.oneCPriceUpdated", {
+                                      datetime: formatDateTime(
+                                        product.salePriceReceivedAt ||
+                                          product.purchasePriceUpdatedAt
+                                      ),
+                                    })}
                                   </small>
                                 )}
                                 {effectiveMode === "one_c_price_type" && (
                                   <small className="price-update-time">
-                                    Категория обновлена:{" "}
-                                    {formatDateTime(product.salePriceReceivedAt)}
+                                    {t("manager.clients.categoryUpdated", {
+                                      datetime: formatDateTime(product.salePriceReceivedAt),
+                                    })}
                                   </small>
                                 )}
                               </div>

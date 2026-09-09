@@ -10,6 +10,7 @@ import {
 } from "../../shared/SharedPanels";
 import { StickyCabinetChrome } from "../../shared/StickyCabinetChrome";
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { requestStatusLabel } from "../../shared/i18n/displayLabels";
 import {
   CLIENT_TABS,
   CLIENT_CABINET_SECTIONS,
@@ -228,7 +229,7 @@ function ClientDashboard({
           {id === "reconciliation" && readyActsBadge > 0 ? (
             <span
               className="client-nav-count"
-              aria-label={`Готовых актов: ${readyActsBadge}`}
+              aria-label={t("client.acts.readyCount", { count: readyActsBadge })}
             >
               {readyActsBadge}
             </span>
@@ -270,9 +271,9 @@ function ClientDashboard({
           <p className="eyebrow">{t("shared.section.history")}</p>
           <h2>{t("client.nav.orders")}</h2>
           <p>
-            Активных: {active.length}
+            {t("client.orders.activeCount", { count: active.length })}
             {active[0]
-              ? ` · ближайшая доставка ${formatDate(active[0].firstDeliveryDate)}`
+              ? t("client.orders.nextDelivery", { date: formatDate(active[0].firstDeliveryDate) })
               : ""}
           </p>
         </div>
@@ -311,14 +312,14 @@ function ClientDashboard({
                     <span className={`badge ${statusClass(order.status)}`}>
                       {order.status}
                     </span>
-                    <h3>Заказ № {order.number}</h3>
-                    <p>Создан: {formatDateTime(order.createdAt)}</p>
+                    <h3>{t("client.order.numberHeading", { number: order.number })}</h3>
+                    <p>{t("client.order.createdAt", { datetime: formatDateTime(order.createdAt) })}</p>
                   </div>
                   <div className="nowrap">
                     <strong className="success-text">
                       {settings.showPrices && total > 0
                         ? formatMoney(total)
-                        : `${getPositionCount(order)} поз.`}
+                        : t("client.orders.positionCount", { count: getPositionCount(order) })}
                     </strong>
                   </div>
                 </div>
@@ -359,7 +360,7 @@ function ClientDashboard({
                           {UNIT_CONFIG[item.unit]?.shortLabel || item.unit}
                           <small>
                             {item.multiplier > 1
-                              ? `${item.quantity * item.multiplier} шт. всего`
+                              ? t("client.orders.pieceTotal", { count: item.quantity * item.multiplier })
                               : ""}
                           </small>
                         </strong>
@@ -376,12 +377,12 @@ function ClientDashboard({
                         />
                         <span>
                           <span className="badge yellow">
-                            {item.requestStatus || "Новый запрос"}
+                            {requestStatusLabel(item.requestStatus || "Новый запрос", t)}
                           </span>
                           {item.name}
                           <small>{item.details}</small>
                           {item.managerComment && (
-                            <small>Менеджер: {item.managerComment}</small>
+                            <small>{t("client.order.managerCommentPrefix", { comment: item.managerComment })}</small>
                           )}
                         </span>
                         <strong>
@@ -518,7 +519,7 @@ function ClientDashboard({
         <Header
           title={
             profile.contactName
-              ? `Здравствуйте, ${profile.contactName}!`
+              ? t("client.profile.helloNamed", { name: profile.contactName })
               : t("client.clientPersonalCabinet")
           }
           subtitle={profile.companyName}
@@ -552,34 +553,54 @@ function ClientDashboard({
               <div className="warning-box client-home-gate">
                 {!profileComplete && settings.requireProfile && (
                   <p>
-                    Сначала заполните профиль организации в{" "}
-                    <button
-                      className="linkish"
-                      type="button"
-                      onClick={() => {
-                        selectTab("cabinet");
-                        if (isNarrow) selectCabinetSection("settings");
-                      }}
-                    >{
-                      t("client.settings")
-                    }</button>
-                    .
+                    {(() => {
+                      const token = "\u0001";
+                      const [before, after = ""] = t("client.gate.fillOrgProfileInSettings", {
+                        settings: token,
+                      }).split(token);
+                      return (
+                        <>
+                          {before}
+                          <button
+                            className="linkish"
+                            type="button"
+                            onClick={() => {
+                              selectTab("cabinet");
+                              if (isNarrow) selectCabinetSection("settings");
+                            }}
+                          >
+                            {t("client.settings")}
+                          </button>
+                          {after}
+                        </>
+                      );
+                    })()}
                   </p>
                 )}
                 {settings.requireAddress && !addresses.length && (
                   <p>
-                    Добавьте адрес доставки в{" "}
-                    <button
-                      className="linkish"
-                      type="button"
-                      onClick={() => {
-                        selectTab("cabinet");
-                        if (isNarrow) selectCabinetSection("addresses");
-                      }}
-                    >{
-                      t("client.settings")
-                    }</button>
-                    .
+                    {(() => {
+                      const token = "\u0001";
+                      const [before, after = ""] = t("client.gate.addDeliveryAddressInSettings", {
+                        settings: token,
+                      }).split(token);
+                      return (
+                        <>
+                          {before}
+                          <button
+                            className="linkish"
+                            type="button"
+                            onClick={() => {
+                              selectTab("cabinet");
+                              if (isNarrow) selectCabinetSection("addresses");
+                            }}
+                          >
+                            {t("client.settings")}
+                          </button>
+                          {after}
+                        </>
+                      );
+                    })()}
                   </p>
                 )}
               </div>

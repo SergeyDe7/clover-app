@@ -205,14 +205,17 @@ export function MatrixOneCProductAdd({
       if (addedNames.length) {
         setNotice(
           addedNames.length === 1
-            ? `Добавлено в матрицу: «${addedNames[0]}».`
-            : `Добавлено в матрицу: ${addedNames.length} поз. (${addedNames.slice(0, 3).join(", ")}${addedNames.length > 3 ? "…" : ""}).`
+            ? t("manager.matrix.addedNamed", { name: addedNames[0] })
+            : t("manager.matrix.addedCountPreview", {
+                count: addedNames.length,
+                preview: `${addedNames.slice(0, 3).join(", ")}${addedNames.length > 3 ? "…" : ""}`,
+              })
         );
       } else {
         setNotice(t("manager.noNewItemsEverythingWasAlready"));
       }
       if (skippedDuplicates) {
-        setError(`Пропущено дубликатов (уже в матрице): ${skippedDuplicates}.`);
+        setError(t("manager.matrix.skippedDuplicates", { count: skippedDuplicates }));
       }
       // Обновим выдачу с учётом новой матрицы.
       await runSearch(search);
@@ -285,9 +288,9 @@ export function MatrixOneCProductAdd({
           onAdded={(addedNames = []) => {
             setNotice(
               addedNames.length === 1
-                ? `Добавлено в матрицу: «${addedNames[0]}». Цены подтянутся после обмена с 1С.`
+                ? t("manager.matrix.addedNamedPricesLater", { name: addedNames[0] })
                 : addedNames.length
-                  ? `Добавлено в матрицу из Excel: ${addedNames.length} поз. Цены подтянутся после обмена с 1С («Обновить цены»).`
+                  ? t("manager.matrix.addedFromExcelPricesLater", { count: addedNames.length })
                   : t("manager.noNewItemsEverythingWasAlready")
             );
             onAfterAdd?.({ addedNames, source: "excel" });
@@ -345,8 +348,11 @@ export function MatrixOneCProductAdd({
           )}
           <div className="matrix-add-actions">
             <span className="muted small">
-              1С: {catalogTotal || "—"} · найдено: {total} · к добавлению:{" "}
-              {selectedItems.length}
+              {t("manager.matrix.oneCFoundToAdd", {
+                catalog: catalogTotal || "—",
+                found: total,
+                add: selectedItems.length,
+              })}
             </span>
             <button
               className="primary-button"
@@ -354,7 +360,7 @@ export function MatrixOneCProductAdd({
               disabled={loading || selectedItems.length === 0}
               onClick={() => void addItems(selectedItems)}
             >
-              {loading ? t("manager.adding") : `Добавить (${selectedItems.length})`}
+              {loading ? t("manager.adding") : t("manager.matrix.addCount", { count: selectedItems.length })}
             </button>
           </div>
           <div className="one-c-products-list one-c-picker-list">
@@ -393,13 +399,14 @@ export function MatrixOneCProductAdd({
                     />
                     <div>
                       <strong>{item.name}</strong>
-                      <span>Код: {item.code || "—"}</span>
+                      <span>{t("manager.codeValue", { code: item.code || "—" })}</span>
                       {alreadyInMatrix ? (
                         <span className="muted small">{t("manager.alreadyInTheMatrixDuplicateIs")}</span>
                       ) : alreadyInClover ? (
                         <span className="muted small">
-                          Уже в Clover:{" "}
-                          {item.cloverLink.productName || `ID ${item.cloverLink.productId}`}
+                          {t("manager.alreadyInCloverNamed", {
+                            name: item.cloverLink.productName || `ID ${item.cloverLink.productId}`,
+                          })}
                         </span>
                       ) : (
                         <span className="muted small">{t("manager.onlyIn1cWillBeCreated")}</span>

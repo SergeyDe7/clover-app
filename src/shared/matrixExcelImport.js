@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { uiText } from "./i18n/translationRuntime.js";
 
 const NAME_HEADERS = [
   "название",
@@ -128,7 +129,7 @@ function matrixExportFilePart(value) {
 }
 
 /** Скачать Excel всей матрицы клиента: колонки Название / Код / Категория. */
-export function downloadClientMatrixExcel({ clientName, products } = {}) {
+export function downloadClientMatrixExcel({ clientName, products, t } = {}) {
   const list = (Array.isArray(products) ? products : []).filter(
     (product) => product && product.active !== false
   );
@@ -144,6 +145,9 @@ export function downloadClientMatrixExcel({ clientName, products } = {}) {
   sheet["!cols"] = [{ wch: 52 }, { wch: 18 }, { wch: 22 }];
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Матрица");
-  XLSX.writeFile(workbook, `матрица-${matrixExportFilePart(clientName)}.xlsx`);
+  XLSX.writeFile(
+    workbook,
+    uiText(t, "manager.matrix.exportFileName", { name: matrixExportFilePart(clientName) })
+  );
   return list.length;
 }

@@ -307,7 +307,7 @@ export function MatrixExcelReview({
     setProgress({ done: 0, total: unique.length });
     setImportState({
       status: "busy",
-      message: `Загружаем товары из Excel (0/${unique.length})…`,
+      message: t("manager.excel.importProgress", { done: 0, total: unique.length }),
     });
     const addedNames = [];
     let reusedCount = 0;
@@ -414,7 +414,7 @@ export function MatrixExcelReview({
         setProgress({ done, total: unique.length });
         setImportState({
           status: "busy",
-          message: `Загружаем товары из Excel (${done}/${unique.length})…`,
+          message: t("manager.excel.importProgress", { done, total: unique.length }),
         });
       }
 
@@ -424,21 +424,21 @@ export function MatrixExcelReview({
       if (addedNames.length) {
         parts.push(
           isStorefront
-            ? `На витрину: ${addedNames.length}`
+            ? t("manager.excel.addedToStorefront", { count: addedNames.length })
             : isCatalog
-              ? `В каталог: ${addedNames.length}`
-              : `В матрицу: ${addedNames.length}`
+              ? t("manager.excel.addedToCatalog", { count: addedNames.length })
+              : t("manager.excel.addedToMatrix", { count: addedNames.length })
         );
       }
-      if (reusedCount) parts.push(`из каталога Clover без дублей: ${reusedCount}`);
-      if (createdCount) parts.push(`новых в каталоге: ${createdCount}`);
+      if (reusedCount) parts.push(t("manager.excel.reusedFromCatalog", { count: reusedCount }));
+      if (createdCount) parts.push(t("manager.excel.createdInCatalog", { count: createdCount }));
       if (skipped) {
         parts.push(
           isStorefront
-            ? `пропущено (уже на витрине/дубли): ${skipped}`
+            ? t("manager.excel.skippedStorefront", { count: skipped })
             : isCatalog
-              ? `пропущено (уже в каталоге/дубли): ${skipped}`
-              : `пропущено (уже в матрице/дубли): ${skipped}`
+              ? t("manager.excel.skippedCatalog", { count: skipped })
+              : t("manager.excel.skippedMatrix", { count: skipped })
         );
       }
       if (parts.length) setError(parts.join(". ") + ".");
@@ -517,11 +517,11 @@ export function MatrixExcelReview({
       <strong>{fileName ? `Excel: ${fileName}` : t("manager.matchingWith1c")}</strong>
       {summary && (
         <div className="matrix-summary" style={{ marginTop: 8 }}>
-          <span>Строк: {summary.total}</span>
-          <span>Точных: {summary.exact}</span>
-          <span>По коду: {summary.code}</span>
-          <span>Похожих: {summary.fuzzy}</span>
-          <span>Без пары: {summary.miss}</span>
+          <span>{t("manager.excel.rowsCount", { count: summary.total })}</span>
+          <span>{t("manager.excel.exactCount", { count: summary.exact })}</span>
+          <span>{t("manager.excel.byCodeCount", { count: summary.code })}</span>
+          <span>{t("manager.excel.similarCount", { count: summary.fuzzy })}</span>
+          <span>{t("manager.excel.unmatchedCount", { count: summary.miss })}</span>
           <span>
             {isStorefront
               ? t("manager.alreadyOnStorefront")
@@ -535,10 +535,10 @@ export function MatrixExcelReview({
                 ? (rows || []).filter((row) => row.alreadyInClover).length
                 : summary.alreadyInMatrix || 0}
           </span>
-          <span>К добавлению: {selectedCount}</span>
+          <span>{t("manager.excel.toAddCount", { count: selectedCount })}</span>
           {busy && progress.total > 0 ? (
             <span>
-              Загрузка: {progress.done}/{progress.total}
+              {t("manager.excel.uploadProgress", { done: progress.done, total: progress.total })}
             </span>
           ) : null}
         </div>
@@ -590,7 +590,7 @@ export function MatrixExcelReview({
               <div className="matrix-excel-source">
                 <strong>{row.name || "—"}</strong>
                 <span className="muted small">
-                  {row.code ? `Код из файла: ${row.code}` : t("manager.noCode")} ·{" "}
+                  {row.code ? t("manager.excel.fileCode", { code: row.code }) : t("manager.noCode")} ·{" "}
                   {statusLabel(row.status, t)}
                   {row.score ? ` (${Math.round(row.score * 100)}%)` : ""}
                   {row.alreadyInMatrix ? (
@@ -647,8 +647,9 @@ export function MatrixExcelReview({
                   }</span>
                 ) : row.match?.cloverLink?.productId ? (
                   <span className="muted small">
-                    Уже в Clover:{" "}
-                    {row.match.cloverLink.productName || row.match.cloverLink.productId}
+                    {t("manager.alreadyInCloverNamed", {
+                      name: row.match.cloverLink.productName || row.match.cloverLink.productId,
+                    })}
                   </span>
                 ) : null}
                 <div className="matrix-excel-search">
@@ -763,11 +764,11 @@ export function MatrixExcelReview({
             ? t("manager.added")
             : busy
               ? progress.total
-                ? `Добавляем… ${progress.done}/${progress.total}`
+                ? t("manager.excel.addingProgress", { done: progress.done, total: progress.total })
                 : t("client.adding")
               : isCatalog
-                ? `Добавить в каталог (${selectedCount})`
-                : `Добавить товары (${selectedCount})`}
+                ? t("manager.excel.addToCatalogCount", { count: selectedCount })
+                : t("manager.excel.addProductsCount", { count: selectedCount })}
         </button>
         <button
           className="secondary-button"

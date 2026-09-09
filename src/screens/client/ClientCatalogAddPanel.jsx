@@ -149,7 +149,7 @@ export function ClientCatalogAddPanel({
   const groups = useMemo(
     () =>
       buildGroupNav(
-        activeProducts.map((item) => canonicalizeProductCategory(item.category || t("client.other")))
+        activeProducts.map((item) => canonicalizeProductCategory(item.category || "Прочее"))
       ),
     [activeProducts]
   );
@@ -289,7 +289,7 @@ export function ClientCatalogAddPanel({
                         type="button"
                         onClick={() => selectGroup(group.name)}
                       >
-                        {group.name}
+                        {group.name === "Прочее" ? t("client.other") : group.name}
                       </button>
                       {hasChildren ? (
                         <button
@@ -298,8 +298,8 @@ export function ClientCatalogAddPanel({
                           aria-expanded={isOpen}
                           aria-label={
                             isOpen
-                              ? `Скрыть подкатегории: ${group.name}`
-                              : `Показать подкатегории: ${group.name}`
+                              ? t("client.catalog.hideSubcategories", { name: group.name })
+                              : t("client.catalog.showSubcategories", { name: group.name })
                           }
                           onClick={(event) => {
                             event.preventDefault();
@@ -409,7 +409,7 @@ export function ClientCatalogAddPanel({
                     )}
                   </div>
                   <h2>{product.name}</h2>
-                  <p className="product-code">Арт. {productArticle(product) || "—"}</p>
+                  <p className="product-code">{t("shared.article.prefix", { article: productArticle(product) || "—" })}</p>
                   <p className="product-price client-catalog-add-price">
                     {showPrices && price > 0 ? (
                       <>

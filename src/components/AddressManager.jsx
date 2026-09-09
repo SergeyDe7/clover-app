@@ -101,7 +101,7 @@ function AddressManager({ addresses, onChange }) {
 
     const shouldDelete = await appConfirm({
       title: t("shared.deleteTheAddress"),
-      message: `Удалить адрес «${addressToDelete.label}»?`,
+      message: t("shared.address.deleteNamed", { label: addressToDelete.label }),
       confirmLabel: t("shared.action.delete"),
       cancelLabel: t("shared.modal.cancel"),
       tone: "danger",

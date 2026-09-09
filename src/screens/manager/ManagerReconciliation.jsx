@@ -64,7 +64,15 @@ export function ManagerReconciliation({
     const clientLabel = item.client?.companyName || item.client?.email || t("manager.client2");
     const ok = await appConfirm({
       title: t("manager.deleteTheStatement"),
-      message: `Запрос «${reconciliationPeriodLabel(item)}» для ${clientLabel} будет удалён навсегда — и у менеджера, и в ЛК клиента.${item.fileName ? " PDF-файл тоже будет удалён с сервера." : ""}`,
+      message: item.fileName
+        ? t("manager.acts.deleteConfirmWithPdf", {
+            period: reconciliationPeriodLabel(item),
+            client: clientLabel,
+          })
+        : t("manager.acts.deleteConfirm", {
+            period: reconciliationPeriodLabel(item),
+            client: clientLabel,
+          }),
       confirmLabel: t("shared.action.delete"),
       cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
@@ -99,7 +107,7 @@ export function ManagerReconciliation({
           <p className="eyebrow">{t("shared.section.documents")}</p>
           <h2>{t("manager.nav.acts")}</h2>
           <p>
-            Прикрепите PDF акта из 1С и нажмите «Отправить».
+            {t("manager.acts.attachPdfAndSend")}
             {isAdmin ? t("manager.anAdminCanDeleteTheStatement") : ""}
           </p>
         </div>
@@ -119,9 +127,9 @@ export function ManagerReconciliation({
                 </span>
                 <h3>{item.client?.companyName || item.client?.email || t("shared.role.client")}</h3>
                 <p>{reconciliationPeriodLabel(item)} · {formatDateTime(item.createdAt)}</p>
-                {item.clientComment && <p>Комментарий клиента: {item.clientComment}</p>}
+                {item.clientComment && <p>{t("manager.clientComment")} {item.clientComment}</p>}
                 {alreadySent && (
-                  <p className="muted small">Отправлено: {item.fileName}</p>
+                  <p className="muted small">{t("manager.acts.sentFile", { fileName: item.fileName })}</p>
                 )}
               </div>
 

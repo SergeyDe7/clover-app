@@ -34,6 +34,12 @@ function interpolate(template, params) {
   });
 }
 
+/** When a helper cannot use the hook, RU_DICTIONARY is the SAFE_RU_FALLBACK. */
+export function uiText(t, key, params) {
+  if (typeof t === "function") return t(key, params);
+  return render(lookupIn(RU_DICTIONARY, key), params);
+}
+
 function render(template, params) {
   if (!template) return "";
   const rendered = interpolate(template, params);

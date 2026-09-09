@@ -25,6 +25,11 @@ import {
 import { canPurgeOrder, canTrashOrder, isAdminHardDeleteStatus } from "../../shared/orderTrash";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
+import {
+  exchangeStatusLabel as exchangeStatusDisplay,
+  orderStatusLabel,
+  requestStatusLabel,
+} from "../../shared/i18n/displayLabels";
 
 const CUSTOM_STATUSES = [
   "Новый запрос",
@@ -318,7 +323,7 @@ export function ManagerOrders({
     }
     const ok = await appConfirm({
       title: t("manager.cancelThe1cTransfer"),
-      message: `Будет отменена передача для ${cancellable.length} заказ(ов). Кнопка снова станет «Передать в 1С».`,
+      message: t("manager.orders.cancelTransferCount", { count: cancellable.length }),
       confirmLabel: t("manager.cancelTransfer"),
       cancelLabel: t("manager.noNeed"),
       tone: "danger",
@@ -384,19 +389,19 @@ export function ManagerOrders({
       if (alreadySame.length === selected.length) {
         await appAlert({
           title: t("manager.noChanges"),
-          message: `Все выбранные заказы уже в статусе «${bulkStatus}».`,
+          message: t("manager.orders.alreadyAllStatus", {
+            status: orderStatusLabel(bulkStatus, t),
+          }),
         });
         return;
       }
       await appAlert({
         title: t("manager.statusNotChanged"),
-        message: [
-          `Статус «${bulkStatus}» недоступен для выбранных заказов.`,
-          alreadySame.length ? `Уже в этом статусе: ${alreadySame.length}.` : "",
-          forbidden ? `Нельзя сменить: ${forbidden}.` : "",
-        ]
-          .filter(Boolean)
-          .join(" "),
+        message: t("manager.orders.bulkUnavailable", {
+          status: orderStatusLabel(bulkStatus, t),
+          unchanged: alreadySame.length,
+          blocked: forbidden,
+        }),
         tone: "warn",
       });
       return;
@@ -407,13 +412,11 @@ export function ManagerOrders({
     if (forbidden > 0 || alreadySame.length > 0) {
       await appAlert({
         title: t("auth.statusUpdatedPartially"),
-        message: [
-          `К обновлению: ${allowedIds.length}.`,
-          alreadySame.length ? `Уже в этом статусе: ${alreadySame.length}.` : "",
-          forbidden ? `Нельзя сменить: ${forbidden}.` : "",
-        ]
-          .filter(Boolean)
-          .join(" "),
+        message: t("manager.orders.bulkQueued", {
+          updated: allowedIds.length,
+          unchanged: alreadySame.length,
+          blocked: forbidden,
+        }),
         tone: "warn",
       });
     }
@@ -521,9 +524,9 @@ export function ManagerOrders({
                 setExchangeFilterValue(exchangeFilter === "waiting" ? "all" : "waiting");
               }}
             >
-              Ждут передачи в 1С
+              {t("manager.waitingFor1cTransfer")}
               {waitingOneCCount > 0 ? (
-                <span className="manager-nav-count" aria-label={`Ждут передачи в 1С: ${waitingOneCCount}`}>
+                <span className="manager-nav-count" aria-label={t("manager.orders.waitingOneCCount", { count: waitingOneCCount })}>
                   {waitingOneCCount}
                 </span>
               ) : null}
@@ -536,9 +539,9 @@ export function ManagerOrders({
                 setExchangeFilterValue(exchangeFilter === "queued" ? "all" : "queued");
               }}
             >
-              В очереди
+              {t("manager.inQueue")}
               {queuedOneCCount > 0 ? (
-                <span className="manager-nav-count" aria-label={`В очереди: ${queuedOneCCount}`}>
+                <span className="manager-nav-count" aria-label={t("manager.orders.queuedCount", { count: queuedOneCCount })}>
                   {queuedOneCCount}
                 </span>
               ) : null}
@@ -559,7 +562,7 @@ export function ManagerOrders({
             >
               {bulkPanelOpen ? t("manager.hideActions") : t("manager.bulkActions")}
               {selectedIds.length > 0 ? (
-                <span className="manager-nav-count" aria-label={`Выбрано: ${selectedIds.length}`}>
+                <span className="manager-nav-count" aria-label={t("manager.orders.selectedCount", { count: selectedIds.length })}>
                   {selectedIds.length}
                 </span>
               ) : null}
@@ -571,9 +574,9 @@ export function ManagerOrders({
           type="button"
           onClick={() => onOrdersViewChange?.("trash")}
         >
-          Корзина
+          {t("manager.orders.trash")}
           {trashedOrders.length > 0 ? (
-            <span className="manager-nav-count" aria-label={`В корзине: ${trashedOrders.length}`}>
+            <span className="manager-nav-count" aria-label={t("manager.orders.inTrashCount", { count: trashedOrders.length })}>
               {trashedOrders.length}
             </span>
           ) : null}
@@ -582,7 +585,7 @@ export function ManagerOrders({
 
       {!inTrash && exchangeContour.prodEnabled && (exchangeContour.allowedDatabases || []).length > 1 ? (
         <label className="field manager-orders-contour" style={{ marginTop: 12, maxWidth: 320 }}>{
-          t("manager.text29")
+          t("manager.orders.oneCContour")
           }<select
             value={sendDatabase}
             onChange={(event) => setSendDatabase(event.target.value)}
@@ -598,16 +601,16 @@ export function ManagerOrders({
 
       {!inTrash && filtersOpen && (
         <div className="toolbar three manager-orders-filters">
-          <select value={status} onChange={(e) => setStatusFilter(e.target.value)} aria-label={t("manager.orderStatusFilter")}><option>{t("shared.filter.all")}</option>{ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
+          <select value={status} onChange={(e) => setStatusFilter(e.target.value)} aria-label={t("manager.orderStatusFilter")}><option value="Все">{t("shared.filter.all")}</option>{ORDER_STATUSES.map((item) => <option key={item} value={item}>{orderStatusLabel(item, t)}</option>)}</select>
           <select
             value={exchangeFilter}
             onChange={(e) => setExchangeFilterValue(e.target.value)}
-            aria-label={t("manager.text17")}
+            aria-label={t("manager.orders.oneCStatusFilter")}
           >
             <option value="all">{t("manager.all1cStatuses")}</option>
             <option value="waiting">{t("manager.waitingFor1cTransfer")}</option>
             <option value="queued">{t("manager.inQueue")}</option>
-            {Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}
+            {Object.entries(EXCHANGE_STATUS_LABELS).map(([id]) => <option value={id} key={id}>{exchangeStatusDisplay(id, t)}</option>)}
           </select>
           <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label={t("manager.orderSorting")}><option value="newest">{t("manager.newestFirst")}</option><option value="oldest">{t("manager.oldestFirst")}</option><option value="delivery">{t("manager.byDeliveryDate")}</option></select>
         </div>
@@ -628,7 +631,7 @@ export function ManagerOrders({
               aria-label={t("manager.statusForBulkChange")}
             >
               {MANAGER_BULK_ORDER_STATUSES.map((item) => (
-                <option key={item}>{item}</option>
+                <option key={item} value={item}>{orderStatusLabel(item, t)}</option>
               ))}
             </select>
             <button
@@ -637,7 +640,7 @@ export function ManagerOrders({
               disabled={!selectedIds.length || bulkBusy}
               onClick={() => void applyBulkStatus()}
             >
-              Изменить статус
+              {t("manager.orders.changeStatus")}
               {selectedIds.length > 0 ? (
                 <span className="manager-bulk-apply-count">{selectedIds.length}</span>
               ) : null}
@@ -669,7 +672,7 @@ export function ManagerOrders({
               t("shared.action.delete")
             }</button>
             {selectedIds.length > 0 && <button className="secondary-button" type="button" onClick={() => setSelectedIds([])}>{t("manager.clearSelection")}</button>}
-            <span className="muted small">Выбрано заказов: {selectedIds.length}</span>
+            <span className="muted small">{t("manager.orders.selectedOrdersCount", { count: selectedIds.length })}</span>
           </div>
         </div>
       )}
@@ -694,7 +697,7 @@ export function ManagerOrders({
               checked={selectedIds.includes(order.id)}
               onChange={() => toggleSelected(order.id)}
               onClick={(event) => event.stopPropagation()}
-              aria-label={`Выбрать заказ ${order.number}`}
+              aria-label={t("manager.orders.selectOrder", { number: order.number })}
             />
             <div className="manager-order-main">
               <div className="manager-order-title-row">
@@ -707,12 +710,12 @@ export function ManagerOrders({
               </div>
               <div className="manager-order-status-row exchange-status-line">
                 {inTrash || allowedNextOrderStatuses(order.status).length <= 1 ? (
-                  <span className={`badge ${statusClass(order.status)}`}>{order.status}</span>
+                  <span className={`badge ${statusClass(order.status)}`}>{orderStatusLabel(order.status, t)}</span>
                 ) : (
                   <select
                     className={`badge ${statusClass(order.status)} manager-order-status-select`}
                     value={order.status || "Новый"}
-                    aria-label={`Статус заказа ${order.number || ""}`}
+                    aria-label={t("manager.orders.statusAria", { number: order.number || "" })}
                     onClick={(event) => event.stopPropagation()}
                     onChange={(event) => {
                       const nextStatus = event.target.value;
@@ -721,12 +724,12 @@ export function ManagerOrders({
                     }}
                   >
                     {allowedNextOrderStatuses(order.status).map((item) => (
-                      <option key={item} value={item}>{item}</option>
+                      <option key={item} value={item}>{orderStatusLabel(item, t)}</option>
                     ))}
                   </select>
                 )}
                 <span className={`badge ${exchangeBadgeClass(exchange.status)}`}>
-                  1С: {exchangeStatusLabel(exchange)}
+                  {t("manager.orders.oneCWithStatus", { status: exchangeStatusLabel(exchange, t) })}
                 </span>
                 {inTrash ? (
                   <>
@@ -753,7 +756,7 @@ export function ManagerOrders({
                     className="badge status-work manager-manual-processed-badge"
                     title={t("manager.theOrderWasProcessedManuallySending")}
                   >
-                    Обработан вручную
+                    {orderStatusLabel("Обработан вручную", t)}
                   </span>
                 ) : (
                   <button
@@ -851,7 +854,7 @@ export function ManagerOrders({
             <div className="manager-order-controls">
               <div className="exchange-actions">
                 {inTrash ? (
-                  <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>{t("manager.print")}</button>
+                  <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings, t)}>{t("manager.print")}</button>
                 ) : (
                   <>
                     {canCancelOneCTransfer(exchange) ? (
@@ -865,20 +868,20 @@ export function ManagerOrders({
                         t("manager.cancelTransferTo1c")
                       }</button>
                     ) : null}
-                    <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings)}>{t("manager.print")}</button>
+                    <button className="secondary-button" type="button" onClick={() => printOrderDocument(order, settings, t)}>{t("manager.print")}</button>
                   </>
                 )}
               </div>
             </div>
             {inTrash && order.deletedAt && (
               <div className="exchange-message manager-order-exchange-note">
-                В корзине с {formatDateTime(order.deletedAt)}
-                {order.deletedBy?.role ? ` · удалил: ${order.deletedBy.role}` : ""}
+                {t("manager.orders.inTrashSince", { datetime: formatDateTime(order.deletedAt) })}
+                {order.deletedBy?.role ? t("manager.orders.deletedByRole", { role: order.deletedBy.role }) : ""}
               </div>
             )}
             {!inTrash && exchange.message && (
               <div className="exchange-message manager-order-exchange-note">
-                {exchange.message}{exchange.receipt ? ` · Заказ покупателя ${exchange.receipt}` : ""}
+                {exchange.message}{exchange.receipt ? t("manager.orders.customerOrderReceipt", { receipt: exchange.receipt }) : ""}
               </div>
             )}
             <div className="order-products">
@@ -903,7 +906,7 @@ export function ManagerOrders({
                     )}
                     <div className="form-grid">
                       <label className="field">{t("manager.requestStatus")
-                        }<select value={item.requestStatus || "Новый запрос"} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, requestStatus: e.target.value } : value) })}>{CUSTOM_STATUSES.map((value) => <option key={value}>{value}</option>)}</select>
+                        }<select value={item.requestStatus || "Новый запрос"} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, requestStatus: e.target.value } : value) })}>{CUSTOM_STATUSES.map((value) => <option key={value} value={value}>{requestStatusLabel(value, t)}</option>)}</select>
                       </label>
                       <label className="field">{t("manager.pricePerSelectedUnit")
                         }<input type="number" min="0" step="0.01" value={item.unitPrice || ""} onFocus={selectDefaultNumber} onChange={(e) => onUpdateOrder(order.id, { customItems: order.customItems.map((value) => value.id === item.id ? { ...value, unitPrice: Number(e.target.value) || 0 } : value) })} />

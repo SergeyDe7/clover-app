@@ -189,10 +189,10 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS translation_entries (
     id TEXT PRIMARY KEY,
-    namespace TEXT NOT NULL,
+    namespace TEXT NOT NULL CHECK(length(trim(namespace)) > 0),
     entity_type TEXT NOT NULL DEFAULT '',
     entity_id TEXT NOT NULL DEFAULT '',
-    field_key TEXT NOT NULL,
+    field_key TEXT NOT NULL CHECK(length(trim(field_key)) > 0),
     source_ru TEXT NOT NULL CHECK(length(trim(source_ru)) > 0),
     source_hash TEXT NOT NULL CHECK(length(trim(source_hash)) > 0),
     critical INTEGER NOT NULL CHECK(critical IN (0, 1)),

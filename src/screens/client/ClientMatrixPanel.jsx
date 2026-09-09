@@ -156,9 +156,9 @@ export function ClientMatrixPanel({
           t("client.theManagerWillPinRegularProducts")
         }</div>
       ) : (
-        <p className="client-matrix-meta">{
-          t("client.inTheMatrix") }<strong>{activeProducts.length}</strong> поз.
-          {activeCategory !== "Все" ? ` · категория «${activeCategory}»: ${filtered.length}` : ""}
+        <p className="client-matrix-meta">
+          {t("client.matrix.activePositions", { count: activeProducts.length })}
+          {activeCategory !== "Все" ? t("client.matrix.categoryCount", { name: activeCategory, count: filtered.length }) : ""}
         </p>
       )}
 
@@ -217,7 +217,7 @@ export function ClientMatrixPanel({
                 )}
               </div>
               <h2>{product.name}</h2>
-              <p className="product-code">Арт. {productArticle(product) || "—"}</p>
+              <p className="product-code">{t("shared.article.prefix", { article: productArticle(product) || "—" })}</p>
               <p className="product-price">
                 {settings?.showPrices && price > 0 ? (
                   <>
@@ -245,7 +245,10 @@ export function ClientMatrixPanel({
                 </div>
                 <p className="unit-hint">
                   {multiplier > 1
-                    ? `1 ${unitMeta.label.toLowerCase()} = ${multiplier} шт.`
+                    ? t("client.matrix.unitEqualsPieces", {
+                        unit: unitMeta.label.toLowerCase(),
+                        multiplier,
+                      })
                     : t("client.quantityIsCountedInPieces")}
                 </p>
               </div>

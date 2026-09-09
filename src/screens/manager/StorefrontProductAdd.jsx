@@ -181,11 +181,11 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
       setNotice(
         addedNames.length
           ? addedNames.length === 1
-            ? `На витрину: «${addedNames[0]}».`
-            : `На витрину: ${addedNames.length} поз.`
+            ? t("manager.storefront.addedNamed", { name: addedNames[0] })
+            : t("manager.storefront.addedCountShort", { count: addedNames.length })
           : t("manager.noNewItems")
       );
-      if (skipped) setError(`Уже на витрине, пропущено: ${skipped}.`);
+      if (skipped) setError(t("manager.storefront.skippedAlready", { count: skipped }));
       await runSearch(search);
     } catch (addError) {
       setError(addError.message);
@@ -236,9 +236,8 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
     <>
       <strong>{t("manager.search1cExportStorefront")}</strong>
       <p className="muted small" style={{ marginTop: 6, marginBottom: 8 }}>
-        Если товар уже есть в Clover, на витрине останется его имя из матрицы.
-        Новый товар получит имя из 1С (его можно потом поменять в карточке).
-        {catalogTotal ? ` В выгрузке: ${catalogTotal}.` : ""}
+        {t("manager.storefront.ifExistsKeepMatrixName")}
+        {catalogTotal ? t("manager.storefront.exportTotal", { count: catalogTotal }) : ""}
       </p>
       <div className="one-c-products-search">
         <input
@@ -277,7 +276,7 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
       )}
       <div className="matrix-add-actions storefront-add-summary">
         <span className="muted small">
-          Найдено: {total}. К добавлению: {selectedItems.length}.
+          {t("manager.storefront.foundToAdd", { found: total, add: selectedItems.length })}
         </span>
         <button
           className="primary-button"
@@ -287,7 +286,7 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
         >
           {loading
             ? t("manager.adding")
-            : `Добавить на витрину (${selectedItems.length})`}
+            : t("manager.storefront.addCount", { count: selectedItems.length })}
         </button>
       </div>
       <div className="one-c-products-list one-c-picker-list storefront-add-picker-list">
@@ -329,17 +328,17 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
                 />
                 <div style={{ minWidth: 0 }}>
                   <strong>{item.name}</strong>
-                  <span>Код: {item.code || "—"}</span>
+                  <span>{t("manager.codeValue", { code: item.code || "—" })}</span>
                   {alreadyOn ? (
                     <span className="muted small">
                       <span className="badge green" style={{ marginRight: 6 }}>{
                         t("manager.storefront.on")
                       }</span>
-                      {clover?.name ? `как «${clover.name}»` : t("manager.cannotBeAddedAgain")}
+                      {clover?.name ? t("manager.storefront.asNamed", { name: clover.name }) : t("manager.cannotBeAddedAgain")}
                     </span>
                   ) : clover ? (
                     <span className="muted small">
-                      В Clover/матрице: «{clover.name}» — это имя пойдёт на витрину
+                      {t("manager.storefront.inCloverMatrixName", { name: clover.name })}
                     </span>
                   ) : (
                     <span className="muted small">{
@@ -377,9 +376,9 @@ export function StorefrontProductAdd({ products, setProducts, onAfterAdd }) {
       onAdded={(addedNames = []) => {
         setNotice(
           addedNames.length === 1
-            ? `На витрину: «${addedNames[0]}».`
+            ? t("manager.storefront.addedNamed", { name: addedNames[0] })
             : addedNames.length
-              ? `На витрину из Excel: ${addedNames.length} поз.`
+              ? t("manager.storefront.addedFromExcel", { count: addedNames.length })
               : t("manager.noNewItemsEverythingIsAlready")
         );
         onAfterAdd?.({ addedNames, source: "excel" });

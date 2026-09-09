@@ -33,6 +33,7 @@ import {
 import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
 import { appAlert, appConfirm } from "./shared/AppModal";
 import { canTrashOrder, isAdminHardDeleteStatus } from "./shared/orderTrash";
+import { orderStatusLabel } from "./shared/i18n/displayLabels";
 import {
   canOrderAcceptAddendum,
   mergeOrderCatalogItems,
@@ -192,7 +193,7 @@ function LoginView({ onAuth, authBusy, authError }) {
         if (!cancelled) setVerificationBusy(false);
       });
     return () => { cancelled = true; };
-  }, [verifyToken]);
+  }, [verifyToken, t]);
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -583,7 +584,7 @@ function App() {
   const { t } = useLocalization();
   useEffect(() => {
     document.title = t("auth.documentTitle");
-  }, []);
+  }, [t]);
   const [role, setRole] = useState("client");
   const [authUser, setAuthUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getApiToken()));
@@ -979,7 +980,7 @@ function App() {
         setSyncError("");
       } catch (error) {
         setSyncError(
-          `${error.message}. Данные останутся на экране, но сервер пока их не сохранил.`
+          t("auth.sync.keptOnScreen", { message: error.message })
         );
       }
     }, delay);
@@ -1544,7 +1545,7 @@ function App() {
             // оставляем откат к previousOrders
           }
         }
-        const message = `${error.message} Заказ не сохранён на сервере — менеджер его не увидит.`;
+        const message = t("auth.order.notSavedOnServer", { message: error.message });
         setSyncError(message);
         void appAlert({ title: t("auth.orderNotSaved"), message, tone: "danger" });
         throw error;
@@ -1560,7 +1561,7 @@ function App() {
       });
       return;
     }
-    const gate = canTrashOrder(order, "client");
+    const gate = canTrashOrder(order, "client", t);
     if (!gate.ok) {
       await appAlert({ title: t("auth.cannotDelete"), message: gate.error, tone: "warn" });
       return;
@@ -1582,7 +1583,7 @@ function App() {
         setSyncError("");
       } catch (error) {
         pendingDeletedOrderIdsRef.current.delete(orderId);
-        const message = `${error.message}. Заказ не удалён на сервере.`;
+        const message = t("auth.order.notDeletedOnServer", { message: error.message });
         setSyncError(message);
         void appAlert({ title: t("auth.deletionWasNotCompleted"), message, tone: "danger" });
         try {
@@ -1697,7 +1698,9 @@ function App() {
             if (!updatedCount && unchanged.length) {
               void appAlert({
                 title: t("manager.noChanges"),
-                message: `Все выбранные заказы уже в статусе «${patch.status}».`,
+                message: t("manager.orders.alreadyAllStatus", {
+                  status: orderStatusLabel(patch.status, t),
+                }),
               });
             }
             return;
@@ -1708,16 +1711,14 @@ function App() {
           ];
           void appAlert({
             title: t("auth.statusUpdatedPartially"),
-            message: [
-              `Обновлено: ${updatedCount}.`,
-              unchanged.length ? `Уже в этом статусе: ${unchanged.length}.` : "",
-              `Нельзя сменить: ${details.length}.`,
-            ]
-              .filter(Boolean)
-              .join(" "),
+            message: t("manager.orders.bulkPartialResult", {
+              updated: updatedCount,
+              unchanged: unchanged.length,
+              blocked: details.length,
+            }),
             tone: "warn",
             expandable: details.length
-              ? { summary: `Подробности (${details.length})`, lines: details }
+              ? { summary: t("manager.orders.detailsCount", { count: details.length }), lines: details }
               : null,
           });
         } catch (error) {
@@ -1769,7 +1770,7 @@ function App() {
       return;
     }
 
-    const gate = canTrashOrder(order, staffRole);
+    const gate = canTrashOrder(order, staffRole, t);
     if (!gate.ok) {
       await appAlert({ title: t("auth.cannotDelete"), message: gate.error, tone: "warn" });
       return;
@@ -1777,7 +1778,7 @@ function App() {
 
     if (hardDeleteCompleted) {
       const ok = await appConfirm({
-        title: `Удалить заказ № ${order.number} навсегда?`,
+        title: t("auth.order.deleteForeverTitle", { number: order.number }),
         message:
           t("auth.theOrderWillDisappearFromClover"),
         confirmLabel: t("shared.action.deleteForever"),
@@ -1812,8 +1813,8 @@ function App() {
         setSyncError("");
       } catch (error) {
         const message = hardDeleteCompleted
-          ? `${error.message}. Заказ не удалён.`
-          : `${error.message}. Заказ не перемещён в корзину.`;
+          ? t("auth.order.notDeleted", { message: error.message })
+          : t("auth.order.notMovedToTrash", { message: error.message });
         setSyncError(message);
         void appAlert({
           title: hardDeleteCompleted ? t("auth.deletion") : t("storefront.nav.cart"),
@@ -1831,7 +1832,7 @@ function App() {
 
   const restoreManagerOrder = async (order) => {
     const ok = await appConfirm({
-      title: `Восстановить заказ № ${order.number}?`,
+      title: t("auth.order.restoreTitle", { number: order.number }),
       message: t("auth.theOrderWillReturnToThe"),
       confirmLabel: t("shared.action.restore"),
       cancelLabel: t("shared.modal.cancel"),
@@ -1859,7 +1860,7 @@ function App() {
       return;
     }
     const ok = await appConfirm({
-      title: `Удалить заказ № ${order.number} навсегда?`,
+      title: t("auth.order.deleteForeverTitle", { number: order.number }),
       message: isAdminHardDeleteStatus(order?.status)
         ? t("auth.thisCannotBeRestoredWithoutA")
         : t("auth.thisCannotBeRestoredWithoutA2"),
@@ -1882,7 +1883,7 @@ function App() {
   const createProductFromCustom = async (order, customItem) => {
     const ok = await appConfirm({
       title: t("auth.createTheProductInTheCatalog"),
-      message: `Товар «${customItem.name}» будет добавлен в каталог Clover.`,
+      message: t("auth.product.addToCatalogNamed", { name: customItem.name }),
       confirmLabel: t("shared.action.create"),
       cancelLabel: t("shared.modal.cancel"),
     });

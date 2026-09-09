@@ -6,6 +6,7 @@ import cloverLogo from "../assets/clover-logo.png";
 import { startPasskeyRegistration } from "../utils/webauthn";
 import { api, setApiToken } from "../serverApi";
 import { formatDateTime } from "./appHelpers";
+import { orderHistoryLabel } from "./i18n/displayLabels";
 import { appConfirm } from "./AppModal";
 import {
   installPushSyncListeners,
@@ -52,7 +53,7 @@ export function OrderTimeline({ order }) {
     : [
         {
           id: `created-${order.id}`,
-          label: t("shared.orderCreated"),
+          label: "Заказ создан",
           actor: order.customerContact || "Клиент",
           createdAt: order.createdAt,
         },
@@ -70,7 +71,7 @@ export function OrderTimeline({ order }) {
               paddingLeft: 12,
             }}
           >
-            <div style={{ fontWeight: 700 }}>{item.label}</div>
+            <div style={{ fontWeight: 700 }}>{orderHistoryLabel(item.label, t)}</div>
             <small>
               {formatDateTime(item.createdAt)} · {item.actor || t("shared.role.system")}
             </small>
@@ -226,7 +227,7 @@ export function CustomRequestPhoto({ photo, className = "" }) {
         type="button"
         onClick={() => setViewerOpen(true)}
         title={t("shared.openPhoto")}
-        aria-label={`Открыть фотографию: ${altText}`}
+        aria-label={t("shared.media.openPhotoNamed", { name: altText })}
       >
         <img src={photo.dataUrl} alt={altText} />
       </button>
@@ -452,7 +453,7 @@ export function PasswordSecurityPanel({
           {passkeys.map((item, index) => (
             <div className="passkey-row" key={item.id}>
               <div>
-                <strong>Ключ доступа {index + 1}</strong>
+                <strong>{t("shared.passkey.accessKeyNumbered", { n: index + 1 })}</strong>
                 <span>{item.backedUp ? t("shared.syncedWithTheDeviceAccount") : t("shared.savedOnThisDevice")}</span>
               </div>
               <button className="danger-button" type="button" disabled={passkeyBusy} onClick={() => removePasskey(item.id)}>{

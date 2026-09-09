@@ -139,7 +139,13 @@ export function CustomItemForm({ onAdd }) {
             </label>
             <label className="field">{t("shared.field.unit")
               }<select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
-                <option>шт.</option><option>уп.</option><option>пач.</option><option>кг</option><option>л</option><option>рулон</option><option>кор.</option>
+                <option value="шт.">шт.</option>
+                <option value="уп.">уп.</option>
+                <option value="пач.">пач.</option>
+                <option value="кг">кг</option>
+                <option value="л">л</option>
+                <option value="рулон">рулон</option>
+                <option value="кор.">кор.</option>
               </select>
             </label>
           </div>

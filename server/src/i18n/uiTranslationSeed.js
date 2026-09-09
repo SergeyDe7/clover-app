@@ -1,6 +1,6 @@
 /** Server-owned Stage 3.1 target seeds. Not imported by frontend feature components. */
 
-const SEEDS = {
+export const SEEDS = {
   "shared.modal.confirmTitle": {
     "en": "Confirm action",
     "uz": "Amalni tasdiqlang",
@@ -58,12 +58,12 @@ const SEEDS = {
     "ar": "محتويات الطلب"
   },
   "auth.login.title": {
-    "en": "Client cabinet",
+    "en": "Client portal",
     "uz": "Shaxsiy kabinet",
     "ky": "Жеке кабинет",
     "tg": "Кабинети шахсӣ",
-    "zh-CN": "个人柜面",
-    "ar": "الخزانة الشخصية"
+    "zh-CN": "个人账户",
+    "ar": "الحساب الشخصي"
   },
   "auth.login.submit": {
     "en": "Sign in",
@@ -306,12 +306,12 @@ const SEEDS = {
     "ar": "العودة لتسجيل الدخول"
   },
   "auth.accessHint": {
-    "en": "A manager can give you access to the client cabinet",
+    "en": "A manager can give you access to the client portal",
     "uz": "Shaxsiy kabinetga kirishni menejerdan olishingiz mumkin",
     "ky": "Жеке кабинетке кирүүнү менеджерден ала аласыз",
     "tg": "Дастрасӣ ба кабинети шахсиро аз менеҷер гирифта метавонед",
-    "zh-CN": "可向经理申请个人柜面权限",
-    "ar": "يمكنك الحصول على دخول الخزانة من المدير"
+    "zh-CN": "可向经理申请个人账户权限",
+    "ar": "يمكنك الحصول على دخول البوابة من المدير"
   },
   "auth.devLink": {
     "en": "Test link for local setup:",
@@ -346,12 +346,12 @@ const SEEDS = {
     "ar": "أُلغي الدخول بـ Face ID."
   },
   "auth.documentTitle": {
-    "en": "Client cabinet | CLOVER",
+    "en": "Client portal | CLOVER",
     "uz": "Shaxsiy kabinet | CLOVER",
     "ky": "Жеке кабинет | CLOVER",
     "tg": "Кабинети шахсӣ | CLOVER",
-    "zh-CN": "个人柜面 | CLOVER",
-    "ar": "الخزانة الشخصية | CLOVER"
+    "zh-CN": "个人账户 | CLOVER",
+    "ar": "الحساب الشخصي | CLOVER"
   },
   "manager.nav.orders": {
     "en": "Orders",
@@ -658,6 +658,38 @@ const SEEDS = {
     "ar": "إرجاع AUTO"
   },
   "admin.languages.stale": {
+    "en": "stale",
+    "uz": "eskirgan",
+    "ky": "эскирген",
+    "tg": "кӯҳнашуда",
+    "zh-CN": "已过期",
+    "ar": "قديم"
+  },
+  "admin.languages.state.auto": {
+    "en": "AUTO",
+    "uz": "AUTO",
+    "ky": "AUTO",
+    "tg": "AUTO",
+    "zh-CN": "AUTO",
+    "ar": "AUTO"
+  },
+  "admin.languages.state.manual": {
+    "en": "MANUAL",
+    "uz": "MANUAL",
+    "ky": "MANUAL",
+    "tg": "MANUAL",
+    "zh-CN": "MANUAL",
+    "ar": "MANUAL"
+  },
+  "admin.languages.state.missing": {
+    "en": "MISSING",
+    "uz": "MISSING",
+    "ky": "MISSING",
+    "tg": "MISSING",
+    "zh-CN": "MISSING",
+    "ar": "MISSING"
+  },
+  "admin.languages.state.stale": {
     "en": "stale",
     "uz": "eskirgan",
     "ky": "эскирген",
@@ -1266,12 +1298,12 @@ const SEEDS = {
     "ar": "حُدِّثت الحالة جزئيًا"
   },
   "auth.theOrderWillDisappearFromClover": {
-    "en": "The order will disappear from Clover for the client and in the cabinet. The 1C document is not changed or deleted. It cannot be restored without a backup.",
+    "en": "The order will disappear from Clover for the client and in the portal. The 1C document is not changed or deleted. It cannot be restored without a backup.",
     "uz": "Buyurtma Clover’da mijoz va kabinetdan yo‘qoladi. 1C hujjati o‘zgarmaydi va o‘chirilmaydi. Zaxira nusxasisiz tiklab bo‘lmaydi.",
     "ky": "Заказ Clover’ден кардарда жана кабинетте жоголот. 1C документи өзгөрбөйт жана өчүрүлбөйт. Камдык көчүрмөсүз калыбына келтирүү мүмкүн эмес.",
     "tg": "Фармоиш аз Clover назди муштарӣ ва дар кабинет нест мешавад. Ҳуҷҷати 1C тағйир намеёбад ва нест намешавад. Бе нусхаи эҳтиётӣ барқарор кардан мумкин нест.",
-    "zh-CN": "该订单将从客户和柜面的 Clover 中消失。1C 单据不会更改或删除。没有备份将无法恢复。",
-    "ar": "سيختفي الطلب من Clover لدى العميل وفي الخزانة. مستند 1C لا يتغير ولا يُحذف. لا يمكن الاستعادة بدون نسخة احتياطية."
+    "zh-CN": "该订单将从客户和门户的 Clover 中消失。1C 单据不会更改或删除。没有备份将无法恢复。",
+    "ar": "سيختفي الطلب من Clover لدى العميل وفي البوابة. مستند 1C لا يتغير ولا يُحذف. لا يمكن الاستعادة بدون نسخة احتياطية."
   },
   "auth.theOrderWillReturnToThe": {
     "en": "The order will return to the active list and become visible to the client.",
@@ -1490,12 +1522,12 @@ const SEEDS = {
     "ar": "العودة إلى الطلب"
   },
   "client.cabinetSections": {
-    "en": "Cabinet sections",
+    "en": "Portal sections",
     "uz": "Kabinet bo‘limlari",
     "ky": "Кабинет бөлүмдөрү",
     "tg": "Бахшҳои кабинет",
-    "zh-CN": "柜面分区",
-    "ar": "أقسام الخزانة"
+    "zh-CN": "门户分区",
+    "ar": "أقسام البوابة"
   },
   "client.catalog.categories": {
     "en": "Categories",
@@ -1530,12 +1562,12 @@ const SEEDS = {
     "ar": "اختر عنوانًا من القائمة أو أضف جديدًا."
   },
   "client.clientPersonalCabinet": {
-    "en": "Client personal cabinet",
+    "en": "Client personal portal",
     "uz": "Mijoz shaxsiy kabineti",
     "ky": "Кардардын жеке кабинети",
     "tg": "Кабинети шахсии муштарӣ",
-    "zh-CN": "客户个人柜面",
-    "ar": "خزانة العميل"
+    "zh-CN": "客户个人门户",
+    "ar": "بوابة العميل"
   },
   "client.closeCart": {
     "en": "Close cart",
@@ -2218,12 +2250,12 @@ const SEEDS = {
     "ar": "العنوان من الطلب"
   },
   "manager.adminCabinet": {
-    "en": "Admin cabinet",
+    "en": "Admin portal",
     "uz": "Admin kabineti",
     "ky": "Админ кабинети",
     "tg": "Кабинети админ",
-    "zh-CN": "管理员柜面",
-    "ar": "خزانة المسؤول"
+    "zh-CN": "管理员门户",
+    "ar": "بوابة المسؤول"
   },
   "manager.adminSections": {
     "en": "Admin sections",
@@ -2514,20 +2546,20 @@ const SEEDS = {
     "ar": "حسب الرمز"
   },
   "manager.cabinetSettingsUpdated": {
-    "en": "Cabinet settings updated",
+    "en": "Portal settings updated",
     "uz": "Kabinet sozlamalari yangilandi",
     "ky": "Кабинет жөндөөлөрү жаңыртылды",
     "tg": "Танзимоти кабинет навсозӣ шуд",
-    "zh-CN": "柜面设置已更新",
-    "ar": "تم تحديث إعدادات الخزانة"
+    "zh-CN": "门户设置已更新",
+    "ar": "تم تحديث إعدادات البوابة"
   },
   "manager.cabinetSignIn": {
-    "en": "Cabinet sign-in",
+    "en": "Portal sign-in",
     "uz": "Kabinetga kirish",
     "ky": "Кабинетке кирүү",
     "tg": "Вуруд ба кабинет",
-    "zh-CN": "登录柜面",
-    "ar": "دخول الخزانة"
+    "zh-CN": "登录门户",
+    "ar": "دخول البوابة"
   },
   "manager.cancelThe1cTransfer": {
     "en": "Cancel the 1C transfer?",
@@ -2970,12 +3002,12 @@ const SEEDS = {
     "ar": "جارٍ الإنشاء..."
   },
   "manager.dataRestoredTheCabinetWasRefreshed": {
-    "en": "Data restored. The cabinet was refreshed.",
+    "en": "Data restored. The portal was refreshed.",
     "uz": "Ma’lumotlar tiklandi. Kabinet yangilandi.",
     "ky": "Маалыматтар калыбына келтирилди. Кабинет жаңыртылды.",
     "tg": "Маълумот барқарор шуд. Кабинет навсозӣ шуд.",
-    "zh-CN": "数据已恢复。柜面已刷新。",
-    "ar": "تمت استعادة البيانات. تم تحديث الخزانة."
+    "zh-CN": "数据已恢复。门户已刷新。",
+    "ar": "تمت استعادة البيانات. تم تحديث البوابة."
   },
   "manager.dataWasResetAfterASafety": {
     "en": "Data was reset after a safety backup was created",
@@ -3818,12 +3850,12 @@ const SEEDS = {
     "ar": "مدير"
   },
   "manager.managerCabinet": {
-    "en": "Manager cabinet",
+    "en": "Manager portal",
     "uz": "Menejer kabineti",
     "ky": "Менеджер кабинети",
     "tg": "Кабинети менеҷер",
-    "zh-CN": "经理柜面",
-    "ar": "خزانة المدير"
+    "zh-CN": "经理门户",
+    "ar": "بوابة المدير"
   },
   "manager.managerChangedClientDetails": {
     "en": "Manager changed client details",
@@ -3858,12 +3890,12 @@ const SEEDS = {
     "ar": "أُرسل إشعار للمدير"
   },
   "manager.manualCopyFromTheManagerCabinet": {
-    "en": "Manual copy from the manager cabinet",
+    "en": "Manual copy from the manager portal",
     "uz": "Menejer kabinetidan qo‘lda nusxa",
     "ky": "Менеджер кабинетинен кол менен көчүрмө",
     "tg": "Нусхаи дастӣ аз кабинети менеҷер",
-    "zh-CN": "来自经理柜面的手动副本",
-    "ar": "نسخة يدوية من خزانة المدير"
+    "zh-CN": "来自经理门户的手动副本",
+    "ar": "نسخة يدوية من بوابة المدير"
   },
   "manager.map": {
     "en": "Map",
@@ -5402,12 +5434,12 @@ const SEEDS = {
     "ar": "إظهار زر لإعادة الطلب بسرعة."
   },
   "manager.showNewEventsImmediatelyInThe": {
-    "en": "Show new events immediately in the manager cabinet.",
+    "en": "Show new events immediately in the manager portal.",
     "uz": "Yangi hodisalarni menejer kabinetida darhol ko‘rsatish.",
     "ky": "Жаңы окуяларды менеджер кабинетинде дароо көрсөтүү.",
     "tg": "Нишон додани рӯйдодҳои нав фавран дар кабинети менеҷер.",
-    "zh-CN": "在经理柜面立即显示新事件。",
-    "ar": "إظهار الأحداث الجديدة فورًا في خزانة المدير."
+    "zh-CN": "在经理门户立即显示新事件。",
+    "ar": "إظهار الأحداث الجديدة فورًا في بوابة المدير."
   },
   "manager.showPrices": {
     "en": "Show prices",
@@ -5593,7 +5625,7 @@ const SEEDS = {
     "zh-CN": "测试连接",
     "ar": "اختبار الاتصال"
   },
-  "manager.text": {
+  "manager.oneC.priceType": {
     "en": "1C price type",
     "uz": "1C narx turi",
     "ky": "1C баа түрү",
@@ -5601,7 +5633,7 @@ const SEEDS = {
     "zh-CN": "1C 价格类型",
     "ar": "نوع سعر 1C"
   },
-  "manager.text10": {
+  "manager.exchange.connection.checked": {
     "en": "1C connection checked",
     "uz": "1C ulanishi tekshirildi",
     "ky": "1C туташуусу текшерилди",
@@ -5609,7 +5641,7 @@ const SEEDS = {
     "zh-CN": "已检查 1C 连接",
     "ar": "تم فحص اتصال 1C"
   },
-  "manager.text11": {
+  "manager.exchange.catalog.previewed": {
     "en": "1C catalog viewed",
     "uz": "1C ma’lumotnomasi ko‘rildi",
     "ky": "1C маалыматнаамасы каралды",
@@ -5617,7 +5649,7 @@ const SEEDS = {
     "zh-CN": "已查看 1C 目录",
     "ar": "تم استعراض دليل 1C"
   },
-  "manager.text12": {
+  "manager.exchange.status.reset": {
     "en": "1C exchange status reset",
     "uz": "1C almashuv holati tiklandi",
     "ky": "1C алмашуу статусу баштапкы абалга келтирилди",
@@ -5625,7 +5657,7 @@ const SEEDS = {
     "zh-CN": "已重置 1C 交换状态",
     "ar": "أُعيد ضبط حالة تبادل 1C"
   },
-  "manager.text13": {
+  "manager.exchange.draft.created": {
     "en": "1C order draft created",
     "uz": "1C da buyurtma qoralamasi yaratildi",
     "ky": "1C’де заказ долбоору түзүлдү",
@@ -5633,7 +5665,7 @@ const SEEDS = {
     "zh-CN": "已在 1C 创建订单草稿",
     "ar": "أُنشئت مسودة طلب في 1C"
   },
-  "manager.text14": {
+  "manager.exchange.match.linked": {
     "en": "1C matching: queued clients and products are linked.",
     "uz": "1C solishtirish: navbatdagi mijoz va mahsulotlar bog‘langan.",
     "ky": "1C дал келтирүү: кезектеги кардарлар жана товарлар байланышкан.",
@@ -5641,7 +5673,7 @@ const SEEDS = {
     "zh-CN": "1C 匹配：队列中的客户和商品已关联。",
     "ar": "مطابقة 1C: العملاء والمنتجات في الطابور مرتبطون."
   },
-  "manager.text15": {
+  "manager.exchange.config.saved": {
     "en": "1C connection settings saved",
     "uz": "1C ulanish sozlamalari saqlandi",
     "ky": "1C туташуу жөндөөлөрү сакталды",
@@ -5649,7 +5681,7 @@ const SEEDS = {
     "zh-CN": "1C 连接设置已保存",
     "ar": "تم حفظ إعدادات اتصال 1C"
   },
-  "manager.text16": {
+  "manager.exchange.prodDisabled": {
     "en": "1C TEST only (prod is off)",
     "uz": "faqat 1C TEST (prod o‘chiq)",
     "ky": "1C TEST гана (prod өчүк)",
@@ -5657,7 +5689,7 @@ const SEEDS = {
     "zh-CN": "仅 1C TEST（生产已关闭）",
     "ar": "1C TEST فقط (الإنتاج متوقف)"
   },
-  "manager.text17": {
+  "manager.orders.oneCStatusFilter": {
     "en": "1C status filter",
     "uz": "1C holati filtri",
     "ky": "1C статус чыпкасы",
@@ -5665,7 +5697,7 @@ const SEEDS = {
     "zh-CN": "1C 状态筛选",
     "ar": "عامل تصفية حالة 1C"
   },
-  "manager.text18": {
+  "manager.products.oneC.pricePending": {
     "en": "1C price has not been received yet",
     "uz": "1C narxi hali olinmadi",
     "ky": "1C баасы азырынча алынган жок",
@@ -5673,7 +5705,7 @@ const SEEDS = {
     "zh-CN": "尚未收到 1C 价格",
     "ar": "لم يُستلم سعر 1C بعد"
   },
-  "manager.text2": {
+  "manager.products.oneC.articleUnlinked": {
     "en": "1C SKU: not linked",
     "uz": "1C artikul: bog‘lanmagan",
     "ky": "1C артикул: байланышкан эмес",
@@ -5681,7 +5713,7 @@ const SEEDS = {
     "zh-CN": "1C 货号：未关联",
     "ar": "رمز 1C: غير مرتبط"
   },
-  "manager.text3": {
+  "manager.oneC.category": {
     "en": "1C category",
     "uz": "1C kategoriyasi",
     "ky": "1C категориясы",
@@ -5689,7 +5721,7 @@ const SEEDS = {
     "zh-CN": "1C 分类",
     "ar": "فئة 1C"
   },
-  "manager.text4": {
+  "manager.clients.oneCPriceCategory": {
     "en": "1C price category",
     "uz": "1C narx kategoriyasi",
     "ky": "1C баа категориясы",
@@ -5697,7 +5729,7 @@ const SEEDS = {
     "zh-CN": "1C 价格类别",
     "ar": "فئة سعر 1C"
   },
-  "manager.text5": {
+  "manager.exchange.connection.saved": {
     "en": "1C connection settings saved.",
     "uz": "1C ulanish sozlamalari saqlandi.",
     "ky": "1C туташуу жөндөөлөрү сакталды.",
@@ -5705,7 +5737,7 @@ const SEEDS = {
     "zh-CN": "1C 连接设置已保存。",
     "ar": "تم حفظ إعدادات اتصال 1C."
   },
-  "manager.text6": {
+  "manager.exchange.title": {
     "en": "1C exchange",
     "uz": "1C bilan almashuv",
     "ky": "1C менен алмашуу",
@@ -5713,7 +5745,7 @@ const SEEDS = {
     "zh-CN": "与 1C 交换",
     "ar": "تبادل 1C"
   },
-  "manager.text7": {
+  "manager.exchange.connection.error": {
     "en": "1C connection error",
     "uz": "1C ga ulanish xatosi",
     "ky": "1C туташуу катасы",
@@ -5721,7 +5753,7 @@ const SEEDS = {
     "zh-CN": "连接 1C 出错",
     "ar": "خطأ اتصال 1C"
   },
-  "manager.text8": {
+  "manager.exchange.send.testError": {
     "en": "1C test send error",
     "uz": "1C ga test uzatish xatosi",
     "ky": "1C сыноо өткөрүү катасы",
@@ -5729,7 +5761,7 @@ const SEEDS = {
     "zh-CN": "1C 测试发送失败",
     "ar": "خطأ إرسال تجريبي إلى 1C"
   },
-  "manager.text9": {
+  "manager.exchange.errorsToggle": {
     "en": "1C exchange errors",
     "uz": "1C almashuv xatolari",
     "ky": "1C алмашуу каталары",
@@ -7474,12 +7506,12 @@ const SEEDS = {
     "ar": "كل الأقسام"
   },
   "admin.chooseWhatTheManagerSeesIn": {
-    "en": "Choose what the manager sees in the cabinet.",
+    "en": "Choose what the manager sees in the portal.",
     "uz": "Menejer kabinetda nimalarni ko‘rishini tanlang.",
     "ky": "Менеджер кабинетте эмнени көрөрүн тандаңыз.",
     "tg": "Интихоб кунед, ки менеҷер дар кабинет чӣ мебинад.",
-    "zh-CN": "选择经理在柜面中可见的内容。",
-    "ar": "اختر ما يراه المدير في الخزانة."
+    "zh-CN": "选择经理在门户中可见的内容。",
+    "ar": "اختر ما يراه المدير في البوابة."
   },
   "admin.contactsForClients": {
     "en": "Contacts for clients",
@@ -7498,12 +7530,12 @@ const SEEDS = {
     "ar": "الإنشاء وإغلاق الوصول وتغيير كلمة المرور وصلاحيات الأقسام والحذف. تُحفظ كلمات مرور المديرين في هذا السجل (كما للعملاء). للمسؤول فقط."
   },
   "admin.fullCabinetAccess": {
-    "en": "full cabinet access",
+    "en": "full portal access",
     "uz": "kabinetga to‘liq kirish",
     "ky": "кабинетке толук кирүү",
     "tg": "дастрасии пурра ба кабинет",
-    "zh-CN": "柜面完全权限",
-    "ar": "وصول كامل إلى الخزانة"
+    "zh-CN": "门户完全权限",
+    "ar": "وصول كامل إلى البوابة"
   },
   "admin.fullName": {
     "en": "Full name",
@@ -8130,12 +8162,12 @@ const SEEDS = {
     "ar": "سجل الإجراءات"
   },
   "manager.aCustomPriceOverridesPurchaseAnd": {
-    "en": "A custom price overrides “purchase + %” (and the 1C price type) on the website storefront only. It does not affect the client cabinet.",
+    "en": "A custom price overrides “purchase + %” (and the 1C price type) on the website storefront only. It does not affect the client portal.",
     "uz": "O‘z narxi «xarid + %» hisobini (va 1C narx turini) faqat sayt vitrinasida bosadi. Mijoz LKsiga ta’sir qilmaydi.",
     "ky": "Өз баа «сатып алуу + %» эсебин (жана 1С баанын түрүн) сайттын витринасында гана каптайт. Кардар кабинетине таасир этпейт.",
     "tg": "Нархи худ ҳисоби «харид + %» (ва навъи нархи 1С)-ро танҳо дар витринаи сайт мепӯшонад. Ба ЛК-и муштариён таъсир намекунад.",
-    "zh-CN": "自定义价仅在网站橱窗覆盖“采购 + %”（及 1C 价格类型）。不影响客户柜面。",
-    "ar": "السعر الخاص يستبدل حساب «الشراء + %» (ونوع سعر 1C) على واجهة الموقع فقط. لا يؤثر في خزانة العملاء."
+    "zh-CN": "自定义价仅在网站橱窗覆盖“采购 + %”（及 1C 价格类型）。不影响客户门户。",
+    "ar": "السعر الخاص يستبدل حساب «الشراء + %» (ونوع سعر 1C) على واجهة الموقع فقط. لا يؤثر في بوابة العملاء."
   },
   "manager.addFrom1c": {
     "en": "Add from 1C",
@@ -8290,12 +8322,12 @@ const SEEDS = {
     "ar": "مطابقة التسمية تلقائياً"
   },
   "manager.baseIsThePurchasePriceFrom": {
-    "en": "Base is the purchase price from the 1C export (and the “Purchase” type if it is newer). Result: purchase × (1 + % / 100), rounded up as in the cabinet.",
+    "en": "Base is the purchase price from the 1C export (and the “Purchase” type if it is newer). Result: purchase × (1 + % / 100), rounded up as in the portal.",
     "uz": "Asos — 1C yuklamasidagi xarid narxi (va «Xarid» turi yangiroq bo‘lsa). Natija: xarid × (1 + % / 100), LKdagi kabi yuqoriga yaxlitlash.",
     "ky": "Негиз — 1С жүктөмөдөгү сатып алуу баасы (жана «Сатып алуу» түрү жаңыраак болсо). Жыйынтык: сатып алуу × (1 + % / 100), кабинеттегидей өйдө тегеректөө.",
     "tg": "Асос — нархи харид аз боркунии 1С (ва навъи «Харид», агар навтар бошад). Натиҷа: харид × (1 + % / 100), мудаввар ба боло мисли ЛК.",
-    "zh-CN": "基数是 1C 导出的采购价（若“采购”类型更新则用它）。结果：采购价 × (1 + % / 100)，按柜面向上取整。",
-    "ar": "الأساس سعر الشراء من تصدير 1C (ونوع «الشراء» إن كان أحدث). الناتج: الشراء × (1 + % / 100) مع تقريب لأعلى كما في الخزانة."
+    "zh-CN": "基数是 1C 导出的采购价（若“采购”类型更新则用它）。结果：采购价 × (1 + % / 100)，按门户向上取整。",
+    "ar": "الأساس سعر الشراء من تصدير 1C (ونوع «الشراء» إن كان أحدث). الناتج: الشراء × (1 + % / 100) مع تقريب لأعلى كما في البوابة."
   },
   "manager.baseUnf16Document": {
     "en": "Base: UNF 1.6 · document ЗаказПокупателя",
@@ -8338,20 +8370,20 @@ const SEEDS = {
     "ar": "حسب المصفوفة"
   },
   "manager.cabinetLoginsAndPasswordsWrittenTo": {
-    "en": "Cabinet logins and passwords. Written to the log when a client is created or a password is changed. Passwords from before this log cannot be recovered — set a new one.",
+    "en": "Portal logins and passwords. Written to the log when a client is created or a password is changed. Passwords from before this log cannot be recovered — set a new one.",
     "uz": "LK login va parollari. Mijoz yaratilganda va parol almashtirilganda jurnalga yoziladi. Jurnal paydo bo‘lishidan oldingi parollarni tiklab bo‘lmaydi — yangisini belgilang.",
     "ky": "Жеке кабинеттин логиндери жана сырсөздөрү. Кардар түзүлгөндө жана сырсөз алмаштырылганда журналга жазылат. Журналдан мурунку сырсөздөрдү калыбына келтирүүгө болбойт — жаңысын коюңуз.",
     "tg": "Логин ва паролҳои ЛК. Ҳангоми эҷоди муштарӣ ва ивази парол ба журнал навишта мешаванд. Паролҳои пеш аз журнал барқарор намешаванд — нав гузоред.",
-    "zh-CN": "个人柜面登录名和密码。创建客户或改密时写入日志。日志出现前的旧密码无法恢复 — 请设置新密码。",
-    "ar": "أسماء الدخول وكلمات مرور الخزانة. تُكتب في السجل عند إنشاء العميل أو تغيير كلمة المرور. لا يمكن استعادة كلمات المرور السابقة — عيّن جديدة."
+    "zh-CN": "个人账户登录名和密码。创建客户或改密时写入日志。日志出现前的旧密码无法恢复 — 请设置新密码。",
+    "ar": "أسماء الدخول وكلمات مرور البوابة. تُكتب في السجل عند إنشاء العميل أو تغيير كلمة المرور. لا يمكن استعادة كلمات المرور السابقة — عيّن جديدة."
   },
   "manager.cabinetSettings": {
-    "en": "Cabinet settings",
+    "en": "Portal settings",
     "uz": "Kabinet sozlamalari",
     "ky": "Кабинет жөндөөлөрү",
     "tg": "Танзимоти кабинет",
-    "zh-CN": "柜面设置",
-    "ar": "إعدادات الخزانة"
+    "zh-CN": "门户设置",
+    "ar": "إعدادات البوابة"
   },
   "manager.calculationMethod": {
     "en": "Calculation method",
@@ -8410,12 +8442,12 @@ const SEEDS = {
     "ar": "تُحفظ التغييرات تلقائياً وتُطبَّق فوراً."
   },
   "manager.changesAreSavedWithCabinetSettings": {
-    "en": "Changes are saved with cabinet settings. Zones are not deleted — turn a zone off if it is no longer needed.",
+    "en": "Changes are saved with portal settings. Zones are not deleted — turn a zone off if it is no longer needed.",
     "uz": "O‘zgarishlar kabinet sozlamalari bilan saqlanadi. Zonalar o‘chirilmaydi — kerak bo‘lmasa zonani o‘chiring.",
     "ky": "Өзгөрүүлөр кабинет жөндөөлөрү менен сакталат. Аймактар өчүрүлбөйт — керек болбосо аймакты өчүрүңүз.",
     "tg": "Тағйирот бо танзимоти кабинет нигоҳ дошта мешаванд. Минтақаҳо нест карда намешаванд — агар лозим набошад, минтақаро хомӯш кунед.",
-    "zh-CN": "更改与柜面设置一起保存。不会删除区域 — 不再需要时请关闭该区域。",
-    "ar": "تُحفظ التغييرات مع إعدادات الخزانة. لا يُحذف النطاق — عطّله إن لم يعد لازماً."
+    "zh-CN": "更改与门户设置一起保存。不会删除区域 — 不再需要时请关闭该区域。",
+    "ar": "تُحفظ التغييرات مع إعدادات البوابة. لا يُحذف النطاق — عطّله إن لم يعد لازماً."
   },
   "manager.changingThisTextAppearsOnThe": {
     "en": "Changing this text appears on the public site immediately. Check the legal wording before saving.",
@@ -8498,12 +8530,12 @@ const SEEDS = {
     "ar": "العملاء"
   },
   "manager.clientsCabinetLoginsManagersLoginsPasswords": {
-    "en": "Clients — cabinet logins. Managers — logins, passwords and rights (admin only).",
+    "en": "Clients — portal logins. Managers — logins, passwords and rights (admin only).",
     "uz": "Mijozlar — LK loginlari. Menejerlar — login, parol va huquqlar (faqat administrator).",
     "ky": "Кардарлар — жеке кабинет логиндери. Менеджерлер — логин, сырсөз жана укуктар (админ гана).",
     "tg": "Муштариён — логинҳои ЛК. Менеҷерон — логин, парол ва ҳуқуқҳо (танҳо админ).",
-    "zh-CN": "客户 — 柜面登录名。经理 — 登录名、密码和权限（仅管理员）。",
-    "ar": "العملاء — أسماء دخول الخزانة. المديرون — الدخول وكلمات المرور والصلاحيات (المسؤول فقط)."
+    "zh-CN": "客户 — 门户登录名。经理 — 登录名、密码和权限（仅管理员）。",
+    "ar": "العملاء — أسماء دخول البوابة. المديرون — الدخول وكلمات المرور والصلاحيات (المسؤول فقط)."
   },
   "manager.clientSignInEmail": {
     "en": "Client sign-in email",
@@ -9098,12 +9130,12 @@ const SEEDS = {
     "ar": "كيف تُضاف المنتجات إلى الواجهة؟"
   },
   "manager.howToCalculateTheStorefrontPrice": {
-    "en": "How to calculate the storefront price. Clients see personal matrix prices in the cabinet.",
+    "en": "How to calculate the storefront price. Clients see personal matrix prices in the portal.",
     "uz": "Vitrinada narxni qanday hisoblash. Mijoz LKsida — matritsaning shaxsiy narxlari.",
     "ky": "Витринадагы бааны кантип эсептөө. Кардар кабинетинде — матрицанын жеке баалары.",
     "tg": "Чӣ гуна нархи витрина ҳисоб шавад. Дар ЛК-и муштариён — нархҳои шахсии матрица.",
-    "zh-CN": "如何计算橱窗价格。客户柜面显示矩阵个人价。",
-    "ar": "كيف يُحسب سعر الواجهة. في خزانة العملاء — أسعار المصفوفة الشخصية."
+    "zh-CN": "如何计算橱窗价格。客户门户显示矩阵个人价。",
+    "ar": "كيف يُحسب سعر الواجهة. في بوابة العملاء — أسعار المصفوفة الشخصية."
   },
   "manager.howToGetThereOptional": {
     "en": "How to get there — optional",
@@ -9217,7 +9249,7 @@ const SEEDS = {
     "zh-CN": "JPG、PNG 或 WEBP，最大 5 MB。自动：800×800 方形、白底、JPEG。",
     "ar": "JPG أو PNG أو WEBP حتى 5 م.ب. تلقائياً: مربع 800×800 وخلفية بيضاء وJPEG."
   },
-  "manager.label": {
+  "manager.clients.contactCaption": {
     "en": "Label",
     "uz": "Imzo",
     "ky": "Колтамга",
@@ -9426,12 +9458,12 @@ const SEEDS = {
     "ar": "المصفوفة قيد الإعداد"
   },
   "manager.matrixModePriceTypeAndMarkup": {
-    "en": "Matrix mode, price type and markup. Choose the 1C counterparty in “Client details”. After “Refresh prices” in 1C the client cabinet pulls the catalog automatically.",
+    "en": "Matrix mode, price type and markup. Choose the 1C counterparty in “Client details”. After “Refresh prices” in 1C the client portal pulls the catalog automatically.",
     "uz": "Matritsa tartibi, narx turi va ustama. 1C kontragent «Mijoz ma’lumotlari»da tanlanadi. 1C da «Narxlarni yangilash»dan keyin mijoz LKsi katalogni avtomatik tortadi.",
     "ky": "Матрица режими, баанын түрү жана үстөк. 1С контрагентти «Кардар маалыматынан» тандашат. 1Сде «Бааны жаңыртуудан» кийин кардар кабинети каталогду автоматтык тартат.",
     "tg": "Реҷаи матрица, навъи нарх ва болоравӣ. Контрагенти 1С дар «Маълумоти муштарӣ» интихоб мешавад. Пас аз «Навсозии нархҳо» дар 1С ЛК-и муштарӣ каталогро худкор мекашад.",
-    "zh-CN": "矩阵模式、价格类型和加价。在“客户资料”中选择 1C 对方。在 1C 中“刷新价格”后，客户柜面会自动拉取目录。",
-    "ar": "وضع المصفوفة ونوع السعر والهامش. يُختار طرف 1C في «بيانات العميل». بعد «تحديث الأسعار» في 1C تسحب خزانة العميل الكتالوج تلقائياً."
+    "zh-CN": "矩阵模式、价格类型和加价。在“客户资料”中选择 1C 对方。在 1C 中“刷新价格”后，客户门户会自动拉取目录。",
+    "ar": "وضع المصفوفة ونوع السعر والهامش. يُختار طرف 1C في «بيانات العميل». بعد «تحديث الأسعار» في 1C تسحب بوابة العميل الكتالوج تلقائياً."
   },
   "manager.matrixNote": {
     "en": "Matrix note",
@@ -10385,7 +10417,7 @@ const SEEDS = {
     "zh-CN": "摘要与批量操作。单独传单在卡片的“订单”页签。",
     "ar": "ملخص وعمليات جماعية. نقل طلب واحد في البطاقة ضمن تبويب «الطلبات»."
   },
-  "manager.text19": {
+  "manager.field.bodyText": {
     "en": "Text",
     "uz": "Matn",
     "ky": "Текст",
@@ -10393,7 +10425,7 @@ const SEEDS = {
     "zh-CN": "文本",
     "ar": "النص"
   },
-  "manager.text20": {
+  "manager.clients.oneCCounterparty": {
     "en": "1C counterparty",
     "uz": "1C kontragent",
     "ky": "1С контрагент",
@@ -10401,7 +10433,7 @@ const SEEDS = {
     "zh-CN": "1C 对方",
     "ar": "طرف 1C"
   },
-  "manager.text21": {
+  "manager.clients.oneCAndPrices": {
     "en": "1C and prices",
     "uz": "1C va narxlar",
     "ky": "1С жана баалар",
@@ -10409,7 +10441,7 @@ const SEEDS = {
     "zh-CN": "1C 与价格",
     "ar": "1C والأسعار"
   },
-  "manager.text22": {
+  "manager.clients.oneCCounterpartyMissing": {
     "en": "1C counterparty is not selected — open “Client details”.",
     "uz": "1C kontragent tanlanmagan — «Mijoz ma’lumotlari»ni oching.",
     "ky": "1С контрагент тандала элек — «Кардар маалыматын» ачыңыз.",
@@ -10417,7 +10449,7 @@ const SEEDS = {
     "zh-CN": "未选择 1C 对方 — 请打开“客户资料”。",
     "ar": "طرف 1C غير محدد — افتح «بيانات العميل»."
   },
-  "manager.text23": {
+  "manager.clients.oneCPriceType": {
     "en": "1C price category (price type)",
     "uz": "1C narx toifasi (narx turi)",
     "ky": "1С баа категориясы (баанын түрү)",
@@ -10425,7 +10457,7 @@ const SEEDS = {
     "zh-CN": "1C 价格类别（价格类型）",
     "ar": "فئة سعر 1C (نوع السعر)"
   },
-  "manager.text24": {
+  "manager.clients.oneCPriceTypeNoMarkup": {
     "en": "1C price category without markup",
     "uz": "Ustamasiz 1C narx toifasi",
     "ky": "Үстөксүз 1С баа категориясы",
@@ -10433,7 +10465,7 @@ const SEEDS = {
     "zh-CN": "不加价的 1C 价格类别",
     "ar": "فئة سعر 1C دون هامش"
   },
-  "manager.text25": {
+  "manager.exchange.linkStatus": {
     "en": "1C connection",
     "uz": "1C aloqasi",
     "ky": "1С байланышы",
@@ -10441,7 +10473,7 @@ const SEEDS = {
     "zh-CN": "1C 连接",
     "ar": "اتصال 1C"
   },
-  "manager.text26": {
+  "manager.exchange.user": {
     "en": "1C exchange user",
     "uz": "1C almashuv foydalanuvchisi",
     "ky": "1С алмашуу колдонуучусу",
@@ -10449,7 +10481,7 @@ const SEEDS = {
     "zh-CN": "1C 交换用户",
     "ar": "مستخدم تبادل 1C"
   },
-  "manager.text27": {
+  "manager.exchange.drafts": {
     "en": "1C drafts",
     "uz": "1C qoralamalari",
     "ky": "1С долбоорлору",
@@ -10457,7 +10489,7 @@ const SEEDS = {
     "zh-CN": "1C 草稿",
     "ar": "مسودات 1C"
   },
-  "manager.text28": {
+  "manager.exchange.matchWizard": {
     "en": "1C matching wizard",
     "uz": "1C bilan solishtirish ustasi",
     "ky": "1С менен салыштыруу устаты",
@@ -10465,7 +10497,7 @@ const SEEDS = {
     "zh-CN": "1C 匹配向导",
     "ar": "معالج المطابقة مع 1C"
   },
-  "manager.text29": {
+  "manager.orders.oneCContour": {
     "en": "1C transfer contour",
     "uz": "1C ga yuborish konturi",
     "ky": "1Сге өткөрүү контуру",
@@ -10473,7 +10505,7 @@ const SEEDS = {
     "zh-CN": "传到 1C 的路径",
     "ar": "مسار النقل إلى 1C"
   },
-  "manager.text30": {
+  "manager.products.oneCCatalog": {
     "en": "1C catalog",
     "uz": "1C katalogi",
     "ky": "1С каталогу",
@@ -10481,7 +10513,7 @@ const SEEDS = {
     "zh-CN": "1C 目录",
     "ar": "كتالوج 1C"
   },
-  "manager.text31": {
+  "manager.orders.oneCErrors": {
     "en": "1C errors",
     "uz": "1C xatolari",
     "ky": "1С каталары",
@@ -10489,7 +10521,7 @@ const SEEDS = {
     "zh-CN": "1C 错误",
     "ar": "أخطاء 1C"
   },
-  "manager.text32": {
+  "manager.settings.deliveryNomenclature": {
     "en": "1C delivery nomenclature",
     "uz": "1C dagi yetkazib berish nomenklaturasi",
     "ky": "1Сдеги жеткирүү номенклатурасы",
@@ -10497,7 +10529,7 @@ const SEEDS = {
     "zh-CN": "1C 配送品名",
     "ar": "تسمية التوصيل في 1C"
   },
-  "manager.text33": {
+  "manager.storefront.oneC.counterparty.title": {
     "en": "1C counterparty for website orders",
     "uz": "Sayt buyurtmalari uchun 1C kontragent",
     "ky": "Сайт заказдары үчүн 1С контрагент",
@@ -10505,7 +10537,7 @@ const SEEDS = {
     "zh-CN": "网站订单的 1C 对方",
     "ar": "طرف 1C لطلبات الموقع"
   },
-  "manager.text34": {
+  "manager.storefront.oneC.counterparty.id": {
     "en": "1C counterparty ID (optional)",
     "uz": "1C kontragent ID (ixtiyoriy)",
     "ky": "1С контрагент ID (милдеттүү эмес)",
@@ -10513,7 +10545,7 @@ const SEEDS = {
     "zh-CN": "1C 对方 ID（可选）",
     "ar": "معرف طرف 1C (اختياري)"
   },
-  "manager.text35": {
+  "manager.products.oneC.article": {
     "en": "1C SKU",
     "uz": "1C artikuli",
     "ky": "1С артикулу",
@@ -10521,7 +10553,7 @@ const SEEDS = {
     "zh-CN": "1C 货号",
     "ar": "رمز 1C"
   },
-  "manager.text36": {
+  "manager.products.oneC.link": {
     "en": "1C link",
     "uz": "1C bilan bog‘lanish",
     "ky": "1С менен байланыш",
@@ -10530,12 +10562,12 @@ const SEEDS = {
     "ar": "الربط مع 1C"
   },
   "manager.theCabinetWillShowAYour": {
-    "en": "The cabinet will show a “Your manager” button. On hover or tap the client sees the name, phone and contact buttons.",
+    "en": "The portal will show a “Your manager” button. On hover or tap the client sees the name, phone and contact buttons.",
     "uz": "Shaxsiy kabinetda «Menejeringiz» tugmasi paydo bo‘ladi. Sichqoncha yoki bosishda mijoz F.I.Sh., telefon va aloqa tugmalarini ko‘radi.",
     "ky": "Жеке кабинетте «Сиздин менеджер» баскычы пайда болот. Курсор же басууда кардар аты-жөнүн, телефонду жана байланыш баскычтарын көрөт.",
     "tg": "Дар кабинет тугмаи «Менеҷери шумо» пайдо мешавад. Ҳангоми нишон додан ё пахш муштарӣ Н.Н.Ф., телефон ва тугмаҳои тамосро мебинад.",
-    "zh-CN": "柜面会出现“您的经理”按钮。悬停或点击时客户会看到姓名、电话和联系按钮。",
-    "ar": "ستظهر في الخزانة زر «مديرك». عند التمرير أو الضغط يرى العميل الاسم والهاتف وأزرار التواصل."
+    "zh-CN": "门户会出现“您的经理”按钮。悬停或点击时客户会看到姓名、电话和联系按钮。",
+    "ar": "ستظهر في البوابة زر «مديرك». عند التمرير أو الضغط يرى العميل الاسم والهاتف وأزرار التواصل."
   },
   "manager.theCheckboxSelectsItemsToRemove": {
     "en": "The checkbox selects items to remove from the matrix. Unchecking does not remove the product.",
@@ -10578,12 +10610,12 @@ const SEEDS = {
     "ar": "في الملف — الاسم والصورة والسعر بهامشك"
   },
   "manager.thePhotoIsUploadedToThe": {
-    "en": "The photo is uploaded to the server and appears automatically in the client cabinet. JPG, PNG and WEBP up to 5 MB are squared to 800×800 on a white background (JPEG).",
+    "en": "The photo is uploaded to the server and appears automatically in the client portal. JPG, PNG and WEBP up to 5 MB are squared to 800×800 on a white background (JPEG).",
     "uz": "Foto serverga yuklanadi va mijoz kabinetida avtomatik paydo bo‘ladi. 5 MBgacha JPG, PNG va WEBP yuklashda oq fonda 800×800 kvadratga keltiriladi (JPEG).",
     "ky": "Сүрөт серверге жүктөлүп, кардар кабинетинде автоматтык пайда болот. 5 МБ чейинки JPG, PNG жана WEBP жүктөөдө ак фонда 800×800 чарчыга келтирилет (JPEG).",
     "tg": "Сурат ба сервер бор мешавад ва дар кабинети муштарӣ худкор пайдо мешавад. JPG, PNG ва WEBP то 5 МБ ҳангоми боркунӣ ба квадрати 800×800 дар заминаи сафед оварда мешаванд (JPEG).",
-    "zh-CN": "照片上传到服务器后会自动出现在客户柜面。不超过 5 MB 的 JPG、PNG、WEBP 会裁成白底 800×800 方形（JPEG）。",
-    "ar": "تُرفع الصورة إلى الخادم وتظهر تلقائياً في خزانة العميل. JPG وPNG وWEBP حتى 5 م.ب تُحوَّل عند الرفع إلى مربع 800×800 على خلفية بيضاء (JPEG)."
+    "zh-CN": "照片上传到服务器后会自动出现在客户门户。不超过 5 MB 的 JPG、PNG、WEBP 会裁成白底 800×800 方形（JPEG）。",
+    "ar": "تُرفع الصورة إلى الخادم وتظهر تلقائياً في بوابة العميل. JPG وPNG وWEBP حتى 5 م.ب تُحوَّل عند الرفع إلى مربع 800×800 على خلفية بيضاء (JPEG)."
   },
   "manager.theseTextsAppearOnThePublic": {
     "en": "These texts appear on the public product card (/vitrina, clover-spb.ru). When adding from 1C, empty fields and photos are filled automatically.",
@@ -11033,7 +11065,7 @@ const SEEDS = {
     "zh-CN": "另一台设备已开启通知。可在此手机或电脑上单独开启。",
     "ar": "الإشعارات مفعّلة بالفعل على جهاز آخر. يمكن تفعيلها على حدة على هذا الهاتف أو الحاسوب."
   },
-  "shared.notificationsCount": {
+  "manager.notifications.countLabel": {
     "en": "Notifications: {count}",
     "uz": "Bildirishnomalar: {count}",
     "ky": "Билдирмелер: {count}",
@@ -11290,12 +11322,12 @@ const SEEDS = {
     "ar": "في أسفل الشاشة اضغط الزر بمربع وسهم لأعلى (مشاركة)."
   },
   "storefront.cabinet": {
-    "en": "Cabinet",
+    "en": "Portal",
     "uz": "LK",
     "ky": "ЖК",
     "tg": "ЛК",
-    "zh-CN": "柜面",
-    "ar": "الخزانة"
+    "zh-CN": "门户",
+    "ar": "البوابة"
   },
   "storefront.call": {
     "en": "Call",
@@ -11306,11 +11338,11 @@ const SEEDS = {
     "ar": "اتصال"
   },
   "storefront.cloverIsYourPersonalCabinetOn": {
-    "en": "Clover is your personal cabinet on the website",
+    "en": "Clover is your personal account on the website",
     "uz": "Clover — saytdagi shaxsiy kabinetingiz",
     "ky": "Clover — сайттагы жеке кабинетиңиз",
     "tg": "Clover — кабинети шахсии шумо дар сайт",
-    "zh-CN": "Clover 是网站上的个人柜面",
+    "zh-CN": "Clover 是网站上的个人账户",
     "ar": "Clover هو خزانتك الشخصية على الموقع"
   },
   "storefront.cloverMobileApp": {
@@ -11330,12 +11362,12 @@ const SEEDS = {
     "ar": "يفتح Clover كتطبيق منفصل — مناسب بجانب النوافذ الأخرى."
   },
   "storefront.cloverWorksAsAPwaNo": {
-    "en": "Clover works as a PWA: no App Store or Google Play needed. Add the site to the home screen and open the cabinet with one tap.",
+    "en": "Clover works as a PWA: no App Store or Google Play needed. Add the site to the home screen and open the portal with one tap.",
     "uz": "Clover PWA sifatida ishlaydi: App Store yoki Google Play kerak emas. Saytni ekranga qo‘shing — shaxsiy kabinetni bitta teginishda oching.",
     "ky": "Clover PWA катары иштейт: App Store же Google Play керек эмес. Сайтты экранга кошуңуз — жеке кабинетти бир басуу менен ачыңыз.",
     "tg": "Clover ҳамчун PWA кор мекунад: App Store ё Google Play лозим нест. Сайтро ба экран илова кунед — кабинетро бо як пахш кушоед.",
-    "zh-CN": "Clover 以 PWA 运行：无需 App Store 或 Google Play。把网站加到主屏幕，一点即可打开柜面。",
-    "ar": "يعمل Clover كتطبيق ويب تقدّمي: لا حاجة إلى App Store أو Google Play. أضف الموقع إلى الشاشة وافتح الخزانة بلمسة."
+    "zh-CN": "Clover 以 PWA 运行：无需 App Store 或 Google Play。把网站加到主屏幕，一点即可打开门户。",
+    "ar": "يعمل Clover كتطبيق ويب تقدّمي: لا حاجة إلى App Store أو Google Play. أضف الموقع إلى الشاشة وافتح البوابة بلمسة."
   },
   "storefront.contact": {
     "en": "Contact",
@@ -11522,20 +11554,20 @@ const SEEDS = {
     "ar": "مرّر القائمة واختر «إلى الشاشة الرئيسية» → «إضافة». ستظهر أيقونة Clover على سطح المكتب."
   },
   "storefront.signInToCabinet": {
-    "en": "Sign in to cabinet",
+    "en": "Sign in to the portal",
     "uz": "LKga kirish",
     "ky": "Жеке кабинетке кирүү",
     "tg": "Даромадан ба ЛК",
-    "zh-CN": "登录个人柜面",
-    "ar": "دخول الخزانة"
+    "zh-CN": "登录个人账户",
+    "ar": "دخول البوابة"
   },
   "storefront.signInToTheCabinetOrders": {
-    "en": "Sign in to the cabinet — orders, the product matrix and delivery statuses will be at hand. Order notifications work in the installed app. The first open may take a few seconds — then it loads faster.",
+    "en": "Sign in to the portal — orders, the product matrix and delivery statuses will be at hand. Order notifications work in the installed app. The first open may take a few seconds — then it loads faster.",
     "uz": "Shaxsiy kabinetga kiring — buyurtmalar, tovar matritsasi va yetkazib berish holatlari qo‘l ostida bo‘ladi. Buyurtma bildirishnomalari o‘rnatilgan ilovada ishlaydi. Birinchi ochilish bir necha soniya olishi mumkin — keyin tezroq yuklanadi.",
     "ky": "Жеке кабинетке кириңиз — заказдар, товар матрицасы жана жеткирүү статустары колуңузда болот. Заказ билдирмелери орнотулган колдонмодо иштейт. Биринчи ачылыш бир нече секунд алышы мүмкүн — андан кийин тезирээк жүктөлөт.",
     "tg": "Ба кабинет ворид шавед — фармоишҳо, матрицаи мол ва статусҳои расонидан дар даст мешаванд. Огоҳиномаҳои фармоиш дар барномаи насбшуда кор мекунанд. Кушодани аввал метавонад чанд сония гирад — баъд барнома тезтар бор мешавад.",
-    "zh-CN": "登录柜面 — 订单、商品矩阵和配送状态都在手边。已安装应用可接收订单通知。首次打开可能需几秒，之后会更快。",
-    "ar": "ادخل إلى الخزانة — الطلبات ومصفوفة المنتجات وحالات التوصيل في متناول اليد. إشعارات الطلب تعمل في التطبيق المثبّت. قد يستغرق الفتح الأول ثوانياً — ثم يحمّل أسرع."
+    "zh-CN": "登录门户 — 订单、商品矩阵和配送状态都在手边。已安装应用可接收订单通知。首次打开可能需几秒，之后会更快。",
+    "ar": "ادخل إلى البوابة — الطلبات ومصفوفة المنتجات وحالات التوصيل في متناول اليد. إشعارات الطلب تعمل في التطبيق المثبّت. قد يستغرق الفتح الأول ثوانياً — ثم يحمّل أسرع."
   },
   "storefront.specialOffersFromInformationalMaterialsNo": {
     "en": "Special offers from КЛЕВЕР. Informational materials — no automatic price changes in the catalog or cart.",
@@ -11569,7 +11601,7 @@ const SEEDS = {
     "zh-CN": "点右上角 ⋮，选择“安装应用”、“添加到主屏幕”或“将网站安装为应用”。",
     "ar": "اضغط ⋮ أعلى اليمين واختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية» أو «تثبيت الموقع كتطبيق»."
   },
-  "storefront.text": {
+  "storefront.brand.wordmark": {
     "en": "КЛЕВЕР",
     "uz": "КЛЕВЕР",
     "ky": "КЛЕВЕР",
@@ -11586,12 +11618,12 @@ const SEEDS = {
     "ar": "السلة فارغة."
   },
   "storefront.theOrderGoesToTheManager": {
-    "en": "The order goes to the manager and can be sent to 1C from the cabinet.",
+    "en": "The order goes to the manager and can be sent to 1C from the portal.",
     "uz": "Buyurtma menejerga ketadi va LKdan 1C ga yuborilishi mumkin.",
     "ky": "Заказ менеджерге кетет жана кабинеттен 1Сге өткөрүлүшү мүмкүн.",
     "tg": "Фармоиш ба менеҷер меравад ва аз ЛК ба 1С интиқол дода мешавад.",
-    "zh-CN": "订单会交给经理，并可从柜面传到 1C。",
-    "ar": "يذهب الطلب إلى المدير ويمكن نقله إلى 1C من الخزانة."
+    "zh-CN": "订单会交给经理，并可从门户传到 1C。",
+    "ar": "يذهب الطلب إلى المدير ويمكن نقله إلى 1C من البوابة."
   },
   "storefront.total": {
     "en": "Total:",
@@ -11602,12 +11634,12 @@ const SEEDS = {
     "ar": "الإجمالي:"
   },
   "storefront.websitePricesWithoutPersonalCabinetTerms": {
-    "en": "Website prices — without personal cabinet terms.",
+    "en": "Website prices — without personal account terms.",
     "uz": "Sayt narxlari — LK shaxsiy shartlarisiz.",
     "ky": "Сайт баалары — жеке кабинеттин жеке шарттарысыз.",
     "tg": "Нархҳои сайт — бе шартҳои шахсии ЛК.",
-    "zh-CN": "网站价格 — 不含柜面个人条件。",
-    "ar": "أسعار الموقع — دون شروط الخزانة الشخصية."
+    "zh-CN": "网站价格 — 不含门户个人条件。",
+    "ar": "أسعار الموقع — دون شروط الحساب الشخصي."
   },
   "storefront.weWillContactYouToConfirm": {
     "en": ". We will contact you to confirm.",
@@ -11624,10 +11656,2585 @@ const SEEDS = {
     "tg": "Навиштан",
     "zh-CN": "写信",
     "ar": "مراسلة"
+  },
+  "manager.orderStatus.new": {
+    "en": "New",
+    "uz": "Yangi",
+    "ky": "Жаңы",
+    "tg": "Нав",
+    "zh-CN": "新建",
+    "ar": "جديد"
+  },
+  "manager.orderStatus.accepted": {
+    "en": "Accepted",
+    "uz": "Qabul qilindi",
+    "ky": "Кабыл алынды",
+    "tg": "Қабул шуд",
+    "zh-CN": "已接收",
+    "ar": "مقبول"
+  },
+  "manager.orderStatus.manual": {
+    "en": "Processed manually",
+    "uz": "Qo‘lda qayta ishlandi",
+    "ky": "Кол менен иштелди",
+    "tg": "Дастӣ коркард шуд",
+    "zh-CN": "已手动处理",
+    "ar": "عولج يدويًا"
+  },
+  "manager.orderStatus.picking": {
+    "en": "Being assembled",
+    "uz": "Yig‘ilmoqda",
+    "ky": "Жыйналууда",
+    "tg": "Ҷамъ мешавад",
+    "zh-CN": "正在配货",
+    "ar": "قيد التجميع"
+  },
+  "manager.orderStatus.ready": {
+    "en": "Ready for delivery",
+    "uz": "Yetkazishga tayyor",
+    "ky": "Жеткирүүгө даяр",
+    "tg": "Барои расондан тайёр",
+    "zh-CN": "待配送",
+    "ar": "جاهز للتسليم"
+  },
+  "manager.orderStatus.delivering": {
+    "en": "Out for delivery",
+    "uz": "Yetkazilmoqda",
+    "ky": "Жеткирилип жатат",
+    "tg": "Расонда мешавад",
+    "zh-CN": "配送中",
+    "ar": "قيد التسليم"
+  },
+  "manager.orderStatus.done": {
+    "en": "Completed",
+    "uz": "Bajarildi",
+    "ky": "Аткарылды",
+    "tg": "Иҷро шуд",
+    "zh-CN": "已完成",
+    "ar": "مكتمل"
+  },
+  "manager.orderStatus.cancelled": {
+    "en": "Cancelled",
+    "uz": "Bekor qilindi",
+    "ky": "Жокко чыгарылды",
+    "tg": "Бекор шуд",
+    "zh-CN": "已取消",
+    "ar": "ملغى"
+  },
+  "manager.customStatus.newRequest": {
+    "en": "New request",
+    "uz": "Yangi so‘rov",
+    "ky": "Жаңы сурам",
+    "tg": "Дархости нав",
+    "zh-CN": "新请求",
+    "ar": "طلب جديد"
+  },
+  "manager.customStatus.clarifying": {
+    "en": "Being clarified",
+    "uz": "Aniqlanmoqda",
+    "ky": "Такталууда",
+    "tg": "Мушаххас мешавад",
+    "zh-CN": "正在确认",
+    "ar": "قيد التوضيح"
+  },
+  "manager.customStatus.agreed": {
+    "en": "Agreed",
+    "uz": "Kelishildi",
+    "ky": "Макулдашылды",
+    "tg": "Мувофиқа шуд",
+    "zh-CN": "已协商",
+    "ar": "متفق عليه"
+  },
+  "manager.customStatus.addedToCatalog": {
+    "en": "Added to catalog",
+    "uz": "Katalogga qo‘shildi",
+    "ky": "Каталогго кошулду",
+    "tg": "Ба каталог илова шуд",
+    "zh-CN": "已加入目录",
+    "ar": "أُضيف إلى الكتالوج"
+  },
+  "manager.customStatus.rejected": {
+    "en": "Rejected",
+    "uz": "Rad etildi",
+    "ky": "Четке кагылды",
+    "tg": "Рад шуд",
+    "zh-CN": "已拒绝",
+    "ar": "مرفوض"
+  },
+  "manager.exchangeStatus.notSent": {
+    "en": "Not sent",
+    "uz": "Yuborilmagan",
+    "ky": "Жөнөтүлгөн жок",
+    "tg": "Фиристода нашудааст",
+    "zh-CN": "未发送",
+    "ar": "غير مُرسل"
+  },
+  "manager.exchangeStatus.queued": {
+    "en": "Queued for 1C transfer",
+    "uz": "1C ga yuborish navbatida",
+    "ky": "1Сга өткөрүү кезегинде",
+    "tg": "Дар навбат барои интиқол ба 1С",
+    "zh-CN": "排队待传到 1C",
+    "ar": "في قائمة الإرسال إلى 1C"
+  },
+  "manager.exchangeStatus.sending": {
+    "en": "Sending to 1C",
+    "uz": "1C ga yuborilmoqda",
+    "ky": "1Сга өткөрүлүп жатат",
+    "tg": "Ба 1С интиқол дода мешавад",
+    "zh-CN": "正在传到 1C",
+    "ar": "يُرسل إلى 1C"
+  },
+  "manager.exchangeStatus.accepted": {
+    "en": "Accepted in 1C",
+    "uz": "1C da qabul qilindi",
+    "ky": "1Сда кабыл алынды",
+    "tg": "Дар 1С қабул шуд",
+    "zh-CN": "已在 1C 接收",
+    "ar": "مقبول في 1C"
+  },
+  "manager.exchangeStatus.draft": {
+    "en": "Draft created in 1C",
+    "uz": "1C da qoralama yaratildi",
+    "ky": "1Сда долбоор түзүлдү",
+    "tg": "Сиёҳнавис дар 1С сохта шуд",
+    "zh-CN": "已在 1C 创建草稿",
+    "ar": "أُنشئ مسودة في 1C"
+  },
+  "manager.exchangeStatus.error": {
+    "en": "Failed to send",
+    "uz": "Yuborib bo‘lmadi",
+    "ky": "Өткөрүлгөн жок",
+    "tg": "Интиқол нашуд",
+    "zh-CN": "未能发送",
+    "ar": "تعذّر الإرسال"
+  },
+  "manager.notifications.titleWithCount": {
+    "en": "Notifications · {count}",
+    "uz": "Bildirishnomalar · {count}",
+    "ky": "Билдирмелер · {count}",
+    "tg": "Огоҳиномаҳо · {count}",
+    "zh-CN": "通知 · {count}",
+    "ar": "إشعارات · {count}"
+  },
+  "manager.orders.selectOrder": {
+    "en": "Select order {number}",
+    "uz": "{number} buyurtmani tanlash",
+    "ky": "{number} заказды тандоо",
+    "tg": "Интихоби фармоиш {number}",
+    "zh-CN": "选择订单 {number}",
+    "ar": "اختيار الطلب {number}"
+  },
+  "manager.orders.statusAria": {
+    "en": "Status of order {number}",
+    "uz": "{number} buyurtma holati",
+    "ky": "{number} заказдын статусу",
+    "tg": "Ҳолати фармоиш {number}",
+    "zh-CN": "订单 {number} 状态",
+    "ar": "حالة الطلب {number}"
+  },
+  "manager.orders.waitingOneCCount": {
+    "en": "Waiting for 1C transfer: {count}",
+    "uz": "1C ga yuborishni kutmoqda: {count}",
+    "ky": "1Сга өткөрүүнү күтүүдө: {count}",
+    "tg": "Интизори интиқол ба 1С: {count}",
+    "zh-CN": "等待传到 1C：{count}",
+    "ar": "بانتظار الإرسال إلى 1C: {count}"
+  },
+  "manager.orders.queuedCount": {
+    "en": "In queue: {count}",
+    "uz": "Navbatda: {count}",
+    "ky": "Кезекте: {count}",
+    "tg": "Дар навбат: {count}",
+    "zh-CN": "排队中：{count}",
+    "ar": "في القائمة: {count}"
+  },
+  "manager.orders.selectedCount": {
+    "en": "Selected: {count}",
+    "uz": "Tanlangan: {count}",
+    "ky": "Тандалган: {count}",
+    "tg": "Интихобшуда: {count}",
+    "zh-CN": "已选：{count}",
+    "ar": "المحدد: {count}"
+  },
+  "manager.orders.inTrashCount": {
+    "en": "In trash: {count}",
+    "uz": "Savatda: {count}",
+    "ky": "Себетте: {count}",
+    "tg": "Дар сабад: {count}",
+    "zh-CN": "回收站中：{count}",
+    "ar": "في المهملات: {count}"
+  },
+  "manager.acts.newRequestsCount": {
+    "en": "New requests: {count}",
+    "uz": "Yangi so‘rovlar: {count}",
+    "ky": "Жаңы сурамдар: {count}",
+    "tg": "Дархостҳои нав: {count}",
+    "zh-CN": "新请求：{count}",
+    "ar": "طلبات جديدة: {count}"
+  },
+  "manager.products.selectNamed": {
+    "en": "Select “{name}”",
+    "uz": "«{name}» ni tanlash",
+    "ky": "«{name}» тандоо",
+    "tg": "Интихоби «{name}»",
+    "zh-CN": "选择“{name}”",
+    "ar": "اختيار «{name}»"
+  },
+  "manager.products.deleteNamed": {
+    "en": "“{name}” will be removed from the Clover catalog, the website storefront, and every client matrix. Orders with this product stay unchanged.",
+    "uz": "«{name}» Clover katalogidan, sayt vitrinasidan va barcha mijoz matritsalaridan o‘chiriladi. Shu mahsulotli buyurtmalar o‘zgarmaydi.",
+    "ky": "«{name}» Clover каталогунан, сайт витринасынан жана бардык кардар матрицаларынан өчүрүлөт. Бул товар менен заказдар өзгөрбөйт.",
+    "tg": "«{name}» аз каталоги Clover, витринаи сайт ва матритсаҳои ҳамаи муштариён нест карда мешавад. Фармоишҳо бо ин мол тағйир намеёбанд.",
+    "zh-CN": "“{name}”将从 Clover 目录、网站橱窗以及所有客户矩阵中删除。含该商品的订单不变。",
+    "ar": "سيُحذف «{name}» من كتالوج Clover ومن واجهة الموقع ومن مصفوفات كل العملاء. الطلبات التي تتضمن هذا المنتج لا تتغير."
+  },
+  "manager.products.deleteCountConfirm": {
+    "en": "Really delete {count} products from the Clover catalog?",
+    "uz": "Clover katalogidan {count} ta mahsulotni o‘chirishni tasdiqlaysizmi?",
+    "ky": "Clover каталогунан {count} товарды чын эле өчүрөсүзбү?",
+    "tg": "Аз каталоги Clover {count} молро ҳақиқатан нест кунем?",
+    "zh-CN": "确定从 Clover 目录删除 {count} 件商品？",
+    "ar": "هل تريد حذف {count} من المنتجات من كتالوج Clover؟"
+  },
+  "manager.products.deletePhotoNamed": {
+    "en": "Delete the photo of “{name}”?",
+    "uz": "«{name}» mahsulot fotosuratini o‘chirish?",
+    "ky": "«{name}» товардын сүрөтүн өчүрөбүзбү?",
+    "tg": "Акси моли «{name}»-ро нест кунем?",
+    "zh-CN": "删除商品“{name}”的照片？",
+    "ar": "حذف صورة المنتج «{name}»؟"
+  },
+  "manager.products.deleteCertificateNamed": {
+    "en": "Delete the certificate of “{name}”?",
+    "uz": "«{name}» sertifikatini o‘chirish?",
+    "ky": "«{name}» сертификатын өчүрөбүзбү?",
+    "tg": "Сертификати «{name}»-ро нест кунем?",
+    "zh-CN": "删除商品“{name}”的证书？",
+    "ar": "حذف شهادة المنتج «{name}»؟"
+  },
+  "manager.clients.deleteNamed": {
+    "en": "Delete “{name}”?\n\nThe account, matrix, access log, and linked orders will be removed. This cannot be undone.",
+    "uz": "«{name}» ni o‘chirish?\n\nHisob, matritsa, kirish jurnali va bog‘langan buyurtmalar o‘chiriladi. Bu qaytarilmaydi.",
+    "ky": "«{name}» өчүрүлсүнбү?\n\nАккаунт, матрица, кирүү журналы жана байланышкан заказдар өчүрүлөт. Бул кайтарылбайт.",
+    "tg": "«{name}»-ро нест кунем?\n\nҲисоб, матритса, журнали дастрасӣ ва фармоишҳои алоқаманд нест мешаванд. Ин бебозгашт аст.",
+    "zh-CN": "删除“{name}”？\n\n将删除账号、矩阵、访问日志及相关订单。此操作不可撤销。",
+    "ar": "حذف «{name}»؟\n\nسيُحذف الحساب والمصفوفة وسجل الوصول والطلبات المرتبطة. لا يمكن التراجع."
+  },
+  "manager.exchange.failedToSend": {
+    "en": "Failed to send to 1C",
+    "uz": "1C ga yuborib bo‘lmadi",
+    "ky": "1Сга өткөрүлгөн жок",
+    "tg": "Ба 1С интиқол нашуд",
+    "zh-CN": "未能传到 1C",
+    "ar": "تعذّر الإرسال إلى 1C"
+  },
+  "auth.order.deleteForeverTitle": {
+    "en": "Permanently delete order No. {number}?",
+    "uz": "{number} buyurtmani butunlay o‘chirish?",
+    "ky": "{number} заказды түбөлүккө өчүрөбүзбү?",
+    "tg": "Фармоиши № {number}-ро абадӣ нест кунем?",
+    "zh-CN": "永久删除订单号 {number}？",
+    "ar": "حذف الطلب رقم {number} نهائيًا؟"
+  },
+  "auth.order.restoreTitle": {
+    "en": "Restore order No. {number}?",
+    "uz": "{number} buyurtmani tiklash?",
+    "ky": "{number} заказды калыбына келтиребизби?",
+    "tg": "Фармоиши № {number}-ро барқарор кунем?",
+    "zh-CN": "恢复订单号 {number}？",
+    "ar": "استعادة الطلب رقم {number}؟"
+  },
+  "auth.product.addToCatalogNamed": {
+    "en": "Product “{name}” will be added to the Clover catalog.",
+    "uz": "«{name}» mahsuloti Clover katalogiga qo‘shiladi.",
+    "ky": "«{name}» товары Clover каталогуна кошулат.",
+    "tg": "Моли «{name}» ба каталоги Clover илова мешавад.",
+    "zh-CN": "商品“{name}”将加入 Clover 目录。",
+    "ar": "سيُضاف المنتج «{name}» إلى كتالوج Clover."
+  },
+  "client.acts.readyCount": {
+    "en": "Ready statements: {count}",
+    "uz": "Tayyor aktlar: {count}",
+    "ky": "Даяр актылар: {count}",
+    "tg": "Актҳои тайёр: {count}",
+    "zh-CN": "已完成对账单：{count}",
+    "ar": "كشوف جاهزة: {count}"
+  },
+  "client.nav.notificationsCount": {
+    "en": "Notifications: {count}",
+    "uz": "Bildirishnomalar: {count}",
+    "ky": "Билдирмелер: {count}",
+    "tg": "Огоҳиномаҳо: {count}",
+    "zh-CN": "通知数：{count}",
+    "ar": "الإشعارات: {count}"
+  },
+  "client.catalog.hideSubcategories": {
+    "en": "Hide subcategories: {name}",
+    "uz": "Osttoifalarni yashirish: {name}",
+    "ky": "Подкатегорияларды жашыруу: {name}",
+    "tg": "Пинҳон кардани зеркатегорияҳо: {name}",
+    "zh-CN": "隐藏子分类：{name}",
+    "ar": "إخفاء الفئات الفرعية: {name}"
+  },
+  "client.catalog.showSubcategories": {
+    "en": "Show subcategories: {name}",
+    "uz": "Osttoifalarni ko‘rsatish: {name}",
+    "ky": "Подкатегорияларды көрсөтүү: {name}",
+    "tg": "Нишон додани зеркатегорияҳо: {name}",
+    "zh-CN": "显示子分类：{name}",
+    "ar": "إظهار الفئات الفرعية: {name}"
+  },
+  "shared.media.openPhotoNamed": {
+    "en": "Open photo: {name}",
+    "uz": "Fotosuratni ochish: {name}",
+    "ky": "Сүрөттү ачуу: {name}",
+    "tg": "Кушодани акс: {name}",
+    "zh-CN": "打开照片：{name}",
+    "ar": "فتح الصورة: {name}"
+  },
+  "auth.sync.keptOnScreen": {
+    "en": "{message}. The data will stay on screen, but the server has not saved it yet.",
+    "uz": "{message}. Ma’lumot ekranda qoladi, lekin server hozircha saqlamadi.",
+    "ky": "{message}. Маалымат экранда калат, бирок сервер азырынча сактаган жок.",
+    "tg": "{message}. Маълумот дар экран мемонад, вале сервер ҳоло онро захира накардааст.",
+    "zh-CN": "{message}。数据仍留在屏幕上，但服务器尚未保存。",
+    "ar": "{message}. ستبقى البيانات على الشاشة، لكن الخادم لم يحفظها بعد."
+  },
+  "auth.order.notSavedOnServer": {
+    "en": "{message} The order was not saved on the server — the manager will not see it.",
+    "uz": "{message} Buyurtma serverda saqlanmadi — menejer uni ko‘rmaydi.",
+    "ky": "{message} Заказ серверде сакталган жок — менеджер аны көрбөйт.",
+    "tg": "{message} Фармоиш дар сервер захира нашуд — менеҷер онро намебинад.",
+    "zh-CN": "{message} 订单未保存到服务器，经理看不到。",
+    "ar": "{message} لم يُحفظ الطلب على الخادم — لن يراه المدير."
+  },
+  "auth.order.notDeletedOnServer": {
+    "en": "{message}. The order was not deleted on the server.",
+    "uz": "{message}. Buyurtma serverda o‘chirilmadi.",
+    "ky": "{message}. Заказ серверде өчүрүлгөн жок.",
+    "tg": "{message}. Фармоиш дар сервер нест карда нашуд.",
+    "zh-CN": "{message}。服务器上的订单未被删除。",
+    "ar": "{message}. لم يُحذف الطلب على الخادم."
+  },
+  "auth.order.notDeleted": {
+    "en": "{message}. The order was not deleted.",
+    "uz": "{message}. Buyurtma o‘chirilmadi.",
+    "ky": "{message}. Заказ өчүрүлгөн жок.",
+    "tg": "{message}. Фармоиш нест карда нашуд.",
+    "zh-CN": "{message}。订单未被删除。",
+    "ar": "{message}. لم يُحذف الطلب."
+  },
+  "auth.order.notMovedToTrash": {
+    "en": "{message}. The order was not moved to the trash.",
+    "uz": "{message}. Buyurtma savatga ko‘chirilmadi.",
+    "ky": "{message}. Заказ себетке жылдырылган жок.",
+    "tg": "{message}. Фармоиш ба сабад кӯчонида нашуд.",
+    "zh-CN": "{message}。订单未移入回收站。",
+    "ar": "{message}. لم يُنقل الطلب إلى سلة المهملات."
+  },
+  "shared.address.deleteNamed": {
+    "en": "Delete address “{label}”?",
+    "uz": "«{label}» manzilini o‘chirish?",
+    "ky": "«{label}» дарегин өчүрөсүзбү?",
+    "tg": "Суроғаи «{label}»-ро нест кунем?",
+    "zh-CN": "删除地址“{label}”？",
+    "ar": "حذف العنوان «{label}»؟"
+  },
+  "admin.staff.roleUpdated": {
+    "en": "Role updated: {role}",
+    "uz": "Rol yangilandi: {role}",
+    "ky": "Рол жаңыртылды: {role}",
+    "tg": "Нақш навсозӣ шуд: {role}",
+    "zh-CN": "角色已更新：{role}",
+    "ar": "تم تحديث الدور: {role}"
+  },
+  "admin.staff.managerCreated": {
+    "en": "Manager {email} created. The password is saved in the log.",
+    "uz": "Menejer {email} yaratildi. Parol jurnalda saqlanadi.",
+    "ky": "Менеджер {email} түзүлдү. Сырсөз журналга сакталды.",
+    "tg": "Менеҷер {email} сохта шуд. Парол дар журнал захира шуд.",
+    "zh-CN": "已创建经理 {email}。密码已记入日志。",
+    "ar": "تم إنشاء المدير {email}. حُفظت كلمة المرور في السجل."
+  },
+  "admin.staff.accessClosedNamed": {
+    "en": "{email} will not be able to sign in until access is reopened.",
+    "uz": "{email} kirish yopiq bo‘lsa, kabinetga kira olmaydi.",
+    "ky": "{email} кирүү жабылганча кабинетке кире албайт.",
+    "tg": "{email} то дастрасӣ кушода нашавад, ба кабинет ворид шуда наметавонад.",
+    "zh-CN": "在重新开放访问之前，{email} 无法登录。",
+    "ar": "لن يتمكن {email} من الدخول إلى الحساب ما دام الوصول مغلقًا."
+  },
+  "admin.staff.accessOpenedNamed": {
+    "en": "{email} can sign in again.",
+    "uz": "{email} yana kira oladi.",
+    "ky": "{email} кайра кире алат.",
+    "tg": "{email} боз ворид шуда метавонад.",
+    "zh-CN": "{email} 可以再次登录。",
+    "ar": "يمكن لـ {email} تسجيل الدخول مجددًا."
+  },
+  "admin.staff.deleteForeverNamed": {
+    "en": "{email} will be deleted permanently.",
+    "uz": "{email} butunlay o‘chiriladi.",
+    "ky": "{email} кайтарылгыс өчүрүлөт.",
+    "tg": "{email} бебозгашт нест карда мешавад.",
+    "zh-CN": "{email} 将被永久删除。",
+    "ar": "سيُحذف {email} نهائيًا."
+  },
+  "admin.staff.passwordJournalCount": {
+    "en": " · {count} with a password in the log",
+    "uz": " · {count} ta parol jurnalda",
+    "ky": " · журналда сырсөзү бар: {count}",
+    "tg": " · {count} бо парол дар журнал",
+    "zh-CN": " · 日志中有密码的 {count} 个",
+    "ar": " · {count} بكلمة مرور في السجل"
+  },
+  "client.matrix.categoryCount": {
+    "en": " · category “{name}”: {count}",
+    "uz": " · toifa «{name}»: {count}",
+    "ky": " · категориясы «{name}»: {count}",
+    "tg": " · категорияи «{name}»: {count}",
+    "zh-CN": " · 分类“{name}”：{count}",
+    "ar": " · الفئة «{name}»: {count}"
+  },
+  "client.matrix.unitEqualsPieces": {
+    "en": "1 {unit} = {multiplier} pcs",
+    "uz": "1 {unit} = {multiplier} dona",
+    "ky": "1 {unit} = {multiplier} даана",
+    "tg": "1 {unit} = {multiplier} адад",
+    "zh-CN": "1 {unit} = {multiplier} 件",
+    "ar": "1 {unit} = {multiplier} قطعة"
+  },
+  "client.orders.nextDelivery": {
+    "en": " · next delivery {date}",
+    "uz": " · yaqin yetkazib berish {date}",
+    "ky": " · жакынкы жеткирүү {date}",
+    "tg": " · наздиктарин расонидан {date}",
+    "zh-CN": " · 最近一次配送 {date}",
+    "ar": " · أقرب توصيل {date}"
+  },
+  "client.orders.positionCount": {
+    "en": "{count} lines",
+    "uz": "{count} qator",
+    "ky": "{count} сап",
+    "tg": "{count} сатр",
+    "zh-CN": "{count} 行",
+    "ar": "{count} بندًا"
+  },
+  "client.orders.pieceTotal": {
+    "en": "{count} pcs total",
+    "uz": "jami {count} dona",
+    "ky": "жалпы {count} даана",
+    "tg": "ҳамагӣ {count} адад",
+    "zh-CN": "共 {count} 件",
+    "ar": "{count} قطعة إجمالًا"
+  },
+  "client.profile.helloNamed": {
+    "en": "Hello, {name}!",
+    "uz": "Salom, {name}!",
+    "ky": "Саламатсызбы, {name}!",
+    "tg": "Салом, {name}!",
+    "zh-CN": "您好，{name}！",
+    "ar": "مرحبًا، {name}!"
+  },
+  "client.order.paidDelivery.confirm": {
+    "en": "The order total is below {freeFrom}. Delivery is {fee}. Add {needMore} more for free delivery, or place the order with paid delivery.",
+    "uz": "Buyurtma summasi {freeFrom} dan kam. Yetkazib berish — {fee}. Bepul yetkazish uchun yana {needMore} qo‘shing yoki pullik yetkazish bilan rasmiylashtiring.",
+    "ky": "Заказдын суммасы {freeFrom} ден аз. Жеткирүү — {fee}. Акысыз жеткирүү үчүн дагы {needMore} кошуңуз же акы төлөнүүчү жеткирүү менен тариздеңиз.",
+    "tg": "Маблағи фармоиш аз {freeFrom} камтар аст. Расонидан — {fee}. Барои расонидани ройгон боз {needMore} илова кунед ё фармоишро бо расонидани пулакӣ бароред.",
+    "zh-CN": "订单金额低于 {freeFrom}。运费 {fee}。再添加 {needMore} 可免运费，或按付费配送下单。",
+    "ar": "مجموع الطلب أقل من {freeFrom}. التوصيل — {fee}. أضف سلعًا بقيمة {needMore} للتوصيل المجاني أو أكمل الطلب بتوصيل مدفوع."
+  },
+  "client.order.paidDelivery.confirmLabel": {
+    "en": "Place order (+{fee})",
+    "uz": "Rasmiylashtirish (+{fee})",
+    "ky": "Тариздөө (+{fee})",
+    "tg": "Барасмиятдарорӣ (+{fee})",
+    "zh-CN": "下单（+{fee}）",
+    "ar": "إتمام الطلب (+{fee})"
+  },
+  "client.order.addendum.confirmWithCount": {
+    "en": "Add {count} lines to order {orderLabel}? Date, address and comment will stay the same.",
+    "uz": "{orderLabel} buyurtmasiga {count} qator qo‘shilsinmi? Sana, manzil va izoh o‘zgarmaydi.",
+    "ky": "{orderLabel} заказына {count} сап кошулсунбу? Дата, дарек жана комментарий өзгөрбөйт.",
+    "tg": "Ба фармоиши {orderLabel} {count} сатр илова шавад? Сана, суроға ва шарҳ тағйир намеёбанд.",
+    "zh-CN": "将 {count} 行加入订单 {orderLabel}？日期、地址和备注不会改变。",
+    "ar": "إضافة {count} بندًا إلى الطلب {orderLabel}؟ لن تتغير التاريخ والعنوان والتعليق."
+  },
+  "client.order.addendum.confirm": {
+    "en": "Add items to order {orderLabel}? Date, address and comment will stay the same.",
+    "uz": "{orderLabel} buyurtmasiga qatorlar qo‘shilsinmi? Sana, manzil va izoh o‘zgarmaydi.",
+    "ky": "{orderLabel} заказына саптар кошулсунбу? Дата, дарек жана комментарий өзгөрбөйт.",
+    "tg": "Ба фармоиши {orderLabel} сатрҳо илова шаванд? Сана, суроға ва шарҳ тағйир намеёбанд.",
+    "zh-CN": "将商品加入订单 {orderLabel}？日期、地址和备注不会改变。",
+    "ar": "إضافة بنود إلى الطلب {orderLabel}؟ لن تتغير التاريخ والعنوان والتعليق."
+  },
+  "client.order.addendum.titleNumber": {
+    "en": "Add to order #{number}",
+    "uz": "№{number} buyurtmasiga qo‘shish",
+    "ky": "№{number} заказына кошуу",
+    "tg": "Ба фармоиши №{number} илова кардан",
+    "zh-CN": "加入订单 #{number}",
+    "ar": "إضافة إلى الطلب رقم {number}"
+  },
+  "shared.article.prefix": {
+    "en": "SKU {article}",
+    "uz": "Art. {article}",
+    "ky": "Код {article}",
+    "tg": "Рамзи {article}",
+    "zh-CN": "货号 {article}",
+    "ar": "رمز {article}"
+  },
+  "client.order.deliveryPaidNeedMore": {
+    "en": "The order includes a “Delivery” line — {fee}. {needMore} more for free delivery.",
+    "uz": "Buyurtmada «Yetkazib berish» qatori — {fee}. Bepul yetkazishgacha yana {needMore}.",
+    "ky": "Заказда «Жеткирүү» сабы — {fee}. Акысыз жеткирүүгө дагы {needMore}.",
+    "tg": "Дар фармоиш сатри «Расонидан» — {fee}. То ройгон боз {needMore}.",
+    "zh-CN": "订单含“配送”行 — {fee}。距免运费还差 {needMore}。",
+    "ar": "يشمل الطلب بند «التوصيل» — {fee}. يتبقى {needMore} للتوصيل المجاني."
+  },
+  "client.order.deliveryPaidAddMore": {
+    "en": "The order includes a “Delivery” line — {fee}. Add {needMore} more for free delivery.",
+    "uz": "Buyurtmada «Yetkazib berish» qatori — {fee}. Bepul yetkazish uchun yana {needMore} qo‘shing.",
+    "ky": "Заказда «Жеткирүү» сабы — {fee}. Акысыз жеткирүү үчүн дагы {needMore} кошуңуз.",
+    "tg": "Дар фармоиш сатри «Расонидан» — {fee}. Барои ройгон боз {needMore} илова кунед.",
+    "zh-CN": "订单含“配送”行 — {fee}。再添加 {needMore} 可免运费。",
+    "ar": "يشمل الطلب بند «التوصيل» — {fee}. أضف {needMore} للتوصيل المجاني."
+  },
+  "client.acts.fileName": {
+    "en": "reconciliation-{id}.pdf",
+    "uz": "akt-sverka-{id}.pdf",
+    "ky": "акт-сверка-{id}.pdf",
+    "tg": "акт-муқоиса-{id}.pdf",
+    "zh-CN": "对账单-{id}.pdf",
+    "ar": "كشف-مطابقة-{id}.pdf"
+  },
+  "manager.access.removePasswordNamed": {
+    "en": "The password for “{name}” will disappear from the log. The client account will remain.",
+    "uz": "«{name}» paroli jurnaldan yo‘qoladi. Mijoz akkaunti o‘chmaydi.",
+    "ky": "«{name}» сырсөзү журналдан жоголот. Кардар аккаунту өчпөйт.",
+    "tg": "Пароли «{name}» аз журнал нест мешавад. Ҳисоби муштарӣ нест намешавад.",
+    "zh-CN": "“{name}”的密码将从日志中消失。客户账户不会删除。",
+    "ar": "ستختفي كلمة مرور «{name}» من السجل. لن يُحذف حساب العميل."
+  },
+  "manager.access.deleteNamedWithLogin": {
+    "en": "Delete “{name}” ({login})?\n\nThe account, matrix, access log and related orders will be removed. This cannot be undone.",
+    "uz": "«{name}» ({login}) o‘chirilsinmi?\n\nAkkaunt, matritsa, kirish jurnali va bog‘liq buyurtmalar o‘chadi. Bu qaytarilmaydi.",
+    "ky": "«{name}» ({login}) өчүрүлсүнбү?\n\nАккаунт, матрица, кирүү журналы жана байланышкан заказдар өчөт. Бул кайтарылбайт.",
+    "tg": "«{name}» ({login})-ро нест кунем?\n\nҲисоб, матритса, журнали дастрасӣ ва фармоишҳои алоқаманд нест мешаванд. Ин бебозгашт аст.",
+    "zh-CN": "删除“{name}”（{login}）？\n\n将删除账户、矩阵、访问日志及相关订单。此操作不可撤销。",
+    "ar": "حذف «{name}» ({login})؟\n\nسيُحذف الحساب والمصفوفة وسجل الوصول والطلبات المرتبطة. هذا لا يمكن التراجع عنه."
+  },
+  "manager.access.noLogin": {
+    "en": "no login",
+    "uz": "loginsiz",
+    "ky": "логин жок",
+    "tg": "бе логин",
+    "zh-CN": "无登录名",
+    "ar": "بدون تسجيل دخول"
+  },
+  "manager.access.updatedAt": {
+    "en": "Updated {datetime}",
+    "uz": "Yangilangan {datetime}",
+    "ky": "Жаңыртылган {datetime}",
+    "tg": "Навсозӣ шуд {datetime}",
+    "zh-CN": "已更新 {datetime}",
+    "ar": "حُدّث {datetime}"
+  },
+  "manager.audit.clientAddresses": {
+    "en": "Client: {clientId} · addresses: {addresses}",
+    "uz": "Mijoz: {clientId} · manzillar: {addresses}",
+    "ky": "Кардар: {clientId} · даректер: {addresses}",
+    "tg": "Муштарӣ: {clientId} · суроғаҳо: {addresses}",
+    "zh-CN": "客户：{clientId} · 地址数：{addresses}",
+    "ar": "العميل: {clientId} · العناوين: {addresses}"
+  },
+  "manager.audit.clientAddressesEmailChanged": {
+    "en": "Client: {clientId} · addresses: {addresses} · sign-in email changed",
+    "uz": "Mijoz: {clientId} · manzillar: {addresses} · kirish emaili o‘zgardi",
+    "ky": "Кардар: {clientId} · даректер: {addresses} · кирүү email’и өзгөрдү",
+    "tg": "Муштарӣ: {clientId} · суроғаҳо: {addresses} · email-и вуруд тағйир ёфт",
+    "zh-CN": "客户：{clientId} · 地址数：{addresses} · 登录邮箱已更改",
+    "ar": "العميل: {clientId} · العناوين: {addresses} · تغيّر بريد الدخول"
+  },
+  "manager.audit.productMatrices": {
+    "en": "Product: {name} · matrices: {count}",
+    "uz": "Mahsulot: {name} · matritsalar: {count}",
+    "ky": "Товар: {name} · матрицалар: {count}",
+    "tg": "Мол: {name} · матритсаҳо: {count}",
+    "zh-CN": "商品：{name} · 矩阵：{count}",
+    "ar": "المنتج: {name} · المصفوفات: {count}"
+  },
+  "manager.audit.backupFallback": {
+    "en": "Backup",
+    "uz": "Zaxira nusxa",
+    "ky": "Запас көчүрмө",
+    "tg": "Нусхаи захиравӣ",
+    "zh-CN": "备份",
+    "ar": "نسخة احتياطية"
+  },
+  "manager.audit.backupWithPhotos": {
+    "en": "{reason} · photos: {photoCount}",
+    "uz": "{reason} · fotosuratlar: {photoCount}",
+    "ky": "{reason} · сүрөттөр: {photoCount}",
+    "tg": "{reason} · аксҳо: {photoCount}",
+    "zh-CN": "{reason} · 照片：{photoCount}",
+    "ar": "{reason} · الصور: {photoCount}"
+  },
+  "manager.audit.backupRestored": {
+    "en": "File: {fileName} · photos restored: {count}",
+    "uz": "Fayl: {fileName} · tiklangan fotosuratlar: {count}",
+    "ky": "Файл: {fileName} · калыбына келтирилген сүрөттөр: {count}",
+    "tg": "Файл: {fileName} · аксҳои барқароршуда: {count}",
+    "zh-CN": "文件：{fileName} · 已恢复照片：{count}",
+    "ar": "الملف: {fileName} · الصور المستعادة: {count}"
+  },
+  "manager.audit.backupCopyFallback": {
+    "en": "copy",
+    "uz": "nusxa",
+    "ky": "көчүрмө",
+    "tg": "нусха",
+    "zh-CN": "副本",
+    "ar": "نسخة"
+  },
+  "manager.audit.backupCleanup": {
+    "en": "Copies removed: {removed} · remaining: {remaining}",
+    "uz": "O‘chirilgan nusxalar: {removed} · qoldi: {remaining}",
+    "ky": "Өчүрүлгөн көчүрмөлөр: {removed} · калды: {remaining}",
+    "tg": "Нусхаҳои нестшуда: {removed} · монд: {remaining}",
+    "zh-CN": "已删除副本：{removed} · 剩余：{remaining}",
+    "ar": "النسخ المحذوفة: {removed} · المتبقي: {remaining}"
+  },
+  "manager.audit.orderReady": {
+    "en": "Order #{number} · ready to send",
+    "uz": "Buyurtma № {number} · yuborishga tayyor",
+    "ky": "Заказ № {number} · өткөрүүгө даяр",
+    "tg": "Фармоиш № {number} · барои интиқол тайёр",
+    "zh-CN": "订单 #{number} · 可发送",
+    "ar": "الطلب رقم {number} · جاهز للإرسال"
+  },
+  "manager.audit.orderIssues": {
+    "en": "Order #{number} · errors: {count}",
+    "uz": "Buyurtma № {number} · xatolar: {count}",
+    "ky": "Заказ № {number} · каталар: {count}",
+    "tg": "Фармоиш № {number} · хатоҳо: {count}",
+    "zh-CN": "订单 #{number} · 错误：{count}",
+    "ar": "الطلب رقم {number} · الأخطاء: {count}"
+  },
+  "manager.audit.orderReceipt": {
+    "en": "Order #{number} · Customer order: {receipt}",
+    "uz": "Buyurtma № {number} · Xaridor buyurtmasi: {receipt}",
+    "ky": "Заказ № {number} · Сатып алуучунун заказы: {receipt}",
+    "tg": "Фармоиш № {number} · Фармоиши харидор: {receipt}",
+    "zh-CN": "订单 #{number} · 客户订单：{receipt}",
+    "ar": "الطلب رقم {number} · طلب المشتري: {receipt}"
+  },
+  "manager.audit.orderFormat": {
+    "en": "Order #{number} · format: {format}",
+    "uz": "Buyurtma № {number} · format: {format}",
+    "ky": "Заказ № {number} · форматы: {format}",
+    "tg": "Фармоиш № {number} · формат: {format}",
+    "zh-CN": "订单 #{number} · 格式：{format}",
+    "ar": "الطلب رقم {number} · التنسيق: {format}"
+  },
+  "manager.audit.batchFormat": {
+    "en": "Format: {format} · orders: {count}",
+    "uz": "Format: {format} · buyurtmalar: {count}",
+    "ky": "Формат: {format} · заказдар: {count}",
+    "tg": "Формат: {format} · фармоишҳо: {count}",
+    "zh-CN": "格式：{format} · 订单：{count}",
+    "ar": "التنسيق: {format} · الطلبات: {count}"
+  },
+  "manager.audit.exchangeConfig": {
+    "en": "Mode: {mode} · address: {address}",
+    "uz": "Rejim: {mode} · manzil: {address}",
+    "ky": "Режим: {mode} · дарек: {address}",
+    "tg": "Режим: {mode} · суроға: {address}",
+    "zh-CN": "模式：{mode} · 地址：{address}",
+    "ar": "الوضع: {mode} · العنوان: {address}"
+  },
+  "manager.audit.modeReal": {
+    "en": "live 1C",
+    "uz": "haqiqiy 1C",
+    "ky": "чыныгы 1С",
+    "tg": "1С-и воқеӣ",
+    "zh-CN": "真实 1C",
+    "ar": "1C حقيقي"
+  },
+  "manager.audit.addressFilled": {
+    "en": "filled",
+    "uz": "to‘ldirilgan",
+    "ky": "толтурулган",
+    "tg": "пур карда шудааст",
+    "zh-CN": "已填写",
+    "ar": "مملوء"
+  },
+  "manager.audit.addressEmpty": {
+    "en": "not filled",
+    "uz": "to‘ldirilmagan",
+    "ky": "толтурулган эмес",
+    "tg": "пур карда нашудааст",
+    "zh-CN": "未填写",
+    "ar": "غير مملوء"
+  },
+  "manager.audit.connectionOk": {
+    "en": "{mode} — {detail}",
+    "uz": "{mode} — {detail}",
+    "ky": "Жыйынтык: {mode} · {detail}",
+    "tg": "Натиҷа: {mode} · {detail}",
+    "zh-CN": "结果：{mode} · {detail}",
+    "ar": "النتيجة: {mode} · {detail}"
+  },
+  "manager.audit.modeRealTitle": {
+    "en": "Live 1C",
+    "uz": "Haqiqiy 1C",
+    "ky": "Чыныгы 1С",
+    "tg": "1С-и воқеӣ",
+    "zh-CN": "真实 1C",
+    "ar": "1C حقيقي"
+  },
+  "manager.audit.modeSimulatorTitle": {
+    "en": "Simulator",
+    "uz": "Simulyator",
+    "ky": "Тууралоочу",
+    "tg": "Тақлидгар",
+    "zh-CN": "模拟器",
+    "ar": "المحاكي"
+  },
+  "manager.audit.connectionChecked": {
+    "en": "connection checked",
+    "uz": "ulanish tekshirildi",
+    "ky": "туташуу текшерилди",
+    "tg": "пайваст санҷида шуд",
+    "zh-CN": "已检查连接",
+    "ar": "تم فحص الاتصال"
+  },
+  "manager.audit.catalogPreview": {
+    "en": "{type} · records: {count}",
+    "uz": "{type} · yozuvlar: {count}",
+    "ky": "{type} · жазуулар: {count}",
+    "tg": "{type} · сабтҳо: {count}",
+    "zh-CN": "{type} · 记录：{count}",
+    "ar": "{type} · السجلات: {count}"
+  },
+  "manager.audit.catalogError": {
+    "en": "{type} — {message}",
+    "uz": "{type} — {message}",
+    "ky": "Ката: {type} · {message}",
+    "tg": "Хато: {type} · {message}",
+    "zh-CN": "错误：{type} · {message}",
+    "ar": "خطأ: {type} · {message}"
+  },
+  "manager.audit.directory": {
+    "en": "Catalog",
+    "uz": "Ma’lumotnoma",
+    "ky": "Маалымдама",
+    "tg": "Маълумотнома",
+    "zh-CN": "目录",
+    "ar": "الدليل"
+  },
+  "manager.audit.errorWord": {
+    "en": "error",
+    "uz": "xato",
+    "ky": "ката",
+    "tg": "хато",
+    "zh-CN": "错误",
+    "ar": "خطأ"
+  },
+  "manager.audit.nomenclatureReceived": {
+    "en": "Received: {received} · new links: {newlyLinked} · unmatched: {unmatched}",
+    "uz": "Qabul qilindi: {received} · yangi bog‘lanishlar: {newlyLinked} · mos kelmagan: {unmatched}",
+    "ky": "Алынды: {received} · жаңы байланыштар: {newlyLinked} · дал келбеген: {unmatched}",
+    "tg": "Гирифта шуд: {received} · пайвандҳои нав: {newlyLinked} · бе мувофиқат: {unmatched}",
+    "zh-CN": "已收到：{received} · 新关联：{newlyLinked} · 未匹配：{unmatched}",
+    "ar": "المستلم: {received} · روابط جديدة: {newlyLinked} · بلا تطابق: {unmatched}"
+  },
+  "manager.audit.autoLinkSummary": {
+    "en": "Clover products: {cloverTotal} · linked: {linked} · new links: {newlyLinked}",
+    "uz": "Clover mahsulotlari: {cloverTotal} · bog‘langan: {linked} · yangi bog‘lanishlar: {newlyLinked}",
+    "ky": "Clover товарлары: {cloverTotal} · байланышкан: {linked} · жаңы байланыштар: {newlyLinked}",
+    "tg": "Молҳои Clover: {cloverTotal} · пайваст: {linked} · пайвандҳои нав: {newlyLinked}",
+    "zh-CN": "Clover 商品：{cloverTotal} · 已关联：{linked} · 新关联：{newlyLinked}",
+    "ar": "منتجات Clover: {cloverTotal} · المرتبطة: {linked} · روابط جديدة: {newlyLinked}"
+  },
+  "manager.audit.draftCreated": {
+    "en": "Order #{number} · document {document} · {mode}",
+    "uz": "Buyurtma № {number} · hujjat {document} · {mode}",
+    "ky": "Заказ № {number} · документи {document} · {mode}",
+    "tg": "Фармоиш № {number} · ҳуҷҷат {document} · {mode}",
+    "zh-CN": "订单 #{number} · 单据 {document} · {mode}",
+    "ar": "الطلب رقم {number} · المستند {document} · {mode}"
+  },
+  "manager.audit.documentCreated": {
+    "en": "created",
+    "uz": "yaratildi",
+    "ky": "түзүлдү",
+    "tg": "сохта шуд",
+    "zh-CN": "已创建",
+    "ar": "تم الإنشاء"
+  },
+  "manager.audit.orderError": {
+    "en": "Order #{number} · {message}",
+    "uz": "Buyurtma № {number} · {message}",
+    "ky": "Заказ номери {number} · {message}",
+    "tg": "Фармоиш № {number} · {message}",
+    "zh-CN": "订单 #{number} · {message}",
+    "ar": "الطلب رقم {number} · {message}"
+  },
+  "shared.fileSize.bytes": {
+    "en": "{bytes} B",
+    "uz": "{bytes} B",
+    "ky": "{bytes} байт",
+    "tg": "{bytes} байт",
+    "zh-CN": "{bytes} 字节",
+    "ar": "{bytes} بايت"
+  },
+  "shared.fileSize.kilobytes": {
+    "en": "{value} KB",
+    "uz": "{value} KB",
+    "ky": "{value} килобайт",
+    "tg": "{value} килобайт",
+    "zh-CN": "{value} 千字节",
+    "ar": "{value} كيلوبايت"
+  },
+  "shared.fileSize.megabytes": {
+    "en": "{value} MB",
+    "uz": "{value} MB",
+    "ky": "{value} мегабайт",
+    "tg": "{value} мегабайт",
+    "zh-CN": "{value} 兆字节",
+    "ar": "{value} ميغابايت"
+  },
+  "manager.backup.removedOld": {
+    "en": "Old copies removed: {count}.",
+    "uz": "Eski nusxalar o‘chirildi: {count}.",
+    "ky": "Эски көчүрмөлөр өчүрүлдү: {count}.",
+    "tg": "Нусхаҳои кӯҳна нест шуданд: {count}.",
+    "zh-CN": "已删除旧副本：{count}。",
+    "ar": "تم حذف النسخ القديمة: {count}."
+  },
+  "manager.backup.restoreConfirmNamed": {
+    "en": "Restore data from copy “{fileName}”? The server will automatically create a safety copy first.",
+    "uz": "«{fileName}» nusxasidan ma’lumot tiklansinmi? Tiklashdan oldin server avtomatik zahira nusxa yaratadi.",
+    "ky": "«{fileName}» көчүрмөсүнөн маалымат калыбына келтирилсинби? Калыбына келтирүүдөн мурун сервер автоматтык коопсуздук көчүрмөсүн түзөт.",
+    "tg": "Маълумот аз нусхаи «{fileName}» барқарор шавад? Пеш аз барқарорсозӣ сервер худкор нусхаи эҳтиётӣ месозад.",
+    "zh-CN": "从副本“{fileName}”恢复数据？恢复前服务器会自动创建安全副本。",
+    "ar": "استعادة البيانات من النسخة «{fileName}»؟ سينشئ الخادم نسخة أمان تلقائيًا قبل الاستعادة."
+  },
+  "manager.backup.fullCopyPhotos": {
+    "en": "full copy, photos: {count}",
+    "uz": "to‘liq nusxa, fotosuratlar: {count}",
+    "ky": "толук көчүрмө, сүрөттөр: {count}",
+    "tg": "нусхаи пурра, аксҳо: {count}",
+    "zh-CN": "完整副本，照片：{count}",
+    "ar": "نسخة كاملة، الصور: {count}"
+  },
+  "manager.products.saveFailedNamed": {
+    "en": "Could not save the product: {message}",
+    "uz": "Mahsulot saqlanmadi: {message}",
+    "ky": "Товар сакталган жок: {message}",
+    "tg": "Мол захира нашуд: {message}",
+    "zh-CN": "无法保存商品：{message}",
+    "ar": "تعذّر حفظ المنتج: {message}"
+  },
+  "manager.clients.fixedPriceMissing": {
+    "en": "“{name}” is set to a fixed price, but the amount is missing. Enter a price or switch back to “By matrix”.",
+    "uz": "«{name}» uchun belgilangan narx tanlangan, lekin summa yo‘q. Narx kiriting yoki «Matritsa bo‘yicha» ga qayting.",
+    "ky": "«{name}» үчүн белгиленген баа тандалган, бирок сумма жок. Бааны киргизиңиз же «Матрица боюнча» кайтыңыз.",
+    "tg": "Барои «{name}» нархи собит интихоб шудааст, вале маблағ нест. Нархро ворид кунед ё «Аз рӯи матритса»-ро баргардонед.",
+    "zh-CN": "“{name}”已选固定价，但未填写金额。请输入价格或改回“按矩阵”。",
+    "ar": "تم اختيار سعر ثابت لـ «{name}» دون مبلغ. أدخل السعر أو أعد «حسب المصفوفة»."
+  },
+  "manager.clients.markupPercent": {
+    "en": "Markup {percent}%",
+    "uz": "Ustama {percent}%",
+    "ky": "Үстөк {percent}%",
+    "tg": "Надбавка {percent}%",
+    "zh-CN": "加价 {percent}%",
+    "ar": "هامش {percent}%"
+  },
+  "manager.clients.matrixProductCount": {
+    "en": "Products in the matrix: {count}",
+    "uz": "Matritsadagi mahsulotlar: {count}",
+    "ky": "Матрицадагы товарлар: {count}",
+    "tg": "Молҳо дар матритса: {count}",
+    "zh-CN": "矩阵中的商品：{count}",
+    "ar": "المنتجات في المصفوفة: {count}"
+  },
+  "manager.clients.matrixSelectedCount": {
+    "en": "In the matrix: {count}",
+    "uz": "Matritsada: {count}",
+    "ky": "Матрицада: {count}",
+    "tg": "Дар матритса: {count}",
+    "zh-CN": "矩阵中：{count}",
+    "ar": "في المصفوفة: {count}"
+  },
+  "manager.clients.categoryPricePlaceholder": {
+    "en": "Category: {price}",
+    "uz": "Toifa: {price}",
+    "ky": "Категория баасы: {price}",
+    "tg": "Нархи категория: {price}",
+    "zh-CN": "分类：{price}",
+    "ar": "الفئة: {price}"
+  },
+  "manager.clients.catalogPricePlaceholder": {
+    "en": "Price: {price}",
+    "uz": "Narx: {price}",
+    "ky": "Баа: {price}",
+    "tg": "Нарх: {price}",
+    "zh-CN": "价格：{price}",
+    "ar": "السعر: {price}"
+  },
+  "manager.exchange.prodEnabledDatabases": {
+    "en": "prod enabled · databases {databases}",
+    "uz": "prod yoqilgan · bazalar {databases}",
+    "ky": "prod күйгүзүлгөн · базалар {databases}",
+    "tg": "prod фаъол · пойгоҳҳо {databases}",
+    "zh-CN": "prod 已启用 · 数据库 {databases}",
+    "ar": "prod مفعّل · قواعد {databases}"
+  },
+  "manager.exchange.databaseName": {
+    "en": " · database {database}",
+    "uz": " · baza {database}",
+    "ky": " · маалымат базасы {database}",
+    "tg": " · пойгоҳ {database}",
+    "zh-CN": " · 数据库 {database}",
+    "ar": " · قاعدة {database}"
+  },
+  "manager.exchange.extensionVersion": {
+    "en": " · extension {version}",
+    "uz": " · kengaytma {version}",
+    "ky": " · кеңейтме {version}",
+    "tg": " · васеъшавӣ {version}",
+    "zh-CN": " · 扩展 {version}",
+    "ar": " · إضافة {version}"
+  },
+  "manager.exchange.articleNamed": {
+    "en": " · SKU {article}",
+    "uz": " · artikul {article}",
+    "ky": " · код {article}",
+    "tg": " · рамзи {article}",
+    "zh-CN": " · 货号 {article}",
+    "ar": " · الرمز {article}"
+  },
+  "manager.exchange.innNamed": {
+    "en": " · Tax ID {inn}",
+    "uz": " · INN {inn}",
+    "ky": " · салык ID {inn}",
+    "tg": " · рамзи андоз {inn}",
+    "zh-CN": " · 税号 {inn}",
+    "ar": " · الرقم الضريبي {inn}"
+  },
+  "manager.exchange.unmatchedCounts": {
+    "en": "Unmatched clients: {clients} · products: {products}",
+    "uz": "Mos kelmagan mijozlar: {clients} · mahsulotlar: {products}",
+    "ky": "Дал келбеген кардарлар: {clients} · товарлар: {products}",
+    "tg": "Муштариёни бе мувофиқат: {clients} · молҳо: {products}",
+    "zh-CN": "未匹配客户：{clients} · 商品：{products}",
+    "ar": "عملاء بلا مطابقة: {clients} · منتجات: {products}"
+  },
+  "manager.exchange.errorCount": {
+    "en": "{count} errors",
+    "uz": "{count} ta xato",
+    "ky": "{count} ката",
+    "tg": "{count} хато",
+    "zh-CN": "{count} 个错误",
+    "ar": "{count} أخطاء"
+  },
+  "manager.orders.cancelTransferCount": {
+    "en": "Transfer will be cancelled for {count} order(s). The button will become “Send to 1C” again.",
+    "uz": "{count} ta buyurtma uchun yuborish bekor qilinadi. Tugma yana «1C ga yuborish» bo‘ladi.",
+    "ky": "{count} заказ үчүн өткөрүү жокко чыгарылат. Баскыч кайра «1Сга өткөрүү» болот.",
+    "tg": "Интиқол барои {count} фармоиш бекор мешавад. Тугма боз «Ба 1С фиристодан» мешавад.",
+    "zh-CN": "将取消 {count} 个订单的传送。按钮会重新变为“传到 1C”。",
+    "ar": "سيُلغى الإرسال لـ {count} من الطلبات. سيصبح الزر «إرسال إلى 1C» مجددًا."
+  },
+  "manager.orders.alreadyAllStatus": {
+    "en": "All selected orders are already in status “{status}”.",
+    "uz": "Tanlangan barcha buyurtmalar allaqachon «{status}» holatida.",
+    "ky": "Тандалган бардык заказдар мурунтан «{status}» статусунда.",
+    "tg": "Ҳамаи фармоишҳои интихобшуда аллакай дар ҳолати «{status}» ҳастанд.",
+    "zh-CN": "所选订单已全部处于“{status}”状态。",
+    "ar": "كل الطلبات المحددة موجودة أصلًا في الحالة «{status}»."
+  },
+  "manager.orders.bulkUnavailable": {
+    "en": "Status “{status}” is not available for the selected orders. Already in this status: {unchanged}. Cannot change: {blocked}.",
+    "uz": "«{status}» holati tanlangan buyurtmalar uchun mavjud emas. Allaqachon shu holatda: {unchanged}. O‘zgartirib bo‘lmaydi: {blocked}.",
+    "ky": "«{status}» статусу тандалган заказдарга жеткиликсиз. Буга чейин ушул статуста: {unchanged}. Алмаштырууга болбойт: {blocked}.",
+    "tg": "Ҳолати «{status}» барои фармоишҳои интихобшуда дастрас нест. Аллакай дар ин ҳолат: {unchanged}. Иваз кардан мумкин нест: {blocked}.",
+    "zh-CN": "所选订单无法使用状态“{status}”。已是该状态：{unchanged}。无法更改：{blocked}。",
+    "ar": "الحالة «{status}» غير متاحة للطلبات المحددة. موجودة أصلًا في هذه الحالة: {unchanged}. لا يمكن التغيير: {blocked}."
+  },
+  "manager.orders.bulkQueued": {
+    "en": "To update: {updated}. Already in this status: {unchanged}. Cannot change: {blocked}.",
+    "uz": "Yangilanadigan: {updated}. Allaqachon shu holatda: {unchanged}. O‘zgartirib bo‘lmaydi: {blocked}.",
+    "ky": "Жаңыртууга: {updated}. Буга чейин ушул статуста: {unchanged}. Алмаштырууга болбойт: {blocked}.",
+    "tg": "Ба навсозӣ: {updated}. Аллакай дар ин ҳолат: {unchanged}. Иваз кардан мумкин нест: {blocked}.",
+    "zh-CN": "待更新：{updated}。已是该状态：{unchanged}。无法更改：{blocked}。",
+    "ar": "للتحديث: {updated}. موجودة أصلًا في هذه الحالة: {unchanged}. لا يمكن التغيير: {blocked}."
+  },
+  "manager.orders.bulkPartialResult": {
+    "en": "Updated: {updated}. Already in this status: {unchanged}. Cannot change: {blocked}.",
+    "uz": "Yangilandi: {updated}. Allaqachon shu holatda: {unchanged}. O‘zgartirib bo‘lmaydi: {blocked}.",
+    "ky": "Жаңыртылды: {updated}. Буга чейин ушул статуста: {unchanged}. Алмаштырууга болбойт: {blocked}.",
+    "tg": "Навсозӣ шуд: {updated}. Аллакай дар ин ҳолат: {unchanged}. Иваз кардан мумкин нест: {blocked}.",
+    "zh-CN": "已更新：{updated}。已是该状态：{unchanged}。无法更改：{blocked}。",
+    "ar": "تم التحديث: {updated}. موجودة أصلًا في هذه الحالة: {unchanged}. لا يمكن التغيير: {blocked}."
+  },
+  "manager.orders.detailsCount": {
+    "en": "Details ({count})",
+    "uz": "Tafsilotlar ({count})",
+    "ky": "Чоо-жайы ({count})",
+    "tg": "Тафсилот ({count})",
+    "zh-CN": "详细信息（{count}）",
+    "ar": "التفاصيل ({count})"
+  },
+  "manager.orders.deletedByRole": {
+    "en": " · deleted by: {role}",
+    "uz": " · o‘chirdi: {role}",
+    "ky": " · өчүргөн: {role}",
+    "tg": " · нест кард: {role}",
+    "zh-CN": " · 删除人：{role}",
+    "ar": " · حذفه: {role}"
+  },
+  "manager.orders.customerOrderReceipt": {
+    "en": " · Customer order {receipt}",
+    "uz": " · Xaridor buyurtmasi {receipt}",
+    "ky": " · Сатып алуучунун заказы {receipt}",
+    "tg": " · Фармоиши харидор {receipt}",
+    "zh-CN": " · 客户订单 {receipt}",
+    "ar": " · طلب المشتري {receipt}"
+  },
+  "manager.products.autoLinkedCount": {
+    "en": "Products linked automatically: {count}.",
+    "uz": "Avtomatik bog‘langan mahsulotlar: {count}.",
+    "ky": "Автоматтык байланышкан товарлар: {count}.",
+    "tg": "Молҳои худкор пайвастшуда: {count}.",
+    "zh-CN": "已自动关联商品：{count}。",
+    "ar": "المنتجات المرتبطة تلقائيًا: {count}."
+  },
+  "manager.products.deleteEntireCatalog": {
+    "en": "The entire catalog ({count} lines) will be removed from the website storefront and client matrices. This is not an Excel undo or file upload. Orders stay unchanged.",
+    "uz": "Butun katalog ({count} qator) sayt vitrinasi va mijoz matritsalaridan o‘chiriladi. Bu Excel bekor qilish yoki fayl yuklash emas. Buyurtmalar o‘zgarmaydi.",
+    "ky": "Бүт каталог ({count} сап) сайт витринасынан жана кардар матрицаларынан өчүрүлөт. Бул Excel жокко чыгаруу же файл жүктөө эмес. Заказдар өзгөрбөйт.",
+    "tg": "Тамоми каталог ({count} сатр) аз витринаи сайт ва матритсаҳои муштарӣ нест мешавад. Ин бекоркунии Excel ё боркунии файл нест. Фармоишҳо тағйир намеёбанд.",
+    "zh-CN": "将删除整个目录（{count} 行）：从网站橱窗和客户矩阵中移除。这不是撤销 Excel 或上传文件。订单不变。",
+    "ar": "سيُحذف الكتالوج بالكامل ({count} بندًا) من واجهة الموقع ومصفوفات العملاء. هذا ليس تراجع Excel ولا رفع ملف. الطلبات لا تتغير."
+  },
+  "manager.products.deleteSelectedCount": {
+    "en": "{count} will be removed from the Clover catalog, website storefront and client matrices. Orders with these products stay unchanged.",
+    "uz": "Clover katalogi, sayt vitrinasi va mijoz matritsalaridan o‘chiriladi: {count}. Shu mahsulotli buyurtmalar o‘zgarmaydi.",
+    "ky": "Clover каталогунан, сайт витринасынан жана кардар матрицаларынан өчүрүлөт: {count}. Бул товарлар менен заказдар өзгөрбөйт.",
+    "tg": "Аз каталоги Clover, витринаи сайт ва матритсаҳои муштарӣ нест мешавад: {count}. Фармоишҳо бо ин молҳо тағйир намеёбанд.",
+    "zh-CN": "将从 Clover 目录、网站橱窗和客户矩阵中删除 {count} 项。含这些商品的订单不变。",
+    "ar": "سيُحذف من كتالوج Clover وواجهة الموقع ومصفوفات العملاء: {count}. الطلبات بهذه المنتجات لا تتغير."
+  },
+  "manager.products.addedToCatalogNamed": {
+    "en": "To catalog: “{name}”.",
+    "uz": "Katalogga: «{name}».",
+    "ky": "Каталогго: «{name}».",
+    "tg": "Ба каталог: «{name}».",
+    "zh-CN": "已加入目录：“{name}”。",
+    "ar": "إلى الكتالوج: «{name}»."
+  },
+  "manager.products.addedToCatalogFromExcel": {
+    "en": "To catalog from Excel: {count} lines.",
+    "uz": "Excel’dan katalogga: {count} qator.",
+    "ky": "Excel’dен каталогго: {count} сап.",
+    "tg": "Аз Excel ба каталог: {count} сатр.",
+    "zh-CN": "从 Excel 加入目录：{count} 行。",
+    "ar": "إلى الكتالوج من Excel: {count} بندًا."
+  },
+  "manager.products.oneCArticleCode": {
+    "en": "1C SKU: {code}",
+    "uz": "1C artikuli: {code}",
+    "ky": "1С артикулу: {code}",
+    "tg": "Артикули 1С: {code}",
+    "zh-CN": "1C 货号：{code}",
+    "ar": "رمز 1C: {code}"
+  },
+  "manager.acts.deleteConfirm": {
+    "en": "Request “{period}” for {client} will be deleted forever — for the manager and in the client portal.",
+    "uz": "«{period}» so‘rovi {client} uchun butunlay o‘chiriladi — menejerda ham, mijoz kabinetida ham.",
+    "ky": "«{period}» сурамы {client} үчүн түбөлүккө өчүрүлөт — менеджерде да, кардар кабинетинде да.",
+    "tg": "Дархости «{period}» барои {client} ҳамеша нест мешавад — ҳам дар менеҷер, ҳам дар кабинети муштарӣ.",
+    "zh-CN": "将永久删除 {client} 的“{period}”请求 — 经理端和客户门户都会删除。",
+    "ar": "سيُحذف طلب «{period}» لـ {client} نهائيًا — لدى المدير وفي حساب العميل."
+  },
+  "manager.acts.deleteConfirmWithPdf": {
+    "en": "Request “{period}” for {client} will be deleted forever — for the manager and in the client portal. The PDF will also be removed from the server.",
+    "uz": "«{period}» so‘rovi {client} uchun butunlay o‘chiriladi — menejerda ham, mijoz kabinetida ham. PDF ham serverdan o‘chiriladi.",
+    "ky": "«{period}» сурамы {client} үчүн түбөлүккө өчүрүлөт — менеджерде да, кардар кабинетинде да. PDF да серверден өчүрүлөт.",
+    "tg": "Дархости «{period}» барои {client} ҳамеша нест мешавад — ҳам дар менеҷер, ҳам дар кабинети муштарӣ. Файли PDF низ аз сервер нест мешавад.",
+    "zh-CN": "将永久删除 {client} 的“{period}”请求 — 经理端和客户门户都会删除。PDF 也会从服务器删除。",
+    "ar": "سيُحذف طلب «{period}» لـ {client} نهائيًا — لدى المدير وفي حساب العميل. سيُحذف ملف PDF من الخادم أيضًا."
+  },
+  "manager.settings.sentCount": {
+    "en": "Sent: {count}",
+    "uz": "Yuborildi: {count}",
+    "ky": "Жөнөтүлдү: {count}",
+    "tg": "Фиристода шуд: {count}",
+    "zh-CN": "已发送：{count}",
+    "ar": "أُرسل: {count}"
+  },
+  "manager.settings.channelSent": {
+    "en": "{channel}: sent",
+    "uz": "{channel}: yuborildi",
+    "ky": "{channel}: жөнөтүлдү",
+    "tg": "{channel}: фиристода шуд",
+    "zh-CN": "{channel}：已发送",
+    "ar": "{channel}: أُرسل"
+  },
+  "manager.settings.mailSentTo": {
+    "en": "The email was sent to {email}. {summary}",
+    "uz": "Xat {email} manziliga ketdi. {summary}",
+    "ky": "Кат {email} дарегине жөнөтүлдү. {summary}",
+    "tg": "Нома ба {email} рафт. {summary}",
+    "zh-CN": "邮件已发往 {email}。{summary}",
+    "ar": "أُرسل البريد إلى {email}. {summary}"
+  },
+  "manager.settings.namedAddressFallback": {
+    "en": "the specified address",
+    "uz": "ko‘rsatilgan manzil",
+    "ky": "көрсөтүлгөн дарек",
+    "tg": "суроғаи зикршуда",
+    "zh-CN": "指定地址",
+    "ar": "العنوان المحدد"
+  },
+  "manager.settings.defaultValue": {
+    "en": "Default: {value}",
+    "uz": "Standart: {value}",
+    "ky": "Демейки: {value}",
+    "tg": "Пешфарз: {value}",
+    "zh-CN": "默认：{value}",
+    "ar": "الافتراضي: {value}"
+  },
+  "manager.storefront.addedCount": {
+    "en": "Added to the storefront: {count}.",
+    "uz": "Vitrinaga qo‘shildi: {count}.",
+    "ky": "Витринага кошулду: {count}.",
+    "tg": "Ба витрина илова шуд: {count}.",
+    "zh-CN": "已加入橱窗：{count}。",
+    "ar": "أُضيف إلى الواجهة: {count}."
+  },
+  "manager.storefront.removedCount": {
+    "en": "Removed from the storefront: {count}.",
+    "uz": "Vitrinadan olindi: {count}.",
+    "ky": "Витринадан алынды: {count}.",
+    "tg": "Аз витрина гирифта шуд: {count}.",
+    "zh-CN": "已从橱窗移除：{count}。",
+    "ar": "أُزيل من الواجهة: {count}."
+  },
+  "manager.storefront.descriptionFilled": {
+    "en": "description {filled}/3",
+    "uz": "tavsif {filled}/3",
+    "ky": "сүрөттөмө {filled}/3",
+    "tg": "тавсиф {filled}/3",
+    "zh-CN": "描述 {filled}/3",
+    "ar": "الوصف {filled}/3"
+  },
+  "manager.storefront.enrichQueued": {
+    "en": "Updating descriptions: {count} product(s). Old texts stay until they are replaced.",
+    "uz": "Tavsiflar yangilanmoqda: {count} mahsulot. Eski matnlar almashtirilguncha saqlanadi.",
+    "ky": "Сүрөттөмөлөр жаңыртылууда: {count} товар. Эски тексттер алмаштырылганча сакталат.",
+    "tg": "Навсозии тавсифҳо: {count} мол. Матнҳои кӯҳна то иваз шудан мемонанд.",
+    "zh-CN": "正在更新描述：{count} 件商品。旧文本会保留到被替换。",
+    "ar": "تحديث الأوصاف: {count} منتجًا. تبقى النصوص القديمة حتى تُستبدل."
+  },
+  "manager.matrix.addedCountSave": {
+    "en": "Added to the client matrix: {count} lines. Click “Save matrix”.",
+    "uz": "Mijoz matritsasiga qo‘shildi: {count} qator. «Matritsani saqlash» ni bosing.",
+    "ky": "Кардар матрицасына кошулду: {count} сап. «Матрицаны сактоо» басыңыз.",
+    "tg": "Ба матритсаи муштарӣ илова шуд: {count} сатр. «Матритсаро захира кунед»-ро пахш кунед.",
+    "zh-CN": "已加入客户矩阵：{count} 行。请点击“保存矩阵”。",
+    "ar": "أُضيف إلى مصفوفة العميل: {count} بندًا. اضغط «حفظ المصفوفة»."
+  },
+  "manager.matrix.listFromTotal": {
+    "en": " of {total}",
+    "uz": " / {total}",
+    "ky": " ичинен {total}",
+    "tg": " аз {total}",
+    "zh-CN": " / 共 {total}",
+    "ar": " من أصل {total}"
+  },
+  "manager.excel.importProgress": {
+    "en": "Loading products from Excel ({done}/{total})…",
+    "uz": "Excel’dan mahsulotlar yuklanmoqda ({done}/{total})…",
+    "ky": "Excel’dен товарлар жүктөлүүдө ({done}/{total})…",
+    "tg": "Молҳо аз Excel бор мешаванд ({done}/{total})…",
+    "zh-CN": "正在从 Excel 加载商品（{done}/{total})…",
+    "ar": "جارٍ تحميل المنتجات من Excel ({done}/{total})…"
+  },
+  "manager.excel.addedToStorefront": {
+    "en": "To storefront: {count}",
+    "uz": "Vitrinaga: {count}",
+    "ky": "Витринага: {count}",
+    "tg": "Ба витрина: {count}",
+    "zh-CN": "到橱窗：{count}",
+    "ar": "إلى الواجهة: {count}"
+  },
+  "manager.excel.addedToCatalog": {
+    "en": "To catalog: {count}",
+    "uz": "Katalogga: {count}",
+    "ky": "Каталогго: {count}",
+    "tg": "Ба каталог: {count}",
+    "zh-CN": "到目录：{count}",
+    "ar": "إلى الكتالوج: {count}"
+  },
+  "manager.excel.addedToMatrix": {
+    "en": "To matrix: {count}",
+    "uz": "Matritsaga: {count}",
+    "ky": "Матрицага: {count}",
+    "tg": "Ба матритса: {count}",
+    "zh-CN": "到矩阵：{count}",
+    "ar": "إلى المصفوفة: {count}"
+  },
+  "manager.excel.reusedFromCatalog": {
+    "en": "from the Clover catalog without duplicates: {count}",
+    "uz": "Clover katalogidan dublikatsiz: {count}",
+    "ky": "Clover каталогунан кайталабастан: {count}",
+    "tg": "аз каталоги Clover бе такрор: {count}",
+    "zh-CN": "来自 Clover 目录且无重复：{count}",
+    "ar": "من كتالوج Clover بلا تكرار: {count}"
+  },
+  "manager.excel.createdInCatalog": {
+    "en": "new in the catalog: {count}",
+    "uz": "katalogdagi yangilar: {count}",
+    "ky": "каталогдогу жаңылар: {count}",
+    "tg": "нав дар каталог: {count}",
+    "zh-CN": "目录中的新品：{count}",
+    "ar": "جديد في الكتالوج: {count}"
+  },
+  "manager.excel.skippedStorefront": {
+    "en": "skipped (already on storefront/duplicates): {count}",
+    "uz": "o‘tkazib yuborildi (vitrinada/dublikat): {count}",
+    "ky": "өткөрүлдү (витринада/кайттама): {count}",
+    "tg": "гузаронида шуд (аллакай дар витрина/такрор): {count}",
+    "zh-CN": "已跳过（已在橱窗/重复）：{count}",
+    "ar": "تم التخطي (موجود في الواجهة/مكرر): {count}"
+  },
+  "manager.excel.skippedCatalog": {
+    "en": "skipped (already in catalog/duplicates): {count}",
+    "uz": "o‘tkazib yuborildi (katalogda/dublikat): {count}",
+    "ky": "өткөрүлдү (каталогдо/кайттама): {count}",
+    "tg": "гузаронида шуд (аллакай дар каталог/такрор): {count}",
+    "zh-CN": "已跳过（已在目录/重复）：{count}",
+    "ar": "تم التخطي (موجود في الكتالوج/مكرر): {count}"
+  },
+  "manager.excel.skippedMatrix": {
+    "en": "skipped (already in matrix/duplicates): {count}",
+    "uz": "o‘tkazib yuborildi (matritsada/dublikat): {count}",
+    "ky": "өткөрүлдү (матрицада/кайттама): {count}",
+    "tg": "гузаронида шуд (аллакай дар матритса/такрор): {count}",
+    "zh-CN": "已跳过（已在矩阵/重复）：{count}",
+    "ar": "تم التخطي (موجود في المصفوفة/مكرر): {count}"
+  },
+  "manager.excel.fileCode": {
+    "en": "Code from file: {code}",
+    "uz": "Fayldagi kod: {code}",
+    "ky": "Файлдагы код: {code}",
+    "tg": "Рамз аз файл: {code}",
+    "zh-CN": "文件中的代码：{code}",
+    "ar": "الرمز من الملف: {code}"
+  },
+  "manager.excel.addingProgress": {
+    "en": "Adding… {done}/{total}",
+    "uz": "Qo‘shilmoqda… {done}/{total}",
+    "ky": "Кошулууда… {done}/{total}",
+    "tg": "Илова мешавад… {done}/{total}",
+    "zh-CN": "正在添加… {done}/{total}",
+    "ar": "جارٍ الإضافة… {done}/{total}"
+  },
+  "manager.excel.addToCatalogCount": {
+    "en": "Add to catalog ({count})",
+    "uz": "Katalogga qo‘shish ({count})",
+    "ky": "Каталогго кошуу ({count})",
+    "tg": "Ба каталог илова кардан ({count})",
+    "zh-CN": "加入目录（{count}）",
+    "ar": "إضافة إلى الكتالوج ({count})"
+  },
+  "manager.excel.addProductsCount": {
+    "en": "Add products ({count})",
+    "uz": "Mahsulotlar qo‘shish ({count})",
+    "ky": "Товарларды кошуу ({count})",
+    "tg": "Молҳоро илова кардан ({count})",
+    "zh-CN": "添加商品（{count}）",
+    "ar": "إضافة المنتجات ({count})"
+  },
+  "manager.matrix.addedNamed": {
+    "en": "Added to the matrix: “{name}”.",
+    "uz": "Matritsaga qo‘shildi: «{name}».",
+    "ky": "Матрицага кошулду: «{name}».",
+    "tg": "Ба матритса илова шуд: «{name}».",
+    "zh-CN": "已加入矩阵：“{name}”。",
+    "ar": "أُضيف إلى المصفوفة: «{name}»."
+  },
+  "manager.matrix.addedCountPreview": {
+    "en": "Added to the matrix: {count} lines ({preview}).",
+    "uz": "Matritsaga qo‘shildi: {count} qator ({preview}).",
+    "ky": "Матрицага кошулду: {count} сап ({preview}).",
+    "tg": "Ба матритса илова шуд: {count} сатр ({preview}).",
+    "zh-CN": "已加入矩阵：{count} 行（{preview}）。",
+    "ar": "أُضيف إلى المصفوفة: {count} بندًا ({preview})."
+  },
+  "manager.matrix.skippedDuplicates": {
+    "en": "Skipped duplicates (already in the matrix): {count}.",
+    "uz": "Dublikatlar o‘tkazib yuborildi (matritsada): {count}.",
+    "ky": "Кайталамалар өткөрүлдү (матрицада): {count}.",
+    "tg": "Такрорҳо гузаронида шуданд (аллакай дар матритса): {count}.",
+    "zh-CN": "已跳过重复项（已在矩阵中）：{count}。",
+    "ar": "تم تخطي التكرارات (موجودة في المصفوفة): {count}."
+  },
+  "manager.matrix.addedNamedPricesLater": {
+    "en": "Added to the matrix: “{name}”. Prices will arrive after the 1C exchange.",
+    "uz": "Matritsaga qo‘shildi: «{name}». Narxlar 1C almashinuvidan keyin keladi.",
+    "ky": "Матрицага кошулду: «{name}». Баалар 1С алмашуусунан кийин келет.",
+    "tg": "Ба матритса илова шуд: «{name}». Нархҳо пас аз мубодила бо 1С меоянд.",
+    "zh-CN": "已加入矩阵：“{name}”。价格会在与 1C 交换后同步。",
+    "ar": "أُضيف إلى المصفوفة: «{name}». ستصل الأسعار بعد التبادل مع 1C."
+  },
+  "manager.matrix.addedFromExcelPricesLater": {
+    "en": "Added to the matrix from Excel: {count} lines. Prices will arrive after the 1C exchange (“Update prices”).",
+    "uz": "Excel’dan matritsaga qo‘shildi: {count} qator. Narxlar 1C almashinuvidan keyin keladi («Narxlarni yangilash»).",
+    "ky": "Excel’dен матрицага кошулду: {count} сап. Баалар 1С алмашуусунан кийин келет («Бааны жаңыртуу»).",
+    "tg": "Аз Excel ба матритса илова шуд: {count} сатр. Нархҳо пас аз мубодила бо 1С меоянд («Наврҳоро навсозӣ кунед»).",
+    "zh-CN": "已从 Excel 加入矩阵：{count} 行。价格会在与 1C 交换后同步（“更新价格”）。",
+    "ar": "أُضيف إلى المصفوفة من Excel: {count} بندًا. ستصل الأسعار بعد التبادل مع 1C («تحديث الأسعار»)."
+  },
+  "manager.matrix.addCount": {
+    "en": "Add ({count})",
+    "uz": "Qo‘shish ({count})",
+    "ky": "Кошуу ({count})",
+    "tg": "Илова кардан ({count})",
+    "zh-CN": "添加（{count}）",
+    "ar": "إضافة ({count})"
+  },
+  "manager.products.oneC.noExactShownCatalog": {
+    "en": "No exact matches for “{query}”. Showing the 1C catalog ({total}). Refine the words and click “Find”.",
+    "uz": "«{query}» bo‘yicha aniq moslik yo‘q. 1C katalogi ko‘rsatildi ({total}). So‘zlarni aniqlang va «Topish» ni bosing.",
+    "ky": "«{query}» боюнча так дал келүүлөр жок. 1С каталогу көрсөтүлдү ({total}). Сөздөрдү тактап, «Табуу» басыңыз.",
+    "tg": "Барои «{query}» мувофиқати дақиқ нест. Каталоги 1С нишон дода шуд ({total}). Калимаҳоро дақиқ кунед ва «Ёфтан»-ро пахш кунед.",
+    "zh-CN": "“{query}”没有精确匹配。已显示 1C 目录（{total}）。请细化关键词并点击“查找”。",
+    "ar": "لا توجد مطابقات دقيقة لـ «{query}». يظهر كتالوج 1C ({total}). دقّق الكلمات واضغط «بحث»."
+  },
+  "manager.products.oneC.foundInExport": {
+    "en": "Found in the 1C export: {total}. Unlinked items are on top. You can edit the search and press “Find” / “Full catalog”.",
+    "uz": "1C yuklamasida topildi: {total}. Bo‘shlar yuqorida. Qidiruvni tahrirlab, «Topish» / «Butun katalog» ni bosishingiz mumkin.",
+    "ky": "1С жүктөмөсүнөн табылды: {total}. Боштор үстүндө. Издөөнү оңдоп, «Табуу» / «Бүт каталог» бассаңыз болот.",
+    "tg": "Дар содироти 1С ёфт шуд: {total}. Озодҳо дар боло. Сатри ҷустуҷӯро ислоҳ карда, «Ёфтан» / «Тамоми каталог»-ро пахш кардан мумкин аст.",
+    "zh-CN": "在 1C 导出中找到：{total}。未关联的在上方。可修改搜索并点“查找”/“全部目录”。",
+    "ar": "عُثر في تصدير 1C: {total}. غير المرتبطة في الأعلى. يمكن تعديل البحث والضغط «بحث» / «الكتالوج كاملًا»."
+  },
+  "manager.products.oneC.selectedCategory": {
+    "en": "1C item selected. Category: “{category}”. Check units and prices, then “Save product”.",
+    "uz": "1C pozitsiyasi tanlandi. Toifa: «{category}». Birlik va narxlarni tekshiring, so‘ng «Mahsulotni saqlash».",
+    "ky": "1С позициясы тандалды. Категория: «{category}». Бирдик жана бааларды текшерип, «Товарды сактоо» басыңыз.",
+    "tg": "Мавқеи 1С интихоб шуд. Категория: «{category}». Воҳидҳо ва нархҳоро санҷед, сипас «Молро захира кунед».",
+    "zh-CN": "已选择 1C 品项。分类：“{category}”。请核对单位和价格，然后“保存商品”。",
+    "ar": "تم اختيار بند 1C. الفئة: «{category}». راجع الوحدات والأسعار ثم «حفظ المنتج»."
+  },
+  "manager.products.oneC.relinkConfirm": {
+    "en": "“{name}” is already linked to “{linkedName}”. Relink it to the current product?",
+    "uz": "«{name}» allaqachon «{linkedName}» mahsulotiga bog‘langan. Joriy mahsulotga qayta bog‘lansinmi?",
+    "ky": "«{name}» мурунтан «{linkedName}» товарына байланган. Учурдагы товарга кайра байлансынбы?",
+    "tg": "«{name}» аллакай бо моли «{linkedName}» пайваст аст. Ба моли ҷорӣ аз нав пайваст шавад?",
+    "zh-CN": "“{name}”已关联到“{linkedName}”。要改绑到当前商品吗？",
+    "ar": "«{name}» مرتبط أصلًا بالمنتج «{linkedName}». إعادة الربط بالمنتج الحالي؟"
+  },
+  "manager.products.subcategoryRequired": {
+    "en": "Group “{category}” requires a subcategory.",
+    "uz": "«{category}» guruhi uchun osttoifa kerak.",
+    "ky": "«{category}» тобу үчүн подкатегория керек.",
+    "tg": "Барои гурӯҳи «{category}» зеркатегория лозим аст.",
+    "zh-CN": "分组“{category}”需要填写子分类。",
+    "ar": "يجب تحديد فئة فرعية للمجموعة «{category}»."
+  },
+  "manager.products.updatedAt": {
+    "en": "Updated: {datetime}",
+    "uz": "Yangilangan: {datetime}",
+    "ky": "Жаңыртылган: {datetime}",
+    "tg": "Навсозӣ шуд: {datetime}",
+    "zh-CN": "已更新：{datetime}",
+    "ar": "حُدّث: {datetime}"
+  },
+  "manager.products.priceTypeTitle": {
+    "en": "Price type “{name}”",
+    "uz": "Narx turi «{name}»",
+    "ky": "Баа түрү «{name}»",
+    "tg": "Намуди нарх «{name}»",
+    "zh-CN": "价格类型“{name}”",
+    "ar": "نوع السعر «{name}»"
+  },
+  "manager.products.purchasePriceTitle": {
+    "en": "Product purchase price",
+    "uz": "Mahsulotning xarid narxi",
+    "ky": "Товардын сатып алуу баасы",
+    "tg": "Нархи хариди мол",
+    "zh-CN": "商品采购价",
+    "ar": "سعر شراء المنتج"
+  },
+  "manager.products.priceFromUpdate": {
+    "en": "From “Update prices” (price type)",
+    "uz": "«Narxlarni yangilash» dan (narx turi)",
+    "ky": "«Бааны жаңыртуу» дан (баа түрү)",
+    "tg": "Аз «Наврҳоро навсозӣ кунед» (намуди нарх)",
+    "zh-CN": "来自“更新价格”（价格类型）",
+    "ar": "من «تحديث الأسعار» (نوع السعر)"
+  },
+  "manager.products.priceFromPurchaseExport": {
+    "en": "From the purchase-price export",
+    "uz": "Xarid narxlari yuklamasidan",
+    "ky": "Сатып алуу бааларынын жүктөмөсүнөн",
+    "tg": "Аз содироти нархҳои харид",
+    "zh-CN": "来自采购价导出",
+    "ar": "من تصدير أسعار الشراء"
+  },
+  "manager.products.purchaseFallbackName": {
+    "en": "Purchase",
+    "uz": "Xarid",
+    "ky": "Сатып алуу",
+    "tg": "Харид",
+    "zh-CN": "采购",
+    "ar": "شراء"
+  },
+  "manager.storefront.addedNamed": {
+    "en": "To storefront: “{name}”.",
+    "uz": "Vitrinaga: «{name}».",
+    "ky": "Витринага: «{name}».",
+    "tg": "Ба витрина: «{name}».",
+    "zh-CN": "到橱窗：“{name}”。",
+    "ar": "إلى الواجهة: «{name}»."
+  },
+  "manager.storefront.addedCountShort": {
+    "en": "To storefront: {count} lines.",
+    "uz": "Vitrinaga: {count} qator.",
+    "ky": "Витринага: {count} сап.",
+    "tg": "Ба витрина: {count} сатр.",
+    "zh-CN": "到橱窗：{count} 行。",
+    "ar": "إلى الواجهة: {count} بندًا."
+  },
+  "manager.storefront.skippedAlready": {
+    "en": "Already on the storefront, skipped: {count}.",
+    "uz": "Allaqachon vitrinada, o‘tkazib yuborildi: {count}.",
+    "ky": "Мурунтан витринада, өткөрүлдү: {count}.",
+    "tg": "Аллакай дар витрина, гузаронида шуд: {count}.",
+    "zh-CN": "已在橱窗，已跳过：{count}。",
+    "ar": "موجود أصلًا في الواجهة، تم التخطي: {count}."
+  },
+  "manager.storefront.exportTotal": {
+    "en": " In the export: {count}.",
+    "uz": " Yuklamada: {count}.",
+    "ky": " Жүктөмөдө: {count}.",
+    "tg": " Дар содирот: {count}.",
+    "zh-CN": " 导出中：{count}。",
+    "ar": " في التصدير: {count}."
+  },
+  "manager.storefront.addCount": {
+    "en": "Add to storefront ({count})",
+    "uz": "Vitrinaga qo‘shish ({count})",
+    "ky": "Витринага кошуу ({count})",
+    "tg": "Ба витрина илова кардан ({count})",
+    "zh-CN": "加入橱窗（{count}）",
+    "ar": "إضافة إلى الواجهة ({count})"
+  },
+  "manager.storefront.asNamed": {
+    "en": "as “{name}”",
+    "uz": "«{name}» sifatida",
+    "ky": "«{name}» катары",
+    "tg": "ҳамчун «{name}»",
+    "zh-CN": "作为“{name}”",
+    "ar": "باسم «{name}»"
+  },
+  "manager.storefront.addedFromExcel": {
+    "en": "To storefront from Excel: {count} lines.",
+    "uz": "Excel’dan vitrinaga: {count} qator.",
+    "ky": "Excel’dен витринага: {count} сап.",
+    "tg": "Аз Excel ба витрина: {count} сатр.",
+    "zh-CN": "从 Excel 加入橱窗：{count} 行。",
+    "ar": "إلى الواجهة من Excel: {count} بندًا."
+  },
+  "storefront.nav.cartWithCount": {
+    "en": "Cart ({count})",
+    "uz": "Savat ({count})",
+    "ky": "Себет ({count})",
+    "tg": "Сабад ({count})",
+    "zh-CN": "购物车（{count}）",
+    "ar": "السلة ({count})"
+  },
+  "storefront.nav.cartAriaCount": {
+    "en": "Cart: {count} lines",
+    "uz": "Savat: {count} qator",
+    "ky": "Себет: {count} сап",
+    "tg": "Сабад: {count} сатр",
+    "zh-CN": "购物车：{count} 行",
+    "ar": "السلة: {count} بندًا"
+  },
+  "storefront.hero.slideAria": {
+    "en": "Slide {index}",
+    "uz": "Slayd {index}",
+    "ky": "Сүрөт слайды {index}",
+    "tg": "Слайди {index}",
+    "zh-CN": "幻灯片 {index}",
+    "ar": "الشريحة {index}"
+  },
+  "storefront.qty.ariaWithUnit": {
+    "en": "Quantity, {unit}",
+    "uz": "Miqdor, {unit}",
+    "ky": "Саны, {unit}",
+    "tg": "Миқдор, {unit}",
+    "zh-CN": "数量，{unit}",
+    "ar": "الكمية، {unit}"
+  },
+  "storefront.qty.inUnitPieces": {
+    "en": "In {unit}: {count} pcs",
+    "uz": "{unit} ichida: {count} dona",
+    "ky": "{unit} ичинде: {count} даана",
+    "tg": "Дар {unit}: {count} адад",
+    "zh-CN": "{unit} 内：{count} 件",
+    "ar": "في {unit}: {count} قطعة"
+  },
+  "storefront.qty.multipleOf": {
+    "en": "Multiple of {step}",
+    "uz": "{step} ga karrali",
+    "ky": "{step} эселенген",
+    "tg": "Карат ба {step}",
+    "zh-CN": "按 {step} 的倍数",
+    "ar": "مضاعفات {step}"
+  },
+  "storefront.qty.multipleOfLower": {
+    "en": "multiple of {step}",
+    "uz": "{step} ga karrali",
+    "ky": "{step} эселенген",
+    "tg": "карат ба {step}",
+    "zh-CN": "按 {step} 的倍数",
+    "ar": "مضاعفات {step}"
+  },
+  "storefront.unit.piecesInNamed": {
+    "en": "{size} pcs in “{label}”",
+    "uz": "«{label}» da {size} dona",
+    "ky": "«{label}» ичинде {size} даана",
+    "tg": "{size} адад дар «{label}»",
+    "zh-CN": "“{label}”内 {size} 件",
+    "ar": "{size} قطعة في «{label}»"
+  },
+  "storefront.cart.unitSizePieces": {
+    "en": " · {count} pcs each",
+    "uz": " · {count} donadan",
+    "ky": " · {count} даанадан",
+    "tg": " · {count} ададӣ",
+    "zh-CN": " · 每 {count} 件",
+    "ar": " · {count} قطعة لكل"
+  },
+  "storefront.cart.removeNamed": {
+    "en": "Remove {name}",
+    "uz": "{name} ni o‘chirish",
+    "ky": "{name} өчүрүү",
+    "tg": "Нест кардани {name}",
+    "zh-CN": "删除 {name}",
+    "ar": "حذف {name}"
+  },
+  "storefront.cart.deliveryNeedMore": {
+    "en": "Delivery {fee}. {needMore} more for free delivery.",
+    "uz": "Yetkazib berish {fee}. Bepul yetkazishgacha yana {needMore}.",
+    "ky": "Жеткирүү {fee}. Акысыз жеткирүүгө дагы {needMore}.",
+    "tg": "Расонидан {fee}. То ройгон боз {needMore}.",
+    "zh-CN": "运费 {fee}。距免运费还差 {needMore}。",
+    "ar": "التوصيل {fee}. يتبقى {needMore} للتوصيل المجاني."
+  },
+  "storefront.checkout.paidDeliverySpb": {
+    "en": "St. Petersburg delivery — {fee} (order below {freeFrom})",
+    "uz": "Sankt-Peterburg yetkazib berish — {fee} (buyurtma {freeFrom} dan kam)",
+    "ky": "Санкт-Петербург жеткирүүсү — {fee} (заказ {freeFrom} ден аз)",
+    "tg": "Расонидан дар СПб — {fee} (фармоиш камтар аз {freeFrom})",
+    "zh-CN": "圣彼得堡配送 — {fee}（订单低于 {freeFrom}）",
+    "ar": "توصيل سانت بطرسبرغ — {fee} (طلب أقل من {freeFrom})"
+  },
+  "storefront.product.pieceSuffix": {
+    "en": ", pcs",
+    "uz": ", dona",
+    "ky": ", даана",
+    "tg": ", адад",
+    "zh-CN": "，件",
+    "ar": "، قطعة"
+  },
+  "storefront.product.unitSuffix": {
+    "en": " — {unit}",
+    "uz": " — {unit}",
+    "ky": " · бирдик {unit}",
+    "tg": " · воҳид {unit}",
+    "zh-CN": " · 单位 {unit}",
+    "ar": " · الوحدة {unit}"
+  },
+  "manager.exchange.queuedContour": {
+    "en": "Queued {contour}",
+    "uz": "Navbatda {contour}",
+    "ky": "Кезекте {contour}",
+    "tg": "Дар навбат {contour}",
+    "zh-CN": "排队中 {contour}",
+    "ar": "في الانتظار {contour}"
+  },
+  "manager.exchange.sendingContour": {
+    "en": "Sending to {contour}",
+    "uz": "{contour} ga yuborilmoqda",
+    "ky": "{contour} га өткөрүлүүдө",
+    "tg": "Ба {contour} фиристода мешавад",
+    "zh-CN": "正在传到 {contour}",
+    "ar": "يُرسل إلى {contour}"
+  },
+  "manager.exchange.acceptedContour": {
+    "en": "Accepted in {contour}",
+    "uz": "{contour} da qabul qilindi",
+    "ky": "{contour} да кабыл алынды",
+    "tg": "Дар {contour} қабул шуд",
+    "zh-CN": "已在 {contour} 接收",
+    "ar": "قُبل في {contour}"
+  },
+  "shared.print.blockedTitle": {
+    "en": "Printing blocked",
+    "uz": "Chop etish bloklangan",
+    "ky": "Басып чыгаруу бөгөттөлгөн",
+    "tg": "Чоп манъ аст",
+    "zh-CN": "打印被拦截",
+    "ar": "الطباعة محظورة"
+  },
+  "shared.print.blockedMessage": {
+    "en": "The browser blocked the print window. Allow pop-ups for this site.",
+    "uz": "Brauzer chop oynasini blokladi. Ushbu sayt uchun qalqib chiquvchi oynalarga ruxsat bering.",
+    "ky": "Браузер басып чыгаруу терезесин бөгөттөдү. Бул сайт үчүн калкыма терезелерге уруксат бериңиз.",
+    "tg": "Браузер равзанаи чопро манъ кард. Барои ин сайт равзанаҳои зоҳиршавандаро иҷозат диҳед.",
+    "zh-CN": "浏览器拦截了打印窗口。请允许此站点弹出窗口。",
+    "ar": "حظر المتصفح نافذة الطباعة. اسمح بالنوافذ المنبثقة لهذا الموقع."
+  },
+  "shared.print.documentTitle": {
+    "en": "Order {number}",
+    "uz": "Buyurtma {number}",
+    "ky": "Заказ номери {number}",
+    "tg": "Фармоиш {number}",
+    "zh-CN": "订单 {number}",
+    "ar": "الطلب {number}"
+  },
+  "shared.print.orderHeading": {
+    "en": "Order #{number}",
+    "uz": "Buyurtma № {number}",
+    "ky": "Заказ номери № {number}",
+    "tg": "Фармоиш № {number}",
+    "zh-CN": "订单 #{number}",
+    "ar": "الطلب رقم {number}"
+  },
+  "shared.print.systemLine": {
+    "en": "Clover system · {datetime}",
+    "uz": "Clover tizimi · {datetime}",
+    "ky": "Clover системасы · {datetime}",
+    "tg": "Системаи Clover · {datetime}",
+    "zh-CN": "Clover 系统 · {datetime}",
+    "ar": "نظام Clover · {datetime}"
+  },
+  "shared.print.clientLabel": {
+    "en": "Client:",
+    "uz": "Mijoz:",
+    "ky": "Кардар:",
+    "tg": "Муштарӣ:",
+    "zh-CN": "客户：",
+    "ar": "العميل:"
+  },
+  "shared.print.deliveryLabel": {
+    "en": "Delivery:",
+    "uz": "Yetkazib berish:",
+    "ky": "Жеткирүү:",
+    "tg": "Расонидан:",
+    "zh-CN": "配送：",
+    "ar": "التوصيل:"
+  },
+  "shared.print.colProduct": {
+    "en": "Product",
+    "uz": "Mahsulot",
+    "ky": "Товар аталышы",
+    "tg": "Номи мол",
+    "zh-CN": "商品",
+    "ar": "المنتج"
+  },
+  "shared.print.outsideMatrix": {
+    "en": "Item outside the matrix · {details}",
+    "uz": "Matritsadan tashqari mahsulot · {details}",
+    "ky": "Матрицадан тышкары товар · {details}",
+    "tg": "Мол берун аз матритса · {details}",
+    "zh-CN": "矩阵外商品 · {details}",
+    "ar": "منتج خارج المصفوفة · {details}"
+  },
+  "shared.print.totalAmount": {
+    "en": "Total: {amount}",
+    "uz": "Jami: {amount}",
+    "ky": "Жыйынтык: {amount}",
+    "tg": "Ҷамъ: {amount}",
+    "zh-CN": "合计：{amount}",
+    "ar": "الإجمالي: {amount}"
+  },
+  "shared.print.managerComment": {
+    "en": "Manager comment:",
+    "uz": "Menejer izohi:",
+    "ky": "Менеджер комментарийи:",
+    "tg": "Шарҳи менеҷер:",
+    "zh-CN": "经理备注：",
+    "ar": "تعليق المدير:"
+  },
+  "shared.print.externalId": {
+    "en": "External ID: {id}",
+    "uz": "Tashqi ID: {id}",
+    "ky": "Тышкы ID: {id}",
+    "tg": "ID-и беруна: {id}",
+    "zh-CN": "外部 ID：{id}",
+    "ar": "المعرّف الخارجي: {id}"
+  },
+  "manager.matrix.exportFileName": {
+    "en": "matrix-{name}.xlsx",
+    "uz": "matritsa-{name}.xlsx",
+    "ky": "матрицасы-{name}.xlsx",
+    "tg": "матритса-{name}.xlsx",
+    "zh-CN": "矩阵-{name}.xlsx",
+    "ar": "مصفوفة-{name}.xlsx"
+  },
+  "shared.order.cannotTrashByStatus": {
+    "en": "An order with status “{status}” cannot be deleted (accepted or processed in 1C).",
+    "uz": "«{status}» holatidagi buyurtmani o‘chirib bo‘lmaydi (1C da qabul qilingan yoki qayta ishlangan).",
+    "ky": "«{status}» статусундагы заказды өчүрүүгө болбойт (1Сда кабыл алынган же иштелген).",
+    "tg": "Фармоиш бо ҳолати «{status}»-ро нест кардан мумкин нест (дар 1С қабул ё коркард шудааст).",
+    "zh-CN": "状态为“{status}”的订单不能删除（已在 1C 接受或处理）。",
+    "ar": "لا يمكن حذف طلب بالحالة «{status}» (مقبول أو مُعالج في 1C)."
+  },
+  "client.delivery.closedSunday": {
+    "en": "Delivery is not available on this day.",
+    "uz": "Bu kunda yetkazib berish yo‘q.",
+    "ky": "Бул күнү жеткирүү жок.",
+    "tg": "Дар ин рӯз расонидан нест.",
+    "zh-CN": "当天不提供配送。",
+    "ar": "لا يتوفر التوصيل في هذا اليوم."
+  },
+  "client.delivery.nextWorkingDay": {
+    "en": "Delivery can be scheduled only for the next working day.",
+    "uz": "Yetkazib berishni faqat keyingi ish kuniga belgilash mumkin.",
+    "ky": "Жеткирүүнү кийинки иш күнүнө гана белгилөөгө болот.",
+    "tg": "Расониданро танҳо ба рӯзи кории оянда таъин кардан мумкин аст.",
+    "zh-CN": "只能预约下一个工作日配送。",
+    "ar": "يمكن جدولة التوصيل ليوم العمل التالي فقط."
+  },
+  "client.delivery.afterCutoff": {
+    "en": "After 18:00 delivery can be scheduled only for the next working day after tomorrow.",
+    "uz": "18:00 dan keyin yetkazib berishni faqat indingi ish kunidan keyingi kunga belgilash mumkin.",
+    "ky": "18:00дөн кийин жеткирүүнү эртеңкиден кийинки иш күнүнө гана белгилөөгө болот.",
+    "tg": "Баъд аз 18:00 расониданро танҳо ба рӯзи кории пасфардо таъин кардан мумкин аст.",
+    "zh-CN": "18:00 之后只能预约后天的工作日配送。",
+    "ar": "بعد الساعة 18:00 يمكن جدولة التوصيل ليوم العمل بعد غد فقط."
+  },
+  "client.delivery.dateRequired": {
+    "en": "Enter a delivery date.",
+    "uz": "Yetkazib berish sanasini kiriting.",
+    "ky": "Жеткирүү күнүн көрсөтүңүз.",
+    "tg": "Санаи расониданро нишон диҳед.",
+    "zh-CN": "请填写配送日期。",
+    "ar": "حدد تاريخ التوصيل."
+  },
+  "shared.order.notFound": {
+    "en": "Order not found.",
+    "uz": "Buyurtma topilmadi.",
+    "ky": "Заказ табылган жок.",
+    "tg": "Фармоиш ёфт нашуд.",
+    "zh-CN": "未找到订单。",
+    "ar": "الطلب غير موجود."
+  },
+  "shared.order.alreadyTrashed": {
+    "en": "The order is already in the trash.",
+    "uz": "Buyurtma allaqachon savatda.",
+    "ky": "Заказ мурунтан эле корзинада.",
+    "tg": "Фармоиш аллакай дар сабад аст.",
+    "zh-CN": "订单已在回收站。",
+    "ar": "الطلب موجود بالفعل في سلة المهملات."
+  },
+  "shared.order.completedAdminOnly": {
+    "en": "Only an administrator can delete a completed order.",
+    "uz": "Bajarilgan buyurtmani faqat administrator o‘chira oladi.",
+    "ky": "Аткарылган заказды администратор гана өчүрө алат.",
+    "tg": "Фармоиши иҷрошударо танҳо маъмур нест карда метавонад.",
+    "zh-CN": "已完成订单只能由管理员删除。",
+    "ar": "يمكن للمسؤول فقط حذف طلب مكتمل."
+  },
+  "shared.order.exchangeBlocked": {
+    "en": "The order is already in 1C exchange. Deletion is forbidden.",
+    "uz": "Buyurtma allaqachon 1C almashinuvida. O‘chirish taqiqlangan.",
+    "ky": "Заказ мурунтан эле 1C алмашуусунда. Өчүрүүгө тыюу салынган.",
+    "tg": "Фармоиш аллакай дар мубодилаи 1C аст. Несткунӣ манъ аст.",
+    "zh-CN": "订单已在 1C 交换中，禁止删除。",
+    "ar": "الطلب قيد تبادل 1C بالفعل. الحذف ممنوع."
+  },
+  "shared.order.clientOnlyNew": {
+    "en": "A client can delete only an order with status “New”.",
+    "uz": "Mijoz faqat «Yangi» holatidagi buyurtmani o‘chira oladi.",
+    "ky": "Кардар «Жаңы» статусундагы заказды гана өчүрө алат.",
+    "tg": "Муштарӣ танҳо фармоиш бо ҳолати «Нав»-ро нест карда метавонад.",
+    "zh-CN": "客户只能删除状态为“新建”的订单。",
+    "ar": "يمكن للعميل حذف طلب بحالة «جديد» فقط."
+  },
+  "shared.order.notInTrash": {
+    "en": "The order is not in the trash.",
+    "uz": "Buyurtma savatda emas.",
+    "ky": "Заказ корзинада эмес.",
+    "tg": "Фармоиш дар сабад нест.",
+    "zh-CN": "订单不在回收站。",
+    "ar": "الطلب ليس في سلة المهملات."
+  },
+  "shared.order.purgeFromTrashOnly": {
+    "en": "Permanent deletion is allowed only for an order in the trash.",
+    "uz": "Butunlay o‘chirish faqat savatdagi buyurtma uchun mumkin.",
+    "ky": "Тубөлүк өчүрүү корзинадагы заказ үчүн гана мүмкүн.",
+    "tg": "Несткунии доимӣ танҳо барои фармоиш дар сабад иҷозат аст.",
+    "zh-CN": "仅回收站中的订单可永久删除。",
+    "ar": "يُسمح بالحذف النهائي فقط لطلب في سلة المهملات."
+  },
+  "shared.order.purgeCompletedAdminOnly": {
+    "en": "Only an administrator can permanently delete a completed order.",
+    "uz": "Bajarilgan buyurtmani butunlay faqat administrator o‘chira oladi.",
+    "ky": "Аткарылган заказды тубөлүк администратор гана өчүрө алат.",
+    "tg": "Фармоиши иҷрошударо доимӣ танҳо маъмур нест карда метавонад.",
+    "zh-CN": "已完成订单只能由管理员永久删除。",
+    "ar": "يمكن للمسؤول فقط حذف طلب مكتمل نهائياً."
+  },
+  "manager.promo.status.active": {
+    "en": "Active",
+    "uz": "Faol",
+    "ky": "Активдүү",
+    "tg": "Фаъол",
+    "zh-CN": "进行中",
+    "ar": "نشطة"
+  },
+  "manager.promo.status.scheduled": {
+    "en": "Scheduled",
+    "uz": "Rejalashtirilgan",
+    "ky": "Пландалган",
+    "tg": "Банақшагирифта",
+    "zh-CN": "已排期",
+    "ar": "مجدولة"
+  },
+  "manager.promo.status.completed": {
+    "en": "Completed",
+    "uz": "Tugagan",
+    "ky": "Аяктаган",
+    "tg": "Анҷомёфта",
+    "zh-CN": "已结束",
+    "ar": "مكتملة"
+  },
+  "manager.promo.status.disabled": {
+    "en": "Disabled",
+    "uz": "O‘chiq",
+    "ky": "Өчүрүлгөн",
+    "tg": "Хомӯш",
+    "zh-CN": "已关闭",
+    "ar": "متوقفة"
+  },
+  "manager.addressNumbered": {
+    "en": "Address {n}",
+    "uz": "Manzil {n}",
+    "ky": "Дарек {n}",
+    "tg": "Суроға {n}",
+    "zh-CN": "地址 {n}",
+    "ar": "العنوان {n}"
+  },
+  "shared.passkey.accessKeyNumbered": {
+    "en": "Passkey {n}",
+    "uz": "Kirish kaliti {n}",
+    "ky": "Кирүү ачкычы {n}",
+    "tg": "Калиди дастрасӣ {n}",
+    "zh-CN": "通行密钥 {n}",
+    "ar": "مفتاح الدخول {n}"
+  },
+  "client.order.numberHeading": {
+    "en": "Order #{number}",
+    "uz": "Buyurtma № {number}",
+    "ky": "Заказ номери {number}",
+    "tg": "Фармоиш № {number}",
+    "zh-CN": "订单 #{number}",
+    "ar": "الطلب رقم {number}"
+  },
+  "manager.order.numberHeading": {
+    "en": "Order #{number}",
+    "uz": "Buyurtma № {number}",
+    "ky": "Заказ номери {number}",
+    "tg": "Фармоиш № {number}",
+    "zh-CN": "订单 #{number}",
+    "ar": "الطلب رقم {number}"
+  },
+  "client.order.createdAt": {
+    "en": "Created: {datetime}",
+    "uz": "Yaratilgan: {datetime}",
+    "ky": "Түзүлгөн: {datetime}",
+    "tg": "Сохта шуд: {datetime}",
+    "zh-CN": "创建时间：{datetime}",
+    "ar": "أُنشئ: {datetime}"
+  },
+  "client.orders.activeCount": {
+    "en": "Active: {count}",
+    "uz": "Faol: {count}",
+    "ky": "Активдүү: {count}",
+    "tg": "Фаъол: {count}",
+    "zh-CN": "进行中：{count}",
+    "ar": "نشطة: {count}"
+  },
+  "client.order.managerCommentPrefix": {
+    "en": "Manager: {comment}",
+    "uz": "Menejer: {comment}",
+    "ky": "Менеджер комментарийи: {comment}",
+    "tg": "Менеҷер: {comment}",
+    "zh-CN": "经理：{comment}",
+    "ar": "المدير: {comment}"
+  },
+  "client.gate.fillOrgProfileInSettings": {
+    "en": "Fill in the organization profile first in {settings}.",
+    "uz": "Avval tashkilot profilini {settings} bo‘limida to‘ldiring.",
+    "ky": "Адегенде уюмдун профилин {settings} бөлүмүндө толтуруңуз.",
+    "tg": "Аввал профили ташкилотро дар {settings} пур кунед.",
+    "zh-CN": "请先在{settings}中填写组织资料。",
+    "ar": "املأ ملف المنظمة أولاً في {settings}."
+  },
+  "client.gate.addDeliveryAddressInSettings": {
+    "en": "Add a delivery address in {settings}.",
+    "uz": "Yetkazib berish manzilini {settings} bo‘limida qo‘shing.",
+    "ky": "Жеткирүү дарегин {settings} бөлүмүнө кошуңуз.",
+    "tg": "Суроғаи расониданро дар {settings} илова кунед.",
+    "zh-CN": "请在{settings}中添加配送地址。",
+    "ar": "أضف عنوان التوصيل في {settings}."
+  },
+  "client.order.addendumInNumber": {
+    "en": "to #{number}",
+    "uz": "№{number} ga",
+    "ky": "№{number} ге",
+    "tg": "ба №{number}",
+    "zh-CN": "到 #{number}",
+    "ar": "إلى رقم {number}"
+  },
+  "client.order.outsideMatrixUnit": {
+    "en": "Item outside the matrix · {unit}",
+    "uz": "Matritsadan tashqari mahsulot · {unit}",
+    "ky": "Матрицадан тышкары товар · {unit}",
+    "tg": "Мол берун аз матритса · {unit}",
+    "zh-CN": "矩阵外商品 · {unit}",
+    "ar": "منتج خارج المصفوفة · {unit}"
+  },
+  "client.profile.contactsHint": {
+    "en": "Enter full name, role in the company, and phone. The primary contact is for order communication. You can add up to {max} contacts.",
+    "uz": "F.I.O., kompaniyadagi rol va telefonni kiriting. Asosiy kontakt — buyurtmalar bo‘yicha aloqa uchun. {max} tagacha kontakt qo‘shish mumkin.",
+    "ky": "ФИО, компаниядагы рол жана телефонду жазыңыз. Негизги контакт — заказдар боюнча байланыш үчүн. {max} контактка чейин кошууга болот.",
+    "tg": "НОМУ насаб, нақш дар ширкат ва телефонро нависед. Контакти асосӣ — барои алоқа оид ба фармоишҳо. То {max} контакт илова кардан мумкин аст.",
+    "zh-CN": "请填写姓名、公司职务和电话。主联系人用于订单沟通。最多可添加 {max} 个联系人。",
+    "ar": "أدخل الاسم الكامل والدور في الشركة والهاتف. جهة الاتصال الأساسية للتواصل حول الطلبات. يمكن إضافة حتى {max} جهات اتصال."
+  },
+  "client.profile.contactNumbered": {
+    "en": "Contact {n}",
+    "uz": "Kontakt {n}",
+    "ky": "Байланыш {n}",
+    "tg": "Тамос {n}",
+    "zh-CN": "联系人 {n}",
+    "ar": "جهة الاتصال {n}"
+  },
+  "client.matrix.activePositions": {
+    "en": "In the matrix: {count} items",
+    "uz": "Matritsada: {count} poz.",
+    "ky": "Матрицада: {count} поз.",
+    "tg": "Дар матритса: {count} поз.",
+    "zh-CN": "矩阵中：{count} 项",
+    "ar": "في المصفوفة: {count} صنف"
+  },
+  "manager.orders.selectedOrdersCount": {
+    "en": "Orders selected: {count}",
+    "uz": "Tanlangan buyurtmalar: {count}",
+    "ky": "Тандалган заказдар: {count}",
+    "tg": "Фармоишҳои интихобшуда: {count}",
+    "zh-CN": "已选订单：{count}",
+    "ar": "الطلبات المحددة: {count}"
+  },
+  "manager.orders.changeStatus": {
+    "en": "Change status",
+    "uz": "Holatni o‘zgartirish",
+    "ky": "Статусту өзгөртүү",
+    "tg": "Тағйири ҳолат",
+    "zh-CN": "更改状态",
+    "ar": "تغيير الحالة"
+  },
+  "manager.orders.trash": {
+    "en": "Trash",
+    "uz": "Savat",
+    "ky": "Себет",
+    "tg": "Сабад",
+    "zh-CN": "回收站",
+    "ar": "المهملات"
+  },
+  "manager.orders.oneCWithStatus": {
+    "en": "1C: {status}",
+    "uz": "1C: {status}",
+    "ky": "1С статусу: {status}",
+    "tg": "Ҳолати 1С: {status}",
+    "zh-CN": "1C：{status}",
+    "ar": "حالة 1C: {status}"
+  },
+  "manager.orders.inTrashSince": {
+    "en": "In trash since {datetime}",
+    "uz": "Savatda {datetime} dan",
+    "ky": "Себетте {datetime} дан",
+    "tg": "Дар сабад аз {datetime}",
+    "zh-CN": "进入回收站于 {datetime}",
+    "ar": "في المهملات منذ {datetime}"
+  },
+  "manager.exchange.connectionTo1c": {
+    "en": "1C connection · {status}",
+    "uz": "1C ulanishi · {status}",
+    "ky": "1С туташуусу · {status}",
+    "tg": "Пайваст ба 1С · {status}",
+    "zh-CN": "1C 连接 · {status}",
+    "ar": "اتصال 1C · {status}"
+  },
+  "manager.exchange.secretInEnv": {
+    "en": "Secret in server/.env: {status}",
+    "uz": "server/.env dagi maxfiy kalit: {status}",
+    "ky": "server/.env сыр сөзү: {status}",
+    "tg": "Сир дар server/.env: {status}",
+    "zh-CN": "server/.env 中的密钥：{status}",
+    "ar": "السر في server/.env: {status}"
+  },
+  "manager.exchange.readStatus": {
+    "en": "Read: {status}",
+    "uz": "O‘qish: {status}",
+    "ky": "Окуу: {status}",
+    "tg": "Хондан: {status}",
+    "zh-CN": "读取：{status}",
+    "ar": "القراءة: {status}"
+  },
+  "manager.exchange.writeStatus": {
+    "en": "Write: {status}",
+    "uz": "Yozish: {status}",
+    "ky": "Жазуу: {status}",
+    "tg": "Навиштан: {status}",
+    "zh-CN": "写入：{status}",
+    "ar": "الكتابة: {status}"
+  },
+  "manager.exchange.ordersContour": {
+    "en": "Order contour: {status}",
+    "uz": "Buyurtmalar konturi: {status}",
+    "ky": "Заказдар контуру: {status}",
+    "tg": "Контури фармоишҳо: {status}",
+    "zh-CN": "订单环境：{status}",
+    "ar": "محيط الطلبات: {status}"
+  },
+  "manager.exchange.orderCreatedMeta": {
+    "en": "Created {datetime} · delivery {date} · order status: {status}",
+    "uz": "Yaratilgan {datetime} · yetkazish {date} · buyurtma holati: {status}",
+    "ky": "Түзүлгөн {datetime} · жеткирүү {date} · заказ статусу: {status}",
+    "tg": "Сохта шуд {datetime} · расонидан {date} · ҳолати фармоиш: {status}",
+    "zh-CN": "创建于 {datetime} · 配送 {date} · 订单状态：{status}",
+    "ar": "أُنشئ {datetime} · التوصيل {date} · حالة الطلب: {status}"
+  },
+  "manager.exchange.documentLine": {
+    "en": "Document: {document} · {posted} · {mode}",
+    "uz": "Hujjat: {document} · {posted} · {mode}",
+    "ky": "Документтин номери: {document} · {posted} · {mode}",
+    "tg": "Ҳуҷҷат: {document} · {posted} · {mode}",
+    "zh-CN": "单据：{document} · {posted} · {mode}",
+    "ar": "المستند: {document} · {posted} · {mode}"
+  },
+  "manager.exchange.clientsUnlinkedCount": {
+    "en": "Clients without a 1C link: {count}",
+    "uz": "1C bilan bog‘lanmagan mijozlar: {count}",
+    "ky": "1С менен байланышы жок кардарлар: {count}",
+    "tg": "Муштариёни бе пайванд бо 1С: {count}",
+    "zh-CN": "未关联 1C 的客户：{count}",
+    "ar": "عملاء بلا ربط مع 1C: {count}"
+  },
+  "manager.exchange.productsWithoutNomenclatureId": {
+    "en": "Products without a nomenclature ID: {count}",
+    "uz": "Nomenklatura IDsiz mahsulotlar: {count}",
+    "ky": "Номенклатура ID жок товарлар: {count}",
+    "tg": "Молҳо бе ID-и номенклатура: {count}",
+    "zh-CN": "无品名 ID 的商品：{count}",
+    "ar": "منتجات بلا معرّف تسمية: {count}"
+  },
+  "manager.exchange.logOrderLine": {
+    "en": "{datetime} · order #{number} · {user}",
+    "uz": "{datetime} · buyurtma № {number} · {user}",
+    "ky": "{datetime} · заказ номери {number} · {user}",
+    "tg": "{datetime} · фармоиш № {number} · {user}",
+    "zh-CN": "{datetime} · 订单 #{number} · {user}",
+    "ar": "{datetime} · الطلب رقم {number} · {user}"
+  },
+  "manager.clients.codeAndInn": {
+    "en": "Code: {code} · TIN: {inn}",
+    "uz": "Kod: {code} · INN: {inn}",
+    "ky": "Коду: {code} · ИНН: {inn}",
+    "tg": "Рамз: {code} · ИНН: {inn}",
+    "zh-CN": "代码：{code} · 税号：{inn}",
+    "ar": "الرمز: {code} · الرقم الضريبي: {inn}"
+  },
+  "manager.matchPercent": {
+    "en": "Match: {percent}%",
+    "uz": "Moslik: {percent}%",
+    "ky": "Дадалдык: {percent}%",
+    "tg": "Мутобиқат: {percent}%",
+    "zh-CN": "匹配度：{percent}%",
+    "ar": "التطابق: {percent}%"
+  },
+  "manager.clients.alreadyLinkedToClient": {
+    "en": "Already linked to Clover client: {name}",
+    "uz": "Allaqachon Clover mijoziga bog‘langan: {name}",
+    "ky": "Алле качан Clover кардарына байланган: {name}",
+    "tg": "Аллакай бо муштарии Clover пайваст аст: {name}",
+    "zh-CN": "已关联 Clover 客户：{name}",
+    "ar": "مرتبط بالفعل بعميل Clover: {name}"
+  },
+  "manager.clients.extraPhonesHint": {
+    "en": "Besides the main phone above, you can add more numbers. Up to {max} contacts in total.",
+    "uz": "Yuqoridagi asosiy telefondan tashqari yana raqamlar qo‘shish mumkin. Jami {max} tagacha kontakt.",
+    "ky": "Жогорудагы негизги телефондон тышкары дагы номерлер кошууга болот. Жалпы {max} контактка чейин.",
+    "tg": "Ғайр аз телефони асосӣ боз рақамҳо илова кардан мумкин. Ҳамагӣ то {max} контакт.",
+    "zh-CN": "除上方主电话外还可添加其他号码。最多共 {max} 个联系人。",
+    "ar": "بالإضافة إلى الهاتف الأساسي أعلاه يمكن إضافة أرقام أخرى. حتى {max} جهات اتصال إجمالاً."
+  },
+  "manager.clients.loginStaysEmail": {
+    "en": "The login stays {email}. The matrix and orders do not change.",
+    "uz": "Login {email} bo‘lib qoladi. Matritsa va buyurtmalar o‘zgarmaydi.",
+    "ky": "Логин {email} бойдон калат. Матрица жана заказдар өзгөрбөйт.",
+    "tg": "Логин {email} мемонад. Матритса ва фармоишҳо тағйир намеёбанд.",
+    "zh-CN": "登录名仍为 {email}。矩阵和订单不变。",
+    "ar": "يبقى تسجيل الدخول {email}. المصفوفة والطلبات لا تتغير."
+  },
+  "manager.clients.ordersCount": {
+    "en": "{count} orders",
+    "uz": "{count} ta buyurtma",
+    "ky": "{count} заказ",
+    "tg": "{count} фармоиш",
+    "zh-CN": "{count} 笔订单",
+    "ar": "{count} طلبات"
+  },
+  "manager.clients.oneCNamed": {
+    "en": "1C: {name}",
+    "uz": "1C: {name}",
+    "ky": "1С аталышы: {name}",
+    "tg": "Номи 1С: {name}",
+    "zh-CN": "1C：{name}",
+    "ar": "اسم 1C: {name}"
+  },
+  "manager.clients.counterparty1c": {
+    "en": "1C counterparty: {name}",
+    "uz": "1C kontragent: {name}",
+    "ky": "1С контрагент: {name}",
+    "tg": "Контрагенти 1С: {name}",
+    "zh-CN": "1C 往来单位：{name}",
+    "ar": "طرف 1C: {name}"
+  },
+  "manager.clients.missingPriceWaitRefresh": {
+    "en": "Without a price: {count} — wait for “Refresh prices” in 1C",
+    "uz": "Narxsiz: {count} — 1C da «Narxlarni yangilash» ni kuting",
+    "ky": "Баасыз: {count} — 1Сдагы «Бааны жаңыртуу» ну күтүңүз",
+    "tg": "Бе нарх: {count} — «Навсозии нархҳо»-ро дар 1С интизор шавед",
+    "zh-CN": "无价格：{count} — 请等待 1C 中的“更新价格”",
+    "ar": "بلا سعر: {count} — انتظر «تحديث الأسعار» في 1C"
+  },
+  "manager.clients.retryWithMessage": {
+    "en": "{message} · retry",
+    "uz": "{message} · qayta urinish",
+    "ky": "{message} · кайталоо",
+    "tg": "{message} · такрор",
+    "zh-CN": "{message} · 重试",
+    "ar": "{message} · إعادة المحاولة"
+  },
+  "manager.clients.personalExceptionsCount": {
+    "en": "Personal exceptions: {count}",
+    "uz": "Shaxsiy istisnolar: {count}",
+    "ky": "Жеке өзгөчөлүктөр: {count}",
+    "tg": "Истисноҳои шахсӣ: {count}",
+    "zh-CN": "个别例外：{count}",
+    "ar": "استثناءات فردية: {count}"
+  },
+  "manager.markedCount": {
+    "en": "Marked: {count}",
+    "uz": "Belgilangan: {count}",
+    "ky": "Белгиленген: {count}",
+    "tg": "Қайдшуда: {count}",
+    "zh-CN": "已标记：{count}",
+    "ar": "محدد: {count}"
+  },
+  "manager.clients.priceForClient": {
+    "en": "For the client: {price}",
+    "uz": "Mijozga: {price}",
+    "ky": "Кардарга: {price}",
+    "tg": "Ба муштарӣ: {price}",
+    "zh-CN": "客户价：{price}",
+    "ar": "للعميل: {price}"
+  },
+  "manager.clients.sharedMarkupPercent": {
+    "en": "Client markup: {percent}%",
+    "uz": "Mijozning umumiy ustamasi: {percent}%",
+    "ky": "Кардардын жалпы үстөмөсү: {percent}%",
+    "tg": "Нархи умумии муштарӣ: {percent}%",
+    "zh-CN": "客户总加价：{percent}%",
+    "ar": "هامش العميل العام: {percent}%"
+  },
+  "manager.clients.oneCPriceUpdated": {
+    "en": "1C price updated: {datetime}",
+    "uz": "1C narxi yangilandi: {datetime}",
+    "ky": "1С баасы жаңырды: {datetime}",
+    "tg": "Нархи 1С нав шуд: {datetime}",
+    "zh-CN": "1C 价格已更新：{datetime}",
+    "ar": "تم تحديث سعر 1C: {datetime}"
+  },
+  "manager.clients.categoryUpdated": {
+    "en": "Category updated: {datetime}",
+    "uz": "Kategoriya yangilandi: {datetime}",
+    "ky": "Категория жаңырды: {datetime}",
+    "tg": "Категория нав шуд: {datetime}",
+    "zh-CN": "类别已更新：{datetime}",
+    "ar": "تم تحديث الفئة: {datetime}"
+  },
+  "manager.access.withPasswordCount": {
+    "en": "{count} with a password",
+    "uz": "{count} ta parol bilan",
+    "ky": "{count} сырсөз менен",
+    "tg": "{count} бо парол",
+    "zh-CN": "{count} 个有密码",
+    "ar": "{count} بكلمة مرور"
+  },
+  "manager.access.clientsCount": {
+    "en": "{count} clients",
+    "uz": "{count} ta mijoz",
+    "ky": "{count} кардар",
+    "tg": "{count} муштарӣ",
+    "zh-CN": "{count} 位客户",
+    "ar": "{count} عملاء"
+  },
+  "manager.products.exportAt": {
+    "en": "Export: {datetime}",
+    "uz": "Yuklama: {datetime}",
+    "ky": "Чыгаруу: {datetime}",
+    "tg": "Содирот: {datetime}",
+    "zh-CN": "导出：{datetime}",
+    "ar": "التصدير: {datetime}"
+  },
+  "manager.products.notInFreshCatalog": {
+    "en": "Not in the latest catalog: {count}",
+    "uz": "Yangi katalogda yo‘q: {count}",
+    "ky": "Жаңы каталогдо жок: {count}",
+    "tg": "Дар каталоги тоза нест: {count}",
+    "zh-CN": "不在最新目录中：{count}",
+    "ar": "ليس في أحدث كتالوج: {count}"
+  },
+  "manager.products.foundShownFirst": {
+    "en": "Found: {total}. Showing the first {shown}.",
+    "uz": "Topildi: {total}. Dastlabki {shown} ta ko‘rsatilgan.",
+    "ky": "Табылды: {total}. Биринчи {shown} көрсөтүлдү.",
+    "tg": "Ёфт шуд: {total}. Аввалин {shown} нишон дода шудааст.",
+    "zh-CN": "找到：{total}。显示前 {shown} 条。",
+    "ar": "العثور: {total}. تُعرض أول {shown}."
+  },
+  "manager.products.linkedNamed": {
+    "en": "Linked: {name}",
+    "uz": "Bog‘langan: {name}",
+    "ky": "Байланган: {name}",
+    "tg": "Пайваст: {name}",
+    "zh-CN": "已关联：{name}",
+    "ar": "مرتبط: {name}"
+  },
+  "manager.settings.paidDeliveryRule": {
+    "en": "For orders under {freeFrom} ₽ Clover adds delivery {fee} ₽; from {freeFrom} ₽ — free.",
+    "uz": "{freeFrom} ₽ dan kam buyurtmalarga Clover {fee} ₽ yetkazib berish qo‘shadi; {freeFrom} ₽ dan — bepul.",
+    "ky": "{freeFrom} ₽ ден аз заказдарга Clover {fee} ₽ жеткирүү кошот; {freeFrom} ₽ ден — акысыз.",
+    "tg": "Барои фармоишҳои камтар аз {freeFrom} ₽ Clover расонидани {fee} ₽ илова мекунад; аз {freeFrom} ₽ — ройгон.",
+    "zh-CN": "订单低于 {freeFrom} ₽ 时 Clover 加收运费 {fee} ₽；满 {freeFrom} ₽ 免费。",
+    "ar": "للطلبات أقل من {freeFrom} ₽ تضيف Clover توصيلاً بقيمة {fee} ₽؛ من {freeFrom} ₽ — مجاني."
+  },
+  "manager.settings.zoneEmptyFieldsHint": {
+    "en": "You can pick a zone for each client address. Empty fields use the global values: free from {freeFrom} ₽, delivery {fee} ₽.",
+    "uz": "Har bir mijoz manzili uchun zona tanlash mumkin. Bo‘sh maydonlar global qiymatlarni oladi: {freeFrom} ₽ dan bepul, yetkazib berish {fee} ₽.",
+    "ky": "Кардардын ар бир дареги үчүн зона тандоого болот. Бош талаалар глобалдык маанилерди алат: {freeFrom} ₽ ден акысыз, жеткирүү {fee} ₽.",
+    "tg": "Барои ҳар суроғаи муштарӣ минтақа интихоб кардан мумкин. Майдонҳои холӣ қиматҳои умумиро мегиранд: ройгон аз {freeFrom} ₽, расонидан {fee} ₽.",
+    "zh-CN": "可为每个客户地址选择区域。空字段使用全局值：满 {freeFrom} ₽ 包邮，运费 {fee} ₽。",
+    "ar": "يمكن اختيار منطقة لكل عنوان عميل. الحقول الفارغة تأخذ القيم العامة: مجاني من {freeFrom} ₽، التوصيل {fee} ₽."
+  },
+  "manager.storefront.nameEqualsMatrixHint": {
+    "en": "On the site the product name is the Clover matrix name (not the raw 1C title). You can pick from the catalog below or add from 1C / Excel even if the item is not yet on any client.",
+    "uz": "Saytda mahsulot nomi Clover matritsasidagidek (xom 1C nomi emas). Pastdagi katalogdan tanlash yoki 1C / Excel dan qo‘shish mumkin, hatto pozitsiya hech bir mijozda bo‘lmasa ham.",
+    "ky": "Сайтта товардын аты Clover матрицасындагыдай (чийки 1С аталышы эмес). Төмөнкү каталогдон тандоого же 1С / Excel ден кошууга болот, атүгүл позиция эч бир кардарда жок болсо да.",
+    "tg": "Дар сайт номи мол мисли матритсаи Clover аст (на номи хоми 1С). Аз каталоги поён интихоб ё аз 1С / Excel илова кардан мумкин, ҳатто агар позиция ҳанӯз назди ҳеҷ муштарӣ набошад.",
+    "zh-CN": "网站上的商品名与 Clover 矩阵一致（不是 1C 原始名称）。可从下方目录选择，或从 1C / Excel 添加，即使该品尚未属于任何客户。",
+    "ar": "اسم المنتج في الموقع هو اسم مصفوفة Clover (وليس عنوان 1C الخام). يمكن الاختيار من الكتالوج أدناه أو الإضافة من 1C / Excel حتى إن لم يكن الصنف لدى أي عميل بعد."
+  },
+  "manager.storefront.nowOnStorefrontSelected": {
+    "en": "Now on the storefront: {onStorefront} of {total}. Selected: {selected}.",
+    "uz": "Hozir vitrinada: {onStorefront} / {total}. Tanlangan: {selected}.",
+    "ky": "Азыр витринада: {onStorefront} / {total}. Тандалган: {selected}.",
+    "tg": "Ҳоло дар витрина: {onStorefront} аз {total}. Интихобшуда: {selected}.",
+    "zh-CN": "当前在橱窗：{onStorefront} / {total}。已选：{selected}。",
+    "ar": "الآن على الواجهة: {onStorefront} من {total}. المحدد: {selected}."
+  },
+  "manager.storefront.lastSave": {
+    "en": "Last save: {datetime}",
+    "uz": "Oxirgi saqlash: {datetime}",
+    "ky": "Акыркы сактоо: {datetime}",
+    "tg": "Охирин захира: {datetime}",
+    "zh-CN": "上次保存：{datetime}",
+    "ar": "آخر حفظ: {datetime}"
+  },
+  "manager.matrix.inListCount": {
+    "en": "In the list: {count}",
+    "uz": "Ro‘yxatda: {count}",
+    "ky": "Тизмеде: {count}",
+    "tg": "Дар рӯйхат: {count}",
+    "zh-CN": "列表中：{count}",
+    "ar": "في القائمة: {count}"
+  },
+  "manager.matrix.toAddCount": {
+    "en": "to add: {count}",
+    "uz": "qo‘shishga: {count}",
+    "ky": "кошууга: {count}",
+    "tg": "барои илова: {count}",
+    "zh-CN": "待添加：{count}",
+    "ar": "للإضافة: {count}"
+  },
+  "manager.excel.rowsCount": {
+    "en": "Rows: {count}",
+    "uz": "Qatorlar: {count}",
+    "ky": "Катарлар: {count}",
+    "tg": "Сатрҳо: {count}",
+    "zh-CN": "行数：{count}",
+    "ar": "الصفوف: {count}"
+  },
+  "manager.excel.exactCount": {
+    "en": "Exact: {count}",
+    "uz": "Aniq: {count}",
+    "ky": "Так: {count}",
+    "tg": "Дақиқ: {count}",
+    "zh-CN": "精确：{count}",
+    "ar": "مطابقة تامة: {count}"
+  },
+  "manager.excel.byCodeCount": {
+    "en": "By code: {count}",
+    "uz": "Kod bo‘yicha: {count}",
+    "ky": "Код боюнча: {count}",
+    "tg": "Аз рӯи рамз: {count}",
+    "zh-CN": "按代码：{count}",
+    "ar": "حسب الرمز: {count}"
+  },
+  "manager.excel.similarCount": {
+    "en": "Similar: {count}",
+    "uz": "O‘xshash: {count}",
+    "ky": "Окшош: {count}",
+    "tg": "Монанд: {count}",
+    "zh-CN": "相近：{count}",
+    "ar": "مشابه: {count}"
+  },
+  "manager.excel.unmatchedCount": {
+    "en": "Unmatched: {count}",
+    "uz": "Jufsiz: {count}",
+    "ky": "Жупсуз: {count}",
+    "tg": "Бе ҷуфт: {count}",
+    "zh-CN": "无配对：{count}",
+    "ar": "بلا زوج: {count}"
+  },
+  "manager.excel.toAddCount": {
+    "en": "To add: {count}",
+    "uz": "Qo‘shishga: {count}",
+    "ky": "Кошууга: {count}",
+    "tg": "Барои илова: {count}",
+    "zh-CN": "待添加：{count}",
+    "ar": "للإضافة: {count}"
+  },
+  "manager.excel.uploadProgress": {
+    "en": "Upload: {done}/{total}",
+    "uz": "Yuklash: {done}/{total}",
+    "ky": "Жүктөө: {done}/{total}",
+    "tg": "Боркунӣ: {done}/{total}",
+    "zh-CN": "上传：{done}/{total}",
+    "ar": "التحميل: {done}/{total}"
+  },
+  "manager.alreadyInCloverNamed": {
+    "en": "Already in Clover: {name}",
+    "uz": "Allaqachon Clover da: {name}",
+    "ky": "Алле качан Clover да: {name}",
+    "tg": "Аллакай дар Clover: {name}",
+    "zh-CN": "已在 Clover：{name}",
+    "ar": "موجود بالفعل في Clover: {name}"
+  },
+  "manager.matrix.oneCFoundToAdd": {
+    "en": "1C: {catalog} · found: {found} · to add: {add}",
+    "uz": "1C: {catalog} · topildi: {found} · qo‘shishga: {add}",
+    "ky": "1С: {catalog} · табылды: {found} · кошууга: {add}",
+    "tg": "1С: {catalog} · ёфт шуд: {found} · барои илова: {add}",
+    "zh-CN": "1C：{catalog} · 找到：{found} · 待添加：{add}",
+    "ar": "1C: {catalog} · العثور: {found} · للإضافة: {add}"
+  },
+  "manager.codeValue": {
+    "en": "Code: {code}",
+    "uz": "Kod: {code}",
+    "ky": "Коду: {code}",
+    "tg": "Рамз: {code}",
+    "zh-CN": "代码：{code}",
+    "ar": "الرمز: {code}"
+  },
+  "manager.products.websitePriceUnit": {
+    "en": "Website price, {unit}",
+    "uz": "Sayt narxi, {unit}",
+    "ky": "Сайт баасы, {unit}",
+    "tg": "Нархи сайт, {unit}",
+    "zh-CN": "网站价格，{unit}",
+    "ar": "سعر الموقع، {unit}"
+  },
+  "manager.products.oneCExportListHint": {
+    "en": "In the 1C export: {total}. Currently in the list: {shown}. Unlinked items first; already linked ones can be relinked.",
+    "uz": "1C yuklamasida: {total}. Hozir ro‘yxatda: {shown}. Bo‘shlari yuqorida; bog‘langanlarini qayta bog‘lash mumkin.",
+    "ky": "1С чыгаруусунда: {total}. Азыр тизмеде: {shown}. Боштор үстүндө; байлангандарды кайра байлоого болот.",
+    "tg": "Дар содироти 1С: {total}. Ҳоло дар рӯйхат: {shown}. Озодҳо боло; пайвастшудаҳоро аз нав пайваст кардан мумкин.",
+    "zh-CN": "1C 导出中：{total}。当前列表：{shown}。未关联的在上；已关联的可重新绑定。",
+    "ar": "في تصدير 1C: {total}. في القائمة الآن: {shown}. غير المرتبطة أولاً؛ يمكن إعادة ربط المرتبطة."
+  },
+  "manager.products.alreadyLinkedToProduct": {
+    "en": "Already linked to Clover product: {name}",
+    "uz": "Allaqachon Clover mahsulotiga bog‘langan: {name}",
+    "ky": "Алле качан Clover товарына байланган: {name}",
+    "tg": "Аллакай бо моли Clover пайваст аст: {name}",
+    "zh-CN": "已关联 Clover 商品：{name}",
+    "ar": "مرتبط بالفعل بمنتج Clover: {name}"
+  },
+  "manager.storefront.ifExistsKeepMatrixName": {
+    "en": "If the product already exists in Clover, the storefront will keep its matrix name. A new product gets the 1C name (you can change it later in the card).",
+    "uz": "Agar mahsulot Clover da bo‘lsa, vitrinada matritsadagi nomi qoladi. Yangi mahsulot 1C nomini oladi (keyin kartochkada o‘zgartirish mumkin).",
+    "ky": "Эгер товар Clover да бар болсо, витринада матрицадагы аты калат. Жаңы товар 1С атын алат (кийин карточкадан өзгөртсө болот).",
+    "tg": "Агар мол аллакай дар Clover бошад, дар витрина номи матритса мемонад. Моли нав номи 1С-ро мегирад (баъд дар корт иваз кардан мумкин).",
+    "zh-CN": "若商品已在 Clover，橱窗将保留其矩阵名称。新产品使用 1C 名称（之后可在卡片中修改）。",
+    "ar": "إذا كان المنتج موجودًا في Clover، تبقى واجهة المتجر على اسم المصفوفة. المنتج الجديد يأخذ اسم 1C (يمكن تغييره لاحقًا في البطاقة)."
+  },
+  "manager.storefront.foundToAdd": {
+    "en": "Found: {found}. To add: {add}.",
+    "uz": "Topildi: {found}. Qo‘shishga: {add}.",
+    "ky": "Табылды: {found}. Кошууга: {add}.",
+    "tg": "Ёфт шуд: {found}. Барои илова: {add}.",
+    "zh-CN": "找到：{found}。待添加：{add}。",
+    "ar": "العثور: {found}. للإضافة: {add}."
+  },
+  "manager.storefront.inCloverMatrixName": {
+    "en": "In Clover/matrix: “{name}” — this name will go to the storefront",
+    "uz": "Clover/matritsada: «{name}» — shu nom vitrinaga chiqadi",
+    "ky": "Clover/матрицада: «{name}» — бул ат витринага чыгат",
+    "tg": "Дар Clover/матритса: «{name}» — ҳамин ном ба витрина меравад",
+    "zh-CN": "在 Clover/矩阵中：「{name}」— 此名称将用于橱窗",
+    "ar": "في Clover/المصفوفة: «{name}» — هذا الاسم سيظهر على الواجهة"
+  },
+  "storefront.cart.spbUnderAmount": {
+    "en": "St. Petersburg · order under {amount}",
+    "uz": "Sankt-Peterburg · buyurtma {amount} dan kam",
+    "ky": "Санкт-Петербург · заказ {amount} ден аз",
+    "tg": "СПб · фармоиш камтар аз {amount}",
+    "zh-CN": "圣彼得堡 · 订单低于 {amount}",
+    "ar": "سانت بطرسبرغ · طلب أقل من {amount}"
+  },
+  "checkout.summary.goodsCountAmount": {
+    "en": "Items: {count} pos. · {amount}",
+    "uz": "Mahsulotlar: {count} poz. · {amount}",
+    "ky": "Товарлар: {count} поз. · {amount}",
+    "tg": "Молҳо: {count} поз. · {amount}",
+    "zh-CN": "商品：{count} 项 · {amount}",
+    "ar": "المنتجات: {count} صنف · {amount}"
+  },
+  "storefront.install.iosOpenSafari": {
+    "en": "Go to {host} in Safari. Installing to the home screen is not available in Chrome and other browsers on iOS.",
+    "uz": "{host} ni Safari brauzerida oching. iOS dagi Chrome va boshqa brauzerlarda ekranga o‘rnatish mavjud emas.",
+    "ky": "{host} дарегин Safari браузеринде ачыңыз. iOS тогу Chrome жана башка браузерлерде экранга орнотуу жеткиликсиз.",
+    "tg": "Ба {host} дар браузери Safari гузаред. Дар Chrome ва дигар браузерҳои iOS насб ба экран дастрас нест.",
+    "zh-CN": "请在 Safari 中打开 {host}。iOS 上的 Chrome 及其他浏览器无法添加到主屏幕。",
+    "ar": "انتقل إلى {host} في متصفح Safari. التثبيت على الشاشة غير متاح في Chrome والمتصفحات الأخرى على iOS."
+  },
+  "storefront.install.androidOpenChrome": {
+    "en": "Open {host} in Google Chrome (preferably the latest version from Play Store). Samsung Internet also works: menu → “Add to Home screen”.",
+    "uz": "{host} ni Google Chrome da oching (Play Store dagi so‘nggi versiya afzal). Samsung Internet ham bo‘ladi: menyu → «Asosiy ekranga qo‘shish».",
+    "ky": "{host} дарегин Google Chrome да ачыңыз (Play Store дан акыркы версия жакшы). Samsung Internet да ылайыктуу: меню → «Башкы экранга кошуу».",
+    "tg": "Ба {host} дар Google Chrome дароед (беҳтар версияи охирин аз Play Store). Samsung Internet низ мувофиқ аст: меню → «Илова ба экрани асосӣ».",
+    "zh-CN": "请在 Google Chrome 中打开 {host}（最好使用 Play 商店最新版）。三星浏览器也可以：菜单 → “添加到主屏幕”。",
+    "ar": "ادخل إلى {host} في Google Chrome (يفضّل أحدث إصدار من Play Store). Samsung Internet مناسب أيضًا: القائمة → «إضافة إلى الشاشة الرئيسية»."
+  },
+  "storefront.product.articleCode": {
+    "en": "SKU {code}",
+    "uz": "Artikul {code}",
+    "ky": "Артикулу {code}",
+    "tg": "Рамзи мол {code}",
+    "zh-CN": "货号 {code}",
+    "ar": "الرمز {code}"
+  },
+  "storefront.product.quantity": {
+    "en": "Quantity",
+    "uz": "Miqdor",
+    "ky": "Саны",
+    "tg": "Миқдор",
+    "zh-CN": "数量",
+    "ar": "الكمية"
+  },
+  "admin.staff.adminsNowCount": {
+    "en": "Administrators now: {count}",
+    "uz": "Hozir administratorlar: {count}",
+    "ky": "Азыр администраторлор: {count}",
+    "tg": "Ҳоло маъмурон: {count}",
+    "zh-CN": "当前管理员：{count}",
+    "ar": "المسؤولون الآن: {count}"
+  },
+  "admin.staff.passwordUpdatedAt": {
+    "en": "Updated {stamp}",
+    "uz": "Yangilangan {stamp}",
+    "ky": "Жаңыртылган {stamp}",
+    "tg": "Нав шуд {stamp}",
+    "zh-CN": "已更新 {stamp}",
+    "ar": "حُدّث {stamp}"
+  },
+  "admin.staff.passwordUpdatedAtBy": {
+    "en": "Updated {stamp} · {who}",
+    "uz": "Yangilangan {stamp} · {who}",
+    "ky": "Жаңыртылган {stamp} · {who}",
+    "tg": "Нав шуд {stamp} · {who}",
+    "zh-CN": "已更新 {stamp} · {who}",
+    "ar": "حُدّث {stamp} · {who}"
+  },
+  "manager.priceList.filePriceFormula": {
+    "en": "Price in the file = cost × (1 + {markup} / 100)",
+    "uz": "Fayldagi narx = xarid × (1 + {markup} / 100)",
+    "ky": "Файлдагы баа = сатып алуу × (1 + {markup} / 100)",
+    "tg": "Нарх дар файл = харид × (1 + {markup} / 100)",
+    "zh-CN": "文件中的价格 = 采购价 × (1 + {markup} / 100)",
+    "ar": "السعر في الملف = التكلفة × (1 + {markup} / 100)"
+  },
+  "manager.acts.attachPdfAndSend": {
+    "en": "Attach the 1C statement PDF and tap “Send”.",
+    "uz": "1C aktining PDF ini biriktiring va «Yuborish» ni bosing.",
+    "ky": "1С актынын PDF ин тиркеп, «Жөнөтүү» басыңыз.",
+    "tg": "PDF-и акти 1С-ро замима кунед ва «Фиристодан»-ро пахш кунед.",
+    "zh-CN": "附上 1C 对账单 PDF 并点击“发送”。",
+    "ar": "أرفق PDF كشف 1C واضغط «إرسال»."
+  },
+  "manager.acts.sentFile": {
+    "en": "Sent: {fileName}",
+    "uz": "Yuborilgan: {fileName}",
+    "ky": "Жөнөтүлдү: {fileName}",
+    "tg": "Фиристода шуд: {fileName}",
+    "zh-CN": "已发送：{fileName}",
+    "ar": "أُرسل: {fileName}"
+  },
+  "manager.notice.moreUnseen": {
+    "en": "More unseen: {count}",
+    "uz": "Yana ko‘rilmagan: {count}",
+    "ky": "Дагы көрүлбөгөн: {count}",
+    "tg": "Боз диданашуда: {count}",
+    "zh-CN": "还有未查看：{count}",
+    "ar": "المزيد غير المُشاهَد: {count}"
   }
 };
 
 export const SEED_EXACT_RU_ALLOWLIST = Object.freeze([
+  ...["en", "uz", "ky", "tg", "zh-CN", "ar"].flatMap((locale) =>
+    ["admin.languages.state.auto", "admin.languages.state.manual", "admin.languages.state.missing"].map((key) => ({
+      key,
+      locale,
+      reason: "intentional technical AUTO/MANUAL/MISSING code shown with localized Languages editor chrome",
+    }))
+  ),
   {
     "key": "auth.login.email",
     "locale": "ky",
@@ -11959,7 +14566,7 @@ export const SEED_EXACT_RU_ALLOWLIST = Object.freeze([
     "reason": "unavoidable brand or technical token copied from RU"
   },
   {
-    "key": "manager.text19",
+    "key": "manager.field.bodyText",
     "locale": "ky",
     "reason": "unavoidable brand or technical token copied from RU"
   },
@@ -11999,32 +14606,32 @@ export const SEED_EXACT_RU_ALLOWLIST = Object.freeze([
     "reason": "unavoidable brand or technical token copied from RU"
   },
   {
-    "key": "storefront.text",
+    "key": "storefront.brand.wordmark",
     "locale": "en",
     "reason": "Cyrillic brand wordmark КЛЕВЕР is preserved in all locales"
   },
   {
-    "key": "storefront.text",
+    "key": "storefront.brand.wordmark",
     "locale": "uz",
     "reason": "Cyrillic brand wordmark КЛЕВЕР is preserved in all locales"
   },
   {
-    "key": "storefront.text",
+    "key": "storefront.brand.wordmark",
     "locale": "ky",
     "reason": "Cyrillic brand wordmark КЛЕВЕР is preserved in all locales"
   },
   {
-    "key": "storefront.text",
+    "key": "storefront.brand.wordmark",
     "locale": "tg",
     "reason": "Cyrillic brand wordmark КЛЕВЕР is preserved in all locales"
   },
   {
-    "key": "storefront.text",
+    "key": "storefront.brand.wordmark",
     "locale": "zh-CN",
     "reason": "Cyrillic brand wordmark КЛЕВЕР is preserved in all locales"
   },
   {
-    "key": "storefront.text",
+    "key": "storefront.brand.wordmark",
     "locale": "ar",
     "reason": "Cyrillic brand wordmark КЛЕВЕР is preserved in all locales"
   }
@@ -12063,4 +14670,11 @@ export function listSeedKeys() {
   return Object.keys(SEEDS);
 }
 
-export { SEEDS, SEEDS as UI_TRANSLATION_SEEDS };
+export function hasSeedKey(key) {
+  return Object.prototype.hasOwnProperty.call(SEEDS, key);
+}
+
+for (const key of Object.keys(SEEDS)) {
+  Object.freeze(SEEDS[key]);
+}
+Object.freeze(SEEDS);

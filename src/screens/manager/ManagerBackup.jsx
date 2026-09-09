@@ -5,11 +5,11 @@ import { api } from "../../serverApi";
 import { formatDateTime } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 
-function formatFileSize(value) {
+function formatFileSize(value, t) {
   const bytes = Number(value) || 0;
-  if (bytes < 1024) return `${bytes} Б`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
+  if (bytes < 1024) return t("shared.fileSize.bytes", { bytes });
+  if (bytes < 1024 * 1024) return t("shared.fileSize.kilobytes", { value: Math.round(bytes / 1024) });
+  return t("shared.fileSize.megabytes", { value: (bytes / 1024 / 1024).toFixed(1) });
 }
 
 export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onReload }) {
@@ -37,7 +37,7 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
     try {
       await api.createBackup({
         label: "manual",
-        reason: t("manager.manualCopyFromTheManagerCabinet"),
+        reason: "Ручная копия из кабинета менеджера",
       });
       await loadBackups();
       await appAlert({
@@ -75,7 +75,7 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
       await appAlert({
         title: t("manager.cleanupFinished"),
         message: result.removed?.length
-          ? `Удалено старых копий: ${result.removed.length}.`
+          ? t("manager.backup.removedOld", { count: result.removed.length })
           : t("manager.thereAreNoOldCopiesTo"),
         tone: "success",
       });
@@ -106,7 +106,7 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
   const restoreBackup = async (item) => {
     const ok = await appConfirm({
       title: t("manager.restoreTheData"),
-      message: `Восстановить данные из копии «${item.fileName}»? Перед восстановлением сервер автоматически создаст страховочную копию.`,
+      message: t("manager.backup.restoreConfirmNamed", { fileName: item.fileName }),
       confirmLabel: t("shared.action.restore"),
       cancelLabel: t("shared.modal.cancel"),
       tone: "danger",
@@ -171,7 +171,7 @@ export function ManagerBackup({ data, onImport, onClearOrders, onResetAll, onRel
     {error && <div className="auth-error" style={{ marginTop: 14 }}>{error}</div>}
     <div className="backup-list">
       {backups.map((item) => <article className="backup-row" key={item.fileName}>
-        <div><h3>{item.reason}</h3><p>{formatDateTime(item.createdAt)} · {formatFileSize(item.size)} · {item.includesPhotos ? `полная копия, фото: ${item.photoCount || 0}` : t("manager.oldJsonCopyWithoutPhotos")}<br />{item.fileName}</p></div>
+        <div><h3>{item.reason}</h3><p>{formatDateTime(item.createdAt)} · {formatFileSize(item.size, t)} · {item.includesPhotos ? t("manager.backup.fullCopyPhotos", { count: item.photoCount || 0 }) : t("manager.oldJsonCopyWithoutPhotos")}<br />{item.fileName}</p></div>
         <div className="inline-actions"><button className="secondary-button" type="button" disabled={busy} onClick={() => downloadBackup(item)}>{t("manager.download")}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => restoreBackup(item)}>{t("shared.action.restore")}</button></div>
       </article>)}
       {!backups.length && !error && <div className="empty-box">{t("manager.noCopiesCreatedYet")}</div>}

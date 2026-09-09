@@ -108,7 +108,7 @@ export function StoreHeader({ current }) {
         {link({ name: "contacts" }, t("storefront.nav.contacts"), "contacts")}
         {link(
           { name: "cart" },
-          `Корзина${count ? ` (${count})` : ""}`,
+          count ? t("storefront.nav.cartWithCount", { count }) : t("storefront.nav.cart"),
           "cart"
         )}
       </nav>
@@ -140,7 +140,7 @@ export function StoreHeader({ current }) {
         <a
           className="sf-header-tool sf-cart-mobile"
           href={storefrontHref({ name: "cart" })}
-          aria-label={count ? `Корзина: ${count} поз.` : t("storefront.nav.cart")}
+          aria-label={count ? t("storefront.nav.cartAriaCount", { count }) : t("storefront.nav.cart")}
           onClick={(e) => {
             e.preventDefault();
             go({ name: "cart" });

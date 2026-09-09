@@ -89,7 +89,7 @@ export function MatrixCloverCatalogAdd({
     setNotice(
       ids.length === 1
         ? t("manager.theProductWasAddedToThe")
-        : `В матрицу клиента добавлено: ${ids.length} поз. Нажмите «Сохранить матрицу».`
+        : t("manager.matrix.addedCountSave", { count: ids.length })
     );
   };
 
@@ -138,9 +138,9 @@ export function MatrixCloverCatalogAdd({
           )}
           <div className="matrix-add-actions">
             <span className="muted small">
-              В списке: {items.length}
-              {available.length > CATALOG_LIST_LIMIT ? ` из ${available.length}` : ""}
-              {" · "}к добавлению: {selectedItems.length}
+              {t("manager.matrix.inListCount", { count: items.length })}
+              {available.length > CATALOG_LIST_LIMIT ? t("manager.matrix.listFromTotal", { total: available.length }) : ""}
+              {" · "}{t("manager.matrix.toAddCount", { count: selectedItems.length })}
             </span>
             <button
               className="primary-button"
@@ -148,7 +148,7 @@ export function MatrixCloverCatalogAdd({
               disabled={selectedItems.length === 0}
               onClick={() => addProducts(selectedItems)}
             >
-              Добавить ({selectedItems.length})
+              {t("manager.matrix.addCount", { count: selectedItems.length })}
             </button>
           </div>
           <div className="one-c-products-list one-c-picker-list">

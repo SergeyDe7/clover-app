@@ -12,6 +12,7 @@ import {
 } from "../../shared/appHelpers";
 import { AUDIT_ACTION_LABELS } from "./ManagerAudit";
 import { appAlert } from "../../shared/AppModal";
+import { exchangeStatusLabel, orderStatusLabel } from "../../shared/i18n/displayLabels";
 
 export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavigate }) {
   const { t } = useLocalization();
@@ -75,7 +76,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       setPreview(null);
       await appAlert({
         title: t("shared.status.saved"),
-        message: t("manager.text5"),
+        message: t("manager.exchange.connection.saved"),
         tone: "success",
       });
     } catch (saveError) {
@@ -133,7 +134,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       }
       if (type === "reset") result = await api.resetExchangeOrder(row.id);
       if (result?.result?.message) {
-        await appAlert({ title: t("manager.text6"), message: result.result.message, tone: "success" });
+        await appAlert({ title: t("manager.exchange.title"), message: result.result.message, tone: "success" });
       }
       await onReload();
       await load();
@@ -201,12 +202,12 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
       <div className="exchange-summary-strip">
         <article className="stat-card"><span>{t("manager.queueNotSent")}</span><strong>{summary.notSent || 0}</strong></article>
         <article className="stat-card"><span>{t("manager.exchangeErrors")}</span><strong>{summary.error || 0}</strong></article>
-        <article className="stat-card"><span>{t("manager.text25")}</span><strong>{connectionLabel}</strong></article>
+        <article className="stat-card"><span>{t("manager.exchange.linkStatus")}</span><strong>{connectionLabel}</strong></article>
       </div>
 
       <details className="panel manager-exchange-block" open={!modeIsReal || !runtime.readyForRead}>
         <summary className="manager-exchange-summary">
-          Подключение к 1С · {connectionLabel}
+          {t("manager.exchange.connectionTo1c", { status: connectionLabel })}
         </summary>
         <div className="manager-exchange-block-body">
           <div className="form-grid">
@@ -227,7 +228,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
               />
             </label>
             <label className="field">{
-              t("manager.text26")
+              t("manager.exchange.user")
               }<input
                 value={configForm.username || ""}
                 disabled={Boolean(runtime.usernameFromEnv)}
@@ -278,14 +279,16 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
           </div>
 
           <div className="manager-exchange-status-row">
-            <div className="warning-box">Секрет в server/.env: {runtime.secretConfigured ? t("manager.configured") : t("manager.notConfigured")}</div>
-            <div className="warning-box">Чтение: {runtime.readyForRead ? t("manager.available") : t("manager.notReady")}</div>
-            <div className="warning-box">Запись: {runtime.readyForWrite ? t("manager.allowed") : t("manager.blocked")}</div>
+            <div className="warning-box">{t("manager.exchange.secretInEnv", { status: runtime.secretConfigured ? t("manager.configured") : t("manager.notConfigured") })}</div>
+            <div className="warning-box">{t("manager.exchange.readStatus", { status: runtime.readyForRead ? t("manager.available") : t("manager.notReady") })}</div>
+            <div className="warning-box">{t("manager.exchange.writeStatus", { status: runtime.readyForWrite ? t("manager.allowed") : t("manager.blocked") })}</div>
             <div className="warning-box">{t("manager.baseUnf16Document")}</div>
             <div className={exchangeContour.prodEnabled ? "success-box" : "warning-box"}>
-              Контур заказов: {exchangeContour.prodEnabled
-                ? `prod включён · базы ${allowedDatabases}`
-                : t("manager.text16")}
+              {t("manager.exchange.ordersContour", {
+                status: exchangeContour.prodEnabled
+                  ? t("manager.exchange.prodEnabledDatabases", { databases: allowedDatabases })
+                  : t("manager.exchange.prodDisabled"),
+              })}
             </div>
           </div>
 
@@ -293,7 +296,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
             <div className={connectionResult.ok === false ? "auth-error" : "success-box"}>
               {connectionResult.ok === false
                 ? connectionResult.message
-                : <><strong>{t("manager.connectionWorks")}</strong> {connectionResult.configuration || "1С:УНФ"}{connectionResult.database ? ` · база ${connectionResult.database}` : ""}{connectionResult.extensionVersion ? ` · расширение ${connectionResult.extensionVersion}` : ""}</>}
+                : <><strong>{t("manager.connectionWorks")}</strong> {connectionResult.configuration || "1С:УНФ"}{connectionResult.database ? t("manager.exchange.databaseName", { database: connectionResult.database }) : ""}{connectionResult.extensionVersion ? t("manager.exchange.extensionVersion", { version: connectionResult.extensionVersion }) : ""}</>}
             </div>
           )}
 
@@ -305,7 +308,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
                 {(preview.items || []).map((item, index) => (
                   <div key={item.id || index} className="manager-exchange-preview-item">
                     <strong>{item.name || item.presentation || item.code || t("manager.untitled")}</strong>
-                    <small>ID: {item.id || "—"}{item.article ? ` · артикул ${item.article}` : ""}{item.inn ? ` · ИНН ${item.inn}` : ""}</small>
+                    <small>ID: {item.id || "—"}{item.article ? t("manager.exchange.articleNamed", { article: item.article }) : ""}{item.inn ? t("manager.exchange.innNamed", { inn: item.inn }) : ""}</small>
                   </div>
                 ))}
               </div>
@@ -331,21 +334,21 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
           <article><span>{t("manager.notSent2")}</span><strong>{summary.notSent || 0}</strong></article>
           <article><span>{t("shared.status.done")}</span><strong>{summary.ready || 0}</strong></article>
           <article><span>{t("manager.sentAsATest")}</span><strong>{summary.sent || 0}</strong></article>
-          <article><span>{t("manager.text27")}</span><strong>{summary.draft || 0}</strong></article>
+          <article><span>{t("manager.exchange.drafts")}</span><strong>{summary.draft || 0}</strong></article>
           <article><span>{t("manager.errors")}</span><strong>{summary.error || 0}</strong></article>
         </div>
         <div className="manager-exchange-batch">
           <select value={batchStatus} onChange={(e) => setBatchStatus(e.target.value)} aria-label={t("manager.orderPackFilter")} disabled={Boolean(busyBatch)}>
             <option value="all">{t("manager.allOrders")}</option>
-            {Object.entries(EXCHANGE_STATUS_LABELS).map(([id, label]) => <option value={id} key={id}>{label}</option>)}
+            {Object.entries(EXCHANGE_STATUS_LABELS).map(([id]) => <option value={id} key={id}>{exchangeStatusLabel(id, t)}</option>)}
           </select>
           <button className="secondary-button" type="button" disabled={Boolean(busyBatch)} onClick={() => downloadBatch("json")}>{busyBatch === "json" ? t("manager.downloading") : t("manager.downloadJsonPack")}</button>
           <button className="secondary-button" type="button" disabled={Boolean(busyBatch)} onClick={() => downloadBatch("csv")}>{busyBatch === "csv" ? t("manager.downloading") : t("manager.downloadCsvPack")}</button>
         </div>
         <div className={`${matchingOk ? "success-box" : "warning-box"} manager-exchange-match-note`}>
           {matchingOk
-            ? t("manager.text14")
-            : `Не сопоставлено клиентов: ${missingClients} · товаров: ${missingProducts}`}
+            ? t("manager.exchange.match.linked")
+            : t("manager.exchange.unmatchedCounts", { clients: missingClients, products: missingProducts })}
         </div>
         <div className="exchange-order-list">
           {(data?.rows || []).map((row) => {
@@ -355,15 +358,23 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
               <article className="exchange-order-row" key={row.id}>
                 <div className="exchange-order-head">
                   <div>
-                    <span className={`badge ${exchangeBadgeClass(exchange.status)}`}>{EXCHANGE_STATUS_LABELS[exchange.status]}</span>
-                    <h3>Заказ № {row.number} · {row.customerName}</h3>
-                    <p className="muted small">Создан {formatDateTime(row.createdAt)} · доставка {formatDate(row.deliveryDate)} · статус заказа: {row.orderStatus}</p>
+                    <span className={`badge ${exchangeBadgeClass(exchange.status)}`}>{exchangeStatusLabel(exchange.status, t)}</span>
+                    <h3>{t("manager.order.numberHeading", { number: row.number })} · {row.customerName}</h3>
+                    <p className="muted small">{t("manager.exchange.orderCreatedMeta", {
+                      datetime: formatDateTime(row.createdAt),
+                      date: formatDate(row.deliveryDate),
+                      status: orderStatusLabel(row.orderStatus, t),
+                    })}</p>
                   </div>
-                  <strong>{row.validation?.ready ? t("manager.ready2") : `${row.validation?.issues?.length || 0} ошибок`}</strong>
+                  <strong>{row.validation?.ready ? t("manager.ready2") : t("manager.exchange.errorCount", { count: row.validation?.issues?.length || 0 })}</strong>
                 </div>
                 {row.validation?.issues?.length > 0 && <ul className="exchange-issues">{row.validation.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>}
                 {exchange.message && <div className="exchange-message">{exchange.message}{exchange.receipt ? ` · ${exchange.receipt}` : ""}</div>}
-                {exchange.remoteDocument && <div className="exchange-message">Документ: {exchange.remoteDocument.number || exchange.remoteDocument.id || "—"} · {exchange.remoteDocument.posted ? t("manager.posted") : t("manager.notPosted")} · {exchange.remoteDocument.mode === "real" ? t("manager.production1c") : t("manager.simulator")}</div>}
+                {exchange.remoteDocument && <div className="exchange-message">{t("manager.exchange.documentLine", {
+                  document: exchange.remoteDocument.number || exchange.remoteDocument.id || "—",
+                  posted: exchange.remoteDocument.posted ? t("manager.posted") : t("manager.notPosted"),
+                  mode: exchange.remoteDocument.mode === "real" ? t("manager.production1c") : t("manager.simulator"),
+                })}</div>}
                 <div className="exchange-actions">
                   <button className="secondary-button" type="button" onClick={goToOrders}>{t("manager.inOrders")}</button>
                   <button className="secondary-button" disabled={busy} type="button" onClick={() => action(row, "check")}>{t("manager.check")}</button>
@@ -403,13 +414,13 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
           <div className="panel-heading">
             <div>
               <p className="eyebrow">{t("manager.dataPreparation")}</p>
-              <h2>{t("manager.text28")}</h2>
+              <h2>{t("manager.exchange.matchWizard")}</h2>
               <p>{t("manager.onlyClientsAndProductsUsedIn")}</p>
             </div>
           </div>
           <div className="form-grid">
             <div className="comment-box">
-              <strong>Клиенты без связи с 1С: {data?.matching?.clients?.length || 0}</strong>
+              <strong>{t("manager.exchange.clientsUnlinkedCount", { count: data?.matching?.clients?.length || 0 })}</strong>
               <div className="manager-exchange-preview-list">
                 {(data?.matching?.clients || []).slice(0, 8).map((client) => (
                   <div key={client.id}>
@@ -421,7 +432,7 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
               <button className="secondary-button" type="button" onClick={() => onNavigate("clients")}>{t("manager.openClients")}</button>
             </div>
             <div className="comment-box">
-              <strong>Товары без ID номенклатуры: {data?.matching?.products?.length || 0}</strong>
+              <strong>{t("manager.exchange.productsWithoutNomenclatureId", { count: data?.matching?.products?.length || 0 })}</strong>
               <div className="manager-exchange-preview-list">
                 {(data?.matching?.products || []).slice(0, 8).map((product) => (
                   <div key={product.id}>
@@ -448,7 +459,11 @@ export function ManagerExchange({ onReload, onApplyManagerNotifications, onNavig
           {(data?.log || []).map((item) => (
             <article className="exchange-log-row" key={item.id}>
               <h4>{AUDIT_ACTION_LABELS[item.action] ? t(AUDIT_ACTION_LABELS[item.action]) : item.action}</h4>
-              <p>{formatDateTime(item.createdAt)} · заказ № {item.details?.orderNumber || "—"} · {item.userEmail || t("shared.role.system")}</p>
+              <p>{t("manager.exchange.logOrderLine", {
+                datetime: formatDateTime(item.createdAt),
+                number: item.details?.orderNumber || "—",
+                user: item.userEmail || t("shared.role.system"),
+              })}</p>
             </article>
           ))}
           {!(data?.log || []).length && (

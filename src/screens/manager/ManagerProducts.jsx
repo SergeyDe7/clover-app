@@ -12,6 +12,7 @@ import {
   restoreWindowScroll,
 } from "../../shared/appHelpers";
 import { appAlert, appConfirm } from "../../shared/AppModal";
+import { visibilityFilterLabel } from "../../shared/i18n/displayLabels";
 import { productImageSrc } from "../../shared/productPhoto";
 import { ProductEditor } from "./ProductEditor";
 import { MatrixExcelReview } from "./MatrixExcelImport";
@@ -82,7 +83,7 @@ function OneCProductsPanel({
         void appAlert({
           title: linked ? t("manager.linksUpdated") : t("manager.noMatches"),
           message: linked
-            ? `Автоматически связаны товары: ${linked}.`
+            ? t("manager.products.autoLinkedCount", { count: linked })
             : t("manager.noNewExactMatchesWereFound"),
           tone: linked ? "success" : "default",
         });
@@ -119,7 +120,7 @@ function OneCProductsPanel({
   return (
     <section className="one-c-products-panel one-c-products-panel-compact">
       <div className="one-c-products-head">
-        <strong className="one-c-products-title">{t("manager.text30")}</strong>
+        <strong className="one-c-products-title">{t("manager.products.oneCCatalog")}</strong>
         <div className="one-c-products-actions">
           <button
             className="secondary-button"
@@ -193,9 +194,11 @@ function OneCProductsPanel({
 
       <div className="one-c-products-meta">
         <span>
-          Выгрузка: {summary.receivedAt ? formatDateTime(summary.receivedAt) : t("manager.notYet")}
+          {t("manager.products.exportAt", {
+            datetime: summary.receivedAt ? formatDateTime(summary.receivedAt) : t("manager.notYet"),
+          })}
         </span>
-        {summary.stale > 0 && <span className="warning-text">Не в свежем каталоге: {summary.stale}</span>}
+        {summary.stale > 0 && <span className="warning-text">{t("manager.products.notInFreshCatalog", { count: summary.stale })}</span>}
       </div>
 
       <button
@@ -239,7 +242,10 @@ function OneCProductsPanel({
           </form>
 
           <p className="muted small">
-            Найдено: {catalog?.total || 0}. Показаны первые {catalog?.items?.length || 0}.
+            {t("manager.products.foundShownFirst", {
+              total: catalog?.total || 0,
+              shown: catalog?.items?.length || 0,
+            })}
           </p>
 
           <div className="one-c-products-list">
@@ -247,11 +253,11 @@ function OneCProductsPanel({
               <article key={item.id}>
                 <div>
                   <strong>{item.name}</strong>
-                  <span>Артикул 1С: {item.code || "—"}</span>
+                  <span>{t("manager.products.oneCArticleCode", { code: item.code || "—" })}</span>
                 </div>
                 {item.cloverLink ? (
                   <span className="badge green">
-                    Связан: {item.cloverLink.productName}
+                    {t("manager.products.linkedNamed", { name: item.cloverLink.productName })}
                   </span>
                 ) : (
                   <span className="badge gray">{t("manager.notInClover")}</span>
@@ -319,7 +325,7 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
     } catch (error) {
       void appAlert({
         title: "Не удалось сохранить",
-        message: `Не удалось сохранить товар: ${error.message}`,
+        message: t("manager.products.saveFailedNamed", { message: error.message }),
         tone: "danger",
       });
     }
@@ -329,7 +335,9 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
     if (!product?.id) return;
     const ok = await appConfirm({
       title: t("manager.deleteTheProductFromTheCatalog"),
-      message: `«${product.name || t("storefront.product")}» будет удалён из каталога Clover, с витрины сайта и из матриц всех клиентов. Заказы с этим товаром не меняются.`,
+      message: t("manager.products.deleteNamed", {
+        name: product.name || t("storefront.product"),
+      }),
       confirmLabel: t("shared.action.delete"),
       tone: "danger",
     });
@@ -388,8 +396,8 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
           ? t("manager.deleteManyProducts")
           : t("manager.deleteSelectedProducts"),
       message: wipingAll
-        ? `Будет удалён весь каталог (${ids.length} поз.): с витрины сайта и из матриц клиентов. Это не отмена Excel и не загрузка файла. Заказы не меняются.`
-        : `Будет удалено из каталога Clover, с витрины сайта и из матриц клиентов: ${ids.length}. Заказы с этими товарами не меняются.`,
+        ? t("manager.products.deleteEntireCatalog", { count: ids.length })
+        : t("manager.products.deleteSelectedCount", { count: ids.length }),
       confirmLabel: wipingAll ? t("manager.yesDeleteTheEntireCatalog") : t("manager.deleteSelected"),
       tone: "danger",
     });
@@ -399,7 +407,7 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
         title: t("manager.confirmAgain"),
         message: wipingAll
           ? t("manager.theCatalogWillBecomeEmptyIt")
-          : `Точно удалить ${ids.length} товаров из каталога Clover?`,
+          : t("manager.products.deleteCountConfirm", { count: ids.length }),
         confirmLabel: t("manager.iConfirmDeletion"),
         tone: "danger",
       });
@@ -444,16 +452,16 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
 
       <div className="toolbar products-filter-bar" id="manager-products-toolbar">
         <input type="search" placeholder={t("manager.searchProductOr1cSku")} value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select>
+        <select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((item) => <option key={item} value={item}>{item === "Все" ? t("shared.filter.all") : item}</option>)}</select>
         <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>
-          <option>{t("shared.filter.all")}</option>
-          <option>{t("shared.filter.active")}</option>
-          <option>{t("manager.hidden2")}</option>
-          <option>{t("manager.onTheWebsiteStorefront")}</option>
-          <option>{t("manager.storefront.off")}</option>
-          <option>{t("manager.linkedTo1c2")}</option>
-          <option>{t("manager.notLinkedTo1c")}</option>
-          <option>{t("manager.hasVariants")}</option>
+          <option value="Все">{visibilityFilterLabel("Все", t)}</option>
+          <option value="Активные">{visibilityFilterLabel("Активные", t)}</option>
+          <option value="Скрытые">{visibilityFilterLabel("Скрытые", t)}</option>
+          <option value="На витрине сайта">{visibilityFilterLabel("На витрине сайта", t)}</option>
+          <option value="Не на витрине">{visibilityFilterLabel("Не на витрине", t)}</option>
+          <option value="Связанные с 1С">{visibilityFilterLabel("Связанные с 1С", t)}</option>
+          <option value="Без связи с 1С">{visibilityFilterLabel("Без связи с 1С", t)}</option>
+          <option value="Есть варианты">{visibilityFilterLabel("Есть варианты", t)}</option>
         </select>
         <div className="inline-actions">
           <button className="primary-button" type="button" onClick={() => setEditorProduct(null)}>{t("manager.products.add")}</button>
@@ -504,7 +512,7 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
         >
           {deleteBusy ? t("manager.deleting2") : t("manager.deleteSelected")}
         </button>
-        <span>Отмечено: {selectedCount}</span>
+        <span>{t("manager.markedCount", { count: selectedCount })}</span>
       </div>
       )}
       {excelFile ? (
@@ -521,9 +529,9 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
             void appAlert({
               title: addedNames.length ? t("manager.excelLoadedIntoTheCatalog") : t("manager.noNewProducts"),
               message: addedNames.length === 1
-                ? `В каталог: «${addedNames[0]}».`
+                ? t("manager.products.addedToCatalogNamed", { name: addedNames[0] })
                 : addedNames.length
-                  ? `В каталог из Excel: ${addedNames.length} поз.`
+                  ? t("manager.products.addedToCatalogFromExcel", { count: addedNames.length })
                   : t("manager.allCheckedItemsAreAlreadyIn"),
               tone: addedNames.length ? "success" : "default",
             });
@@ -545,7 +553,9 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
               type="checkbox"
               checked={selectedSet.has(String(product.id))}
               onChange={(event) => toggleSelected(product.id, event.target.checked)}
-              aria-label={`Выбрать «${product.name || t("storefront.product")}»`}
+              aria-label={t("manager.products.selectNamed", {
+                name: product.name || t("storefront.product"),
+              })}
             />
           </label>
           )}
@@ -562,8 +572,8 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
             ) : null}
             <p className="product-one-c-line">
               {String(product.oneCCode || "").trim()
-                ? `Артикул 1С: ${product.oneCCode}`
-                : t("manager.text2")}
+                ? t("manager.products.oneCArticleCode", { code: product.oneCCode })
+                : t("manager.products.oneC.articleUnlinked")}
             </p>
             {product.certificateUrl ? (
               <p>

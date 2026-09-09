@@ -6,6 +6,18 @@ import {
 import { storefrontHref } from "../mode.js";
 import { navigateStorefront } from "../components/StoreHeader.jsx";
 
+function HostLinkedText({ text, host, onHostClick }) {
+  const parts = String(text).split(host);
+  if (parts.length < 2) return text;
+  return (
+    <>
+      {parts[0]}
+      <a href="/" onClick={onHostClick}>{host}</a>
+      {parts.slice(1).join(host)}
+    </>
+  );
+}
+
 function Step({ n, title, children }) {
   return (
     <li className="sf-install-step">
@@ -48,12 +60,11 @@ export function InstallAppPage() {
         <PlatformCard title={t("storefront.iphoneAndIpad")} badge="iOS">
           <Step n="1" title={t("storefront.openSafari")}>
             <p>
-              Перейдите на{" "}
-              <a href="/" onClick={(e) => { e.preventDefault(); navigateStorefront("home"); }}>
-                clover-spb.ru
-              </a>{" "}
-              в браузере Safari. В Chrome и других браузерах на iOS установка на экран
-              недоступна.
+              <HostLinkedText
+                text={t("storefront.install.iosOpenSafari", { host: "clover-spb.ru" })}
+                host="clover-spb.ru"
+                onHostClick={(e) => { e.preventDefault(); navigateStorefront("home"); }}
+              />
             </p>
           </Step>
           <Step n="2" title={t("storefront.tapShare")}>
@@ -71,12 +82,11 @@ export function InstallAppPage() {
         <PlatformCard title="Android" badge="Android">
           <Step n="1" title={t("storefront.openChrome")}>
             <p>
-              Зайдите на{" "}
-              <a href="/" onClick={(e) => { e.preventDefault(); navigateStorefront("home"); }}>
-                clover-spb.ru
-              </a>{" "}
-              в Google Chrome (желательно последняя версия из Play Store). Samsung Internet
-              тоже подойдёт: меню → «Добавить на главный экран».
+              <HostLinkedText
+                text={t("storefront.install.androidOpenChrome", { host: "clover-spb.ru" })}
+                host="clover-spb.ru"
+                onHostClick={(e) => { e.preventDefault(); navigateStorefront("home"); }}
+              />
             </p>
           </Step>
           <Step n="2" title={t("storefront.browserMenu")}>

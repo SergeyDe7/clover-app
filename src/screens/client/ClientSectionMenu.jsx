@@ -96,7 +96,7 @@ export function ClientSectionMenu({
               >
                 <span>{t(label)}</span>
                 {badge > 0 ? (
-                  <span className="client-nav-count" aria-label={`Уведомлений: ${badge}`}>
+                  <span className="client-nav-count" aria-label={t("client.nav.notificationsCount", { count: badge })}>
                     {badge}
                   </span>
                 ) : null}

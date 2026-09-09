@@ -1,5 +1,5 @@
 import { TARGET_INTERNAL_LOCALES, canonicalizeTargetLocale } from "./languageRegistry.js";
-import { UI_CATALOG_BY_KEY } from "./uiCatalog.js";
+import { getCatalogEntry } from "./uiCatalog.js";
 import { isNonEmptyText, placeholdersMatch } from "./placeholderValidation.js";
 
 function copyFreeze(map) {
@@ -26,7 +26,7 @@ export function translationStoreToDictionaries(store) {
   for (const value of values) {
     const entry = byId.get(String(value.entryId || ""));
     if (!entry) continue;
-    const catalog = UI_CATALOG_BY_KEY.get(entry.fieldKey);
+    const catalog = getCatalogEntry(entry.fieldKey);
     if (!catalog) continue;
     if (catalog.namespace !== entry.namespace) continue;
     if (String(entry.entityType || "") !== "" || String(entry.entityId || "") !== "") continue;

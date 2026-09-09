@@ -27,7 +27,7 @@ export function AddressesPanel({ addresses, onChange }) {
 
   const remove = async (item) => {
     const ok = await appConfirm({
-      title: `Удалить адрес «${item.label}»?`,
+      title: t("shared.address.deleteNamed", { label: item.label }),
       message: t("client.theAddressWillDisappearFromThe"),
       confirmLabel: t("shared.action.delete"),
       cancelLabel: t("shared.modal.cancel"),

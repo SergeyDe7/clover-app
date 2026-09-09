@@ -2,6 +2,7 @@ import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert } from "../../shared/AppModal";
+import { visibilityFilterLabel } from "../../shared/i18n/displayLabels";
 import { normalizeProduct, productArticle, UNIT_ORDER, UNIT_CONFIG, unitPriceField, selectDefaultNumber, matchesCatalogPrefixSearch, productCatalogSearchHaystack, formatRussianPhone, getRussianPhoneLocalDigits } from "../../shared/appHelpers";
 import { StorefrontProductAdd } from "./StorefrontProductAdd";
 import {
@@ -106,7 +107,7 @@ export function ManagerStorefront({
     storefrontInfoPages: cloneStorefrontInfoPages(settings?.storefrontInfoPages),
     storefrontOneCClientId: settings?.storefrontOneCClientId || "",
     storefrontOneCClientName:
-      settings?.storefrontOneCClientName || t("manager.cloverOnlineStore"),
+      settings?.storefrontOneCClientName || "Интернет магазин Clover",
   });
 
   useEffect(() => {
@@ -139,7 +140,7 @@ export function ManagerStorefront({
         storefrontInfoPages: cloneStorefrontInfoPages(settings?.storefrontInfoPages),
         storefrontOneCClientId: settings?.storefrontOneCClientId || "",
         storefrontOneCClientName:
-          settings?.storefrontOneCClientName || t("manager.cloverOnlineStore"),
+          settings?.storefrontOneCClientName || "Интернет магазин Clover",
       };
       const same =
         prev.storefrontPricingMode === next.storefrontPricingMode &&
@@ -379,8 +380,8 @@ export function ManagerStorefront({
     const saved = await persistProducts(
       next,
       checked
-        ? `На витрину добавлено: ${touched}.`
-        : `С витрины снято: ${touched}.`
+        ? t("manager.storefront.addedCount", { count: touched })
+        : t("manager.storefront.removedCount", { count: touched })
     );
     if (saved) clearSelection();
   };
@@ -469,7 +470,7 @@ export function ManagerStorefront({
     ].filter((value) => String(value || "").trim()).length;
     const manual = item.storefrontPricing?.source === "manual";
     const parts = [];
-    if (filled) parts.push(`описание ${filled}/3`);
+    if (filled) parts.push(t("manager.storefront.descriptionFilled", { filled }));
     else parts.push(t("manager.descriptionIsEmpty"));
     if (manual) parts.push(t("manager.ownPrice"));
     return parts.join(" · ");
@@ -500,7 +501,7 @@ export function ManagerStorefront({
               checked={draft.storefrontPricingMode !== "purchase_markup"}
               onChange={() => setField("storefrontPricingMode", "price_type")}
             />
-            <span>{t("manager.text")}</span>
+            <span>{t("manager.oneC.priceType")}</span>
           </label>
           <label className="storefront-check">
             <input
@@ -605,7 +606,7 @@ export function ManagerStorefront({
       </div>
 
       <div className="manager-contact-settings" style={{ marginTop: 20 }}>
-        <h3>{t("manager.text33")}</h3>
+        <h3>{t("manager.storefront.oneC.counterparty.title")}</h3>
         <p className="storefront-settings-hint">{
           t("manager.guestOrdersWithoutRegistrationGoTo")
         }</p>
@@ -621,7 +622,7 @@ export function ManagerStorefront({
             />
           </label>
           <label className="field field-wide">{
-            t("manager.text34")
+            t("manager.storefront.oneC.counterparty.id")
             }<input
               value={draft.storefrontOneCClientId || ""}
               placeholder={t("manager.ifTheGuidFromTheExport")}
@@ -994,11 +995,12 @@ export function ManagerStorefront({
       <div className="manager-contact-settings" style={{ marginTop: 28 }}>
         <h3>{t("manager.productsOnTheStorefront")}</h3>
         <p className="storefront-settings-hint">
-          На сайте имя товара = как в матрице Clover (не сырое название 1С).
-          Можно выбрать из каталога ниже или добавить из 1С / Excel, даже если
-          позиции ещё нет ни у одного клиента. Сейчас на витрине:{" "}
-          <strong>{onStorefrontCount}</strong> из {activeProducts.length}.
-          Выбрано: <strong>{selectedCount}</strong>.
+          {t("manager.storefront.nameEqualsMatrixHint")}{" "}
+          {t("manager.storefront.nowOnStorefrontSelected", {
+            onStorefront: onStorefrontCount,
+            total: activeProducts.length,
+            selected: selectedCount,
+          })}
         </p>
         <StorefrontProductAdd
           products={products}
@@ -1026,9 +1028,9 @@ export function ManagerStorefront({
               value={storefrontFilter}
               onChange={(event) => setStorefrontFilter(event.target.value)}
             >
-              <option>{t("shared.filter.all")}</option>
-              <option>{t("manager.storefront.on")}</option>
-              <option>{t("manager.storefront.off")}</option>
+              <option value="Все">{visibilityFilterLabel("Все", t)}</option>
+              <option value="На витрине">{visibilityFilterLabel("На витрине", t)}</option>
+              <option value="Не на витрине">{visibilityFilterLabel("Не на витрине", t)}</option>
             </select>
           </label>
         </div>
@@ -1080,7 +1082,7 @@ export function ManagerStorefront({
                     title: t("manager.queueStarted"),
                     message:
                       result.message ||
-                      `Обновление описаний: ${result.queued || 0} товар(ов). Старые тексты сохраняются до замены.`,
+                      t("manager.storefront.enrichQueued", { count: result.queued || 0 }),
                     tone: "success",
                   });
                 } catch (error) {

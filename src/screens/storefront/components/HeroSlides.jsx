@@ -131,7 +131,7 @@ export function HeroSlides({ slides, intervalSec }) {
               key={slide.src}
               type="button"
               role="tab"
-              aria-label={`Слайд ${slideIndex + 1}`}
+              aria-label={t("storefront.hero.slideAria", { index: slideIndex + 1 })}
               aria-selected={slideIndex === index}
               className={slideIndex === index ? "is-active" : ""}
               onClick={() => setIndex(slideIndex)}

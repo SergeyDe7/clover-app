@@ -55,7 +55,7 @@ export function ProductCard({ product }) {
           </button>
         </h3>
         {product.code ? (
-          <p className="sf-product-code">Арт. {product.code}</p>
+          <p className="sf-product-code">{t("shared.article.prefix", { article: product.code })}</p>
         ) : null}
         <strong className="sf-product-price">
           <span className="sf-product-price-value">

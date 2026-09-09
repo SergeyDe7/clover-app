@@ -153,7 +153,7 @@ export function AdminRolePanel({ currentUser }) {
     setNotice("");
     try {
       await api.setUserRole(userId, role);
-      setNotice(`Роль обновлена: ${role}`);
+      setNotice(t("admin.staff.roleUpdated", { role }));
       await load();
     } catch (err) {
       setError(err.message);
@@ -193,7 +193,7 @@ export function AdminRolePanel({ currentUser }) {
     setNotice("");
     try {
       await api.createManager(nextEmail, nextPassword, contact);
-      setNotice(`Менеджер ${nextEmail} создан. Пароль сохранён в журнале.`);
+      setNotice(t("admin.staff.managerCreated", { email: nextEmail }));
       setFormKey((value) => value + 1);
       await load();
     } catch (err) {
@@ -227,8 +227,8 @@ export function AdminRolePanel({ currentUser }) {
     const ok = await appConfirm({
       title: disable ? t("shared.closeAccess2") : t("shared.openAccess2"),
       message: disable
-        ? `${user.email} не сможет войти в кабинет, пока доступ закрыт.`
-        : `${user.email} снова сможет войти.`,
+        ? t("admin.staff.accessClosedNamed", { email: user.email })
+        : t("admin.staff.accessOpenedNamed", { email: user.email }),
       confirmLabel: disable ? t("shared.closeAccess") : t("shared.action.open"),
       tone: disable ? "danger" : "default",
     });
@@ -296,7 +296,7 @@ export function AdminRolePanel({ currentUser }) {
   const removeManager = async (user) => {
     const ok = await appConfirm({
       title: t("shared.deleteTheManager"),
-      message: `${user.email} будет удалён безвозвратно.`,
+      message: t("admin.staff.deleteForeverNamed", { email: user.email }),
       confirmLabel: t("shared.action.delete"),
       tone: "danger",
     });
@@ -432,8 +432,8 @@ export function AdminRolePanel({ currentUser }) {
       )}
 
       <p className="muted small" style={{ marginTop: 18 }}>
-        Администраторов сейчас: {adminCount}
-        {canManageStaff ? ` · ${savedPasswordCount} с паролем в журнале` : null}
+        {t("admin.staff.adminsNowCount", { count: adminCount })}
+        {canManageStaff ? t("admin.staff.passwordJournalCount", { count: savedPasswordCount }) : null}
       </p>
 
       <div className="exchange-actions" style={{ marginTop: 10 }}>
@@ -575,8 +575,14 @@ export function AdminRolePanel({ currentUser }) {
                   </div>
                   {user.passwordUpdatedAt ? (
                     <small className="muted">
-                      Обновлён {formatDateTime(user.passwordUpdatedAt)}
-                      {user.passwordUpdatedBy ? ` · ${user.passwordUpdatedBy}` : ""}
+                      {user.passwordUpdatedBy
+                        ? t("admin.staff.passwordUpdatedAtBy", {
+                            stamp: formatDateTime(user.passwordUpdatedAt),
+                            who: user.passwordUpdatedBy,
+                          })
+                        : t("admin.staff.passwordUpdatedAt", {
+                            stamp: formatDateTime(user.passwordUpdatedAt),
+                          })}
                     </small>
                   ) : (
                     <small className="muted">{

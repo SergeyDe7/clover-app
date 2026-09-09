@@ -63,9 +63,9 @@ export function CartPage() {
             <div className="sf-cart-meta">
               <strong>{item.name}</strong>
               <p className="sf-muted">
-                Арт. {item.code} · {item.unitLabel || item.unit}
+                {t("shared.article.prefix", { article: item.code })} · {item.unitLabel || item.unit}
                 {Number(item.unitSize) > 1
-                  ? ` · по ${Number(item.unitSize)} шт`
+                  ? t("storefront.cart.unitSizePieces", { count: Number(item.unitSize) })
                   : ""}
               </p>
             </div>
@@ -79,7 +79,7 @@ export function CartPage() {
             <button
               type="button"
               className="sf-cart-remove sf-btn sf-btn-ghost sf-btn-sm"
-              aria-label={`Удалить ${item.name}`}
+              aria-label={t("storefront.cart.removeNamed", { name: item.name })}
               onClick={() => removeFromCart(item.productId, item.unit)}
             >
               <span className="sf-cart-remove-label">{t("shared.action.delete")}</span>
@@ -94,7 +94,7 @@ export function CartPage() {
             <div className="sf-cart-meta">
               <strong>{t("checkout.delivery")}</strong>
               <p className="sf-muted">
-                По СПб · заказ менее {formatMoney(FREE_DELIVERY_MIN_TOTAL)}
+                {t("storefront.cart.spbUnderAmount", { amount: formatMoney(FREE_DELIVERY_MIN_TOTAL) })}
               </p>
             </div>
             <strong className="sf-cart-line-total">
@@ -112,7 +112,10 @@ export function CartPage() {
               }`}
             >
               {deliveryFee > 0
-                ? `Доставка ${formatMoney(PAID_DELIVERY_FEE)}. До бесплатной ещё ${formatMoney(FREE_DELIVERY_MIN_TOTAL - goodsTotal)}.`
+                ? t("storefront.cart.deliveryNeedMore", {
+                    fee: formatMoney(PAID_DELIVERY_FEE),
+                    needMore: formatMoney(FREE_DELIVERY_MIN_TOTAL - goodsTotal),
+                  })
                 : t("storefront.deliveryInSaintPetersburgIsFree")}
             </p>
           ) : null}

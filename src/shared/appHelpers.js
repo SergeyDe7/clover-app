@@ -2,6 +2,7 @@
 // Не содержит React-компонентов — только данные и функции без побочных эффектов рендера.
 
 import { assignCloverTaxonomy, canonicalizeProductCategory } from "../screens/storefront/productGroups.js";
+import { uiText } from "./i18n/translationRuntime.js";
 
 export const MANAGER_ACTIVE_TAB_KEY = "clover-manager-active-tab-v1";
 
@@ -897,14 +898,14 @@ export function exchangeContourLabel(database) {
   return name === "TEST" ? "1С TEST" : "1С";
 }
 
-export function exchangeStatusLabel(exchange = {}) {
+export function exchangeStatusLabel(exchange = {}, t) {
   const state = normalizeOrderExchange(exchange);
   const base = EXCHANGE_STATUS_LABELS[state.status] || EXCHANGE_STATUS_LABELS.not_sent;
   if (!["ready", "sending", "sent"].includes(state.status)) return base;
   const contour = exchangeContourLabel(state.database);
-  if (state.status === "ready") return `В очереди ${contour}`;
-  if (state.status === "sending") return `Передаётся в ${contour}`;
-  return `Принят в ${contour}`;
+  if (state.status === "ready") return uiText(t, "manager.exchange.queuedContour", { contour });
+  if (state.status === "sending") return uiText(t, "manager.exchange.sendingContour", { contour });
+  return uiText(t, "manager.exchange.acceptedContour", { contour });
 }
 
 export function normalizeOrderExchange(value = {}) {
@@ -957,13 +958,13 @@ export function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-export function printOrderDocument(order, settings) {
+export function printOrderDocument(order, settings, t) {
   const printWindow = window.open("", "_blank", "width=960,height=760");
   if (!printWindow) {
     void import("./AppModal.jsx").then(({ appAlert }) =>
       appAlert({
-        title: "Печать заблокирована",
-        message: "Браузер заблокировал окно печати. Разрешите всплывающие окна для этого сайта.",
+        title: uiText(t, "shared.print.blockedTitle"),
+        message: uiText(t, "shared.print.blockedMessage"),
         tone: "warn",
       })
     );
@@ -982,27 +983,27 @@ export function printOrderDocument(order, settings) {
   const customRows = (order.customItems || []).map((item, index) => `
     <tr>
       <td>${(order.items || []).length + index + 1}</td>
-      <td><strong>${escapeHtml(item.name)}</strong><br><small>Товар вне матрицы · ${escapeHtml(item.details || "")}</small></td>
+      <td><strong>${escapeHtml(item.name)}</strong><br><small>${escapeHtml(uiText(t, "shared.print.outsideMatrix", { details: item.details || "" }))}</small></td>
       <td>${escapeHtml(item.unit || "шт.")}</td>
       <td>${Number(item.quantity) || 0}</td>
       <td>${settings.showPrices ? escapeHtml(formatMoney(Number(item.unitPrice) || 0)) : "—"}</td>
       <td>${settings.showPrices ? escapeHtml(formatMoney((Number(item.unitPrice) || 0) * (Number(item.quantity) || 0))) : "—"}</td>
     </tr>`).join("");
 
-  printWindow.document.write(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Заказ ${escapeHtml(order.number)}</title><style>
+  printWindow.document.write(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>${escapeHtml(uiText(t, "shared.print.documentTitle", { number: order.number }))}</title><style>
     body{font-family:Arial,sans-serif;color:#263226;margin:32px} h1{margin:0 0 4px;color:#3f7c3d} .meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:22px 0;padding:16px;background:#f3f7f1;border-radius:12px}.meta div{line-height:1.5} table{width:100%;border-collapse:collapse;margin-top:18px}th,td{border:1px solid #dce6d9;padding:9px;text-align:left;vertical-align:top}th{background:#eef5eb}.total{margin-top:18px;text-align:right;font-size:20px;font-weight:700}.note{margin-top:18px;padding:12px;background:#fff8e8;border-radius:10px}.footer{margin-top:36px;color:#718071;font-size:12px}@media print{button{display:none}body{margin:12mm}}
   </style></head><body>
-    <h1>Заказ № ${escapeHtml(order.number)}</h1>
-    <div>Система Clover · ${escapeHtml(formatDateTime(order.createdAt))}</div>
+    <h1>${escapeHtml(uiText(t, "shared.print.orderHeading", { number: order.number }))}</h1>
+    <div>${escapeHtml(uiText(t, "shared.print.systemLine", { datetime: formatDateTime(order.createdAt) }))}</div>
     <div class="meta">
-      <div><strong>Клиент:</strong><br>${escapeHtml(order.customerName || "")}<br>${escapeHtml(order.customerContact || "")}<br>${escapeHtml(order.customerPhone || "")}</div>
-      <div><strong>Доставка:</strong><br>${escapeHtml(formatDate(order.firstDeliveryDate))}<br>${escapeHtml(order.address || "")}</div>
+      <div><strong>${escapeHtml(uiText(t, "shared.print.clientLabel"))}</strong><br>${escapeHtml(order.customerName || "")}<br>${escapeHtml(order.customerContact || "")}<br>${escapeHtml(order.customerPhone || "")}</div>
+      <div><strong>${escapeHtml(uiText(t, "shared.print.deliveryLabel"))}</strong><br>${escapeHtml(formatDate(order.firstDeliveryDate))}<br>${escapeHtml(order.address || "")}</div>
     </div>
-    <table><thead><tr><th>№</th><th>Товар</th><th>Единица</th><th>Количество</th><th>Цена</th><th>Сумма</th></tr></thead><tbody>${itemRows}${customRows}</tbody></table>
-    ${settings.showPrices ? `<div class="total">Итого: ${escapeHtml(formatMoney(getOrderTotal(order)))}</div>` : ""}
-    ${order.clientComment ? `<div class="note"><strong>Комментарий клиента:</strong><br>${escapeHtml(order.clientComment)}</div>` : ""}
-    ${order.managerComment ? `<div class="note"><strong>Комментарий менеджера:</strong><br>${escapeHtml(order.managerComment)}</div>` : ""}
-    <div class="footer">Внешний ID: ${escapeHtml(order.externalId || order.id || "")}</div>
+    <table><thead><tr><th>№</th><th>${escapeHtml(uiText(t, "shared.print.colProduct"))}</th><th>${escapeHtml(uiText(t, "shared.field.unit"))}</th><th>${escapeHtml(uiText(t, "shared.field.qty"))}</th><th>${escapeHtml(uiText(t, "shared.field.price"))}</th><th>${escapeHtml(uiText(t, "shared.amount"))}</th></tr></thead><tbody>${itemRows}${customRows}</tbody></table>
+    ${settings.showPrices ? `<div class="total">${escapeHtml(uiText(t, "shared.print.totalAmount", { amount: formatMoney(getOrderTotal(order)) }))}</div>` : ""}
+    ${order.clientComment ? `<div class="note"><strong>${escapeHtml(uiText(t, "manager.clientComment"))}</strong><br>${escapeHtml(order.clientComment)}</div>` : ""}
+    ${order.managerComment ? `<div class="note"><strong>${escapeHtml(uiText(t, "shared.print.managerComment"))}</strong><br>${escapeHtml(order.managerComment)}</div>` : ""}
+    <div class="footer">${escapeHtml(uiText(t, "shared.print.externalId", { id: order.externalId || order.id || "" }))}</div>
     <script>window.onload=()=>window.print();</script>
   </body></html>`);
   printWindow.document.close();
@@ -7251,6 +7252,7 @@ export function pickProductCardOneCCost({
   salePriceReceivedAt = "",
   oneCPriceTypes = [],
   preferredUnit = "piece",
+  t,
 } = {}) {
   const unit =
     UNIT_ORDER.includes(preferredUnit) && hasPurchasePrice(purchasePrices?.[preferredUnit])
@@ -7300,10 +7302,14 @@ export function pickProductCardOneCCost({
     kind: picked.kind,
     unit,
     updatedAt: fromType ? typedAt : purchaseAt,
-    title: fromType ? `Вид цен «${zakup?.name || "Закупочная"}»` : "Закупочная цена товара",
+    title: fromType
+      ? uiText(t, "manager.products.priceTypeTitle", {
+          name: zakup?.name || uiText(t, "manager.products.purchaseFallbackName"),
+        })
+      : uiText(t, "manager.products.purchasePriceTitle"),
     sourceLabel: fromType
-      ? "Из «Обновить цены» (вид цен)"
-      : "Из выгрузки закупочных цен",
+      ? uiText(t, "manager.products.priceFromUpdate")
+      : uiText(t, "manager.products.priceFromPurchaseExport"),
   };
 }
 

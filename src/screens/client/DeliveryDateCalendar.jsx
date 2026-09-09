@@ -2,7 +2,7 @@ import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Календарь даты доставки: воскресенья и слишком ранние дни недоступны.
 import { useMemo, useState } from "react";
 import {
-  DELIVERY_DATE_MESSAGES,
+  deliveryDateMessage,
   formatLocalIsoDate,
   parseLocalIsoDate,
   startOfLocalDay,
@@ -89,14 +89,14 @@ export function DeliveryDateCalendar({ value, earliestIso, onPick }) {
             return <span key={`e-${index}`} className="delivery-calendar-cell is-empty" />;
           }
           const iso = formatLocalIsoDate(date);
-          const check = validateDeliveryDate(iso);
+          const check = validateDeliveryDate(iso, new Date(), t);
           const selected = value === iso && check.ok;
           const isSunday = date.getDay() === 0;
 
           // Воскресенье и недоступные дни — не button: выбрать нельзя.
           if (!check.ok) {
             const message = isSunday
-              ? DELIVERY_DATE_MESSAGES.sunday
+              ? deliveryDateMessage("sunday", t)
               : check.message;
             return (
               <button

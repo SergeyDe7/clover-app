@@ -142,12 +142,15 @@ export function StorefrontQtyControl({
           min={inputStep}
           step={inputStep}
           inputMode="numeric"
-          aria-label={`Количество, ${qtyUnitLabel}`}
+          aria-label={t("storefront.qty.ariaWithUnit", { unit: qtyUnitLabel })}
           title={
             multiplier > 1
-              ? `В ${storefrontUnitLabel(unit)}: ${multiplier} шт`
+              ? t("storefront.qty.inUnitPieces", {
+                  unit: storefrontUnitLabel(unit),
+                  count: multiplier,
+                })
               : step > 1
-                ? `Кратно ${step}`
+                ? t("storefront.qty.multipleOf", { step })
                 : undefined
           }
           value={draft}
