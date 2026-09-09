@@ -360,6 +360,106 @@ export async function runTranslationAuthHttpTest({ workRoot }) {
     assert.equal(adminSave.status, 200, `admin save ${adminSave.status} ${adminSave.text}`);
     assert.equal(adminSave.json?.ok, true);
 
+    const workspaceZh = await httpJson(baseUrl, "GET", "/api/admin/translations?language=zh&view=interface", {
+      token: tokens.admin,
+    });
+    assert.equal(workspaceZh.status, 200, `workspace zh ${workspaceZh.status} ${workspaceZh.text}`);
+    assert.equal(Array.isArray(workspaceZh.json?.rows), true);
+
+    for (const alias of ["zh-CN", "ZH_cn", "EN"]) {
+      const rejectedWorkspace = await httpJson(
+        baseUrl,
+        "GET",
+        `/api/admin/translations?language=${encodeURIComponent(alias)}&view=interface`,
+        { token: tokens.admin }
+      );
+      assert.equal(
+        rejectedWorkspace.status,
+        400,
+        `workspace ${alias} expected 400 got ${rejectedWorkspace.status} ${rejectedWorkspace.text}`
+      );
+    }
+
+    const saveZh = await httpJson(baseUrl, "PUT", `/api/admin/translations/${entry.id}/zh`, {
+      token: tokens.admin,
+      body: { value: "Confirm via public zh" },
+    });
+    assert.equal(saveZh.status, 200, `save zh ${saveZh.status} ${saveZh.text}`);
+    const afterPublicZh = snapshotStore(dbPath);
+    assert.equal(
+      afterPublicZh.values.some(
+        (row) => row.entry_id === entry.id && row.language_code === "zh-CN" && row.value === "Confirm via public zh"
+      ),
+      true,
+      "exact zh must persist as zh-CN"
+    );
+    assert.equal(
+      afterPublicZh.values.some((row) => row.language_code === "zh"),
+      false,
+      "public zh must not create a zh DB row"
+    );
+
+    const saveZhCn = await httpJson(baseUrl, "PUT", `/api/admin/translations/${entry.id}/zh-CN`, {
+      token: tokens.admin,
+      body: { value: "Confirm via exact zh-CN" },
+    });
+    assert.equal(saveZhCn.status, 200, `save zh-CN ${saveZhCn.status} ${saveZhCn.text}`);
+    const afterExactZhCn = snapshotStore(dbPath);
+    assert.equal(
+      afterExactZhCn.values.some(
+        (row) =>
+          row.entry_id === entry.id && row.language_code === "zh-CN" && row.value === "Confirm via exact zh-CN"
+      ),
+      true,
+      "exact zh-CN must persist as zh-CN"
+    );
+
+    for (const alias of ["ZH_cn", "EN"]) {
+      const beforeAlias = snapshotStore(dbPath);
+      const rejectedSave = await httpJson(baseUrl, "PUT", `/api/admin/translations/${entry.id}/${alias}`, {
+        token: tokens.admin,
+        body: { value: "Must not persist alias" },
+      });
+      assert.equal(
+        rejectedSave.status,
+        400,
+        `save ${alias} expected 400 got ${rejectedSave.status} ${rejectedSave.text}`
+      );
+      const afterAlias = snapshotStore(dbPath);
+      assert.deepEqual(afterAlias.values, beforeAlias.values, `save ${alias} mutated rows`);
+      assert.deepEqual(afterAlias.settings, beforeAlias.settings, `save ${alias} mutated settings`);
+      assert.equal(afterAlias.catalogVersion, beforeAlias.catalogVersion, `save ${alias} mutated catalogVersion`);
+    }
+
+    const beforeSettingsAlias = snapshotStore(dbPath);
+    const settingsAlias = await httpJson(baseUrl, "PUT", "/api/admin/localization", {
+      token: tokens.admin,
+      body: { enabledLanguages: ["ru", "zh-CN"] },
+    });
+    assert.equal(
+      settingsAlias.status,
+      400,
+      `settings zh-CN expected 400 got ${settingsAlias.status} ${settingsAlias.text}`
+    );
+    const afterSettingsAlias = snapshotStore(dbPath);
+    assert.deepEqual(afterSettingsAlias.values, beforeSettingsAlias.values);
+    assert.deepEqual(afterSettingsAlias.settings, beforeSettingsAlias.settings);
+    assert.equal(afterSettingsAlias.catalogVersion, beforeSettingsAlias.catalogVersion);
+
+    const beforeIncomplete = snapshotStore(dbPath);
+    const settingsIncomplete = await httpJson(baseUrl, "PUT", "/api/admin/localization", {
+      token: tokens.admin,
+      body: { enabledLanguages: ["ru", "zh"] },
+    });
+    assert.equal(
+      settingsIncomplete.status,
+      200,
+      `settings exact public zh ${settingsIncomplete.status} ${settingsIncomplete.text}`
+    );
+    assert.deepEqual(settingsIncomplete.json?.settings?.enabledLanguages, ["ru"]);
+    assert.equal(settingsIncomplete.json?.settings?.enabledLanguages?.includes("zh"), false);
+    assert.equal(snapshotStore(dbPath).catalogVersion, beforeIncomplete.catalogVersion);
+
     return {
       host,
       port,

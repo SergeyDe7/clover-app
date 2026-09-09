@@ -13,13 +13,12 @@ import {
   upsertTranslationValueRow,
 } from "./db.js";
 import {
-  DEFAULT_LOCALE,
   PUBLIC_LOCALE_CODES,
   TARGET_INTERNAL_LOCALES,
-  canonicalizeTargetLocale,
-  isSupportedPublicLocale,
-  isSupportedTargetLocale,
-  toPublicLocaleCode,
+  exactTranslationTargetInternal,
+  isExactPublicLocaleCode,
+  isExactPublicTargetLocale,
+  isExactTranslationTargetLocale,
 } from "../../src/shared/i18n/languageRegistry.js";
 import { sourceHash } from "../../src/shared/i18n/sourceHash.js";
 import { placeholdersMatch, isNonEmptyText } from "../../src/shared/i18n/placeholderValidation.js";
@@ -156,7 +155,7 @@ function requirePublicEnabledLanguages(value) {
     if (typeof code !== "string" || !code.trim()) {
       throw invalidLocaleError("enabledLanguages must contain non-empty public locale codes.");
     }
-    if (!PUBLIC_LOCALE_CODES.includes(code) || !isSupportedPublicLocale(code)) {
+    if (!isExactPublicLocaleCode(code)) {
       throw invalidLocaleError("Unsupported localization language.");
     }
   }
@@ -305,7 +304,7 @@ export function initializeLocalizationCatalog() {
 export function listWorkspaceRows(filters = {}) {
   if (Object.prototype.hasOwnProperty.call(filters, "language") && filters.language !== undefined) {
     const languageRaw = filters.language;
-    if (typeof languageRaw !== "string" || !languageRaw.trim() || !isSupportedTargetLocale(languageRaw)) {
+    if (!isExactPublicTargetLocale(languageRaw)) {
       throw invalidLocaleError();
     }
   }
@@ -313,7 +312,7 @@ export function listWorkspaceRows(filters = {}) {
   const store = currentCatalogItems(readTranslationStore());
   return filterTranslationRows(buildTranslationRows(store), {
     ...filters,
-    language: languageRaw && isSupportedTargetLocale(languageRaw) ? toPublicLocaleCode(languageRaw) : languageRaw,
+    language: languageRaw,
   });
 }
 
@@ -335,13 +334,13 @@ function requireCurrentUiEntry(entryId) {
 }
 
 function requireTargetLocale(language) {
-  if (!isSupportedTargetLocale(language)) {
+  if (!isExactTranslationTargetLocale(language)) {
     const error = new Error("Unsupported translation language.");
     error.status = 400;
     error.code = "UNSUPPORTED_LOCALE";
     throw error;
   }
-  const internal = canonicalizeTargetLocale(language);
+  const internal = exactTranslationTargetInternal(language);
   if (!internal) {
     const error = new Error("Unsupported translation language.");
     error.status = 400;
@@ -429,4 +428,3 @@ export function resetTranslationToAuto(entryId, language, actor = "") {
 }
 
 void initialized;
-void DEFAULT_LOCALE;

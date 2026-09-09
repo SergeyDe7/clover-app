@@ -103,9 +103,36 @@ export const TARGET_INTERNAL_LOCALES = Object.freeze([
   "ar",
 ]);
 
+/** Exact public non-RU codes accepted by admin workspace GET. */
+export const PUBLIC_TARGET_LOCALE_CODES = Object.freeze(["en", "uz", "ky", "tg", "zh", "ar"]);
+
 /**
- * Validation boundary: supported public or internal target locale.
- * Never folds unknown/fr/ru into a usable target.
+ * Exact save/reset path spellings. Chinese accepts public zh and internal zh-CN only.
+ * Aliases such as ZH_cn / zh_cn / ZH-CN are not accepted.
+ */
+export const TRANSLATION_TARGET_INPUT_CODES = Object.freeze(["en", "uz", "ky", "tg", "zh", "zh-CN", "ar"]);
+
+export function isExactPublicLocaleCode(value) {
+  return typeof value === "string" && PUBLIC_LOCALE_CODES.includes(value);
+}
+
+export function isExactPublicTargetLocale(value) {
+  return typeof value === "string" && PUBLIC_TARGET_LOCALE_CODES.includes(value);
+}
+
+export function isExactTranslationTargetLocale(value) {
+  return typeof value === "string" && TRANSLATION_TARGET_INPUT_CODES.includes(value);
+}
+
+export function exactTranslationTargetInternal(value) {
+  if (!isExactTranslationTargetLocale(value)) return "";
+  if (value === "zh-CN") return "zh-CN";
+  return PUBLIC_TO_INTERNAL[value] || "";
+}
+
+/**
+ * General recognizer after Stage 1 canonicalization.
+ * Not the Stage 3.1 admin/persistence input boundary.
  */
 export function isSupportedTargetLocale(value) {
   if (typeof value !== "string") return false;

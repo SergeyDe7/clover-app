@@ -455,38 +455,83 @@ assert.equal(storeMod.readLocalizationSettings().enabledLanguages.includes("en")
 }
 
 {
-  const versionBeforeLocale = storeMod.readLocalizationSettings().catalogVersion;
-  const localeCases = [
-    ["en", true],
-    ["zh", true],
-    ["zh-CN", true],
-    ["ZH_cn", true],
-    ["ru", false],
-    ["fr", false],
-    ["unknown", false],
-    ["", false],
-    [1, false],
-  ];
-  for (const [code, ok] of localeCases) {
-    let passed = true;
+  function localeSnapshot() {
+    return {
+      settings: storeMod.readLocalizationSettings(),
+      values: storeMod.readTranslationStore().values,
+    };
+  }
+
+  function assertRejectedLocaleMutation(fn, label) {
+    const before = localeSnapshot();
+    let error = null;
     try {
-      storeMod.listWorkspaceRows({ view: "interface", language: code });
-    } catch {
-      passed = false;
+      fn();
+    } catch (caught) {
+      error = caught;
     }
-    assert.equal(passed, ok, `workspace language ${JSON.stringify(code)}`);
+    assert.ok(error, `${label} must reject`);
+    assert.equal(error.status, 400, `${label} status`);
+    assert.equal(error.code, "UNSUPPORTED_LOCALE", `${label} code`);
+    const after = localeSnapshot();
+    assert.deepEqual(after.values, before.values, `${label} must not change translation rows`);
+    assert.deepEqual(after.settings, before.settings, `${label} must not change settings`);
+    assert.equal(after.settings.catalogVersion, before.settings.catalogVersion, `${label} catalogVersion +0`);
   }
-  let settingsMutated = false;
-  try {
-    storeMod.writeLocalizationSettings({ enabledLanguages: ["ru", "fr"] }, "admin");
-    settingsMutated = true;
-  } catch (error) {
-    assert.equal(error.status, 400);
+
+  const workspaceAccept = ["en", "uz", "ky", "tg", "zh", "ar"];
+  const workspaceReject = ["ru", "zh-CN", "zh_cn", "ZH_cn", "ZH-CN", "EN", " en ", "fr", "", 1];
+  for (const code of workspaceAccept) {
+    assert.doesNotThrow(() => storeMod.listWorkspaceRows({ view: "interface", language: code }));
   }
-  assert.equal(settingsMutated, false);
-  assert.equal(storeMod.readLocalizationSettings().catalogVersion, versionBeforeLocale);
-  const zhSave = storeMod.saveManualTranslation(uiEntry.id, "zh", "Confirm via public zh", "admin@clover.ru");
-  assert.equal(zhSave.value.languageCode, "zh-CN");
+  for (const code of workspaceReject) {
+    assertRejectedLocaleMutation(
+      () => storeMod.listWorkspaceRows({ view: "interface", language: code }),
+      `workspace ${JSON.stringify(code)}`
+    );
+  }
+
+  const saveAccept = ["en", "uz", "ky", "tg", "zh", "zh-CN", "ar"];
+  const saveReject = ["zh_cn", "ZH_cn", "ZH-CN", "EN", " en ", "AR", "ru", "fr", "", 1];
+  for (const code of saveAccept) {
+    const saved = storeMod.saveManualTranslation(uiEntry.id, code, `Confirm exact ${String(code)}`, "admin@clover.ru");
+    assert.equal(saved.value.languageCode, "zh-CN" === code || code === "zh" ? "zh-CN" : code);
+    const reset = storeMod.resetTranslationToAuto(uiEntry.id, code, "admin@clover.ru");
+    assert.equal(reset.value.languageCode, code === "zh" || code === "zh-CN" ? "zh-CN" : code);
+    assert.equal(reset.value.state, "AUTO");
+  }
+  for (const code of saveReject) {
+    assertRejectedLocaleMutation(
+      () => storeMod.saveManualTranslation(uiEntry.id, code, "Must not persist alias", "admin@clover.ru"),
+      `save ${JSON.stringify(code)}`
+    );
+    assertRejectedLocaleMutation(
+      () => storeMod.resetTranslationToAuto(uiEntry.id, code, "admin@clover.ru"),
+      `reset ${JSON.stringify(code)}`
+    );
+  }
+
+  const settingsReject = [
+    ["ru", "zh-CN"],
+    ["ru", "zh_cn"],
+    ["ru", "ZH_cn"],
+    ["ru", "ZH-CN"],
+    ["ru", "EN"],
+    ["ru", " en "],
+    ["ru", "fr"],
+    ["ru", ""],
+  ];
+  for (const enabledLanguages of settingsReject) {
+    assertRejectedLocaleMutation(
+      () => storeMod.writeLocalizationSettings({ enabledLanguages }, "admin"),
+      `settings ${JSON.stringify(enabledLanguages)}`
+    );
+  }
+  const beforeIncomplete = localeSnapshot();
+  const incompletePublic = storeMod.writeLocalizationSettings({ enabledLanguages: ["ru", "zh"] }, "admin");
+  assert.deepEqual(incompletePublic.settings.enabledLanguages, ["ru"]);
+  assert.equal(incompletePublic.settings.enabledLanguages.includes("zh"), false);
+  assert.equal(incompletePublic.settings.catalogVersion, beforeIncomplete.settings.catalogVersion);
 }
 
 {
