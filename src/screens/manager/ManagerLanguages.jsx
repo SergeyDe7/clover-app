@@ -25,6 +25,13 @@ function formatStamp(value) {
   }
 }
 
+function statusTone(cell) {
+  if (cell?.stale) return "stale";
+  if (cell?.state === "AUTO") return "auto";
+  if (cell?.state === "MANUAL") return "manual";
+  return "missing";
+}
+
 export function ManagerLanguages() {
   const { t } = useLocalization();
   const [settings, setSettings] = useState(null);
@@ -192,20 +199,25 @@ export function ManagerLanguages() {
 
   return (
     <section className="manager-languages" aria-labelledby="manager-languages-title">
-      <header>
+      <header className="manager-languages-header">
         <h2 id="manager-languages-title">{t("manager.nav.languages")}</h2>
         <p>{t("admin.languages.lead")}</p>
       </header>
 
-      <div className="form-grid" style={{ marginBottom: 18 }}>
+      <div className="manager-languages-locale-grid">
         {localeCards.map((locale) => {
           const code = locale.publicCode;
           const locked = code === "ru" || locale.alwaysEnabled;
           const on = locked || enabled.has(code);
           const report = completeness[code] || {};
           return (
-            <article className="setting-card" key={code}>
-              <div>
+            <article
+              className={
+                locked ? "manager-languages-locale-card is-locked" : "manager-languages-locale-card"
+              }
+              key={code}
+            >
+              <div className="manager-languages-locale-copy">
                 <h3>{languageLabels[code] || code}</h3>
                 <p>
                   {locked
@@ -230,114 +242,124 @@ export function ManagerLanguages() {
         })}
       </div>
 
-      <nav className="manager-more-nav" aria-label={t("admin.languages.views")}>
-        {TRANSLATION_WORKSPACE_VIEWS.map(([id]) => (
-          <button
-            key={id}
-            className={view === id ? "category-button active" : "category-button"}
-            type="button"
-            onClick={() => setView(id)}
-          >
-            {viewTitles[id] || id}
-          </button>
-        ))}
-      </nav>
+      <div className="manager-languages-workspace">
+        <nav className="manager-languages-tabs" aria-label={t("admin.languages.views")}>
+          {TRANSLATION_WORKSPACE_VIEWS.map(([id]) => (
+            <button
+              key={id}
+              className={view === id ? "manager-languages-tab is-active" : "manager-languages-tab"}
+              type="button"
+              onClick={() => setView(id)}
+            >
+              {viewTitles[id] || id}
+            </button>
+          ))}
+        </nav>
 
-      <div className="form-grid" style={{ marginBottom: 16 }}>
-        <label className="field">
-          {t("storefront.search.placeholder")}
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onBlur={load}
-            placeholder={t("admin.languages.searchPlaceholder")}
-          />
-        </label>
-        <label className="field">
-          {t("admin.languages.language")}
-          <select value={safeLanguage} onChange={(event) => setLanguage(event.target.value)}>
-            {TARGET_LOCALES.map((code) => (
-              <option key={code} value={code}>
-                {languageLabels[code]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field" style={{ alignItems: "center", display: "flex", gap: 8 }}>
-          <input
-            type="checkbox"
-            checked={untranslatedOnly}
-            onChange={(event) => setUntranslatedOnly(event.target.checked)}
-          />
-          {t("admin.languages.untranslatedOnly")}
-        </label>
-      </div>
-
-      {message ? <p>{message}</p> : null}
-
-      {rows.length === 0 ? (
-        <p>{t("admin.languages.empty")}</p>
-      ) : (
-        <div className="table-wrap">
-          <table className="data-table manager-languages-table">
-            <thead>
-              <tr>
-                <th>{t("admin.languages.label.ru")}</th>
-                <th>{languageLabels[safeLanguage]}</th>
-                <th>{t("admin.languages.status")}</th>
-                <th>{t("admin.languages.editor")}</th>
-                <th>{t("admin.languages.updatedAt")}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const cell = row.languages?.[safeLanguage] || {};
-                const stateKey =
-                  cell.stale
-                    ? "admin.languages.state.stale"
-                    : cell.state === "AUTO"
-                      ? "admin.languages.state.auto"
-                      : cell.state === "MANUAL"
-                        ? "admin.languages.state.manual"
-                        : "admin.languages.state.missing";
-                return (
-                  <tr key={`${row.id || row.fieldKey}:${safeLanguage}`}>
-                    <td>{row.sourceRu || "—"}</td>
-                    <td>
-                      <textarea
-                        className="manager-languages-target"
-                        rows={2}
-                        value={readDraftValue(drafts, row.id, safeLanguage, cell.value || "")}
-                        onChange={(event) =>
-                          setDrafts((current) =>
-                            setDraftValue(current, row.id, safeLanguage, event.target.value, true)
-                          )
-                        }
-                      />
-                    </td>
-                    <td>
-                      {t(stateKey)}
-                    </td>
-                    <td>{cell.updatedBy || "—"}</td>
-                    <td>{formatStamp(cell.updatedAt)}</td>
-                    <td>
-                      <div className="manager-languages-actions">
-                        <button type="button" className="primary-button" disabled={busy} onClick={() => saveRow(row)}>
-                          {t("admin.languages.save")}
-                        </button>
-                        <button type="button" className="secondary-button" disabled={busy} onClick={() => resetRow(row)}>
-                          {t("admin.languages.resetAuto")}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="manager-languages-toolbar">
+          <label className="manager-languages-field manager-languages-field-search">
+            {t("storefront.search.placeholder")}
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onBlur={load}
+              placeholder={t("admin.languages.searchPlaceholder")}
+            />
+          </label>
+          <label className="manager-languages-field manager-languages-field-language">
+            {t("admin.languages.language")}
+            <select value={safeLanguage} onChange={(event) => setLanguage(event.target.value)}>
+              {TARGET_LOCALES.map((code) => (
+                <option key={code} value={code}>
+                  {languageLabels[code]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="manager-languages-check">
+            <input
+              type="checkbox"
+              checked={untranslatedOnly}
+              onChange={(event) => setUntranslatedOnly(event.target.checked)}
+            />
+            <span>{t("admin.languages.untranslatedOnly")}</span>
+          </label>
         </div>
-      )}
+
+        {message ? <p className="manager-languages-message">{message}</p> : null}
+
+        {rows.length === 0 ? (
+          <p className="manager-languages-empty">{t("admin.languages.empty")}</p>
+        ) : (
+          <div className="manager-languages-table-wrap">
+            <table className="manager-languages-table">
+              <thead>
+                <tr>
+                  <th>{t("admin.languages.label.ru")}</th>
+                  <th>{languageLabels[safeLanguage]}</th>
+                  <th>{t("admin.languages.status")}</th>
+                  <th>{t("admin.languages.editor")}</th>
+                  <th>{t("admin.languages.updatedAt")}</th>
+                  <th className="manager-languages-col-actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const cell = row.languages?.[safeLanguage] || {};
+                  const tone = statusTone(cell);
+                  const stateKey =
+                    cell.stale
+                      ? "admin.languages.state.stale"
+                      : cell.state === "AUTO"
+                        ? "admin.languages.state.auto"
+                        : cell.state === "MANUAL"
+                          ? "admin.languages.state.manual"
+                          : "admin.languages.state.missing";
+                  return (
+                    <tr key={`${row.id || row.fieldKey}:${safeLanguage}`}>
+                      <td data-label={t("admin.languages.label.ru")}>
+                        <span className="manager-languages-source">{row.sourceRu || "—"}</span>
+                      </td>
+                      <td data-label={languageLabels[safeLanguage]}>
+                        <textarea
+                          className="manager-languages-target"
+                          rows={3}
+                          value={readDraftValue(drafts, row.id, safeLanguage, cell.value || "")}
+                          aria-label={languageLabels[safeLanguage]}
+                          onChange={(event) =>
+                            setDrafts((current) =>
+                              setDraftValue(current, row.id, safeLanguage, event.target.value, true)
+                            )
+                          }
+                        />
+                      </td>
+                      <td data-label={t("admin.languages.status")}>
+                        <span className={`manager-languages-status is-${tone}`}>{t(stateKey)}</span>
+                      </td>
+                      <td data-label={t("admin.languages.editor")}>
+                        <span className="manager-languages-editor">{cell.updatedBy || "—"}</span>
+                      </td>
+                      <td data-label={t("admin.languages.updatedAt")}>
+                        <span className="manager-languages-updated">{formatStamp(cell.updatedAt)}</span>
+                      </td>
+                      <td data-label="">
+                        <div className="manager-languages-actions">
+                          <button type="button" className="primary-button" disabled={busy} onClick={() => saveRow(row)}>
+                            {t("admin.languages.save")}
+                          </button>
+                          <button type="button" className="secondary-button" disabled={busy} onClick={() => resetRow(row)}>
+                            {t("admin.languages.resetAuto")}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

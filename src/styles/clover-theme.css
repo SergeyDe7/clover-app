@@ -1595,17 +1595,413 @@ body:has(.clover-app) {
   color: var(--clover-l3-active-text) !important;
 }
 
-.manager-languages-target {
+/* —— Manager Languages workspace (scoped) —— */
+.manager-languages {
   width: 100%;
-  min-width: 12rem;
-  min-height: 3.2rem;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.manager-languages-header {
+  margin: 0 0 16px;
+}
+
+.manager-languages-header h2 {
+  margin: 0 0 6px;
+}
+
+.manager-languages-header p {
+  margin: 0;
+  max-width: 52rem;
+  color: var(--clover-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.manager-languages-locale-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.manager-languages-locale-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px 14px;
+  background: var(--clover-surface);
+  border: 1px solid var(--clover-border);
+  border-radius: var(--radius-sm);
+}
+
+.manager-languages-locale-copy {
+  min-width: 0;
+}
+
+.manager-languages-locale-card h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
+  line-height: 1.3;
+  color: var(--clover-text);
+}
+
+.manager-languages-locale-card p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--clover-muted);
+}
+
+.manager-languages-locale-card.is-locked {
+  background: var(--clover-surface-soft);
+}
+
+.manager-languages-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  background: var(--clover-surface);
+  border: 1px solid var(--clover-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.manager-languages-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.manager-languages-tab {
+  min-height: 36px !important;
+  padding: 6px 12px;
+  border: 1px solid var(--clover-l3-border);
+  border-radius: 999px;
+  background: var(--clover-l3-bg);
+  color: var(--clover-l3-text);
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.manager-languages-tab:hover {
+  background: var(--clover-l3-hover-bg);
+}
+
+.manager-languages-tab.is-active {
+  background: var(--clover-l3-active-bg);
+  border-color: var(--clover-l3-active-border);
+  color: var(--clover-l3-active-text);
+}
+
+.manager-languages-tab:focus-visible {
+  outline: 2px solid var(--clover-green);
+  outline-offset: 2px;
+}
+
+.manager-languages-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px auto;
+  gap: 12px 16px;
+  align-items: end;
+}
+
+.manager-languages-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--clover-muted-strong);
+}
+
+.manager-languages-field input,
+.manager-languages-field select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--clover-border);
+  border-radius: var(--radius-sm);
+  background: var(--clover-surface);
+  color: var(--clover-text);
+  box-sizing: border-box;
+}
+
+.manager-languages-field input:focus-visible,
+.manager-languages-field select:focus-visible,
+.manager-languages-target:focus-visible,
+.clover-app .manager-languages .manager-languages-field input:focus-visible,
+.clover-app .manager-languages .manager-languages-field select:focus-visible,
+.clover-app .manager-languages .manager-languages-target:focus-visible {
+  outline: 2px solid var(--clover-green) !important;
+  outline-offset: 1px !important;
+  border-color: var(--clover-green) !important;
+}
+
+.manager-languages-field-language {
+  width: 180px;
+  max-width: 100%;
+}
+
+.manager-languages-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  font-size: 13px;
+  color: var(--clover-text-secondary);
+}
+
+.manager-languages-check input {
+  flex-shrink: 0;
+}
+
+.manager-languages-message,
+.manager-languages-empty {
+  margin: 0;
+  color: var(--clover-text-secondary);
+  font-size: 14px;
+}
+
+.manager-languages-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.manager-languages-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.manager-languages-table th,
+.manager-languages-table td {
+  padding: 10px 12px;
+  vertical-align: top;
+  text-align: left;
+  border-bottom: 1px solid var(--clover-border-soft);
+}
+
+.manager-languages-table thead th {
+  padding: 8px 12px;
+  background: var(--clover-surface-soft);
+  color: var(--clover-muted-strong);
+  font-size: 12px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.01em;
+}
+
+.manager-languages-table th:nth-child(1),
+.manager-languages-table td:nth-child(1) {
+  width: 32%;
+}
+
+.manager-languages-table th:nth-child(2),
+.manager-languages-table td:nth-child(2) {
+  width: 36%;
+}
+
+.manager-languages-table th:nth-child(3),
+.manager-languages-table td:nth-child(3),
+.manager-languages-table th:nth-child(4),
+.manager-languages-table td:nth-child(4) {
+  width: 7%;
+}
+
+.manager-languages-table th:nth-child(5),
+.manager-languages-table td:nth-child(5) {
+  width: 8%;
+}
+
+.manager-languages-table th:nth-child(6),
+.manager-languages-table td:nth-child(6) {
+  width: 10%;
+}
+
+.manager-languages-source {
+  display: block;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.manager-languages-target {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 4.6em;
+  padding: 8px 10px;
+  border: 1px solid var(--clover-border);
+  border-radius: 10px;
+  background: var(--clover-surface);
+  color: var(--clover-text);
+  line-height: 1.4;
   resize: vertical;
+  box-sizing: border-box;
+}
+
+.manager-languages-status {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: var(--fw-semibold);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.manager-languages-status.is-auto {
+  background: var(--clover-green-soft);
+  color: var(--clover-green-deep);
+}
+
+.manager-languages-status.is-manual {
+  background: var(--clover-l3-active-bg);
+  color: #fff;
+}
+
+.manager-languages-status.is-stale {
+  background: var(--clover-warn-bg);
+  color: var(--clover-warn-text);
+}
+
+.manager-languages-status.is-missing {
+  background: var(--clover-danger-bg);
+  color: var(--clover-danger);
+}
+
+.manager-languages-editor,
+.manager-languages-updated {
+  display: block;
+  color: var(--clover-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .manager-languages-actions {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 6px;
+}
+
+.clover-app .manager-languages-actions .primary-button,
+.clover-app .manager-languages-actions .secondary-button {
+  min-height: 32px !important;
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .manager-languages-locale-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .manager-languages-toolbar {
+    grid-template-columns: minmax(0, 1fr) 180px;
+  }
+
+  .manager-languages-check {
+    grid-column: 1 / -1;
+    min-height: 36px;
+  }
+}
+
+@media (max-width: 820px) {
+  .manager-languages-locale-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .manager-languages-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .manager-languages-field-language {
+    width: 100%;
+  }
+
+  .manager-languages-workspace {
+    padding: 12px;
+  }
+
+  .manager-languages-table thead {
+    display: none;
+  }
+
+  .manager-languages-table,
+  .manager-languages-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .manager-languages-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "source source"
+      "target target"
+      "status updated"
+      "editor editor"
+      "actions actions";
+    gap: 4px 12px;
+    margin: 0 0 12px;
+    padding: 12px;
+    background: var(--clover-surface-soft);
+    border: 1px solid var(--clover-border-soft);
+    border-radius: var(--radius-sm);
+  }
+
+  .manager-languages-table td {
+    width: auto;
+    min-width: 0;
+    padding: 8px 0;
+    border-bottom: 0;
+  }
+
+  .manager-languages-table td:nth-child(1) { grid-area: source; }
+  .manager-languages-table td:nth-child(2) { grid-area: target; }
+  .manager-languages-table td:nth-child(3) { grid-area: status; }
+  .manager-languages-table td:nth-child(4) { grid-area: editor; }
+  .manager-languages-table td:nth-child(5) { grid-area: updated; }
+  .manager-languages-table td:nth-child(6) { grid-area: actions; }
+
+  .manager-languages-table td[data-label]:not([data-label=""])::before {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--clover-muted);
+    font-size: 12px;
+    font-weight: var(--fw-semibold);
+    content: attr(data-label);
+  }
+
+  .clover-app .manager-languages-actions .primary-button,
+  .clover-app .manager-languages-actions .secondary-button {
+    width: 100%;
+    min-height: 44px !important;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 430px) {
+  .manager-languages-locale-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .category-button.active {
