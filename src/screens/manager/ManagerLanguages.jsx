@@ -17,12 +17,14 @@ import {
   canShowGenericReset,
   nextLoadMoreOffset,
   shouldClearLoadingForRequest,
+  shouldDisableTargetLanguageSelect,
+  shouldReplaceOverviewOnFailure,
 } from "../../shared/i18n/workspaceActionGates.js";
 import { canShowReturnToAuto } from "../../shared/i18n/productTranslationUi.js";
 import {
-  clearTranslationDraft,
+  clearDraftIfUnchanged,
+  emptyWorkspacePageMeta,
   isTranslationDraftDirty,
-  markDraftClean,
   mergePagedWorkspaceRows,
   mergeWorkspaceDrafts,
   readDraftValue,
@@ -85,11 +87,13 @@ export function ManagerLanguages() {
   const [untranslatedOnly, setUntranslatedOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+  const [workspaceError, setWorkspaceError] = useState("");
+  const [overviewError, setOverviewError] = useState("");
   const [drafts, setDrafts] = useState({});
   const [glossary, setGlossary] = useState([]);
   const [glossaryForm, setGlossaryForm] = useState(emptyGlossaryForm);
-  const [pageMeta, setPageMeta] = useState({ total: 0, hasMore: false, limit: 100 });
+  const [pageMeta, setPageMeta] = useState(emptyWorkspacePageMeta());
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [overviewReady, setOverviewReady] = useState(false);
   const requestGenerationRef = useRef(0);
@@ -100,6 +104,9 @@ export function ManagerLanguages() {
   const untranslatedRef = useRef(false);
   const acceptedOffsetRef = useRef(0);
   const inFlightRef = useRef(false);
+  const overviewEverLoadedRef = useRef(false);
+  const page0FailedRef = useRef(false);
+
   const safeLanguage = TARGET_LOCALES.includes(language) ? language : "en";
   languageRef.current = safeLanguage;
   viewRef.current = view;
@@ -107,6 +114,10 @@ export function ManagerLanguages() {
   untranslatedRef.current = untranslatedOnly;
   const glossaryEditing = Boolean(glossaryForm.id);
   const glossaryFormLanguage = glossaryForm.language || safeLanguage;
+  const languageSelectDisabled = shouldDisableTargetLanguageSelect({
+    view,
+    glossaryEditing,
+  });
 
   const languageLabels = {
     ru: t("admin.languages.label.ru"),
@@ -132,6 +143,12 @@ export function ManagerLanguages() {
     return () => clearTimeout(timer);
   }, [query]);
 
+  useEffect(() => {
+    if (view !== "glossary" && glossaryForm.id) {
+      setGlossaryForm(emptyGlossaryForm());
+    }
+  }, [view, glossaryForm.id]);
+
   const loadOverview = useCallback(async () => {
     const requestGeneration = ++overviewGenerationRef.current;
     try {
@@ -141,12 +158,22 @@ export function ManagerLanguages() {
       setCompleteness(payload.completeness || {});
       setLocales(Array.isArray(payload.locales) ? payload.locales : []);
       setOverviewReady(true);
+      overviewEverLoadedRef.current = true;
+      setOverviewError("");
     } catch (error) {
       if (requestGeneration !== overviewGenerationRef.current) return;
-      setSettings({ enabledLanguages: ["ru"], catalogVersion: 0 });
-      setCompleteness({});
-      setOverviewReady(false);
-      setMessage(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
+      if (
+        shouldReplaceOverviewOnFailure({
+          everLoadedSuccessfully: overviewEverLoadedRef.current,
+        })
+      ) {
+        setSettings({ enabledLanguages: ["ru"], catalogVersion: 0 });
+        setCompleteness({});
+        setOverviewReady(false);
+      } else {
+        setOverviewReady(false);
+      }
+      setOverviewError(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
     }
   }, [t]);
 
@@ -160,12 +187,15 @@ export function ManagerLanguages() {
       replaceIdentity = false,
     }) => {
       const requestGeneration = ++requestGenerationRef.current;
+      const isPage0 = replaceIdentity || !(Number(requestOffset) > 0);
       inFlightRef.current = true;
       setWorkspaceLoading(true);
-      if (replaceIdentity || Number(requestOffset) === 0) {
-        // Hide incompatible prior-language rows while loading the new identity/page0.
+      if (isPage0) {
         setRows([]);
         setGlossary([]);
+        setPageMeta(emptyWorkspacePageMeta());
+        acceptedOffsetRef.current = 0;
+        page0FailedRef.current = false;
       }
       try {
         const [workspace, glossaryPayload] = await Promise.all([
@@ -212,7 +242,8 @@ export function ManagerLanguages() {
         };
         setPageMeta(nextMeta);
         acceptedOffsetRef.current = Number(requestOffset) || 0;
-        setMessage("");
+        page0FailedRef.current = false;
+        setWorkspaceError("");
       } catch (error) {
         if (
           !shouldApplyWorkspaceResponse({
@@ -229,8 +260,11 @@ export function ManagerLanguages() {
         if (shouldClearWorkspaceOnLoadError(requestOffset)) {
           setRows([]);
           setGlossary([]);
+          setPageMeta(emptyWorkspacePageMeta());
+          acceptedOffsetRef.current = 0;
+          page0FailedRef.current = true;
         }
-        setMessage(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
+        setWorkspaceError(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
       } finally {
         if (
           shouldClearLoadingForRequest({
@@ -265,7 +299,6 @@ export function ManagerLanguages() {
     loadOverview();
   }, [loadOverview]);
 
-  // Identity changes always load exactly one page-0 request (never old offset).
   useEffect(() => {
     acceptedOffsetRef.current = 0;
     fetchWorkspacePage({
@@ -279,6 +312,7 @@ export function ManagerLanguages() {
   }, [view, safeLanguage, debouncedQuery, untranslatedOnly, fetchWorkspacePage]);
 
   const handleLoadMore = () => {
+    if (page0FailedRef.current) return;
     const next = nextLoadMoreOffset({
       acceptedOffset: acceptedOffsetRef.current,
       limit: pageMeta.limit,
@@ -336,6 +370,8 @@ export function ManagerLanguages() {
       setSettings(result.settings || result);
       setCompleteness(result.completeness || completeness);
       setOverviewReady(true);
+      overviewEverLoadedRef.current = true;
+      setOverviewError("");
       if (Array.isArray(result.rejected) && result.rejected.includes(code)) {
         await appAlert({
           title: t("admin.languages.enableBlockedTitle"),
@@ -379,15 +415,15 @@ export function ManagerLanguages() {
       } else {
         await api.saveLocalizationTranslation(row.id, targetLanguage, savedValue);
       }
-      setDrafts((current) => markDraftClean(current, row.id, targetLanguage, savedValue));
-      setMessage(t("admin.languages.saved"));
+      setDrafts((current) => clearDraftIfUnchanged(current, row.id, targetLanguage, savedValue));
+      setActionMessage(t("admin.languages.saved"));
       await Promise.all([refreshWorkspaceFromStart(), refreshOverview()]);
     } catch (error) {
       if (error?.code === "SOURCE_STALE" || error?.status === 409) {
-        setMessage(t("admin.productTranslations.sourceStale"));
+        setActionMessage(t("admin.productTranslations.sourceStale"));
         await Promise.all([refreshWorkspaceFromStart(), refreshOverview()]);
       } else {
-        setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
+        setActionMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
       }
     } finally {
       setBusy(false);
@@ -405,6 +441,7 @@ export function ManagerLanguages() {
       message: t("admin.languages.resetConfirm"),
     });
     if (!confirmed) return;
+    const priorDraft = readDraftValue(drafts, row.id, targetLanguage, cell.value || "");
     setBusy(true);
     try {
       const productRef = row.kind === "product" ? parseProductTranslationRowId(row.id) : null;
@@ -418,15 +455,15 @@ export function ManagerLanguages() {
       } else {
         await api.resetLocalizationTranslation(row.id, targetLanguage);
       }
-      setMessage(t("admin.languages.resetDone"));
-      setDrafts((current) => clearTranslationDraft(current, row.id, targetLanguage));
+      setActionMessage(t("admin.languages.resetDone"));
+      setDrafts((current) => clearDraftIfUnchanged(current, row.id, targetLanguage, priorDraft));
       await Promise.all([refreshWorkspaceFromStart(), refreshOverview()]);
     } catch (error) {
       if (error?.code === "SOURCE_STALE" || error?.status === 409) {
-        setMessage(t("admin.productTranslations.sourceStale"));
+        setActionMessage(t("admin.productTranslations.sourceStale"));
         await Promise.all([refreshWorkspaceFromStart(), refreshOverview()]);
       } else {
-        setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
+        setActionMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
       }
     } finally {
       setBusy(false);
@@ -434,17 +471,27 @@ export function ManagerLanguages() {
   };
 
   const saveGlossary = async () => {
+    const submitted = { ...glossaryForm, language: glossaryFormLanguage };
     setBusy(true);
     try {
-      await api.saveGlossaryEntry({
-        ...glossaryForm,
-        language: glossaryFormLanguage,
+      await api.saveGlossaryEntry(submitted);
+      setGlossaryForm((current) => {
+        if (
+          current.id === submitted.id &&
+          current.sourceRu === submitted.sourceRu &&
+          current.targetValue === submitted.targetValue &&
+          current.context === submitted.context &&
+          Boolean(current.protected) === Boolean(submitted.protected) &&
+          (current.language || glossaryFormLanguage) === submitted.language
+        ) {
+          return emptyGlossaryForm();
+        }
+        return current;
       });
-      setGlossaryForm(emptyGlossaryForm());
-      setMessage(t("admin.glossary.saved"));
+      setActionMessage(t("admin.glossary.saved"));
       await refreshWorkspaceFromStart();
     } catch (error) {
-      setMessage(errorDisplayMessage(error, t, "admin.glossary.saveFailed"));
+      setActionMessage(errorDisplayMessage(error, t, "admin.glossary.saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -459,10 +506,10 @@ export function ManagerLanguages() {
     setBusy(true);
     try {
       await api.deleteGlossaryEntry(entry.id);
-      setMessage(t("admin.glossary.deleted"));
+      setActionMessage(t("admin.glossary.deleted"));
       await refreshWorkspaceFromStart();
     } catch (error) {
-      setMessage(errorDisplayMessage(error, t, "admin.glossary.saveFailed"));
+      setActionMessage(errorDisplayMessage(error, t, "admin.glossary.saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -478,8 +525,14 @@ export function ManagerLanguages() {
     return list;
   }, [locales]);
 
-  const loadMoreDisabled = busy || workspaceLoading || inFlightRef.current || !pageMeta.hasMore;
+  const loadMoreDisabled =
+    busy ||
+    workspaceLoading ||
+    inFlightRef.current ||
+    !pageMeta.hasMore ||
+    page0FailedRef.current;
   const showWorkspaceRows = !workspaceLoading || rows.length > 0;
+  const bannerMessage = actionMessage || workspaceError || overviewError;
 
   return (
     <section className="manager-languages" aria-labelledby="manager-languages-title">
@@ -560,7 +613,7 @@ export function ManagerLanguages() {
             {t("admin.languages.language")}
             <select
               value={safeLanguage}
-              disabled={glossaryEditing}
+              disabled={languageSelectDisabled}
               onChange={(event) => setLanguage(event.target.value)}
             >
               {TARGET_LOCALES.map((code) => (
@@ -580,7 +633,7 @@ export function ManagerLanguages() {
           </label>
         </div>
 
-        {message ? <p className="manager-languages-message">{message}</p> : null}
+        {bannerMessage ? <p className="manager-languages-message">{bannerMessage}</p> : null}
 
         {view === "glossary" ? (
           <div className="manager-glossary">
@@ -589,6 +642,7 @@ export function ManagerLanguages() {
                 {t("admin.glossary.source")}
                 <input
                   value={glossaryForm.sourceRu}
+                  disabled={busy}
                   onChange={(event) =>
                     setGlossaryForm((current) => ({ ...current, sourceRu: event.target.value }))
                   }
@@ -598,6 +652,7 @@ export function ManagerLanguages() {
                 {t("admin.glossary.target")}
                 <input
                   value={glossaryForm.targetValue}
+                  disabled={busy}
                   onChange={(event) =>
                     setGlossaryForm((current) => ({ ...current, targetValue: event.target.value }))
                   }
@@ -607,6 +662,7 @@ export function ManagerLanguages() {
                 {t("admin.glossary.context")}
                 <select
                   value={glossaryForm.context}
+                  disabled={busy}
                   onChange={(event) =>
                     setGlossaryForm((current) => ({ ...current, context: event.target.value }))
                   }
@@ -622,6 +678,7 @@ export function ManagerLanguages() {
                 <input
                   type="checkbox"
                   checked={glossaryForm.protected}
+                  disabled={busy}
                   onChange={(event) =>
                     setGlossaryForm((current) => ({ ...current, protected: event.target.checked }))
                   }
@@ -636,9 +693,7 @@ export function ManagerLanguages() {
                   type="button"
                   className="secondary-button"
                   disabled={busy}
-                  onClick={() =>
-                    setGlossaryForm(emptyGlossaryForm())
-                  }
+                  onClick={() => setGlossaryForm(emptyGlossaryForm())}
                 >
                   {t("admin.glossary.cancel")}
                 </button>
@@ -742,6 +797,7 @@ export function ManagerLanguages() {
                           rows={3}
                           value={draftValue}
                           aria-label={languageLabels[safeLanguage]}
+                          disabled={busy}
                           onChange={(event) =>
                             setDrafts((current) =>
                               setDraftValue(current, row.id, safeLanguage, event.target.value, true)

@@ -9,16 +9,19 @@ import {
   productTranslationFieldPresentation,
   shouldStartProductTranslationFetch,
 } from "../../shared/i18n/productTranslationUi.js";
-import { canSaveProductTranslationField } from "../../shared/i18n/workspaceActionGates.js";
+import {
+  canSaveProductTranslationField,
+  shouldClearLoadingForRequest,
+  shouldContinueProductMutation,
+} from "../../shared/i18n/workspaceActionGates.js";
 import {
   clearProductDrafts,
-  clearProductFieldDraft,
+  clearProductFieldDraftIfUnchanged,
   isProductFieldDraftDirty,
   readProductFieldDraft,
   writeProductFieldDraft,
 } from "../../shared/i18n/productTranslationDrafts.js";
 import { shouldApplyWorkspaceResponse } from "../../shared/i18n/translationDrafts.js";
-import { shouldClearLoadingForRequest } from "../../shared/i18n/workspaceActionGates.js";
 
 const TARGET_LOCALES = ["en", "uz", "ky", "tg", "zh", "ar"];
 
@@ -42,6 +45,7 @@ export function ProductTranslationEditor({ product }) {
   const requestGenerationRef = useRef(0);
   const inFlightRef = useRef(false);
   const productIdRef = useRef("");
+  const mountedRef = useRef(true);
 
   const productId = product?.id == null ? "" : String(product.id);
   productIdRef.current = productId;
@@ -55,11 +59,21 @@ export function ProductTranslationEditor({ product }) {
   };
 
   useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      requestGenerationRef.current += 1;
+      inFlightRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     requestGenerationRef.current += 1;
     inFlightRef.current = false;
     setDrafts(clearProductDrafts());
     setWorkspace(null);
     setLoading(false);
+    setBusy(false);
     setMessage("");
     setExpanded(false);
     setExpandedField("");
@@ -95,6 +109,15 @@ export function ProductTranslationEditor({ product }) {
       ) {
         return;
       }
+      if (
+        !shouldContinueProductMutation({
+          mounted: mountedRef.current,
+          operationProductId: requestedProductId,
+          currentProductId: productIdRef.current,
+        })
+      ) {
+        return;
+      }
       setWorkspace(payload.workspace || null);
     } catch (error) {
       if (
@@ -109,6 +132,15 @@ export function ProductTranslationEditor({ product }) {
       ) {
         return;
       }
+      if (
+        !shouldContinueProductMutation({
+          mounted: mountedRef.current,
+          operationProductId: requestedProductId,
+          currentProductId: productIdRef.current,
+        })
+      ) {
+        return;
+      }
       setWorkspace(null);
       setMessage(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
     } finally {
@@ -117,7 +149,8 @@ export function ProductTranslationEditor({ product }) {
           requestGeneration,
           currentGeneration: requestGenerationRef.current,
         }) &&
-        requestedProductId === productIdRef.current
+        requestedProductId === productIdRef.current &&
+        mountedRef.current
       ) {
         setLoading(false);
         inFlightRef.current = false;
@@ -137,6 +170,7 @@ export function ProductTranslationEditor({ product }) {
   if (!productId) return null;
 
   const saveField = async (field) => {
+    const operationProductId = productId;
     const sourceHash = workspace?.fields?.[field]?.sourceHash || "";
     const cell = workspace?.fields?.[field]?.languages?.[language] || {};
     const value = readProductFieldDraft(drafts, language, field, cell.value || "");
@@ -150,13 +184,31 @@ export function ProductTranslationEditor({ product }) {
     }
     setBusy(true);
     try {
-      await api.saveProductTranslation(productId, language, field, value, sourceHash);
-      setDrafts((current) => clearProductFieldDraft(current, language, field));
+      await api.saveProductTranslation(operationProductId, language, field, value, sourceHash);
+      if (
+        !shouldContinueProductMutation({
+          mounted: mountedRef.current,
+          operationProductId,
+          currentProductId: productIdRef.current,
+        })
+      ) {
+        return;
+      }
+      setDrafts((current) => clearProductFieldDraftIfUnchanged(current, language, field, value));
       setMessage(t("admin.languages.saved"));
       inFlightRef.current = false;
       setWorkspace(null);
       await load({ force: true });
     } catch (error) {
+      if (
+        !shouldContinueProductMutation({
+          mounted: mountedRef.current,
+          operationProductId,
+          currentProductId: productIdRef.current,
+        })
+      ) {
+        return;
+      }
       if (error?.code === "SOURCE_STALE" || error?.status === 409) {
         setMessage(t("admin.productTranslations.sourceStale"));
         inFlightRef.current = false;
@@ -166,11 +218,20 @@ export function ProductTranslationEditor({ product }) {
         setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
       }
     } finally {
-      setBusy(false);
+      if (
+        shouldContinueProductMutation({
+          mounted: mountedRef.current,
+          operationProductId,
+          currentProductId: productIdRef.current,
+        })
+      ) {
+        setBusy(false);
+      }
     }
   };
 
   const resetField = async (field) => {
+    const operationProductId = productId;
     const cell = workspace?.fields?.[field]?.languages?.[language] || {};
     if (!canShowReturnToAuto(cell)) return;
     const confirmed = await appConfirm({
@@ -178,16 +239,46 @@ export function ProductTranslationEditor({ product }) {
       message: t("admin.languages.resetConfirm"),
     });
     if (!confirmed) return;
+    if (
+      !shouldContinueProductMutation({
+        mounted: mountedRef.current,
+        operationProductId,
+        currentProductId: productIdRef.current,
+      })
+    ) {
+      return;
+    }
+    const priorDraft = readProductFieldDraft(drafts, language, field, cell.value || "");
     const sourceHash = workspace?.fields?.[field]?.sourceHash || "";
     setBusy(true);
     try {
-      await api.resetProductTranslation(productId, language, field, sourceHash);
-      setDrafts((current) => clearProductFieldDraft(current, language, field));
+      await api.resetProductTranslation(operationProductId, language, field, sourceHash);
+      if (
+        !shouldContinueProductMutation({
+          mounted: mountedRef.current,
+          operationProductId,
+          currentProductId: productIdRef.current,
+        })
+      ) {
+        return;
+      }
+      setDrafts((current) =>
+        clearProductFieldDraftIfUnchanged(current, language, field, priorDraft)
+      );
       setMessage(t("admin.languages.resetDone"));
       inFlightRef.current = false;
       setWorkspace(null);
       await load({ force: true });
     } catch (error) {
+      if (
+        !shouldContinueProductMutation({
+          mounted: mountedRef.current,
+          operationProductId,
+          currentProductId: productIdRef.current,
+        })
+      ) {
+        return;
+      }
       if (error?.code === "SOURCE_STALE" || error?.status === 409) {
         setMessage(t("admin.productTranslations.sourceStale"));
         inFlightRef.current = false;
@@ -201,7 +292,15 @@ export function ProductTranslationEditor({ product }) {
         });
       }
     } finally {
-      setBusy(false);
+      if (
+        shouldContinueProductMutation({
+          mounted: mountedRef.current,
+          operationProductId,
+          currentProductId: productIdRef.current,
+        })
+      ) {
+        setBusy(false);
+      }
     }
   };
 
@@ -293,6 +392,7 @@ export function ProductTranslationEditor({ product }) {
                           rows={3}
                           value={draftValue}
                           aria-label={fieldLabel}
+                          disabled={busy}
                           onChange={(event) =>
                             setDrafts((current) =>
                               writeProductFieldDraft(current, language, field, event.target.value, true)

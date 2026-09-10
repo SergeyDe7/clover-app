@@ -62,8 +62,9 @@ export function getCurrentCatalogKeySetInitCount() {
   return currentCatalogKeySetInitCount;
 }
 
+/** Safe immutable copy for tests — never expose the mutable module Set. */
 export function getCurrentCatalogKeys() {
-  return CURRENT_CATALOG_KEYS;
+  return Object.freeze(Array.from(CURRENT_CATALOG_KEYS));
 }
 
 export function isCurrentCatalogEntry(entry) {

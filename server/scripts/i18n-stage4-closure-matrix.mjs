@@ -341,7 +341,8 @@ export async function runStage4ClosureMatrixAsync(ctx) {
 
   const languagesSrc = readFileSync(path.join(workRoot, "src/screens/manager/ManagerLanguages.jsx"), "utf8");
   assert.match(languagesSrc, /glossaryFormLanguage/);
-  assert.match(languagesSrc, /disabled=\{glossaryEditing\}/);
+  assert.match(languagesSrc, /shouldDisableTargetLanguageSelect/);
+  assert.match(languagesSrc, /disabled=\{languageSelectDisabled\}/);
   assert.match(languagesSrc, /shouldApplyWorkspaceResponse/);
 
   let drafts = writeProductFieldDraft({}, "en", "name", "dirty-draft");

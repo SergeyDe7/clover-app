@@ -28,3 +28,22 @@ export function canShowGenericReset(cell) {
 export function canSaveProductTranslationField({ dirty, value }) {
   return dirty === true && String(value ?? "").trim() !== "";
 }
+
+/** Overview refresh failure must not fabricate fake settings when a good snapshot exists. */
+export function shouldReplaceOverviewOnFailure({ everLoadedSuccessfully }) {
+  return everLoadedSuccessfully !== true;
+}
+
+export function shouldDisableTargetLanguageSelect({ view, glossaryEditing }) {
+  return view === "glossary" && glossaryEditing === true;
+}
+
+/** Mutation follow-up GET only when still mounted on the same product. */
+export function shouldContinueProductMutation({
+  mounted,
+  operationProductId,
+  currentProductId,
+}) {
+  if (mounted !== true) return false;
+  return String(operationProductId || "") === String(currentProductId || "");
+}

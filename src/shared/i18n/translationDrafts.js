@@ -1,4 +1,6 @@
-/** Per-entry, per-public-language translation editor drafts. */
+/** Per-entry, per-public-language translation editor drafts.
+ * Store ONLY dirty user edits — never mirror clean server values.
+ */
 
 export function translationDraftKey(entryId, language) {
   return `${String(entryId || "")}\u0000${String(language || "")}`;
@@ -66,6 +68,11 @@ export function workspaceMutationReloadOffset() {
   return 0;
 }
 
+/** Safe paging state when starting/replacing page0 (or after page0 failure). */
+export function emptyWorkspacePageMeta(limit = 100) {
+  return { total: 0, hasMore: false, limit: Number(limit) || 100 };
+}
+
 function asDraftEntry(value) {
   if (value && typeof value === "object" && "value" in value) {
     return {
@@ -86,35 +93,45 @@ export function isTranslationDraftDirty(drafts, entryId, language) {
 
 export function readDraftValue(drafts, entryId, language, fallback = "") {
   const entry = asDraftEntry(drafts?.[translationDraftKey(entryId, language)]);
-  if (entry) return entry.value;
+  if (entry?.dirty) return entry.value;
   return fallback;
 }
 
+/** Only dirty user edits are stored. */
 export function setDraftValue(currentDrafts, entryId, language, value, dirty = true) {
   const next = { ...(currentDrafts || {}) };
-  next[translationDraftKey(entryId, language)] = {
+  const key = translationDraftKey(entryId, language);
+  if (dirty !== true) {
+    delete next[key];
+    return next;
+  }
+  next[key] = {
     value: String(value ?? ""),
-    dirty: dirty === true,
+    dirty: true,
   };
   return next;
 }
 
-export function markDraftClean(currentDrafts, entryId, language, value) {
-  return setDraftValue(currentDrafts, entryId, language, value, false);
+/** @deprecated use clearDraftIfUnchanged — clean mirrors are not stored. */
+export function markDraftClean(currentDrafts, entryId, language) {
+  return clearTranslationDraft(currentDrafts, entryId, language);
 }
 
+/**
+ * Preserve dirty drafts only. Never materialize clean server mirrors.
+ * Drops any leftover non-dirty entries for loaded rows.
+ */
 export function mergeWorkspaceDrafts(currentDrafts, rows, language) {
   const next = { ...(currentDrafts || {}) };
   const list = Array.isArray(rows) ? rows : [];
   for (const row of list) {
     const key = translationDraftKey(row.id, language);
-    const serverValue = row.languages?.[language]?.value || "";
     const current = asDraftEntry(next[key]);
     if (current?.dirty) {
       next[key] = current;
       continue;
     }
-    next[key] = { value: serverValue, dirty: false };
+    delete next[key];
   }
   return next;
 }
@@ -123,4 +140,36 @@ export function clearTranslationDraft(currentDrafts, entryId, language) {
   const next = { ...(currentDrafts || {}) };
   delete next[translationDraftKey(entryId, language)];
   return next;
+}
+
+/**
+ * After SAVE/RESET: remove draft only if it still matches the submitted snapshot.
+ * Newer edits (value changed while in-flight) stay dirty.
+ */
+export function clearDraftIfUnchanged(currentDrafts, entryId, language, submittedValue) {
+  const key = translationDraftKey(entryId, language);
+  const current = asDraftEntry(currentDrafts?.[key]);
+  if (!current) return currentDrafts || {};
+  if (String(current.value ?? "") !== String(submittedValue ?? "")) {
+    return currentDrafts || {};
+  }
+  const next = { ...(currentDrafts || {}) };
+  delete next[key];
+  return next;
+}
+
+export function countTranslationDraftEntries(drafts) {
+  return Object.keys(drafts && typeof drafts === "object" ? drafts : {}).length;
+}
+
+/** Simulate page0 failure ownership for tests. */
+export function pageMetaAfterFailedPage0(previousMeta) {
+  return emptyWorkspacePageMeta(previousMeta?.limit || 100);
+}
+
+export function canRequestLoadMore({ hasMore, acceptedOffset, inFlight, page0Failed }) {
+  if (page0Failed) return false;
+  if (inFlight) return false;
+  if (!hasMore) return false;
+  return Number(acceptedOffset) >= 0;
 }

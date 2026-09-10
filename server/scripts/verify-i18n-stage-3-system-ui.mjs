@@ -397,10 +397,12 @@ const safeOption = scanSource(
 assert.equal(safeOption.optionWithoutValue.length, 0);
 
 const draftsEn = mergeWorkspaceDrafts({}, [{ id: "e1", languages: { en: { value: "Hello" } } }], "en");
+assert.equal(Object.keys(draftsEn).length, 0);
 const draftsDirtyEn = setDraftValue(draftsEn, "e1", "en", "Hello dirty", true);
 const afterUz = mergeWorkspaceDrafts(draftsDirtyEn, [{ id: "e1", languages: { uz: { value: "Salom" } } }], "uz");
 assert.equal(readDraftValue(afterUz, "e1", "en"), "Hello dirty");
-assert.equal(readDraftValue(afterUz, "e1", "uz"), "Salom");
+assert.equal(readDraftValue(afterUz, "e1", "uz"), "");
+assert.equal(readDraftValue(afterUz, "e1", "uz", "Salom"), "Salom");
 assert.equal(
   shouldApplyWorkspaceResponse({
     requestGeneration: 1,
@@ -884,16 +886,17 @@ const draftRowsD = [{ id: "e1", languages: { en: { value: "D" } } }];
 const enKey = translationDraftKey("e1", "en");
 const uzKey = translationDraftKey("e1", "uz");
 const cleanDrafts = mergeWorkspaceDrafts({}, draftRowsA, "en");
-assert.equal(readDraftValue(cleanDrafts, "e1", "en"), "A");
-assert.equal(cleanDrafts[enKey].dirty, false);
+assert.equal(Object.keys(cleanDrafts).length, 0);
+assert.equal(readDraftValue(cleanDrafts, "e1", "en", "A"), "A");
 const refreshedClean = mergeWorkspaceDrafts(cleanDrafts, draftRowsB, "en");
-assert.equal(readDraftValue(refreshedClean, "e1", "en"), "B");
+assert.equal(Object.keys(refreshedClean).length, 0);
+assert.equal(readDraftValue(refreshedClean, "e1", "en", "B"), "B");
 const dirty = setDraftValue(mergeWorkspaceDrafts({}, draftRowsB, "en"), "e1", "en", "C", true);
 const preservedDirty = mergeWorkspaceDrafts(dirty, draftRowsB, "en");
 assert.equal(readDraftValue(preservedDirty, "e1", "en"), "C");
 const savedClean = markDraftClean(preservedDirty, "e1", "en", "C");
-assert.equal(savedClean[enKey].dirty, false);
-assert.equal(readDraftValue(mergeWorkspaceDrafts(savedClean, draftRowsD, "en"), "e1", "en"), "D");
+assert.equal(Object.hasOwn(savedClean, enKey), false);
+assert.equal(readDraftValue(mergeWorkspaceDrafts(savedClean, draftRowsD, "en"), "e1", "en", "D"), "D");
 const independent = setDraftValue(setDraftValue({}, "e1", "en", "C", true), "e1", "uz", "U", true);
 const afterUzRefresh = mergeWorkspaceDrafts(independent, [{ id: "e1", languages: { uz: { value: "Z" } } }], "uz");
 assert.equal(readDraftValue(afterUzRefresh, "e1", "en"), "C");

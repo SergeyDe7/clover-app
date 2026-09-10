@@ -43,6 +43,12 @@ const {
   mergeWorkspaceDrafts,
   setDraftValue,
   isTranslationDraftDirty,
+  readDraftValue,
+  clearDraftIfUnchanged,
+  countTranslationDraftEntries,
+  emptyWorkspacePageMeta,
+  pageMetaAfterFailedPage0,
+  canRequestLoadMore,
 } = await import("../../src/shared/i18n/translationDrafts.js");
 const {
   canSendForeignLanguageEnablePut,
@@ -169,6 +175,12 @@ assert.equal(parseWorkspaceOffset(10.9), 10);
   drafts = mergeWorkspaceDrafts(drafts, [{ id: "r1", languages: { en: { value: "server" } } }], "en");
   assert.equal(isTranslationDraftDirty(drafts, "r1", "en"), true);
   assert.equal(drafts[Object.keys(drafts)[0]].value, "dirty-text");
+  // Untouched rows must NOT accumulate clean draft mirrors
+  drafts = mergeWorkspaceDrafts({}, Array.from({ length: 100 }, (_, i) => ({
+    id: `u${i}`,
+    languages: { en: { value: `v${i}` } },
+  })), "en");
+  assert.equal(Object.keys(drafts).length, 0);
 }
 
 // --- D. Language enable fail-closed ---
@@ -265,12 +277,17 @@ const {
   canSaveProductTranslationField,
   nextLoadMoreOffset,
   shouldClearLoadingForRequest,
+  shouldReplaceOverviewOnFailure,
+  shouldDisableTargetLanguageSelect,
+  shouldContinueProductMutation,
 } = await import("../../src/shared/i18n/workspaceActionGates.js");
 const {
   isProductFieldDraftDirty,
   writeProductFieldDraft,
   readProductFieldDraft,
   clearProductFieldDraft,
+  clearProductFieldDraftIfUnchanged,
+  countProductDraftEntries,
 } = await import("../../src/shared/i18n/productTranslationDrafts.js");
 
 assert.equal(canSaveGenericTranslation({ dirty: false, value: "x" }), false);
@@ -287,6 +304,41 @@ assert.equal(nextLoadMoreOffset({ acceptedOffset: 0, limit: 100, hasMore: true, 
 assert.equal(nextLoadMoreOffset({ acceptedOffset: 100, limit: 100, hasMore: false, inFlight: false }), null);
 assert.equal(shouldClearLoadingForRequest({ requestGeneration: 2, currentGeneration: 3 }), false);
 assert.equal(shouldClearLoadingForRequest({ requestGeneration: 3, currentGeneration: 3 }), true);
+assert.equal(shouldReplaceOverviewOnFailure({ everLoadedSuccessfully: false }), true);
+assert.equal(shouldReplaceOverviewOnFailure({ everLoadedSuccessfully: true }), false);
+assert.equal(shouldDisableTargetLanguageSelect({ view: "interface", glossaryEditing: true }), false);
+assert.equal(shouldDisableTargetLanguageSelect({ view: "glossary", glossaryEditing: true }), true);
+assert.equal(
+  shouldContinueProductMutation({ mounted: false, operationProductId: "1", currentProductId: "1" }),
+  false
+);
+assert.equal(
+  shouldContinueProductMutation({ mounted: true, operationProductId: "1", currentProductId: "2" }),
+  false
+);
+assert.equal(
+  shouldContinueProductMutation({ mounted: true, operationProductId: "1", currentProductId: "1" }),
+  true
+);
+
+{
+  const failed = pageMetaAfterFailedPage0({ total: 900, hasMore: true, limit: 100 });
+  assert.equal(failed.hasMore, false);
+  assert.equal(failed.total, 0);
+  assert.equal(canRequestLoadMore({ hasMore: true, acceptedOffset: 0, inFlight: false, page0Failed: true }), false);
+  assert.deepEqual(emptyWorkspacePageMeta().hasMore, false);
+}
+
+{
+  // Generic SAVE race: B submitted, user types C, B succeeds → C preserved
+  let drafts = setDraftValue({}, "e1", "en", "B", true);
+  drafts = setDraftValue(drafts, "e1", "en", "C", true);
+  drafts = clearDraftIfUnchanged(drafts, "e1", "en", "B");
+  assert.equal(isTranslationDraftDirty(drafts, "e1", "en"), true);
+  assert.equal(readDraftValue(drafts, "e1", "en", ""), "C");
+  drafts = clearDraftIfUnchanged(drafts, "e1", "en", "C");
+  assert.equal(countTranslationDraftEntries(drafts), 0);
+}
 
 {
   let drafts = {};
@@ -294,6 +346,10 @@ assert.equal(shouldClearLoadingForRequest({ requestGeneration: 3, currentGenerat
   drafts = writeProductFieldDraft(drafts, "en", "name", "Hello", true);
   assert.equal(isProductFieldDraftDirty(drafts, "en", "name"), true);
   assert.equal(readProductFieldDraft(drafts, "en", "name", ""), "Hello");
+  drafts = writeProductFieldDraft(drafts, "en", "name", "C", true);
+  drafts = clearProductFieldDraftIfUnchanged(drafts, "en", "name", "B");
+  assert.equal(readProductFieldDraft(drafts, "en", "name", ""), "C");
+  assert.equal(countProductDraftEntries(drafts), 1);
   drafts = clearProductFieldDraft(drafts, "en", "name");
   assert.equal(isProductFieldDraftDirty(drafts, "en", "name"), false);
 }
@@ -305,7 +361,12 @@ assertNoMatch(
 );
 assertMatch("src/screens/manager/ManagerLanguages.jsx", /acceptedOffsetRef|nextLoadMoreOffset|handleLoadMore/);
 assertMatch("src/screens/manager/ManagerLanguages.jsx", /canSaveGenericTranslation|isTranslationDraftDirty/);
+assertMatch("src/screens/manager/ManagerLanguages.jsx", /actionMessage|workspaceError|overviewError|emptyWorkspacePageMeta/);
+assertMatch("src/screens/manager/ManagerLanguages.jsx", /clearDraftIfUnchanged|page0FailedRef/);
 assertMatch("src/screens/manager/ProductTranslationEditor.jsx", /canSaveProductTranslationField|isProductFieldDraftDirty/);
+assertMatch("src/screens/manager/ProductTranslationEditor.jsx", /shouldContinueProductMutation|clearProductFieldDraftIfUnchanged|mountedRef/);
+assertMatch("src/screens/manager/ProductTranslationEditor.jsx", /setBusy\(false\)/);
+assertMatch("src/screens/manager/ManagerLanguages.jsx", /shouldDisableTargetLanguageSelect|shouldReplaceOverviewOnFailure/);
 
 
 // --- F. Image priority helper hardening ---
@@ -463,7 +524,10 @@ assert.equal(
   false
 );
 assert.equal(getCurrentCatalogKeySetInitCount(), keysBefore, "lookup must not rebuild Set");
-assert.equal(getCurrentCatalogKeys().size, 1900);
+assert.equal(getCurrentCatalogKeys().length, 1900);
+assert.equal(Object.isFrozen(getCurrentCatalogKeys()), true);
+assert.equal(typeof getCurrentCatalogKeys().has, "undefined", "must not expose mutable Set");
+
 
 const productStats = {};
 collectFilteredWorkspaceRows({ view: "products", language: "en", limit: 100 }, { __stats: productStats });
@@ -613,6 +677,21 @@ assert.equal(typeof computeProductCompletenessSnapshot, "function");
   const nextExport = fnBody.indexOf("\nexport function ", 10);
   const body = nextExport >= 0 ? fnBody.slice(0, nextExport) : fnBody;
   assert.equal(/buildProductWorkspaceRows\s*\(/.test(body), false);
+}
+
+// Clean draft memory across full interface dataset
+{
+  const all = listWorkspaceRows({ view: "interface", language: "en" });
+  assert.ok(all.length > 1000);
+  let drafts = {};
+  drafts = mergeWorkspaceDrafts(drafts, all, "en");
+  assert.equal(countTranslationDraftEntries(drafts), 0);
+  for (const code of ["en", "uz", "ky", "tg", "zh", "ar"]) {
+    drafts = mergeWorkspaceDrafts(drafts, all.slice(0, 50), code);
+  }
+  assert.equal(countTranslationDraftEntries(drafts), 0);
+  drafts = setDraftValue(drafts, all[0].id, "en", "edited", true);
+  assert.equal(countTranslationDraftEntries(drafts), 1);
 }
 
 console.log("verify-post-stage4-performance-ux: PASS");

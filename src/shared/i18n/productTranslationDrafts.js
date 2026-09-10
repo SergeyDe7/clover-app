@@ -1,4 +1,6 @@
-/** Dirty-aware product translation field drafts (language + field). */
+/** Dirty-aware product translation field drafts (language + field).
+ * Store ONLY dirty user edits.
+ */
 
 function asDraftEntry(value) {
   if (value && typeof value === "object" && "value" in value) {
@@ -23,7 +25,7 @@ export function readProductFieldDraft(drafts, language, field, fallback = "") {
     return fallback;
   }
   const entry = asDraftEntry(bag[field]);
-  if (entry) return entry.value;
+  if (entry?.dirty) return entry.value;
   return fallback;
 }
 
@@ -35,15 +37,18 @@ export function isProductFieldDraftDirty(drafts, language, field) {
 
 export function writeProductFieldDraft(drafts, language, field, value, dirty = true) {
   const current = drafts && typeof drafts === "object" ? drafts : {};
+  const bag = { ...(current[language] || {}) };
+  if (dirty !== true) {
+    delete bag[field];
+    return { ...current, [language]: bag };
+  }
+  bag[field] = {
+    value: String(value ?? ""),
+    dirty: true,
+  };
   return {
     ...current,
-    [language]: {
-      ...(current[language] || {}),
-      [field]: {
-        value: String(value ?? ""),
-        dirty: dirty === true,
-      },
-    },
+    [language]: bag,
   };
 }
 
@@ -54,6 +59,35 @@ export function clearProductFieldDraft(drafts, language, field) {
   return { ...current, [language]: bag };
 }
 
+/**
+ * After SAVE/RESET: clear only if draft still matches submitted snapshot.
+ */
+export function clearProductFieldDraftIfUnchanged(drafts, language, field, submittedValue) {
+  const bag = drafts && typeof drafts === "object" ? drafts[language] : null;
+  if (!bag || !Object.prototype.hasOwnProperty.call(bag, field)) {
+    return drafts && typeof drafts === "object" ? drafts : {};
+  }
+  const entry = asDraftEntry(bag[field]);
+  if (!entry) return drafts || {};
+  if (String(entry.value ?? "") !== String(submittedValue ?? "")) {
+    return drafts || {};
+  }
+  return clearProductFieldDraft(drafts, language, field);
+}
+
 export function clearProductDrafts() {
   return {};
+}
+
+export function countProductDraftEntries(drafts) {
+  let count = 0;
+  const root = drafts && typeof drafts === "object" ? drafts : {};
+  for (const language of Object.keys(root)) {
+    const bag = root[language];
+    if (!bag || typeof bag !== "object") continue;
+    for (const field of Object.keys(bag)) {
+      if (asDraftEntry(bag[field])?.dirty) count += 1;
+    }
+  }
+  return count;
 }
