@@ -321,6 +321,51 @@ export function listTranslationValueRowsForLanguage(languageCode) {
     .all(String(languageCode || ""));
 }
 
+/** Namespace-scoped translation entries (e.g. category corpus only). */
+export function listTranslationEntryRowsByNamespace(namespace) {
+  return db
+    .prepare(
+      `SELECT id, namespace, entity_type AS entityType, entity_id AS entityId,
+              field_key AS fieldKey, source_ru AS sourceRu, source_hash AS sourceHash,
+              critical, created_at AS createdAt, updated_at AS updatedAt
+       FROM translation_entries
+       WHERE namespace = ?
+       ORDER BY entity_type, entity_id, field_key`
+    )
+    .all(String(namespace || ""));
+}
+
+/**
+ * Values for an explicit entry-id set. Optional languageInternal limits to one locale.
+ * Empty entryIds → no query (avoids scanning translation_values).
+ */
+export function listTranslationValueRowsForEntryIds(entryIds, languageInternal = "") {
+  const ids = Array.isArray(entryIds)
+    ? [...new Set(entryIds.map((id) => String(id || "")).filter(Boolean))]
+    : [];
+  if (!ids.length) return [];
+  const placeholders = ids.map(() => "?").join(", ");
+  const language = String(languageInternal || "");
+  if (language) {
+    return db
+      .prepare(
+        `SELECT entry_id AS entryId, language_code AS languageCode, value, state,
+                source_hash AS sourceHash, updated_at AS updatedAt, updated_by AS updatedBy
+         FROM translation_values
+         WHERE language_code = ? AND entry_id IN (${placeholders})`
+      )
+      .all(language, ...ids);
+  }
+  return db
+    .prepare(
+      `SELECT entry_id AS entryId, language_code AS languageCode, value, state,
+              source_hash AS sourceHash, updated_at AS updatedAt, updated_by AS updatedBy
+       FROM translation_values
+       WHERE entry_id IN (${placeholders})`
+    )
+    .all(...ids);
+}
+
 export function getTranslationEntryRow(id) {
   return (
     db
@@ -345,6 +390,26 @@ export function findTranslationEntryByIdentity(namespace, fieldKey) {
          WHERE namespace = ? AND entity_type = '' AND entity_id = '' AND field_key = ?`
       )
       .get(String(namespace || ""), String(fieldKey || "")) || null
+  );
+}
+
+/** Entity-aware identity lookup (category/subcategory rows). */
+export function findTranslationEntryByEntityIdentity(namespace, entityType, entityId, fieldKey) {
+  return (
+    db
+      .prepare(
+        `SELECT id, namespace, entity_type AS entityType, entity_id AS entityId,
+                field_key AS fieldKey, source_ru AS sourceRu, source_hash AS sourceHash,
+                critical, created_at AS createdAt, updated_at AS updatedAt
+         FROM translation_entries
+         WHERE namespace = ? AND entity_type = ? AND entity_id = ? AND field_key = ?`
+      )
+      .get(
+        String(namespace || ""),
+        String(entityType || ""),
+        String(entityId || ""),
+        String(fieldKey || "")
+      ) || null
   );
 }
 

@@ -18,9 +18,11 @@ import {
   StorefrontUnitChoice,
   storefrontUnitLabel,
 } from "../components/StorefrontUnitChoice.jsx";
+import { categoryDisplayNameFromCanonical } from "../../../shared/i18n/categoryDisplayProjection.js";
+import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
 
 export function ProductPage({ code }) {
-  const { t } = useLocalization();
+  const { t, locale } = useLocalization();
   const [product, setProduct] = useState(null);
   const [error, setError] = useState("");
   const [unit, setUnit] = useState("piece");
@@ -98,6 +100,12 @@ export function ProductPage({ code }) {
 
   if (!product) return <p className="sf-muted">{t("storefront.loadingTheCard")}</p>;
 
+  const categoryLabel = categoryDisplayNameFromCanonical(
+    product.category,
+    "",
+    storefrontCategoryDisplayOptions(locale)
+  );
+
   return (
     <div className="sf-product-page">
       <button
@@ -110,7 +118,7 @@ export function ProductPage({ code }) {
           })
         }
       >
-        ← {product.category || t("storefront.nav.catalog")}
+        ← {categoryLabel || t("storefront.nav.catalog")}
       </button>
 
       <div className="sf-product-layout">
@@ -122,7 +130,7 @@ export function ProductPage({ code }) {
           )}
         </div>
         <div className="sf-product-info">
-          <p className="sf-product-cat">{product.category}</p>
+          <p className="sf-product-cat">{categoryLabel}</p>
           <h1>{product.name}</h1>
           <p className="sf-product-code">{t("storefront.product.articleCode", { code: product.code })}</p>
 

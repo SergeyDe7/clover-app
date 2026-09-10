@@ -1,4 +1,6 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
+import { categoryDisplayNameFromCanonical } from "../../../shared/i18n/categoryDisplayProjection.js";
+import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
 import { GroupIcon } from "./GroupIcon.jsx";
 import { getGroupMeta } from "../productGroups.js";
 import { navigateStorefront } from "./StoreHeader.jsx";
@@ -9,9 +11,10 @@ const TWO_LINE_GROUP_NAMES = {
   "Химия, чистящие средства": ["Химия,", "чистящие средства"],
 };
 
-function groupNameLines(name) {
-  if (TWO_LINE_GROUP_NAMES[name]) return TWO_LINE_GROUP_NAMES[name];
-  const text = String(name || "").trim();
+function groupNameLines(canonicalName, displayName) {
+  if (displayName !== canonicalName) return null;
+  if (TWO_LINE_GROUP_NAMES[canonicalName]) return TWO_LINE_GROUP_NAMES[canonicalName];
+  const text = String(displayName || "").trim();
   const comma = text.indexOf(",");
   if (comma <= 0 || comma >= text.length - 1) return null;
   return [text.slice(0, comma + 1), text.slice(comma + 1).trim()];
@@ -30,11 +33,16 @@ function productsCountLabel(count, t) {
 }
 
 export function GroupTile({ name, count = null, className = "" }) {
-  const { t } = useLocalization();
+  const { t, locale } = useLocalization();
+  const displayName = categoryDisplayNameFromCanonical(
+    name,
+    "",
+    storefrontCategoryDisplayOptions(locale)
+  );
   const meta = getGroupMeta(name);
   const showCount =
     count !== null && count !== undefined && Number.isFinite(Number(count));
-  const lines = groupNameLines(name);
+  const lines = groupNameLines(name, displayName);
 
   return (
     <button
@@ -59,7 +67,7 @@ export function GroupTile({ name, count = null, className = "" }) {
               {lines[1]}
             </>
           ) : (
-            name
+            displayName
           )}
         </span>
         {showCount ? (

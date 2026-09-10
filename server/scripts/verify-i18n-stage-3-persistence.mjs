@@ -150,8 +150,31 @@ const first = storeMod.initializeLocalizationCatalog();
 assert.equal(first.dirty, true);
 const store1 = storeMod.readTranslationStore();
 const n = UI_CATALOG.length;
-assert.equal(store1.entries.length, n);
-assert.equal(store1.values.length, n * 6);
+const { listCategoryCatalogEntries } = await import(
+  pathToFileURL(path.join(workRoot, "src/shared/i18n/categoryCatalog.js")).href
+);
+const categoryN = listCategoryCatalogEntries().length;
+const uiEntries = store1.entries.filter(
+  (entry) => !entry.entityType && !entry.entityId
+);
+const categoryEntries = store1.entries.filter(
+  (entry) =>
+    entry.namespace === "category" &&
+    entry.entityType &&
+    entry.entityId
+);
+assert.equal(uiEntries.length, n);
+assert.equal(categoryEntries.length, categoryN);
+assert.equal(store1.entries.length, n + categoryN);
+const uiEntryIds = new Set(uiEntries.map((entry) => entry.id));
+const categoryEntryIds = new Set(categoryEntries.map((entry) => entry.id));
+const uiValues = store1.values.filter((value) => uiEntryIds.has(value.entryId));
+const categoryValues = store1.values.filter((value) =>
+  categoryEntryIds.has(value.entryId)
+);
+assert.equal(uiValues.length, n * 6);
+assert.equal(categoryValues.length, categoryN * 6);
+assert.equal(store1.values.length, (n + categoryN) * 6);
 assert.equal(store1.values.every((v) => v.state === "AUTO"), true);
 assert.equal(store1.values.filter((v) => v.languageCode === "ru").length, 0);
 assert.equal(store1.values.some((v) => v.languageCode === "zh-CN"), true);
@@ -167,7 +190,7 @@ for (const code of ["en", "uz", "ky", "tg", "zh", "ar"]) {
   assert.equal(report.domains.interface.complete, true, `${code} interface`);
   assert.equal(report.domains.checkout.complete, true, `${code} checkout`);
   assert.equal(report.domains.products.complete, false, `${code} products`);
-  assert.equal(report.domains.categories.complete, false, `${code} categories`);
+  assert.equal(report.domains.categories.complete, true, `${code} categories`);
   assert.equal(report.domains.pages.complete, false, `${code} pages`);
   assert.equal(report.domains.faq.complete, false, `${code} faq`);
   assert.equal(report.domains.seo.complete, false, `${code} seo`);

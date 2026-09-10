@@ -1,6 +1,8 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { buildGroupNav, canonicalizeProductSubcategory } from "../productGroups.js";
+import { projectLocalizedGroupNav } from "../../../shared/i18n/categoryDisplayProjection.js";
+import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
 import { navigateStorefront } from "./StoreHeader.jsx";
 
 function NavChevron() {
@@ -26,6 +28,7 @@ function NavChevron() {
 /**
  * Боковое меню категорий — как в ЛК «Добавить товары из каталога»:
  * кнопки category-button + стрелка для подкатегорий.
+ * Navigation/filter identity uses canonical `name`; UI shows `displayName`.
  */
 export function CatalogGroupNav({
   categories = [],
@@ -33,8 +36,11 @@ export function CatalogGroupNav({
   activeSubcategory = "",
   variant = "side",
 }) {
-  const { t } = useLocalization();
-  const groups = buildGroupNav(categories);
+  const { t, locale } = useLocalization();
+  const groups = useMemo(() => {
+    const canonical = buildGroupNav(categories);
+    return projectLocalizedGroupNav(canonical, storefrontCategoryDisplayOptions(locale));
+  }, [categories, locale]);
   const [openParents, setOpenParents] = useState(() => new Set());
 
   const toggleParent = (name) => {
@@ -52,7 +58,6 @@ export function CatalogGroupNav({
     if (groups.find((g) => g.name === name)?.children?.length) {
       setOpenParents((prev) => {
         const next = new Set(prev);
-        // Клик по названию и раскрывает, и сворачивает.
         if (next.has(name)) next.delete(name);
         else next.add(name);
         return next;
@@ -77,15 +82,15 @@ export function CatalogGroupNav({
         type="button"
         className={`sf-cat-btn${!activeCategory ? " is-active" : ""}`}
         onClick={goAll}
-      >{
-        t("shared.filter.all")
-      }</button>
+      >
+        {t("shared.filter.all")}
+      </button>
 
       {groups.map((group) => {
         const hasChildren = group.children.length > 0;
         const isOpen = openParents.has(group.name);
-        const isActive =
-          activeCategory === group.name && !activeSubcategory;
+        const isActive = activeCategory === group.name && !activeSubcategory;
+        const groupLabel = group.displayName || group.name;
 
         return (
           <div key={group.name} className="sf-group-nav-block">
@@ -95,7 +100,7 @@ export function CatalogGroupNav({
                 className={`sf-cat-btn${isActive ? " is-active" : ""}`}
                 onClick={() => goGroup(group.name)}
               >
-                {group.name}
+                {groupLabel}
               </button>
               {hasChildren ? (
                 <button
@@ -104,8 +109,8 @@ export function CatalogGroupNav({
                   aria-expanded={isOpen}
                   aria-label={
                     isOpen
-                      ? t("client.catalog.hideSubcategories", { name: group.name })
-                      : t("client.catalog.showSubcategories", { name: group.name })
+                      ? t("client.catalog.hideSubcategories", { name: groupLabel })
+                      : t("client.catalog.showSubcategories", { name: groupLabel })
                   }
                   onClick={(event) => {
                     event.preventDefault();
@@ -125,14 +130,13 @@ export function CatalogGroupNav({
                     type="button"
                     className={`sf-cat-btn is-child${
                       activeCategory === group.name &&
-                      canonicalizeProductSubcategory(activeSubcategory) ===
-                        child.name
+                      canonicalizeProductSubcategory(activeSubcategory) === child.name
                         ? " is-active"
                         : ""
                     }`}
                     onClick={() => goSub(group.name, child.name)}
                   >
-                    {child.name}
+                    {child.displayName || child.name}
                   </button>
                 ))}
               </div>

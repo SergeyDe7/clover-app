@@ -27,6 +27,8 @@ import {
   getGroupChildren,
   subcategoryMatchesFilter,
 } from "../storefront/productGroups.js";
+import { projectLocalizedGroupNav } from "../../shared/i18n/categoryDisplayProjection.js";
+import { storefrontCategoryDisplayOptions } from "../../shared/i18n/storefrontCategoryDisplay.js";
 import { productImageSrc } from "../../shared/productPhoto";
 import { CatalogSearchInput } from "./CatalogSearchInput";
 import { EmptyState } from "../../shared/uxFeedback";
@@ -103,7 +105,7 @@ export function ClientCatalogAddPanel({
   onAdd,
   onRemove,
 }) {
-  const { t } = useLocalization();
+  const { t, locale } = useLocalization();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
@@ -146,19 +148,27 @@ export function ClientCatalogAddPanel({
     [products]
   );
 
-  const groups = useMemo(
-    () =>
-      buildGroupNav(
-        activeProducts.map((item) => canonicalizeProductCategory(item.category || "Прочее"))
-      ),
-    [activeProducts]
-  );
+  const groups = useMemo(() => {
+    const canonical = buildGroupNav(
+      activeProducts.map((item) => canonicalizeProductCategory(item.category || "Прочее"))
+    );
+    return projectLocalizedGroupNav(canonical, storefrontCategoryDisplayOptions(locale));
+  }, [activeProducts, locale]);
 
   const activeCategory = String(category || "").trim()
     ? canonicalizeProductCategory(category)
     : "";
   const activeSubcategory = canonicalizeProductSubcategory(subcategory);
   const activeChildren = activeCategory ? getGroupChildren(activeCategory) : [];
+  const activeChildrenLocalized = useMemo(() => {
+    if (!activeCategory) return [];
+    const children = getGroupChildren(activeCategory);
+    const projected = projectLocalizedGroupNav(
+      [{ name: activeCategory, children }],
+      storefrontCategoryDisplayOptions(locale)
+    );
+    return projected[0]?.children || [];
+  }, [activeCategory, locale]);
 
   const sortedProducts = useMemo(
     () => activeProducts,
@@ -289,7 +299,7 @@ export function ClientCatalogAddPanel({
                         type="button"
                         onClick={() => selectGroup(group.name)}
                       >
-                        {group.name}
+                        {group.displayName || group.name}
                       </button>
                       {hasChildren ? (
                         <button
@@ -298,8 +308,12 @@ export function ClientCatalogAddPanel({
                           aria-expanded={isOpen}
                           aria-label={
                             isOpen
-                              ? t("client.catalog.hideSubcategories", { name: group.name })
-                              : t("client.catalog.showSubcategories", { name: group.name })
+                              ? t("client.catalog.hideSubcategories", {
+                                  name: group.displayName || group.name,
+                                })
+                              : t("client.catalog.showSubcategories", {
+                                  name: group.displayName || group.name,
+                                })
                           }
                           onClick={(event) => {
                             event.preventDefault();
@@ -325,7 +339,7 @@ export function ClientCatalogAddPanel({
                             }
                             onClick={() => selectSub(group.name, child.name)}
                           >
-                            {child.name}
+                            {child.displayName || child.name}
                           </button>
                         ))}
                       </div>
@@ -351,7 +365,7 @@ export function ClientCatalogAddPanel({
                 >{
                   t("client.allInCategory")
                 }</button>
-                {activeChildren.map((child) => (
+                {activeChildrenLocalized.map((child) => (
                   <button
                     key={child.name}
                     type="button"
@@ -362,7 +376,7 @@ export function ClientCatalogAddPanel({
                     }
                     onClick={() => selectSub(activeCategory, child.name)}
                   >
-                    {child.name}
+                    {child.displayName || child.name}
                   </button>
                 ))}
               </div>
