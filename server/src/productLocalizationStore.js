@@ -548,22 +548,74 @@ export function deleteProductLocalization(productId) {
   return deleteProductTranslationRows(canonicalProductId(productId));
 }
 
-export function productCompletenessItems(products = translationRelevantProducts()) {
+export function computeProductCompletenessSnapshot(products = translationRelevantProducts()) {
+  const productList = Array.isArray(products) ? products : translationRelevantProducts();
+  const storedRows = listProductTranslationRows();
+  const byKey = new Map();
+  for (const row of storedRows) {
+    byKey.set(`${row.productId}\0${row.fieldKey}\0${row.languageCode}`, row);
+  }
+
   const items = [];
-  for (const row of buildProductWorkspaceRows(products)) {
-    for (const [language, cell] of Object.entries(row.languages || {})) {
-      items.push({
-        domain: "products",
-        language,
-        state: cell.stale ? "STALE" : cell.state,
-        stale: cell.stale,
-        critical: row.critical === true,
-        value: cell.value,
-        fieldKey: row.fieldKey,
-      });
+  const fieldReports = {};
+  for (const code of PUBLIC_LOCALE_CODES) {
+    if (code === "ru") continue;
+    fieldReports[code] = {
+      name: emptyFieldReport(),
+      description: emptyFieldReport(),
+      composition: emptyFieldReport(),
+      characteristics: emptyFieldReport(),
+    };
+  }
+
+  for (const product of productList) {
+    const productId = canonicalProductId(product?.id);
+    if (!productId) continue;
+    for (const field of PRODUCT_TRANSLATION_FIELDS) {
+      const sourceRu = productFieldSource(product, field);
+      if (!sourceRu) continue;
+      const currentHash = sourceHash(sourceRu);
+      const critical = field === "name";
+      for (const code of PUBLIC_LOCALE_CODES) {
+        if (code === "ru") continue;
+        const internal = exactTranslationTargetInternal(code === "zh" ? "zh" : code);
+        const match =
+          byKey.get(`${productId}\0${field}\0${internal}`) ||
+          emptyStoredRow(productId, internal, field);
+        const decorated = decorateRow(match, currentHash);
+        const cell = cellFromDecorated(decorated);
+        items.push({
+          domain: "products",
+          language: code,
+          state: cell.stale ? "STALE" : cell.state,
+          stale: cell.stale,
+          critical,
+          value: cell.value,
+          fieldKey: field,
+        });
+        const bucket = fieldReports[code]?.[field];
+        if (!bucket) continue;
+        bucket.total += 1;
+        if (cell.stale) bucket.stale += 1;
+        else if (!String(cell.value || "").trim() || cell.state === "MISSING") bucket.missing += 1;
+        else bucket.current += 1;
+      }
     }
   }
-  return items;
+
+  for (const report of Object.values(fieldReports)) {
+    report.criticalComplete =
+      report.name.total > 0 && report.name.current === report.name.total && report.name.stale === 0;
+    report.detailReady = ["description", "composition", "characteristics"].every(
+      (field) => report[field].current === report[field].total && report[field].stale === 0
+    );
+  }
+
+  return { items, fieldReports };
+}
+
+export function productCompletenessItems(products = translationRelevantProducts()) {
+  return computeProductCompletenessSnapshot(products).items;
 }
 
 function emptyFieldReport() {
@@ -571,34 +623,7 @@ function emptyFieldReport() {
 }
 
 export function productFieldCompletenessByLanguage(products = translationRelevantProducts()) {
-  const reports = {};
-  for (const code of PUBLIC_LOCALE_CODES) {
-    if (code === "ru") continue;
-    reports[code] = {
-      name: emptyFieldReport(),
-      description: emptyFieldReport(),
-      composition: emptyFieldReport(),
-      characteristics: emptyFieldReport(),
-    };
-  }
-  for (const row of buildProductWorkspaceRows(products)) {
-    for (const [language, cell] of Object.entries(row.languages || {})) {
-      const bucket = reports[language]?.[row.fieldKey];
-      if (!bucket) continue;
-      bucket.total += 1;
-      if (cell.stale) bucket.stale += 1;
-      else if (!String(cell.value || "").trim() || cell.state === "MISSING") bucket.missing += 1;
-      else bucket.current += 1;
-    }
-  }
-  for (const report of Object.values(reports)) {
-    report.criticalComplete =
-      report.name.total > 0 && report.name.current === report.name.total && report.name.stale === 0;
-    report.detailReady = ["description", "composition", "characteristics"].every(
-      (field) => report[field].current === report[field].total && report[field].stale === 0
-    );
-  }
-  return reports;
+  return computeProductCompletenessSnapshot(products).fieldReports;
 }
 
 function mapGlossaryEntry(row) {

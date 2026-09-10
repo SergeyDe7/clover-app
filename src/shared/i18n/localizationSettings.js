@@ -186,7 +186,23 @@ function rowState(entry, value) {
   return "FALLBACK_RU";
 }
 
-export function buildTranslationRows(store = emptyTranslationStore()) {
+/** Target public codes for workspace rows. Completeness callers omit language → all six. */
+export function workspaceTargetLanguageCodes(languageRaw) {
+  if (typeof languageRaw === "string" && languageRaw.trim()) {
+    const code = toPublicLocaleCode(languageRaw);
+    if (code && code !== DEFAULT_LOCALE && PUBLIC_LOCALE_CODES.includes(code)) {
+      return [code];
+    }
+  }
+  return PUBLIC_LOCALE_CODES.filter((code) => code !== DEFAULT_LOCALE);
+}
+
+/**
+ * Build generic UI translation workspace rows.
+ * Pass options.language to materialize ONLY that target cell (selected-language path).
+ * Completeness and other all-language callers must omit options.language.
+ */
+export function buildTranslationRows(store = emptyTranslationStore(), options = {}) {
   const normalized = normalizeTranslationStore(store);
   const valuesByEntry = new Map();
   for (const value of normalized.values) {
@@ -195,11 +211,17 @@ export function buildTranslationRows(store = emptyTranslationStore()) {
     valuesByEntry.get(key).push(value);
   }
 
+  const languageCodes = workspaceTargetLanguageCodes(options.language);
+  if (options.__stats && typeof options.__stats === "object") {
+    options.__stats.languageCodes = languageCodes.slice();
+    options.__stats.rowCount = normalized.entries.length;
+    options.__stats.cellBuilds = normalized.entries.length * languageCodes.length;
+  }
+
   return normalized.entries.map((entry) => {
     const values = valuesByEntry.get(String(entry.id || "")) || [];
     const byLanguage = {};
-    for (const code of PUBLIC_LOCALE_CODES) {
-      if (code === DEFAULT_LOCALE) continue;
+    for (const code of languageCodes) {
       const value = values.find((item) => toPublicLocaleCode(item.languageCode) === code);
       byLanguage[code] = {
         value: value?.value || "",

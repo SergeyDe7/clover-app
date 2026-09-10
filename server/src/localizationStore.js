@@ -4,6 +4,7 @@ import {
   runInTransaction,
   listTranslationEntryRows,
   listTranslationValueRows,
+  listTranslationValueRowsForLanguage,
   getTranslationEntryRow,
   findTranslationEntryByIdentity,
   insertTranslationEntryRow,
@@ -18,6 +19,7 @@ import {
   isExactPublicLocaleCode,
   isExactPublicTargetLocale,
   isExactTranslationTargetLocale,
+  toPublicLocaleCode,
 } from "../../src/shared/i18n/languageRegistry.js";
 import { sourceHash } from "../../src/shared/i18n/sourceHash.js";
 import { placeholdersMatch, isNonEmptyText } from "../../src/shared/i18n/placeholderValidation.js";
@@ -36,8 +38,7 @@ import {
 import { bumpLocalizationCatalogVersion } from "./localizationVersion.js";
 import {
   buildProductWorkspaceRows,
-  productCompletenessItems,
-  productFieldCompletenessByLanguage,
+  computeProductCompletenessSnapshot,
 } from "./productLocalizationStore.js";
 import {
   parseWorkspaceLimit,
@@ -50,14 +51,26 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function currentCatalogKeys() {
+/** Built once from static UI_CATALOG — O(1) membership for current-catalog filtering. */
+let currentCatalogKeySetInitCount = 0;
+const CURRENT_CATALOG_KEYS = (() => {
+  currentCatalogKeySetInitCount += 1;
   return new Set(UI_CATALOG.map((entry) => `${entry.namespace}\0${entry.key}`));
+})();
+
+export function getCurrentCatalogKeySetInitCount() {
+  return currentCatalogKeySetInitCount;
 }
 
-function isCurrentCatalogEntry(entry) {
+/** Safe immutable copy for tests — never expose the mutable module Set. */
+export function getCurrentCatalogKeys() {
+  return Object.freeze(Array.from(CURRENT_CATALOG_KEYS));
+}
+
+export function isCurrentCatalogEntry(entry) {
   if (!entry) return false;
   if (String(entry.entityType || "") !== "" || String(entry.entityId || "") !== "") return false;
-  return currentCatalogKeys().has(`${entry.namespace}\0${entry.fieldKey}`);
+  return CURRENT_CATALOG_KEYS.has(`${entry.namespace}\0${entry.fieldKey}`);
 }
 
 function mapStore(entries, values) {
@@ -92,8 +105,15 @@ export function readLocalizationSettings() {
   );
 }
 
-export function readTranslationStore() {
-  return mapStore(listTranslationEntryRows(), listTranslationValueRows());
+export function readTranslationStore(options = {}) {
+  const entries = listTranslationEntryRows();
+  const languageInternal = options.languageInternal
+    ? String(options.languageInternal)
+    : "";
+  const values = languageInternal
+    ? listTranslationValueRowsForLanguage(languageInternal)
+    : listTranslationValueRows();
+  return mapStore(entries, values);
 }
 
 function currentCatalogItems(store) {
@@ -105,7 +125,7 @@ function currentCatalogItems(store) {
   };
 }
 
-function completenessItems(store) {
+function completenessItems(store, productItems = null) {
   const current = currentCatalogItems(store);
   const rows = buildTranslationRows(current);
   const items = [];
@@ -123,13 +143,16 @@ function completenessItems(store) {
       });
     }
   }
-  items.push(...productCompletenessItems());
+  const products =
+    productItems || computeProductCompletenessSnapshot().items;
+  items.push(...products);
   return items;
 }
 
 export function completenessByLanguage(store = readTranslationStore()) {
-  const items = completenessItems(store);
-  const productFields = productFieldCompletenessByLanguage();
+  const productSnap = computeProductCompletenessSnapshot();
+  const items = completenessItems(store, productSnap.items);
+  const productFields = productSnap.fieldReports;
   const reports = {};
   for (const code of PUBLIC_LOCALE_CODES) {
     reports[code] = {
@@ -305,7 +328,37 @@ export function initializeLocalizationCatalog() {
   return result;
 }
 
-export function listWorkspacePage(filters = {}) {
+function projectSelectedLanguageRows(rows, languageRaw) {
+  if (!languageRaw) return rows;
+  const code = toPublicLocaleCode(languageRaw);
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const langs = row?.languages && typeof row.languages === "object" ? row.languages : {};
+    const selected = langs[code];
+    return {
+      ...row,
+      languages: selected ? { [code]: selected } : {},
+    };
+  });
+}
+
+function isPageableWorkspaceView(view) {
+  return (
+    view === "interface" ||
+    view === "products" ||
+    view === "untranslated" ||
+    view === "categories" ||
+    view === "seo"
+  );
+}
+
+/**
+ * Full filtered workspace rows (no paging).
+ * Internal/tests/completeness-adjacent callers that need the entire dataset.
+ * Selected-language UI path builds only the requested target cell and reads
+ * only that language's translation_values.
+ * view=products never reads generic translation_entries/values.
+ */
+export function collectFilteredWorkspaceRows(filters = {}, options = {}) {
   if (Object.prototype.hasOwnProperty.call(filters, "language") && filters.language !== undefined) {
     const languageRaw = filters.language;
     if (!isExactPublicTargetLocale(languageRaw)) {
@@ -318,20 +371,57 @@ export function listWorkspacePage(filters = {}) {
   const languageRaw = filters.language;
   const view = String(filters.view || "interface");
   if (view === "glossary") {
-    return { rows: [], total: 0, offset: 0, limit: 0, hasMore: false };
+    if (options.__stats && typeof options.__stats === "object") {
+      options.__stats.genericEntriesRead = 0;
+      options.__stats.genericValuesRead = 0;
+      options.__stats.valueLanguageInternal = "";
+    }
+    return [];
   }
-  const store = currentCatalogItems(readTranslationStore());
-  const uiRows = buildTranslationRows(store);
-  const boundedProductView = view === "products" || view === "untranslated";
-  const productRows = boundedProductView
+  const buildStats = options.__stats || null;
+  const needUi = view !== "products";
+  const needProducts = view === "products" || view === "untranslated";
+  let uiRows = [];
+  if (needUi) {
+    const internal = languageRaw ? exactTranslationTargetInternal(languageRaw) : "";
+    if (buildStats && typeof buildStats === "object") {
+      buildStats.genericEntriesRead = 1;
+      buildStats.genericValuesRead = 1;
+      buildStats.valueLanguageInternal = internal || "all";
+    }
+    const store = currentCatalogItems(
+      internal
+        ? readTranslationStore({ languageInternal: internal })
+        : readTranslationStore()
+    );
+    uiRows = buildTranslationRows(store, {
+      language: languageRaw,
+      ...(buildStats ? { __stats: buildStats } : {}),
+    });
+  } else if (buildStats && typeof buildStats === "object") {
+    buildStats.genericEntriesRead = 0;
+    buildStats.genericValuesRead = 0;
+    buildStats.valueLanguageInternal = "";
+  }
+  const productRows = needProducts
     ? buildProductWorkspaceRows(undefined, { language: languageRaw })
     : [];
   const combined = view === "products" ? productRows : [...uiRows, ...productRows];
-  const filtered = filterTranslationRows(combined, {
+  let filtered = filterTranslationRows(combined, {
     ...filters,
     language: languageRaw,
   });
-  if (!boundedProductView) {
+  filtered = projectSelectedLanguageRows(filtered, languageRaw);
+  return filtered;
+}
+
+export function listWorkspacePage(filters = {}) {
+  const view = String(filters.view || "interface");
+  if (view === "glossary") {
+    return { rows: [], total: 0, offset: 0, limit: 0, hasMore: false };
+  }
+  const filtered = collectFilteredWorkspaceRows(filters);
+  if (!isPageableWorkspaceView(view)) {
     return {
       rows: filtered,
       total: filtered.length,
@@ -347,8 +437,9 @@ export function listWorkspacePage(filters = {}) {
   return { rows, total, offset, limit, hasMore: offset + rows.length < total };
 }
 
+/** Explicit all-rows accessor for internal/test callers. Never unbounded via listWorkspacePage. */
 export function listWorkspaceRows(filters = {}) {
-  return listWorkspacePage(filters).rows;
+  return collectFilteredWorkspaceRows(filters);
 }
 
 function requireCurrentUiEntry(entryId) {

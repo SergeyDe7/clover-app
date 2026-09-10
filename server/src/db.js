@@ -309,6 +309,18 @@ export function listTranslationValueRows() {
     .all();
 }
 
+/** Language-scoped generic translation values (internal locale code, e.g. zh-CN). */
+export function listTranslationValueRowsForLanguage(languageCode) {
+  return db
+    .prepare(
+      `SELECT entry_id AS entryId, language_code AS languageCode, value, state,
+              source_hash AS sourceHash, updated_at AS updatedAt, updated_by AS updatedBy
+       FROM translation_values
+       WHERE language_code = ?`
+    )
+    .all(String(languageCode || ""));
+}
+
 export function getTranslationEntryRow(id) {
   return (
     db

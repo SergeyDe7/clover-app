@@ -37,7 +37,8 @@ export function isNonEmptyText(value) {
 export function isRegisteredUiKey(value, dictionary) {
   if (typeof value !== "string" || !dictionary || typeof dictionary !== "object") return false;
   const trimmed = value.trim();
-  return Object.keys(dictionary).some((key) => trimmed === key);
+  if (!trimmed) return false;
+  return Object.prototype.hasOwnProperty.call(dictionary, trimmed);
 }
 
 export function isStage3SafeVisibleText(value, dictionary) {

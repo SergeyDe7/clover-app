@@ -105,6 +105,22 @@ export function CatalogPage({
     return groupProductsByCloverGroup(products);
   }, [category, subcategory, products]);
 
+  const imagePriorityById = useMemo(() => {
+    const map = new Map();
+    let index = 0;
+    for (const section of sections) {
+      for (const product of section.products || []) {
+        // Render-order cursor; Map last-write wins if duplicate ids ever appear.
+        // Canonical catalog products use unique ids; priority follows first render encounter.
+        if (!map.has(product.id)) {
+          map.set(product.id, index);
+          index += 1;
+        }
+      }
+    }
+    return map;
+  }, [sections]);
+
   const title = category || t("storefront.nav.catalog");
 
   const searchToolbar = (
@@ -280,7 +296,11 @@ export function CatalogPage({
               ) : null}
               <div className="sf-product-grid">
                 {section.products.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    imagePriorityIndex={imagePriorityById.get(product.id)}
+                  />
                 ))}
               </div>
             </section>
