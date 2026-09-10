@@ -25,7 +25,13 @@ export const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
 export const GIT_SHA_RE = /^[0-9a-f]{40}$/;
 export const ISO_TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 
-const ENGLISH_BOILERPLATE = Object.freeze(["Suitable", "pcs per pack", "in the box", "per pack"]);
+const ENGLISH_BOILERPLATE = Object.freeze([
+  "Suitable",
+  "pcs per pack",
+  "in the box",
+  "per pack",
+  "catering",
+]);
 const CYRILLIC_WORD_RE = /[А-Яа-яЁё]+/g;
 const LATIN_SCRIPT_TARGETS = Object.freeze(["en", "uz", "zh-CN", "ar"]);
 

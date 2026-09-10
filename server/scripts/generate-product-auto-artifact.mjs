@@ -5,8 +5,10 @@
  */
 import { createHash } from "node:crypto";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -203,6 +205,14 @@ const manifest = {
 };
 
 const tmpDir = mkdtempSync(path.join(os.tmpdir(), "clover-stage4-artifact-"));
+const stagingDir = path.join(
+  path.dirname(args.outDir),
+  `.${path.basename(args.outDir)}.next-${process.pid}`
+);
+const backupDir = path.join(
+  path.dirname(args.outDir),
+  `.${path.basename(args.outDir)}.prev-${process.pid}`
+);
 let promoted = false;
 try {
   writeArtifactSet(tmpDir, manifest, itemsByLanguage, products);
@@ -214,8 +224,19 @@ try {
     baseMainSha: args.baseMainSha || undefined,
   });
   validateUniqueCoverage(loaded.items, cells);
-  mkdirSync(args.outDir, { recursive: true });
-  writeArtifactSet(args.outDir, manifest, itemsByLanguage, products);
+  rmSync(stagingDir, { recursive: true, force: true });
+  writeArtifactSet(stagingDir, manifest, itemsByLanguage, products);
+  // Re-validate the on-disk staging tree before any rename into outDir.
+  loadAutoImportManifest(path.join(stagingDir, "manifest.json"), {
+    runId,
+    baseMainSha: args.baseMainSha || undefined,
+  });
+  rmSync(backupDir, { recursive: true, force: true });
+  if (existsSync(args.outDir)) {
+    renameSync(args.outDir, backupDir);
+  }
+  renameSync(stagingDir, args.outDir);
+  rmSync(backupDir, { recursive: true, force: true });
   promoted = true;
 } catch (error) {
   console.error(JSON.stringify({
@@ -225,8 +246,17 @@ try {
     failureSample: failures.slice(0, 12),
   }, null, 2));
   process.exitCode = 2;
+  // Recover previous artifact if mid-swap left outDir missing.
+  if (!existsSync(args.outDir) && existsSync(backupDir)) {
+    try {
+      renameSync(backupDir, args.outDir);
+    } catch {
+      /* keep exitCode=2 */
+    }
+  }
 } finally {
   rmSync(tmpDir, { recursive: true, force: true });
+  rmSync(stagingDir, { recursive: true, force: true });
 }
 
 if (promoted) {

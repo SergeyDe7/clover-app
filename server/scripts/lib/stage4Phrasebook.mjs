@@ -418,7 +418,7 @@ const PHRASES = [
       "HoReCa, keytering va quyish uchun amaliy tanlov.",
       "HoReCa, кейтеринг жана куюу үчүн практикалык тандоо.",
       "интихоби амалӣ барои HoReCa, кейтеринг ва рехтан.",
-      "HoReCa、 catering 与灌装的实用之选。",
+      "HoReCa、餐饮与灌装的实用之选。",
       "خيار عملي لـ HoReCa والتموين والتعبئة."
     ),
   ],

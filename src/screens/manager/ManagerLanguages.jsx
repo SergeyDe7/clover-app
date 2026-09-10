@@ -10,6 +10,7 @@ import { parseProductTranslationRowId } from "../../shared/i18n/productLocalizat
 import {
   clearTranslationDraft,
   markDraftClean,
+  mergePagedWorkspaceRows,
   mergeWorkspaceDrafts,
   readDraftValue,
   setDraftValue,
@@ -77,10 +78,12 @@ export function ManagerLanguages() {
   const requestGenerationRef = useRef(0);
   const languageRef = useRef("en");
   const viewRef = useRef("interface");
+  const offsetRef = useRef(0);
 
   const safeLanguage = TARGET_LOCALES.includes(language) ? language : "en";
   languageRef.current = safeLanguage;
   viewRef.current = view;
+  offsetRef.current = offset;
   const glossaryEditing = Boolean(glossaryForm.id);
   const glossaryFormLanguage = glossaryForm.language || safeLanguage;
 
@@ -107,6 +110,7 @@ export function ManagerLanguages() {
     const requestGeneration = ++requestGenerationRef.current;
     const requestLanguage = safeLanguage;
     const requestView = view;
+    const requestOffset = offset;
     try {
       const [payload, workspace, glossaryPayload] = await Promise.all([
         api.getLocalizationSettings(),
@@ -118,14 +122,14 @@ export function ManagerLanguages() {
               language: requestLanguage,
               untranslatedOnly,
               limit: 100,
-              offset,
+              offset: requestOffset,
             }),
         requestView === "glossary"
           ? api.getGlossaryEntries({
               query,
               language: requestLanguage,
               limit: 100,
-              offset,
+              offset: requestOffset,
             })
           : Promise.resolve({ entries: [], total: 0, hasMore: false, limit: 100, offset: 0 }),
       ]);
@@ -137,6 +141,8 @@ export function ManagerLanguages() {
           currentLanguage: languageRef.current,
           requestView,
           currentView: viewRef.current,
+          requestOffset,
+          currentOffset: offsetRef.current,
         })
       ) {
         return;
@@ -144,10 +150,11 @@ export function ManagerLanguages() {
       setSettings(payload.settings || null);
       setCompleteness(payload.completeness || {});
       setLocales(Array.isArray(payload.locales) ? payload.locales : []);
-      const nextRows = Array.isArray(workspace.rows) ? workspace.rows : [];
-      setRows(nextRows);
-      setDrafts((current) => mergeWorkspaceDrafts(current, nextRows, requestLanguage));
-      setGlossary(Array.isArray(glossaryPayload.entries) ? glossaryPayload.entries : []);
+      const pageRows = Array.isArray(workspace.rows) ? workspace.rows : [];
+      setRows((current) => mergePagedWorkspaceRows(current, pageRows, requestOffset));
+      setDrafts((current) => mergeWorkspaceDrafts(current, pageRows, requestLanguage));
+      const pageGlossary = Array.isArray(glossaryPayload.entries) ? glossaryPayload.entries : [];
+      setGlossary((current) => mergePagedWorkspaceRows(current, pageGlossary, requestOffset));
       setPageMeta({
         total: Number(requestView === "glossary" ? glossaryPayload.total : workspace.total) || 0,
         hasMore: Boolean(requestView === "glossary" ? glossaryPayload.hasMore : workspace.hasMore),
@@ -163,6 +170,8 @@ export function ManagerLanguages() {
           currentLanguage: languageRef.current,
           requestView,
           currentView: viewRef.current,
+          requestOffset,
+          currentOffset: offsetRef.current,
         })
       ) {
         return;
@@ -170,6 +179,7 @@ export function ManagerLanguages() {
       setSettings({ enabledLanguages: ["ru"], catalogVersion: 0 });
       setCompleteness({});
       setRows([]);
+      setGlossary([]);
       setMessage(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
     }
   }, [view, query, untranslatedOnly, safeLanguage, offset, t]);

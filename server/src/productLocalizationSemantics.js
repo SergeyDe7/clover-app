@@ -225,6 +225,8 @@ function collectGlossaryMatches(sourceRu, languageEntries, context) {
   }
   matches.sort((a, b) => {
     if (a.exactContext !== b.exactContext) return a.exactContext ? -1 : 1;
+    // Protected must not be shadowed by a longer non-protected phrase.
+    if (a.protected !== b.protected) return a.protected ? -1 : 1;
     if (b.length !== a.length) return b.length - a.length;
     return a.start - b.start;
   });

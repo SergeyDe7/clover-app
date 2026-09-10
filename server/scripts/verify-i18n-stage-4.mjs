@@ -130,7 +130,8 @@ const generic = { sourceRu: "стакан", targetValue: "cup", context: "", pro
 const exact = { sourceRu: "стакан", targetValue: "tumbler", context: "product.name", protected: false };
 const longer = { sourceRu: "стакан 200", targetValue: "200 cup", context: "", protected: false };
 assert.equal(applyGlossaryPhrases("стакан 200 мл", [generic, exact, longer], "product.name"), "tumbler 200 мл");
-assert.equal(applyGlossaryPhrases("стакан 200 мл", [generic, longer], ""), "200 cup мл");
+// Protected short entry must win over longer non-protected overlap.
+assert.equal(applyGlossaryPhrases("стакан 200 мл", [generic, longer], ""), "cup 200 мл");
 const overlap = applyGlossaryPhrases("стакан стакан", [generic], "");
 assert.equal(overlap, "cup cup");
 const winners = selectGlossaryMatches("стакан 200 мл", [generic, exact], "product.name");
@@ -143,6 +144,31 @@ assert.equal(
     product: {},
     glossaryEntries: [generic, exact],
     context: "product.name",
+  }).ok,
+  true
+);
+const soapProtected = { sourceRu: "мыло", targetValue: "SOAPX", context: "", protected: true };
+const liquidSoap = { sourceRu: "жидкое мыло", targetValue: "liquid soap", context: "", protected: false };
+assert.equal(applyGlossaryPhrases("жидкое мыло", [soapProtected, liquidSoap], ""), "жидкое SOAPX");
+assert.equal(
+  selectGlossaryMatches("жидкое мыло", [soapProtected, liquidSoap], "")[0].target,
+  "SOAPX"
+);
+assert.equal(
+  validateProductTranslationSemantics({
+    sourceRu: "жидкое мыло",
+    targetValue: "liquid soap",
+    product: {},
+    glossaryEntries: [soapProtected, liquidSoap],
+  }).ok,
+  false
+);
+assert.equal(
+  validateProductTranslationSemantics({
+    sourceRu: "жидкое мыло",
+    targetValue: "жидкое SOAPX",
+    product: {},
+    glossaryEntries: [soapProtected, liquidSoap],
   }).ok,
   true
 );
@@ -191,7 +217,9 @@ assert.equal(
   false
 );
 
-const { shouldApplyWorkspaceResponse } = await import("../../src/shared/i18n/translationDrafts.js");
+const { shouldApplyWorkspaceResponse, mergePagedWorkspaceRows } = await import(
+  "../../src/shared/i18n/translationDrafts.js"
+);
 assert.equal(
   shouldApplyWorkspaceResponse({
     requestGeneration: 1,
@@ -223,6 +251,22 @@ assert.equal(
   }),
   false
 );
+assert.equal(
+  shouldApplyWorkspaceResponse({
+    requestGeneration: 4,
+    currentGeneration: 4,
+    requestLanguage: "en",
+    currentLanguage: "en",
+    requestView: "products",
+    currentView: "products",
+    requestOffset: 100,
+    currentOffset: 0,
+  }),
+  false
+);
+
+assert.deepEqual(mergePagedWorkspaceRows(["a"], ["b"], 0), ["b"]);
+assert.deepEqual(mergePagedWorkspaceRows(["a"], ["b"], 100), ["a", "b"]);
 
 assert.equal(
   validateProductTranslationSemantics({

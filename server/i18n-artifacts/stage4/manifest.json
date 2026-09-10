@@ -4,7 +4,7 @@
   "quality": "AUTO_MACHINE_DRAFT",
   "runId": "stage4-initial-cbd1d0e-6259e882d1bf",
   "baseMainSha": "cbd1d0e3ac831fd41126d4e6b0e7af446d436d42",
-  "generatedAt": "2026-09-10T07:46:36.850Z",
+  "generatedAt": "2026-09-10T08:45:10.240Z",
   "productCount": 698,
   "sourceFieldCounts": {
     "name": 698,
@@ -54,7 +54,7 @@
       "file": "chunk-zh-CN.json",
       "language": "zh-CN",
       "count": 2675,
-      "sha256": "79fb5f62cb598fad7fc33baa7a7e18764396bc911b7e1ac4f9adb5eb3567ee25"
+      "sha256": "70cf730c2db192a13a69c38f6e2a7ce93417b2b787f396b40b00e2ae620438bc"
     },
     {
       "file": "chunk-ar.json",
