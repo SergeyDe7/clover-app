@@ -125,6 +125,7 @@ import {
   saveProductManualTranslation,
 } from "./productLocalizationStore.js";
 import { commitCanonicalProducts } from "./productSourceCorpus.js";
+import { scheduleSitemapRefresh } from "./sitemapArtifact.js";
 import { localeChoices } from "../../src/shared/i18n/localizationSettings.js";
 import { publicClientSettings } from "./clientSettings.js";
 import {
@@ -4644,6 +4645,8 @@ app.put(
       markupPercent: next.storefrontMarkupPercent || 0,
       priceTypeId: next.storefrontPriceTypeId || "",
     });
+    // Deferred: after response path; storefrontShowOnlyLinked can change URL set.
+    scheduleSitemapRefresh("storefront-settings");
     res.json({
       ok: true,
       settings: next,

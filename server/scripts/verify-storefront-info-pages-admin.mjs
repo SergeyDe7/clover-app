@@ -400,7 +400,10 @@ const mode = src("src/screens/storefront/mode.js");
 const app = src("src/screens/storefront/StorefrontApp.jsx");
 const publicSite = src("src/screens/storefront/publicSite.js");
 const server = src("server/src/server.js");
-const sitemap = src("public/sitemap.xml");
+const {
+  SITEMAP_STATIC_PATHS,
+  toAbsoluteSitemapUrl,
+} = await import("../../src/shared/sitemap/sitemapContract.js");
 const robots = src("public/robots.txt");
 const deliveryFee = src("server/src/deliveryFee.js");
 const checkout = src("src/screens/storefront/pages/CheckoutPage.jsx");
@@ -457,9 +460,17 @@ assert.match(server, /\/api\/public\/site/);
 assert.match(server, /stripStorefrontSettings/);
 
 for (const slug of FIXED_SLUGS) {
-  assert.match(sitemap, new RegExp(`https://clover-spb\\.ru/${slug}`));
+  assert.ok(
+    SITEMAP_STATIC_PATHS.includes(`/${slug}`),
+    `sitemap static contract missing /${slug}`
+  );
+  assert.equal(
+    toAbsoluteSitemapUrl(`/${slug}`),
+    `https://clover-spb.ru/${slug}`
+  );
 }
-assert.match(sitemap, /https:\/\/clover-spb\.ru\/contacts/);
+assert.ok(SITEMAP_STATIC_PATHS.includes("/contacts"));
+assert.equal(toAbsoluteSitemapUrl("/contacts"), "https://clover-spb.ru/contacts");
 assert.match(robots, /Sitemap: https:\/\/clover-spb\.ru\/sitemap\.xml/);
 assert.doesNotMatch(robots, /Disallow: \/about/);
 

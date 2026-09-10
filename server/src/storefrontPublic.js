@@ -68,6 +68,10 @@ import {
   exactTranslationTargetInternal,
   toPublicLocaleCode,
 } from "../../src/shared/i18n/languageRegistry.js";
+import {
+  passesPublicStorefrontEligibility,
+  resolvePublicProductCode,
+} from "../../src/shared/sitemap/sitemapContract.js";
 
 const STOREFRONT_GUEST_EMAIL = "storefront-guest@clover.local";
 
@@ -508,11 +512,7 @@ function toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId = "")
   const oneCCode = String(product.oneCCode || oneCItem?.code || "").trim();
   // На витрине артикул = код 1С; иначе не-CL код Clover; иначе стабильный slug по id
   // (чтобы карточки без 1С не пропадали из каталога при showOnStorefront).
-  const publicCode =
-    oneCCode ||
-    (/^cl-\d+$/i.test(cloverCode) ? "" : cloverCode) ||
-    `id-${product.id}`;
-  const code = publicCode;
+  const code = resolvePublicProductCode(product, oneCItem);
 
   // На витрине имя = как в матрице/каталоге Clover (не сырое имя 1С).
   const cloverName = String(product.name || "").trim();
@@ -571,12 +571,11 @@ function listStorefrontProducts(storeSettings, language) {
   }
 
   return (Array.isArray(products) ? products : [])
-    .filter((product) => product?.active !== false)
-    .filter((product) => product?.showOnStorefront === true)
-    .filter((product) => {
-      if (!storeSettings.storefrontShowOnlyLinked) return true;
-      return Boolean(String(product.oneCId || "").trim());
-    })
+    .filter((product) =>
+      passesPublicStorefrontEligibility(product, {
+        storefrontShowOnlyLinked: storeSettings.storefrontShowOnlyLinked,
+      })
+    )
     .map((product) => {
       const oneCItem = byId.get(String(product.oneCId || "")) || null;
       const publicProduct = toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId);
