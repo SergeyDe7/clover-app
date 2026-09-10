@@ -2034,6 +2034,7 @@ body:has(.clover-app) {
 .product-translation-field-toggle {
   appearance: none;
   width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2046,11 +2047,39 @@ body:has(.clover-app) {
   cursor: pointer;
   font: inherit;
   color: inherit;
+  box-sizing: border-box;
+}
+
+.product-translation-toggle strong,
+.product-translation-field-toggle strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .product-translation-panel {
   display: grid;
   gap: 10px;
+  min-width: 0;
+}
+
+.product-translation-loading {
+  display: grid;
+  gap: 8px;
+}
+
+.product-translation-skeleton {
+  display: block;
+  height: 42px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #eef2ee 0%, #f7f9f7 50%, #eef2ee 100%);
+  background-size: 200% 100%;
+}
+
+.product-translation-field .manager-languages-target {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .product-translation-field,

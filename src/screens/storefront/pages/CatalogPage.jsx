@@ -110,8 +110,12 @@ export function CatalogPage({
     let index = 0;
     for (const section of sections) {
       for (const product of section.products || []) {
-        map.set(product.id, index);
-        index += 1;
+        // Render-order cursor; Map last-write wins if duplicate ids ever appear.
+        // Canonical catalog products use unique ids; priority follows first render encounter.
+        if (!map.has(product.id)) {
+          map.set(product.id, index);
+          index += 1;
+        }
       }
     }
     return map;

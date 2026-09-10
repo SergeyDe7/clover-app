@@ -321,7 +321,22 @@ function projectSelectedLanguageRows(rows, languageRaw) {
   });
 }
 
-export function listWorkspacePage(filters = {}) {
+function isPageableWorkspaceView(view) {
+  return (
+    view === "interface" ||
+    view === "products" ||
+    view === "untranslated" ||
+    view === "categories" ||
+    view === "seo"
+  );
+}
+
+/**
+ * Full filtered workspace rows (no paging).
+ * Internal/tests/completeness-adjacent callers that need the entire dataset.
+ * Selected-language UI path builds only the requested target cell.
+ */
+export function collectFilteredWorkspaceRows(filters = {}, options = {}) {
   if (Object.prototype.hasOwnProperty.call(filters, "language") && filters.language !== undefined) {
     const languageRaw = filters.language;
     if (!isExactPublicTargetLocale(languageRaw)) {
@@ -334,18 +349,19 @@ export function listWorkspacePage(filters = {}) {
   const languageRaw = filters.language;
   const view = String(filters.view || "interface");
   if (view === "glossary") {
-    return { rows: [], total: 0, offset: 0, limit: 0, hasMore: false };
+    return [];
   }
   const store = currentCatalogItems(readTranslationStore());
-  const uiRows = buildTranslationRows(store);
-  const boundedProductView = view === "products" || view === "untranslated";
-  const pageable =
-    view === "interface" ||
-    view === "products" ||
-    view === "untranslated" ||
-    view === "categories" ||
-    view === "seo";
-  const productRows = boundedProductView
+  const buildStats = options.__stats || null;
+  const needUi = view !== "products";
+  const needProducts = view === "products" || view === "untranslated";
+  const uiRows = needUi
+    ? buildTranslationRows(store, {
+        language: languageRaw,
+        ...(buildStats ? { __stats: buildStats } : {}),
+      })
+    : [];
+  const productRows = needProducts
     ? buildProductWorkspaceRows(undefined, { language: languageRaw })
     : [];
   const combined = view === "products" ? productRows : [...uiRows, ...productRows];
@@ -354,7 +370,16 @@ export function listWorkspacePage(filters = {}) {
     language: languageRaw,
   });
   filtered = projectSelectedLanguageRows(filtered, languageRaw);
-  if (!pageable) {
+  return filtered;
+}
+
+export function listWorkspacePage(filters = {}) {
+  const view = String(filters.view || "interface");
+  if (view === "glossary") {
+    return { rows: [], total: 0, offset: 0, limit: 0, hasMore: false };
+  }
+  const filtered = collectFilteredWorkspaceRows(filters);
+  if (!isPageableWorkspaceView(view)) {
     return {
       rows: filtered,
       total: filtered.length,
@@ -364,26 +389,15 @@ export function listWorkspacePage(filters = {}) {
     };
   }
   const total = filtered.length;
-  const explicitPaging =
-    Object.prototype.hasOwnProperty.call(filters, "limit") ||
-    Object.prototype.hasOwnProperty.call(filters, "offset");
-  if (!explicitPaging) {
-    return {
-      rows: filtered,
-      total,
-      offset: 0,
-      limit: total,
-      hasMore: false,
-    };
-  }
   const limit = parseWorkspaceLimit(filters.limit);
   const offset = parseWorkspaceOffset(filters.offset);
   const rows = filtered.slice(offset, offset + limit);
   return { rows, total, offset, limit, hasMore: offset + rows.length < total };
 }
 
+/** Explicit all-rows accessor for internal/test callers. Never unbounded via listWorkspacePage. */
 export function listWorkspaceRows(filters = {}) {
-  return listWorkspacePage(filters).rows;
+  return collectFilteredWorkspaceRows(filters);
 }
 
 function requireCurrentUiEntry(entryId) {

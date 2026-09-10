@@ -8,6 +8,11 @@ import {
 } from "../../shared/i18n/localizationSettings.js";
 import { parseProductTranslationRowId } from "../../shared/i18n/productLocalization.js";
 import {
+  canSendForeignLanguageEnablePut,
+  isForeignEnableToggleDisabled,
+  shouldShowIncompleteEnableBlock,
+} from "../../shared/i18n/languageEnableGate.js";
+import {
   clearTranslationDraft,
   markDraftClean,
   mergePagedWorkspaceRows,
@@ -15,6 +20,8 @@ import {
   readDraftValue,
   setDraftValue,
   shouldApplyWorkspaceResponse,
+  shouldClearWorkspaceOnLoadError,
+  workspaceMutationReloadOffset,
 } from "../../shared/i18n/translationDrafts.js";
 
 const TARGET_LOCALES = ["en", "uz", "ky", "tg", "zh", "ar"];
@@ -82,11 +89,16 @@ export function ManagerLanguages() {
   const languageRef = useRef("en");
   const viewRef = useRef("interface");
   const offsetRef = useRef(0);
+  const queryRef = useRef("");
+  const untranslatedRef = useRef(false);
+  const skipNextWorkspaceLoadRef = useRef(false);
 
   const safeLanguage = TARGET_LOCALES.includes(language) ? language : "en";
   languageRef.current = safeLanguage;
   viewRef.current = view;
   offsetRef.current = offset;
+  queryRef.current = debouncedQuery;
+  untranslatedRef.current = untranslatedOnly;
   const glossaryEditing = Boolean(glossaryForm.id);
   const glossaryFormLanguage = glossaryForm.language || safeLanguage;
 
@@ -132,78 +144,109 @@ export function ManagerLanguages() {
     }
   }, [t]);
 
+  const fetchWorkspacePage = useCallback(
+    async ({
+      view: requestView,
+      language: requestLanguage,
+      query: requestQuery,
+      untranslatedOnly: requestUntranslatedOnly,
+      offset: requestOffset,
+    }) => {
+      const requestGeneration = ++requestGenerationRef.current;
+      try {
+        const [workspace, glossaryPayload] = await Promise.all([
+          requestView === "glossary"
+            ? Promise.resolve({ rows: [], total: 0, hasMore: false, limit: 100, offset: 0 })
+            : api.getLocalizationTranslations({
+                view: requestView,
+                query: requestQuery,
+                language: requestLanguage,
+                untranslatedOnly: requestUntranslatedOnly,
+                limit: 100,
+                offset: requestOffset,
+              }),
+          requestView === "glossary"
+            ? api.getGlossaryEntries({
+                query: requestQuery,
+                language: requestLanguage,
+                limit: 100,
+                offset: requestOffset,
+              })
+            : Promise.resolve({ entries: [], total: 0, hasMore: false, limit: 100, offset: 0 }),
+        ]);
+        if (
+          !shouldApplyWorkspaceResponse({
+            requestGeneration,
+            currentGeneration: requestGenerationRef.current,
+            requestLanguage,
+            currentLanguage: languageRef.current,
+            requestView,
+            currentView: viewRef.current,
+            requestOffset,
+            currentOffset: offsetRef.current,
+          })
+        ) {
+          return;
+        }
+        const pageRows = Array.isArray(workspace.rows) ? workspace.rows : [];
+        setRows((current) => mergePagedWorkspaceRows(current, pageRows, requestOffset));
+        setDrafts((current) => mergeWorkspaceDrafts(current, pageRows, requestLanguage));
+        const pageGlossary = Array.isArray(glossaryPayload.entries) ? glossaryPayload.entries : [];
+        setGlossary((current) => mergePagedWorkspaceRows(current, pageGlossary, requestOffset));
+        setPageMeta({
+          total: Number(requestView === "glossary" ? glossaryPayload.total : workspace.total) || 0,
+          hasMore: Boolean(requestView === "glossary" ? glossaryPayload.hasMore : workspace.hasMore),
+          limit: Number(requestView === "glossary" ? glossaryPayload.limit : workspace.limit) || 100,
+        });
+        setMessage("");
+      } catch (error) {
+        if (
+          !shouldApplyWorkspaceResponse({
+            requestGeneration,
+            currentGeneration: requestGenerationRef.current,
+            requestLanguage,
+            currentLanguage: languageRef.current,
+            requestView,
+            currentView: viewRef.current,
+            requestOffset,
+            currentOffset: offsetRef.current,
+          })
+        ) {
+          return;
+        }
+        if (shouldClearWorkspaceOnLoadError(requestOffset)) {
+          setRows([]);
+          setGlossary([]);
+        }
+        setMessage(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
+      }
+    },
+    [t]
+  );
+
   const loadWorkspace = useCallback(async () => {
-    const requestGeneration = ++requestGenerationRef.current;
-    const requestLanguage = safeLanguage;
-    const requestView = view;
-    const requestOffset = offset;
-    const requestQuery = debouncedQuery;
-    try {
-      const [workspace, glossaryPayload] = await Promise.all([
-        requestView === "glossary"
-          ? Promise.resolve({ rows: [], total: 0, hasMore: false, limit: 100, offset: 0 })
-          : api.getLocalizationTranslations({
-              view: requestView,
-              query: requestQuery,
-              language: requestLanguage,
-              untranslatedOnly,
-              limit: 100,
-              offset: requestOffset,
-            }),
-        requestView === "glossary"
-          ? api.getGlossaryEntries({
-              query: requestQuery,
-              language: requestLanguage,
-              limit: 100,
-              offset: requestOffset,
-            })
-          : Promise.resolve({ entries: [], total: 0, hasMore: false, limit: 100, offset: 0 }),
-      ]);
-      if (
-        !shouldApplyWorkspaceResponse({
-          requestGeneration,
-          currentGeneration: requestGenerationRef.current,
-          requestLanguage,
-          currentLanguage: languageRef.current,
-          requestView,
-          currentView: viewRef.current,
-          requestOffset,
-          currentOffset: offsetRef.current,
-        })
-      ) {
-        return;
-      }
-      const pageRows = Array.isArray(workspace.rows) ? workspace.rows : [];
-      setRows((current) => mergePagedWorkspaceRows(current, pageRows, requestOffset));
-      setDrafts((current) => mergeWorkspaceDrafts(current, pageRows, requestLanguage));
-      const pageGlossary = Array.isArray(glossaryPayload.entries) ? glossaryPayload.entries : [];
-      setGlossary((current) => mergePagedWorkspaceRows(current, pageGlossary, requestOffset));
-      setPageMeta({
-        total: Number(requestView === "glossary" ? glossaryPayload.total : workspace.total) || 0,
-        hasMore: Boolean(requestView === "glossary" ? glossaryPayload.hasMore : workspace.hasMore),
-        limit: Number(requestView === "glossary" ? glossaryPayload.limit : workspace.limit) || 100,
-      });
-      setMessage("");
-    } catch (error) {
-      if (
-        !shouldApplyWorkspaceResponse({
-          requestGeneration,
-          currentGeneration: requestGenerationRef.current,
-          requestLanguage,
-          currentLanguage: languageRef.current,
-          requestView,
-          currentView: viewRef.current,
-          requestOffset,
-          currentOffset: offsetRef.current,
-        })
-      ) {
-        return;
-      }
-      setRows([]);
-      setGlossary([]);
-      setMessage(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
-    }
-  }, [view, debouncedQuery, untranslatedOnly, safeLanguage, offset, t]);
+    await fetchWorkspacePage({
+      view,
+      language: safeLanguage,
+      query: debouncedQuery,
+      untranslatedOnly,
+      offset,
+    });
+  }, [fetchWorkspacePage, view, safeLanguage, debouncedQuery, untranslatedOnly, offset]);
+
+  const refreshWorkspaceFromStart = useCallback(async () => {
+    const nextOffset = workspaceMutationReloadOffset();
+    offsetRef.current = nextOffset;
+    skipNextWorkspaceLoadRef.current = true;
+    setOffset(nextOffset);
+    await fetchWorkspacePage({
+      view: viewRef.current,
+      language: languageRef.current,
+      query: queryRef.current,
+      untranslatedOnly: untranslatedRef.current,
+      offset: nextOffset,
+    });
+  }, [fetchWorkspacePage]);
 
   const refreshOverview = loadOverview;
 
@@ -216,6 +259,10 @@ export function ManagerLanguages() {
   }, [view, debouncedQuery, untranslatedOnly, safeLanguage]);
 
   useEffect(() => {
+    if (skipNextWorkspaceLoadRef.current) {
+      skipNextWorkspaceLoadRef.current = false;
+      return;
+    }
     loadWorkspace();
   }, [loadWorkspace]);
 
@@ -224,10 +271,12 @@ export function ManagerLanguages() {
   const toggleLanguage = async (code, nextEnabled) => {
     if (code === "ru") return;
     if (
-      nextEnabled &&
-      overviewReady &&
-      completeness?.[code] &&
-      completeness[code].complete !== true
+      shouldShowIncompleteEnableBlock({
+        code,
+        nextEnabled,
+        overviewReady,
+        completeness,
+      })
     ) {
       await appAlert({
         title: t("admin.languages.enableBlockedTitle"),
@@ -236,12 +285,14 @@ export function ManagerLanguages() {
       });
       return;
     }
-    if (!overviewReady && nextEnabled) {
-      await appAlert({
-        title: t("admin.languages.enableBlockedTitle"),
-        message: t("admin.languages.enableBlocked"),
-        tone: "warn",
-      });
+    if (
+      !canSendForeignLanguageEnablePut({
+        code,
+        nextEnabled,
+        overviewReady,
+        completeness,
+      })
+    ) {
       return;
     }
     const next = nextEnabled
@@ -292,11 +343,11 @@ export function ManagerLanguages() {
       }
       setDrafts((current) => markDraftClean(current, row.id, targetLanguage, savedValue));
       setMessage(t("admin.languages.saved"));
-      await Promise.all([loadWorkspace(), refreshOverview()]);
+      await Promise.all([refreshWorkspaceFromStart(), refreshOverview()]);
     } catch (error) {
       if (error?.code === "SOURCE_STALE" || error?.status === 409) {
         setMessage(t("admin.productTranslations.sourceStale"));
-        await Promise.all([loadWorkspace(), refreshOverview()]);
+        await Promise.all([refreshWorkspaceFromStart(), refreshOverview()]);
       } else {
         setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
       }
@@ -327,11 +378,11 @@ export function ManagerLanguages() {
       }
       setMessage(t("admin.languages.resetDone"));
       setDrafts((current) => clearTranslationDraft(current, row.id, targetLanguage));
-      await Promise.all([loadWorkspace(), refreshOverview()]);
+      await Promise.all([refreshWorkspaceFromStart(), refreshOverview()]);
     } catch (error) {
       if (error?.code === "SOURCE_STALE" || error?.status === 409) {
         setMessage(t("admin.productTranslations.sourceStale"));
-        await Promise.all([loadWorkspace(), refreshOverview()]);
+        await Promise.all([refreshWorkspaceFromStart(), refreshOverview()]);
       } else {
         setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
       }
@@ -349,7 +400,7 @@ export function ManagerLanguages() {
       });
       setGlossaryForm(emptyGlossaryForm());
       setMessage(t("admin.glossary.saved"));
-      await Promise.all([loadWorkspace(), refreshOverview()]);
+      await refreshWorkspaceFromStart();
     } catch (error) {
       setMessage(errorDisplayMessage(error, t, "admin.glossary.saveFailed"));
     } finally {
@@ -367,7 +418,7 @@ export function ManagerLanguages() {
     try {
       await api.deleteGlossaryEntry(entry.id);
       setMessage(t("admin.glossary.deleted"));
-      await Promise.all([loadWorkspace(), refreshOverview()]);
+      await refreshWorkspaceFromStart();
     } catch (error) {
       setMessage(errorDisplayMessage(error, t, "admin.glossary.saveFailed"));
     } finally {
@@ -398,6 +449,13 @@ export function ManagerLanguages() {
           const locked = code === "ru" || locale.alwaysEnabled;
           const on = locked || enabled.has(code);
           const report = completeness[code] || {};
+          const toggleDisabled = isForeignEnableToggleDisabled({
+            code,
+            locked,
+            busy,
+            overviewReady,
+            currentlyEnabled: on,
+          });
           return (
             <article
               className={
@@ -418,9 +476,9 @@ export function ManagerLanguages() {
               <button
                 className={on ? "toggle active" : "toggle"}
                 type="button"
-                disabled={busy || locked}
+                disabled={toggleDisabled}
                 aria-label={languageLabels[code] || code}
-                aria-disabled={locked ? "true" : undefined}
+                aria-disabled={locked || toggleDisabled ? "true" : undefined}
                 onClick={() => toggleLanguage(code, !on)}
               >
                 <span />

@@ -25,13 +25,45 @@ export function shouldApplyWorkspaceResponse({
   );
 }
 
-/** Append page-2+ rows; replace when offset is 0 (filter/language reset). */
+/**
+ * offset=0 → replace.
+ * offset>0 → merge by stable row `id` (update in place / append new; no duplicate ids).
+ */
 export function mergePagedWorkspaceRows(currentRows, nextRows, offset) {
   const incoming = Array.isArray(nextRows) ? nextRows : [];
-  if (Number(offset) > 0) {
-    return [...(Array.isArray(currentRows) ? currentRows : []), ...incoming];
+  if (!(Number(offset) > 0)) {
+    return incoming;
   }
-  return incoming;
+  const merged = [];
+  const indexById = new Map();
+  for (const row of Array.isArray(currentRows) ? currentRows : []) {
+    if (row && row.id != null && row.id !== "") {
+      indexById.set(String(row.id), merged.length);
+    }
+    merged.push(row);
+  }
+  for (const row of incoming) {
+    if (row && row.id != null && row.id !== "") {
+      const id = String(row.id);
+      if (indexById.has(id)) {
+        merged[indexById.get(id)] = row;
+        continue;
+      }
+      indexById.set(id, merged.length);
+    }
+    merged.push(row);
+  }
+  return merged;
+}
+
+/** Load More failure must not wipe already-loaded prefix rows. */
+export function shouldClearWorkspaceOnLoadError(requestOffset) {
+  return !(Number(requestOffset) > 0);
+}
+
+/** After membership-changing mutations, always reload from page 0. */
+export function workspaceMutationReloadOffset() {
+  return 0;
 }
 
 function asDraftEntry(value) {

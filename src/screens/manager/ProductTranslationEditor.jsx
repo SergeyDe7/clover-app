@@ -5,6 +5,11 @@ import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 import { PRODUCT_TRANSLATION_FIELDS } from "../../shared/i18n/productLocalization.js";
 import {
+  canShowReturnToAuto,
+  productTranslationFieldPresentation,
+  shouldStartProductTranslationFetch,
+} from "../../shared/i18n/productTranslationUi.js";
+import {
   clearProductDrafts,
   clearProductFieldDraft,
   readProductFieldDraft,
@@ -26,13 +31,17 @@ export function ProductTranslationEditor({ product }) {
   const [expanded, setExpanded] = useState(false);
   const [expandedField, setExpandedField] = useState("");
   const [workspace, setWorkspace] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("en");
   const [drafts, setDrafts] = useState({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const requestGenerationRef = useRef(0);
+  const inFlightRef = useRef(false);
+  const productIdRef = useRef("");
 
   const productId = product?.id == null ? "" : String(product.id);
+  productIdRef.current = productId;
   const languageLabels = {
     en: t("admin.languages.label.en"),
     uz: t("admin.languages.label.uz"),
@@ -44,17 +53,31 @@ export function ProductTranslationEditor({ product }) {
 
   useEffect(() => {
     requestGenerationRef.current += 1;
+    inFlightRef.current = false;
     setDrafts(clearProductDrafts());
     setWorkspace(null);
+    setLoading(false);
     setMessage("");
     setExpanded(false);
     setExpandedField("");
   }, [productId]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ force = false } = {}) => {
     if (!productId) return;
+    if (
+      !shouldStartProductTranslationFetch({
+        hasWorkspace: Boolean(workspace),
+        inFlight: inFlightRef.current,
+        force,
+      })
+    ) {
+      return;
+    }
     const requestGeneration = ++requestGenerationRef.current;
     const requestedProductId = productId;
+    inFlightRef.current = true;
+    setLoading(true);
+    setMessage("");
     try {
       const payload = await api.getProductTranslations(requestedProductId);
       if (
@@ -62,9 +85,9 @@ export function ProductTranslationEditor({ product }) {
           requestGeneration,
           currentGeneration: requestGenerationRef.current,
           requestLanguage: requestedProductId,
-          currentLanguage: productId,
+          currentLanguage: productIdRef.current,
           requestProductId: requestedProductId,
-          currentProductId: productId,
+          currentProductId: productIdRef.current,
         })
       ) {
         return;
@@ -76,17 +99,25 @@ export function ProductTranslationEditor({ product }) {
           requestGeneration,
           currentGeneration: requestGenerationRef.current,
           requestLanguage: requestedProductId,
-          currentLanguage: productId,
+          currentLanguage: productIdRef.current,
           requestProductId: requestedProductId,
-          currentProductId: productId,
+          currentProductId: productIdRef.current,
         })
       ) {
         return;
       }
       setWorkspace(null);
       setMessage(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
+    } finally {
+      if (
+        requestGeneration === requestGenerationRef.current &&
+        requestedProductId === productIdRef.current
+      ) {
+        setLoading(false);
+        inFlightRef.current = false;
+      }
     }
-  }, [productId, t]);
+  }, [productId, t, workspace]);
 
   const openSection = async () => {
     if (expanded) {
@@ -94,9 +125,7 @@ export function ProductTranslationEditor({ product }) {
       return;
     }
     setExpanded(true);
-    if (!workspace) {
-      await load();
-    }
+    await load({ force: false });
   };
 
   if (!productId) return null;
@@ -110,11 +139,15 @@ export function ProductTranslationEditor({ product }) {
       await api.saveProductTranslation(productId, language, field, value, sourceHash);
       setDrafts((current) => clearProductFieldDraft(current, language, field));
       setMessage(t("admin.languages.saved"));
-      await load();
+      inFlightRef.current = false;
+      setWorkspace(null);
+      await load({ force: true });
     } catch (error) {
       if (error?.code === "SOURCE_STALE" || error?.status === 409) {
         setMessage(t("admin.productTranslations.sourceStale"));
-        await load();
+        inFlightRef.current = false;
+        setWorkspace(null);
+        await load({ force: true });
       } else {
         setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
       }
@@ -135,11 +168,15 @@ export function ProductTranslationEditor({ product }) {
       await api.resetProductTranslation(productId, language, field, sourceHash);
       setDrafts((current) => clearProductFieldDraft(current, language, field));
       setMessage(t("admin.languages.resetDone"));
-      await load();
+      inFlightRef.current = false;
+      setWorkspace(null);
+      await load({ force: true });
     } catch (error) {
       if (error?.code === "SOURCE_STALE" || error?.status === 409) {
         setMessage(t("admin.productTranslations.sourceStale"));
-        await load();
+        inFlightRef.current = false;
+        setWorkspace(null);
+        await load({ force: true });
       } else {
         await appAlert({
           title: t("admin.languages.saveFailed"),
@@ -164,7 +201,7 @@ export function ProductTranslationEditor({ product }) {
         {t("admin.productTranslations.title")}
       </button>
       {expanded ? (
-        <div className="product-translation-panel">
+        <div className="product-translation-panel" aria-busy={loading ? "true" : undefined}>
           <label className="field">
             {t("admin.languages.language")}
             <select value={language} onChange={(event) => setLanguage(event.target.value)}>
@@ -176,79 +213,101 @@ export function ProductTranslationEditor({ product }) {
             </select>
           </label>
           {message ? <p className="manager-languages-message">{message}</p> : null}
-          {PRODUCT_TRANSLATION_FIELDS.map((field) => {
-            const source = workspace?.fields?.[field]?.sourceRu || "";
-            const cell = workspace?.fields?.[field]?.languages?.[language] || {};
-            const emptySource = !String(source).trim();
-            const tone = emptySource ? "missing" : statusTone(cell);
-            const fieldOpen = expandedField === field;
-            const fieldLabel =
-              field === "name"
-                ? t("admin.productTranslations.field.name")
-                : field === "description"
-                  ? t("admin.productTranslations.field.description")
-                  : field === "composition"
-                    ? t("admin.productTranslations.field.composition")
-                    : t("admin.productTranslations.field.characteristics");
-            const stateKey = emptySource
-              ? "admin.productTranslations.notApplicable"
-              : cell.stale
-                ? "admin.languages.state.stale"
-                : cell.state === "AUTO"
-                  ? "admin.languages.state.auto"
-                  : cell.state === "MANUAL"
-                    ? "admin.languages.state.manual"
-                    : "admin.languages.state.missing";
-            return (
-              <div className="product-translation-field" key={field}>
-                <button
-                  type="button"
-                  className="product-translation-field-toggle"
-                  aria-expanded={fieldOpen}
-                  onClick={() => setExpandedField(fieldOpen ? "" : field)}
-                >
-                  <strong>{fieldLabel}</strong>
-                  <span className={`manager-languages-status is-${tone}`}>{t(stateKey)}</span>
-                </button>
-                {fieldOpen ? (
-                  emptySource ? (
-                    <p className="muted small">{t("admin.productTranslations.notApplicable")}</p>
-                  ) : (
-                    <>
-                      <p className="manager-languages-source">{source}</p>
-                      <textarea
-                        className="manager-languages-target"
-                        rows={3}
-                        value={readProductFieldDraft(drafts, language, field, cell.value || "")}
-                        aria-label={fieldLabel}
-                        onChange={(event) =>
-                          setDrafts((current) =>
-                            writeProductFieldDraft(current, language, field, event.target.value)
-                          )
-                        }
-                      />
-                      <div className="manager-languages-actions">
-                        {cell.stale ? (
-                          <span className="muted small">{t("admin.productTranslations.staleWarning")}</span>
-                        ) : null}
-                        <button type="button" className="primary-button" disabled={busy} onClick={() => saveField(field)}>
-                          {t("admin.languages.save")}
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          disabled={busy}
-                          onClick={() => resetField(field)}
-                        >
-                          {t("admin.productTranslations.returnToAuto")}
-                        </button>
-                      </div>
-                    </>
-                  )
-                ) : null}
-              </div>
-            );
-          })}
+          {loading ? (
+            <div className="product-translation-loading" aria-hidden="true">
+              <span className="product-translation-skeleton" />
+              <span className="product-translation-skeleton" />
+              <span className="product-translation-skeleton" />
+              <span className="product-translation-skeleton" />
+            </div>
+          ) : !workspace ? null : (
+            PRODUCT_TRANSLATION_FIELDS.map((field) => {
+              const source = workspace?.fields?.[field]?.sourceRu || "";
+              const presentation = productTranslationFieldPresentation({
+                loading: false,
+                workspaceLoaded: Boolean(workspace),
+                sourceRu: source,
+              });
+              const cell = workspace?.fields?.[field]?.languages?.[language] || {};
+              const emptySource = presentation.kind === "notApplicable";
+              const tone = emptySource ? "missing" : statusTone(cell);
+              const fieldOpen = expandedField === field;
+              const fieldLabel =
+                field === "name"
+                  ? t("admin.productTranslations.field.name")
+                  : field === "description"
+                    ? t("admin.productTranslations.field.description")
+                    : field === "composition"
+                      ? t("admin.productTranslations.field.composition")
+                      : t("admin.productTranslations.field.characteristics");
+              const stateKey = emptySource
+                ? "admin.productTranslations.notApplicable"
+                : cell.stale
+                  ? "admin.languages.state.stale"
+                  : cell.state === "AUTO"
+                    ? "admin.languages.state.auto"
+                    : cell.state === "MANUAL"
+                      ? "admin.languages.state.manual"
+                      : "admin.languages.state.missing";
+              const showReturnToAuto = canShowReturnToAuto(cell);
+              return (
+                <div className="product-translation-field" key={field}>
+                  <button
+                    type="button"
+                    className="product-translation-field-toggle"
+                    aria-expanded={fieldOpen}
+                    onClick={() => setExpandedField(fieldOpen ? "" : field)}
+                  >
+                    <strong>{fieldLabel}</strong>
+                    <span className={`manager-languages-status is-${tone}`}>{t(stateKey)}</span>
+                  </button>
+                  {fieldOpen ? (
+                    emptySource ? (
+                      <p className="muted small">{t("admin.productTranslations.notApplicable")}</p>
+                    ) : (
+                      <>
+                        <p className="manager-languages-source">{source}</p>
+                        <textarea
+                          className="manager-languages-target"
+                          rows={3}
+                          value={readProductFieldDraft(drafts, language, field, cell.value || "")}
+                          aria-label={fieldLabel}
+                          onChange={(event) =>
+                            setDrafts((current) =>
+                              writeProductFieldDraft(current, language, field, event.target.value)
+                            )
+                          }
+                        />
+                        <div className="manager-languages-actions">
+                          {cell.stale ? (
+                            <span className="muted small">{t("admin.productTranslations.staleWarning")}</span>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="primary-button"
+                            disabled={busy}
+                            onClick={() => saveField(field)}
+                          >
+                            {t("admin.languages.save")}
+                          </button>
+                          {showReturnToAuto ? (
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              disabled={busy}
+                              onClick={() => resetField(field)}
+                            >
+                              {t("admin.productTranslations.returnToAuto")}
+                            </button>
+                          ) : null}
+                        </div>
+                      </>
+                    )
+                  ) : null}
+                </div>
+              );
+            })
+          )}
         </div>
       ) : null}
     </section>
