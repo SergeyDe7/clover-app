@@ -4,6 +4,7 @@ import {
   runInTransaction,
   listTranslationEntryRows,
   listTranslationValueRows,
+  listTranslationValueRowsForLanguage,
   getTranslationEntryRow,
   findTranslationEntryByIdentity,
   insertTranslationEntryRow,
@@ -50,14 +51,25 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function currentCatalogKeys() {
+/** Built once from static UI_CATALOG — O(1) membership for current-catalog filtering. */
+let currentCatalogKeySetInitCount = 0;
+const CURRENT_CATALOG_KEYS = (() => {
+  currentCatalogKeySetInitCount += 1;
   return new Set(UI_CATALOG.map((entry) => `${entry.namespace}\0${entry.key}`));
+})();
+
+export function getCurrentCatalogKeySetInitCount() {
+  return currentCatalogKeySetInitCount;
 }
 
-function isCurrentCatalogEntry(entry) {
+export function getCurrentCatalogKeys() {
+  return CURRENT_CATALOG_KEYS;
+}
+
+export function isCurrentCatalogEntry(entry) {
   if (!entry) return false;
   if (String(entry.entityType || "") !== "" || String(entry.entityId || "") !== "") return false;
-  return currentCatalogKeys().has(`${entry.namespace}\0${entry.fieldKey}`);
+  return CURRENT_CATALOG_KEYS.has(`${entry.namespace}\0${entry.fieldKey}`);
 }
 
 function mapStore(entries, values) {
@@ -92,8 +104,15 @@ export function readLocalizationSettings() {
   );
 }
 
-export function readTranslationStore() {
-  return mapStore(listTranslationEntryRows(), listTranslationValueRows());
+export function readTranslationStore(options = {}) {
+  const entries = listTranslationEntryRows();
+  const languageInternal = options.languageInternal
+    ? String(options.languageInternal)
+    : "";
+  const values = languageInternal
+    ? listTranslationValueRowsForLanguage(languageInternal)
+    : listTranslationValueRows();
+  return mapStore(entries, values);
 }
 
 function currentCatalogItems(store) {
@@ -334,7 +353,9 @@ function isPageableWorkspaceView(view) {
 /**
  * Full filtered workspace rows (no paging).
  * Internal/tests/completeness-adjacent callers that need the entire dataset.
- * Selected-language UI path builds only the requested target cell.
+ * Selected-language UI path builds only the requested target cell and reads
+ * only that language's translation_values.
+ * view=products never reads generic translation_entries/values.
  */
 export function collectFilteredWorkspaceRows(filters = {}, options = {}) {
   if (Object.prototype.hasOwnProperty.call(filters, "language") && filters.language !== undefined) {
@@ -349,18 +370,38 @@ export function collectFilteredWorkspaceRows(filters = {}, options = {}) {
   const languageRaw = filters.language;
   const view = String(filters.view || "interface");
   if (view === "glossary") {
+    if (options.__stats && typeof options.__stats === "object") {
+      options.__stats.genericEntriesRead = 0;
+      options.__stats.genericValuesRead = 0;
+      options.__stats.valueLanguageInternal = "";
+    }
     return [];
   }
-  const store = currentCatalogItems(readTranslationStore());
   const buildStats = options.__stats || null;
   const needUi = view !== "products";
   const needProducts = view === "products" || view === "untranslated";
-  const uiRows = needUi
-    ? buildTranslationRows(store, {
-        language: languageRaw,
-        ...(buildStats ? { __stats: buildStats } : {}),
-      })
-    : [];
+  let uiRows = [];
+  if (needUi) {
+    const internal = languageRaw ? exactTranslationTargetInternal(languageRaw) : "";
+    if (buildStats && typeof buildStats === "object") {
+      buildStats.genericEntriesRead = 1;
+      buildStats.genericValuesRead = 1;
+      buildStats.valueLanguageInternal = internal || "all";
+    }
+    const store = currentCatalogItems(
+      internal
+        ? readTranslationStore({ languageInternal: internal })
+        : readTranslationStore()
+    );
+    uiRows = buildTranslationRows(store, {
+      language: languageRaw,
+      ...(buildStats ? { __stats: buildStats } : {}),
+    });
+  } else if (buildStats && typeof buildStats === "object") {
+    buildStats.genericEntriesRead = 0;
+    buildStats.genericValuesRead = 0;
+    buildStats.valueLanguageInternal = "";
+  }
   const productRows = needProducts
     ? buildProductWorkspaceRows(undefined, { language: languageRaw })
     : [];

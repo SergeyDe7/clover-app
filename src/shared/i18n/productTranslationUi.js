@@ -7,11 +7,10 @@ export function shouldStartProductTranslationFetch({ hasWorkspace, inFlight, for
   return true;
 }
 
+/** Return-to-AUTO only when a MANUAL override actually exists. */
 export function canShowReturnToAuto(cell) {
   if (!cell || typeof cell !== "object") return false;
-  if (cell.state === "MANUAL") return true;
-  if (cell.stale && String(cell.autoValue || "").trim()) return true;
-  return false;
+  return String(cell.manualValue || "").trim() !== "";
 }
 
 /**

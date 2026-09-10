@@ -9,13 +9,16 @@ import {
   productTranslationFieldPresentation,
   shouldStartProductTranslationFetch,
 } from "../../shared/i18n/productTranslationUi.js";
+import { canSaveProductTranslationField } from "../../shared/i18n/workspaceActionGates.js";
 import {
   clearProductDrafts,
   clearProductFieldDraft,
+  isProductFieldDraftDirty,
   readProductFieldDraft,
   writeProductFieldDraft,
 } from "../../shared/i18n/productTranslationDrafts.js";
 import { shouldApplyWorkspaceResponse } from "../../shared/i18n/translationDrafts.js";
+import { shouldClearLoadingForRequest } from "../../shared/i18n/workspaceActionGates.js";
 
 const TARGET_LOCALES = ["en", "uz", "ky", "tg", "zh", "ar"];
 
@@ -110,7 +113,10 @@ export function ProductTranslationEditor({ product }) {
       setMessage(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
     } finally {
       if (
-        requestGeneration === requestGenerationRef.current &&
+        shouldClearLoadingForRequest({
+          requestGeneration,
+          currentGeneration: requestGenerationRef.current,
+        }) &&
         requestedProductId === productIdRef.current
       ) {
         setLoading(false);
@@ -134,6 +140,14 @@ export function ProductTranslationEditor({ product }) {
     const sourceHash = workspace?.fields?.[field]?.sourceHash || "";
     const cell = workspace?.fields?.[field]?.languages?.[language] || {};
     const value = readProductFieldDraft(drafts, language, field, cell.value || "");
+    if (
+      !canSaveProductTranslationField({
+        dirty: isProductFieldDraftDirty(drafts, language, field),
+        value,
+      })
+    ) {
+      return;
+    }
     setBusy(true);
     try {
       await api.saveProductTranslation(productId, language, field, value, sourceHash);
@@ -157,6 +171,8 @@ export function ProductTranslationEditor({ product }) {
   };
 
   const resetField = async (field) => {
+    const cell = workspace?.fields?.[field]?.languages?.[language] || {};
+    if (!canShowReturnToAuto(cell)) return;
     const confirmed = await appConfirm({
       title: t("admin.productTranslations.returnToAuto"),
       message: t("admin.languages.resetConfirm"),
@@ -250,6 +266,11 @@ export function ProductTranslationEditor({ product }) {
                       ? "admin.languages.state.manual"
                       : "admin.languages.state.missing";
               const showReturnToAuto = canShowReturnToAuto(cell);
+              const draftValue = readProductFieldDraft(drafts, language, field, cell.value || "");
+              const saveEnabled = canSaveProductTranslationField({
+                dirty: isProductFieldDraftDirty(drafts, language, field),
+                value: draftValue,
+              });
               return (
                 <div className="product-translation-field" key={field}>
                   <button
@@ -270,11 +291,11 @@ export function ProductTranslationEditor({ product }) {
                         <textarea
                           className="manager-languages-target"
                           rows={3}
-                          value={readProductFieldDraft(drafts, language, field, cell.value || "")}
+                          value={draftValue}
                           aria-label={fieldLabel}
                           onChange={(event) =>
                             setDrafts((current) =>
-                              writeProductFieldDraft(current, language, field, event.target.value)
+                              writeProductFieldDraft(current, language, field, event.target.value, true)
                             )
                           }
                         />
@@ -285,7 +306,7 @@ export function ProductTranslationEditor({ product }) {
                           <button
                             type="button"
                             className="primary-button"
-                            disabled={busy}
+                            disabled={busy || !saveEnabled}
                             onClick={() => saveField(field)}
                           >
                             {t("admin.languages.save")}

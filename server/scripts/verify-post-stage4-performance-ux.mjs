@@ -254,9 +254,59 @@ assert.equal(
   "notApplicable"
 );
 assert.equal(canShowReturnToAuto({ state: "MISSING" }), false);
-assert.equal(canShowReturnToAuto({ state: "AUTO", autoValue: "x" }), false);
-assert.equal(canShowReturnToAuto({ state: "MANUAL", autoValue: "" }), true);
-assert.equal(canShowReturnToAuto({ state: "AUTO", stale: true, autoValue: "auto" }), true);
+assert.equal(canShowReturnToAuto({ state: "AUTO", autoValue: "x", manualValue: "" }), false);
+assert.equal(canShowReturnToAuto({ state: "MANUAL", manualValue: "edited" }), true);
+assert.equal(canShowReturnToAuto({ state: "STALE", stale: true, manualValue: "edited", autoValue: "auto" }), true);
+assert.equal(canShowReturnToAuto({ state: "AUTO", stale: true, autoValue: "auto", manualValue: "" }), false);
+
+const {
+  canSaveGenericTranslation,
+  canShowGenericReset,
+  canSaveProductTranslationField,
+  nextLoadMoreOffset,
+  shouldClearLoadingForRequest,
+} = await import("../../src/shared/i18n/workspaceActionGates.js");
+const {
+  isProductFieldDraftDirty,
+  writeProductFieldDraft,
+  readProductFieldDraft,
+  clearProductFieldDraft,
+} = await import("../../src/shared/i18n/productTranslationDrafts.js");
+
+assert.equal(canSaveGenericTranslation({ dirty: false, value: "x" }), false);
+assert.equal(canSaveGenericTranslation({ dirty: true, value: "  " }), false);
+assert.equal(canSaveGenericTranslation({ dirty: true, value: "ok" }), true);
+assert.equal(canShowGenericReset({ state: "AUTO", stale: false }), false);
+assert.equal(canShowGenericReset({ state: "MANUAL" }), true);
+assert.equal(canShowGenericReset({ state: "AUTO", stale: true }), true);
+assert.equal(canShowGenericReset({ state: "MISSING" }), true);
+assert.equal(canSaveProductTranslationField({ dirty: false, value: "x" }), false);
+assert.equal(canSaveProductTranslationField({ dirty: true, value: "ok" }), true);
+assert.equal(nextLoadMoreOffset({ acceptedOffset: 0, limit: 100, hasMore: true, inFlight: false }), 100);
+assert.equal(nextLoadMoreOffset({ acceptedOffset: 0, limit: 100, hasMore: true, inFlight: true }), null);
+assert.equal(nextLoadMoreOffset({ acceptedOffset: 100, limit: 100, hasMore: false, inFlight: false }), null);
+assert.equal(shouldClearLoadingForRequest({ requestGeneration: 2, currentGeneration: 3 }), false);
+assert.equal(shouldClearLoadingForRequest({ requestGeneration: 3, currentGeneration: 3 }), true);
+
+{
+  let drafts = {};
+  assert.equal(isProductFieldDraftDirty(drafts, "en", "name"), false);
+  drafts = writeProductFieldDraft(drafts, "en", "name", "Hello", true);
+  assert.equal(isProductFieldDraftDirty(drafts, "en", "name"), true);
+  assert.equal(readProductFieldDraft(drafts, "en", "name", ""), "Hello");
+  drafts = clearProductFieldDraft(drafts, "en", "name");
+  assert.equal(isProductFieldDraftDirty(drafts, "en", "name"), false);
+}
+
+assertNoMatch(
+  "src/screens/manager/ManagerLanguages.jsx",
+  /skipNextWorkspaceLoadRef/,
+  "skip-next mechanism must be removed"
+);
+assertMatch("src/screens/manager/ManagerLanguages.jsx", /acceptedOffsetRef|nextLoadMoreOffset|handleLoadMore/);
+assertMatch("src/screens/manager/ManagerLanguages.jsx", /canSaveGenericTranslation|isTranslationDraftDirty/);
+assertMatch("src/screens/manager/ProductTranslationEditor.jsx", /canSaveProductTranslationField|isProductFieldDraftDirty/);
+
 
 // --- F. Image priority helper hardening ---
 assert.deepEqual(productCardImageLoadingAttrs(0), { loading: "eager", fetchPriority: "high" });
@@ -357,6 +407,10 @@ const {
   collectFilteredWorkspaceRows,
   completenessByLanguage,
   initializeLocalizationCatalog,
+  getCurrentCatalogKeySetInitCount,
+  getCurrentCatalogKeys,
+  isCurrentCatalogEntry,
+  readTranslationStore,
 } = await import("../src/localizationStore.js");
 const {
   productCompletenessItems,
@@ -364,13 +418,80 @@ const {
   computeProductCompletenessSnapshot,
   buildProductWorkspaceRows,
 } = await import("../src/productLocalizationStore.js");
-const { sourceHash } = await import("../../src/shared/i18n/sourceHash.js");
 const { PRODUCT_TRANSLATION_FIELDS } = await import("../../src/shared/i18n/productLocalization.js");
-const { exactTranslationTargetInternal, toPublicLocaleCode, PUBLIC_LOCALE_CODES } = await import(
+const { exactTranslationTargetInternal, PUBLIC_LOCALE_CODES } = await import(
   "../../src/shared/i18n/languageRegistry.js"
 );
+const { listTranslationValueRowsForLanguage } = await import("../src/db.js");
 
 initializeLocalizationCatalog();
+
+assert.equal(getCurrentCatalogKeySetInitCount(), 1, "catalog key set built once at module init");
+const keysBefore = getCurrentCatalogKeySetInitCount();
+for (const entry of UI_CATALOG.slice(0, 50)) {
+  assert.equal(
+    isCurrentCatalogEntry({
+      namespace: entry.namespace,
+      fieldKey: entry.key,
+      entityType: "",
+      entityId: "",
+    }),
+    true
+  );
+}
+assert.equal(isCurrentCatalogEntry({ namespace: "ui", fieldKey: "no.such.key", entityType: "", entityId: "" }), false);
+assert.equal(
+  isCurrentCatalogEntry({ namespace: "wrong", fieldKey: UI_CATALOG[0].key, entityType: "", entityId: "" }),
+  false
+);
+assert.equal(
+  isCurrentCatalogEntry({
+    namespace: UI_CATALOG[0].namespace,
+    fieldKey: UI_CATALOG[0].key,
+    entityType: "product",
+    entityId: "",
+  }),
+  false
+);
+assert.equal(
+  isCurrentCatalogEntry({
+    namespace: UI_CATALOG[0].namespace,
+    fieldKey: UI_CATALOG[0].key,
+    entityType: "",
+    entityId: "x",
+  }),
+  false
+);
+assert.equal(getCurrentCatalogKeySetInitCount(), keysBefore, "lookup must not rebuild Set");
+assert.equal(getCurrentCatalogKeys().size, 1900);
+
+const productStats = {};
+collectFilteredWorkspaceRows({ view: "products", language: "en", limit: 100 }, { __stats: productStats });
+assert.equal(productStats.genericEntriesRead, 0);
+assert.equal(productStats.genericValuesRead, 0);
+
+const enStats = {};
+collectFilteredWorkspaceRows({ view: "interface", language: "en" }, { __stats: enStats });
+assert.equal(enStats.valueLanguageInternal, "en");
+assert.equal(enStats.genericEntriesRead, 1);
+const zhStats = {};
+collectFilteredWorkspaceRows({ view: "interface", language: "zh" }, { __stats: zhStats });
+assert.equal(zhStats.valueLanguageInternal, "zh-CN");
+
+{
+  const enValues = listTranslationValueRowsForLanguage("en");
+  assert.ok(enValues.length > 0);
+  assert.equal(enValues.every((row) => row.languageCode === "en"), true);
+  const zhValues = listTranslationValueRowsForLanguage("zh-CN");
+  assert.ok(zhValues.length > 0);
+  assert.equal(zhValues.every((row) => row.languageCode === "zh-CN"), true);
+}
+
+const scopedStore = readTranslationStore({ languageInternal: "en" });
+assert.ok(scopedStore.values.every((value) => value.languageCode === "en"));
+const allStore = readTranslationStore();
+const allLangs = new Set(allStore.values.map((value) => value.languageCode));
+assert.ok(allLangs.size >= 6, "completeness path still has all-language values available");
 
 const defaultPage = listWorkspacePage({ view: "interface", language: "en" });
 assert.ok(defaultPage.rows.length <= 100);
@@ -417,6 +538,9 @@ assert.deepEqual(Object.keys(searched.rows[0].languages || {}), ["uz"]);
 const overview = completenessByLanguage();
 assert.ok(overview.en);
 assert.equal(typeof overview.en.complete, "boolean");
+for (const code of ["en", "uz", "ky", "tg", "zh", "ar"]) {
+  assert.ok(overview[code], `completeness must cover ${code}`);
+}
 
 const snap = computeProductCompletenessSnapshot();
 assert.ok(Array.isArray(snap.items));
