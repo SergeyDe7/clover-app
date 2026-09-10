@@ -5,8 +5,6 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
-import { DatabaseSync } from "node:sqlite";
 
 const PRODUCTION_DATA = path.resolve("/opt/clover/clover-app/server/data");
 const workRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
@@ -14,9 +12,9 @@ const WORKTREE_DATA = path.resolve(workRoot, "server/data");
 const ARTIFACT = path.join(workRoot, "server/i18n-artifacts/stage4/manifest.json");
 const EXPECTED_MAIN = "cbd1d0e3ac831fd41126d4e6b0e7af446d436d42";
 const UI_CATALOG_BASE = 1856;
-const UI_CATALOG_ADDED = 38;
+const UI_CATALOG_ADDED = 44;
 const UI_CATALOG_REMOVED = 0;
-const UI_CATALOG_FINAL = 1894;
+const UI_CATALOG_FINAL = 1900;
 
 function rejectUnsafePath(candidate) {
   const resolved = path.resolve(candidate);
@@ -52,7 +50,7 @@ console.log("TEST_DB_ISOLATED=YES");
 
 const { sourceHash } = await import("../../src/shared/i18n/sourceHash.js");
 const { UI_CATALOG, hasCatalogKey } = await import("../../src/shared/i18n/uiCatalog.js");
-const { hasSeedKey, getSeedTranslation } = await import("../src/i18n/uiTranslationSeed.js");
+const { hasSeedKey } = await import("../src/i18n/uiTranslationSeed.js");
 const { UNIT_DISPLAY_KEYS, unitDisplayLabel } = await import("../../src/shared/i18n/unitDisplay.js");
 const { quantityInputUnitLabel } = await import("../../src/shared/appHelpers.js");
 const { PUBLIC_LANGUAGE_PREFIXES_ENABLED } = await import("../../src/shared/i18n/languageResolver.js");
@@ -60,6 +58,8 @@ const {
   applyGlossaryPhrases,
   validateProductTranslationSemantics,
   PRODUCT_GLOSSARY_CONTEXTS,
+  selectGlossaryMatches,
+  extractImmutableIdentityTokens,
 } = await import("../src/productLocalizationSemantics.js");
 const {
   readProductFieldDraft,
@@ -83,11 +83,8 @@ const {
   generateAutoCandidate,
   buildProductTranslationCellMap,
 } = await import("../src/productLocalizationStore.js");
-const { completenessByLanguage, listWorkspaceRows } = await import("../src/localizationStore.js");
-const { catalogSourceFingerprint } = await import("../src/productCatalogFingerprint.js");
-const { loadAutoImportManifest, dryRunProductAutoImport, applyProductAutoImport } = await import(
-  "../src/productAutoImport.js"
-);
+const { listWorkspaceRows, listWorkspacePage } = await import("../src/localizationStore.js");
+const { commitCanonicalProducts } = await import("../src/productSourceCorpus.js");
 
 assert.equal(hasRole("manager", ["admin"]), false);
 assert.equal(hasRole("admin", ["admin"]), true);
@@ -136,6 +133,96 @@ assert.equal(applyGlossaryPhrases("стакан 200 мл", [generic, exact, long
 assert.equal(applyGlossaryPhrases("стакан 200 мл", [generic, longer], ""), "200 cup мл");
 const overlap = applyGlossaryPhrases("стакан стакан", [generic], "");
 assert.equal(overlap, "cup cup");
+const winners = selectGlossaryMatches("стакан 200 мл", [generic, exact], "product.name");
+assert.equal(winners.length, 1);
+assert.equal(winners[0].target, "tumbler");
+assert.equal(
+  validateProductTranslationSemantics({
+    sourceRu: "стакан 200 мл",
+    targetValue: "tumbler 200 ml",
+    product: {},
+    glossaryEntries: [generic, exact],
+    context: "product.name",
+  }).ok,
+  true
+);
+
+const { translateCatalogText } = await import("./lib/stage4Phrasebook.mjs");
+const pmmSource = "ПММ D028 5 мм";
+const pmmTokens = extractImmutableIdentityTokens(pmmSource, { name: pmmSource });
+assert.equal(pmmTokens.includes("ПММ"), true);
+assert.equal(pmmTokens.includes("D028"), true);
+for (const language of ["en", "uz", "ky", "tg", "zh-CN", "ar"]) {
+  const translated = translateCatalogText(pmmSource, language, { protectedTokens: pmmTokens, glossaryEntries: [] });
+  assert.match(translated, /ПММ/);
+  assert.match(translated, /D028/);
+  assert.doesNotMatch(translated, /Пmm/);
+}
+assert.equal(
+  validateProductTranslationSemantics({
+    sourceRu: "50 шт",
+    targetValue: "50 dona",
+    product: {},
+  }).ok,
+  true
+);
+assert.equal(
+  validateProductTranslationSemantics({
+    sourceRu: "50 шт",
+    targetValue: "50 件",
+    product: {},
+  }).ok,
+  true
+);
+assert.equal(
+  validateProductTranslationSemantics({
+    sourceRu: "50 шт",
+    targetValue: "50 قطعة",
+    product: {},
+  }).ok,
+  true
+);
+assert.equal(
+  validateProductTranslationSemantics({
+    sourceRu: "50 шт",
+    targetValue: "500 units",
+    product: {},
+  }).ok,
+  false
+);
+
+const { shouldApplyWorkspaceResponse } = await import("../../src/shared/i18n/translationDrafts.js");
+assert.equal(
+  shouldApplyWorkspaceResponse({
+    requestGeneration: 1,
+    currentGeneration: 2,
+    requestLanguage: "en",
+    currentLanguage: "uz",
+  }),
+  false
+);
+assert.equal(
+  shouldApplyWorkspaceResponse({
+    requestGeneration: 2,
+    currentGeneration: 2,
+    requestLanguage: "uz",
+    currentLanguage: "uz",
+    requestView: "glossary",
+    currentView: "glossary",
+  }),
+  true
+);
+assert.equal(
+  shouldApplyWorkspaceResponse({
+    requestGeneration: 3,
+    currentGeneration: 3,
+    requestLanguage: "en",
+    currentLanguage: "en",
+    requestProductId: "A",
+    currentProductId: "B",
+  }),
+  false
+);
 
 assert.equal(
   validateProductTranslationSemantics({
@@ -269,6 +356,37 @@ const reset = resetProductTranslationToAuto(722, "en", "name", "admin@clover.ru"
 assert.equal(reset.field.value, autoA);
 assert.equal(reset.field.state, "AUTO");
 
+const versionBeforeRename = Number(getGlobalState("localizationSettings").catalogVersion);
+commitCanonicalProducts(
+  [{ ...product, name: "Стакан 400 мл «Мега» (50), код CL-722" }],
+  "source-rename"
+);
+assert.equal(Number(getGlobalState("localizationSettings").catalogVersion), versionBeforeRename + 1);
+assert.deepEqual(getGlobalState("localizationSettings").enabledLanguages, ["ru"]);
+expectReject(
+  () =>
+    saveProductManualTranslation(
+      722,
+      "en",
+      "name",
+      "200 ml cup «Мега» (50), код CL-722",
+      "admin@clover.ru",
+      sourceNameHash
+    ),
+  "SOURCE_STALE"
+);
+expectReject(
+  () => resetProductTranslationToAuto(722, "en", "name", "admin@clover.ru", sourceNameHash),
+  "SOURCE_STALE"
+);
+commitCanonicalProducts([product], "restore-product");
+const versionBeforePrice = Number(getGlobalState("localizationSettings").catalogVersion);
+commitCanonicalProducts([{ ...product, pricePiece: 99 }], "price-only");
+assert.equal(Number(getGlobalState("localizationSettings").catalogVersion), versionBeforePrice);
+commitCanonicalProducts([{ ...product, packSize: 99 }], "uom-size-only");
+assert.equal(Number(getGlobalState("localizationSettings").catalogVersion), versionBeforePrice);
+commitCanonicalProducts([product], "restore-product-authority");
+
 const emptyProduct = {
   ...product,
   id: 801,
@@ -303,6 +421,27 @@ const edited = saveGlossaryEntry({
 assert.equal(edited.entry.id, created.entry.id);
 assert.equal(edited.entry.targetValue, "MEGA");
 assert.equal(listGlossaryEntries({ language: "en" }).length, 1);
+expectReject(
+  () =>
+    saveGlossaryEntry({
+      sourceRu: "стакан",
+      language: "en",
+      targetValue: "cup",
+      context: "seo.title",
+    }),
+  "INVALID_GLOSSARY_CONTEXT"
+);
+const versionBeforeIdenticalGlossary = Number(getGlobalState("localizationSettings").catalogVersion);
+const identicalGlossary = saveGlossaryEntry({
+  id: created.entry.id,
+  sourceRu: "мега",
+  language: "en",
+  targetValue: "MEGA",
+  context: "product.name",
+  protected: true,
+});
+assert.equal(identicalGlossary.changed, false);
+assert.equal(Number(getGlobalState("localizationSettings").catalogVersion), versionBeforeIdenticalGlossary);
 
 const fields = productFieldCompletenessByLanguage();
 assert.ok(fields.en.name.total >= 1);
@@ -312,6 +451,22 @@ const items = productCompletenessItems();
 assert.ok(items.some((item) => item.fieldKey === "description"));
 assert.ok(items.filter((item) => item.fieldKey === "name").every((item) => item.critical === true));
 assert.ok(items.filter((item) => item.fieldKey !== "name").every((item) => item.critical !== true));
+
+const inactive = { ...product, id: 999, active: false, name: "Inactive product 10" };
+setGlobalState("products", [product, emptyProduct, inactive]);
+const activeReport = productFieldCompletenessByLanguage();
+assert.equal(activeReport.en.name.total, 2);
+assert.equal(
+  productCompletenessItems().some((item) => item.value && String(item.value).includes("Inactive")),
+  false
+);
+
+const { MANUAL_NAME_MAX_CHARS, STAGE4_QUERY_MAX_CHARS } = await import("../src/productInputLimits.js");
+expectReject(
+  () => saveProductManualTranslation(722, "en", "name", "x".repeat(MANUAL_NAME_MAX_CHARS + 1), "admin", sourceHash(product.name)),
+  "VALUE_TOO_LARGE"
+);
+expectReject(() => listWorkspacePage({ view: "products", language: "en", query: "q".repeat(STAGE4_QUERY_MAX_CHARS + 1) }), "QUERY_TOO_LARGE");
 
 const untranslated = listWorkspaceRows({ view: "untranslated", language: "ky" });
 assert.ok(untranslated.some((row) => row.kind === "product" && row.fieldKey === "name"));
@@ -327,9 +482,14 @@ assert.equal(
   false
 );
 
+const descHash = sourceHash(product.storefrontDetails.description);
 const cells = {
   name: { autoValue: autoA, manualValue: "", autoSourceHash: sourceNameHash },
-  description: { autoValue: "200 ml cup for drinks", manualValue: "" },
+  description: {
+    autoValue: "200 ml cup for drinks",
+    manualValue: "",
+    autoSourceHash: descHash,
+  },
 };
 const projected = projectLocalizedProductDisplay(product, "en", ["ru", "en"], cells);
 assert.equal(projected.name, autoA);
@@ -337,6 +497,25 @@ assert.equal(projected.storefrontDetails.description, "200 ml cup for drinks");
 assert.equal(projected.pricePiece, product.pricePiece);
 const ruOnly = projectLocalizedProductDisplay(product, "en", ["ru"], cells);
 assert.equal(ruOnly.name, product.name);
+const staleAutoPublic = projectLocalizedProductDisplay(product, "en", ["ru", "en"], {
+  name: { autoValue: autoA, autoSourceHash: "0".repeat(64), manualValue: "" },
+});
+assert.equal(staleAutoPublic.name, product.name);
+const staleManualPublic = projectLocalizedProductDisplay(product, "en", ["ru", "en"], {
+  name: {
+    manualValue: manualM,
+    manualSourceHash: "0".repeat(64),
+    autoValue: autoA,
+    autoSourceHash: sourceNameHash,
+  },
+});
+assert.equal(staleManualPublic.name, product.name);
+const currentManualPublic = projectLocalizedProductDisplay(product, "en", ["ru", "en"], {
+  name: { manualValue: manualM, manualSourceHash: sourceNameHash, autoValue: autoA, autoSourceHash: sourceNameHash },
+});
+assert.equal(currentManualPublic.name, manualM);
+assert.equal(projected === product, false);
+assert.equal(product.name.startsWith("Стакан"), true);
 const batch = buildProductTranslationCellMap("en");
 assert.equal(batch instanceof Map, true);
 assert.ok(batch.get("722")?.name);
@@ -381,80 +560,16 @@ assert.equal(PUBLIC_LANGUAGE_PREFIXES_ENABLED, false);
 assert.deepEqual(getGlobalState("localizationSettings").enabledLanguages, ["ru"]);
 assert.ok(typeof generateAutoCandidate(product, "en", "name") === "string");
 
-const prod = new DatabaseSync("/opt/clover/clover-app/server/data/clover.sqlite", { readOnly: true });
-const liveProducts = JSON.parse(prod.prepare("SELECT value_json FROM app_state WHERE key = ?").get("products").value_json);
-prod.close();
-setGlobalState("products", liveProducts);
-for (const row of listProductTranslationRows()) {
-  deleteProductLocalization(row.productId);
-}
-for (const entry of listGlossaryEntries()) {
-  removeGlossaryEntry(entry.id);
-}
-const liveFingerprint = catalogSourceFingerprint(liveProducts);
-const loaded = loadAutoImportManifest(ARTIFACT);
-assert.equal(loaded.manifest.baseMainSha, EXPECTED_MAIN);
-assert.equal(loaded.manifest.quality, "AUTO_MACHINE_DRAFT");
-assert.equal(loaded.manifest.productCount, 698);
-assert.equal(loaded.manifest.sourceCellCount, 2675);
-assert.equal(loaded.manifest.targetCellCount, 16050);
-assert.equal(loaded.items.length, 16050);
-assert.equal(liveFingerprint, loaded.manifest.wholeCatalogSourceFingerprint);
-const dry = dryRunProductAutoImport(loaded);
-assert.equal(dry.writes, 0);
-assert.equal(dry.catalogMatch, true);
-assert.equal(dry.wouldInsertAUTO, 16050);
-assert.equal(dry.wouldSkipMANUAL, 0);
-assert.equal(dry.staleSource, 0);
-assert.equal(dry.unknownProduct, 0);
-assert.equal(dry.invalidLocale, 0);
-assert.equal(dry.invalidField, 0);
-assert.equal(dry.numericMismatch, 0);
-assert.equal(dry.protectedMismatch, 0);
-assert.equal(dry.emptyValue, 0);
-assert.deepEqual(dry.languageCounts, { en: 2675, uz: 2675, ky: 2675, tg: 2675, "zh-CN": 2675, ar: 2675 });
-
-const mismatchLoaded = {
-  ...loaded,
-  manifest: { ...loaded.manifest, wholeCatalogSourceFingerprint: "0".repeat(64) },
-};
-expectReject(() => applyProductAutoImport(mismatchLoaded, "test"), "CATALOG_SOURCE_MISMATCH");
-
-const importer = path.join(workRoot, "server/scripts/import-product-auto-translations.mjs");
-let noMode = "";
-try {
-  execFileSync(process.execPath, [importer, "--file", ARTIFACT], {
-    env: { ...process.env, DB_PATH: dbPath },
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-} catch (error) {
-  noMode = String(error.stderr || error.stdout || error.message);
-}
-assert.match(noMode, /Exactly one of --dry-run or --apply/);
-
-let prodApply = "";
-try {
-  execFileSync(process.execPath, [importer, "--file", ARTIFACT, "--apply"], {
-    env: { ...process.env, DB_PATH: path.join(PRODUCTION_DATA, "clover.sqlite") },
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-} catch (error) {
-  prodApply = String(error.stderr || error.stdout || error.message);
-}
-assert.match(prodApply, /CLOVER_ALLOW_PRODUCT_AUTO_IMPORT=YES/);
-
-const dryCli = execFileSync(process.execPath, [importer, "--file", ARTIFACT, "--dry-run"], {
-  env: { ...process.env, DB_PATH: dbPath },
-  encoding: "utf8",
+const { runStage4ClosureMatrixAsync } = await import("./i18n-stage4-closure-matrix.mjs");
+const closure = await runStage4ClosureMatrixAsync({
+  workRoot,
+  dbPath,
+  artifactPath: ARTIFACT,
+  expectedMain: EXPECTED_MAIN,
 });
-const dryJson = JSON.parse(dryCli);
-assert.equal(dryJson.writes, 0);
-assert.equal(dryJson.wouldInsertAUTO, 16050);
 
-const glossaryCount = listGlossaryEntries().length;
-assert.ok(Number.isInteger(glossaryCount));
+const { runStage4AuthHttpTest } = await import("./i18n-stage4-http-auth.mjs");
+await runStage4AuthHttpTest({ workRoot });
 
 console.log("STAGE4_VERIFY=PASS");
 console.log(`STAGE4_CATALOG_BASE=${UI_CATALOG_BASE}`);
@@ -465,6 +580,8 @@ console.log(`STAGE4_UI_SEED_CELLS=${UI_CATALOG.length * 6}`);
 console.log(`STAGE4_PRODUCT_SOURCE_FIELDS=2675`);
 console.log(`STAGE4_AUTO_TARGET_CELLS=16050`);
 console.log(`STAGE4_EXPECTED_PRODUCT_TRANSLATION_ROWS=16050`);
-console.log(`STAGE4_GLOSSARY_ROWS=${glossaryCount}`);
-console.log(`STAGE4_ARTIFACT_FINGERPRINT=${liveFingerprint}`);
+console.log(`STAGE4_GLOSSARY_ROWS=${closure.glossaryCount}`);
+console.log(`STAGE4_ARTIFACT_FINGERPRINT=${closure.catalogFingerprint}`);
+console.log(`STAGE4_ARTIFACT_RUN_ID=${closure.runId}`);
+console.log(`STAGE4_GLOSSARY_FINGERPRINT=${closure.glossaryFingerprint}`);
 rmSync(tempDir, { recursive: true, force: true });

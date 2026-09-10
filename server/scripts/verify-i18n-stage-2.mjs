@@ -107,7 +107,7 @@ assert.equal(ruLocked.enabledLanguages.includes("en"), false);
 
 assert.deepEqual(
   TRANSLATION_WORKSPACE_VIEWS.map(([id]) => id),
-  ["interface", "categories", "seo", "glossary", "untranslated"]
+  ["interface", "products", "categories", "seo", "glossary", "untranslated"]
 );
 assert.match(languagesSrc, /useLocalization|Языки и переводы|admin\.languages\.title/);
 for (const [, title] of TRANSLATION_WORKSPACE_VIEWS) {

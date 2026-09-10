@@ -1,11 +1,17 @@
-import { normalizeGlossaryPhrase } from "../../src/shared/i18n/productLocalization.js";
+import {
+  normalizeGlossaryPhrase,
+  ALLOWED_GLOSSARY_CONTEXTS,
+} from "../../src/shared/i18n/productLocalization.js";
 
 const NUMBER_RE = /\d+(?:[.,]\d+)?/g;
 const IDENTITY_KEYS = ["code", "oneCCode", "oneCId"];
-const ID_TOKEN_RE = /\b(?:НФ-\d+|NF-\d+|CL-\d+)\b/gi;
+const ID_TOKEN_RE = /(?:^|[^\p{L}\p{N}])(НФ-\d+|NF-\d+|CL-\d+)(?=$|[^\p{L}\p{N}])/gu;
+const MODEL_TOKEN_RE =
+  /(?:^|[^\p{L}\p{N}])((?=[\p{L}\p{N}-]*\d)(?=[\p{L}\p{N}-]*\p{L})[\p{L}\p{N}-]+)/gu;
 const DIMENSION_RE = /(\d+(?:[.,]\d+)?)(?:\s*[x×XхХ]\s*(\d+(?:[.,]\d+)?)){1,2}/g;
 const RATIO_RE = /(\d+(?:[.,]\d+)?)\s*\/\s*(\d+(?:[.,]\d+)?)/g;
-const MEASURE_RE = /(\d+(?:[.,]\d+)?)\s*(г\/м²|г\/м2|gsm|мм|mm|см|cm|мл|ml|кг|kg|шт|pcs?|эт|гр|мкм|um|µm|м|m|л|l|г|g)(?=$|[^\p{L}\p{N}])/giu;
+const MEASURE_RE =
+  /(\d+(?:[.,]\d+)?)\s*(г\/м²|г\/м2|gsm|мм|mm|см|cm|мл|ml|кг|kg|шт\.?|pcs?|dona|даана|дона|件|قطعة|lbl|эт|гр|мкм|um|µm|м|m|л|l|г|g)(?=$|[^\p{L}\p{N}])/giu;
 
 const UNIT_CANON = Object.freeze({
   мм: "mm",
@@ -17,7 +23,9 @@ const UNIT_CANON = Object.freeze({
   "г/м²": "gsm",
   "г/м2": "gsm",
   шт: "pcs",
+  "шт.": "pcs",
   эт: "lbl",
+  lbl: "lbl",
   гр: "g",
   мкм: "um",
   um: "um",
@@ -32,8 +40,47 @@ const UNIT_CANON = Object.freeze({
   gsm: "gsm",
   pcs: "pcs",
   pc: "pcs",
+  dona: "pcs",
+  даана: "pcs",
+  дона: "pcs",
+  件: "pcs",
+  قطعة: "pcs",
   m: "m",
 });
+
+/** Catalog-derived technical series that must survive all six targets exactly. */
+export const CATALOG_TECHNICAL_SERIES = Object.freeze([
+  "ПММ",
+  "СПК",
+  "ПРМС",
+  "ПНД",
+  "ПЭТ",
+  "СТП",
+  "СЛБ",
+  "ХПП",
+  "БОПП",
+  "ПВХ",
+  "ВЗЛП",
+  "РКС",
+  "МОП",
+  "НФ",
+  "ВВ",
+  "КП",
+  "ПП",
+  "УК",
+  "ФА",
+  "ЦВ",
+  "ЖС",
+  "ПВА",
+  "БОС",
+  "ЮТ",
+  "ИП",
+  "КР",
+  "ЕСО",
+  "ДОРЕМИ",
+  "ФОКУС",
+  "НИКА",
+]);
 
 export const PRODUCT_GLOSSARY_CONTEXTS = Object.freeze({
   name: "product.name",
@@ -41,6 +88,8 @@ export const PRODUCT_GLOSSARY_CONTEXTS = Object.freeze({
   composition: "product.composition",
   characteristics: "product.characteristics",
 });
+
+export { ALLOWED_GLOSSARY_CONTEXTS };
 
 function asText(value) {
   return typeof value === "string" ? value : String(value || "");
@@ -57,22 +106,49 @@ export function extractNumericTokens(text) {
   return [...stripped.matchAll(NUMBER_RE)].map((match) => normalizeNumericToken(match[0]));
 }
 
+function collectWholeToken(haystack, token) {
+  if (!token) return false;
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|[^\\p{L}\\p{N}])${escaped}(?=$|[^\\p{L}\\p{N}])`, "u").test(haystack);
+}
+
 export function extractImmutableIdentityTokens(source, product) {
   const text = asText(source);
   const tokens = [];
+  const push = (value) => {
+    const token = String(value || "").trim();
+    if (token && !tokens.includes(token)) tokens.push(token);
+  };
   for (const key of IDENTITY_KEYS) {
     const value = String(product?.[key] || "").trim();
-    if (value && text.includes(value)) tokens.push(value);
+    if (value && text.includes(value)) push(value);
   }
-  for (const match of text.matchAll(ID_TOKEN_RE)) {
-    if (!tokens.includes(match[0])) tokens.push(match[0]);
+  for (const match of text.matchAll(ID_TOKEN_RE)) push(match[1]);
+  for (const match of text.matchAll(MODEL_TOKEN_RE)) {
+    const token = match[1];
+    if (/^(?:м2|м²|gsm)$/i.test(token)) continue;
+    if (/^[мm][²2]$/i.test(token)) continue;
+    if (/^\d+(?:[.,]\d+)?(?:мм|см|мл|кг|шт\.?|гр|эт|г|л|м|мкм)$/i.test(token)) continue;
+    if (/^[dDhHдД]\d+(?:[.,]\d+)?(?:мм|см|мл|мкм)$/i.test(token)) continue;
+    if (/^\d+(?:[.,]\d+)?-\d+(?:[.,]\d+)?(?:мм|см|мл|кг|мкм)?$/i.test(token)) continue;
+    if (/^\d+-?(?:[хxХ]-?)?(?:сл|секц)\.?$/i.test(token)) continue;
+    if (/^\d+(?:рул|куб|эт)\.?$/i.test(token)) continue;
+    if (/^\d+(?:[.,]\d+)?(?:[хxХ×]\d+(?:[.,]\d+)?)+(?:мм|см|м)?$/i.test(token)) continue;
+    push(token);
   }
+  for (const match of text.matchAll(/\b[АA]4\b/g)) push(match[0]);
+  for (const match of text.matchAll(/\d+[А-ЯЁ]\b/g)) push(match[0]);
+  for (const series of CATALOG_TECHNICAL_SERIES) {
+    if (collectWholeToken(text, series)) push(series);
+  }
+  if (text.includes("Д-Полимер")) push("Д-Полимер");
   return tokens;
 }
 
 function normalizeUnit(raw) {
-  const key = String(raw || "").trim().toLowerCase().replace("м2", "м²");
-  return UNIT_CANON[key] || UNIT_CANON[String(raw || "").trim()] || "";
+  const trimmed = String(raw || "").trim();
+  const key = trimmed.toLowerCase().replace("м2", "м²").replace(/\.$/, "");
+  return UNIT_CANON[key] || UNIT_CANON[trimmed] || UNIT_CANON[trimmed.toLowerCase()] || "";
 }
 
 export function extractMeasurementPairs(text) {
@@ -142,6 +218,7 @@ function collectGlossaryMatches(sourceRu, languageEntries, context) {
         target,
         exactContext: Boolean(normalizeGlossaryPhrase(entry.context)),
         length: phrase.length,
+        protected: Number(entry.protected) === 1 || entry.protected === true,
       });
       from = index + 1;
     }
@@ -154,15 +231,21 @@ function collectGlossaryMatches(sourceRu, languageEntries, context) {
   return matches;
 }
 
-export function applyGlossaryPhrases(sourceRu, languageEntries, context = "") {
-  const source = asText(sourceRu);
-  if (!source) return source;
+/** One non-overlapping winner set used by both apply and protected validation. */
+export function selectGlossaryMatches(sourceRu, languageEntries, context = "") {
   const selected = [];
-  for (const match of collectGlossaryMatches(source, languageEntries, context)) {
+  for (const match of collectGlossaryMatches(sourceRu, languageEntries, context)) {
     const overlaps = selected.some((span) => match.start < span.end && match.end > span.start);
     if (overlaps) continue;
     selected.push(match);
   }
+  return selected;
+}
+
+export function applyGlossaryPhrases(sourceRu, languageEntries, context = "") {
+  const source = asText(sourceRu);
+  if (!source) return source;
+  const selected = selectGlossaryMatches(source, languageEntries, context);
   selected.sort((a, b) => b.start - a.start);
   let output = source;
   for (const match of selected) {
@@ -228,15 +311,11 @@ export function validateProductTranslationSemantics({
     };
   }
 
-  const sourceNorm = normalizeGlossaryPhrase(source);
-  for (const entry of Array.isArray(glossaryEntries) ? glossaryEntries : []) {
-    if (!entry || (Number(entry.protected) !== 1 && entry.protected !== true)) continue;
-    if (!glossaryEntryApplies(entry, context)) continue;
-    const phrase = normalizeGlossaryPhrase(entry.source_ru || entry.sourceRu);
-    const expected = asText(entry.target_value || entry.targetValue).trim();
-    if (!phrase || !expected) continue;
-    if (!sourceNorm.includes(phrase)) continue;
-    if (!target.includes(expected)) {
+  const winners = selectGlossaryMatches(source, glossaryEntries, context).filter(
+    (match) => match.protected
+  );
+  for (const match of winners) {
+    if (!target.includes(match.target)) {
       return {
         ok: false,
         code: "GLOSSARY_PROTECTED_MISMATCH",

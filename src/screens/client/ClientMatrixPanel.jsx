@@ -244,7 +244,7 @@ export function ClientMatrixPanel({
                 <p className="unit-hint">
                   {multiplier > 1
                     ? t("client.matrix.unitEqualsPieces", {
-                        unit: unitMeta.label.toLowerCase(),
+                        unit: String(unitDisplayLabel(unit, t) || unit).toLowerCase(),
                         multiplier,
                       })
                     : t("client.quantityIsCountedInPieces")}

@@ -1,188 +1,202 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { createHash } from "node:crypto";
 import {
-  exactTranslationTargetInternal,
-  isExactTranslationTargetLocale,
-} from "../../src/shared/i18n/languageRegistry.js";
-import { isProductTranslationField, canonicalProductId } from "../../src/shared/i18n/productLocalization.js";
-import { PRODUCT_GLOSSARY_CONTEXTS, validateProductTranslationSemantics } from "./productLocalizationSemantics.js";
-import { catalogSourceFingerprint, listProductSourceCells } from "./productCatalogFingerprint.js";
+  listGlossaryRows,
+  listProductTranslationRows,
+  runInTransaction,
+  upsertProductTranslationRow,
+  writeAudit,
+} from "./db.js";
+import { canonicalProductId } from "../../src/shared/i18n/productLocalization.js";
+import { findCanonicalProduct, listCanonicalProducts } from "./productLocalizationStore.js";
+import { bumpLocalizationCatalogVersion } from "./localizationVersion.js";
+import { artifactFingerprint } from "./productAutoArtifact.js";
 import {
-  findCanonicalProduct,
-  listCanonicalProducts,
-  listGlossaryEntries,
-  upsertProductAutoTranslation,
-} from "./productLocalizationStore.js";
-import { getProductTranslationRow, runInTransaction } from "./db.js";
-import { sourceHash } from "../../src/shared/i18n/sourceHash.js";
+  classifyPreparedItem,
+  fingerprintMismatch,
+  precomputeImportContext,
+  summarizeClassification,
+} from "./productAutoImportCore.js";
 
-export const AUTO_IMPORT_FORMAT = "clover-product-auto-import";
-export const AUTO_IMPORT_FORMAT_VERSION = 1;
-export const EXPECTED_BASE_MAIN_SHA = "cbd1d0e3ac831fd41126d4e6b0e7af446d436d42";
+export {
+  AUTO_IMPORT_FORMAT,
+  AUTO_IMPORT_FORMAT_VERSION,
+  loadAutoImportManifest,
+  artifactFingerprint,
+} from "./productAutoArtifact.js";
 
-function emptyCounts() {
-  return {
-    products: 0,
-    sourceFields: 0,
-    targetCells: 0,
-    wouldInsertAUTO: 0,
-    wouldUpdateAUTO: 0,
-    wouldSkipMANUAL: 0,
-    alreadyIdentical: 0,
-    staleSource: 0,
-    unknownProduct: 0,
-    invalidLocale: 0,
-    invalidField: 0,
-    numericMismatch: 0,
-    protectedMismatch: 0,
-    emptyValue: 0,
-    languageCounts: { en: 0, uz: 0, ky: 0, tg: 0, "zh-CN": 0, ar: 0 },
-  };
+export { precomputeImportContext, classifyPreparedItem } from "./productAutoImportCore.js";
+
+function nowIso() {
+  return new Date().toISOString();
 }
 
-function fileSha256(filePath) {
-  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+function importError(code, message, status = 409) {
+  const error = new Error(message);
+  error.code = code;
+  error.status = status;
+  return error;
 }
 
-export function loadAutoImportManifest(filePath) {
-  const resolved = path.resolve(filePath);
-  const raw = JSON.parse(readFileSync(resolved, "utf8"));
-  if (raw.format !== AUTO_IMPORT_FORMAT || Number(raw.formatVersion) !== AUTO_IMPORT_FORMAT_VERSION) {
-    const error = new Error("Unsupported product AUTO import artifact.");
-    error.code = "INVALID_ARTIFACT";
-    throw error;
-  }
-  const root = path.dirname(resolved);
-  const items = [];
-  if (Array.isArray(raw.items)) items.push(...raw.items);
-  const chunks = [];
-  for (const chunk of Array.isArray(raw.chunks) ? raw.chunks : []) {
-    const chunkPath = path.resolve(root, chunk.file);
-    const parsed = JSON.parse(readFileSync(chunkPath, "utf8"));
-    const hash = fileSha256(chunkPath);
-    if (chunk.sha256 && chunk.sha256 !== hash) {
-      const error = new Error(`Chunk hash mismatch: ${chunk.file}`);
-      error.code = "CHUNK_HASH_MISMATCH";
-      throw error;
-    }
-    chunks.push({ file: chunk.file, sha256: hash, count: Array.isArray(parsed.items) ? parsed.items.length : 0 });
-    if (Array.isArray(parsed.items)) items.push(...parsed.items);
-  }
-  return { manifest: raw, items, chunks, artifactPath: resolved };
+function liveImportContext() {
+  return precomputeImportContext(
+    listCanonicalProducts(),
+    listGlossaryRows(),
+    listProductTranslationRows()
+  );
 }
 
-export function classifyAutoItem(item, productsById, glossaryByLanguage) {
-  const productId = canonicalProductId(item?.productId);
-  const product = productsById.get(productId);
-  if (!product) return "unknownProduct";
-  if (!isExactTranslationTargetLocale(item?.language)) return "invalidLocale";
-  const internal = exactTranslationTargetInternal(item.language);
-  if (!internal) return "invalidLocale";
-  if (!isProductTranslationField(item?.field)) return "invalidField";
-  const sourceRu =
-    item.field === "name"
-      ? String(product.name || "").trim()
-      : String(product.storefrontDetails?.[item.field] || "").trim();
-  if (!sourceRu) return "staleSource";
-  if (sourceHash(sourceRu) !== String(item.sourceHash || "")) return "staleSource";
-  const value = typeof item.value === "string" ? item.value : "";
-  if (!value.trim()) return "emptyValue";
-  const check = validateProductTranslationSemantics({
-    sourceRu,
-    targetValue: value,
-    product,
-    glossaryEntries: glossaryByLanguage.get(internal) || [],
-    context: PRODUCT_GLOSSARY_CONTEXTS[item.field] || "",
-  });
-  if (!check.ok) {
-    if (check.code === "NUMERIC_MISMATCH") return "numericMismatch";
-    if (check.code === "PROTECTED_TOKEN_MISMATCH" || check.code === "GLOSSARY_PROTECTED_MISMATCH") {
-      return "protectedMismatch";
-    }
-    return "emptyValue";
+function assertFingerprints(loaded, ctx, expected = {}) {
+  const mismatch = fingerprintMismatch(loaded, ctx);
+  if (mismatch) {
+    throw importError(mismatch, mismatch);
   }
-  const existing = getProductTranslationRow(productId, internal, item.field);
-  if (String(existing?.manualValue || "").trim()) return "wouldSkipMANUAL";
-  if (existing?.autoValue === value && existing?.autoSourceHash === item.sourceHash) return "alreadyIdentical";
-  if (existing?.autoValue) return "wouldUpdateAUTO";
-  return "wouldInsertAUTO";
+  if (expected.runId && expected.runId !== loaded.manifest.runId) {
+    throw importError("RUN_ID_MISMATCH", "Artifact runId does not match the approved run.");
+  }
+  if (expected.fingerprint && expected.fingerprint !== artifactFingerprint(loaded)) {
+    throw importError("ARTIFACT_FINGERPRINT_MISMATCH", "Artifact fingerprint does not match the approved run.");
+  }
+  if (expected.baseMainSha && expected.baseMainSha !== loaded.manifest.baseMainSha) {
+    throw importError("BASE_GUARD_MISMATCH", "Artifact base SHA does not match the approved run.");
+  }
 }
 
-export function dryRunProductAutoImport(loaded, products = listCanonicalProducts()) {
-  const productsById = new Map(products.map((item) => [canonicalProductId(item.id), item]));
-  const glossaryByLanguage = new Map();
-  for (const entry of listGlossaryEntries()) {
-    const list = glossaryByLanguage.get(entry.languageCode) || [];
-    list.push(entry);
-    glossaryByLanguage.set(entry.languageCode, list);
-  }
-  const counts = emptyCounts();
-  counts.products = products.length;
-  counts.sourceFields = listProductSourceCells(products).length;
-  counts.targetCells = loaded.items.length;
-  const currentCatalogFingerprint = catalogSourceFingerprint(products);
-  const artifactCatalogFingerprint = String(loaded.manifest.wholeCatalogSourceFingerprint || "");
-  const catalogMatch = artifactCatalogFingerprint === currentCatalogFingerprint;
-  for (const item of loaded.items) {
-    const internal = isExactTranslationTargetLocale(item.language)
-      ? exactTranslationTargetInternal(item.language)
-      : "";
-    if (internal && counts.languageCounts[internal] !== undefined) {
-      counts.languageCounts[internal] += 1;
-    }
-    const code = classifyAutoItem(item, productsById, glossaryByLanguage);
-    counts[code] += 1;
-  }
+export function classifyProductAutoImport(loaded, ctx) {
+  const counts = summarizeClassification(loaded, ctx);
+  const fatal =
+    counts.staleSource +
+    counts.unknownProduct +
+    counts.invalidLocale +
+    counts.invalidField +
+    counts.numericMismatch +
+    counts.protectedMismatch +
+    counts.emptyValue;
+  return { counts, fatal };
+}
+
+export function dryRunFromContext(loaded, ctx, expected = {}) {
+  assertFingerprints(loaded, ctx, expected);
+  const { counts, fatal } = classifyProductAutoImport(loaded, ctx);
   return {
     mode: "dry-run",
     writes: 0,
+    runId: loaded.manifest.runId,
     artifactBaseSha: loaded.manifest.baseMainSha || "",
-    artifactCatalogFingerprint,
-    currentCatalogFingerprint,
-    catalogMatch,
+    artifactCatalogFingerprint: loaded.manifest.wholeCatalogSourceFingerprint,
+    currentCatalogFingerprint: ctx.catalogFingerprint,
+    artifactGlossaryFingerprint: loaded.manifest.glossaryFingerprint,
+    currentGlossaryFingerprint: ctx.glossaryFingerprint,
+    catalogMatch: true,
+    glossaryMatch: true,
+    fatal,
     ...counts,
   };
 }
 
-export function applyProductAutoImport(loaded, actor = "offline-auto-import", products = listCanonicalProducts()) {
-  const dry = dryRunProductAutoImport(loaded, products);
-  if (!dry.catalogMatch) {
-    const error = new Error("Artifact catalog fingerprint does not match the current product snapshot.");
-    error.code = "CATALOG_SOURCE_MISMATCH";
-    error.status = 409;
-    throw error;
+export function dryRunProductAutoImport(loaded, products = listCanonicalProducts(), expected = {}) {
+  const ctx = precomputeImportContext(products, listGlossaryRows(), listProductTranslationRows());
+  return dryRunFromContext(loaded, ctx, expected);
+}
+
+function applyPreparedWrites(loaded, ctx, actor) {
+  const { counts, fatal } = classifyProductAutoImport(loaded, ctx);
+  if (fatal > 0) {
+    throw importError("ARTIFACT_VALIDATION_FAILED", `Fatal AUTO import defects: ${fatal}`);
   }
-  return runInTransaction(() => {
-    let inserted = 0;
-    let updated = 0;
-    let skippedManual = 0;
-    let identical = 0;
-    let failed = 0;
-    for (const item of loaded.items) {
-      const result = upsertProductAutoTranslation(item, actor);
-      if (result.changed) {
-        if (result.skipped === "") inserted += 1;
-      } else if (result.skipped === "MANUAL_PROTECTED") skippedManual += 1;
-      else if (result.skipped === "UNCHANGED") identical += 1;
-      else failed += 1;
+  let inserted = 0;
+  let updated = 0;
+  let skippedManual = 0;
+  let identical = 0;
+  const stamp = nowIso();
+  const provenance = {
+    runId: loaded.manifest.runId,
+    generatedAt: loaded.manifest.generatedAt,
+  };
+  for (const item of loaded.items) {
+    const code = classifyPreparedItem(item, ctx);
+    if (code === "wouldSkipMANUAL") {
+      skippedManual += 1;
+      continue;
     }
-    return {
-      mode: "apply",
-      artifactBaseSha: dry.artifactBaseSha,
-      artifactCatalogFingerprint: dry.artifactCatalogFingerprint,
-      currentCatalogFingerprint: dry.currentCatalogFingerprint,
-      imported: inserted + updated,
+    if (code === "alreadyIdentical") {
+      identical += 1;
+      continue;
+    }
+    const existing =
+      ctx.existingByKey.get(`${item.productId}\0${item.language}\0${item.field}`) || {
+        productId: item.productId,
+        languageCode: item.language,
+        fieldKey: item.field,
+        autoValue: "",
+        autoSourceHash: "",
+        autoRunId: "",
+        autoGeneratedAt: "",
+        manualValue: "",
+        manualSourceHash: "",
+      };
+    upsertProductTranslationRow({
+      ...existing,
+      productId: item.productId,
+      languageCode: item.language,
+      fieldKey: item.field,
+      autoValue: item.value,
+      autoSourceHash: item.sourceHash,
+      autoRunId: provenance.runId,
+      autoGeneratedAt: provenance.generatedAt,
+      manualValue: existing.manualValue || "",
+      manualSourceHash: existing.manualSourceHash || "",
+      updatedAt: stamp,
+      updatedBy: actor,
+    });
+    if (code === "wouldUpdateAUTO") updated += 1;
+    else inserted += 1;
+  }
+  const changed = inserted + updated > 0;
+  if (changed) {
+    bumpLocalizationCatalogVersion(actor || "product-auto-import");
+  }
+  writeAudit({
+    action: "localization.product.auto.import",
+    details: {
+      runId: loaded.manifest.runId,
+      artifactFingerprint: artifactFingerprint(loaded),
+      catalogFingerprint: ctx.catalogFingerprint,
+      glossaryFingerprint: ctx.glossaryFingerprint,
       inserted,
       updated,
       skippedManual,
       identical,
-      failed,
-      targetCells: loaded.items.length,
-    };
+      languageCounts: counts.languageCounts,
+      changed,
+    },
+  });
+  return {
+    mode: "apply",
+    runId: loaded.manifest.runId,
+    artifactBaseSha: loaded.manifest.baseMainSha || "",
+    artifactCatalogFingerprint: ctx.catalogFingerprint,
+    artifactGlossaryFingerprint: ctx.glossaryFingerprint,
+    artifactFingerprint: artifactFingerprint(loaded),
+    imported: inserted + updated,
+    inserted,
+    updated,
+    skippedManual,
+    identical,
+    failed: 0,
+    targetCells: loaded.items.length,
+    catalogVersionBumped: changed,
+  };
+}
+
+export function applyProductAutoImport(loaded, actor = "offline-auto-import", expected = {}) {
+  return runInTransaction(() => {
+    const ctx = liveImportContext();
+    assertFingerprints(loaded, ctx, expected);
+    return applyPreparedWrites(loaded, ctx, actor);
   });
 }
 
 export function findCanonicalProductSafe(productId) {
   return findCanonicalProduct(productId);
 }
+
+export { canonicalProductId };

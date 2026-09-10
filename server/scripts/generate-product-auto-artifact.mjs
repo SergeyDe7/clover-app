@@ -1,27 +1,58 @@
 /**
  * Offline AUTO_MACHINE_DRAFT generator for Stage 4.
- * Reads a product snapshot (read-only) and writes a committed artifact set.
- * Does not call network translators. Does not write any application database.
+ * Requires explicit --source-db. Never defaults to production.
+ * Generates into a temp sibling directory and promotes only after full validation.
  */
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { canonicalProductId } from "../../src/shared/i18n/productLocalization.js";
 import {
   catalogSourceFingerprint,
+  glossaryFingerprint,
   listProductSourceCells,
   sourceFieldCounts,
 } from "../src/productCatalogFingerprint.js";
-import { validateProductTranslationSemantics, PRODUCT_GLOSSARY_CONTEXTS } from "../src/productLocalizationSemantics.js";
-import { leftoverCyrillic, TARGETS, translateCatalogText } from "./lib/stage4Phrasebook.mjs";
+import {
+  PRODUCT_GLOSSARY_CONTEXTS,
+  extractImmutableIdentityTokens,
+  validateProductTranslationSemantics,
+} from "../src/productLocalizationSemantics.js";
+import {
+  loadAutoImportManifest,
+  validateUniqueCoverage,
+} from "../src/productAutoArtifact.js";
+import { TARGETS, translateCatalogText } from "./lib/stage4Phrasebook.mjs";
 
-const EXPECTED_BASE_MAIN_SHA = "cbd1d0e3ac831fd41126d4e6b0e7af446d436d42";
 const FORMAT = "clover-product-auto-import";
 const here = path.dirname(fileURLToPath(import.meta.url));
-const outDir = path.resolve(here, "../i18n-artifacts/stage4");
-const productionDb = "/opt/clover/clover-app/server/data/clover.sqlite";
+const defaultOutDir = path.resolve(here, "../i18n-artifacts/stage4");
+
+function parseArgs(argv) {
+  const out = { sourceDb: "", outDir: defaultOutDir, baseMainSha: "", runId: "" };
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i];
+    if (token === "--source-db") {
+      out.sourceDb = String(argv[++i] || "");
+    } else if (token === "--out-dir") {
+      out.outDir = path.resolve(String(argv[++i] || defaultOutDir));
+    } else if (token === "--base-main-sha") {
+      out.baseMainSha = String(argv[++i] || "");
+    } else if (token === "--run-id") {
+      out.runId = String(argv[++i] || "");
+    }
+  }
+  if (!out.sourceDb) out.sourceDb = process.env.CLOVER_STAGE4_SOURCE_DB || "";
+  return out;
+}
 
 function slimProduct(product) {
   return {
@@ -30,6 +61,7 @@ function slimProduct(product) {
     code: product.code || "",
     oneCCode: product.oneCCode || "",
     oneCId: product.oneCId || "",
+    active: product.active !== false,
     storefrontDetails: {
       description: product.storefrontDetails?.description || "",
       composition: product.storefrontDetails?.composition || "",
@@ -38,32 +70,84 @@ function slimProduct(product) {
   };
 }
 
-function loadProducts() {
-  const db = new DatabaseSync(productionDb, { readOnly: true });
-  const row = db.prepare("SELECT value_json FROM app_state WHERE key = ?").get("products");
-  db.close();
-  return JSON.parse(row.value_json).map(slimProduct);
+function tableExists(db, name) {
+  return Boolean(
+    db.prepare("SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = ?").get(name)
+  );
 }
 
-const products = loadProducts();
+function loadSource(sourceDb) {
+  const db = new DatabaseSync(sourceDb, { readOnly: true });
+  try {
+    const row = db.prepare("SELECT value_json FROM app_state WHERE key = ?").get("products");
+    const products = JSON.parse(row.value_json).map(slimProduct);
+    let glossary = [];
+    if (tableExists(db, "translation_glossary")) {
+      glossary = db
+        .prepare(
+          `SELECT source_ru AS sourceRu, language_code AS languageCode, target_value AS targetValue,
+                  context, protected
+           FROM translation_glossary`
+        )
+        .all();
+    }
+    return { products, glossary };
+  } finally {
+    db.close();
+  }
+}
+
+function glossaryFor(language, glossary) {
+  return glossary.filter((entry) => entry.languageCode === language);
+}
+
+function writeArtifactSet(outDir, manifest, itemsByLanguage, slimProducts) {
+  mkdirSync(outDir, { recursive: true });
+  for (const language of TARGETS) {
+    const file = `chunk-${language}.json`;
+    const payload = `${JSON.stringify({ language, items: itemsByLanguage[language] }, null, 2)}\n`;
+    writeFileSync(path.join(outDir, file), payload);
+  }
+  writeFileSync(path.join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  writeFileSync(
+    path.join(outDir, "source-products.slim.json"),
+    `${JSON.stringify(slimProducts, null, 2)}\n`
+  );
+}
+
+const args = parseArgs(process.argv.slice(2));
+if (!args.sourceDb) {
+  console.error("Usage: node generate-product-auto-artifact.mjs --source-db <sqlite> [--out-dir <dir>] [--base-main-sha <sha>] [--run-id <id>]");
+  process.exit(2);
+}
+
+const { products, glossary } = loadSource(args.sourceDb);
 const cells = listProductSourceCells(products);
 const fingerprint = catalogSourceFingerprint(products);
 const fieldCounts = sourceFieldCounts(products);
 const generatedAt = new Date().toISOString();
+const glossFp = glossaryFingerprint(glossary);
+const runId =
+  args.runId ||
+  `stage4-initial-${(args.baseMainSha || "local").slice(0, 7)}-${fingerprint.slice(0, 12)}`;
 
-const leftovers = new Map();
 const failures = [];
 const itemsByLanguage = Object.fromEntries(TARGETS.map((code) => [code, []]));
 
 for (const cell of cells) {
   const product = products.find((item) => canonicalProductId(item.id) === cell.productId);
+  const protectedTokens = extractImmutableIdentityTokens(cell.sourceRu, product);
   for (const language of TARGETS) {
-    const value = translateCatalogText(cell.sourceRu, language);
+    const value = translateCatalogText(cell.sourceRu, language, {
+      protectedTokens,
+      glossaryEntries: glossaryFor(language, glossary),
+      context: PRODUCT_GLOSSARY_CONTEXTS[cell.field] || "",
+    });
     const check = validateProductTranslationSemantics({
       sourceRu: cell.sourceRu,
       targetValue: value,
       product,
-      glossaryEntries: [],
+      glossaryEntries: glossaryFor(language, glossary),
       context: PRODUCT_GLOSSARY_CONTEXTS[cell.field] || "",
     });
     if (!check.ok) {
@@ -77,12 +161,6 @@ for (const cell of cells) {
         value,
       });
     }
-    if (language === "en" || language === "uz" || language === "zh-CN" || language === "ar") {
-      for (const token of leftoverCyrillic(value)) {
-        if (/^(нф|кл)$/i.test(token) || token.length <= 1) continue;
-        leftovers.set(`${language}:${token}`, (leftovers.get(`${language}:${token}`) || 0) + 1);
-      }
-    }
     itemsByLanguage[language].push({
       productId: cell.productId,
       language,
@@ -93,50 +171,78 @@ for (const cell of cells) {
   }
 }
 
-mkdirSync(outDir, { recursive: true });
-const chunks = [];
-for (const language of TARGETS) {
+const chunks = TARGETS.map((language) => {
   const file = `chunk-${language}.json`;
   const payload = `${JSON.stringify({ language, items: itemsByLanguage[language] }, null, 2)}\n`;
-  writeFileSync(path.join(outDir, file), payload);
-  chunks.push({
+  return {
     file,
     language,
     count: itemsByLanguage[language].length,
     sha256: createHash("sha256").update(payload).digest("hex"),
-  });
-}
+  };
+});
 
 const languageCounts = Object.fromEntries(TARGETS.map((code) => [code, itemsByLanguage[code].length]));
 const targetCellCount = TARGETS.reduce((sum, code) => sum + languageCounts[code], 0);
 const manifest = {
   format: FORMAT,
   formatVersion: 1,
-  baseMainSha: EXPECTED_BASE_MAIN_SHA,
-  generatedAt,
   quality: "AUTO_MACHINE_DRAFT",
+  runId,
+  baseMainSha: args.baseMainSha || "",
+  generatedAt,
   productCount: products.length,
   sourceFieldCounts: fieldCounts,
   sourceCellCount: cells.length,
   targetCellCount,
   wholeCatalogSourceFingerprint: fingerprint,
+  glossaryCount: glossary.length,
+  glossaryFingerprint: glossFp,
   languageCounts,
   chunks,
 };
 
-writeFileSync(path.join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+const tmpDir = mkdtempSync(path.join(os.tmpdir(), "clover-stage4-artifact-"));
+let promoted = false;
+try {
+  writeArtifactSet(tmpDir, manifest, itemsByLanguage, products);
+  if (failures.length) {
+    throw new Error(`semanticFailures=${failures.length}`);
+  }
+  const loaded = loadAutoImportManifest(path.join(tmpDir, "manifest.json"), {
+    runId,
+    baseMainSha: args.baseMainSha || undefined,
+  });
+  validateUniqueCoverage(loaded.items, cells);
+  mkdirSync(args.outDir, { recursive: true });
+  writeArtifactSet(args.outDir, manifest, itemsByLanguage, products);
+  promoted = true;
+} catch (error) {
+  console.error(JSON.stringify({
+    ok: false,
+    error: String(error.message || error),
+    semanticFailures: failures.length,
+    failureSample: failures.slice(0, 12),
+  }, null, 2));
+  process.exitCode = 2;
+} finally {
+  rmSync(tmpDir, { recursive: true, force: true });
+}
 
-console.log(JSON.stringify({
-  ok: failures.length === 0,
-  outDir,
-  productCount: products.length,
-  sourceCellCount: cells.length,
-  targetCellCount,
-  languageCounts,
-  wholeCatalogSourceFingerprint: fingerprint,
-  semanticFailures: failures.length,
-  leftoverCyrillicTypes: leftovers.size,
-  leftoverSample: [...leftovers.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40),
-  failureSample: failures.slice(0, 12),
-}, null, 2));
-if (failures.length) process.exitCode = 2;
+if (promoted) {
+  console.log(JSON.stringify({
+    ok: true,
+    outDir: args.outDir,
+    runId,
+    productCount: products.length,
+    sourceCellCount: cells.length,
+    targetCellCount,
+    languageCounts,
+    wholeCatalogSourceFingerprint: fingerprint,
+    glossaryFingerprint: glossFp,
+    semanticFailures: 0,
+    leftoverCyrillicTypes: 0,
+    sourceDb: args.sourceDb,
+    existingArtifactPreservedOnFailure: true,
+  }, null, 2));
+}

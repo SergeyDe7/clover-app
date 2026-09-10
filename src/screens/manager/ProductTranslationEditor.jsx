@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../serverApi";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
@@ -10,6 +10,7 @@ import {
   readProductFieldDraft,
   writeProductFieldDraft,
 } from "../../shared/i18n/productTranslationDrafts.js";
+import { shouldApplyWorkspaceResponse } from "../../shared/i18n/translationDrafts.js";
 
 const TARGET_LOCALES = ["en", "uz", "ky", "tg", "zh", "ar"];
 
@@ -27,6 +28,7 @@ export function ProductTranslationEditor({ product }) {
   const [drafts, setDrafts] = useState({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const requestGenerationRef = useRef(0);
 
   const productId = product?.id == null ? "" : String(product.id);
   const languageLabels = {
@@ -39,6 +41,7 @@ export function ProductTranslationEditor({ product }) {
   };
 
   useEffect(() => {
+    requestGenerationRef.current += 1;
     setDrafts(clearProductDrafts());
     setWorkspace(null);
     setMessage("");
@@ -46,10 +49,36 @@ export function ProductTranslationEditor({ product }) {
 
   const load = useCallback(async () => {
     if (!productId) return;
+    const requestGeneration = ++requestGenerationRef.current;
+    const requestedProductId = productId;
     try {
-      const payload = await api.getProductTranslations(productId);
+      const payload = await api.getProductTranslations(requestedProductId);
+      if (
+        !shouldApplyWorkspaceResponse({
+          requestGeneration,
+          currentGeneration: requestGenerationRef.current,
+          requestLanguage: requestedProductId,
+          currentLanguage: productId,
+          requestProductId: requestedProductId,
+          currentProductId: productId,
+        })
+      ) {
+        return;
+      }
       setWorkspace(payload.workspace || null);
     } catch (error) {
+      if (
+        !shouldApplyWorkspaceResponse({
+          requestGeneration,
+          currentGeneration: requestGenerationRef.current,
+          requestLanguage: requestedProductId,
+          currentLanguage: productId,
+          requestProductId: requestedProductId,
+          currentProductId: productId,
+        })
+      ) {
+        return;
+      }
       setWorkspace(null);
       setMessage(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
     }

@@ -44,32 +44,39 @@ the AUTO baseline.
 - `product_id` = `String(product.id)` — application-validated, **no SQL FK**
 - `language_code` ∈ `en | uz | ky | tg | zh-CN | ar` (no RU rows)
 - `field_key` ∈ `name | description | composition | characteristics`
-- Columns: `auto_value`, `auto_source_hash`, `manual_value`, `manual_source_hash`, `updated_at`, `updated_by`
+- Columns: `auto_value`, `auto_source_hash`, `auto_run_id`, `auto_generated_at`, `manual_value`, `manual_source_hash`, `updated_at`, `updated_by`
+- CHECKs: non-empty `product_id`; finite `language_code` / `field_key`; AUTO/MANUAL hash/value consistency
 - No price, cost, markup, matrix, saleUnits, UOM codes, or 1C authority columns
 
 ### `translation_glossary`
 
 - `id`, `source_ru`, `normalized_source`, `language_code`, `target_value`, `context`, `normalized_context`, `protected`, timestamps, `updated_by`
 - Unique: `(normalized_source, language_code, normalized_context)`
+- Finite contexts only: `"" | product.name | product.description | product.composition | product.characteristics`
 - Same internal locales. No credentials. No client/business payloads.
 
 Schema is additive and idempotent (`CREATE TABLE IF NOT EXISTS`).
 
 ## Effective translation resolution
 
-For each product / language / field:
+Admin workspace (review):
 
 1. Non-empty MANUAL → MANUAL (shown even if STALE)
 2. Else non-empty AUTO → AUTO
 3. Else MISSING
 
-STALE is derived when the effective stored `source_hash` ≠ current Russian
-`sourceHash(field)`. Stale MANUAL is never auto-overwritten. Stale AUTO may
-remain visible for admin review and is incomplete / eligible for explicit
-regeneration.
+STALE is derived when the stored source hash ≠ current Russian `sourceHash(field)`.
+Stale MANUAL is never auto-overwritten. Stale AUTO may remain visible for admin
+review.
 
-Russian fallback is applied only at display projection time, never written
-into canonical `product.name` / `storefrontDetails`.
+Public/client display (`projectLocalizedProductDisplay`):
+
+- MANUAL is used only when `manualSourceHash === currentSourceHash`
+- otherwise AUTO is used only when `autoSourceHash === currentSourceHash`
+- otherwise canonical Russian fallback
+- stale MANUAL does **not** fall through to AUTO for public display
+
+Canonical `product.name` / `storefrontDetails` are never mutated by projection.
 
 ## RETURN TO AUTO
 
@@ -129,49 +136,90 @@ future AUTO import/regeneration only.
 
 ## Controlled offline AUTO import
 
-Artifact format `clover-product-auto-import` / `formatVersion: 1`:
+Approved Stage 4 artifact is **chunked**. Top-level `items[]` is forbidden.
 
 ```json
 {
   "format": "clover-product-auto-import",
   "formatVersion": 1,
-  "runId": "stable-run-id",
+  "quality": "AUTO_MACHINE_DRAFT",
+  "runId": "stage4-initial-cbd1d0e-6259e882d1bf",
+  "baseMainSha": "cbd1d0e3ac831fd41126d4e6b0e7af446d436d42",
   "generatedAt": "ISO-8601",
-  "items": [
-    {
-      "productId": "722",
-      "language": "en",
-      "field": "name",
-      "value": "…",
-      "sourceHash": "sha256-of-current-ru"
-    }
+  "productCount": 698,
+  "sourceFieldCounts": { "name": 698, "description": 659, "composition": 659, "characteristics": 659 },
+  "sourceCellCount": 2675,
+  "targetCellCount": 16050,
+  "wholeCatalogSourceFingerprint": "sha256",
+  "glossaryCount": 0,
+  "glossaryFingerprint": "sha256-of-empty",
+  "languageCounts": { "en": 2675, "uz": 2675, "ky": 2675, "tg": 2675, "zh-CN": 2675, "ar": 2675 },
+  "chunks": [
+    { "file": "chunk-en.json", "language": "en", "count": 2675, "sha256": "64-hex" }
   ]
 }
 ```
 
-Importer (temp-DB tests in Task 1; production run is Task 2 only):
+Each chunk file holds `{ "language", "items": [{ productId, language, field, sourceHash, value }] }`.
+`sha256` is required. Paths must stay inside the artifact directory (no `..`, no absolute, no symlink escape).
 
-- upsert AUTO only
-- never overwrite MANUAL
-- require matching current source hash
-- validate protected tokens + numeric/dimension semantics
-- idempotent on the same `(productId, language, field, value, sourceHash)`
+Generator: explicit `--source-db` (READ ONLY). Uses persisted `translation_glossary` if the table exists. Writes a temp sibling directory and promotes only after coverage + semantic + lint validation. Failed generation leaves the committed artifact untouched.
 
-Offline generator may apply glossary longest-match substitution. It is not a
-request-time translator and is not invoked by RETURN TO AUTO.
+`--dry-run` opens SQLite `{ readOnly: true }` and does **not** import `db.js`. Writes: 0. Idempotent no-change apply does not bump `catalogVersion` (an explicit no-op audit row may still be written).
+
+`--apply` requires `DB_PATH`. Production apply additionally requires `CLOVER_ALLOW_PRODUCT_AUTO_IMPORT=YES`, `CLOVER_EXPECT_PRODUCT_AUTO_RUN_ID`, and `CLOVER_EXPECT_PRODUCT_AUTO_FINGERPRINT`. Inside `BEGIN IMMEDIATE` the importer re-reads live products/glossary, rechecks fingerprints, coverage, hashes, and semantics, then writes AUTO rows, bumps `catalogVersion` **once** if any AUTO row changed, and writes sanitized audit `localization.product.auto.import`. Any fatal defect → ROLLBACK, 0 AUTO writes, 0 version change. MANUAL rows are skipped, not fatal.
+
+Importer accounting: `inserted` / `updated` / `skippedManual` / `identical` / `failed`. Fresh TEMP import: inserted=16050. Second identical import: identical=16050, version +0.
+
+## catalogVersion
+
+In-transaction helper `bumpLocalizationCatalogVersion` (no nested BEGIN).
+
+| Event | Δ |
+| --- | --- |
+| MANUAL actual change | +1 |
+| identical MANUAL no-op | +0 |
+| return-to-AUTO actual change | +1 |
+| reset no-op | +0 |
+| glossary ADD / actual EDIT / DELETE | +1 |
+| identical glossary save | +0 |
+| AUTO import with ≥1 changed AUTO row | +1 for the whole run |
+| idempotent AUTO import / MANUAL-only skip | +0 |
+| canonical RU source create/delete/change (`name` + storefront details) | +1 once |
+| price-only / UOM-size-only / 1C-ref-only | +0 |
+| product delete (source removal + translation cleanup) | +1 once |
+
+`enabledLanguages` stays unchanged.
+
+Task 2 expected production arithmetic if no concurrent localization edits:
+
+- PRE `catalogVersion=2`
+- Stage 4 generic UI catalog startup sync +1 → `3`
+- Initial 16050-cell AUTO import +1 → `4`
+
+## UI catalog arithmetic
+
+PRE 1856. Stage 4 added 44 keys (38 original + 6 glossary-context / load-more). POST **1900**. `translation_values` POST: 1900 × 6 = **11400**.
+
+## Completeness
+
+Counts `product.active !== false` only. Inactive products do not block language
+completeness. Domain `products` counts critical **name** cells for active
+products × six targets. Detail fields (description/composition/characteristics)
+are tracked separately and are not enablement-critical. Language enablement
+remains rejected until Stage 9.
+
+Admin «Непереведённое» includes product MISSING/STALE rows for the selected
+target language only.
+
+## Admin workspace
+
+Product/untranslated/glossary listings are bounded: selected target language only, default limit 100, max 200, offset + total/hasMore, server-side search. Interface workspace pagination is unchanged.
 
 ## Fingerprinting
 
 Reuse Stage 3 `sourceHash()` / `normalizeSourceRu()` (NFC, newline normalize,
 trim). Empty source fields are not translation-required.
-
-## Completeness
-
-Domain `products` counts critical product **name** cells (non-empty RU name ×
-six targets). Details fields appear in untranslated inventory but are not
-enablement-critical. Language enablement remains rejected until Stage 9.
-
-Admin «Непереведённое» includes product MISSING/STALE rows.
 
 ## Product delete
 
@@ -181,9 +229,9 @@ Manager delete permission unchanged.
 
 ## Backup / restore
 
-`exportDatabaseSnapshot` / `importDatabaseSnapshot` include
-`productTranslations` and `translationGlossary`. Old snapshots import as empty
-new tables.
+`exportDatabaseSnapshot` / `importDatabaseSnapshot` snapshot **v5** includes
+AUTO value/hash/run id/generated-at, MANUAL value/hash, and glossary fields.
+v4 snapshots import successfully with empty Stage4 tables.
 
 ## Admin UI
 
@@ -195,19 +243,22 @@ new tables.
 ## Test strategy
 
 All schema/store/import tests open a **temp** SQLite via `DB_PATH` and prove
-`TEST_DB_ISOLATED=YES`. They must not touch
-`/opt/clover/clover-app/server/data/clover.sqlite` or the worktree
-`server/data` file.
+`TEST_DB_ISOLATED=YES`. Default `node server/scripts/verify-i18n-stage-4.mjs`
+does **not** open `/opt/clover`. It validates the committed chunked artifact,
+true read-only dry-run, full 16050 TEMP apply, idempotent second apply,
+resumable subset→full, MANUAL freeze, fatal rollback, SOURCE_STALE order,
+stale public fallback, version matrix, backup v5, HTTP auth, pagination, and
+inactive completeness.
 
-`server/scripts/verify-i18n-stage-4.mjs` covers model, lifecycle, glossary,
-validation, import, delete cleanup, completeness, backup tables, locale
-boundary, UOM display keys, and Stage 5–9 exclusion.
+Optional `--source-db` may be used later by Task 2 for live fingerprint checks.
 
 ## Production mutation expectations
 
 Task 1: **no** production DB writes, no merge, no deploy, no AUTO import
-against live products.
+against live products. Quality remains `AUTO_MACHINE_DRAFT`. Human market QA
+is not performed. Foreign languages stay disabled.
 
-Task 2 (later, after GitHub review PASS + explicit DB approval): backup,
-schema migrate, controlled AUTO import, deploy, `enabledLanguages` still
-`["ru"]`.
+Task 2 (later, after independent GitHub review PASS + explicit DB approval):
+backup, schema migrate, generic UI catalog sync (1856→1900 entries,
+11136→11400 values, catalogVersion 2→3), controlled AUTO import (16050 rows,
+catalogVersion 3→4), deploy. `enabledLanguages` still `["ru"]`.

@@ -15152,6 +15152,54 @@ export const SEEDS = {
     "tg": "Бекор кардан",
     "zh-CN": "取消",
     "ar": "إلغاء"
+  },
+  "admin.glossary.context.generic": {
+    "en": "All product fields",
+    "uz": "Barcha mahsulot maydonlari",
+    "ky": "Бардык товар талаалары",
+    "tg": "Ҳамаи майдонҳои маҳсулот",
+    "zh-CN": "全部商品字段",
+    "ar": "كل حقول المنتج"
+  },
+  "admin.glossary.context.name": {
+    "en": "Name",
+    "uz": "Nomi",
+    "ky": "Аталышы",
+    "tg": "Ном",
+    "zh-CN": "名称",
+    "ar": "الاسم"
+  },
+  "admin.glossary.context.description": {
+    "en": "Description",
+    "uz": "Tavsif",
+    "ky": "Сүрөттөмө",
+    "tg": "Тавсиф",
+    "zh-CN": "描述",
+    "ar": "الوصف"
+  },
+  "admin.glossary.context.composition": {
+    "en": "Composition",
+    "uz": "Tarkib",
+    "ky": "Курам",
+    "tg": "Таркиб",
+    "zh-CN": "成分",
+    "ar": "التركيب"
+  },
+  "admin.glossary.context.characteristics": {
+    "en": "Characteristics",
+    "uz": "Xususiyatlar",
+    "ky": "Мүнөздөмөлөр",
+    "tg": "Хусусиятҳо",
+    "zh-CN": "规格",
+    "ar": "الخصائص"
+  },
+  "admin.languages.loadMore": {
+    "en": "Load more",
+    "uz": "Yana yuklash",
+    "ky": "Дагы жүктөө",
+    "tg": "Бештар бор кардан",
+    "zh-CN": "加载更多",
+    "ar": "تحميل المزيد"
   }
 };
 

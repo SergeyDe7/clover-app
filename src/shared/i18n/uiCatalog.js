@@ -13268,6 +13268,48 @@ const RAW_CATALOG = [
     "namespace": "ui",
     "surface": "admin",
     "critical": true
+  },
+  {
+    "key": "admin.glossary.context.generic",
+    "sourceRu": "Все поля товара",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.context.name",
+    "sourceRu": "Название",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.context.description",
+    "sourceRu": "Описание",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.context.composition",
+    "sourceRu": "Состав",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.context.characteristics",
+    "sourceRu": "Характеристики",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.loadMore",
+    "sourceRu": "Показать ещё",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
   }
 ];
 

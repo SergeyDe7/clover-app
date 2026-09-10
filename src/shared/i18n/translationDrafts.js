@@ -9,10 +9,16 @@ export function shouldApplyWorkspaceResponse({
   currentGeneration,
   requestLanguage,
   currentLanguage,
+  requestView,
+  currentView,
+  requestProductId,
+  currentProductId,
 }) {
   return (
     Number(requestGeneration) === Number(currentGeneration) &&
-    String(requestLanguage || "") === String(currentLanguage || "")
+    String(requestLanguage || "") === String(currentLanguage || "") &&
+    (requestView === undefined || String(requestView || "") === String(currentView || "")) &&
+    (requestProductId === undefined || String(requestProductId || "") === String(currentProductId || ""))
   );
 }
 

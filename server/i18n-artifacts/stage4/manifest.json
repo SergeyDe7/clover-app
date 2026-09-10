@@ -1,9 +1,10 @@
 {
   "format": "clover-product-auto-import",
   "formatVersion": 1,
-  "baseMainSha": "cbd1d0e3ac831fd41126d4e6b0e7af446d436d42",
-  "generatedAt": "2026-09-09T20:55:29.655Z",
   "quality": "AUTO_MACHINE_DRAFT",
+  "runId": "stage4-initial-cbd1d0e-6259e882d1bf",
+  "baseMainSha": "cbd1d0e3ac831fd41126d4e6b0e7af446d436d42",
+  "generatedAt": "2026-09-10T07:46:36.850Z",
   "productCount": 698,
   "sourceFieldCounts": {
     "name": 698,
@@ -14,6 +15,8 @@
   "sourceCellCount": 2675,
   "targetCellCount": 16050,
   "wholeCatalogSourceFingerprint": "6259e882d1bfba47f2897df649ad9196402f8875b9c64d95b5781fd0a37f5327",
+  "glossaryCount": 0,
+  "glossaryFingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "languageCounts": {
     "en": 2675,
     "uz": 2675,
@@ -27,37 +30,37 @@
       "file": "chunk-en.json",
       "language": "en",
       "count": 2675,
-      "sha256": "2ecf1dc797214e70a3f1ea8a16857dd5ede9735612ae112945f1301b4abe9ac8"
+      "sha256": "54775c5d1d5bc5490073de32de85201837932bf0b4e5193700db80a2c447552a"
     },
     {
       "file": "chunk-uz.json",
       "language": "uz",
       "count": 2675,
-      "sha256": "393ffb43b1a3eab33d74dc069fc10707cdc0392a9d4a354315d880dfbb9edff1"
+      "sha256": "da3482b31fb27be9619d8d063a9e240f7cd1e8311ef62788bf66c24708fbc5c6"
     },
     {
       "file": "chunk-ky.json",
       "language": "ky",
       "count": 2675,
-      "sha256": "cb120c9091fe2ca0a82a63e9d092a1f5e117231e1ccd5c1c778cef7035fa5eec"
+      "sha256": "4ea42d77ad43d7856f58c2cf1a781cdd6112b3bc5912b98191fd7e756d569673"
     },
     {
       "file": "chunk-tg.json",
       "language": "tg",
       "count": 2675,
-      "sha256": "174f0e6320cd667745c6a44173816816f7885d3cec8362e93693e4b8c1ed74f9"
+      "sha256": "acd85dc4b8d4dc24a22ae70f8beb7d83921c1b4abc1eee9d5e2ea4f3eef16d4e"
     },
     {
       "file": "chunk-zh-CN.json",
       "language": "zh-CN",
       "count": 2675,
-      "sha256": "5884f3e6247ef6e6e7c2f3baffd42beca257a192139aa55a0d8329657df45027"
+      "sha256": "79fb5f62cb598fad7fc33baa7a7e18764396bc911b7e1ac4f9adb5eb3567ee25"
     },
     {
       "file": "chunk-ar.json",
       "language": "ar",
       "count": 2675,
-      "sha256": "3166ddbbb38e49c90b97cd4bf6a5aa8b49280a0daf962d5ef5ca52ce24df43a1"
+      "sha256": "445f2e5120a69bb0511b524bc44bc3051f976d1e6529e1fc997a32d534507a63"
     }
   ]
 }

@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
   getGlobalState,
-  setGlobalState,
   runInTransaction,
   listTranslationEntryRows,
   listTranslationValueRows,
@@ -34,11 +33,18 @@ import {
   namespaceToCompletenessDomain,
   normalizeLocalizationSettings,
 } from "../../src/shared/i18n/localizationSettings.js";
+import { bumpLocalizationCatalogVersion } from "./localizationVersion.js";
 import {
   buildProductWorkspaceRows,
   productCompletenessItems,
   productFieldCompletenessByLanguage,
 } from "./productLocalizationStore.js";
+import {
+  parseWorkspaceLimit,
+  parseWorkspaceOffset,
+  STAGE4_QUERY_MAX_CHARS,
+  assertBoundedString,
+} from "./productInputLimits.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -134,20 +140,8 @@ export function completenessByLanguage(store = readTranslationStore()) {
   return reports;
 }
 
-function persistSettings(next) {
-  setGlobalState(LOCALIZATION_SETTINGS_KEY, next);
-  return next;
-}
-
 function bumpCatalogVersion(current, actor) {
-  return persistSettings(
-    normalizeLocalizationSettings({
-      ...current,
-      catalogVersion: Number(current.catalogVersion || 0) + 1,
-      updatedAt: nowIso(),
-      updatedBy: actor || current.updatedBy || "",
-    })
-  );
+  return bumpLocalizationCatalogVersion(actor, current);
 }
 
 function invalidLocaleError(message = "Unsupported localization language.") {
@@ -311,26 +305,50 @@ export function initializeLocalizationCatalog() {
   return result;
 }
 
-export function listWorkspaceRows(filters = {}) {
+export function listWorkspacePage(filters = {}) {
   if (Object.prototype.hasOwnProperty.call(filters, "language") && filters.language !== undefined) {
     const languageRaw = filters.language;
     if (!isExactPublicTargetLocale(languageRaw)) {
       throw invalidLocaleError();
     }
   }
+  if (Object.prototype.hasOwnProperty.call(filters, "query") && filters.query) {
+    assertBoundedString(filters.query, STAGE4_QUERY_MAX_CHARS, { query: true, label: "query" });
+  }
   const languageRaw = filters.language;
   const view = String(filters.view || "interface");
   if (view === "glossary") {
-    return [];
+    return { rows: [], total: 0, offset: 0, limit: 0, hasMore: false };
   }
   const store = currentCatalogItems(readTranslationStore());
   const uiRows = buildTranslationRows(store);
-  const productRows = view === "products" || view === "untranslated" ? buildProductWorkspaceRows() : [];
+  const boundedProductView = view === "products" || view === "untranslated";
+  const productRows = boundedProductView
+    ? buildProductWorkspaceRows(undefined, { language: languageRaw })
+    : [];
   const combined = view === "products" ? productRows : [...uiRows, ...productRows];
-  return filterTranslationRows(combined, {
+  const filtered = filterTranslationRows(combined, {
     ...filters,
     language: languageRaw,
   });
+  if (!boundedProductView) {
+    return {
+      rows: filtered,
+      total: filtered.length,
+      offset: 0,
+      limit: filtered.length,
+      hasMore: false,
+    };
+  }
+  const total = filtered.length;
+  const limit = parseWorkspaceLimit(filters.limit);
+  const offset = parseWorkspaceOffset(filters.offset);
+  const rows = filtered.slice(offset, offset + limit);
+  return { rows, total, offset, limit, hasMore: offset + rows.length < total };
+}
+
+export function listWorkspaceRows(filters = {}) {
+  return listWorkspacePage(filters).rows;
 }
 
 function requireCurrentUiEntry(entryId) {

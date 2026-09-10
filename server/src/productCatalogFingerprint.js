@@ -3,6 +3,7 @@ import {
   PRODUCT_TRANSLATION_FIELDS,
   canonicalProductId,
   productFieldSource,
+  normalizeGlossaryPhrase,
 } from "../../src/shared/i18n/productLocalization.js";
 
 export function listProductSourceCells(products = []) {
@@ -41,4 +42,19 @@ export function sourceFieldCounts(products = []) {
     counts[cell.field] += 1;
   }
   return counts;
+}
+
+export function glossaryFingerprint(entries = []) {
+  const lines = (Array.isArray(entries) ? entries : [])
+    .map((entry) =>
+      [
+        String(entry.languageCode || entry.language_code || ""),
+        normalizeGlossaryPhrase(entry.sourceRu || entry.source_ru || ""),
+        normalizeGlossaryPhrase(entry.context || ""),
+        String(entry.targetValue || entry.target_value || "").trim(),
+        Number(entry.protected) === 1 || entry.protected === true ? "1" : "0",
+      ].join("\0")
+    )
+    .sort((left, right) => left.localeCompare(right, "en"));
+  return sourceHash(lines.join("\n"));
 }

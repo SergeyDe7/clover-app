@@ -1,8 +1,11 @@
 /**
  * Controlled offline AUTO import.
  * Exactly one of --dry-run or --apply is required.
- * Production apply also requires DB_PATH + CLOVER_ALLOW_PRODUCT_AUTO_IMPORT=YES.
+ * --dry-run never imports db.js and opens SQLite read-only.
+ * Production apply requires DB_PATH + CLOVER_ALLOW_PRODUCT_AUTO_IMPORT=YES
+ * + CLOVER_EXPECT_PRODUCT_AUTO_RUN_ID + CLOVER_EXPECT_PRODUCT_AUTO_FINGERPRINT.
  */
+import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 
 const PRODUCTION_DATA = path.resolve("/opt/clover/clover-app/server/data");
@@ -34,33 +37,53 @@ if (args.dryRun === args.apply) {
 }
 
 const dbPath = process.env.DB_PATH;
-if (!dbPath) {
-  console.error("DB_PATH is required.");
+if (!args.dryRun && !dbPath) {
+  console.error("DB_PATH is required for --apply.");
+  process.exit(2);
+}
+if (args.dryRun && !dbPath) {
+  console.error("DB_PATH is required for --dry-run.");
   process.exit(2);
 }
 
-const resolvedDb = path.resolve(dbPath);
+const resolvedDb = realpathSync(path.resolve(dbPath));
+if (lstatSync(path.resolve(dbPath)).isSymbolicLink()) {
+  console.error("Refusing symlink DB_PATH.");
+  process.exit(2);
+}
+
 const isProductionDb =
   resolvedDb === path.join(PRODUCTION_DATA, "clover.sqlite") ||
   resolvedDb.startsWith(`${PRODUCTION_DATA}${path.sep}`);
 
-if (args.apply && isProductionDb && process.env.CLOVER_ALLOW_PRODUCT_AUTO_IMPORT !== "YES") {
-  console.error("Production apply requires CLOVER_ALLOW_PRODUCT_AUTO_IMPORT=YES.");
-  process.exit(2);
+const expected = {
+  runId: process.env.CLOVER_EXPECT_PRODUCT_AUTO_RUN_ID || "",
+  fingerprint: process.env.CLOVER_EXPECT_PRODUCT_AUTO_FINGERPRINT || "",
+  baseMainSha: process.env.CLOVER_EXPECT_PRODUCT_AUTO_BASE_SHA || "",
+};
+
+if (args.apply) {
+  if (isProductionDb && process.env.CLOVER_ALLOW_PRODUCT_AUTO_IMPORT !== "YES") {
+    console.error("Production apply requires CLOVER_ALLOW_PRODUCT_AUTO_IMPORT=YES.");
+    process.exit(2);
+  }
+  if (isProductionDb && (!expected.runId || !expected.fingerprint)) {
+    console.error(
+      "Production apply requires CLOVER_EXPECT_PRODUCT_AUTO_RUN_ID and CLOVER_EXPECT_PRODUCT_AUTO_FINGERPRINT."
+    );
+    process.exit(2);
+  }
 }
 
-const {
-  applyProductAutoImport,
-  dryRunProductAutoImport,
-  loadAutoImportManifest,
-} = await import("../src/productAutoImport.js");
-
-const loaded = loadAutoImportManifest(path.resolve(args.file));
 if (args.dryRun) {
-  const report = dryRunProductAutoImport(loaded);
-  console.log(JSON.stringify({ ok: true, writes: 0, ...report }, null, 2));
+  const { dryRunProductAutoImportReadOnly } = await import("../src/productAutoImportReadOnly.js");
+  const report = dryRunProductAutoImportReadOnly(path.resolve(args.file), resolvedDb, expected);
+  console.log(JSON.stringify({ ok: true, writes: 0, ...report, dbPath: resolvedDb }, null, 2));
   process.exit(0);
 }
 
-const result = applyProductAutoImport(loaded, "offline-auto-import");
+process.env.DB_PATH = resolvedDb;
+const { applyProductAutoImport, loadAutoImportManifest } = await import("../src/productAutoImport.js");
+const loaded = loadAutoImportManifest(path.resolve(args.file), expected);
+const result = applyProductAutoImport(loaded, "offline-auto-import", expected);
 console.log(JSON.stringify({ ok: true, ...result, dbPath: resolvedDb }, null, 2));

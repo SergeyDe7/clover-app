@@ -45,3 +45,20 @@ export function normalizeGlossaryPhrase(value) {
     .toLowerCase()
     .replace(/\s+/g, " ");
 }
+
+export const ALLOWED_GLOSSARY_CONTEXTS = Object.freeze([
+  "",
+  "product.name",
+  "product.description",
+  "product.composition",
+  "product.characteristics",
+]);
+
+export function isAllowedGlossaryContext(value) {
+  return ALLOWED_GLOSSARY_CONTEXTS.includes(String(value ?? ""));
+}
+
+/** Completeness counts current catalog products that are not explicitly inactive. */
+export function isTranslationRelevantProduct(product) {
+  return Boolean(product) && product.active !== false;
+}

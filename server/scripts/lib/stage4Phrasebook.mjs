@@ -106,12 +106,12 @@ const PHRASES = [
   [
     "ПВХ (винил) — гигиеничный материал для контакта с продуктами и поверхностями.",
     T(
-      "PVC (vinyl) — a hygienic material for contact with food and surfaces.",
-      "PVX (vinil) — oziq-ovqat va sirtlar bilan kontakt uchun gigiyenik material.",
+      "ПВХ (vinyl) — a hygienic material for contact with food and surfaces.",
+      "ПВХ (vinil) — oziq-ovqat va sirtlar bilan kontakt uchun gigiyenik material.",
       "ПВХ (винил) — азык-түлүк жана беттер менен контакт үчүн гигиеналык материал.",
       "ПВХ (винил) — маводи гигиенӣ барои тамос бо хӯрок ва сатҳҳо.",
-      "PVC（乙烯基）— 适合接触食品与表面的卫生材料。",
-      "PVC (فينيل) — مادة صحية لملامسة الأغذية والأسطح."
+      "ПВХ（乙烯基）— 适合接触食品与表面的卫生材料。",
+      "ПВХ (فينيل) — مادة صحية لملامسة الأغذية والأسطح."
     ),
   ],
   [
@@ -128,12 +128,12 @@ const PHRASES = [
   [
     "Прозрачный пищевой пластик / ПЭТ — лёгкий и удобный для розлива.",
     T(
-      "Clear food-grade plastic / PET — light and convenient for filling.",
-      "Shaffof oziq-ovqat plastigi / PET — yengil va quyish uchun qulay.",
+      "Clear food-grade plastic / ПЭТ — light and convenient for filling.",
+      "Shaffof oziq-ovqat plastigi / ПЭТ — yengil va quyish uchun qulay.",
       "Тунук тамак-аш пластиги / ПЭТ — жеңил жана куюуга ыңгайлуу.",
       "Пластики ғизоии шаффоф / ПЭТ — сабук ва барои рехтан қулай.",
-      "透明食品级塑料/PET — 轻便，便于灌装。",
-      "بلاستيك غذائي شفاف / PET — خفيف ومناسب للتعبئة."
+      "透明食品级塑料/ПЭТ — 轻便，便于灌装。",
+      "بلاستيك غذائي شفاف / ПЭТ — خفيف ومناسب للتعبئة."
     ),
   ],
   [
@@ -228,7 +228,7 @@ const PHRASES = [
     "для напитков, шейков и подачи на барной стойке",
     T(
       "for drinks, shakes, and bar-counter service",
-      "ichimliklar, sheyklar va bar стойкасида berish uchun",
+      "ichimliklar, sheyklar va bar stoykasida berish uchun",
       "суусундуктар, шейктер жана бар стойкасында берүү үчүн",
       "барои нӯшокиҳо, шейкҳо ва пешниҳод дар бар",
       "用于饮品、奶昔与吧台出品",
@@ -284,7 +284,7 @@ const PHRASES = [
     T(
       "Order from Clover for steady site supply — the manager will confirm stock and shipment terms.",
       "Barqaror yetkazib berish uchun Clover’dan buyurtma qiling — mavjudlik va jo‘natish shartlarini menejer tasdiqlaydi.",
-      "Объектке туруктуу жеткирүү үчүн Clover’dен буйрутма кылыңыз — менеджер запасты жана жөнөтүү шарттарын ырастайт.",
+      "Объектке туруктуу жеткирүү үчүн Clover ден буйрутма кылыңыз — менеджер запасты жана жөнөтүү шарттарын ырастайт.",
       "Барои таъминоти устувор аз Clover фармоиш диҳед — менеҷер мавҷудият ва шартҳои боркуниро тасдиқ мекунад.",
       "向 Clover 订货以保证现场稳定供应 — 库存与发运条件由经理确认。",
       "اطلب من Clover لتوريد ثابت للموقع — يؤكد المدير التوفر وشروط الشحن."
@@ -545,11 +545,11 @@ const PHRASES = [
   ],
   [
     "шт. в упаковке /",
-    T("pcs per pack /", "pcs per pack /", "pcs per pack /", "pcs per pack /", "pcs per pack /", "pcs per pack /"),
+    T("pcs per pack /", "dona qadoqda /", "даана таңгакта /", "дона дар баста /", "件/包 /", "قطعة في العبوة /"),
   ],
-  ["в коробе", T("in the box", "in the box", "in the box", "in the box", "in the box", "in the box")],
-  ["в упаковке", T("per pack", "per pack", "per pack", "per pack", "per pack", "per pack")],
-  ["Подходит ", T("Suitable ", "Suitable ", "Suitable ", "Suitable ", "Suitable ", "Suitable ")],
+  ["в коробе", T("in the box", "qutida", "кутуда", "дар қуттӣ", "箱内", "في الصندوق")],
+  ["в упаковке", T("per pack", "qadoqda", "таңгакта", "дар баста", "每包", "في العبوة")],
+  ["Подходит ", T("Suitable ", "Mos ", "Ылайыктуу ", "Мувофиқ ", "适合 ", "مناسب ")],
   ["Ключевые параметры:", T("Key specs:", "Asosiy parametrlar:", "Негизги параметрлер:", "Параметрҳои асосӣ:", "关键参数：", "المواصفات الأساسية:")],
   ["Категория в каталоге Clover:", T("Clover catalog category:", "Clover katalogidagi toifa:", "Clover каталогундагы категория:", "Категория дар каталоги Clover:", "Clover 目录分类：", "فئة كتالوج Clover:")],
   ["Одноразовая посуда", T("Disposable tableware", "Bir martalik idish", "Бир жолу колдонулуучу идиш", "Зарфҳои якдафъаина", "一次性餐具", "أوانٍ أحادية الاستخدام")],
@@ -595,6 +595,71 @@ const PHRASES = [
 ];
 
 const WORD_ROWS = String.raw`
+и=and|va|жана|ва|和|و
+в=in|da|ичинде|дар|在|في
+к=to|ga|ка|ба|至|إلى
+с=with|bilan|менен|бо|-|مع
+пластик=plastic|plastik|пластик|пластик|塑料|بلاستيك
+пищевой=food-grade|oziq-ovqat|тамак-аш|ғизоӣ|食品级|غذائي
+лёгкий=light|yengil|жеңил|сабук|轻|خفيف
+легкий=light|yengil|жеңил|сабук|轻|خفيف
+удобный=convenient|qulay|ыңгайлуу|қулай|方便|مناسب
+розлива=filling|quyish|куюу|рехтан|灌装|تعبئة
+мартини=martini|martini|мартини|мартини|马提尼|مارتيني
+канистра=canister|kanistra|канистра|канистра|罐|صفائح
+ручной=manual|qo‘lda|кол|дастӣ|手动|يدوي
+ручная=manual|qo‘lda|кол|дастӣ|手动|يدوي
+вскрытия=opening|ochish|ачуу|кушодан|开启|فتح
+подставкой=stand|taglik|туура|таггоҳ|支架|قاعدة
+крестовым=cross|xoch|крест|салиб|十字|صليب
+литр=liter|litr|литр|литр|升|لتر
+листов=sheets|varaqlar|барактар|варақҳо|张|أوراق
+листах=sheets|varaqlar|барактар|варақҳо|张|أوراق
+ополаскиватель=rinse aid|chaqirish|чайкоо|обкашӣ|漂洗剂|مساعد الشطف
+сорго=sorghum|sorgo|сорго|сорго|高粱|ذرة بيضاء
+мини=mini|mini|мини|мини|迷你|ميني
+штучно=by piece|donalab|дааналап|донагӣ|按件|بالقطعة
+сложение=fold|buklash|бүктөө|печондан|折叠|طي
+целлюлоза=cellulose|sellyuloza|целлюлоза|селлюлоза|纤维素|سليلوز
+винил=vinyl|vinil|винил|винил|乙烯基|فينيل
+гигиеничный=hygienic|gigiyenik|гигиеналык|гигиенӣ|卫生|صحي
+материал=material|material|материал|мавод|材料|مادة
+контакта=contact|kontakt|контакт|тамос|接触|ملامسة
+продуктами=foods|oziq-ovqat|азык|хӯрок|食品|أغذية
+поверхностями=surfaces|sirtlar|беттер|сатҳҳо|表面|أسطح
+широким=wide|keng|кең|васеъ|宽|واسع
+горлом=neck|bo‘g‘iz|моюн|гардан|瓶口|عنق
+пробка=cap|qopqoq|капкак|сарпӯш|盖|غطاء
+высота=height|balandlik|бийиктик|баландӣ|高度|ارتفاع
+цветов=colors|ranglar|түстөр|рангҳо|颜色|ألوان
+мопов=mops|mop|моп|моп|拖把|ممسحة
+карманами=pockets|cho‘ntaklar|чоңтоқ|ҷайб|口袋|جيوب
+газета=newsprint|gazeta|гезит|газета|报纸|جريدة
+практичный=practical|amaliy|практикалык|амалӣ|实用|عملي
+выбор=choice|tanlov|тандоо|интихоб|选择|خيار
+клининга=cleaning|tozalash|тазалоо|тозакунӣ|清洁|تنظيف
+склада=warehouse|ombor|кампа|анбор|仓库|مستودع
+хозяйственных=household|xo‘jalik|чарба|хоҷагӣ|家用|منزلية
+зон=zones|zonalar|зоналар|минтақаҳо|区域|مناطق
+хорошо=well|yaxshi|жакшы|хуб|很好|جيداً
+подметает=sweeps|supuradi|шыпырат|рӯфта|清扫|يكنس
+пыль=dust|chang|чаң|чанг|灰尘|غبار
+мусор=trash|chiqindi|таштанды|партов|垃圾|نفايات
+удобен=handy|qulay|ыңгайлуу|қулай|方便|مريح
+ежедневной=daily|kundalik|күнүмдүк|ҳаррӯза|日常|يومي
+сухой=dry|quruq|кургак|хушк|干|جاف
+лишней=extra|ortiqcha|ашыкча|зиёдатӣ|多余|زائد
+пыли=dust|chang|чаң|чанг|灰尘|غبار
+воздухе=air|havo|аба|ҳаво|空气|هواء
+стойке=counter|stoyka|стойка|стойка|吧台|منضدة
+подачи=serving|berish|берүү|додан|出品|تقديم
+зап=spare|ehtiyot|запас|эҳтиёт|备用|احتياطي
+уп=pk|up|уп|уп|包|عب
+рул=rl|rul|рул|рул|卷|لف
+проз=clear|shaffof|тунук|шаффоф|透明|شفاف
+метал=metal|metall|металл|металл|金属|معدن
+мм=mm|mm|мм|мм|mm|mm
+эт=lbl|lbl|эт|эт|lbl|lbl
 сл=ply|ply|ply|ply|ply|ply
 гр=g|g|g|g|g|g
 стп=STP|STP|STP|STP|STP|STP
@@ -841,9 +906,9 @@ const WORD_ROWS = String.raw`
 лотку=tray|lotok|лоток|фаршдон|托盘|صينية
 лопатка=spatula|belkurak|калак|белча|刮刀|ملعقة مسطحة
 палочки=sticks|tayoqchalar|таякчалар|чӯбчаҳо|棒|عيدان
-зубочистки=toothpicks|tishcho‘plar|тиш чукугучтар| Sacچҳо|牙签|أعواد أسنان
-зубочистка=toothpick|tishcho‘p|тиш чукугуч| Sacча|牙签|عود أسنان
-зубочисткой=toothpick|tishcho‘p|тиш чукугуч| Sacча|牙签|عود أسنان
+зубочистки=toothpicks|tishcho‘plar|тиш чукугучтар|чӯбчаҳо|牙签|أعواد أسنان
+зубочистка=toothpick|tishcho‘p|тиш чукугуч|чӯбча|牙签|عود أسنان
+зубочисткой=toothpick|tishcho‘p|тиш чукугуч|чӯбча|牙签|عود أسنان
 пика=pick|pika|пика|пика|签|سيخ
 размешиватель=stirrer|aralashtirgich|аралаштыргыч|омезакунанда|搅拌棒|محرك
 шапочка=cap|qalpoqcha|калпакча|тӯппича|帽|طاقية
@@ -872,7 +937,7 @@ const WORD_ROWS = String.raw`
 маркер=marker|marker|маркер|маркер|记号笔|قلم تخطيط
 карандаш=pencil|qalam|карандаш|қалам|铅笔|قلم رصاص
 карандаши=pencils|qalamlar|карандаштар|қаламҳо|铅笔|أقلام رصاص
-ластик=eraser|o‘chirgich|өчүргүч|по PACKкунанда|橡皮|ممحاة
+ластик=eraser|o‘chirgich|өчүргүч|покунанда|橡皮|ممحاة
 ластиком=eraser|o‘chirgich|өчүргүч|поккунанда|橡皮|ممحاة
 линейка=ruler|chizg‘ich|сызыч|хаткаш|尺|مسطرة
 скотч=tape|skotch|скотч|скотч|胶带|شريط
@@ -908,7 +973,7 @@ const WORD_ROWS = String.raw`
 ножницы=scissors|qaychi|кайчы|қайчӣ|剪刀|مقص
 шило=awl|bigiz|шило|дерат|锥|مخراز
 зажигалка=lighter|zajigalka|зажигалка|алангагирак|打火机|ولاعة
-горелка=burner|goreлка|горелка|сӯзонда|喷灯|موقد
+горелка=burner|gorelka|горелка|сӯзонда|喷灯|موقد
 газ=gas|gaz|газ|газ|气|غاز
 газовая=gas|gaz|газ|газӣ|气|غاز
 газовых=gas|gaz|газ|газӣ|气|غاز
@@ -1028,7 +1093,7 @@ const WORD_ROWS = String.raw`
 одежды=clothes|kiyim|кийим|либос|衣物|ملابس
 белья=linen|choyshab|ич кийим|ҷомахоб|织物|بياضات
 зеркал=mirrors|ko‘zgular|күзгүлөр|оинаҳо|镜子|مرايا
-плит=hobs|plitа|плита|оташдон|灶|مواقد
+плит=hobs|plita|плита|оташдон|灶|مواقد
 плиты=hob|plita|плита|оташдон|灶|موقد
 труб=pipes|trubalar|түтүктөр|қубурҳо|管|أنابيب
 сантехники=plumbing|santexnika|сантехника|сантехника|水暖|سباكة
@@ -1176,7 +1241,7 @@ const WORD_ROWS = String.raw`
 эффектом=effect|effekt|эффект|таъсир|效果|تأثير
 юнити=unity|yuniti|юнити|юнити|统一|يونتي
 ять=yat|yat|ять|ять|雅特|يات
-cпанбонд=spanbond|spanbond|спанбонд|спанбонд|无纺布|سبانبوند
+спанбонд=spanbond|spanbond|спанбонд|спанбонд|无纺布|سبانبوند
 спанбонд=spanbond|spanbond|спанбонд|спанбонд|无纺布|سبانبوند
 белизна=belizna|belizna|белизна|белизна|漂白剂|بيليزنيا
 горло=neck|bo‘g‘iz|моюн|гардан|颈口|عنق
@@ -1242,7 +1307,7 @@ function parseWordRows(raw) {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const source = trimmed.slice(0, eq).trim().toLowerCase();
-    if (source.length < 2) continue;
+    if (!source) continue;
     const parts = trimmed.slice(eq + 1).split("|");
     if (parts.length < 6) continue;
     map.set(source, T(parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]));
@@ -1251,6 +1316,15 @@ function parseWordRows(raw) {
 }
 
 const WORDS = parseWordRows(WORD_ROWS);
+
+const COUNT_UNITS = Object.freeze({
+  en: "pcs",
+  uz: "dona",
+  ky: "даана",
+  tg: "дона",
+  "zh-CN": "件",
+  ar: "قطعة",
+});
 
 function entriesForLanguage(language, pairs) {
   return pairs.map(([sourceRu, translations]) => ({
@@ -1261,46 +1335,118 @@ function entriesForLanguage(language, pairs) {
   }));
 }
 
-const UNIT_RULES = [
-  [/г\/м²/gi, "gsm"],
-  [/г\/м2/gi, "gsm"],
-  [/мкм/gi, "um"],
-  [/мм/gi, "mm"],
-  [/см/gi, "cm"],
-  [/мл/gi, "ml"],
-  [/кг/gi, "kg"],
-  [/шт\.?/gi, "pcs"],
-  [/(^|[^\p{L}\p{N}])гр(?=$|[^\p{L}\p{N}])/giu, "$1g"],
-  [/(^|[^\p{L}\p{N}])эт(?=$|[^\p{L}\p{N}])/giu, "$1lbl"],
-  [/(\d+(?:[.,]\d+)?)\s*г(?=$|[^\p{L}\p{N}])/gu, "$1 g"],
-  [/(\d+(?:[.,]\d+)?)\s*л(?=$|[^\p{L}\p{N}])/gu, "$1 l"],
-  [/(\d+(?:[.,]\d+)?)\s*м(?=$|[^\p{L}\p{N}])/gu, "$1 m"],
-];
+function protectTokens(text, tokens) {
+  const unique = [...new Set((tokens || []).filter(Boolean))].sort((a, b) => b.length - a.length);
+  let output = String(text || "");
+  const slots = [];
+  unique.forEach((token, index) => {
+    if (!output.includes(token)) return;
+    const placeholder = `\u0000P${index}\u0000`;
+    output = output.split(token).join(placeholder);
+    slots.push({ placeholder, token });
+  });
+  return { output, slots };
+}
 
-function translateUnits(text) {
-  let output = String(text || "").replace(/(\d)\s*[хХ]\s*(\d)/g, "$1x$2");
-  for (const [pattern, replacement] of UNIT_RULES) {
-    output = output.replace(pattern, replacement);
+function restoreTokens(text, slots) {
+  let output = String(text || "");
+  for (const slot of slots) {
+    output = output.split(slot.placeholder).join(slot.token);
   }
   return output;
 }
 
+const PLY_UNITS = Object.freeze({
+  en: "ply",
+  uz: "qatlam",
+  ky: "катмар",
+  tg: "қабат",
+  "zh-CN": "层",
+  ar: "طبقة",
+});
+const SECTION_UNITS = Object.freeze({
+  en: "sect.",
+  uz: "bo‘lim",
+  ky: "бөлүк",
+  tg: "қисм",
+  "zh-CN": "格",
+  ar: "قسم",
+});
+const ROLL_UNITS = Object.freeze({
+  en: "rolls",
+  uz: "rulon",
+  ky: "түрмөк",
+  tg: "рулон",
+  "zh-CN": "卷",
+  ar: "لفة",
+});
+const CUBE_UNITS = Object.freeze({
+  en: "cubes",
+  uz: "kub",
+  ky: "куб",
+  tg: "куб",
+  "zh-CN": "格",
+  ar: "مكعب",
+});
+
+function translateUnits(text, language) {
+  const count = COUNT_UNITS[language] || "pcs";
+  const ply = PLY_UNITS[language] || "ply";
+  const sect = SECTION_UNITS[language] || "sect.";
+  const roll = ROLL_UNITS[language] || "rolls";
+  const cube = CUBE_UNITS[language] || "cubes";
+  let output = String(text || "").replace(/(\d)\s*[хХ]\s*(\d)/g, "$1x$2");
+  output = output.replace(/(\d+)\s*[хxХ]-?\s*сл\.?(?=$|[^\p{L}\p{N}])/giu, `$1-${ply}`);
+  output = output.replace(/(\d+)\s*-?\s*сл\.?(?=$|[^\p{L}\p{N}])/giu, `$1-${ply}`);
+  output = output.replace(/(\d+)\s*-?\s*[хxХ]?\s*-?\s*секц\.?(?=$|[^\p{L}\p{N}])/giu, `$1-${sect}`);
+  output = output.replace(/(\d+)\s*рул\.?(?=$|[^\p{L}\p{N}])/giu, `$1 ${roll}`);
+  output = output.replace(/(\d+)\s*куб\.?(?=$|[^\p{L}\p{N}])/giu, `$1 ${cube}`);
+  output = output.replace(/г\/м²/gi, "gsm").replace(/г\/м2/gi, "gsm");
+  output = output.replace(/(\d+(?:[.,]\d+)?)\s*мкм(?=$|[^\p{L}\p{N}])/giu, "$1 um");
+  output = output.replace(/мкм/gi, "um");
+  output = output.replace(/([dDhH])(\d+(?:[.,]\d+)?)\s*мм(?=$|[^\p{L}\p{N}])/gu, "$1$2 mm");
+  output = output.replace(
+    /(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\s*мм(?=$|[^\p{L}\p{N}])/gu,
+    "$1-$2 mm"
+  );
+  output = output.replace(/(\d+(?:[.,]\d+)?)\s*мм(?=$|[^\p{L}\p{N}])/gu, "$1 mm");
+  output = output.replace(/(\d+(?:[.,]\d+)?)\s*см(?=$|[^\p{L}\p{N}])/gu, "$1 cm");
+  output = output.replace(/(\d+(?:[.,]\d+)?)\s*мл(?=$|[^\p{L}\p{N}])/gu, "$1 ml");
+  output = output.replace(/(\d+(?:[.,]\d+)?)\s*кг(?=$|[^\p{L}\p{N}])/gu, "$1 kg");
+  output = output.replace(/(\d+(?:[.,]\d+)?)\s*шт\.?(?=$|[^\p{L}\p{N}])/gu, `$1 ${count}`);
+  output = output.replace(/(\d+(?:[.,]\d+)?)\s*гр(?=$|[^\p{L}\p{N}])/gu, "$1 g");
+  output = output.replace(/(^|[^\p{L}\p{N}])гр(?=$|[^\p{L}\p{N}])/giu, "$1g");
+  output = output.replace(/(\d+(?:[.,]\d+)?)\s*эт(?=$|[^\p{L}\p{N}])/giu, "$1 lbl");
+  output = output.replace(/(^|[^\p{L}\p{N}])эт(?=$|[^\p{L}\p{N}])/giu, "$1lbl");
+  output = output.replace(/(\d+(?:[.,]\d+)?)\s*г(?=$|[^\p{L}\p{N}])/gu, "$1 g");
+  output = output.replace(/(\d+(?:[.,]\d+)?)\s*л(?=$|[^\p{L}\p{N}])/gu, "$1 l");
+  output = output.replace(/(\d+(?:[.,]\d+)?)\s*м(?=$|[^\p{L}\p{N}])/gu, "$1 m");
+  return output;
+}
+
 function applyWholeWords(text, language) {
-  return String(text || "").replace(/[A-Za-zА-Яа-яЁё]+/g, (word) => {
+  return String(text || "").replace(/(?<![\p{L}\p{N}])[A-Za-zА-Яа-яЁё]+(?![\p{L}\p{N}])/gu, (word) => {
     const hit = WORDS.get(word.toLowerCase());
     if (!hit) return word;
     return hit[language] || hit.en || word;
   });
 }
 
-export function translateCatalogText(sourceRu, language) {
+export function translateCatalogText(sourceRu, language, options = {}) {
   const lang = TARGETS.includes(language) ? language : "en";
   let text = String(sourceRu || "");
   if (!text) return "";
+  text = text.replace(/[cс]панбонд/gi, "спанбонд");
+  const protectedTokens = Array.isArray(options.protectedTokens) ? options.protectedTokens : [];
+  const persistedGlossary = Array.isArray(options.glossaryEntries) ? options.glossaryEntries : [];
+  const context = options.context || "";
   text = applyGlossaryPhrases(text, entriesForLanguage(lang, PHRASES), "");
+  const shielded = protectTokens(text, protectedTokens);
+  text = shielded.output;
+  text = applyGlossaryPhrases(text, persistedGlossary, context);
+  text = translateUnits(text, lang);
   text = applyWholeWords(text, lang);
-  text = translateUnits(text);
-  return text;
+  return restoreTokens(text, shielded.slots);
 }
 
 export function leftoverCyrillic(text) {
