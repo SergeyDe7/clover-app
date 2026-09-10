@@ -2023,6 +2023,31 @@ body:has(.clover-app) {
   }
 }
 
+.product-translation-editor,
+.manager-glossary {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.product-translation-field,
+.manager-glossary-form {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.manager-glossary-form {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 768px) {
+  .manager-glossary-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+  }
+}
+
 .category-button.active {
   background: var(--clover-l2-active-bg) !important;
   border-color: var(--clover-l2-active-border) !important;

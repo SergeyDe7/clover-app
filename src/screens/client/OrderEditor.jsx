@@ -4,7 +4,6 @@ import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState
 import { createPortal } from "react-dom";
 import { Header } from "../../shared/SharedPanels";
 import {
-  UNIT_CONFIG,
   STORAGE,
   safeRead,
   safeWrite,
@@ -24,6 +23,7 @@ import {
   productCatalogSearchHaystack,
   glueProductNameUnits,
 } from "../../shared/appHelpers";
+import { unitDisplayLabel, unitDisplayShort } from "../../shared/i18n/unitDisplay.js";
 import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import {
   getEarliestDeliveryDateIso,
@@ -1523,7 +1523,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                     <p className="product-code">{t("shared.article.prefix", { article: productArticle(product) })}</p>
                     <p className="product-price">
                       {settings.showPrices && price > 0
-                        ? <>{formatMoney(price)} <small>/ {UNIT_CONFIG[unit].shortLabel}</small></>
+                        ? <>{formatMoney(price)} <small>/ {unitDisplayShort(unit, t)}</small></>
                         : t("shared.price.pending")}
                     </p>
                     <div className="product-card-controls">
@@ -1537,7 +1537,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                               key={item}
                               onClick={() => setProductUnit(product.id, item)}
                             >
-                              {UNIT_CONFIG[item].shortLabel || UNIT_CONFIG[item].label}
+                              {unitDisplayShort(item, t) || unitDisplayLabel(item, t)}
                             </button>
                           );
                         })}
@@ -1737,7 +1737,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                                   key={unitId}
                                   onClick={() => setProductUnit(item.productId, unitId)}
                                 >
-                                  {UNIT_CONFIG[unitId].shortLabel || UNIT_CONFIG[unitId].label}
+                                  {unitDisplayShort(unitId, t) || unitDisplayLabel(unitId, t)}
                                 </button>
                               ));
                             })()}

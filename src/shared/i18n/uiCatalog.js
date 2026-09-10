@@ -13002,6 +13002,314 @@ const RAW_CATALOG = [
     "namespace": "ui",
     "surface": "auth",
     "critical": true
+  },
+  {
+    "key": "shared.unit.piece",
+    "sourceRu": "штука",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "shared.unit.pieceShort",
+    "sourceRu": "шт.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "shared.unit.pair",
+    "sourceRu": "пара",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "shared.unit.pairShort",
+    "sourceRu": "пар.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "shared.unit.meter",
+    "sourceRu": "метр",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "shared.unit.meterShort",
+    "sourceRu": "м",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "shared.unit.roll",
+    "sourceRu": "рулон",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "shared.unit.rollShort",
+    "sourceRu": "рул.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "shared.unit.pack",
+    "sourceRu": "упаковка",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "shared.unit.packShort",
+    "sourceRu": "уп.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "shared.unit.bundle",
+    "sourceRu": "пачка",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "shared.unit.bundleShort",
+    "sourceRu": "пач.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "shared.unit.box",
+    "sourceRu": "коробка",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "shared.unit.boxShort",
+    "sourceRu": "кор.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.view.products",
+    "sourceRu": "Товары",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.productTranslations.title",
+    "sourceRu": "Переводы",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.productTranslations.lead",
+    "sourceRu": "Русский текст остаётся источником. Переводы только для витрины.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.productTranslations.field.name",
+    "sourceRu": "Название",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.productTranslations.field.description",
+    "sourceRu": "Описание",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.productTranslations.field.composition",
+    "sourceRu": "Состав",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.productTranslations.field.characteristics",
+    "sourceRu": "Характеристики",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.productTranslations.staleWarning",
+    "sourceRu": "Русский источник изменился. Проверьте перевод.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.productTranslations.returnToAuto",
+    "sourceRu": "Вернуть к AUTO",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.add",
+    "sourceRu": "Добавить в словарь",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.delete",
+    "sourceRu": "Удалить",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.source",
+    "sourceRu": "Русская фраза",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.target",
+    "sourceRu": "Перевод",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.context",
+    "sourceRu": "Контекст",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.protected",
+    "sourceRu": "Защищённый термин",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.empty",
+    "sourceRu": "В словаре пока нет записей.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.saved",
+    "sourceRu": "Запись словаря сохранена.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.deleted",
+    "sourceRu": "Запись словаря удалена.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.saveFailed",
+    "sourceRu": "Не удалось сохранить словарь.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.confirmDelete",
+    "sourceRu": "Удалить эту запись словаря?",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.productTranslations.sourceStale",
+    "sourceRu": "Русский источник изменился. Черновик сохранён — обновите экран и проверьте текст.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.productTranslations.notApplicable",
+    "sourceRu": "Нет русского источника — перевод не создаётся.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.edit",
+    "sourceRu": "Изменить",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.cancel",
+    "sourceRu": "Отмена",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.context.generic",
+    "sourceRu": "Все поля товара",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.context.name",
+    "sourceRu": "Название",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.context.description",
+    "sourceRu": "Описание",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.context.composition",
+    "sourceRu": "Состав",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.glossary.context.characteristics",
+    "sourceRu": "Характеристики",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.loadMore",
+    "sourceRu": "Показать ещё",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
   }
 ];
 

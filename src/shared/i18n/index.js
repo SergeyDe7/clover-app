@@ -49,6 +49,14 @@ export {
 } from "./localizationSettings.js";
 
 export { RU_DICTIONARY, UI_CATALOG, UI_CATALOG_BY_KEY, getCatalogEntry, hasCatalogKey } from "./uiCatalog.js";
+export {
+  PRODUCT_TRANSLATION_FIELDS,
+  canonicalProductId,
+  productFieldSource,
+  productTranslationRowId,
+  parseProductTranslationRowId,
+} from "./productLocalization.js";
+export { unitDisplayLabel, unitDisplayShort, UNIT_DISPLAY_KEYS } from "./unitDisplay.js";
 export { translationStoreToDictionaries } from "./translationStoreProjection.js";
 export {
   DEFAULT_ERROR_DISPLAY_KEY,

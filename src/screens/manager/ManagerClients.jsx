@@ -1,4 +1,5 @@
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { unitDisplayLabel } from "../../shared/i18n/unitDisplay.js";
 // Раздел менеджера: клиенты, матрицы товаров и связи с 1С.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -8,7 +9,6 @@ import {
   EMPTY_LINK,
   writeOpenManagerClientId,
   UNIT_ORDER,
-  UNIT_CONFIG,
   unitPriceField,
   hasManualUnitValue,
   prefillManualPriceFromProduct,
@@ -870,6 +870,7 @@ export function ManagerClients({
   dirtyClientLinkIdsRef,
   oneCPriceTypes = [],
   catalogPricesVersion = "",
+  staffRole = "manager",
   onReload,
 }) {
   const { t } = useLocalization();
@@ -2705,7 +2706,7 @@ export function ManagerClients({
                                         className="matrix-price-field matrix-price-calculated"
                                         key={unit}
                                       >
-                                        <span>{UNIT_CONFIG[unit].label}</span>
+                                        <span>{unitDisplayLabel(unit, t)}</span>
                                         {costPrice != null &&
                                         Number.isFinite(Number(costPrice)) ? (
                                           <>
@@ -2737,7 +2738,7 @@ export function ManagerClients({
                                         className="matrix-price-field"
                                         key={unit}
                                       >
-                                        {UNIT_CONFIG[unit].label}
+                                        {unitDisplayLabel(unit, t)}
                                         <input
                                           type="number"
                                           min="0"
@@ -2785,7 +2786,7 @@ export function ManagerClients({
                                       className="matrix-price-field matrix-price-calculated"
                                       key={unit}
                                     >
-                                      <span>{UNIT_CONFIG[unit].label}</span>
+                                      <span>{unitDisplayLabel(unit, t)}</span>
                                       <small>
                                         {link.oneCPriceTypeId
                                           ? link.oneCPriceTypeName ||
@@ -2957,6 +2958,7 @@ export function ManagerClients({
           product={editorProduct}
           products={products}
           oneCPriceTypes={oneCPriceTypes}
+          staffRole={staffRole}
           onClose={() => setEditorProduct(undefined)}
           onSave={saveCatalogProduct}
           onDelete={deleteCatalogProduct}

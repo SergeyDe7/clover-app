@@ -318,13 +318,14 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
         />
       )}
       {tab === "exchange" && staffHasFeature(authUser, "exchange") && <ManagerExchange onReload={onReload} onApplyManagerNotifications={onApplyManagerNotifications} onNavigate={selectTab} />}
-      {tab === "clients" && staffHasFeature(authUser, "clients") && <ManagerClients clients={clients} orders={orders} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} dirtyClientLinkIdsRef={dirtyClientLinkIdsRef} oneCPriceTypes={oneCPriceTypes} catalogPricesVersion={catalogPricesVersion} onReload={onReload} />}
+      {tab === "clients" && staffHasFeature(authUser, "clients") && <ManagerClients clients={clients} orders={orders} products={products} setProducts={setProducts} clientLinks={clientLinks} setClientLinks={setClientLinks} dirtyClientLinkIdsRef={dirtyClientLinkIdsRef} oneCPriceTypes={oneCPriceTypes} catalogPricesVersion={catalogPricesVersion} staffRole={authUser?.role === "admin" ? "admin" : "manager"} onReload={onReload} />}
       {tab === "products" && staffHasFeature(authUser, "products") && (
         <ManagerProducts
           products={products}
           setProducts={setProducts}
           setClientLinks={setClientLinks}
           oneCPriceTypes={oneCPriceTypes}
+          staffRole={authUser?.role === "admin" ? "admin" : "manager"}
         />
       )}
       {tab === "acts" && staffHasFeature(authUser, "acts") && (

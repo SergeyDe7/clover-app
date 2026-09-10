@@ -9,11 +9,29 @@ export function shouldApplyWorkspaceResponse({
   currentGeneration,
   requestLanguage,
   currentLanguage,
+  requestView,
+  currentView,
+  requestProductId,
+  currentProductId,
+  requestOffset,
+  currentOffset,
 }) {
   return (
     Number(requestGeneration) === Number(currentGeneration) &&
-    String(requestLanguage || "") === String(currentLanguage || "")
+    String(requestLanguage || "") === String(currentLanguage || "") &&
+    (requestView === undefined || String(requestView || "") === String(currentView || "")) &&
+    (requestProductId === undefined || String(requestProductId || "") === String(currentProductId || "")) &&
+    (requestOffset === undefined || Number(requestOffset) === Number(currentOffset))
   );
+}
+
+/** Append page-2+ rows; replace when offset is 0 (filter/language reset). */
+export function mergePagedWorkspaceRows(currentRows, nextRows, offset) {
+  const incoming = Array.isArray(nextRows) ? nextRows : [];
+  if (Number(offset) > 0) {
+    return [...(Array.isArray(currentRows) ? currentRows : []), ...incoming];
+  }
+  return incoming;
 }
 
 function asDraftEntry(value) {

@@ -9,7 +9,6 @@ import {
   useState,
 } from "react";
 import {
-  UNIT_CONFIG,
   UNIT_ORDER,
   formatMoney,
   getUnitPrice,
@@ -18,6 +17,7 @@ import {
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
 } from "../../shared/appHelpers";
+import { unitDisplayShort } from "../../shared/i18n/unitDisplay.js";
 import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import {
   buildGroupNav,
@@ -414,7 +414,7 @@ export function ClientCatalogAddPanel({
                     {showPrices && price > 0 ? (
                       <>
                         {formatMoney(price)}{" "}
-                        <small>/ {(UNIT_CONFIG[unit] || UNIT_CONFIG.piece).shortLabel}</small>
+                        <small>/ {unitDisplayShort(unit, t)}</small>
                       </>
                     ) : (
                       t("shared.price.pending")

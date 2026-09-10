@@ -6,9 +6,11 @@ import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
 import {
   TRANSLATION_WORKSPACE_VIEWS,
 } from "../../shared/i18n/localizationSettings.js";
+import { parseProductTranslationRowId } from "../../shared/i18n/productLocalization.js";
 import {
   clearTranslationDraft,
   markDraftClean,
+  mergePagedWorkspaceRows,
   mergeWorkspaceDrafts,
   readDraftValue,
   setDraftValue,
@@ -16,6 +18,29 @@ import {
 } from "../../shared/i18n/translationDrafts.js";
 
 const TARGET_LOCALES = ["en", "uz", "ky", "tg", "zh", "ar"];
+const GLOSSARY_CONTEXT_OPTIONS = [
+  { id: "" },
+  { id: "product.name" },
+  { id: "product.description" },
+  { id: "product.composition" },
+  { id: "product.characteristics" },
+];
+
+function glossaryContextLabel(t, contextId) {
+  if (contextId === "product.name") return t("admin.glossary.context.name");
+  if (contextId === "product.description") return t("admin.glossary.context.description");
+  if (contextId === "product.composition") return t("admin.glossary.context.composition");
+  if (contextId === "product.characteristics") return t("admin.glossary.context.characteristics");
+  return t("admin.glossary.context.generic");
+}
+const emptyGlossaryForm = () => ({
+  id: "",
+  language: "",
+  sourceRu: "",
+  targetValue: "",
+  context: "",
+  protected: false,
+});
 
 function formatStamp(value) {
   if (!value) return "—";
@@ -46,11 +71,21 @@ export function ManagerLanguages() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [drafts, setDrafts] = useState({});
+  const [glossary, setGlossary] = useState([]);
+  const [glossaryForm, setGlossaryForm] = useState(emptyGlossaryForm);
+  const [offset, setOffset] = useState(0);
+  const [pageMeta, setPageMeta] = useState({ total: 0, hasMore: false, limit: 100 });
   const requestGenerationRef = useRef(0);
   const languageRef = useRef("en");
+  const viewRef = useRef("interface");
+  const offsetRef = useRef(0);
 
   const safeLanguage = TARGET_LOCALES.includes(language) ? language : "en";
   languageRef.current = safeLanguage;
+  viewRef.current = view;
+  offsetRef.current = offset;
+  const glossaryEditing = Boolean(glossaryForm.id);
+  const glossaryFormLanguage = glossaryForm.language || safeLanguage;
 
   const languageLabels = {
     ru: t("admin.languages.label.ru"),
@@ -64,6 +99,7 @@ export function ManagerLanguages() {
 
   const viewTitles = {
     interface: t("admin.languages.view.interface"),
+    products: t("admin.languages.view.products"),
     categories: t("admin.languages.view.categories"),
     seo: t("admin.languages.view.seo"),
     glossary: t("admin.languages.view.glossary"),
@@ -73,20 +109,40 @@ export function ManagerLanguages() {
   const load = useCallback(async () => {
     const requestGeneration = ++requestGenerationRef.current;
     const requestLanguage = safeLanguage;
+    const requestView = view;
+    const requestOffset = offset;
     try {
-      const payload = await api.getLocalizationSettings();
-      const workspace = await api.getLocalizationTranslations({
-        view,
-        query,
-        language: requestLanguage,
-        untranslatedOnly,
-      });
+      const [payload, workspace, glossaryPayload] = await Promise.all([
+        api.getLocalizationSettings(),
+        requestView === "glossary"
+          ? Promise.resolve({ rows: [], total: 0, hasMore: false, limit: 100, offset: 0 })
+          : api.getLocalizationTranslations({
+              view: requestView,
+              query,
+              language: requestLanguage,
+              untranslatedOnly,
+              limit: 100,
+              offset: requestOffset,
+            }),
+        requestView === "glossary"
+          ? api.getGlossaryEntries({
+              query,
+              language: requestLanguage,
+              limit: 100,
+              offset: requestOffset,
+            })
+          : Promise.resolve({ entries: [], total: 0, hasMore: false, limit: 100, offset: 0 }),
+      ]);
       if (
         !shouldApplyWorkspaceResponse({
           requestGeneration,
           currentGeneration: requestGenerationRef.current,
           requestLanguage,
           currentLanguage: languageRef.current,
+          requestView,
+          currentView: viewRef.current,
+          requestOffset,
+          currentOffset: offsetRef.current,
         })
       ) {
         return;
@@ -94,9 +150,16 @@ export function ManagerLanguages() {
       setSettings(payload.settings || null);
       setCompleteness(payload.completeness || {});
       setLocales(Array.isArray(payload.locales) ? payload.locales : []);
-      const nextRows = Array.isArray(workspace.rows) ? workspace.rows : [];
-      setRows(nextRows);
-      setDrafts((current) => mergeWorkspaceDrafts(current, nextRows, requestLanguage));
+      const pageRows = Array.isArray(workspace.rows) ? workspace.rows : [];
+      setRows((current) => mergePagedWorkspaceRows(current, pageRows, requestOffset));
+      setDrafts((current) => mergeWorkspaceDrafts(current, pageRows, requestLanguage));
+      const pageGlossary = Array.isArray(glossaryPayload.entries) ? glossaryPayload.entries : [];
+      setGlossary((current) => mergePagedWorkspaceRows(current, pageGlossary, requestOffset));
+      setPageMeta({
+        total: Number(requestView === "glossary" ? glossaryPayload.total : workspace.total) || 0,
+        hasMore: Boolean(requestView === "glossary" ? glossaryPayload.hasMore : workspace.hasMore),
+        limit: Number(requestView === "glossary" ? glossaryPayload.limit : workspace.limit) || 100,
+      });
       setMessage("");
     } catch (error) {
       if (
@@ -105,6 +168,10 @@ export function ManagerLanguages() {
           currentGeneration: requestGenerationRef.current,
           requestLanguage,
           currentLanguage: languageRef.current,
+          requestView,
+          currentView: viewRef.current,
+          requestOffset,
+          currentOffset: offsetRef.current,
         })
       ) {
         return;
@@ -112,9 +179,14 @@ export function ManagerLanguages() {
       setSettings({ enabledLanguages: ["ru"], catalogVersion: 0 });
       setCompleteness({});
       setRows([]);
+      setGlossary([]);
       setMessage(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
     }
-  }, [view, query, untranslatedOnly, safeLanguage, t]);
+  }, [view, query, untranslatedOnly, safeLanguage, offset, t]);
+
+  useEffect(() => {
+    setOffset(0);
+  }, [view, query, untranslatedOnly, safeLanguage]);
 
   useEffect(() => {
     load();
@@ -157,12 +229,28 @@ export function ManagerLanguages() {
     const savedValue = readDraftValue(drafts, row.id, targetLanguage, "");
     setBusy(true);
     try {
-      await api.saveLocalizationTranslation(row.id, targetLanguage, savedValue);
+      const productRef = row.kind === "product" ? parseProductTranslationRowId(row.id) : null;
+      if (productRef) {
+        await api.saveProductTranslation(
+          productRef.productId,
+          targetLanguage,
+          productRef.field,
+          savedValue,
+          row.sourceHash || ""
+        );
+      } else {
+        await api.saveLocalizationTranslation(row.id, targetLanguage, savedValue);
+      }
       setDrafts((current) => markDraftClean(current, row.id, targetLanguage, savedValue));
       setMessage(t("admin.languages.saved"));
       await load();
     } catch (error) {
-      setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
+      if (error?.code === "SOURCE_STALE" || error?.status === 409) {
+        setMessage(t("admin.productTranslations.sourceStale"));
+        await load();
+      } else {
+        setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
+      }
     } finally {
       setBusy(false);
     }
@@ -171,18 +259,68 @@ export function ManagerLanguages() {
   const resetRow = async (row) => {
     const targetLanguage = languageRef.current;
     const confirmed = await appConfirm({
-      title: t("admin.languages.resetAuto"),
+      title: row.kind === "product" ? t("admin.productTranslations.returnToAuto") : t("admin.languages.resetAuto"),
       message: t("admin.languages.resetConfirm"),
     });
     if (!confirmed) return;
     setBusy(true);
     try {
-      await api.resetLocalizationTranslation(row.id, targetLanguage);
+      const productRef = row.kind === "product" ? parseProductTranslationRowId(row.id) : null;
+      if (productRef) {
+        await api.resetProductTranslation(
+          productRef.productId,
+          targetLanguage,
+          productRef.field,
+          row.sourceHash || ""
+        );
+      } else {
+        await api.resetLocalizationTranslation(row.id, targetLanguage);
+      }
       setMessage(t("admin.languages.resetDone"));
       setDrafts((current) => clearTranslationDraft(current, row.id, targetLanguage));
       await load();
     } catch (error) {
-      setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
+      if (error?.code === "SOURCE_STALE" || error?.status === 409) {
+        setMessage(t("admin.productTranslations.sourceStale"));
+        await load();
+      } else {
+        setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveGlossary = async () => {
+    setBusy(true);
+    try {
+      await api.saveGlossaryEntry({
+        ...glossaryForm,
+        language: glossaryFormLanguage,
+      });
+      setGlossaryForm(emptyGlossaryForm());
+      setMessage(t("admin.glossary.saved"));
+      await load();
+    } catch (error) {
+      setMessage(errorDisplayMessage(error, t, "admin.glossary.saveFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteGlossary = async (entry) => {
+    const confirmed = await appConfirm({
+      title: t("admin.glossary.delete"),
+      message: t("admin.glossary.confirmDelete"),
+    });
+    if (!confirmed) return;
+    setBusy(true);
+    try {
+      await api.deleteGlossaryEntry(entry.id);
+      setMessage(t("admin.glossary.deleted"));
+      await load();
+    } catch (error) {
+      setMessage(errorDisplayMessage(error, t, "admin.glossary.saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -269,7 +407,11 @@ export function ManagerLanguages() {
           </label>
           <label className="manager-languages-field manager-languages-field-language">
             {t("admin.languages.language")}
-            <select value={safeLanguage} onChange={(event) => setLanguage(event.target.value)}>
+            <select
+              value={safeLanguage}
+              disabled={glossaryEditing}
+              onChange={(event) => setLanguage(event.target.value)}
+            >
               {TARGET_LOCALES.map((code) => (
                 <option key={code} value={code}>
                   {languageLabels[code]}
@@ -289,7 +431,124 @@ export function ManagerLanguages() {
 
         {message ? <p className="manager-languages-message">{message}</p> : null}
 
-        {rows.length === 0 ? (
+        {view === "glossary" ? (
+          <div className="manager-glossary">
+            <div className="manager-glossary-form">
+              <label className="field">
+                {t("admin.glossary.source")}
+                <input
+                  value={glossaryForm.sourceRu}
+                  onChange={(event) =>
+                    setGlossaryForm((current) => ({ ...current, sourceRu: event.target.value }))
+                  }
+                />
+              </label>
+              <label className="field">
+                {t("admin.glossary.target")}
+                <input
+                  value={glossaryForm.targetValue}
+                  onChange={(event) =>
+                    setGlossaryForm((current) => ({ ...current, targetValue: event.target.value }))
+                  }
+                />
+              </label>
+              <label className="field">
+                {t("admin.glossary.context")}
+                <select
+                  value={glossaryForm.context}
+                  onChange={(event) =>
+                    setGlossaryForm((current) => ({ ...current, context: event.target.value }))
+                  }
+                >
+                  {GLOSSARY_CONTEXT_OPTIONS.map((option) => (
+                    <option key={option.id || "generic"} value={option.id}>
+                      {glossaryContextLabel(t, option.id)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="manager-languages-check">
+                <input
+                  type="checkbox"
+                  checked={glossaryForm.protected}
+                  onChange={(event) =>
+                    setGlossaryForm((current) => ({ ...current, protected: event.target.checked }))
+                  }
+                />
+                <span>{t("admin.glossary.protected")}</span>
+              </label>
+              <button type="button" className="primary-button" disabled={busy} onClick={saveGlossary}>
+                {glossaryForm.id ? t("admin.languages.save") : t("admin.glossary.add")}
+              </button>
+              {glossaryForm.id ? (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={() =>
+                    setGlossaryForm(emptyGlossaryForm())
+                  }
+                >
+                  {t("admin.glossary.cancel")}
+                </button>
+              ) : null}
+            </div>
+            {glossary.length === 0 ? (
+              <p className="manager-languages-empty">{t("admin.glossary.empty")}</p>
+            ) : (
+              <div className="manager-languages-table-wrap">
+                <table className="manager-languages-table">
+                  <thead>
+                    <tr>
+                      <th>{t("admin.glossary.source")}</th>
+                      <th>{t("admin.glossary.target")}</th>
+                      <th>{t("admin.glossary.context")}</th>
+                      <th>{t("admin.glossary.protected")}</th>
+                      <th className="manager-languages-col-actions" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {glossary.map((entry) => (
+                      <tr key={entry.id}>
+                        <td>{entry.sourceRu}</td>
+                        <td>{entry.targetValue}</td>
+                        <td>{entry.context || "—"}</td>
+                        <td>{entry.protected ? "✓" : "—"}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            disabled={busy}
+                            onClick={() =>
+                              setGlossaryForm({
+                                id: entry.id,
+                                language: entry.publicLanguage || safeLanguage,
+                                sourceRu: entry.sourceRu || "",
+                                targetValue: entry.targetValue || "",
+                                context: entry.context || "",
+                                protected: Boolean(entry.protected),
+                              })
+                            }
+                          >
+                            {t("admin.glossary.edit")}
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            disabled={busy}
+                            onClick={() => deleteGlossary(entry)}
+                          >
+                            {t("admin.glossary.delete")}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : rows.length === 0 ? (
           <p className="manager-languages-empty">{t("admin.languages.empty")}</p>
         ) : (
           <div className="manager-languages-table-wrap">
@@ -360,6 +619,16 @@ export function ManagerLanguages() {
             </table>
           </div>
         )}
+        {pageMeta.hasMore ? (
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={busy}
+            onClick={() => setOffset((current) => current + (pageMeta.limit || 100))}
+          >
+            {t("admin.languages.loadMore")}
+          </button>
+        ) : null}
       </div>
     </section>
   );

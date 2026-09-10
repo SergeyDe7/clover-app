@@ -459,6 +459,8 @@ export const api = {
     if (filters.query) params.set("query", String(filters.query));
     if (filters.language) params.set("language", String(filters.language));
     if (filters.untranslatedOnly) params.set("untranslatedOnly", "1");
+    if (filters.limit != null) params.set("limit", String(filters.limit));
+    if (filters.offset != null) params.set("offset", String(filters.offset));
     const query = params.toString();
     return request(`/admin/translations${query ? `?${query}` : ""}`);
   },
@@ -478,6 +480,42 @@ export const api = {
       `/admin/translations/${encodeURIComponent(entryId)}/${encodeURIComponent(language)}/reset-auto`,
       { method: "POST", body: {} }
     );
+  },
+
+  getProductTranslations(productId) {
+    return request(`/admin/product-translations/${encodeURIComponent(productId)}`);
+  },
+
+  saveProductTranslation(productId, language, field, value, expectedSourceHash) {
+    return request(
+      `/admin/product-translations/${encodeURIComponent(productId)}/${encodeURIComponent(language)}/${encodeURIComponent(field)}`,
+      { method: "PUT", body: { value, expectedSourceHash } }
+    );
+  },
+
+  resetProductTranslation(productId, language, field, expectedSourceHash) {
+    return request(
+      `/admin/product-translations/${encodeURIComponent(productId)}/${encodeURIComponent(language)}/${encodeURIComponent(field)}/reset-auto`,
+      { method: "POST", body: { expectedSourceHash } }
+    );
+  },
+
+  getGlossaryEntries(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.query) params.set("query", String(filters.query));
+    if (filters.language) params.set("language", String(filters.language));
+    if (filters.limit != null) params.set("limit", String(filters.limit));
+    if (filters.offset != null) params.set("offset", String(filters.offset));
+    const query = params.toString();
+    return request(`/admin/glossary${query ? `?${query}` : ""}`);
+  },
+
+  saveGlossaryEntry(entry) {
+    return request("/admin/glossary", { method: "PUT", body: entry || {} });
+  },
+
+  deleteGlossaryEntry(id) {
+    return request(`/admin/glossary/${encodeURIComponent(id)}`, { method: "DELETE" });
   },
 
 

@@ -27,12 +27,12 @@ function findCartQty(productId, unit) {
   return item ? Number(item.qty) || 0 : 0;
 }
 
-function displayUnitLabel(unit, multiplier) {
+function displayUnitLabel(unit, multiplier, t) {
   const raw = quantityInputUnitLabel(unit, multiplier);
   if (Math.max(1, Number(multiplier) || 1) > 1) {
-    return storefrontUnitLabel("piece") || "шт";
+    return storefrontUnitLabel("piece", t) || "шт";
   }
-  return storefrontUnitLabel(unit) || String(raw).replace(/\.$/, "");
+  return storefrontUnitLabel(unit, t) || String(raw).replace(/\.$/, "");
 }
 
 export function StorefrontQtyControl({
@@ -51,7 +51,7 @@ export function StorefrontQtyControl({
   const step = Math.max(1, Math.floor(Number(orderStep) || 1));
   const multiplier = Math.max(1, Math.floor(Number(unitSize) || 1));
   const inputStep = quantityInputStep(multiplier, step);
-  const qtyUnitLabel = displayUnitLabel(unit, multiplier);
+  const qtyUnitLabel = displayUnitLabel(unit, multiplier, t);
   const lineKey = cartLineKey(productId, unit);
   const [cartQty, setCartQtyState] = useState(() => findCartQty(productId, unit));
   const [draft, setDraft] = useState(() =>
@@ -146,7 +146,7 @@ export function StorefrontQtyControl({
           title={
             multiplier > 1
               ? t("storefront.qty.inUnitPieces", {
-                  unit: storefrontUnitLabel(unit),
+                  unit: storefrontUnitLabel(unit, t),
                   count: multiplier,
                 })
               : step > 1

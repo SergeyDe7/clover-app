@@ -58,6 +58,16 @@ import {
   normalizeStorefrontPromotions,
 } from "../../src/shared/storefrontPromotions.js";
 import { normalizeStorefrontInfoPages } from "../../src/shared/storefrontInfoPages.js";
+import {
+  buildProductTranslationCellMap,
+  projectLocalizedProductDisplay,
+} from "./productLocalizationStore.js";
+import { readLocalizationSettings } from "./localizationStore.js";
+import { canonicalProductId } from "../../src/shared/i18n/productLocalization.js";
+import {
+  exactTranslationTargetInternal,
+  toPublicLocaleCode,
+} from "../../src/shared/i18n/languageRegistry.js";
 
 const STOREFRONT_GUEST_EMAIL = "storefront-guest@clover.local";
 
@@ -456,6 +466,32 @@ function buildStorefrontPrices(product, oneCItem, storeSettings, costPriceTypeId
   return { prices, priceSources };
 }
 
+function applyPublicProductLocalization(publicProduct, canonical, language, enabledLanguages, cellMap) {
+  if (!language || !publicProduct || !canonical) return publicProduct;
+  const cells = cellMap?.get(canonicalProductId(canonical.id)) || {};
+  const projected = projectLocalizedProductDisplay(
+    canonical,
+    language,
+    enabledLanguages,
+    cells
+  );
+  if (!projected || projected === canonical) return publicProduct;
+  const details = publicProduct.details && typeof publicProduct.details === "object"
+    ? publicProduct.details
+    : {};
+  return {
+    ...publicProduct,
+    name: projected.name || publicProduct.name,
+    details: {
+      description: String(projected.storefrontDetails?.description ?? details.description ?? ""),
+      composition: String(projected.storefrontDetails?.composition ?? details.composition ?? ""),
+      characteristics: String(
+        projected.storefrontDetails?.characteristics ?? details.characteristics ?? ""
+      ),
+    },
+  };
+}
+
 function toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId = "") {
   const { prices, priceSources } = buildStorefrontPrices(
     product,
@@ -517,12 +553,22 @@ function toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId = "")
   };
 }
 
-function listStorefrontProducts(storeSettings) {
+function listStorefrontProducts(storeSettings, language) {
   const products = getGlobalState("products", DEFAULT_PRODUCTS);
   const oneCProducts = getGlobalState("oneCProducts", []);
   const priceTypes = getGlobalState("oneCPriceTypes", []);
   const byId = oneCByIdMap(oneCProducts);
   const costPriceTypeId = findPurchasePriceTypeId(priceTypes);
+  const settings = readLocalizationSettings();
+  const enabledLanguages = settings.enabledLanguages || ["ru"];
+  let cellMap = null;
+  const requested = String(language || "").trim();
+  if (requested && requested !== "ru") {
+    const publicCode = toPublicLocaleCode(requested);
+    if (enabledLanguages.includes(publicCode) && exactTranslationTargetInternal(requested)) {
+      cellMap = buildProductTranslationCellMap(requested);
+    }
+  }
 
   return (Array.isArray(products) ? products : [])
     .filter((product) => product?.active !== false)
@@ -533,7 +579,14 @@ function listStorefrontProducts(storeSettings) {
     })
     .map((product) => {
       const oneCItem = byId.get(String(product.oneCId || "")) || null;
-      return toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId);
+      const publicProduct = toPublicProduct(product, oneCItem, storeSettings, costPriceTypeId);
+      return applyPublicProductLocalization(
+        publicProduct,
+        product,
+        language,
+        enabledLanguages,
+        cellMap
+      );
     })
     .filter((product) => product.name);
 }

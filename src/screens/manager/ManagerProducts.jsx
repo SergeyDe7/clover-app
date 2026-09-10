@@ -275,7 +275,7 @@ function OneCProductsPanel({
   );
 }
 
-export function ManagerProducts({ products, setProducts, setClientLinks, oneCPriceTypes = [] }) {
+export function ManagerProducts({ products, setProducts, setClientLinks, oneCPriceTypes = [], staffRole = "manager" }) {
   const { t } = useLocalization();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Все");
@@ -612,6 +612,7 @@ export function ManagerProducts({ products, setProducts, setClientLinks, oneCPri
           product={editorProduct}
           products={products}
           oneCPriceTypes={oneCPriceTypes}
+          staffRole={staffRole}
           onClose={() => setEditorProduct(undefined)}
           onSave={save}
           onDelete={deleteCatalogProduct}

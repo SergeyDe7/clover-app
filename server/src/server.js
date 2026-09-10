@@ -25,6 +25,7 @@ import {
   resetServerData,
   setClientStateField,
   setGlobalState,
+  runInTransaction,
   removeProductIdFromAllFavorites,
   listAudit,
   listExchangeAudit,
@@ -108,12 +109,22 @@ import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanMana
 import {
   completenessByLanguage,
   initializeLocalizationCatalog,
-  listWorkspaceRows,
+  listWorkspacePage,
   readLocalizationSettings,
   resetTranslationToAuto,
   saveManualTranslation,
   writeLocalizationSettings,
 } from "./localizationStore.js";
+import {
+  deleteProductLocalization,
+  getProductTranslationWorkspace,
+  listGlossaryPage,
+  removeGlossaryEntry,
+  resetProductTranslationToAuto,
+  saveGlossaryEntry,
+  saveProductManualTranslation,
+} from "./productLocalizationStore.js";
+import { commitCanonicalProducts } from "./productSourceCorpus.js";
 import { localeChoices } from "../../src/shared/i18n/localizationSettings.js";
 import { publicClientSettings } from "./clientSettings.js";
 import {
@@ -1587,7 +1598,7 @@ function persistSingleCatalogProduct(req, res, { create = false } = {}) {
     return res.status(404).json({ error: "Товар не найден." });
   }
 
-  setGlobalState("products", upsert.products);
+  commitCanonicalProducts( upsert.products);
   persistPrunedOneCCandidates(upsert.products);
   auditFromRequest(req, upsert.created ? "product.create" : "product.update", {
     productId: upsert.product.id,
@@ -2806,7 +2817,7 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     const articled = applyOneCArticles(reclassified.products);
     const prepared = articled.products;
     if (reclassified.changed || articled.changed) {
-      setGlobalState("products", prepared);
+      commitCanonicalProducts( prepared);
     }
     globalThis.__cloverPreparedCatalog = { sig: catalogSig, products: prepared };
   }
@@ -4521,7 +4532,7 @@ app.put(
       });
     }
 
-    setGlobalState("products", products);
+    commitCanonicalProducts( products);
 
     // Массовое «на витрину» тоже дополняет фото/описание (раньше только from-catalog).
     for (const product of products) {
@@ -4536,7 +4547,7 @@ app.put(
           uploadsDirectory,
           getProducts: () => getGlobalState("products", DEFAULT_PRODUCTS),
           setProducts: (list) => {
-            setGlobalState("products", list);
+            commitCanonicalProducts( list);
             setGlobalState("catalogPricesVersion", new Date().toISOString());
           },
         });
@@ -4685,15 +4696,17 @@ app.get(
   roleRequired("admin"),
   (req, res, next) => {
     try {
-      res.json({
-        rows: listWorkspaceRows({
+      res.json(
+        listWorkspacePage({
           view: req.query?.view,
           query: req.query?.query,
           language: req.query?.language,
           untranslatedOnly:
             req.query?.untranslatedOnly === "1" || req.query?.untranslatedOnly === "true",
-        }),
-      });
+          limit: req.query?.limit,
+          offset: req.query?.offset,
+        })
+      );
     } catch (error) {
       next(error);
     }
@@ -4741,6 +4754,128 @@ app.post(
         changed: result.changed === true,
       });
       res.json({ ok: true, changed: result.changed === true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  "/api/admin/product-translations/:productId",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      res.json({ ok: true, workspace: getProductTranslationWorkspace(req.params.productId) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.put(
+  "/api/admin/product-translations/:productId/:language/:field",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      const result = saveProductManualTranslation(
+        req.params.productId,
+        req.params.language,
+        req.params.field,
+        req.body?.value,
+        req.user?.email || req.user?.id || "",
+        req.body?.expectedSourceHash
+      );
+      auditFromRequest(req, "localization.product.manual.save", {
+        productId: req.params.productId,
+        language: req.params.language,
+        field: req.params.field,
+        changed: result.changed === true,
+      });
+      res.json({ ok: true, changed: result.changed === true, field: result.field });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  "/api/admin/product-translations/:productId/:language/:field/reset-auto",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      const result = resetProductTranslationToAuto(
+        req.params.productId,
+        req.params.language,
+        req.params.field,
+        req.user?.email || req.user?.id || "",
+        req.body?.expectedSourceHash
+      );
+      auditFromRequest(req, "localization.product.auto.reset", {
+        productId: req.params.productId,
+        language: req.params.language,
+        field: req.params.field,
+        changed: result.changed === true,
+      });
+      res.json({ ok: true, changed: result.changed === true, field: result.field });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  "/api/admin/glossary",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      const page = listGlossaryPage({
+        query: req.query?.query,
+        language: req.query?.language,
+        limit: req.query?.limit,
+        offset: req.query?.offset,
+      });
+      res.json({
+        ok: true,
+        ...page,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.put(
+  "/api/admin/glossary",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      const result = saveGlossaryEntry(req.body || {}, req.user?.email || req.user?.id || "");
+      auditFromRequest(req, "localization.glossary.save", {
+        id: result.entry?.id,
+        language: result.entry?.languageCode,
+        protected: Number(result.entry?.protected) === 1,
+      });
+      res.json({ ok: true, entry: result.entry });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.delete(
+  "/api/admin/glossary/:id",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      const result = removeGlossaryEntry(req.params.id, req.user?.email || req.user?.id || "");
+      auditFromRequest(req, "localization.glossary.delete", { id: result.id });
+      res.json({ ok: true, id: result.id });
     } catch (error) {
       next(error);
     }
@@ -5144,7 +5279,7 @@ app.post(
         req.body.products.map(stripRuntimeProductPricing),
         storedProducts
       );
-      setGlobalState("products", products);
+      commitCanonicalProducts( products);
     }
 
     if (req.body?.settings) {
@@ -5202,7 +5337,7 @@ app.post(
       index === productIndex ? updatedProduct : product
     );
 
-    setGlobalState("products", updatedProducts);
+    commitCanonicalProducts( updatedProducts);
     setGlobalState("catalogPricesVersion", new Date().toISOString());
     auditFromRequest(req, "product.image.upload", {
       productId: updatedProduct.id,
@@ -5243,7 +5378,7 @@ app.delete(
       index === productIndex ? updatedProduct : product
     );
 
-    setGlobalState("products", updatedProducts);
+    commitCanonicalProducts( updatedProducts);
     setGlobalState("catalogPricesVersion", new Date().toISOString());
     auditFromRequest(req, "product.image.delete", {
       productId: updatedProduct.id,
@@ -5285,11 +5420,14 @@ app.delete(
       return res.status(404).json({ error: "Товар не найден." });
     }
 
+    runInTransaction(() => {
+      commitCanonicalProducts( removed.products);
+      setGlobalState("clientLinks", removed.clientLinks);
+      setGlobalState("catalogPricesVersion", new Date().toISOString());
+      deleteProductLocalization(productId);
+    });
     removeUploadedImage(removed.product.imageUrl);
     removeUploadedImage(removed.product.certificateUrl);
-    setGlobalState("products", removed.products);
-    setGlobalState("clientLinks", removed.clientLinks);
-    setGlobalState("catalogPricesVersion", new Date().toISOString());
     const favoritesChanged = removeProductIdFromAllFavorites(productId);
 
     auditFromRequest(req, "product.delete", {
@@ -5387,7 +5525,7 @@ app.post(
       index === productIndex ? updatedProduct : product
     );
 
-    setGlobalState("products", updatedProducts);
+    commitCanonicalProducts( updatedProducts);
     auditFromRequest(req, "product.certificate.upload", {
       productId: updatedProduct.id,
       productName: updatedProduct.name,
@@ -5428,7 +5566,7 @@ app.delete(
       index === productIndex ? updatedProduct : product
     );
 
-    setGlobalState("products", updatedProducts);
+    commitCanonicalProducts( updatedProducts);
     auditFromRequest(req, "product.certificate.delete", {
       productId: updatedProduct.id,
       productName: updatedProduct.name,
@@ -5676,7 +5814,7 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
     );
     setGlobalState("oneCProductCandidates", cleanCandidateMap);
     if (linked.changed || reclassified.changed || articled.changed) {
-      setGlobalState("products", articled.products);
+      commitCanonicalProducts( articled.products);
     }
 
     const meta = {
@@ -5835,7 +5973,7 @@ app.post(
       const product =
         nextProducts.find((entry) => String(entry.id) === String(result.product.id)) ||
         result.product;
-      setGlobalState("products", nextProducts);
+      commitCanonicalProducts( nextProducts);
 
       // Фото + описание/состав/характеристики с открытых источников — в фоне.
       const enrichTarget =
@@ -5849,7 +5987,7 @@ app.post(
           uploadsDirectory,
           getProducts: () => getGlobalState("products", DEFAULT_PRODUCTS),
           setProducts: (list) => {
-            setGlobalState("products", list);
+            commitCanonicalProducts( list);
             setGlobalState("catalogPricesVersion", new Date().toISOString());
           },
         });
@@ -5858,7 +5996,7 @@ app.post(
             ? { ...entry, enrichmentStatus: "pending" }
             : entry
         );
-        setGlobalState("products", nextProducts);
+        commitCanonicalProducts( nextProducts);
       }
 
       // В ответ — с ценами 1С (закупка / виды цен), иначе матрица менеджера пустая.
@@ -6018,7 +6156,7 @@ app.post(
       const nextProducts = products.map((entry) =>
         String(entry.id) === String(product.id) ? nextProduct : entry
       );
-      setGlobalState("products", nextProducts);
+      commitCanonicalProducts( nextProducts);
       setGlobalState("catalogPricesVersion", new Date().toISOString());
       auditFromRequest(req, "product.enrich", {
         productId: product.id,
@@ -6066,7 +6204,7 @@ app.post(
         forceRefreshCopy: forceCopy,
         getProducts: () => getGlobalState("products", DEFAULT_PRODUCTS),
         setProducts: (list) => {
-          setGlobalState("products", list);
+          commitCanonicalProducts( list);
           setGlobalState("catalogPricesVersion", new Date().toISOString());
         },
       });
@@ -6224,7 +6362,7 @@ app.post(
     const updatedProducts = products.map((item, index) =>
       index === productIndex ? updatedProduct : item
     );
-    setGlobalState("products", updatedProducts);
+    commitCanonicalProducts( updatedProducts);
     auditFromRequest(req, "one-c.product.request", {
       productId: updatedProduct.id,
       productName: updatedProduct.name,
@@ -6258,7 +6396,7 @@ app.post(
         item,
         linkedAt
       );
-      setGlobalState("products", updatedProducts);
+      commitCanonicalProducts( updatedProducts);
       persistPrunedOneCCandidates(updatedProducts);
 
       const productsOut = enrichManagerCatalogProducts(updatedProducts);
@@ -6293,7 +6431,7 @@ app.post(
     );
 
     if (linked.changed) {
-      setGlobalState("products", linked.products);
+      commitCanonicalProducts( linked.products);
     }
 
     const nextCandidates = buildOneCProductCandidates(
@@ -7702,7 +7840,10 @@ app.use((error, req, res, _next) => {
   console.error(error);
 
   if (Number.isInteger(error?.status) && error.status >= 400 && error.status < 600) {
-    return res.status(error.status).json({ error: error.message });
+    return res.status(error.status).json({
+      error: error.message,
+      ...(error.code ? { code: error.code } : {}),
+    });
   }
 
   if (error instanceof z.ZodError) {

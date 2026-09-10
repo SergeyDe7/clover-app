@@ -3,7 +3,6 @@ import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  UNIT_CONFIG,
   formatMoney,
   getUnitMultiplier,
   getUnitPrice,
@@ -12,6 +11,7 @@ import {
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
 } from "../../shared/appHelpers";
+import { unitDisplayLabel, unitDisplayShort } from "../../shared/i18n/unitDisplay.js";
 import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import { productImageSrc } from "../../shared/productPhoto";
 import { CatalogSearchInput } from "./CatalogSearchInput";
@@ -173,7 +173,6 @@ export function ClientMatrixPanel({
         {filtered.map((product) => {
           const allowedUnits = orderedSaleUnits(product);
           const unit = units[product.id] || allowedUnits[0] || "piece";
-          const unitMeta = UNIT_CONFIG[unit] || UNIT_CONFIG.piece;
           const price = getUnitPrice(product, unit);
           const multiplier = getUnitMultiplier(product, unit);
           const soleUnit = allowedUnits.length === 1;
@@ -221,7 +220,7 @@ export function ClientMatrixPanel({
               <p className="product-price">
                 {settings?.showPrices && price > 0 ? (
                   <>
-                    {formatMoney(price)} <small>/ {unitMeta.shortLabel || unit}</small>
+                    {formatMoney(price)} <small>/ {unitDisplayShort(unit, t) || unit}</small>
                   </>
                 ) : (
                   t("shared.price.pending")
@@ -238,15 +237,14 @@ export function ClientMatrixPanel({
                         setUnits((current) => ({ ...current, [product.id]: item }))
                       }
                     >
-                      {(UNIT_CONFIG[item] || UNIT_CONFIG.piece).shortLabel ||
-                        (UNIT_CONFIG[item] || UNIT_CONFIG.piece).label}
+                      {unitDisplayShort(item, t) || unitDisplayLabel(item, t)}
                     </button>
                   ))}
                 </div>
                 <p className="unit-hint">
                   {multiplier > 1
                     ? t("client.matrix.unitEqualsPieces", {
-                        unit: unitMeta.label.toLowerCase(),
+                        unit: String(unitDisplayLabel(unit, t) || unit).toLowerCase(),
                         multiplier,
                       })
                     : t("client.quantityIsCountedInPieces")}

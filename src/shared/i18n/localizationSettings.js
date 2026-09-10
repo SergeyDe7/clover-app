@@ -11,6 +11,7 @@ export const LOCALIZATION_SETTINGS_KEY = "localizationSettings";
 
 export const TRANSLATION_WORKSPACE_VIEWS = Object.freeze([
   Object.freeze(["interface", "Интерфейс", "ui"]),
+  Object.freeze(["products", "Товары", "product"]),
   Object.freeze(["categories", "Категории и подкатегории", "category"]),
   Object.freeze(["seo", "SEO / FAQ / страницы", "seo"]),
   Object.freeze(["glossary", "Словарь номенклатуры", "glossary"]),
@@ -29,6 +30,7 @@ export const COMPLETENESS_DOMAINS = Object.freeze([
 
 const VIEW_NAMESPACES = Object.freeze({
   interface: ["ui"],
+  products: ["product"],
   categories: ["category"],
   seo: ["seo", "faq", "page"],
   glossary: ["glossary"],
@@ -36,6 +38,7 @@ const VIEW_NAMESPACES = Object.freeze({
 
 const NAMESPACE_TO_DOMAIN = Object.freeze({
   ui: "interface",
+  product: "products",
   category: "categories",
   page: "pages",
   faq: "faq",

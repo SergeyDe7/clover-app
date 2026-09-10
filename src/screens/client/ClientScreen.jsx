@@ -22,7 +22,6 @@ import {
   clientCabinetSectionFromQuery,
   countUnseenReadyActs,
   markReadyActsSeen,
-  UNIT_CONFIG,
   formatDate,
   formatDateTime,
   formatMoney,
@@ -30,6 +29,7 @@ import {
   getPositionCount,
   statusClass,
 } from "../../shared/appHelpers";
+import { unitDisplayShort } from "../../shared/i18n/unitDisplay.js";
 import { canTrashOrder } from "../../shared/orderTrash";
 import { EmptyState } from "../../shared/uxFeedback";
 import { ManagerContact } from "./ManagerContact";
@@ -357,7 +357,7 @@ function ClientDashboard({
                         </span>
                         <strong>
                           {item.quantity}{" "}
-                          {UNIT_CONFIG[item.unit]?.shortLabel || item.unit}
+                          {unitDisplayShort(item.unit, t) || item.unit}
                           <small>
                             {item.multiplier > 1
                               ? t("client.orders.pieceTotal", { count: item.quantity * item.multiplier })

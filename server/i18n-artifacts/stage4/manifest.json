@@ -1,0 +1,66 @@
+{
+  "format": "clover-product-auto-import",
+  "formatVersion": 1,
+  "quality": "AUTO_MACHINE_DRAFT",
+  "runId": "stage4-initial-cbd1d0e-6259e882d1bf",
+  "baseMainSha": "cbd1d0e3ac831fd41126d4e6b0e7af446d436d42",
+  "generatedAt": "2026-09-10T08:45:10.240Z",
+  "productCount": 698,
+  "sourceFieldCounts": {
+    "name": 698,
+    "description": 659,
+    "composition": 659,
+    "characteristics": 659
+  },
+  "sourceCellCount": 2675,
+  "targetCellCount": 16050,
+  "wholeCatalogSourceFingerprint": "6259e882d1bfba47f2897df649ad9196402f8875b9c64d95b5781fd0a37f5327",
+  "glossaryCount": 0,
+  "glossaryFingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "languageCounts": {
+    "en": 2675,
+    "uz": 2675,
+    "ky": 2675,
+    "tg": 2675,
+    "zh-CN": 2675,
+    "ar": 2675
+  },
+  "chunks": [
+    {
+      "file": "chunk-en.json",
+      "language": "en",
+      "count": 2675,
+      "sha256": "54775c5d1d5bc5490073de32de85201837932bf0b4e5193700db80a2c447552a"
+    },
+    {
+      "file": "chunk-uz.json",
+      "language": "uz",
+      "count": 2675,
+      "sha256": "da3482b31fb27be9619d8d063a9e240f7cd1e8311ef62788bf66c24708fbc5c6"
+    },
+    {
+      "file": "chunk-ky.json",
+      "language": "ky",
+      "count": 2675,
+      "sha256": "4ea42d77ad43d7856f58c2cf1a781cdd6112b3bc5912b98191fd7e756d569673"
+    },
+    {
+      "file": "chunk-tg.json",
+      "language": "tg",
+      "count": 2675,
+      "sha256": "acd85dc4b8d4dc24a22ae70f8beb7d83921c1b4abc1eee9d5e2ea4f3eef16d4e"
+    },
+    {
+      "file": "chunk-zh-CN.json",
+      "language": "zh-CN",
+      "count": 2675,
+      "sha256": "70cf730c2db192a13a69c38f6e2a7ce93417b2b787f396b40b00e2ae620438bc"
+    },
+    {
+      "file": "chunk-ar.json",
+      "language": "ar",
+      "count": 2675,
+      "sha256": "445f2e5120a69bb0511b524bc44bc3051f976d1e6529e1fc997a32d534507a63"
+    }
+  ]
+}
