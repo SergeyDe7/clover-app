@@ -6,6 +6,7 @@ import {
   productFieldSource,
 } from "../../src/shared/i18n/productLocalization.js";
 import { bumpLocalizationCatalogVersion } from "./localizationVersion.js";
+import { scheduleSitemapRefreshIfUrlSetChanged } from "./sitemapArtifact.js";
 
 export function productTranslatableSourceRecord(product) {
   const id = canonicalProductId(product?.id);
@@ -49,6 +50,9 @@ export function translatableProductSourceChanged(beforeList, afterList) {
  * Stage 4 Russian source field is created, deleted, or changed.
  * Price/UOM/1C-ref-only mutations leave version unchanged.
  * Does not open a nested transaction.
+ *
+ * Sitemap refresh is deferred (setImmediate) and only when the public URL set
+ * changes — never part of DB transaction success/failure.
  */
 export function commitCanonicalProducts(nextProducts, actor = "") {
   const before = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -56,5 +60,10 @@ export function commitCanonicalProducts(nextProducts, actor = "") {
   if (translatableProductSourceChanged(before, nextProducts)) {
     bumpLocalizationCatalogVersion(actor || "product-source");
   }
+  scheduleSitemapRefreshIfUrlSetChanged(
+    before,
+    nextProducts,
+    actor || "products"
+  );
   return nextProducts;
 }

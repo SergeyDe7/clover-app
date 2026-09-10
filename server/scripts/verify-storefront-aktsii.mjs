@@ -225,7 +225,10 @@ const adminPromos = readFileSync(
   "utf8"
 );
 const server = readFileSync(path.join(projectRoot, "server/src/server.js"), "utf8");
-const sitemap = readFileSync(path.join(projectRoot, "public/sitemap.xml"), "utf8");
+const {
+  SITEMAP_STATIC_PATHS,
+  toAbsoluteSitemapUrl,
+} = await import("../../src/shared/sitemap/sitemapContract.js");
 const pricing = readFileSync(path.join(projectRoot, "server/src/pricing.js"), "utf8");
 const delivery = readFileSync(
   path.join(projectRoot, "server/src/deliveryFee.js"),
@@ -244,7 +247,8 @@ assert.match(aktsii, /t\("storefront\.nav\.promos"\)/);
 assert.match(admin, /storefrontPromotions/);
 assert.match(adminPromos, /uploadStorefrontPromoImage/);
 assert.match(server, /\/api\/admin\/storefront\/promo-image/);
-assert.match(sitemap, /https:\/\/clover-spb\.ru\/aktsii/);
+assert.ok(SITEMAP_STATIC_PATHS.includes("/aktsii"));
+assert.equal(toAbsoluteSitemapUrl("/aktsii"), "https://clover-spb.ru/aktsii");
 
 // informational-only isolation: promotions module must not touch pricing/delivery source
 assert.doesNotMatch(pricing, /storefrontPromotions|normalizePromotionLink/);

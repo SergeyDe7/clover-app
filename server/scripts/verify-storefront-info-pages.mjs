@@ -59,8 +59,11 @@ const page = readFileSync(
   path.join(projectRoot, "src/screens/storefront/pages/InfoPage.jsx"),
   "utf8"
 );
-const sitemap = readFileSync(path.join(projectRoot, "public/sitemap.xml"), "utf8");
 const robots = readFileSync(path.join(projectRoot, "public/robots.txt"), "utf8");
+const {
+  SITEMAP_STATIC_PATHS,
+  toAbsoluteSitemapUrl,
+} = await import("../../src/shared/sitemap/sitemapContract.js");
 const pricing = readFileSync(path.join(projectRoot, "server/src/pricing.js"), "utf8");
 const delivery = readFileSync(
   path.join(projectRoot, "server/src/deliveryFee.js"),
@@ -86,9 +89,19 @@ assert.match(footer, /sf-footer-info/);
 assert.match(page, /<h1>\{page\.heading\}<\/h1>/);
 
 for (const [slug] of REQUIRED) {
-  assert.match(sitemap, new RegExp(`https://clover-spb\\.ru/${slug}`));
+  assert.ok(
+    SITEMAP_STATIC_PATHS.includes(`/${slug}`),
+    `sitemap static contract missing /${slug}`
+  );
+  assert.equal(
+    toAbsoluteSitemapUrl(`/${slug}`),
+    `https://clover-spb.ru/${slug}`
+  );
 }
-assert.match(sitemap, /https:\/\/clover-spb\.ru\/aktsii/);
+assert.ok(SITEMAP_STATIC_PATHS.includes("/aktsii"));
+assert.ok(SITEMAP_STATIC_PATHS.includes("/privacy-policy"));
+assert.ok(SITEMAP_STATIC_PATHS.includes("/personal-data-consent"));
+assert.equal(SITEMAP_STATIC_PATHS.includes("/install-app"), false);
 assert.match(robots, /Sitemap: https:\/\/clover-spb\.ru\/sitemap\.xml/);
 assert.match(robots, /Disallow: \/lk/);
 assert.match(robots, /Disallow: \/api\//);
