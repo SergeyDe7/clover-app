@@ -35,11 +35,6 @@ export function CatalogPage({
     "",
     storefrontCategoryDisplayOptions(locale)
   );
-  const subcategoryDisplayName = categoryDisplayNameFromCanonical(
-    subcategory,
-    category,
-    storefrontCategoryDisplayOptions(locale)
-  );
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -226,12 +221,6 @@ export function CatalogPage({
                       </button>
                     </>
                   ) : null}
-                  {subcategory ? (
-                    <>
-                      <span className="sf-crumb-sep">/</span>
-                      <span className="sf-crumb-current">{subcategoryDisplayName}</span>
-                    </>
-                  ) : null}
                   {facet ? (
                     <>
                       <span className="sf-crumb-sep">/</span>
@@ -319,7 +308,13 @@ export function CatalogPage({
             <section className="sf-group-block" key={section.name}>
               {!category ? (
                 <div className="sf-group-head">
-                  <h2>{section.name}</h2>
+                  <h2>
+                    {categoryDisplayNameFromCanonical(
+                      section.name,
+                      "",
+                      storefrontCategoryDisplayOptions(locale)
+                    )}
+                  </h2>
                 </div>
               ) : null}
               <div className="sf-product-grid">

@@ -407,6 +407,42 @@ assert.doesNotMatch(
   /sf-product-cat">\{product\.category\}/
 );
 
+// CatalogPage: no unrequested subcategory breadcrumb; section H2 uses display projection
+const catalogPageSrc = readFileSync(
+  path.join(workRoot, "src/screens/storefront/pages/CatalogPage.jsx"),
+  "utf8"
+);
+assert.doesNotMatch(
+  catalogPageSrc,
+  /sf-crumb-current">\{subcategoryDisplayName\}/,
+  "must not render subcategory breadcrumb crumb"
+);
+assert.doesNotMatch(
+  catalogPageSrc,
+  /subcategoryDisplayName/,
+  "subcategory breadcrumb display helper must not be reintroduced"
+);
+assert.doesNotMatch(
+  catalogPageSrc,
+  /<h2>\{\s*section\.name\s*\}<\/h2>/,
+  "all-catalog section H2 must not render raw canonical section.name"
+);
+assert.match(
+  catalogPageSrc,
+  /key=\{section\.name\}/,
+  "section React key must remain canonical section.name"
+);
+assert.match(
+  catalogPageSrc,
+  /categoryDisplayNameFromCanonical\(\s*section\.name/,
+  "section H2 must use Stage 5.1 category display projection"
+);
+assert.match(
+  catalogPageSrc,
+  /\{categoryDisplayName\}/,
+  "existing category breadcrumb localization must remain"
+);
+
 // Storefront display helper documents Stage 6 transport boundary + RU freeze
 const displayHelper = await import("../../src/shared/i18n/storefrontCategoryDisplay.js");
 assert.deepEqual(displayHelper.STOREFRONT_CATEGORY_ENABLED_LANGUAGES, ["ru"]);
