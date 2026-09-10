@@ -16,6 +16,8 @@ import {
   getSubgroupFacets,
   groupProductsByCloverGroup,
 } from "../productGroups.js";
+import { projectLocalizedGroupNav, categoryDisplayNameFromCanonical } from "../../../shared/i18n/categoryDisplayProjection.js";
+import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
 import {
   matchesCatalogPrefixSearch,
   productCatalogSearchHaystack,
@@ -27,7 +29,12 @@ export function CatalogPage({
   subcategory = "",
   facet = "",
 }) {
-  const { t } = useLocalization();
+  const { t, locale } = useLocalization();
+  const categoryDisplayName = categoryDisplayNameFromCanonical(
+    category,
+    "",
+    storefrontCategoryDisplayOptions(locale)
+  );
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -90,7 +97,6 @@ export function CatalogPage({
   }, [data, query]);
 
   const activeMeta = category ? getGroupMeta(category) : null;
-  const subgroups = category ? getGroupChildren(category) : [];
   const facets = subcategory ? getSubgroupFacets(category, subcategory) : [];
 
   // Родительская категория: все товары группы (включая подкатегории).
@@ -121,7 +127,18 @@ export function CatalogPage({
     return map;
   }, [sections]);
 
-  const title = category || t("storefront.nav.catalog");
+  const localizedSubgroups = useMemo(() => {
+    if (!category) return [];
+    const children = getGroupChildren(category);
+    return (
+      projectLocalizedGroupNav(
+        [{ name: category, children }],
+        storefrontCategoryDisplayOptions(locale)
+      )[0]?.children || []
+    );
+  }, [category, locale]);
+
+  const title = category ? categoryDisplayName : t("storefront.nav.catalog");
 
   const searchToolbar = (
     <div className="sf-catalog-toolbar">
@@ -147,7 +164,7 @@ export function CatalogPage({
             aria-expanded={treeOpen}
             onClick={() => setTreeOpen((open) => !open)}
           >
-            <span>{category || t("client.catalog.categories")}</span>
+            <span>{category ? categoryDisplayName : t("client.catalog.categories")}</span>
             <svg
               className="sf-catalog-tree-toggle-icon"
               viewBox="0 0 12 12"
@@ -200,7 +217,7 @@ export function CatalogPage({
                           navigateStorefront({ name: "catalog", category })
                         }
                       >
-                        {category}
+                        {categoryDisplayName}
                       </button>
                     </>
                   ) : null}
@@ -220,9 +237,9 @@ export function CatalogPage({
             </div>
           )}
 
-          {subgroups.length > 0 ? (
+          {localizedSubgroups.length > 0 ? (
             <div className="sf-subcat-chips" aria-label={t("storefront.subgroups")}>
-              {subgroups.map((child) => (
+              {localizedSubgroups.map((child) => (
                 <button
                   key={child.name}
                   type="button"
@@ -237,7 +254,7 @@ export function CatalogPage({
                     })
                   }
                 >
-                  {child.name}
+                  {child.displayName || child.name}
                 </button>
               ))}
             </div>
@@ -291,7 +308,13 @@ export function CatalogPage({
             <section className="sf-group-block" key={section.name}>
               {!category ? (
                 <div className="sf-group-head">
-                  <h2>{section.name}</h2>
+                  <h2>
+                    {categoryDisplayNameFromCanonical(
+                      section.name,
+                      "",
+                      storefrontCategoryDisplayOptions(locale)
+                    )}
+                  </h2>
                 </div>
               ) : null}
               <div className="sf-product-grid">

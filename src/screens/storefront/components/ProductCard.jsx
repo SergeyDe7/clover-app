@@ -1,4 +1,6 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
+import { categoryDisplayNameFromCanonical } from "../../../shared/i18n/categoryDisplayProjection.js";
+import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
 import { useEffect, useMemo, useState } from "react";
 import { formatMoney, navigateStorefront } from "./StoreHeader.jsx";
 import {
@@ -14,7 +16,12 @@ import {
 import { productCardImageLoadingAttrs } from "./productCardImage.js";
 
 export function ProductCard({ product, imagePriorityIndex = Number.POSITIVE_INFINITY }) {
-  const { t } = useLocalization();
+  const { t, locale } = useLocalization();
+  const categoryLabel = categoryDisplayNameFromCanonical(
+    product.category,
+    "",
+    storefrontCategoryDisplayOptions(locale)
+  );
   const units = useMemo(() => orderedSaleUnits(product), [product]);
   const [unit, setUnit] = useState(() => units[0] || "piece");
 
@@ -49,7 +56,7 @@ export function ProductCard({ product, imagePriorityIndex = Number.POSITIVE_INFI
         )}
       </button>
       <div className="sf-product-body has-units">
-        <p className="sf-product-cat">{product.category}</p>
+        <p className="sf-product-cat">{categoryLabel}</p>
         <h3>
           <button
             type="button"
