@@ -1,12 +1,14 @@
 /**
  * Code-owned Stage 5.1 category/subcategory localization corpus.
  * Russian CLOVER taxonomy remains business/data authority; IDs are display-only keys.
+ *
+ * Browser-safe: no Node builtins / sourceHash. Server persistence hashes via
+ * localizationStore + shared sourceHash(sourceRu).
  */
 import {
   CLOVER_GROUP_META,
   CLOVER_PRODUCT_GROUPS,
 } from "../../screens/storefront/productGroups.js";
-import { sourceHash } from "./sourceHash.js";
 
 export const CATEGORY_NAMESPACE = "category";
 export const CATEGORY_FIELD_KEY = "name";
@@ -103,7 +105,6 @@ function buildCatalog() {
       entityId,
       fieldKey: CATEGORY_FIELD_KEY,
       sourceRu,
-      sourceHash: sourceHash(sourceRu),
       parentEntityId: "",
       critical: true,
     });
@@ -127,7 +128,6 @@ function buildCatalog() {
         entityId: fullId,
         fieldKey: CATEGORY_FIELD_KEY,
         sourceRu: childRu,
-        sourceHash: sourceHash(childRu),
         parentEntityId: entityId,
         parentSourceRu: sourceRu,
         critical: true,

@@ -23,6 +23,10 @@ import {
   productCatalogSearchHaystack,
 } from "../../../shared/appHelpers.js";
 import { sortProductsWithLidsGrouped } from "../../../shared/productCatalogOrder.js";
+import {
+  makeCatalogRouteSnapshot,
+  resolveStorefrontCatalogView,
+} from "../catalogRouteSnapshot.js";
 
 export function CatalogPage({
   category = "",
@@ -35,7 +39,8 @@ export function CatalogPage({
     "",
     storefrontCategoryDisplayOptions(locale)
   );
-  const [data, setData] = useState(null);
+  const routeKey = catalogScrollRouteKey(category, subcategory, facet);
+  const [catalogRouteSnapshot, setCatalogRouteSnapshot] = useState(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   // Mobile: каталог открывается со свёрнутыми категориями; раскрытие — только тапом «Категории».
@@ -45,6 +50,7 @@ export function CatalogPage({
 
   useEffect(() => {
     let cancelled = false;
+    const requestKey = catalogScrollRouteKey(category, subcategory, facet);
     setError("");
     storefrontApi
       .catalog({
@@ -53,7 +59,9 @@ export function CatalogPage({
         facet: facet || undefined,
       })
       .then((payload) => {
-        if (!cancelled) setData(payload);
+        if (!cancelled) {
+          setCatalogRouteSnapshot(makeCatalogRouteSnapshot(requestKey, payload));
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(errorDisplayMessage(err, t, "storefront.error.catalogLoadFailed"));
@@ -63,7 +71,6 @@ export function CatalogPage({
     };
   }, [category, subcategory, facet, t]);
 
-  const routeKey = catalogScrollRouteKey(category, subcategory, facet);
   const prevRouteKeyRef = useRef(null);
   useLayoutEffect(() => {
     resetCatalogScrollOnRouteIdentity(prevRouteKeyRef.current, routeKey);
@@ -89,12 +96,18 @@ export function CatalogPage({
     return () => mq.removeEventListener?.("change", syncMobileChrome);
   }, [category]);
 
+  const { categories: navCategories, currentPayload } = useMemo(
+    () => resolveStorefrontCatalogView(routeKey, catalogRouteSnapshot),
+    [routeKey, catalogRouteSnapshot]
+  );
+
   const products = useMemo(() => {
-    const list = data?.products || [];
+    if (!currentPayload) return [];
+    const list = currentPayload.products || [];
     return list.filter((product) =>
       matchesCatalogPrefixSearch(productCatalogSearchHaystack(product), query)
     );
-  }, [data, query]);
+  }, [currentPayload, query]);
 
   const activeMeta = category ? getGroupMeta(category) : null;
   const facets = subcategory ? getSubgroupFacets(category, subcategory) : [];
@@ -102,6 +115,7 @@ export function CatalogPage({
   // Родительская категория: все товары группы (включая подкатегории).
   // Подкатегория/facet сужают выборку на API.
   const sections = useMemo(() => {
+    if (!currentPayload) return [];
     if (category) {
       const sorted = sortProductsWithLidsGrouped(products);
       return sorted.length
@@ -109,8 +123,7 @@ export function CatalogPage({
         : [];
     }
     return groupProductsByCloverGroup(products);
-  }, [category, subcategory, products]);
-
+  }, [category, subcategory, products, currentPayload]);
   const imagePriorityById = useMemo(() => {
     const map = new Map();
     let index = 0;
@@ -184,7 +197,7 @@ export function CatalogPage({
           <p className="sf-catalog-side-title">{t("storefront.nav.catalog")}</p>
           <div className="sf-catalog-tree-body">
             <CatalogGroupNav
-              categories={data?.categories || []}
+              categories={navCategories}
               activeCategory={category}
               activeSubcategory={subcategory}
               variant="side"
@@ -329,7 +342,7 @@ export function CatalogPage({
             </section>
           ))}
 
-          {!error && data && !products.length ? (
+          {!error && currentPayload && !products.length ? (
             <p className="sf-muted">
               {category
                 ? t("storefront.thereAreNoProductsInThis")
