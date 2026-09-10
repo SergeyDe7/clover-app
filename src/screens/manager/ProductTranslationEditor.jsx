@@ -23,6 +23,8 @@ function statusTone(cell) {
 
 export function ProductTranslationEditor({ product }) {
   const { t } = useLocalization();
+  const [expanded, setExpanded] = useState(false);
+  const [expandedField, setExpandedField] = useState("");
   const [workspace, setWorkspace] = useState(null);
   const [language, setLanguage] = useState("en");
   const [drafts, setDrafts] = useState({});
@@ -45,6 +47,8 @@ export function ProductTranslationEditor({ product }) {
     setDrafts(clearProductDrafts());
     setWorkspace(null);
     setMessage("");
+    setExpanded(false);
+    setExpandedField("");
   }, [productId]);
 
   const load = useCallback(async () => {
@@ -84,9 +88,16 @@ export function ProductTranslationEditor({ product }) {
     }
   }, [productId, t]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const openSection = async () => {
+    if (expanded) {
+      setExpanded(false);
+      return;
+    }
+    setExpanded(true);
+    if (!workspace) {
+      await load();
+    }
+  };
 
   if (!productId) return null;
 
@@ -143,79 +154,103 @@ export function ProductTranslationEditor({ product }) {
 
   return (
     <section className="product-translation-editor" aria-labelledby="product-translations-title">
-      <h3 id="product-translations-title">{t("admin.productTranslations.title")}</h3>
-      <p className="muted small">{t("admin.productTranslations.lead")}</p>
-      <label className="field">
-        {t("admin.languages.language")}
-        <select value={language} onChange={(event) => setLanguage(event.target.value)}>
-          {TARGET_LOCALES.map((code) => (
-            <option key={code} value={code}>
-              {languageLabels[code]}
-            </option>
-          ))}
-        </select>
-      </label>
-      {message ? <p className="manager-languages-message">{message}</p> : null}
-      {PRODUCT_TRANSLATION_FIELDS.map((field) => {
-        const source = workspace?.fields?.[field]?.sourceRu || "";
-        const cell = workspace?.fields?.[field]?.languages?.[language] || {};
-        const emptySource = !String(source).trim();
-        const tone = emptySource ? "missing" : statusTone(cell);
-        const fieldLabel =
-          field === "name"
-            ? t("admin.productTranslations.field.name")
-            : field === "description"
-              ? t("admin.productTranslations.field.description")
-              : field === "composition"
-                ? t("admin.productTranslations.field.composition")
-                : t("admin.productTranslations.field.characteristics");
-        const stateKey = emptySource
-          ? "admin.productTranslations.notApplicable"
-          : cell.stale
-            ? "admin.languages.state.stale"
-            : cell.state === "AUTO"
-              ? "admin.languages.state.auto"
-              : cell.state === "MANUAL"
-                ? "admin.languages.state.manual"
-                : "admin.languages.state.missing";
-        return (
-          <div className="product-translation-field" key={field}>
-            <strong>{fieldLabel}</strong>
-            <p className="manager-languages-source">{source || "—"}</p>
-            {emptySource ? (
-              <p className="muted small">{t("admin.productTranslations.notApplicable")}</p>
-            ) : (
-              <textarea
-                className="manager-languages-target"
-                rows={3}
-                value={readProductFieldDraft(drafts, language, field, cell.value || "")}
-                aria-label={fieldLabel}
-                onChange={(event) =>
-                  setDrafts((current) =>
-                    writeProductFieldDraft(current, language, field, event.target.value)
+      <button
+        type="button"
+        className="product-translation-toggle"
+        id="product-translations-title"
+        aria-expanded={expanded}
+        onClick={openSection}
+      >
+        {t("admin.productTranslations.title")}
+      </button>
+      {expanded ? (
+        <div className="product-translation-panel">
+          <label className="field">
+            {t("admin.languages.language")}
+            <select value={language} onChange={(event) => setLanguage(event.target.value)}>
+              {TARGET_LOCALES.map((code) => (
+                <option key={code} value={code}>
+                  {languageLabels[code]}
+                </option>
+              ))}
+            </select>
+          </label>
+          {message ? <p className="manager-languages-message">{message}</p> : null}
+          {PRODUCT_TRANSLATION_FIELDS.map((field) => {
+            const source = workspace?.fields?.[field]?.sourceRu || "";
+            const cell = workspace?.fields?.[field]?.languages?.[language] || {};
+            const emptySource = !String(source).trim();
+            const tone = emptySource ? "missing" : statusTone(cell);
+            const fieldOpen = expandedField === field;
+            const fieldLabel =
+              field === "name"
+                ? t("admin.productTranslations.field.name")
+                : field === "description"
+                  ? t("admin.productTranslations.field.description")
+                  : field === "composition"
+                    ? t("admin.productTranslations.field.composition")
+                    : t("admin.productTranslations.field.characteristics");
+            const stateKey = emptySource
+              ? "admin.productTranslations.notApplicable"
+              : cell.stale
+                ? "admin.languages.state.stale"
+                : cell.state === "AUTO"
+                  ? "admin.languages.state.auto"
+                  : cell.state === "MANUAL"
+                    ? "admin.languages.state.manual"
+                    : "admin.languages.state.missing";
+            return (
+              <div className="product-translation-field" key={field}>
+                <button
+                  type="button"
+                  className="product-translation-field-toggle"
+                  aria-expanded={fieldOpen}
+                  onClick={() => setExpandedField(fieldOpen ? "" : field)}
+                >
+                  <strong>{fieldLabel}</strong>
+                  <span className={`manager-languages-status is-${tone}`}>{t(stateKey)}</span>
+                </button>
+                {fieldOpen ? (
+                  emptySource ? (
+                    <p className="muted small">{t("admin.productTranslations.notApplicable")}</p>
+                  ) : (
+                    <>
+                      <p className="manager-languages-source">{source}</p>
+                      <textarea
+                        className="manager-languages-target"
+                        rows={3}
+                        value={readProductFieldDraft(drafts, language, field, cell.value || "")}
+                        aria-label={fieldLabel}
+                        onChange={(event) =>
+                          setDrafts((current) =>
+                            writeProductFieldDraft(current, language, field, event.target.value)
+                          )
+                        }
+                      />
+                      <div className="manager-languages-actions">
+                        {cell.stale ? (
+                          <span className="muted small">{t("admin.productTranslations.staleWarning")}</span>
+                        ) : null}
+                        <button type="button" className="primary-button" disabled={busy} onClick={() => saveField(field)}>
+                          {t("admin.languages.save")}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={busy}
+                          onClick={() => resetField(field)}
+                        >
+                          {t("admin.productTranslations.returnToAuto")}
+                        </button>
+                      </div>
+                    </>
                   )
-                }
-              />
-            )}
-            <div className="manager-languages-actions">
-              <span className={`manager-languages-status is-${tone}`}>{t(stateKey)}</span>
-              {cell.stale && !emptySource ? (
-                <span className="muted small">{t("admin.productTranslations.staleWarning")}</span>
-              ) : null}
-              {emptySource ? null : (
-                <>
-                  <button type="button" className="primary-button" disabled={busy} onClick={() => saveField(field)}>
-                    {t("admin.languages.save")}
-                  </button>
-                  <button type="button" className="secondary-button" disabled={busy} onClick={() => resetField(field)}>
-                    {t("admin.productTranslations.returnToAuto")}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        );
-      })}
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
     </section>
   );
 }

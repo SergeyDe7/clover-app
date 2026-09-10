@@ -18,6 +18,7 @@ import {
   isExactPublicLocaleCode,
   isExactPublicTargetLocale,
   isExactTranslationTargetLocale,
+  toPublicLocaleCode,
 } from "../../src/shared/i18n/languageRegistry.js";
 import { sourceHash } from "../../src/shared/i18n/sourceHash.js";
 import { placeholdersMatch, isNonEmptyText } from "../../src/shared/i18n/placeholderValidation.js";
@@ -36,8 +37,7 @@ import {
 import { bumpLocalizationCatalogVersion } from "./localizationVersion.js";
 import {
   buildProductWorkspaceRows,
-  productCompletenessItems,
-  productFieldCompletenessByLanguage,
+  computeProductCompletenessSnapshot,
 } from "./productLocalizationStore.js";
 import {
   parseWorkspaceLimit,
@@ -105,7 +105,7 @@ function currentCatalogItems(store) {
   };
 }
 
-function completenessItems(store) {
+function completenessItems(store, productItems = null) {
   const current = currentCatalogItems(store);
   const rows = buildTranslationRows(current);
   const items = [];
@@ -123,13 +123,16 @@ function completenessItems(store) {
       });
     }
   }
-  items.push(...productCompletenessItems());
+  const products =
+    productItems || computeProductCompletenessSnapshot().items;
+  items.push(...products);
   return items;
 }
 
 export function completenessByLanguage(store = readTranslationStore()) {
-  const items = completenessItems(store);
-  const productFields = productFieldCompletenessByLanguage();
+  const productSnap = computeProductCompletenessSnapshot();
+  const items = completenessItems(store, productSnap.items);
+  const productFields = productSnap.fieldReports;
   const reports = {};
   for (const code of PUBLIC_LOCALE_CODES) {
     reports[code] = {
@@ -305,6 +308,19 @@ export function initializeLocalizationCatalog() {
   return result;
 }
 
+function projectSelectedLanguageRows(rows, languageRaw) {
+  if (!languageRaw) return rows;
+  const code = toPublicLocaleCode(languageRaw);
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const langs = row?.languages && typeof row.languages === "object" ? row.languages : {};
+    const selected = langs[code];
+    return {
+      ...row,
+      languages: selected ? { [code]: selected } : {},
+    };
+  });
+}
+
 export function listWorkspacePage(filters = {}) {
   if (Object.prototype.hasOwnProperty.call(filters, "language") && filters.language !== undefined) {
     const languageRaw = filters.language;
@@ -323,15 +339,22 @@ export function listWorkspacePage(filters = {}) {
   const store = currentCatalogItems(readTranslationStore());
   const uiRows = buildTranslationRows(store);
   const boundedProductView = view === "products" || view === "untranslated";
+  const pageable =
+    view === "interface" ||
+    view === "products" ||
+    view === "untranslated" ||
+    view === "categories" ||
+    view === "seo";
   const productRows = boundedProductView
     ? buildProductWorkspaceRows(undefined, { language: languageRaw })
     : [];
   const combined = view === "products" ? productRows : [...uiRows, ...productRows];
-  const filtered = filterTranslationRows(combined, {
+  let filtered = filterTranslationRows(combined, {
     ...filters,
     language: languageRaw,
   });
-  if (!boundedProductView) {
+  filtered = projectSelectedLanguageRows(filtered, languageRaw);
+  if (!pageable) {
     return {
       rows: filtered,
       total: filtered.length,
@@ -341,6 +364,18 @@ export function listWorkspacePage(filters = {}) {
     };
   }
   const total = filtered.length;
+  const explicitPaging =
+    Object.prototype.hasOwnProperty.call(filters, "limit") ||
+    Object.prototype.hasOwnProperty.call(filters, "offset");
+  if (!explicitPaging) {
+    return {
+      rows: filtered,
+      total,
+      offset: 0,
+      limit: total,
+      hasMore: false,
+    };
+  }
   const limit = parseWorkspaceLimit(filters.limit);
   const offset = parseWorkspaceOffset(filters.offset);
   const rows = filtered.slice(offset, offset + limit);

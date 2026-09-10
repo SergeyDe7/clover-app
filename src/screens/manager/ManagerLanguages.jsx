@@ -75,7 +75,10 @@ export function ManagerLanguages() {
   const [glossaryForm, setGlossaryForm] = useState(emptyGlossaryForm);
   const [offset, setOffset] = useState(0);
   const [pageMeta, setPageMeta] = useState({ total: 0, hasMore: false, limit: 100 });
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [overviewReady, setOverviewReady] = useState(false);
   const requestGenerationRef = useRef(0);
+  const overviewGenerationRef = useRef(0);
   const languageRef = useRef("en");
   const viewRef = useRef("interface");
   const offsetRef = useRef(0);
@@ -106,19 +109,42 @@ export function ManagerLanguages() {
     untranslated: t("admin.languages.view.untranslated"),
   };
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const loadOverview = useCallback(async () => {
+    const requestGeneration = ++overviewGenerationRef.current;
+    try {
+      const payload = await api.getLocalizationSettings();
+      if (requestGeneration !== overviewGenerationRef.current) return;
+      setSettings(payload.settings || null);
+      setCompleteness(payload.completeness || {});
+      setLocales(Array.isArray(payload.locales) ? payload.locales : []);
+      setOverviewReady(true);
+    } catch (error) {
+      if (requestGeneration !== overviewGenerationRef.current) return;
+      setSettings({ enabledLanguages: ["ru"], catalogVersion: 0 });
+      setCompleteness({});
+      setOverviewReady(false);
+      setMessage(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
+    }
+  }, [t]);
+
+  const loadWorkspace = useCallback(async () => {
     const requestGeneration = ++requestGenerationRef.current;
     const requestLanguage = safeLanguage;
     const requestView = view;
     const requestOffset = offset;
+    const requestQuery = debouncedQuery;
     try {
-      const [payload, workspace, glossaryPayload] = await Promise.all([
-        api.getLocalizationSettings(),
+      const [workspace, glossaryPayload] = await Promise.all([
         requestView === "glossary"
           ? Promise.resolve({ rows: [], total: 0, hasMore: false, limit: 100, offset: 0 })
           : api.getLocalizationTranslations({
               view: requestView,
-              query,
+              query: requestQuery,
               language: requestLanguage,
               untranslatedOnly,
               limit: 100,
@@ -126,7 +152,7 @@ export function ManagerLanguages() {
             }),
         requestView === "glossary"
           ? api.getGlossaryEntries({
-              query,
+              query: requestQuery,
               language: requestLanguage,
               limit: 100,
               offset: requestOffset,
@@ -147,9 +173,6 @@ export function ManagerLanguages() {
       ) {
         return;
       }
-      setSettings(payload.settings || null);
-      setCompleteness(payload.completeness || {});
-      setLocales(Array.isArray(payload.locales) ? payload.locales : []);
       const pageRows = Array.isArray(workspace.rows) ? workspace.rows : [];
       setRows((current) => mergePagedWorkspaceRows(current, pageRows, requestOffset));
       setDrafts((current) => mergeWorkspaceDrafts(current, pageRows, requestLanguage));
@@ -176,26 +199,51 @@ export function ManagerLanguages() {
       ) {
         return;
       }
-      setSettings({ enabledLanguages: ["ru"], catalogVersion: 0 });
-      setCompleteness({});
       setRows([]);
       setGlossary([]);
       setMessage(errorDisplayMessage(error, t, "admin.languages.loadFailed"));
     }
-  }, [view, query, untranslatedOnly, safeLanguage, offset, t]);
+  }, [view, debouncedQuery, untranslatedOnly, safeLanguage, offset, t]);
+
+  const refreshOverview = loadOverview;
+
+  useEffect(() => {
+    loadOverview();
+  }, [loadOverview]);
 
   useEffect(() => {
     setOffset(0);
-  }, [view, query, untranslatedOnly, safeLanguage]);
+  }, [view, debouncedQuery, untranslatedOnly, safeLanguage]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    loadWorkspace();
+  }, [loadWorkspace]);
 
   const enabled = new Set(settings?.enabledLanguages || ["ru"]);
 
   const toggleLanguage = async (code, nextEnabled) => {
     if (code === "ru") return;
+    if (
+      nextEnabled &&
+      overviewReady &&
+      completeness?.[code] &&
+      completeness[code].complete !== true
+    ) {
+      await appAlert({
+        title: t("admin.languages.enableBlockedTitle"),
+        message: t("admin.languages.enableBlocked"),
+        tone: "warn",
+      });
+      return;
+    }
+    if (!overviewReady && nextEnabled) {
+      await appAlert({
+        title: t("admin.languages.enableBlockedTitle"),
+        message: t("admin.languages.enableBlocked"),
+        tone: "warn",
+      });
+      return;
+    }
     const next = nextEnabled
       ? [...enabled, code]
       : [...enabled].filter((item) => item !== code);
@@ -206,6 +254,7 @@ export function ManagerLanguages() {
       });
       setSettings(result.settings || result);
       setCompleteness(result.completeness || completeness);
+      setOverviewReady(true);
       if (Array.isArray(result.rejected) && result.rejected.includes(code)) {
         await appAlert({
           title: t("admin.languages.enableBlockedTitle"),
@@ -243,11 +292,11 @@ export function ManagerLanguages() {
       }
       setDrafts((current) => markDraftClean(current, row.id, targetLanguage, savedValue));
       setMessage(t("admin.languages.saved"));
-      await load();
+      await Promise.all([loadWorkspace(), refreshOverview()]);
     } catch (error) {
       if (error?.code === "SOURCE_STALE" || error?.status === 409) {
         setMessage(t("admin.productTranslations.sourceStale"));
-        await load();
+        await Promise.all([loadWorkspace(), refreshOverview()]);
       } else {
         setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
       }
@@ -278,11 +327,11 @@ export function ManagerLanguages() {
       }
       setMessage(t("admin.languages.resetDone"));
       setDrafts((current) => clearTranslationDraft(current, row.id, targetLanguage));
-      await load();
+      await Promise.all([loadWorkspace(), refreshOverview()]);
     } catch (error) {
       if (error?.code === "SOURCE_STALE" || error?.status === 409) {
         setMessage(t("admin.productTranslations.sourceStale"));
-        await load();
+        await Promise.all([loadWorkspace(), refreshOverview()]);
       } else {
         setMessage(errorDisplayMessage(error, t, "admin.languages.saveFailed"));
       }
@@ -300,7 +349,7 @@ export function ManagerLanguages() {
       });
       setGlossaryForm(emptyGlossaryForm());
       setMessage(t("admin.glossary.saved"));
-      await load();
+      await Promise.all([loadWorkspace(), refreshOverview()]);
     } catch (error) {
       setMessage(errorDisplayMessage(error, t, "admin.glossary.saveFailed"));
     } finally {
@@ -318,7 +367,7 @@ export function ManagerLanguages() {
     try {
       await api.deleteGlossaryEntry(entry.id);
       setMessage(t("admin.glossary.deleted"));
-      await load();
+      await Promise.all([loadWorkspace(), refreshOverview()]);
     } catch (error) {
       setMessage(errorDisplayMessage(error, t, "admin.glossary.saveFailed"));
     } finally {
@@ -401,7 +450,6 @@ export function ManagerLanguages() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              onBlur={load}
               placeholder={t("admin.languages.searchPlaceholder")}
             />
           </label>

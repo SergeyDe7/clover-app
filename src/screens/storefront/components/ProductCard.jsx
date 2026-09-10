@@ -11,8 +11,9 @@ import {
   StorefrontUnitChoice,
   storefrontUnitLabel,
 } from "./StorefrontUnitChoice.jsx";
+import { productCardImageLoadingAttrs } from "./productCardImage.js";
 
-export function ProductCard({ product }) {
+export function ProductCard({ product, imagePriorityIndex = Number.POSITIVE_INFINITY }) {
   const { t } = useLocalization();
   const units = useMemo(() => orderedSaleUnits(product), [product]);
   const [unit, setUnit] = useState(() => units[0] || "piece");
@@ -25,6 +26,7 @@ export function ProductCard({ product }) {
   const orderStep = getUnitOrderStep(product, unit);
   const unitSize = getUnitMultiplier(product, unit);
   const unitLabel = storefrontUnitLabel(unit, t);
+  const imageAttrs = productCardImageLoadingAttrs(imagePriorityIndex);
 
   return (
     <article className="sf-product-card">
@@ -36,7 +38,12 @@ export function ProductCard({ product }) {
         }
       >
         {product.imageUrl ? (
-          <img src={product.imageUrl} alt="" loading="lazy" />
+          <img
+            src={product.imageUrl}
+            alt=""
+            loading={imageAttrs.loading}
+            {...(imageAttrs.fetchPriority ? { fetchPriority: imageAttrs.fetchPriority } : {})}
+          />
         ) : (
           <div className="sf-product-placeholder" aria-hidden="true" />
         )}
