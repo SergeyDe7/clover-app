@@ -75,6 +75,108 @@ const {
 assert.equal(CATEGORY_NAMESPACE, "category");
 assert.equal(CATEGORY_FIELD_KEY, "name");
 
+/** Strip line and block comments without treating string contents as code. */
+function stripJsCommentsPreservingStrings(source) {
+  let out = "";
+  let i = 0;
+  const n = source.length;
+  while (i < n) {
+    const ch = source[i];
+    const next = source[i + 1];
+    if (ch === '"' || ch === "'" || ch === "`") {
+      const quote = ch;
+      out += ch;
+      i += 1;
+      while (i < n) {
+        const c = source[i];
+        out += c;
+        if (c === "\\" && i + 1 < n) {
+          out += source[i + 1];
+          i += 2;
+          continue;
+        }
+        if (c === quote) {
+          i += 1;
+          break;
+        }
+        i += 1;
+      }
+      continue;
+    }
+    if (ch === "/" && next === "/") {
+      i += 2;
+      while (i < n && source[i] !== "\n") i += 1;
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      i += 2;
+      while (i + 1 < n && !(source[i] === "*" && source[i + 1] === "/")) i += 1;
+      i = Math.min(n, i + 2);
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+/** Collect static import/export module specifiers (formatting-independent). */
+function collectStaticModuleSpecifiers(source) {
+  const code = stripJsCommentsPreservingStrings(source);
+  const specs = [];
+  const re =
+    /\b(?:import|export)(?:\s+type)?\s+(?:[\w*\s{},]+?\s+from\s+)?(["'])([^"']+)\1/g;
+  let match;
+  while ((match = re.exec(code)) !== null) {
+    specs.push(match[2]);
+  }
+  const sideEffect = /\bimport\s*(["'])([^"']+)\1/g;
+  while ((match = sideEffect.exec(code)) !== null) {
+    specs.push(match[2]);
+  }
+  return [...new Set(specs)];
+}
+
+function assertBrowserSafeCategoryModule(label, relativePath) {
+  const source = readFileSync(path.join(workRoot, relativePath), "utf8");
+  const specs = collectStaticModuleSpecifiers(source);
+  for (const spec of specs) {
+    assert.ok(
+      !spec.startsWith("node:"),
+      `${label} must not import node builtin ${spec}`
+    );
+    assert.ok(
+      spec !== "crypto",
+      `${label} must not import bare crypto builtin`
+    );
+    const leaf = spec.split("/").pop() || spec;
+    assert.ok(
+      leaf !== "sourceHash.js" && leaf !== "sourceHash",
+      `${label} must not depend on sourceHash (${spec})`
+    );
+    assert.ok(
+      !/(?:^|\/)server(?:\/|$)/.test(spec) &&
+        !spec.includes("localizationStore") &&
+        !/\/db\.js$/.test(spec),
+      `${label} must not import server-only module ${spec}`
+    );
+  }
+}
+
+// Browser boundary: Stage 5.1 category modules must not pull Node hashing / server code.
+assertBrowserSafeCategoryModule(
+  "categoryCatalog",
+  "src/shared/i18n/categoryCatalog.js"
+);
+assertBrowserSafeCategoryModule(
+  "categoryDisplayProjection",
+  "src/shared/i18n/categoryDisplayProjection.js"
+);
+assertBrowserSafeCategoryModule(
+  "storefrontCategoryDisplay",
+  "src/shared/i18n/storefrontCategoryDisplay.js"
+);
+
 const catalogEntries = listCategoryCatalogEntries();
 assert.ok(catalogEntries.length > 0, "category corpus must be non-empty");
 
@@ -91,8 +193,12 @@ assert.ok(catalogEntries.every((e) => e.critical === true), "all category rows c
 assert.ok(catalogEntries.every((e) => e.fieldKey === "name"));
 assert.ok(catalogEntries.every((e) => e.namespace === "category"));
 assert.ok(
-  catalogEntries.every((e) => e.sourceHash === sourceHash(e.sourceRu)),
-  "source hashes must match sourceHash(sourceRu)"
+  catalogEntries.every((e) => typeof e.sourceRu === "string" && e.sourceRu.trim()),
+  "catalog entries must expose canonical sourceRu"
+);
+assert.ok(
+  catalogEntries.every((e) => !Object.prototype.hasOwnProperty.call(e, "sourceHash")),
+  "browser catalog entries must not precompute sourceHash"
 );
 
 // Duplicate Прочее isolation
@@ -219,12 +325,52 @@ const {
   writeLocalizationSettings,
   collectFilteredWorkspaceRows,
 } = await import("../src/localizationStore.js");
-const { findTranslationEntryByEntityIdentity } = await import("../src/db.js");
+const { findTranslationEntryByEntityIdentity, getTranslationValueRow } = await import("../src/db.js");
 
 initializeLocalizationCatalog();
 
 const settings = readLocalizationSettings();
 assert.deepEqual(settings.enabledLanguages, ["ru"]);
+
+// Server hash authority: persisted rows must match code-owned catalog identity + sourceRu.
+for (const catalogEntry of catalogEntries) {
+  const persisted = findTranslationEntryByEntityIdentity(
+    catalogEntry.namespace,
+    catalogEntry.entityType,
+    catalogEntry.entityId,
+    catalogEntry.fieldKey
+  );
+  assert.ok(persisted, `persisted category entry ${catalogEntry.entityId}`);
+  assert.equal(persisted.namespace, catalogEntry.namespace, `namespace ${catalogEntry.entityId}`);
+  assert.equal(persisted.entityType, catalogEntry.entityType, `entityType ${catalogEntry.entityId}`);
+  assert.equal(persisted.entityId, catalogEntry.entityId, `entityId ${catalogEntry.entityId}`);
+  assert.equal(persisted.fieldKey, catalogEntry.fieldKey, `fieldKey ${catalogEntry.entityId}`);
+  assert.equal(
+    persisted.sourceRu,
+    catalogEntry.sourceRu,
+    `persisted sourceRu must equal catalog sourceRu for ${catalogEntry.entityId}`
+  );
+  assert.ok(
+    Number(persisted.critical) === 1 || persisted.critical === true,
+    `persisted critical for ${catalogEntry.entityId}`
+  );
+  const expectedHash = sourceHash(catalogEntry.sourceRu);
+  assert.equal(
+    persisted.sourceHash,
+    expectedHash,
+    `server entry sourceHash from catalog sourceRu for ${catalogEntry.entityId}`
+  );
+  for (const locale of TARGETS) {
+    const value = getTranslationValueRow(persisted.id, locale);
+    assert.ok(value, `AUTO value ${catalogEntry.entityId}/${locale}`);
+    assert.equal(value.state, "AUTO");
+    assert.equal(
+      value.sourceHash,
+      expectedHash,
+      `server value sourceHash from catalog sourceRu for ${catalogEntry.entityId}/${locale}`
+    );
+  }
+}
 
 const reports = completenessByLanguage();
 for (const code of ["en", "uz", "ky", "tg", "zh", "ar"]) {
