@@ -27,6 +27,8 @@ import {
   makeCatalogRouteSnapshot,
   resolveStorefrontCatalogView,
 } from "../catalogRouteSnapshot.js";
+import { resolveCategoryCommercialSeo } from "../categoryCommercialSeo.js";
+import { storefrontHref } from "../mode.js";
 
 export function CatalogPage({
   category = "",
@@ -153,6 +155,39 @@ export function CatalogPage({
 
   const title = category ? categoryDisplayName : t("storefront.nav.catalog");
 
+  const commercialSeo = useMemo(
+    () =>
+      resolveCategoryCommercialSeo({
+        category,
+        subcategory,
+        facet,
+        locale,
+      }),
+    [category, subcategory, facet, locale]
+  );
+
+  const popularLinks = useMemo(() => {
+    if (!commercialSeo) return [];
+    const childNames = new Set(
+      getGroupChildren(category).map((child) => child.name)
+    );
+    return commercialSeo.popularSubcategories.filter((name) =>
+      childNames.has(name)
+    );
+  }, [commercialSeo, category]);
+
+  const showLowerCommercial =
+    Boolean(commercialSeo) &&
+    Boolean(currentPayload) &&
+    !error &&
+    products.length > 0 &&
+    query.trim() === "";
+
+  function goCatalogRoute(route) {
+    window.history.pushState({}, "", storefrontHref(route));
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }
+
   const searchToolbar = (
     <div className="sf-catalog-toolbar">
       <input
@@ -241,7 +276,10 @@ export function CatalogPage({
                     </>
                   ) : null}
                 </nav>
-                <h1>{title}</h1>
+                <h1>{commercialSeo ? commercialSeo.h1 : title}</h1>
+                {commercialSeo ? (
+                  <p className="sf-category-commercial-lead">{commercialSeo.lead}</p>
+                ) : null}
               </div>
             </header>
           ) : (
@@ -271,6 +309,40 @@ export function CatalogPage({
                 </button>
               ))}
             </div>
+          ) : null}
+
+          {popularLinks.length > 0 ? (
+            <nav
+              className="sf-category-commercial-popular"
+              aria-label="Популярные разделы"
+            >
+              <p className="sf-category-commercial-popular-title">
+                Популярные разделы
+              </p>
+              <ul className="sf-category-commercial-popular-list">
+                {popularLinks.map((sub) => {
+                  const route = {
+                    name: "catalog",
+                    category,
+                    subcategory: sub,
+                  };
+                  return (
+                    <li key={sub}>
+                      <a
+                        className="sf-category-commercial-popular-link"
+                        href={storefrontHref(route)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          goCatalogRoute(route);
+                        }}
+                      >
+                        {sub}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
           ) : null}
 
           {subcategory && facets.length > 0 ? (
@@ -348,6 +420,28 @@ export function CatalogPage({
                 ? t("storefront.thereAreNoProductsInThis")
                 : t("storefront.thereAreNoProductsInThe")}
             </p>
+          ) : null}
+
+          {showLowerCommercial ? (
+            <section
+              className="sf-category-commercial-lower"
+              aria-label="Информация для бизнеса"
+            >
+              <p className="sf-category-commercial-body">{commercialSeo.body}</p>
+              <ul className="sf-category-commercial-benefits">
+                {commercialSeo.benefits.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+              <div className="sf-category-commercial-faq">
+                {commercialSeo.faq.map((item) => (
+                  <details key={item.q} className="sf-category-commercial-faq-item">
+                    <summary>{item.q}</summary>
+                    <p>{item.a}</p>
+                  </details>
+                ))}
+              </div>
+            </section>
           ) : null}
         </div>
       </div>

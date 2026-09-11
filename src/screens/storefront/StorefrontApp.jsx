@@ -3,6 +3,7 @@ import { StoreHeader } from "./components/StoreHeader.jsx";
 import { StoreFooter } from "./components/StoreFooter.jsx";
 import { parseStorefrontRoute } from "./mode.js";
 import { isCabinetPath } from "../../config/urls.js";
+import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 import { HomePage } from "./pages/HomePage.jsx";
 import { loadPublicSite, peekPublicSite } from "./publicSite.js";
 import {
@@ -39,6 +40,7 @@ const InfoPage = lazy(() =>
 );
 
 export default function StorefrontApp() {
+  const { locale } = useLocalization();
   const [route, setRoute] = useState(() =>
     parseStorefrontRoute(window.location.pathname)
   );
@@ -102,8 +104,10 @@ export default function StorefrontApp() {
 
   useEffect(() => {
     if (route.name === "product") return;
-    applyStorefrontDocumentMeta(storefrontRouteDocumentMeta(route, site));
-  }, [route, site]);
+    applyStorefrontDocumentMeta(
+      storefrontRouteDocumentMeta(route, site, { locale })
+    );
+  }, [route, site, locale]);
 
   let page;
   let current = "home";
