@@ -114,7 +114,12 @@ import {
   resetTranslationToAuto,
   saveManualTranslation,
   writeLocalizationSettings,
+  saveStorefrontSettingsWithPageSync,
 } from "./localizationStore.js";
+import {
+  cleanupObsoleteStorefrontUploads,
+  collectObsoleteStorefrontUploadUrls,
+} from "./storefrontUploadCleanup.js";
 import {
   deleteProductLocalization,
   getProductTranslationWorkspace,
@@ -4629,23 +4634,22 @@ app.put(
       ...getGlobalState("settings", DEFAULT_SETTINGS),
     };
     const next = mergeStorefrontSettings(current, req.body?.settings || {});
-    if (
-      current.storefrontContactMapImageUrl &&
-      current.storefrontContactMapImageUrl !== next.storefrontContactMapImageUrl
-    ) {
-      removeUploadedImage(current.storefrontContactMapImageUrl);
-    }
-    const nextHeroUploads = new Set(heroSlideUploadUrls(next.storefrontHeroSlides));
-    for (const imageUrl of heroSlideUploadUrls(current.storefrontHeroSlides)) {
-      if (!nextHeroUploads.has(imageUrl)) removeUploadedImage(imageUrl);
-    }
-    const nextPromoUploads = new Set(
-      promotionUploadUrls(next.storefrontPromotions)
-    );
-    for (const imageUrl of promotionUploadUrls(current.storefrontPromotions)) {
-      if (!nextPromoUploads.has(imageUrl)) removeUploadedImage(imageUrl);
-    }
-    setGlobalState("settings", next);
+
+    // Qualify obsolete uploads before DB write; delete only after successful commit.
+    const obsoleteUploadUrls = collectObsoleteStorefrontUploadUrls(current, next, {
+      heroSlideUploadUrls,
+      promotionUploadUrls,
+    });
+
+    // DB commit first — settings + InfoPage localization source sync atomic.
+    saveStorefrontSettingsWithPageSync(next, req.user?.email || req.user?.id || "admin");
+
+    // Best-effort cleanup: a single unlink failure must not abort audit/sitemap/response.
+    cleanupObsoleteStorefrontUploads(obsoleteUploadUrls, {
+      deleteUrl: removeUploadedImage,
+      log: (message) => console.error(message),
+    });
+
     auditFromRequest(req, "storefront.settings.save", {
       pricingMode: next.storefrontPricingMode || "price_type",
       markupPercent: next.storefrontMarkupPercent || 0,
