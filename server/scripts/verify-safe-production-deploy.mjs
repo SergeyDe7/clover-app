@@ -45,6 +45,17 @@ assert.ok(
 );
 assert.ok(scriptSrc.includes("BUILD_WT") || scriptSrc.includes("worktree"), "off-live build worktree");
 assert.ok(scriptSrc.includes("STAGED_DIST") || scriptSrc.includes("staged"), "staged dist");
+// Committed normal default for readiness window must be 60 (sandbox may still override via env).
+assert.match(
+  scriptSrc,
+  /CLOVER_DEPLOY_HEALTH_ATTEMPTS:-\s*60\b/,
+  "default CLOVER_DEPLOY_HEALTH_ATTEMPTS must be 60"
+);
+assert.equal(
+  /CLOVER_DEPLOY_HEALTH_ATTEMPTS:-\s*30\b/.test(scriptSrc),
+  false,
+  "default CLOVER_DEPLOY_HEALTH_ATTEMPTS must not remain 30"
+);
 console.log("STATIC_CONTRACT:PASS");
 
 function sh(cmd, opts = {}) {
