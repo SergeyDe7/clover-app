@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   getGlobalState,
+  setGlobalState,
   runInTransaction,
   listTranslationEntryRows,
   listTranslationValueRows,
@@ -32,11 +33,24 @@ import {
   listCategoryCatalogEntries,
   isCurrentCategoryCatalogEntry,
 } from "../../src/shared/i18n/categoryCatalog.js";
+import {
+  PAGE_NAMESPACE,
+  INFO_PAGE_ENTITY_TYPE,
+  listInfoPageCatalogEntries,
+  isCurrentInfoPageCatalogEntry,
+  getInfoPageCanonicalField,
+} from "../../src/shared/i18n/infoPageCatalog.js";
+import { resolveStorefrontInfoPage } from "../../src/shared/storefrontInfoPages.js";
+import { DEFAULT_SETTINGS } from "./defaults.js";
 import { getSeedTranslation } from "./i18n/uiTranslationSeed.js";
 import {
   getCategorySeedTranslation,
   hasCategorySeed,
 } from "./i18n/categoryTranslationSeed.js";
+import {
+  getInfoPageSeedTranslation,
+  hasInfoPageSeed,
+} from "./i18n/infoPageTranslationSeed.js";
 import {
   LOCALIZATION_SETTINGS_KEY,
   applyEnabledLanguages,
@@ -85,9 +99,13 @@ export function isCurrentCatalogEntry(entry) {
   return CURRENT_CATALOG_KEYS.has(`${entry.namespace}\0${entry.fieldKey}`);
 }
 
-/** UI catalog OR current category entity catalog. */
+/** UI catalog OR current category entity catalog OR current InfoPage 21. */
 export function isCurrentEditableTranslationEntry(entry) {
-  return isCurrentCatalogEntry(entry) || isCurrentCategoryCatalogEntry(entry);
+  return (
+    isCurrentCatalogEntry(entry) ||
+    isCurrentCategoryCatalogEntry(entry) ||
+    isCurrentInfoPageCatalogEntry(entry)
+  );
 }
 
 function mapStore(entries, values) {
@@ -176,12 +194,45 @@ function currentCategoryCatalogItems(store) {
   };
 }
 
+function currentInfoPageCatalogItems(store) {
+  const current = store.entries.filter(isCurrentInfoPageCatalogEntry);
+  const currentIds = new Set(current.map((entry) => entry.id));
+  return {
+    entries: current,
+    values: store.values.filter((value) => currentIds.has(value.entryId)),
+  };
+}
+
+/**
+ * InfoPage namespace store only: current 21 identities + optional language values.
+ * Does not scan UI/generic translation_entries.
+ */
+export function readInfoPageTranslationStore(options = {}) {
+  const namespaceRows = listTranslationEntryRowsByNamespace(PAGE_NAMESPACE);
+  const current = namespaceRows.filter(isCurrentInfoPageCatalogEntry);
+  const entryIds = current.map((entry) => entry.id);
+  const languageInternal = options.languageInternal
+    ? String(options.languageInternal)
+    : "";
+  const values = listTranslationValueRowsForEntryIds(entryIds, languageInternal);
+  return {
+    store: mapStore(current, values),
+    stats: {
+      infoPageNamespaceEntriesRead: namespaceRows.length,
+      infoPageCurrentEntries: current.length,
+      infoPageValuesRead: values.length,
+      valueLanguageInternal: languageInternal || "all",
+    },
+  };
+}
+
 function completenessItems(store, productItems = null) {
   const ui = currentCatalogItems(store);
   const categories = currentCategoryCatalogItems(store);
+  const pages = currentInfoPageCatalogItems(store);
   const current = {
-    entries: [...ui.entries, ...categories.entries],
-    values: [...ui.values, ...categories.values],
+    entries: [...ui.entries, ...categories.entries, ...pages.entries],
+    values: [...ui.values, ...categories.values, ...pages.values],
   };
   const rows = buildTranslationRows(current);
   const items = [];
@@ -374,6 +425,10 @@ function syncCatalogBatch() {
     dirty = true;
   }
 
+  if (syncInfoPageCatalogBatch(stamp)) {
+    dirty = true;
+  }
+
   if (dirty) {
     bumpCatalogVersion(settings, "catalog-sync");
   }
@@ -471,6 +526,159 @@ function syncCategoryCatalogBatch(stamp = nowIso()) {
   return dirty;
 }
 
+/**
+ * Transaction-neutral InfoPage source sync for the current 21 identities.
+ * MUST NOT open its own transaction — callers wrap with runInTransaction.
+ *
+ * @returns {boolean} whether localization rows changed
+ */
+export function syncInfoPageCatalogBatch(stamp = nowIso(), options = {}) {
+  if (options && options.__testThrow) {
+    const error = new Error(String(options.__testThrowMessage || "info page sync test failure"));
+    error.status = 500;
+    error.code = "TEST_INFO_PAGE_SYNC_FAIL";
+    throw error;
+  }
+
+  let dirty = false;
+  const settingsRaw =
+    options.settings && typeof options.settings === "object"
+      ? options.settings
+      : getGlobalState("settings", DEFAULT_SETTINGS);
+  const storedPages =
+    settingsRaw && typeof settingsRaw === "object" ? settingsRaw.storefrontInfoPages : null;
+
+  for (const catalogEntry of listInfoPageCatalogEntries()) {
+    const slug = catalogEntry.entityId;
+    const fieldKey = catalogEntry.fieldKey;
+    const resolved = resolveStorefrontInfoPage(slug, storedPages);
+    const canonicalResolved = resolveStorefrontInfoPage(slug, undefined);
+    const effectiveRu = String(resolved?.[fieldKey] || "");
+    const canonicalRu = String(canonicalResolved?.[fieldKey] || getInfoPageCanonicalField(slug, fieldKey));
+    const isCanonical = effectiveRu === canonicalRu;
+    const hash = sourceHash(effectiveRu);
+
+    const existing = findTranslationEntryByEntityIdentity(
+      PAGE_NAMESPACE,
+      INFO_PAGE_ENTITY_TYPE,
+      slug,
+      fieldKey
+    );
+
+    if (!existing) {
+      const id = randomUUID();
+      insertTranslationEntryRow({
+        id,
+        namespace: PAGE_NAMESPACE,
+        entityType: INFO_PAGE_ENTITY_TYPE,
+        entityId: slug,
+        fieldKey,
+        sourceRu: effectiveRu,
+        sourceHash: hash,
+        critical: true,
+        createdAt: stamp,
+        updatedAt: stamp,
+      });
+      dirty = true;
+      if (isCanonical) {
+        for (const locale of TARGET_INTERNAL_LOCALES) {
+          upsertTranslationValueRow({
+            entryId: id,
+            languageCode: locale,
+            value: getInfoPageSeedTranslation(slug, fieldKey, locale),
+            state: "AUTO",
+            sourceHash: hash,
+            updatedAt: stamp,
+            updatedBy: "info-page-catalog-seed",
+          });
+        }
+      }
+      continue;
+    }
+
+    const sourceChanged =
+      existing.sourceHash !== hash || existing.sourceRu !== effectiveRu;
+    const criticalChanged = Boolean(existing.critical) !== true;
+    if (sourceChanged || criticalChanged) {
+      updateTranslationEntryRow({
+        id: existing.id,
+        sourceRu: effectiveRu,
+        sourceHash: hash,
+        critical: true,
+        updatedAt: stamp,
+      });
+      dirty = true;
+    }
+
+    const entryHash = sourceChanged ? hash : existing.sourceHash;
+
+    if (!isCanonical) {
+      // CASE B: preserve AUTO/MANUAL values and their sourceHashes (become STALE).
+      // Missing targets stay missing — do not insert canonical AUTO against override RU.
+      continue;
+    }
+
+    // CASE A / return-to-fallback: restore or refresh canonical AUTO; preserve MANUAL.
+    for (const locale of TARGET_INTERNAL_LOCALES) {
+      const seed = getInfoPageSeedTranslation(slug, fieldKey, locale);
+      const value = getTranslationValueRow(existing.id, locale);
+      if (!value) {
+        upsertTranslationValueRow({
+          entryId: existing.id,
+          languageCode: locale,
+          value: seed,
+          state: "AUTO",
+          sourceHash: entryHash,
+          updatedAt: stamp,
+          updatedBy: "info-page-catalog-seed",
+        });
+        dirty = true;
+        continue;
+      }
+      if (value.state === "MANUAL") {
+        continue;
+      }
+      const alreadyCurrent =
+        value.state === "AUTO" &&
+        value.value === seed &&
+        value.sourceHash === entryHash;
+      if (alreadyCurrent) {
+        continue;
+      }
+      upsertTranslationValueRow({
+        entryId: existing.id,
+        languageCode: locale,
+        value: seed,
+        state: "AUTO",
+        sourceHash: entryHash,
+        updatedAt: stamp,
+        updatedBy: "info-page-catalog-seed",
+      });
+      dirty = true;
+    }
+  }
+
+  return dirty;
+}
+
+/**
+ * Persist storefront settings + InfoPage source sync in ONE transaction.
+ * Callers must perform irreversible upload cleanup ONLY after this returns.
+ */
+export function saveStorefrontSettingsWithPageSync(nextSettings, actor = "", syncOptions = {}) {
+  return runInTransaction(() => {
+    setGlobalState("settings", nextSettings);
+    const dirty = syncInfoPageCatalogBatch(nowIso(), {
+      settings: nextSettings,
+      ...syncOptions,
+    });
+    if (dirty) {
+      bumpCatalogVersion(readLocalizationSettings(), actor || "storefront-info-page-sync");
+    }
+    return { dirty };
+  });
+}
+
 let initialized = false;
 
 export function initializeLocalizationCatalog() {
@@ -535,6 +743,7 @@ export function collectFilteredWorkspaceRows(filters = {}, options = {}) {
   const needUi = view === "interface" || view === "seo" || view === "untranslated";
   const needCategories = view === "categories" || view === "untranslated";
   const needProducts = view === "products" || view === "untranslated";
+  const needPages = view === "seo" || view === "untranslated";
   const internal = languageRaw ? exactTranslationTargetInternal(languageRaw) : "";
 
   // Stage 5.1: categories-only path — no generic UI entry scan, no products.
@@ -547,6 +756,7 @@ export function collectFilteredWorkspaceRows(filters = {}, options = {}) {
       buildStats.namespace = CATEGORY_NAMESPACE;
       buildStats.uiRowsBuilt = 0;
       buildStats.productRowsBuilt = 0;
+      buildStats.infoPageRowsBuilt = 0;
     }
     const categoryRows = buildTranslationRows(categoryStore, {
       language: languageRaw,
@@ -564,8 +774,45 @@ export function collectFilteredWorkspaceRows(filters = {}, options = {}) {
     return filtered;
   }
 
+  // Stage 5.2-A: seo path — UI current catalog + bounded page namespace (no products/categories).
+  if (view === "seo") {
+    const store = internal
+      ? readTranslationStore({ languageInternal: internal })
+      : readTranslationStore();
+    if (buildStats && typeof buildStats === "object") {
+      buildStats.genericEntriesRead = 1;
+      buildStats.genericValuesRead = 1;
+      buildStats.valueLanguageInternal = internal || "all";
+    }
+    const uiStore = currentCatalogItems(store);
+    const uiRows = buildTranslationRows(uiStore, {
+      language: languageRaw,
+      ...(buildStats ? { __stats: buildStats } : {}),
+    });
+    const { store: pageStore, stats: pageReadStats } = readInfoPageTranslationStore({
+      languageInternal: internal || undefined,
+    });
+    const pageRows = buildTranslationRows(pageStore, {
+      language: languageRaw,
+    });
+    if (buildStats && typeof buildStats === "object") {
+      Object.assign(buildStats, pageReadStats);
+      buildStats.namespacePage = PAGE_NAMESPACE;
+      buildStats.uiRowsBuilt = uiRows.length;
+      buildStats.categoryRowsBuilt = 0;
+      buildStats.productRowsBuilt = 0;
+      buildStats.infoPageRowsBuilt = pageRows.length;
+    }
+    let filtered = filterTranslationRows([...uiRows, ...pageRows], {
+      ...filters,
+      language: languageRaw,
+    });
+    filtered = projectSelectedLanguageRows(filtered, languageRaw);
+    return filtered;
+  }
+
   const store =
-    needUi || needCategories
+    needUi || needCategories || needPages
       ? internal
         ? readTranslationStore({ languageInternal: internal })
         : readTranslationStore()
@@ -597,6 +844,14 @@ export function collectFilteredWorkspaceRows(filters = {}, options = {}) {
     });
   }
 
+  let pageRows = [];
+  if (needPages) {
+    const pageStore = currentInfoPageCatalogItems(store);
+    pageRows = buildTranslationRows(pageStore, {
+      language: languageRaw,
+    });
+  }
+
   const productRows = needProducts
     ? buildProductWorkspaceRows(undefined, { language: languageRaw })
     : [];
@@ -605,11 +860,12 @@ export function collectFilteredWorkspaceRows(filters = {}, options = {}) {
     buildStats.uiRowsBuilt = uiRows.length;
     buildStats.categoryRowsBuilt = categoryRows.length;
     buildStats.productRowsBuilt = productRows.length;
+    buildStats.infoPageRowsBuilt = pageRows.length;
   }
 
   let combined;
   if (view === "products") combined = productRows;
-  else combined = [...uiRows, ...categoryRows, ...productRows];
+  else combined = [...uiRows, ...categoryRows, ...productRows, ...pageRows];
 
   let filtered = filterTranslationRows(combined, {
     ...filters,
@@ -646,7 +902,7 @@ export function listWorkspaceRows(filters = {}) {
   return collectFilteredWorkspaceRows(filters);
 }
 
-/** Validates UI or category current entries. */
+/** Validates UI, category, or current InfoPage entries. */
 function requireCurrentEditableEntry(entryId) {
   const entry = getTranslationEntryRow(entryId);
   if (!entry) {
@@ -664,7 +920,39 @@ function requireCurrentEditableEntry(entryId) {
   return entry;
 }
 
+function infoPageEffectiveIsCanonical(entry) {
+  const slug = String(entry.entityId || "");
+  const fieldKey = String(entry.fieldKey || "");
+  const settings = getGlobalState("settings", DEFAULT_SETTINGS);
+  const storedPages =
+    settings && typeof settings === "object" ? settings.storefrontInfoPages : null;
+  const resolved = resolveStorefrontInfoPage(slug, storedPages);
+  const canonicalResolved = resolveStorefrontInfoPage(slug, undefined);
+  const effectiveRu = String(resolved?.[fieldKey] || "");
+  const canonicalRu = String(
+    canonicalResolved?.[fieldKey] || getInfoPageCanonicalField(slug, fieldKey)
+  );
+  return effectiveRu === canonicalRu;
+}
+
 function resolveAutoSeedForEntry(entry, internalLocale) {
+  if (isCurrentInfoPageCatalogEntry(entry)) {
+    if (!hasInfoPageSeed(entry.entityId, entry.fieldKey)) {
+      const error = new Error("Unknown info page seed cannot be reset.");
+      error.status = 409;
+      error.code = "NO_SEED";
+      throw error;
+    }
+    if (!infoPageEffectiveIsCanonical(entry)) {
+      const error = new Error(
+        "No current AUTO seed while InfoPage effective RU is an admin override."
+      );
+      error.status = 409;
+      error.code = "NO_CURRENT_AUTO_SEED";
+      throw error;
+    }
+    return getInfoPageSeedTranslation(entry.entityId, entry.fieldKey, internalLocale);
+  }
   if (isCurrentCategoryCatalogEntry(entry)) {
     if (!hasCategorySeed(entry.entityType, entry.entityId)) {
       const error = new Error("Unknown category seed cannot be reset.");
