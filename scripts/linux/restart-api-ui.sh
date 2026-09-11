@@ -82,7 +82,7 @@ require_loaded_unit() {
 
 wait_for_health() {
   local i
-  local attempts="${CLOVER_DEPLOY_HEALTH_ATTEMPTS:-30}"
+  local attempts="${CLOVER_DEPLOY_HEALTH_ATTEMPTS:-60}"
   for i in $(seq 1 "${attempts}"); do
     if "${CURL_BIN}" -fsS "${HEALTH_API}" >/dev/null 2>&1 \
       && "${CURL_BIN}" -fsS -o /dev/null "${HEALTH_UI}" 2>&1; then
