@@ -466,6 +466,12 @@ app.use(cors({
   },
   credentials: false,
 }));
+// SEO-002: allow crawlers to fetch /api/public/* for storefront JS rendering,
+// but keep JSON out of the index.
+app.use("/api/public", (req, res, next) => {
+  res.setHeader("X-Robots-Tag", "noindex");
+  next();
+});
 app.use(express.json({ limit: "24mb" }));
 app.use("/uploads/reconciliation", (req, res) => res.status(404).end());
 app.use("/uploads", express.static(uploadsDirectory, { maxAge: "1h" }));

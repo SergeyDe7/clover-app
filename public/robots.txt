@@ -1,7 +1,8 @@
 User-agent: *
 Allow: /
-Disallow: /lk
+Allow: /api/public/
 Disallow: /api/
+Disallow: /lk
 Disallow: /vitrina/lk
 
 Sitemap: https://clover-spb.ru/sitemap.xml
