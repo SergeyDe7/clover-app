@@ -1,4 +1,5 @@
 import { useLocalization } from "./shared/i18n/LocalizationProvider";
+import { syncBrowserPreferenceFromProfile } from "./shared/i18n/languagePreference.js";
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import cloverLogo from "./assets/clover-logo.png";
@@ -684,12 +685,13 @@ function App() {
     }
 
     setOrders(incomingOrders);
-    setProfile(
-      normalizeProfileContacts({
-        ...EMPTY_PROFILE,
-        ...(data.profile || EMPTY_PROFILE),
-      })
-    );
+    const nextProfile = normalizeProfileContacts({
+      ...EMPTY_PROFILE,
+      ...(data.profile || EMPTY_PROFILE),
+    });
+    setProfile(nextProfile);
+    // Stage 6.1: authenticated profile locale is authoritative and syncs to browser storage.
+    syncBrowserPreferenceFromProfile(nextProfile);
     setAddresses(
       Array.isArray(data.addresses) ? data.addresses : []
     );
