@@ -28,6 +28,15 @@ export {
 } from "./languageResolver.js";
 
 export {
+  LANGUAGE_PREFERENCE_STORAGE_KEY,
+  clearLanguagePreference,
+  normalizeLanguagePreference,
+  readLanguagePreference,
+  syncBrowserPreferenceFromProfile,
+  writeLanguagePreference,
+} from "./languagePreference.js";
+
+export {
   MISSING_TRANSLATION_FALLBACK_RU,
   createLocalizationRuntime,
   translate,

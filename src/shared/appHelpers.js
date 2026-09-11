@@ -4,6 +4,7 @@
 import { assignCloverTaxonomy, canonicalizeProductCategory } from "../screens/storefront/productGroups.js";
 import { uiText } from "./i18n/translationRuntime.js";
 import { exchangeStatusLabel as exchangeStatusCodeLabel } from "./i18n/displayLabels.js";
+import { normalizeLanguagePreference } from "./i18n/languagePreference.js";
 
 export const MANAGER_ACTIVE_TAB_KEY = "clover-manager-active-tab-v1";
 
@@ -740,6 +741,7 @@ export const EMPTY_PROFILE = {
   phone: "",
   email: "",
   contacts: [],
+  locale: "",
 };
 
 function newContactId() {
@@ -771,6 +773,7 @@ export function normalizeProfileContacts(profile = {}) {
   const companyName = String(source.companyName || "").trim();
   const email = String(source.email || "").trim();
   const rawContacts = Array.isArray(source.contacts) ? source.contacts : [];
+  const normalizedLocale = normalizeLanguagePreference(source.locale) || "";
 
   let contacts = rawContacts
     .map((item, index) => {
@@ -815,6 +818,7 @@ export function normalizeProfileContacts(profile = {}) {
       phone: "",
       email,
       contacts: [],
+      ...(normalizedLocale ? { locale: normalizedLocale } : {}),
     };
   }
 
@@ -836,6 +840,7 @@ export function normalizeProfileContacts(profile = {}) {
     phone: primary.phone || "",
     email,
     contacts,
+    ...(normalizedLocale ? { locale: normalizedLocale } : {}),
   };
 }
 

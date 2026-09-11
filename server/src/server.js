@@ -132,6 +132,7 @@ import {
 import { commitCanonicalProducts } from "./productSourceCorpus.js";
 import { scheduleSitemapRefresh } from "./sitemapArtifact.js";
 import { localeChoices } from "../../src/shared/i18n/localizationSettings.js";
+import { normalizeLanguagePreference } from "../../src/shared/i18n/languagePreference.js";
 import { publicClientSettings } from "./clientSettings.js";
 import {
   listClientAccessEntries,
@@ -1327,6 +1328,7 @@ function normalizeClientProfileContacts(profile = {}, accountEmail = "") {
   const companyName = String(source.companyName || "").trim();
   const email = String(accountEmail || source.email || "").trim();
   const rawContacts = Array.isArray(source.contacts) ? source.contacts : [];
+  const normalizedLocale = normalizeLanguagePreference(source.locale) || "";
   const ROLE_PRIMARY = "Основной";
   const ROLE_SECONDARY = "Дополнительный";
   const syncLabel = (label, isPrimary) => {
@@ -1378,6 +1380,7 @@ function normalizeClientProfileContacts(profile = {}, accountEmail = "") {
       phone: "",
       email,
       contacts: [],
+      ...(normalizedLocale ? { locale: normalizedLocale } : {}),
     };
   }
 
@@ -1399,6 +1402,7 @@ function normalizeClientProfileContacts(profile = {}, accountEmail = "") {
     phone: primary.phone || "",
     email,
     contacts,
+    ...(normalizedLocale ? { locale: normalizedLocale } : {}),
   };
 }
 
@@ -4438,11 +4442,31 @@ app.put(
         : {};
     const current = getClientState(req.user.id).profile || {};
     const accountEmail = normalizeEmail(req.user.email);
+
+    // Locale is an optional preference: reject unknown non-empty values explicitly.
+    if (Object.prototype.hasOwnProperty.call(incoming, "locale")) {
+      const rawLocale = incoming.locale;
+      if (rawLocale !== "" && rawLocale != null) {
+        if (!normalizeLanguagePreference(rawLocale)) {
+          return res.status(400).json({ error: "Некорректная локаль профиля." });
+        }
+      }
+    }
+
     // Клиент не может сменить email/логин через профиль.
+    // Whitelist merge: only known profile fields (locale validated above).
     const profile = normalizeClientProfileContacts(
       {
-        ...current,
-        ...incoming,
+        companyName:
+          incoming.companyName !== undefined ? incoming.companyName : current.companyName,
+        contactName:
+          incoming.contactName !== undefined ? incoming.contactName : current.contactName,
+        phone: incoming.phone !== undefined ? incoming.phone : current.phone,
+        contacts: incoming.contacts !== undefined ? incoming.contacts : current.contacts,
+        locale:
+          Object.prototype.hasOwnProperty.call(incoming, "locale")
+            ? incoming.locale
+            : current.locale,
       },
       accountEmail || current.email || ""
     );

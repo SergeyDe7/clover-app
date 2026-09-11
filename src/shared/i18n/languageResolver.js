@@ -21,20 +21,21 @@ export function resolveLocale(input = {}) {
   void source.acceptLanguage;
 
   const surface = source.surface === "cabinet" ? "cabinet" : "storefront";
+  const enabledLanguages = source.enabledLanguages;
 
   if (
     PUBLIC_LANGUAGE_PREFIXES_ENABLED &&
     surface === "storefront" &&
-    isLanguageEnabled(source.urlPrefix)
+    isLanguageEnabled(source.urlPrefix, enabledLanguages)
   ) {
     return canonicalizeLocale(source.urlPrefix);
   }
 
-  if (isLanguageEnabled(source.preferredLanguage)) {
+  if (isLanguageEnabled(source.preferredLanguage, enabledLanguages)) {
     return canonicalizeLocale(source.preferredLanguage);
   }
 
-  if (isLanguageEnabled(source.storedLanguage)) {
+  if (isLanguageEnabled(source.storedLanguage, enabledLanguages)) {
     return canonicalizeLocale(source.storedLanguage);
   }
 
