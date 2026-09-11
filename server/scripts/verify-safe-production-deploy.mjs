@@ -333,13 +333,46 @@ exit 2
   rmSync(box.root, { recursive: true, force: true });
 }
 
-// --- F. INVALID TARGET ---
+// --- F1. NONEXISTENT TARGET ---
 {
-  const box = initSandbox("invalid");
+  const box = initSandbox("f1-missing");
+  const beforeTag = liveTag(box);
   const res = runDeploy(box, "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
   assert.notEqual(res.status, 0);
-  assert.equal(liveSha(box), box.oldSha);
-  console.log("F_INVALID_TARGET:PASS");
+  assert.equal(liveSha(box), box.oldSha, "source unchanged");
+  assert.equal(liveTag(box), beforeTag, "dist unchanged");
+  assert.equal(readFileSync(path.join(box.state, "restart_count"), "utf8").trim(), "0");
+  assert.doesNotMatch(res.stdout, /Deploy OK/);
+  console.log("F1_NONEXISTENT_TARGET:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- F2. EXISTING NON-FAST-FORWARD (older ancestor of live HEAD) ---
+{
+  const box = initSandbox("f2-nonff");
+  // Live HEAD = newer; target = older ancestor (exists but not a forward descendant).
+  execFileSync("git", ["-C", box.live, "reset", "--hard", box.newSha]);
+  writeFileSync(
+    path.join(box.live, "dist/index.html"),
+    `<meta name="clover-ui-build" content="ui-OLD"><script src="/assets/index-OLD.js"></script>`
+  );
+  const before = liveSha(box);
+  assert.equal(before, box.newSha);
+  const beforeTag = liveTag(box);
+  // Prove target exists as a commit object.
+  execFileSync("git", ["-C", box.live, "cat-file", "-e", `${box.oldSha}^{commit}`]);
+  const res = runDeploy(box, box.oldSha);
+  assert.notEqual(res.status, 0, "non-FF target must be refused");
+  assert.match(
+    res.stderr,
+    /not a fast-forward descendant|fast-forward descendant of current production/i,
+    `expected ancestry refusal, got: ${res.stderr}`
+  );
+  assert.equal(liveSha(box), before, "source unchanged on non-FF refusal");
+  assert.equal(liveTag(box), beforeTag, "dist unchanged on non-FF refusal");
+  assert.equal(readFileSync(path.join(box.state, "restart_count"), "utf8").trim(), "0");
+  assert.doesNotMatch(res.stdout, /Deploy OK/);
+  console.log("F2_EXISTING_NON_FF_TARGET:PASS");
   rmSync(box.root, { recursive: true, force: true });
 }
 
@@ -417,6 +450,41 @@ exit 2
   const res = runDeploy(box, box.newSha.slice(0, 12));
   assert.notEqual(res.status, 0);
   console.log("J_NO_UNSAFE_PROCESS_AND_SHORT_SHA:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- K. SAME-DEVICE filesystem (injectable overrides equal) ---
+{
+  const box = initSandbox("fs-same");
+  const res = runDeploy(box, box.newSha, {
+    CLOVER_DEPLOY_FSDEV_LIVE: "1001",
+    CLOVER_DEPLOY_FSDEV_STAGING: "1001",
+    CLOVER_DEPLOY_FSDEV_LKG: "1001",
+  });
+  assert.equal(res.status, 0, `same-device deploy failed: ${res.stderr}\n${res.stdout}`);
+  assert.match(res.stdout, /Deploy OK/);
+  assert.equal(liveSha(box), box.newSha);
+  console.log("K_SAME_DEVICE:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- L. CROSS-DEVICE filesystem refused before build/cutover ---
+{
+  const box = initSandbox("fs-cross");
+  const before = liveSha(box);
+  const beforeTag = liveTag(box);
+  const res = runDeploy(box, box.newSha, {
+    CLOVER_DEPLOY_FSDEV_LIVE: "1001",
+    CLOVER_DEPLOY_FSDEV_STAGING: "2002",
+    CLOVER_DEPLOY_FSDEV_LKG: "1001",
+  });
+  assert.notEqual(res.status, 0);
+  assert.match(res.stderr, /cross-filesystem deploy staging is unsafe/i);
+  assert.equal(liveSha(box), before, "source unchanged on cross-fs refusal");
+  assert.equal(liveTag(box), beforeTag, "dist unchanged on cross-fs refusal");
+  assert.equal(readFileSync(path.join(box.state, "restart_count"), "utf8").trim(), "0");
+  assert.doesNotMatch(res.stdout, /Deploy OK/);
+  console.log("L_CROSS_DEVICE_REFUSAL:PASS");
   rmSync(box.root, { recursive: true, force: true });
 }
 

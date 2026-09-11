@@ -206,14 +206,35 @@ PREV_SHA="$("${GIT_BIN}" -C "${ROOT}" rev-parse HEAD)"
 if ! "${GIT_BIN}" -C "${ROOT}" cat-file -e "${TARGET_SHA}^{commit}"; then
   die "target SHA not present in ROOT repo: ${TARGET_SHA}"
 fi
-# Non-fast-forward / unrelated target: require TARGET reachable from origin/main ancestry OR ancestor of HEAD/descendant.
-# Accept any commit object already in repo; refuse if reset would leave uncommitted tracked changes (already checked).
-# Explicit invalid: refuse if target equals empty tree or not a commit (handled above).
+# Accept only current SHA or a descendant (fast-forward). Refuse older ancestors / diverged commits.
+# Rollback uses recorded PREV_SHA internally and is not subject to this gate.
+if ! "${GIT_BIN}" -C "${ROOT}" merge-base --is-ancestor "${PREV_SHA}" "${TARGET_SHA}"; then
+  die "target is not a fast-forward descendant of current production SHA (${PREV_SHA})"
+fi
 
 require_loaded_unit "${API_UNIT}"
 require_loaded_unit "${UI_UNIT}"
 
 mkdir -p "${STAGING_ROOT}" "${LKG_ROOT}"
+# Rename/move cutover requires same filesystem for live dist, staging, and LKG.
+fs_device() {
+  local path="$1"
+  local override="$2"
+  if [[ -n "${override}" ]]; then
+    printf '%s\n' "${override}"
+    return 0
+  fi
+  stat -c '%d' "${path}"
+}
+LIVE_FS_PROBE="${LIVE_DIST}"
+[[ -e "${LIVE_FS_PROBE}" ]] || LIVE_FS_PROBE="${ROOT}"
+LIVE_DEV="$(fs_device "${LIVE_FS_PROBE}" "${CLOVER_DEPLOY_FSDEV_LIVE:-}")"
+STAGING_DEV="$(fs_device "${STAGING_ROOT}" "${CLOVER_DEPLOY_FSDEV_STAGING:-}")"
+LKG_DEV="$(fs_device "${LKG_ROOT}" "${CLOVER_DEPLOY_FSDEV_LKG:-}")"
+if [[ "${LIVE_DEV}" != "${STAGING_DEV}" || "${LIVE_DEV}" != "${LKG_DEV}" ]]; then
+  die "cross-filesystem deploy staging is unsafe (live=${LIVE_DEV} staging=${STAGING_DEV} lkg=${LKG_DEV})"
+fi
+
 STAGED_DIST="${STAGING_ROOT}/dist-${TARGET_SHA}-$$"
 BUILD_WT="${STAGING_ROOT}/src-${TARGET_SHA}-$$"
 rm -rf "${STAGED_DIST}" "${BUILD_WT}"
