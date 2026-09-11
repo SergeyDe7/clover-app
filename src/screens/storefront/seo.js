@@ -5,6 +5,10 @@ import {
   resolveStorefrontInfoPage,
 } from "../../shared/storefrontInfoPages.js";
 import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE } from "./siteCopy.js";
+import {
+  formatSeoTemplate,
+  getSeoCanonicalField,
+} from "../../shared/i18n/seoCatalog.js";
 
 export const STOREFRONT_SITE_NAME = "КЛЕВЕР";
 export const STOREFRONT_DEFAULT_TITLE = `${STOREFRONT_HERO_TITLE} | ${STOREFRONT_SITE_NAME}`;
@@ -104,13 +108,17 @@ export function storefrontRouteDocumentMeta(route, site) {
     const label = parts.length ? parts.join(" — ") : "Каталог";
     return {
       title: `${label} | ${STOREFRONT_SITE_NAME}`,
-      description: `Каталог «${label}»: хозтовары, упаковка и расходники для HoReCa. Заказ без регистрации на сайте ${STOREFRONT_SITE_NAME}.`,
+      description: formatSeoTemplate(getSeoCanonicalField("catalog", "descriptionTemplate"), {
+        label,
+      }),
       path: storefrontHref(route),
     };
   }
   if (route.name === "product") {
     return {
-      title: `Товар ${route.code} | ${STOREFRONT_SITE_NAME}`,
+      title: formatSeoTemplate(getSeoCanonicalField("product", "titleTemplate"), {
+        code: route.code,
+      }),
       description: STOREFRONT_DEFAULT_DESCRIPTION,
       path: storefrontHref(route),
       type: "product",
@@ -118,30 +126,29 @@ export function storefrontRouteDocumentMeta(route, site) {
   }
   if (route.name === "cart") {
     return {
-      title: `Корзина | ${STOREFRONT_SITE_NAME}`,
-      description: "Корзина заказа на сайте компании КЛЕВЕР.",
+      title: getSeoCanonicalField("cart", "title"),
+      description: getSeoCanonicalField("cart", "description"),
       path: storefrontHref(route),
     };
   }
   if (route.name === "checkout") {
     return {
-      title: `Оформление заказа | ${STOREFRONT_SITE_NAME}`,
-      description: "Оформление заказа хозтоваров и упаковки для HoReCa.",
+      title: getSeoCanonicalField("checkout", "title"),
+      description: getSeoCanonicalField("checkout", "description"),
       path: storefrontHref(route),
     };
   }
   if (route.name === "contacts") {
     return {
-      title: `Контакты | ${STOREFRONT_SITE_NAME}`,
-      description: "Контакты компании КЛЕВЕР: адрес, телефон и карта проезда.",
+      title: getSeoCanonicalField("contacts", "title"),
+      description: getSeoCanonicalField("contacts", "description"),
       path: storefrontHref(route),
     };
   }
   if (route.name === "aktsii") {
     return {
-      title: `Акции | ${STOREFRONT_SITE_NAME}`,
-      description:
-        "Акции и специальные предложения компании КЛЕВЕР для HoReCa. Актуальные информационные материалы на сайте clover-spb.ru.",
+      title: getSeoCanonicalField("aktsii", "title"),
+      description: getSeoCanonicalField("aktsii", "description"),
       path: "https://clover-spb.ru/aktsii",
     };
   }
