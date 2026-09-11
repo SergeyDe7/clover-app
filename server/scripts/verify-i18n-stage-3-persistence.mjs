@@ -156,8 +156,13 @@ const { listCategoryCatalogEntries } = await import(
 const { listInfoPageCatalogEntries } = await import(
   pathToFileURL(path.join(workRoot, "src/shared/i18n/infoPageCatalog.js")).href
 );
+const { listSeoCatalogEntries } = await import(
+  pathToFileURL(path.join(workRoot, "src/shared/i18n/seoCatalog.js")).href
+);
 const categoryN = listCategoryCatalogEntries().length;
 const pageN = listInfoPageCatalogEntries().length;
+const seoN = listSeoCatalogEntries().length;
+assert.equal(seoN, 10, "Stage 5.2-B SEO corpus must be exactly 10 entries");
 const uiEntries = store1.entries.filter(
   (entry) => !entry.entityType && !entry.entityId
 );
@@ -173,22 +178,32 @@ const pageEntries = store1.entries.filter(
     entry.entityType === "info" &&
     entry.entityId
 );
+const seoEntries = store1.entries.filter(
+  (entry) =>
+    entry.namespace === "seo" &&
+    entry.entityType === "route" &&
+    entry.entityId
+);
 assert.equal(uiEntries.length, n);
 assert.equal(categoryEntries.length, categoryN);
 assert.equal(pageEntries.length, pageN);
-assert.equal(store1.entries.length, n + categoryN + pageN);
+assert.equal(seoEntries.length, seoN);
+assert.equal(store1.entries.length, n + categoryN + pageN + seoN);
 const uiEntryIds = new Set(uiEntries.map((entry) => entry.id));
 const categoryEntryIds = new Set(categoryEntries.map((entry) => entry.id));
 const pageEntryIds = new Set(pageEntries.map((entry) => entry.id));
+const seoEntryIds = new Set(seoEntries.map((entry) => entry.id));
 const uiValues = store1.values.filter((value) => uiEntryIds.has(value.entryId));
 const categoryValues = store1.values.filter((value) =>
   categoryEntryIds.has(value.entryId)
 );
 const pageValues = store1.values.filter((value) => pageEntryIds.has(value.entryId));
+const seoValues = store1.values.filter((value) => seoEntryIds.has(value.entryId));
 assert.equal(uiValues.length, n * 6);
 assert.equal(categoryValues.length, categoryN * 6);
 assert.equal(pageValues.length, pageN * 6);
-assert.equal(store1.values.length, (n + categoryN + pageN) * 6);
+assert.equal(seoValues.length, seoN * 6);
+assert.equal(store1.values.length, (n + categoryN + pageN + seoN) * 6);
 assert.equal(store1.values.every((v) => v.state === "AUTO"), true);
 assert.equal(store1.values.filter((v) => v.languageCode === "ru").length, 0);
 assert.equal(store1.values.some((v) => v.languageCode === "zh-CN"), true);
@@ -207,7 +222,7 @@ for (const code of ["en", "uz", "ky", "tg", "zh", "ar"]) {
   assert.equal(report.domains.categories.complete, true, `${code} categories`);
   assert.equal(report.domains.pages.complete, true, `${code} pages`);
   assert.equal(report.domains.faq.complete, false, `${code} faq`);
-  assert.equal(report.domains.seo.complete, false, `${code} seo`);
+  assert.equal(report.domains.seo.complete, true, `${code} seo`);
   assert.equal(report.complete, false, `${code} overall`);
 }
 assert.equal(freshCompleteness.ru.complete, true);
