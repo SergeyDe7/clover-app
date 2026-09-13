@@ -2084,3 +2084,24 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
   max-width: 62ch;
 }
 .sf-install-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+@media (max-width: 400px) {
+  .sf-header {
+    gap: 2px;
+    padding-right: 4px;
+    padding-left: 4px;
+  }
+  .sf-brand img {
+    width: auto;
+    height: 24px;
+    max-height: 24px;
+  }
+  .sf-header-actions {
+    gap: 0;
+  }
+  .sf-header-tool,
+  .sf-language-selector .language-selector-trigger {
+    width: 44px;
+    min-width: 44px;
+  }
+}

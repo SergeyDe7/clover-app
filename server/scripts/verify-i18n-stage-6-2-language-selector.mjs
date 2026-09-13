@@ -3,6 +3,9 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createServer as createViteServer } from "vite";
 import { projectRoot } from "./readFrontendUiSource.mjs";
 import { buildPublicLocalizationRuntimeSnapshot } from "../src/publicLocalizationRuntime.js";
 import {
@@ -419,14 +422,111 @@ applyRuntimeDocumentLocale(fakeDocument, { locale: "zh-CN", direction: "ltr" });
 assert.equal(fakeRoot.lang, "zh-CN");
 assert.equal(fakeAppRoot.lang, "zh-CN");
 
-// K: one native selector mounted through the intended existing shells and login.
+// K: one reusable flag control is mounted in intended shells and omitted from admin DOM.
 assert.match(selector, /const accessibleLabel = t\("admin\.languages\.language"\)/);
-assert.match(selector, /<select[\s\S]*aria-label=\{accessibleLabel\}/);
-assert.match(selector, /enabledLanguages\.map/);
-assert.match(read("src/screens/storefront/components/StoreHeader.jsx"), /<LanguageSelector className="sf-language-selector" \/>/);
-assert.match(read("src/shared/SharedPanels.jsx"), /<LanguageSelector onLanguageChange=\{onLanguageChange\}\s*\/>/);
+assert.match(selector, /aria-haspopup="listbox"/);
+assert.match(selector, /role="listbox"/);
+assert.match(selector, /role="option"/);
+assert.match(selector, /aria-selected=/);
+assert.match(selector, /tabIndex=\{option\.language === focusedLanguage \? 0 : -1\}/);
+assert.match(selector, /event\.key === "Escape"/);
+assert.match(selector, /event\.key === "ArrowDown"/);
+assert.match(selector, /event\.key === "Home"/);
+assert.match(selector, /event\.key === "Tab"/);
+
+const expectedLanguagePresentation = {
+  ru: { flag: "🇷🇺", name: "Русский" },
+  en: { flag: "🇬🇧", name: "English" },
+  uz: { flag: "🇺🇿", name: "O‘zbekcha" },
+  ky: { flag: "🇰🇬", name: "Кыргызча" },
+  tg: { flag: "🇹🇯", name: "Тоҷикӣ" },
+  zh: { flag: "🇨🇳", name: "中文" },
+  ar: { flag: "🇸🇦", name: "العربية" },
+};
+const presentationModule = await import(pathToFileURL(
+  path.join(projectRoot, "src/shared/i18n/languageSelectorPresentation.js")
+).href);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(presentationModule.LANGUAGE_PRESENTATION)),
+  expectedLanguagePresentation
+);
+assert.deepEqual(
+  presentationModule.getLanguageOptions([...PUBLIC_LOCALE_CODES, "invalid", "en"])
+    .map(({ language, flag, name }) => ({ language, flag, name })),
+  PUBLIC_LOCALE_CODES.map((language) => ({
+    language,
+    ...expectedLanguagePresentation[language],
+  })),
+  "rendered options must be enabled-only, de-duplicated flag presentations"
+);
+assert.deepEqual(
+  presentationModule.getLanguageOptions(["invalid"]),
+  [],
+  "invalid input must not normalize into a rendered RU option"
+);
+
+const vite = await createViteServer({
+  root: projectRoot,
+  appType: "custom",
+  logLevel: "silent",
+  server: { middlewareMode: true },
+});
+try {
+  const panelsModule = await vite.ssrLoadModule("/src/shared/SharedPanels.jsx");
+
+  const visibleHeaderMarkup = renderToStaticMarkup(
+    React.createElement(panelsModule.Header, {
+      title: "Client",
+      showLanguageSelector: true,
+    })
+  );
+  assert.match(visibleHeaderMarkup, /class="language-selector/);
+  assert.match(visibleHeaderMarkup, /class="language-selector-trigger"/);
+  assert.match(visibleHeaderMarkup, /class="language-flag"/);
+  assert.match(visibleHeaderMarkup, /aria-label="[^"]+:\s*Русский"/);
+  assert.doesNotMatch(
+    visibleHeaderMarkup,
+    />\s*Русский\s*</,
+    "the compact selected value must show a flag, not a visible language name"
+  );
+
+  const adminHeaderMarkup = renderToStaticMarkup(
+    React.createElement(panelsModule.Header, {
+      title: "Admin",
+      showLanguageSelector: false,
+    })
+  );
+  assert.doesNotMatch(
+    adminHeaderMarkup,
+    /language-selector|language-flag|aria-haspopup="listbox"/,
+    "admin header must not render selector DOM or focusable remnants"
+  );
+} finally {
+  await vite.close();
+}
+
+const storefrontHeader = read("src/screens/storefront/components/StoreHeader.jsx");
+const storefrontLanguageIndex = storefrontHeader.indexOf('<LanguageSelector className="sf-language-selector" />');
+assert.ok(storefrontHeader.indexOf("<StorefrontContacts />") < storefrontLanguageIndex);
+assert.ok(storefrontLanguageIndex < storefrontHeader.indexOf('className="sf-header-tool sf-login-mobile"'));
+assert.ok(storefrontLanguageIndex < storefrontHeader.indexOf('className="sf-btn sf-btn-ghost sf-login sf-login-desktop"'));
+assert.match(read("src/screens/client/ClientScreen.jsx"), /onLanguageChange=\{onLanguageChange\}/);
+assert.match(
+  read("src/screens/manager/ManagerScreen.jsx"),
+  /showLanguageSelector=\{authUser\?\.role !== "admin"\}/
+);
+assert.match(read("src/shared/SharedPanels.jsx"), /showLanguageSelector \? \([\s\S]*<LanguageSelector onLanguageChange=\{onLanguageChange\}/);
 assert.match(app, /<LanguageSelector className="language-selector-login" \/>/);
-assert.match(read("src/styles/clover-theme.css"), /@media \(max-width: 640px\)[\s\S]*\.language-selector select[\s\S]*min-height:\s*44px/);
+const appCss = read("src/App.css");
+const themeCss = read("src/styles/clover-theme.css");
+const storefrontCss = read("src/screens/storefront/storefront.css");
+assert.match(appCss, /\.login-card\{position:relative/);
+assert.match(themeCss, /\.language-selector-login\s*\{[\s\S]*position:\s*absolute;[\s\S]*top:\s*12px;[\s\S]*right:\s*12px;[\s\S]*left:\s*auto;/);
+assert.match(themeCss, /\.language-selector-trigger,[\s\S]*\.language-selector-option\s*\{[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;/);
+assert.match(themeCss, /\.language-selector-trigger,[\s\S]*\.language-selector-option\s*\{[\s\S]*box-sizing:\s*border-box;/);
+assert.match(themeCss, /\.language-selector-trigger:focus-visible,[\s\S]*outline:\s*3px/);
+assert.match(themeCss, /\.language-selector-option-name\s*\{[\s\S]*position:\s*absolute;[\s\S]*clip:/);
+assert.match(storefrontCss, /@media \(max-width:\s*400px\)[\s\S]*\.sf-header-actions\s*\{[\s\S]*gap:\s*0;[\s\S]*\.sf-language-selector \.language-selector-trigger\s*\{[\s\S]*width:\s*44px;/);
 
 // A/L: endpoint is public/read-only and Stage 6.2 does not touch protected business contours.
 const server = read("server/src/server.js");
