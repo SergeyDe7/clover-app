@@ -1,5 +1,6 @@
 import { useLocalization } from "./shared/i18n/LocalizationProvider";
 import { syncBrowserPreferenceFromProfile } from "./shared/i18n/languagePreference.js";
+import { LanguageSelector } from "./shared/i18n/LanguageSelector.jsx";
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import cloverLogo from "./assets/clover-logo.png";
@@ -291,6 +292,7 @@ function LoginView({ onAuth, authBusy, authError }) {
     return (
       <main className="page login-page" ref={pageRef}>
         <section className="login-card">
+          <LanguageSelector className="language-selector-login" />
           <img className="logo" src={cloverLogo} alt={t("auth.login.logoAlt")} width="280" height="189" />
           <h1>{t("auth.verify.title")}</h1>
           <p className="subtitle">{t("auth.verify.subtitle")}</p>
@@ -312,6 +314,7 @@ function LoginView({ onAuth, authBusy, authError }) {
     <style>{APP_STYLES}</style>
     <main className="page login-page" ref={pageRef}>
       <section className="login-card">
+        <LanguageSelector className="language-selector-login" />
         <img className="logo" src={cloverLogo} alt={t("auth.login.logoAlt")} width="280" height="189" />
         <h1>{title}</h1>
         {mode !== "login" && (
@@ -581,7 +584,7 @@ function mergeOrdersFromServer(previous, incoming, { clientMode = false } = {}) 
 }
 
 function App() {
-  const { t } = useLocalization();
+  const { t, setLanguage, invalidateLanguageRequests } = useLocalization();
   useEffect(() => {
     document.title = t("auth.documentTitle");
   }, [t]);
@@ -627,6 +630,7 @@ function App() {
   // Несохранённые правки матрицы у менеджера — live-bootstrap их не затирает.
   const dirtyClientLinkIdsRef = useRef(new Set());
   const catalogPricesVersionRef = useRef("");
+  const bootstrapSequenceRef = useRef(0);
   const [catalogPricesVersion, setCatalogPricesVersion] = useState("");
 
   const applyManagerNotificationList = (items) => {
@@ -691,7 +695,10 @@ function App() {
     });
     setProfile(nextProfile);
     // Stage 6.1: authenticated profile locale is authoritative and syncs to browser storage.
-    syncBrowserPreferenceFromProfile(nextProfile);
+    if (data.user.role === "client") {
+      const profileLanguage = syncBrowserPreferenceFromProfile(nextProfile);
+      if (profileLanguage) void setLanguage(profileLanguage);
+    }
     setAddresses(
       Array.isArray(data.addresses) ? data.addresses : []
     );
@@ -728,6 +735,7 @@ function App() {
   };
 
   const loadBootstrap = async ({ silent = false } = {}) => {
+    const sequence = ++bootstrapSequenceRef.current;
     // Показываем полноэкранную загрузку только при первом запуске/входе.
     // После загрузки кабинета фоновые обновления не должны заменять экран.
     const shouldBlockScreen = !silent && !hydrated;
@@ -737,10 +745,12 @@ function App() {
 
     try {
       const data = await api.bootstrap();
+      if (sequence !== bootstrapSequenceRef.current) return;
       applyBootstrap(data, { openClientOrderLanding: !silent });
       setIsLoggedIn(true);
       setSyncError("");
     } catch (error) {
+      if (sequence !== bootstrapSequenceRef.current) return;
       if (error.status === 401) {
         clearApiToken();
         setAuthUser(null);
@@ -769,7 +779,7 @@ function App() {
         }
       }
     } finally {
-      if (shouldBlockScreen) {
+      if (sequence === bootstrapSequenceRef.current && shouldBlockScreen) {
         setLoading(false);
       }
     }
@@ -1243,6 +1253,8 @@ function App() {
   };
 
   const logout = () => {
+    bootstrapSequenceRef.current += 1;
+    invalidateLanguageRequests();
     clearApiToken();
     writeManagerActiveTab("orders");
     writeOpenManagerClientId("");
@@ -2096,6 +2108,9 @@ function App() {
         <ClientScreen
           profile={profile}
           setProfile={setProfile}
+          onLanguageChange={(locale) => {
+            setProfile((current) => ({ ...current, locale }));
+          }}
           addresses={addresses}
           setAddresses={setAddresses}
           orders={clientOrders}

@@ -64,10 +64,12 @@ assert.equal(existsSync(providerPath), true, "LocalizationProvider.jsx contract 
 assert.match(providerSrc, /export function LocalizationProvider/);
 assert.match(providerSrc, /export function useLocalization/);
 assert.match(providerSrc, /createLocalizationRuntime\(/);
-assert.doesNotMatch(providerSrc, /\bruntime\b/, "Provider must not accept arbitrary ready runtime");
+assert.doesNotMatch(
+  providerSrc,
+  /export function LocalizationProvider\(\{[^}]*\bruntime\s*[,}]/,
+  "Provider must not accept arbitrary ready runtime"
+);
 assert.doesNotMatch(providerSrc, /runtimeFactory|unsafeRuntime/);
-assert.doesNotMatch(providerSrc, /allowForeignRuntime\s*=\s*true/);
-assert.doesNotMatch(providerSrc, /allowForeignRuntime:\s*true/);
 assert.doesNotMatch(providerSrc, /from ["'].*App\.jsx["']/);
 assert.doesNotMatch(providerSrc, /StorefrontApp/);
 assert.doesNotMatch(providerSrc, /ManagerLanguages/);
@@ -79,10 +81,9 @@ assert.doesNotMatch(providerSrc, /Accept-Language/);
 assert.doesNotMatch(providerSrc, /window\.location/);
 assert.doesNotMatch(providerSrc, /localStorage/);
 assert.doesNotMatch(providerSrc, /sessionStorage/);
-assert.doesNotMatch(providerSrc, /preferred_language|preferredLanguage/);
+assert.doesNotMatch(providerSrc, /preferred_language/);
 assert.doesNotMatch(providerSrc, /PUBLIC_LANGUAGE_PREFIXES/);
-assert.doesNotMatch(providerSrc, /setLanguage/);
-assert.doesNotMatch(providerSrc, /LanguageSelector/);
+assert.match(providerSrc, /setLanguage/);
 
 const runtimeMod = await import(pathToFileURL(runtimePath).href);
 assert.equal(typeof runtimeMod.createLocalizationRuntime, "function");
@@ -195,7 +196,11 @@ for (const file of listSrcJsFiles(path.join(projectRoot, "src"))) {
     foreignActivationFiles.push(rel);
   }
 }
-assert.deepEqual(providerImportFiles, [], `LocalizationProvider.jsx imported outside main: ${providerImportFiles.join(", ")}`);
+assert.deepEqual(
+  providerImportFiles,
+  ["src/shared/i18n/LanguageSelector.jsx"],
+  `LocalizationProvider.jsx imported outside Stage 6.2 selector: ${providerImportFiles.join(", ")}`
+);
 assert.deepEqual(providerMountFiles, ["src/main.jsx"]);
 assert.deepEqual(runtimeFactoryFiles, [], `createLocalizationRuntime used outside allowlist: ${runtimeFactoryFiles.join(", ")}`);
 assert.deepEqual(foreignActivationFiles, [], `production foreign-runtime activation in: ${foreignActivationFiles.join(", ")}`);

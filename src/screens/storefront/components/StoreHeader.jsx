@@ -1,4 +1,5 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
+import { LanguageSelector } from "../../../shared/i18n/LanguageSelector.jsx";
 import { useEffect, useState } from "react";
 import {
   cabinetLoginUrl,
@@ -113,6 +114,7 @@ export function StoreHeader({ current }) {
         )}
       </nav>
       <div className="sf-header-actions">
+        <LanguageSelector className="sf-language-selector" />
         <a
           className="sf-header-tool sf-catalog-mobile"
           href={storefrontHref({ name: "catalog" })}

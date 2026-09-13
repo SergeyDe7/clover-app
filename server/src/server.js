@@ -111,6 +111,7 @@ import {
   initializeLocalizationCatalog,
   listWorkspacePage,
   readLocalizationSettings,
+  readTranslationStore,
   resetTranslationToAuto,
   saveManualTranslation,
   writeLocalizationSettings,
@@ -134,6 +135,7 @@ import { scheduleSitemapRefresh } from "./sitemapArtifact.js";
 import { localeChoices } from "../../src/shared/i18n/localizationSettings.js";
 import { normalizeLanguagePreference } from "../../src/shared/i18n/languagePreference.js";
 import { publicClientSettings } from "./clientSettings.js";
+import { buildPublicLocalizationRuntimeSnapshot } from "./publicLocalizationRuntime.js";
 import {
   listClientAccessEntries,
   removeClientAccessEntry,
@@ -1993,6 +1995,30 @@ app.get("/api/public/site", (req, res) => {
   } catch (error) {
     console.error("public site failed", error);
     res.status(500).json({ error: "Не удалось загрузить данные сайта." });
+  }
+});
+
+/** Minimal read-only localization policy and safe UI translation projection. */
+app.get("/api/public/localization/runtime", (req, res) => {
+  try {
+    const requestedLanguage = String(req.query.language || "");
+    const settings = readLocalizationSettings();
+    const policy = buildPublicLocalizationRuntimeSnapshot({
+      requestedLanguage,
+      settings,
+    });
+    const translationStore =
+      policy.effectiveLocale === "ru"
+        ? undefined
+        : readTranslationStore({ languageInternal: policy.effectiveLocale });
+    res.json(buildPublicLocalizationRuntimeSnapshot({
+      requestedLanguage,
+      settings,
+      translationStore,
+    }));
+  } catch (error) {
+    console.error("public localization runtime failed", error);
+    res.status(500).json({ error: "Не удалось загрузить локализацию." });
   }
 });
 
