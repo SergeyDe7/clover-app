@@ -24,7 +24,7 @@ const defaultRuntime = Object.freeze({
   ...createLocalizationRuntime(),
   enabledLanguages: Object.freeze(["ru"]),
   catalogVersion: "",
-  setLanguage: async () => false,
+      setLanguage: async () => ({ ok: false, stale: false }),
   invalidateLanguageRequests: () => {},
 });
 const LocalizationContext = createContext(defaultRuntime);
@@ -95,12 +95,17 @@ export function LocalizationProvider({
         if (isLanguageEnabled(language, snapshot.enabledLanguages)) {
           writeLanguagePreference(language);
         }
-        const next = await loader.load(language);
-        return Boolean(
-          next &&
-          isLanguageEnabled(language, next.enabledLanguages) &&
-          toPublicLocaleCode(next.locale) === toPublicLocaleCode(language)
-        );
+        const result = await loader.loadWithStatus(language);
+        if (result.status === "stale") return { ok: false, stale: true };
+        const next = result.snapshot;
+        return {
+          ok: Boolean(
+            next &&
+            isLanguageEnabled(language, next.enabledLanguages) &&
+            toPublicLocaleCode(next.locale) === toPublicLocaleCode(language)
+          ),
+          stale: false,
+        };
       },
       invalidateLanguageRequests: () => loader.invalidate(),
     });

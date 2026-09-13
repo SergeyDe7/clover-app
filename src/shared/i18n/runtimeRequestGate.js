@@ -97,14 +97,19 @@ export function createRuntimeSnapshotLoader({ requestSnapshot, applySnapshot }) 
   const gate = createRuntimeRequestGate();
   return Object.freeze({
     async load(language) {
+      const result = await this.loadWithStatus(language);
+      return result.status === "applied" ? result.snapshot : null;
+    },
+    async loadWithStatus(language) {
       const generation = gate.next();
       try {
         const snapshot = await requestSnapshot(language || "ru");
-        if (!gate.isCurrent(generation)) return null;
+        if (!gate.isCurrent(generation)) return { status: "stale", snapshot: null };
         applySnapshot(snapshot);
-        return snapshot;
+        return { status: "applied", snapshot };
       } catch {
-        return null;
+        if (!gate.isCurrent(generation)) return { status: "stale", snapshot: null };
+        return { status: "failed", snapshot: null };
       }
     },
     invalidate() {

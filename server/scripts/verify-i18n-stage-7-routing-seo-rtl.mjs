@@ -36,6 +36,11 @@ import {
   resolvePublicRouteRequest,
 } from "../../src/shared/sitemap/publicRouteHtml.js";
 import { isForbiddenSitemapUrl } from "../../src/shared/sitemap/sitemapContract.js";
+import { JSONLD_HTML_EMBED_CASES, closeJsonLdHtmlEmbedBrowser } from "./jsonLdHtmlEmbed.mjs";
+import {
+  assertJsonLdHtmlEmbedCases,
+  renderJsonLdEmbedCases,
+} from "./verify-i18n-stage-7-jsonld-html-embed.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const productionData = path.resolve("/opt/clover/clover-app/server/data");
@@ -167,10 +172,19 @@ function seedFixtureDatabase() {
     );
     for (const internal of TARGET_INTERNAL_LOCALES) {
       const publicCode = internal === "zh-CN" ? "zh" : internal;
-      const translated =
+      let translated =
         entry.entityId === "catalog" && entry.fieldKey === "title"
           ? `${publicCode.toUpperCase()} Catalog`
           : `${publicCode.toUpperCase()} ${entry.sourceRu}`;
+      if (
+        entry.entityId === "home" &&
+        entry.fieldKey === "description" &&
+        publicCode === "uz"
+      ) {
+        translated = JSONLD_HTML_EMBED_CASES.find(
+          (item) => item.id === "script-close"
+        ).description;
+      }
       insertValue.run(id, internal, translated, hash);
     }
   });
@@ -517,6 +531,11 @@ const escaped = renderPublicRouteHtml(baseHtml, {
 assert.doesNotMatch(parseHead(escaped).title, /<script>/i);
 assert.match(parseHead(escaped).title, /&lt;script&gt;/);
 
+const jsonLdEmbedFailures = await assertJsonLdHtmlEmbedCases(
+  renderJsonLdEmbedCases(baseHtml)
+);
+assert.deepEqual(jsonLdEmbedFailures, []);
+
 const sitemap = readFileSync(path.join(outDir, "sitemap.xml"), "utf8");
 const sitemapUrls = parseSitemap(sitemap);
 assert.ok(sitemapUrls.length > 0);
@@ -703,9 +722,18 @@ try {
   )?.[1];
   assert.ok(assetName);
   assert.equal((await request(assetName)).status, 200);
+
+  const uzHome = await request("/uz/");
+  assert.equal(uzHome.status, 200);
+  const httpJsonLdFailures = await assertJsonLdHtmlEmbedCases([], {
+    httpHtml: await uzHome.text(),
+    httpExpectedId: "script-close",
+  });
+  assert.deepEqual(httpJsonLdFailures, []);
 } finally {
   preview.kill("SIGTERM");
   await new Promise((resolve) => preview.once("exit", resolve));
+  await closeJsonLdHtmlEmbedBrowser();
 }
 
 const sw = readFileSync(path.join(root, "public/sw.js"), "utf8");
@@ -730,6 +758,7 @@ assert.match(storefrontCss, /\.sf-product-price(?:-value)?/);
 
 console.log("STAGE_7_ROUTE_CONTRACT=PASS");
 console.log("STAGE_7_HTTP_HTML=PASS");
+console.log("STAGE_7_JSONLD_HTML_EMBED=PASS");
 console.log("STAGE_7_SITEMAP_XML=PASS");
 console.log("STAGE_7_RTL_STATIC=PASS");
 console.log("STAGE_7_CACHE_ISOLATION=PASS");

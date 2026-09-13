@@ -1,10 +1,11 @@
 # Clover I18N Stage 7 — locale URLs + hreflang/canonical/sitemap + RTL
 
-Date: 2026-09-13  
-Updated: 2026-09-14 (local Stage 7 closure)  
-Branch: `codex/i18n-stage-7-routing-seo-rtl`  
-Base / HEAD: `a9ce4bf53411854c37cd562e841c7d0e734cbe74`  
-Worktree: `/opt/clover/i18n-stage-7-routing-seo-rtl`  
+Date: 2026-09-13
+Updated: 2026-09-14 (JSON-LD embed + failed locale-switch consistency; unpublished)
+Branch: `codex/i18n-stage-7-routing-seo-rtl`
+Published HEAD: `ecbe32b486cef76c6afdf52d49a961a16b893e1c`
+Base: `a9ce4bf53411854c37cd562e841c7d0e734cbe74`
+Worktree: `/opt/clover/i18n-stage-7-routing-seo-rtl`
 Do not use `/opt/clover/clover-app` for test execution.
 
 ## GOAL
@@ -84,7 +85,21 @@ commit/push/PR/deploy.
 
 ## LOCAL CLOSURE STATUS
 
-LOCAL IMPLEMENTATION AND VERIFICATION: **CLOSED**
+Published PR #108 head `ecbe32b` is unchanged and still has the original
+JSON-LD HTML script-breakout finding. A later observation also confirmed
+an inconsistent in-page AR→RU state after a failed runtime request.
+The previous plan line that treated leftover RTL / mixed chrome as
+“not a defect / existing last-valid contract” is **withdrawn**.
+
+Local combined correction (JSON-LD embed + accept-then-navigate locale
+switch) is **verified on this worktree and not published**. Do not treat
+PR #108 as fixed until a later authorized publication of this exact
+candidate.
+
+LOCAL IMPLEMENTATION AND VERIFICATION (published head): **CLOSED, with
+confirmed review findings**
+LOCAL JSON-LD HTML EMBED CORRECTION: **verified, unpublished**
+LOCAL FAILED-SWITCH CONSISTENCY CORRECTION: **verified, unpublished**
 PUBLICATION / MERGE / DEPLOY / PRODUCTION VERIFICATION: **not done**
 Stage 8 and Stage 9: **not started** by this task.
 
@@ -104,26 +119,50 @@ Local closure is not a production rollout CLOSED.
   from that locale’s home SEO, not product/page copy.
 - Product SPA locale switch reapplies home-derived Organization description.
 - Stage 7 verifier: `server/scripts/verify-i18n-stage-7-routing-seo-rtl.mjs`.
+- In-page language switch is accepted only after runtime succeeds; a failed
+  switch keeps the last accepted URL/content/runtime together.
 
 ## CANDIDATE IDENTITY
+
+Published PR head (still live, not corrected):
+`ecbe32b486cef76c6afdf52d49a961a16b893e1c`
+
+Local unpublished combined correction vs that head:
 
 | Field | Value |
 |---|---|
 | Worktree | `/opt/clover/i18n-stage-7-routing-seo-rtl` |
 | Branch | `codex/i18n-stage-7-routing-seo-rtl` |
-| Base / HEAD | `a9ce4bf53411854c37cd562e841c7d0e734cbe74` |
-| Files | 31 tracked modified + 8 untracked |
-| Code-identical prior artifact | `/opt/clover/recovery/i18n-stage7-candidate-20260913T220900Z` hash `90dbedc64…` — implementation unchanged; this update is docs-only after final-code lint/build |
-| Final artifact (includes this docs update) | `/opt/clover/recovery/i18n-stage7-candidate-20260913T221330Z` — hash in that `manifest.txt` |
-| Serialization | `git diff --binary <base>` then `git diff --no-index /dev/null` for each untracked file in sorted untracked order |
-| Earlier same-hash snapshot | `/opt/clover/recovery/i18n-stage7-candidate-20260913T214327Z` and `/opt/clover/recovery/i18n-stage7-pre-closure-20260913T214926Z` hash `2cdefa2fef5726de0b2c7772e49f6b30a258c4d188d1195750728dc7a05025db` — **stale** after JSON-LD + ProductPage org-desc fixes |
+| Published HEAD | `ecbe32b486cef76c6afdf52d49a961a16b893e1c` |
+| Base | `a9ce4bf53411854c37cd562e841c7d0e734cbe74` |
+| Combined artifact | `/opt/clover/recovery/i18n-stage7-correction-20260913T230400Z` — hash in that `manifest.txt` |
+| Prior JSON-LD-only artifact | `/opt/clover/recovery/i18n-stage7-jsonld-escape-20260913T224800Z` hash `acff2a38…` — JSON-LD files unchanged; superseded as the publication candidate |
+| Serialization | `git diff --binary <published-head>` then `git diff --no-index /dev/null` for each untracked file in sorted untracked order |
 
 ## THIS-CYCLE FIXES
+
+Published-head Stage 7 work (already in `ecbe32b`):
 
 1. Organization JSON-LD description taken from locale home SEO
    (`localizedSitemap.js`, `publicRouteHtml.js`, `seo.js`), not product/page.
 2. ProductPage receives `site` and passes `organizationDescription` so AR→RU
    SPA navigation does not leave a stale AR home description.
+
+Unpublished local correction (this cycle, after independent PR review):
+
+3. Server HTML Organization JSON-LD is `JSON.stringify` then unicode-escaped
+   for HTML script context (`<` `>` `&` U+2028 U+2029). Prevents
+   `</script>` / `<!--` breakout without HTML-escaping JSON or dropping data.
+4. Stage 7 verifier + Playwright/HTML5 regression: FAIL on original,
+   PASS after the escape. HTTP `/uz/` uses a synthetic marker payload.
+5. In-page language switch is accept-then-navigate. A failed RU runtime
+   (HTTP 500, network, invalid 200) keeps the last accepted
+   URL/content/runtime/`lang`/`dir`/selector together and shows
+   `shared.error.requestFailed`. The earlier “not a defect” disposition
+   is withdrawn.
+6. Behavioral verifier
+   `verify-i18n-stage-7-locale-switch-consistency.mjs` covers A–E
+   (reject, retry, stale EN isolation, query/hash/back/forward).
 
 ## COMMAND EVIDENCE
 
@@ -218,8 +257,10 @@ Neither reproduced. No implementation change.
 
 ## THIS-CYCLE IMPLEMENTATION CHANGES
 
-Дополнительные изменения реализации не потребовались.
-Documentation-only update of this plan after sitemap/JSON-LD closure.
+Combined unpublished local correction: JSON-LD HTML script-context
+escape (unchanged from the 224800Z artifact) plus accept-then-navigate
+for failed in-page locale switches. This plan update after tests is
+docs-only.
 
 ## INDEPENDENT REVIEW
 
@@ -231,8 +272,11 @@ Self-review is not independent review.
 | Focused SEO | [c2d61651](c2d61651-b615-4477-9c25-4f06e936f7c7) | F1/F2 delta | PASS |
 | JSON-LD home vs product | [bb2d5bac](bb2d5bac-0d9b-47a5-ba68-dccb904e2a09) | org-desc source | PASS; minor ProductPage stale org after SPA switch |
 | ProductPage org-desc | [797b1224](797b1224-b0ab-4fab-8eef-af5c01fa4017) | ProductPage/`site` + verifier lock | PASS; disposition NONE |
+| JSON-LD HTML embed | [51913691](51913691-0ea4-48dc-a20f-8f9743422dfb) | IMPORTANT 1 delta vs `ecbe32b` | PASS; leftover RTL after failed RU later **reclassified as a defect** |
+| Failed locale switch | [78f82f73](78f82f73-4005-4e03-95f0-7fbff8a3e2a9) | accept-then-navigate + JSON-LD intact | PASS |
 
 Combined coverage: full candidate + all subsequent implementation deltas.
+This cycle reviewed only the unpublished JSON-LD HTML embed delta.
 
 ## PRE_EXISTING FAILURES
 

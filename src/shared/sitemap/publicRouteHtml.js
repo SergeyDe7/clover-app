@@ -79,6 +79,15 @@ function lookupPublicRouteRecord(manifest, requestPathname, parsed) {
   return manifest.routes?.[publicPathForLocale(parsed.pathname, locale)] || null;
 }
 
+function escapeJsonLdForHtmlScript(jsonText) {
+  return String(jsonText)
+    .replaceAll("<", "\\u003c")
+    .replaceAll(">", "\\u003e")
+    .replaceAll("&", "\\u0026")
+    .replaceAll("\u2028", "\\u2028")
+    .replaceAll("\u2029", "\\u2029");
+}
+
 function localizeOrganizationJsonLd(raw, record) {
   try {
     const data = JSON.parse(raw);
@@ -88,7 +97,7 @@ function localizeOrganizationJsonLd(raw, record) {
     if (record.organizationDescription) {
       next.description = record.organizationDescription;
     }
-    return JSON.stringify(next);
+    return escapeJsonLdForHtmlScript(JSON.stringify(next));
   } catch {
     return raw;
   }

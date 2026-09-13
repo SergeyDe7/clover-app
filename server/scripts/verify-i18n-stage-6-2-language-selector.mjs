@@ -319,7 +319,8 @@ assert.ok(
   "client profile state must update synchronously when selection starts"
 );
 assert.ok(
-  provider.indexOf("writeLanguagePreference(language)") < provider.indexOf("const next = await loader.load(language)"),
+  provider.indexOf("writeLanguagePreference(language)") <
+    provider.indexOf("await loader.loadWithStatus(language)"),
   "browser preference must be written before the async runtime request"
 );
 assert.match(app, /scheduleSync\(\(\) => api\.saveProfile\(profile\)\)/);
@@ -334,6 +335,16 @@ assert.doesNotMatch(selector, /pushState|replaceState|location\.(?:assign|replac
 assert.match(provider, /addEventListener\("popstate"/);
 assert.match(storefrontHeaderSource, /equivalentPublicLocaleHref/);
 assert.match(storefrontHeaderSource, /window\.history\.pushState/);
+assert.match(storefrontHeaderSource, /revertPublicLanguageSwitch/);
+assert.match(storefrontHeaderSource, /acceptPublicLanguageSwitch/);
+assert.match(storefrontHeaderSource, /onLanguageAccepted/);
+assert.match(storefrontHeaderSource, /onLanguageRejected/);
+assert.match(selector, /onLanguageRejected\(language\)/);
+assert.ok(
+  selector.indexOf("void setLanguage(language)") <
+    selector.indexOf("onLanguageRejected(language)"),
+  "rejected public locale switch runs after the existing setLanguage attempt"
+);
 
 // J: runtime direction and the actual document/root projection contract.
 assert.equal(createLocalizationRuntime({ locale: "ar", allowForeignRuntime: true }).direction, "rtl");
