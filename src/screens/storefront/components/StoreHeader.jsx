@@ -114,7 +114,6 @@ export function StoreHeader({ current }) {
         )}
       </nav>
       <div className="sf-header-actions">
-        <LanguageSelector className="sf-language-selector" />
         <a
           className="sf-header-tool sf-catalog-mobile"
           href={storefrontHref({ name: "catalog" })}
@@ -153,6 +152,7 @@ export function StoreHeader({ current }) {
           {count > 0 ? <span className="sf-header-badge">{count > 99 ? "99+" : count}</span> : null}
         </a>
         <StorefrontContacts />
+        <LanguageSelector className="sf-language-selector" />
         <a
           className="sf-header-tool sf-login-mobile"
           href={cabinetLoginUrl("/")}

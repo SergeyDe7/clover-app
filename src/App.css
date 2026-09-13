@@ -4,7 +4,7 @@ body{margin:0;min-height:100vh;font-family:"Manrope","Segoe UI",system-ui,sans-s
 button,input{font:inherit}
 button{cursor:pointer}
 .page{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 16px;background:#f4f8f2;box-sizing:border-box;width:100%;max-width:100%;overflow-x:hidden}
-.login-card{width:min(100%,460px);padding:clamp(22px,4.5vw,40px) clamp(16px,4vw,36px) clamp(22px,4vw,38px);background:rgba(255,255,255,.96);border:1px solid rgba(86,156,80,.15);border-radius:clamp(14px,3vw,16px);box-shadow:0 14px 36px rgba(48,82,45,.1);text-align:center;box-sizing:border-box;margin:0 auto}
+.login-card{position:relative;width:min(100%,460px);padding:clamp(22px,4.5vw,40px) clamp(16px,4vw,36px) clamp(22px,4vw,38px);background:rgba(255,255,255,.96);border:1px solid rgba(86,156,80,.15);border-radius:clamp(14px,3vw,16px);box-shadow:0 14px 36px rgba(48,82,45,.1);text-align:center;box-sizing:border-box;margin:0 auto}
 .logo,.login-card .logo{display:block;width:clamp(140px,42vw,280px);max-width:min(280px,78%);height:auto;margin:0 auto clamp(8px,2vh,18px)}
 .login-card h1{margin:0 0 clamp(6px,1.2vh,10px);font-size:clamp(22px,5.5vw,30px);color:#386f37;line-height:1.2}
 .subtitle{margin:0 0 clamp(16px,3vh,30px);color:#6d786d;line-height:1.5;font-size:clamp(13px,3.4vw,15px)}

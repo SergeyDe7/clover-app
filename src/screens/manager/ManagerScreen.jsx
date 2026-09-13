@@ -167,6 +167,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
       <Header
         title={authUser?.role === "admin" ? t("manager.adminCabinet") : t("manager.managerCabinet")}
         onLogout={onLogout}
+        showLanguageSelector={authUser?.role !== "admin"}
         nav={
           <nav className="manager-nav" aria-label={authUser?.role === "admin" ? t("manager.adminSections") : t("manager.managerSections")}>
             {allowedMainTabs.map(([id, label]) => (
