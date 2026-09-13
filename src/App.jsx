@@ -1,5 +1,9 @@
 import { useLocalization } from "./shared/i18n/LocalizationProvider";
-import { syncBrowserPreferenceFromProfile } from "./shared/i18n/languagePreference.js";
+import {
+  createProfileLocaleCoordinator,
+  syncBrowserPreferenceFromProfile,
+} from "./shared/i18n/languagePreference.js";
+import { LanguageSelector } from "./shared/i18n/LanguageSelector.jsx";
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import cloverLogo from "./assets/clover-logo.png";
@@ -291,6 +295,7 @@ function LoginView({ onAuth, authBusy, authError }) {
     return (
       <main className="page login-page" ref={pageRef}>
         <section className="login-card">
+          <LanguageSelector className="language-selector-login" />
           <img className="logo" src={cloverLogo} alt={t("auth.login.logoAlt")} width="280" height="189" />
           <h1>{t("auth.verify.title")}</h1>
           <p className="subtitle">{t("auth.verify.subtitle")}</p>
@@ -312,6 +317,7 @@ function LoginView({ onAuth, authBusy, authError }) {
     <style>{APP_STYLES}</style>
     <main className="page login-page" ref={pageRef}>
       <section className="login-card">
+        <LanguageSelector className="language-selector-login" />
         <img className="logo" src={cloverLogo} alt={t("auth.login.logoAlt")} width="280" height="189" />
         <h1>{title}</h1>
         {mode !== "login" && (
@@ -581,7 +587,7 @@ function mergeOrdersFromServer(previous, incoming, { clientMode = false } = {}) 
 }
 
 function App() {
-  const { t } = useLocalization();
+  const { t, setLanguage, invalidateLanguageRequests } = useLocalization();
   useEffect(() => {
     document.title = t("auth.documentTitle");
   }, [t]);
@@ -627,6 +633,8 @@ function App() {
   // Несохранённые правки матрицы у менеджера — live-bootstrap их не затирает.
   const dirtyClientLinkIdsRef = useRef(new Set());
   const catalogPricesVersionRef = useRef("");
+  const bootstrapSequenceRef = useRef(0);
+  const profileLocaleCoordinatorRef = useRef(createProfileLocaleCoordinator());
   const [catalogPricesVersion, setCatalogPricesVersion] = useState("");
 
   const applyManagerNotificationList = (items) => {
@@ -641,7 +649,22 @@ function App() {
     syncAppBadge(unreadNotifications.length);
   };
 
-  const applyBootstrap = (data, { openClientOrderLanding = false } = {}) => {
+  const applyBootstrap = (
+    data,
+    { openClientOrderLanding = false, profileLocaleRequest } = {}
+  ) => {
+    const incomingProfile = normalizeProfileContacts({
+      ...EMPTY_PROFILE,
+      ...(data.profile || EMPTY_PROFILE),
+    });
+    const profileLocaleResolution =
+      profileLocaleCoordinatorRef.current.reconcileBootstrapProfile(
+        incomingProfile,
+        data.user?.id,
+        profileLocaleRequest
+      );
+    if (!profileLocaleResolution) return false;
+
     setAuthUser(data.user);
     setRole(data.user.role);
     setProducts(
@@ -685,13 +708,15 @@ function App() {
     }
 
     setOrders(incomingOrders);
-    const nextProfile = normalizeProfileContacts({
-      ...EMPTY_PROFILE,
-      ...(data.profile || EMPTY_PROFILE),
-    });
+    const nextProfile = profileLocaleResolution.profile;
     setProfile(nextProfile);
     // Stage 6.1: authenticated profile locale is authoritative and syncs to browser storage.
-    syncBrowserPreferenceFromProfile(nextProfile);
+    if (data.user.role === "client") {
+      const profileLanguage = syncBrowserPreferenceFromProfile(nextProfile);
+      if (profileLanguage && profileLocaleResolution.shouldApplyRuntime) {
+        void setLanguage(profileLanguage);
+      }
+    }
     setAddresses(
       Array.isArray(data.addresses) ? data.addresses : []
     );
@@ -725,9 +750,13 @@ function App() {
     }
 
     setHydrated(true);
+    return true;
   };
 
   const loadBootstrap = async ({ silent = false } = {}) => {
+    const sequence = ++bootstrapSequenceRef.current;
+    const profileLocaleRequest =
+      profileLocaleCoordinatorRef.current.captureBootstrap();
     // Показываем полноэкранную загрузку только при первом запуске/входе.
     // После загрузки кабинета фоновые обновления не должны заменять экран.
     const shouldBlockScreen = !silent && !hydrated;
@@ -737,10 +766,16 @@ function App() {
 
     try {
       const data = await api.bootstrap();
-      applyBootstrap(data, { openClientOrderLanding: !silent });
+      if (sequence !== bootstrapSequenceRef.current) return;
+      const applied = applyBootstrap(data, {
+        openClientOrderLanding: !silent,
+        profileLocaleRequest,
+      });
+      if (!applied) return;
       setIsLoggedIn(true);
       setSyncError("");
     } catch (error) {
+      if (sequence !== bootstrapSequenceRef.current) return;
       if (error.status === 401) {
         clearApiToken();
         setAuthUser(null);
@@ -769,7 +804,7 @@ function App() {
         }
       }
     } finally {
-      if (shouldBlockScreen) {
+      if (sequence === bootstrapSequenceRef.current && shouldBlockScreen) {
         setLoading(false);
       }
     }
@@ -1120,6 +1155,7 @@ function App() {
       setManagerNotifications([]);
 
       setApiToken(result.token);
+      profileLocaleCoordinatorRef.current.beginSession(result.user.id);
       setAuthUser(result.user);
       setRole(result.user.role);
       setIsLoggedIn(true);
@@ -1243,6 +1279,9 @@ function App() {
   };
 
   const logout = () => {
+    bootstrapSequenceRef.current += 1;
+    profileLocaleCoordinatorRef.current.invalidateSession();
+    invalidateLanguageRequests();
     clearApiToken();
     writeManagerActiveTab("orders");
     writeOpenManagerClientId("");
@@ -2096,6 +2135,16 @@ function App() {
         <ClientScreen
           profile={profile}
           setProfile={setProfile}
+          onLanguageChange={(locale) => {
+            const explicitLocale =
+              profileLocaleCoordinatorRef.current.recordExplicitChoice(
+                locale,
+                authUser?.id
+              );
+            if (explicitLocale) {
+              setProfile((current) => ({ ...current, locale: explicitLocale }));
+            }
+          }}
           addresses={addresses}
           setAddresses={setAddresses}
           orders={clientOrders}

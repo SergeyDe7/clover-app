@@ -64,6 +64,7 @@ function useIsNarrow() {
 function ClientDashboard({
   profile,
   setProfile,
+  onLanguageChange,
   addresses,
   setAddresses,
   orders,
@@ -524,6 +525,7 @@ function ClientDashboard({
           }
           subtitle={profile.companyName}
           onLogout={onLogout}
+          onLanguageChange={onLanguageChange}
           nav={
             !isNarrow ? (
               <nav className="client-nav" aria-label={t("client.cabinetSections")}>

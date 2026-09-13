@@ -753,7 +753,7 @@ const featureSrc = audited
   .filter((rel) => !rel.startsWith("src/shared/i18n/"))
   .map((rel) => readRel(rel))
   .join("\n");
-assert.doesNotMatch(featureSrc, /LanguageSelector/);
+assert.match(featureSrc, /LanguageSelector/);
 assert.doesNotMatch(featureSrc, /preferred_language/);
 assert.doesNotMatch(featureSrc, /allowForeignRuntime\s*=\s*true/);
 assert.doesNotMatch(featureSrc, /allowForeignRuntime:\s*true/);

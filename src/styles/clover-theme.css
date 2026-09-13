@@ -10652,3 +10652,45 @@ html.clover-storefront-add-open body {
     width: 100%;
   }
 }
+.language-selector {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.language-selector-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.language-selector select {
+  min-height: 40px;
+  max-width: 9.5rem;
+  padding: 7px 28px 7px 10px;
+  border: 1px solid rgba(47, 125, 50, 0.3);
+  border-radius: 10px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.language-selector select:focus-visible {
+  outline: 3px solid rgba(47, 125, 50, 0.25);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .language-selector select {
+    min-height: 44px;
+    max-width: 7rem;
+    padding-inline-start: 8px;
+  }
+}

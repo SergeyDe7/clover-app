@@ -74,12 +74,93 @@ export function clearLanguagePreference() {
 
 /**
  * After authenticated bootstrap/login: profile.locale is authoritative when valid.
- * Syncs into browser storage. Returns synced public code or null.
+ * Syncs into browser storage best-effort. Returns the normalized public code even
+ * when storage is unavailable, or null when the profile locale itself is invalid.
  */
 export function syncBrowserPreferenceFromProfile(profile) {
   const source = profile && typeof profile === "object" ? profile : null;
   if (!source) return null;
   const normalized = normalizeLanguagePreference(source.locale);
   if (!normalized) return null;
-  return writeLanguagePreference(normalized);
+  writeLanguagePreference(normalized);
+  return normalized;
+}
+
+function normalizeAccountId(value) {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const normalized = String(value).trim();
+  return normalized || null;
+}
+
+/**
+ * Coordinates client profile locale with explicit choices made while bootstrap
+ * requests are pending. Session boundaries prevent one account's choice from
+ * affecting another account.
+ */
+export function createProfileLocaleCoordinator() {
+  let session = 0;
+  let accountId = null;
+  let selectionVersion = 0;
+  let explicitLocale = null;
+
+  const resetSession = (nextAccountId) => {
+    session += 1;
+    accountId = normalizeAccountId(nextAccountId);
+    selectionVersion = 0;
+    explicitLocale = null;
+  };
+
+  return Object.freeze({
+    beginSession(nextAccountId) {
+      resetSession(nextAccountId);
+    },
+    invalidateSession() {
+      resetSession(null);
+    },
+    captureBootstrap() {
+      return Object.freeze({ session, accountId, selectionVersion });
+    },
+    recordExplicitChoice(locale, currentAccountId) {
+      const normalizedLocale = normalizeLanguagePreference(locale);
+      const normalizedAccountId = normalizeAccountId(currentAccountId);
+      if (
+        !normalizedLocale ||
+        !normalizedAccountId ||
+        normalizedAccountId !== accountId
+      ) {
+        return null;
+      }
+      selectionVersion += 1;
+      explicitLocale = normalizedLocale;
+      return normalizedLocale;
+    },
+    reconcileBootstrapProfile(profile, incomingAccountId, request) {
+      const normalizedAccountId = normalizeAccountId(incomingAccountId);
+      if (
+        !request ||
+        request.session !== session ||
+        !normalizedAccountId ||
+        (request.accountId && request.accountId !== normalizedAccountId)
+      ) {
+        return null;
+      }
+      if (accountId === null) accountId = normalizedAccountId;
+      if (accountId !== normalizedAccountId) return null;
+
+      const incomingProfile = profile && typeof profile === "object" ? profile : {};
+      const profileLocale = normalizeLanguagePreference(incomingProfile.locale);
+      const preserveExplicitChoice =
+        selectionVersion > request.selectionVersion && Boolean(explicitLocale);
+      const locale = preserveExplicitChoice ? explicitLocale : profileLocale;
+
+      return Object.freeze({
+        profile: preserveExplicitChoice
+          ? { ...incomingProfile, locale }
+          : incomingProfile,
+        locale,
+        shouldApplyRuntime: Boolean(locale) && !preserveExplicitChoice,
+        preservedExplicitChoice: preserveExplicitChoice,
+      });
+    },
+  });
 }

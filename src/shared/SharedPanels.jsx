@@ -1,4 +1,5 @@
 import { useLocalization } from "./i18n/LocalizationProvider";
+import { LanguageSelector } from "./i18n/LanguageSelector.jsx";
 // Компоненты, общие для экрана клиента и экрана менеджера.
 import { Component, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -108,7 +109,7 @@ function PanelErrorRetry({ onRetry }) {
   );
 }
 
-export function Header({ title, subtitle, onLogout, onLogoClick, nav, between, children }) {
+export function Header({ title, subtitle, onLogout, onLogoClick, nav, between, children, onLanguageChange }) {
   const { t } = useLocalization();
   const headerRef = useRef(null);
   const [compactHeader, setCompactHeader] = useState(() => {
@@ -184,6 +185,7 @@ export function Header({ title, subtitle, onLogout, onLogoClick, nav, between, c
             </div>
           )}
           {children}
+          <LanguageSelector onLanguageChange={onLanguageChange} />
           {onLogout && (
             <button className="header-button header-logout" type="button" onClick={onLogout}>{
               t("shared.signOut")
