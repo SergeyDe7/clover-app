@@ -129,6 +129,165 @@ globalThis.localStorage = {
 };
 assert.equal(preference.readLanguagePreference(), null);
 assert.equal(preference.writeLanguagePreference("en"), null);
+assert.equal(
+  preference.syncBrowserPreferenceFromProfile({ locale: "en" }),
+  "en",
+  "valid profile locale must survive unavailable browser storage"
+);
+
+// A: profile locale activates through the real runtime loader even when storage throws.
+const storageFailureApplied = [];
+const storageFailureLoader = createRuntimeSnapshotLoader({
+  requestSnapshot: async (language) => normalizePublicRuntimeSnapshot({
+    enabledLanguages: ["ru", "en"],
+    catalogVersion: 11,
+    effectiveLocale: language,
+    dictionary: { "shared.signOut": "Sign out" },
+  }),
+  applySnapshot: (snapshot) => storageFailureApplied.push(snapshot),
+});
+const storageIndependentProfileLocale =
+  preference.syncBrowserPreferenceFromProfile({ locale: "en" });
+assert.ok(await storageFailureLoader.load(storageIndependentProfileLocale));
+assert.equal(storageFailureApplied.at(-1).locale, "en");
+assert.equal(
+  createLocalizationRuntime({
+    locale: storageFailureApplied.at(-1).locale,
+    dictionaries: storageFailureApplied.at(-1).dictionaries,
+    allowForeignRuntime: true,
+  }).t("shared.signOut"),
+  "Sign out"
+);
+
+// B: a newer explicit choice wins only the locale field of an older bootstrap.
+values.clear();
+globalThis.localStorage = {
+  getItem: (key) => values.get(key) ?? null,
+  setItem: (key, value) => values.set(key, value),
+  removeItem: (key) => values.delete(key),
+};
+const coordinator = preference.createProfileLocaleCoordinator();
+coordinator.beginSession("client-a");
+const oldBootstrap = coordinator.captureBootstrap();
+const selectedLocale = coordinator.recordExplicitChoice("en", "client-a");
+assert.equal(selectedLocale, "en");
+preference.writeLanguagePreference(selectedLocale);
+
+const explicitRuntimeApplied = [];
+const explicitRuntimeLoader = createRuntimeSnapshotLoader({
+  requestSnapshot: async (language) => normalizePublicRuntimeSnapshot(
+    buildPublicLocalizationRuntimeSnapshot({
+      requestedLanguage: language,
+      settings: { enabledLanguages: ["ru", "en"], catalogVersion: 12 },
+      translationStore: { entries: [], values: [] },
+    })
+  ),
+  applySnapshot: (snapshot) => explicitRuntimeApplied.push(snapshot),
+});
+assert.ok(await explicitRuntimeLoader.load(selectedLocale));
+
+const incomingBootstrapProfile = {
+  locale: "ru",
+  companyName: "Fresh server company",
+  contactName: "Fresh server contact",
+};
+const reconciled = coordinator.reconcileBootstrapProfile(
+  incomingBootstrapProfile,
+  "client-a",
+  oldBootstrap
+);
+assert.equal(reconciled.preservedExplicitChoice, true);
+assert.equal(reconciled.shouldApplyRuntime, false);
+assert.equal(reconciled.profile.locale, "en");
+assert.equal(reconciled.profile.companyName, "Fresh server company");
+assert.equal(reconciled.profile.contactName, "Fresh server contact");
+preference.syncBrowserPreferenceFromProfile(reconciled.profile);
+assert.equal(values.get("clover-language-preference-v1"), "en");
+assert.equal(explicitRuntimeApplied.at(-1).locale, "en");
+const autosavePayloads = [structuredClone(reconciled.profile)];
+assert.equal(autosavePayloads.at(-1).locale, "en");
+assert.equal(autosavePayloads.at(-1).companyName, "Fresh server company");
+
+// Negative controls model both original regressions without mutating the candidate.
+globalThis.localStorage = {
+  getItem() { throw new Error("unavailable"); },
+  setItem() { throw new Error("unavailable"); },
+  removeItem() { throw new Error("unavailable"); },
+};
+assert.equal(
+  preference.writeLanguagePreference("en"),
+  null,
+  "the former storage-dependent activation value is null"
+);
+assert.equal(
+  {
+    locale: selectedLocale,
+    ...incomingBootstrapProfile,
+  }.locale,
+  "ru",
+  "the former unconditional bootstrap profile would revert the explicit EN choice"
+);
+
+// C: without a newer choice, the valid profile locale remains authoritative.
+const noChoiceCoordinator = preference.createProfileLocaleCoordinator();
+noChoiceCoordinator.beginSession("client-c");
+const noChoiceResolution = noChoiceCoordinator.reconcileBootstrapProfile(
+  { locale: "en", companyName: "Client C" },
+  "client-c",
+  noChoiceCoordinator.captureBootstrap()
+);
+assert.equal(noChoiceResolution.locale, "en");
+assert.equal(noChoiceResolution.shouldApplyRuntime, true);
+assert.equal(noChoiceResolution.profile.companyName, "Client C");
+
+// D: logout/account switch invalidates A and lets B's profile remain authoritative.
+const accountCoordinator = preference.createProfileLocaleCoordinator();
+accountCoordinator.beginSession("client-a");
+const profileAccountARequest = accountCoordinator.captureBootstrap();
+assert.equal(accountCoordinator.recordExplicitChoice("en", "client-a"), "en");
+accountCoordinator.invalidateSession();
+accountCoordinator.beginSession("client-b");
+const profileAccountBRequest = accountCoordinator.captureBootstrap();
+const accountBResolution = accountCoordinator.reconcileBootstrapProfile(
+  { locale: "ru", companyName: "Client B" },
+  "client-b",
+  profileAccountBRequest
+);
+assert.equal(accountBResolution.locale, "ru");
+assert.equal(accountBResolution.shouldApplyRuntime, true);
+assert.equal(
+  accountCoordinator.reconcileBootstrapProfile(
+    { locale: "ru", companyName: "Delayed Client A" },
+    "client-a",
+    profileAccountARequest
+  ),
+  null
+);
+
+// E: a supported but disabled profile locale resolves through policy to safe RU.
+const disabledProfileCoordinator = preference.createProfileLocaleCoordinator();
+disabledProfileCoordinator.beginSession("client-disabled");
+const disabledProfileResolution =
+  disabledProfileCoordinator.reconcileBootstrapProfile(
+    { locale: "ar" },
+    "client-disabled",
+    disabledProfileCoordinator.captureBootstrap()
+  );
+assert.equal(disabledProfileResolution.locale, "ar");
+assert.equal(disabledProfileResolution.shouldApplyRuntime, true);
+const disabledProfileApplied = [];
+const disabledProfileLoader = createRuntimeSnapshotLoader({
+  requestSnapshot: async (language) => normalizePublicRuntimeSnapshot(
+    buildPublicLocalizationRuntimeSnapshot({
+      requestedLanguage: language,
+      settings: { enabledLanguages: ["ru", "en"], catalogVersion: 13 },
+      translationStore: { entries: [], values: [] },
+    })
+  ),
+  applySnapshot: (snapshot) => disabledProfileApplied.push(snapshot),
+});
+assert.ok(await disabledProfileLoader.load(disabledProfileResolution.locale));
+assert.equal(disabledProfileApplied.at(-1).locale, "ru");
 
 // F-H: client state enters the existing autosave path; staff/selector have no persistence API.
 const app = read("src/App.jsx");
@@ -139,13 +298,16 @@ assert.match(
   /if \(!response\.ok\)[\s\S]*return normalizePublicRuntimeSnapshot\(await response\.json\(\)\)/,
   "HTTP 200 runtime payload must pass through strict validation"
 );
-assert.match(app, /setProfile\(\(current\) => \(\{ \.\.\.current, locale \}\)\)/);
+assert.match(app, /recordExplicitChoice\([\s\S]*setProfile\(\(current\) => \(\{[\s\S]*locale: explicitLocale/);
+assert.match(app, /reconcileBootstrapProfile\([\s\S]*const nextProfile = profileLocaleResolution\.profile/);
+assert.match(app, /profileLocaleResolution\.shouldApplyRuntime[\s\S]*setLanguage\(profileLanguage\)/);
 assert.match(app, /authUser\?\.role !== "client"[\s\S]*scheduleSync\(\(\) => api\.saveProfile\(profile\)\)/);
 assert.doesNotMatch(selector, /api\.|fetch\(|saveProfile|PUT|profile/);
 assert.match(app, /data\.user\.role === "client"[\s\S]*syncBrowserPreferenceFromProfile/);
 assert.match(app, /const sequence = \+\+bootstrapSequenceRef\.current/);
 assert.match(app, /sequence !== bootstrapSequenceRef\.current\) return/);
 assert.match(app, /bootstrapSequenceRef\.current \+= 1/);
+assert.match(app, /profileLocaleCoordinatorRef\.current\.invalidateSession\(\)/);
 assert.match(app, /invalidateLanguageRequests\(\)/);
 assert.doesNotMatch(app, /data\.user\.role === "manager"[\s\S]{0,200}syncBrowserPreferenceFromProfile/);
 assert.ok(

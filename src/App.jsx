@@ -1,5 +1,8 @@
 import { useLocalization } from "./shared/i18n/LocalizationProvider";
-import { syncBrowserPreferenceFromProfile } from "./shared/i18n/languagePreference.js";
+import {
+  createProfileLocaleCoordinator,
+  syncBrowserPreferenceFromProfile,
+} from "./shared/i18n/languagePreference.js";
 import { LanguageSelector } from "./shared/i18n/LanguageSelector.jsx";
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
@@ -631,6 +634,7 @@ function App() {
   const dirtyClientLinkIdsRef = useRef(new Set());
   const catalogPricesVersionRef = useRef("");
   const bootstrapSequenceRef = useRef(0);
+  const profileLocaleCoordinatorRef = useRef(createProfileLocaleCoordinator());
   const [catalogPricesVersion, setCatalogPricesVersion] = useState("");
 
   const applyManagerNotificationList = (items) => {
@@ -645,7 +649,22 @@ function App() {
     syncAppBadge(unreadNotifications.length);
   };
 
-  const applyBootstrap = (data, { openClientOrderLanding = false } = {}) => {
+  const applyBootstrap = (
+    data,
+    { openClientOrderLanding = false, profileLocaleRequest } = {}
+  ) => {
+    const incomingProfile = normalizeProfileContacts({
+      ...EMPTY_PROFILE,
+      ...(data.profile || EMPTY_PROFILE),
+    });
+    const profileLocaleResolution =
+      profileLocaleCoordinatorRef.current.reconcileBootstrapProfile(
+        incomingProfile,
+        data.user?.id,
+        profileLocaleRequest
+      );
+    if (!profileLocaleResolution) return false;
+
     setAuthUser(data.user);
     setRole(data.user.role);
     setProducts(
@@ -689,15 +708,14 @@ function App() {
     }
 
     setOrders(incomingOrders);
-    const nextProfile = normalizeProfileContacts({
-      ...EMPTY_PROFILE,
-      ...(data.profile || EMPTY_PROFILE),
-    });
+    const nextProfile = profileLocaleResolution.profile;
     setProfile(nextProfile);
     // Stage 6.1: authenticated profile locale is authoritative and syncs to browser storage.
     if (data.user.role === "client") {
       const profileLanguage = syncBrowserPreferenceFromProfile(nextProfile);
-      if (profileLanguage) void setLanguage(profileLanguage);
+      if (profileLanguage && profileLocaleResolution.shouldApplyRuntime) {
+        void setLanguage(profileLanguage);
+      }
     }
     setAddresses(
       Array.isArray(data.addresses) ? data.addresses : []
@@ -732,10 +750,13 @@ function App() {
     }
 
     setHydrated(true);
+    return true;
   };
 
   const loadBootstrap = async ({ silent = false } = {}) => {
     const sequence = ++bootstrapSequenceRef.current;
+    const profileLocaleRequest =
+      profileLocaleCoordinatorRef.current.captureBootstrap();
     // Показываем полноэкранную загрузку только при первом запуске/входе.
     // После загрузки кабинета фоновые обновления не должны заменять экран.
     const shouldBlockScreen = !silent && !hydrated;
@@ -746,7 +767,11 @@ function App() {
     try {
       const data = await api.bootstrap();
       if (sequence !== bootstrapSequenceRef.current) return;
-      applyBootstrap(data, { openClientOrderLanding: !silent });
+      const applied = applyBootstrap(data, {
+        openClientOrderLanding: !silent,
+        profileLocaleRequest,
+      });
+      if (!applied) return;
       setIsLoggedIn(true);
       setSyncError("");
     } catch (error) {
@@ -1130,6 +1155,7 @@ function App() {
       setManagerNotifications([]);
 
       setApiToken(result.token);
+      profileLocaleCoordinatorRef.current.beginSession(result.user.id);
       setAuthUser(result.user);
       setRole(result.user.role);
       setIsLoggedIn(true);
@@ -1254,6 +1280,7 @@ function App() {
 
   const logout = () => {
     bootstrapSequenceRef.current += 1;
+    profileLocaleCoordinatorRef.current.invalidateSession();
     invalidateLanguageRequests();
     clearApiToken();
     writeManagerActiveTab("orders");
@@ -2109,7 +2136,14 @@ function App() {
           profile={profile}
           setProfile={setProfile}
           onLanguageChange={(locale) => {
-            setProfile((current) => ({ ...current, locale }));
+            const explicitLocale =
+              profileLocaleCoordinatorRef.current.recordExplicitChoice(
+                locale,
+                authUser?.id
+              );
+            if (explicitLocale) {
+              setProfile((current) => ({ ...current, locale: explicitLocale }));
+            }
           }}
           addresses={addresses}
           setAddresses={setAddresses}
