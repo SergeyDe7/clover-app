@@ -6,12 +6,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { getEnabledLocales, isLanguageEnabled, toPublicLocaleCode } from "./languageRegistry.js";
-import { resolveLocale } from "./languageResolver.js";
+import { isLanguageEnabled, toPublicLocaleCode } from "./languageRegistry.js";
 import { readLanguagePreference, writeLanguagePreference } from "./languagePreference.js";
 import { createLocalizationRuntime } from "./translationRuntime.js";
 import {
   applyRuntimeDocumentLocale,
+  normalizePublicRuntimeSnapshot,
   createRuntimeSnapshotLoader,
 } from "./runtimeRequestGate.js";
 
@@ -25,25 +25,6 @@ const defaultRuntime = Object.freeze({
 });
 const LocalizationContext = createContext(defaultRuntime);
 
-function normalizeSnapshot(payload) {
-  const source = payload && typeof payload === "object" ? payload : {};
-  const enabledLanguages = getEnabledLocales(source.enabledLanguages);
-  const requested = source.effectiveLocale ?? source.locale;
-  const locale = resolveLocale({ preferredLanguage: requested, enabledLanguages });
-  const dictionary = source.dictionary && typeof source.dictionary === "object"
-    ? source.dictionary
-    : {};
-  return {
-    enabledLanguages,
-    catalogVersion:
-      typeof source.catalogVersion === "string" || Number.isFinite(source.catalogVersion)
-        ? source.catalogVersion
-        : "",
-    locale,
-    dictionaries: { [locale]: dictionary },
-  };
-}
-
 async function requestRuntimeSnapshot(language, signal) {
   const query = new URLSearchParams({ language: toPublicLocaleCode(language) });
   const response = await fetch(`${RUNTIME_ENDPOINT}?${query}`, {
@@ -52,7 +33,7 @@ async function requestRuntimeSnapshot(language, signal) {
     signal,
   });
   if (!response.ok) throw new Error(`Localization runtime request failed (${response.status})`);
-  return normalizeSnapshot(await response.json());
+  return normalizePublicRuntimeSnapshot(await response.json());
 }
 
 export function LocalizationProvider({
@@ -105,7 +86,7 @@ export function LocalizationProvider({
   useEffect(() => {
     if (typeof document === "undefined") return undefined;
     applyRuntimeDocumentLocale(document, {
-      locale: toPublicLocaleCode(value.locale),
+      locale: value.locale,
       direction: value.direction,
     });
     return undefined;
@@ -121,5 +102,3 @@ export function LocalizationProvider({
 export function useLocalization() {
   return useContext(LocalizationContext);
 }
-
-export { normalizeSnapshot as normalizePublicRuntimeSnapshot };

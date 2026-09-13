@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -20,6 +21,7 @@ import {
   applyRuntimeDocumentLocale,
   createRuntimeRequestGate,
   createRuntimeSnapshotLoader,
+  normalizePublicRuntimeSnapshot,
 } from "../../src/shared/i18n/runtimeRequestGate.js";
 
 const read = (rel) => readFileSync(path.join(projectRoot, rel), "utf8");
@@ -53,6 +55,55 @@ assert.equal(resolveLocale({ storedLanguage: "ar", enabledLanguages: disabled.en
 assert.equal(resolveLocale({ preferredLanguage: "bogus", enabledLanguages: ["ru", "en"] }), "ru");
 assert.deepEqual(getEnabledLocales(["en", "en", "bogus"]), ["ru", "en"]);
 
+const normalizedZh = normalizePublicRuntimeSnapshot({
+  enabledLanguages: ["ru", "zh"],
+  catalogVersion: 9,
+  effectiveLocale: "zh-CN",
+  dictionary: { "shared.signOut": "退出" },
+});
+assert.deepEqual(normalizedZh.enabledLanguages, ["ru", "zh"]);
+assert.equal(normalizedZh.locale, "zh-CN");
+assert.equal(normalizedZh.catalogVersion, 9);
+assert.equal(normalizedZh.dictionaries["zh-CN"]["shared.signOut"], "退出");
+assert.equal(
+  createLocalizationRuntime({
+    locale: normalizedZh.locale,
+    dictionaries: normalizedZh.dictionaries,
+    allowForeignRuntime: true,
+  }).t("shared.signOut"),
+  "退出"
+);
+for (const invalidPayload of [
+  null,
+  {},
+  {
+    enabledLanguages: ["ru", "invalid"],
+    catalogVersion: 1,
+    effectiveLocale: "ru",
+    dictionary: {},
+  },
+  {
+    enabledLanguages: ["ru"],
+    catalogVersion: 1,
+    effectiveLocale: "en",
+    dictionary: {},
+  },
+  {
+    enabledLanguages: ["ru"],
+    catalogVersion: "1",
+    effectiveLocale: "ru",
+    dictionary: {},
+  },
+  {
+    enabledLanguages: ["ru"],
+    catalogVersion: 1,
+    effectiveLocale: "ru",
+    dictionary: [],
+  },
+]) {
+  assert.throws(() => normalizePublicRuntimeSnapshot(invalidPayload));
+}
+
 // D-E: Stage 6.1 storage behavior and the public/internal Chinese round-trip.
 const values = new Map();
 globalThis.localStorage = {
@@ -83,6 +134,11 @@ assert.equal(preference.writeLanguagePreference("en"), null);
 const app = read("src/App.jsx");
 const selector = read("src/shared/i18n/LanguageSelector.jsx");
 const provider = read("src/shared/i18n/LocalizationProvider.jsx");
+assert.match(
+  provider,
+  /if \(!response\.ok\)[\s\S]*return normalizePublicRuntimeSnapshot\(await response\.json\(\)\)/,
+  "HTTP 200 runtime payload must pass through strict validation"
+);
 assert.match(app, /setProfile\(\(current\) => \(\{ \.\.\.current, locale \}\)\)/);
 assert.match(app, /authUser\?\.role !== "client"[\s\S]*scheduleSync\(\(\) => api\.saveProfile\(profile\)\)/);
 assert.doesNotMatch(selector, /api\.|fetch\(|saveProfile|PUT|profile/);
@@ -114,6 +170,54 @@ assert.equal(createLocalizationRuntime({ locale: "ar", allowForeignRuntime: true
 assert.equal(createLocalizationRuntime({ locale: "ru", allowForeignRuntime: true }).direction, "ltr");
 assert.match(provider, /applyRuntimeDocumentLocale\(document/);
 
+// Fresh failure stays on safe RU; later malformed data preserves the last valid runtime.
+const freshFailureApplied = [];
+const freshFailureLoader = createRuntimeSnapshotLoader({
+  requestSnapshot: async () => {
+    throw new Error("offline");
+  },
+  applySnapshot: (snapshot) => freshFailureApplied.push(snapshot),
+});
+assert.equal(await freshFailureLoader.load("en"), null);
+assert.deepEqual(freshFailureApplied, []);
+
+let returnMalformedPayload = false;
+const validThenMalformedApplied = [];
+const validThenMalformedLoader = createRuntimeSnapshotLoader({
+  requestSnapshot: async () => normalizePublicRuntimeSnapshot(
+    returnMalformedPayload
+      ? {}
+      : {
+          enabledLanguages: ["ru", "en"],
+          catalogVersion: 10,
+          effectiveLocale: "en",
+          dictionary: { "shared.signOut": "Sign out" },
+        }
+  ),
+  applySnapshot: (snapshot) => validThenMalformedApplied.push(snapshot),
+});
+assert.ok(await validThenMalformedLoader.load("en"));
+returnMalformedPayload = true;
+assert.equal(await validThenMalformedLoader.load("ru"), null);
+assert.equal(validThenMalformedApplied.length, 1);
+assert.equal(validThenMalformedApplied[0].locale, "en");
+
+// A delayed locale A response cannot overwrite the newer locale B snapshot.
+let resolveLocaleA;
+const localeRaceApplied = [];
+const localeADeferred = new Promise((resolve) => { resolveLocaleA = resolve; });
+const localeRaceLoader = createRuntimeSnapshotLoader({
+  requestSnapshot: (language) => language === "en"
+    ? localeADeferred
+    : Promise.resolve({ locale: "ru" }),
+  applySnapshot: (snapshot) => localeRaceApplied.push(snapshot),
+});
+const staleLocaleA = localeRaceLoader.load("en");
+await localeRaceLoader.load("ru");
+resolveLocaleA({ locale: "en" });
+assert.equal(await staleLocaleA, null);
+assert.deepEqual(localeRaceApplied, [{ locale: "ru" }]);
+
 // Deferred A response is rejected after logout invalidation and cannot overwrite B.
 const gate = createRuntimeRequestGate();
 const accountARequest = gate.next();
@@ -143,10 +247,15 @@ const fakeDocument = { documentElement: fakeRoot, getElementById: () => fakeAppR
 applyRuntimeDocumentLocale(fakeDocument, { locale: "ar", direction: "rtl" });
 assert.deepEqual({ ...fakeRoot }, { dir: "rtl", lang: "ar" });
 assert.equal(fakeAppRoot.dir, "rtl");
+assert.equal(fakeAppRoot.lang, "ar");
 applyRuntimeDocumentLocale(fakeDocument, { locale: "ru", direction: "ltr" });
 assert.equal(fakeRoot.dir, "ltr");
 assert.equal(fakeRoot.lang, "ru");
 assert.equal(fakeAppRoot.dir, "ltr");
+assert.equal(fakeAppRoot.lang, "ru");
+applyRuntimeDocumentLocale(fakeDocument, { locale: "zh-CN", direction: "ltr" });
+assert.equal(fakeRoot.lang, "zh-CN");
+assert.equal(fakeAppRoot.lang, "zh-CN");
 
 // K: one native selector mounted through the intended existing shells and login.
 assert.match(selector, /const accessibleLabel = t\("admin\.languages\.language"\)/);
@@ -161,21 +270,14 @@ assert.match(read("src/styles/clover-theme.css"), /@media \(max-width: 640px\)[\
 const server = read("server/src/server.js");
 assert.match(server, /app\.get\("\/api\/public\/localization\/runtime"/);
 assert.doesNotMatch(server, /app\.(?:put|post|patch|delete)\("\/api\/public\/localization\/runtime"/);
-const changed = String(process.env.STAGE62_CHANGED_FILES || [
-  "server/src/publicLocalizationRuntime.js",
-  "server/src/server.js",
-  "src/shared/i18n/LocalizationProvider.jsx",
-  "src/shared/i18n/LanguageSelector.jsx",
-  "src/shared/i18n/runtimeRequestGate.js",
-  "src/shared/SharedPanels.jsx",
-  "src/screens/storefront/components/StoreHeader.jsx",
-  "src/screens/client/ClientScreen.jsx",
-  "src/App.jsx",
-  "src/styles/clover-theme.css",
-  "server/scripts/verify-i18n-stage-3-core.mjs",
-  "server/scripts/verify-i18n-stage-3-system-ui.mjs",
-  "server/scripts/verify-i18n-stage-6-2-language-selector.mjs",
-].join("\n"));
+const changed = String(
+  process.env.STAGE62_CHANGED_FILES ||
+  execFileSync(
+    "git",
+    ["diff", "--name-only", "b71bacce08f2be8fb0926f77dfd6b2416944f8eb"],
+    { cwd: projectRoot, encoding: "utf8" }
+  )
+);
 assert.doesNotMatch(changed, /(?:pricing|price|order|matrix|onec|one-c|migration|schema)/i);
 
 console.log("I18N Stage 6.2 language selector verification passed.");
