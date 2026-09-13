@@ -296,6 +296,7 @@ assert.equal(disabledProfileApplied.at(-1).locale, "ru");
 const app = read("src/App.jsx");
 const selector = read("src/shared/i18n/LanguageSelector.jsx");
 const provider = read("src/shared/i18n/LocalizationProvider.jsx");
+const storefrontHeaderSource = read("src/screens/storefront/components/StoreHeader.jsx");
 assert.match(
   provider,
   /if \(!response\.ok\)[\s\S]*return normalizePublicRuntimeSnapshot\(await response\.json\(\)\)/,
@@ -318,17 +319,32 @@ assert.ok(
   "client profile state must update synchronously when selection starts"
 );
 assert.ok(
-  provider.indexOf("writeLanguagePreference(language)") < provider.indexOf("const next = await loader.load(language)"),
+  provider.indexOf("writeLanguagePreference(language)") <
+    provider.indexOf("await loader.loadWithStatus(language)"),
   "browser preference must be written before the async runtime request"
 );
 assert.match(app, /scheduleSync\(\(\) => api\.saveProfile\(profile\)\)/);
 assert.match(app, /catch \(error\) \{[\s\S]*setSyncError\(/);
 
-// I: locale resolution is route-neutral and all prefix/redirect switches remain frozen off.
+// I: cabinet selection stays route-neutral. Stage 7 supersedes only public
+// storefront route neutrality behind its disabled-by-default build gate.
 assert.equal(PUBLIC_LANGUAGE_PREFIXES_ENABLED, false);
 assert.equal(BROWSER_LANGUAGE_AUTO_REDIRECT, false);
 assert.equal(cabinetPathForLocale("/lk?tab=orders#new", "ar"), "/lk?tab=orders#new");
-assert.doesNotMatch(`${provider}\n${selector}`, /pushState|replaceState|location\.(?:assign|replace)|location\.href/);
+assert.doesNotMatch(selector, /pushState|replaceState|location\.(?:assign|replace)|location\.href/);
+assert.match(provider, /addEventListener\("popstate"/);
+assert.match(storefrontHeaderSource, /equivalentPublicLocaleHref/);
+assert.match(storefrontHeaderSource, /window\.history\.pushState/);
+assert.match(storefrontHeaderSource, /revertPublicLanguageSwitch/);
+assert.match(storefrontHeaderSource, /acceptPublicLanguageSwitch/);
+assert.match(storefrontHeaderSource, /onLanguageAccepted/);
+assert.match(storefrontHeaderSource, /onLanguageRejected/);
+assert.match(selector, /onLanguageRejected\(language\)/);
+assert.ok(
+  selector.indexOf("void setLanguage(language)") <
+    selector.indexOf("onLanguageRejected(language)"),
+  "rejected public locale switch runs after the existing setLanguage attempt"
+);
 
 // J: runtime direction and the actual document/root projection contract.
 assert.equal(createLocalizationRuntime({ locale: "ar", allowForeignRuntime: true }).direction, "rtl");
@@ -506,7 +522,7 @@ try {
 }
 
 const storefrontHeader = read("src/screens/storefront/components/StoreHeader.jsx");
-const storefrontLanguageIndex = storefrontHeader.indexOf('<LanguageSelector className="sf-language-selector" />');
+const storefrontLanguageIndex = storefrontHeader.indexOf("<LanguageSelector");
 assert.ok(storefrontHeader.indexOf("<StorefrontContacts />") < storefrontLanguageIndex);
 assert.ok(storefrontLanguageIndex < storefrontHeader.indexOf('className="sf-header-tool sf-login-mobile"'));
 assert.ok(storefrontLanguageIndex < storefrontHeader.indexOf('className="sf-btn sf-btn-ghost sf-login sf-login-desktop"'));
@@ -521,7 +537,7 @@ const appCss = read("src/App.css");
 const themeCss = read("src/styles/clover-theme.css");
 const storefrontCss = read("src/screens/storefront/storefront.css");
 assert.match(appCss, /\.login-card\{position:relative/);
-assert.match(themeCss, /\.language-selector-login\s*\{[\s\S]*position:\s*absolute;[\s\S]*top:\s*12px;[\s\S]*right:\s*12px;[\s\S]*left:\s*auto;/);
+assert.match(themeCss, /\.language-selector-login\s*\{[\s\S]*position:\s*absolute;[\s\S]*top:\s*12px;[\s\S]*inset-inline-end:\s*12px;/);
 assert.match(themeCss, /\.language-selector-trigger,[\s\S]*\.language-selector-option\s*\{[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;/);
 assert.match(themeCss, /\.language-selector-trigger,[\s\S]*\.language-selector-option\s*\{[\s\S]*box-sizing:\s*border-box;/);
 assert.match(themeCss, /\.language-selector-trigger:focus-visible,[\s\S]*outline:\s*3px/);

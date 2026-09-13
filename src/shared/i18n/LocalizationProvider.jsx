@@ -14,16 +14,31 @@ import {
   normalizePublicRuntimeSnapshot,
   createRuntimeSnapshotLoader,
 } from "./runtimeRequestGate.js";
+import { extractPublicLanguagePrefix } from "./languageResolver.js";
+import {
+  publicLocaleInfrastructureEnabledFromDocument,
+} from "./publicLocaleRouting.js";
 
 const RUNTIME_ENDPOINT = "/api/public/localization/runtime";
 const defaultRuntime = Object.freeze({
   ...createLocalizationRuntime(),
   enabledLanguages: Object.freeze(["ru"]),
   catalogVersion: "",
-  setLanguage: async () => false,
+      setLanguage: async () => ({ ok: false, stale: false }),
   invalidateLanguageRequests: () => {},
 });
 const LocalizationContext = createContext(defaultRuntime);
+
+function publicUrlLanguage() {
+  if (typeof window === "undefined" || typeof document === "undefined") return "";
+  if (!publicLocaleInfrastructureEnabledFromDocument(document)) return "";
+  const pathname = String(window.location?.pathname || "/");
+  if (pathname === "/lk" || pathname.startsWith("/lk/")) return "";
+  const parsed = extractPublicLanguagePrefix(pathname, {
+    infrastructureEnabled: true,
+  });
+  return parsed.locale || "ru";
+}
 
 async function requestRuntimeSnapshot(language, signal) {
   const query = new URLSearchParams({ language: toPublicLocaleCode(language) });
@@ -42,10 +57,11 @@ export function LocalizationProvider({
   dictionaries,
 }) {
   const initialPreference = useRef(readLanguagePreference());
+  const [urlLanguage, setUrlLanguage] = useState(publicUrlLanguage);
   const [snapshot, setSnapshot] = useState(() => ({
     enabledLanguages: ["ru"],
     catalogVersion: "",
-    locale: "ru",
+    locale: publicUrlLanguage() || "ru",
     dictionaries: dictionaries || {},
   }));
   const loader = useRef(createRuntimeSnapshotLoader({
@@ -54,9 +70,16 @@ export function LocalizationProvider({
   })).current;
 
   useEffect(() => {
-    const preferredLanguage = locale || initialPreference.current || "ru";
+    const sync = () => setUrlLanguage(publicUrlLanguage());
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
+
+  useEffect(() => {
+    const preferredLanguage =
+      locale || urlLanguage || initialPreference.current || "ru";
     void loader.load(preferredLanguage);
-  }, [locale, loader]);
+  }, [locale, loader, urlLanguage]);
 
   const value = useMemo(() => {
     const runtime = createLocalizationRuntime({
@@ -72,12 +95,17 @@ export function LocalizationProvider({
         if (isLanguageEnabled(language, snapshot.enabledLanguages)) {
           writeLanguagePreference(language);
         }
-        const next = await loader.load(language);
-        return Boolean(
-          next &&
-          isLanguageEnabled(language, next.enabledLanguages) &&
-          toPublicLocaleCode(next.locale) === toPublicLocaleCode(language)
-        );
+        const result = await loader.loadWithStatus(language);
+        if (result.status === "stale") return { ok: false, stale: true };
+        const next = result.snapshot;
+        return {
+          ok: Boolean(
+            next &&
+            isLanguageEnabled(language, next.enabledLanguages) &&
+            toPublicLocaleCode(next.locale) === toPublicLocaleCode(language)
+          ),
+          stale: false,
+        };
       },
       invalidateLanguageRequests: () => loader.invalidate(),
     });
@@ -85,12 +113,13 @@ export function LocalizationProvider({
 
   useEffect(() => {
     if (typeof document === "undefined") return undefined;
+    const immediate = urlLanguage || value.locale;
     applyRuntimeDocumentLocale(document, {
-      locale: value.locale,
-      direction: value.direction,
+      locale: immediate === "zh" ? "zh-CN" : immediate,
+      direction: (immediate === "ar" ? "rtl" : value.direction) || "ltr",
     });
     return undefined;
-  }, [value.direction, value.locale]);
+  }, [urlLanguage, value.direction, value.locale]);
 
   return (
     <LocalizationContext.Provider value={value}>

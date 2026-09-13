@@ -162,7 +162,7 @@ const { listSeoCatalogEntries } = await import(
 const categoryN = listCategoryCatalogEntries().length;
 const pageN = listInfoPageCatalogEntries().length;
 const seoN = listSeoCatalogEntries().length;
-assert.equal(seoN, 10, "Stage 5.2-B SEO corpus must be exactly 10 entries");
+assert.equal(seoN, 13, "Stage 5.2-B plus Stage 7 SEO corpus must be exactly 13 entries");
 const uiEntries = store1.entries.filter(
   (entry) => !entry.entityType && !entry.entityId
 );

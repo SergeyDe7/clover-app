@@ -57,13 +57,22 @@ import {
   listHomePromotions,
   normalizeStorefrontPromotions,
 } from "../../src/shared/storefrontPromotions.js";
-import { normalizeStorefrontInfoPages } from "../../src/shared/storefrontInfoPages.js";
+import {
+  normalizeStorefrontInfoPages,
+  resolveStorefrontInfoPage,
+} from "../../src/shared/storefrontInfoPages.js";
 import {
   buildProductTranslationCellMap,
   projectLocalizedProductDisplay,
 } from "./productLocalizationStore.js";
-import { readLocalizationSettings } from "./localizationStore.js";
+import {
+  readCategoryTranslationStore,
+  readInfoPageTranslationStore,
+  readLocalizationSettings,
+  readSeoTranslationStore,
+} from "./localizationStore.js";
 import { canonicalProductId } from "../../src/shared/i18n/productLocalization.js";
+import { categoryEntityKey } from "../../src/shared/i18n/categoryCatalog.js";
 import {
   exactTranslationTargetInternal,
   toPublicLocaleCode,
@@ -74,6 +83,104 @@ import {
 } from "../../src/shared/sitemap/sitemapContract.js";
 
 const STOREFRONT_GUEST_EMAIL = "storefront-guest@clover.local";
+
+function currentTranslationLookup(store, language) {
+  const internal = exactTranslationTargetInternal(language);
+  if (!internal) return new Map();
+  const entries = Array.isArray(store?.entries) ? store.entries : [];
+  const values = Array.isArray(store?.values) ? store.values : [];
+  const byId = new Map(entries.map((entry) => [String(entry.id || ""), entry]));
+  const lookup = new Map();
+  for (const value of values) {
+    if (String(value?.languageCode || "") !== internal) continue;
+    if (!["AUTO", "MANUAL"].includes(String(value?.state || ""))) continue;
+    const entry = byId.get(String(value?.entryId || ""));
+    if (!entry) continue;
+    if (String(value.sourceHash || "") !== String(entry.sourceHash || "")) continue;
+    const text = String(value.value || "").trim();
+    if (!text) continue;
+    lookup.set(
+      `${entry.namespace}\0${entry.entityType || ""}\0${entry.entityId || ""}\0${entry.fieldKey}`,
+      text
+    );
+  }
+  return lookup;
+}
+
+function publicTranslationProjection(language) {
+  const settings = readLocalizationSettings();
+  const publicCode = toPublicLocaleCode(language);
+  if (
+    !exactTranslationTargetInternal(language) ||
+    !(settings.enabledLanguages || ["ru"]).includes(publicCode)
+  ) {
+    return {
+      locale: "ru",
+      categoryTranslations: {},
+      infoTranslations: new Map(),
+      seo: {},
+    };
+  }
+  const internal = exactTranslationTargetInternal(language);
+  const categoryStore = readCategoryTranslationStore({
+    languageInternal: internal,
+  }).store;
+  const pageStore = readInfoPageTranslationStore({
+    languageInternal: internal,
+  }).store;
+  const seoStore = readSeoTranslationStore({
+    languageInternal: internal,
+  }).store;
+  const categoryLookup = currentTranslationLookup(categoryStore, language);
+  const categoryTranslations = {};
+  for (const entry of categoryStore.entries || []) {
+    const value = categoryLookup.get(
+      `${entry.namespace}\0${entry.entityType || ""}\0${entry.entityId || ""}\0${entry.fieldKey}`
+    );
+    if (value) {
+      categoryTranslations[
+        categoryEntityKey(entry.entityType, entry.entityId)
+      ] = value;
+    }
+  }
+  const infoTranslations = currentTranslationLookup(pageStore, language);
+  const seoLookup = currentTranslationLookup(seoStore, language);
+  const seo = {};
+  for (const entry of seoStore.entries || []) {
+    const value = seoLookup.get(
+      `${entry.namespace}\0${entry.entityType || ""}\0${entry.entityId || ""}\0${entry.fieldKey}`
+    );
+    if (!value) continue;
+    if (!seo[entry.entityId]) seo[entry.entityId] = {};
+    seo[entry.entityId][entry.fieldKey] = value;
+  }
+  return { locale: publicCode, categoryTranslations, infoTranslations, seo };
+}
+
+function projectPublicInfoPages(infoPages, projection) {
+  if (projection.locale === "ru") return infoPages;
+  const out = {};
+  for (const slug of Object.keys(infoPages || {})) {
+    const page = resolveStorefrontInfoPage(slug, infoPages);
+    if (!page) continue;
+    out[slug] = {
+      ...page,
+      heading:
+        projection.infoTranslations.get(
+          `page\0info\0${slug}\0heading`
+        ) || page.heading,
+      title:
+        projection.infoTranslations.get(
+          `page\0info\0${slug}\0title`
+        ) || page.title,
+      description:
+        projection.infoTranslations.get(
+          `page\0info\0${slug}\0description`
+        ) || page.description,
+    };
+  }
+  return out;
+}
 
 export function getStorefrontSettings(settingsInput) {
   const settings = {
@@ -653,6 +760,7 @@ export function getPublicCatalog({
   subcategory = "",
   facet = "",
   q = "",
+  language = "",
 } = {}) {
   const settings = getStorefrontSettings(
     getGlobalState("settings", DEFAULT_SETTINGS)
@@ -660,7 +768,8 @@ export function getPublicCatalog({
   const priceTypes = normalizeOneCPriceTypes(
     getGlobalState("oneCPriceTypes", [])
   );
-  let products = listStorefrontProducts(settings);
+  const projection = publicTranslationProjection(language);
+  let products = listStorefrontProducts(settings, projection.locale);
 
   const categoryFilter = String(category || "").trim();
   if (categoryFilter) {
@@ -710,15 +819,18 @@ export function getPublicCatalog({
       : null;
 
   return {
+    locale: projection.locale,
     categories: buildCategories(listStorefrontProducts(settings)),
+    categoryTranslations: projection.categoryTranslations,
     products,
     priceType,
-    site: buildPublicSite(settings),
+    site: buildPublicSite(settings, new Date(), projection.locale),
   };
 }
 
-export function buildPublicSite(settingsInput, now = new Date()) {
+export function buildPublicSite(settingsInput, now = new Date(), language = "") {
   const settings = getStorefrontSettings(settingsInput);
+  const projection = publicTranslationProjection(language);
   const promotions = listActivePromotions(settings.storefrontPromotions, now);
   return {
     heroTitle: settings.storefrontHeroTitle || "",
@@ -734,7 +846,10 @@ export function buildPublicSite(settingsInput, now = new Date()) {
     contactNote: settings.storefrontContactNote || "",
     contactMapsUrl: settings.storefrontContactMapsUrl || "",
     contactMapImageUrl: settings.storefrontContactMapImageUrl || "",
-    infoPages: settings.storefrontInfoPages,
+    infoPages: projectPublicInfoPages(settings.storefrontInfoPages, projection),
+    categoryTranslations: projection.categoryTranslations,
+    seo: projection.seo,
+    locale: projection.locale,
   };
 }
 
@@ -743,18 +858,23 @@ export function getAdminStorefrontPromotions(settingsInput, now = new Date()) {
   return listAdminPromotions(settings.storefrontPromotions, now);
 }
 
-export function getPublicSite() {
-  return buildPublicSite(getGlobalState("settings", DEFAULT_SETTINGS));
+export function getPublicSite(language = "") {
+  return buildPublicSite(
+    getGlobalState("settings", DEFAULT_SETTINGS),
+    new Date(),
+    language
+  );
 }
 
-export function getPublicProductByCode(code) {
+export function getPublicProductByCode(code, language = "") {
   const needle = String(code || "").trim().toLocaleLowerCase("ru-RU");
   if (!needle) return null;
   const settings = getStorefrontSettings(
     getGlobalState("settings", DEFAULT_SETTINGS)
   );
-  return (
-    listStorefrontProducts(settings).find((product) => {
+  const projection = publicTranslationProjection(language);
+  const product =
+    listStorefrontProducts(settings, projection.locale).find((product) => {
       const aliases = [
         product.code,
         product.oneCCode,
@@ -765,8 +885,14 @@ export function getPublicProductByCode(code) {
         .map((value) => String(value || "").trim().toLocaleLowerCase("ru-RU"))
         .filter(Boolean);
       return aliases.includes(needle);
-    }) || null
-  );
+    }) || null;
+  return product
+    ? {
+        ...product,
+        locale: projection.locale,
+        categoryTranslations: projection.categoryTranslations,
+      }
+    : null;
 }
 
 export function ensureStorefrontGuestUser() {

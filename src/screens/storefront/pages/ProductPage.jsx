@@ -13,6 +13,7 @@ import {
   toQuantityInputValue,
 } from "../../../shared/appHelpers.js";
 import { applyStorefrontDocumentMeta } from "../seo.js";
+import { STOREFRONT_DEFAULT_DESCRIPTION } from "../../../shared/i18n/storefrontSeoDefaults.js";
 import { storefrontHref } from "../mode.js";
 import {
   StorefrontUnitChoice,
@@ -20,9 +21,15 @@ import {
 } from "../components/StorefrontUnitChoice.jsx";
 import { categoryDisplayNameFromCanonical } from "../../../shared/i18n/categoryDisplayProjection.js";
 import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
+import {
+  isIndexablePublicSearch,
+  publicAlternateLinks,
+  publicLocaleInfrastructureEnabledFromDocument,
+} from "../../../shared/i18n/publicLocaleRouting.js";
 
-export function ProductPage({ code }) {
-  const { t, locale } = useLocalization();
+export function ProductPage({ code, routeLocale, site }) {
+  const { enabledLanguages, t, locale } = useLocalization();
+  const publicLocale = routeLocale || locale;
   const [product, setProduct] = useState(null);
   const [error, setError] = useState("");
   const [unit, setUnit] = useState("piece");
@@ -33,7 +40,7 @@ export function ProductPage({ code }) {
     setError("");
     setProduct(null);
     storefrontApi
-      .product(code)
+      .product(code, publicLocale)
       .then((payload) => {
         if (cancelled) return;
         const next = payload.product;
@@ -49,19 +56,39 @@ export function ProductPage({ code }) {
     return () => {
       cancelled = true;
     };
-  }, [code, t]);
+  }, [code, publicLocale, t]);
 
   useEffect(() => {
     if (!product) return;
-    const summary = String(product.description || product.shortDescription || "").trim();
+    const summary = String(
+      product.storefrontDetails?.description ||
+        product.description ||
+        product.shortDescription ||
+        ""
+    ).trim();
     applyStorefrontDocumentMeta({
       title: `${product.name} | КЛЕВЕР`,
       description: summary.slice(0, 160) || `Купить «${product.name}» в каталоге компании КЛЕВЕР.`,
-      path: storefrontHref({ name: "product", code: product.code || code }),
+      path: storefrontHref(
+        { name: "product", code: product.code || code },
+        { locale: publicLocale }
+      ),
       image: product.imageUrl || undefined,
       type: "product",
+      locale: publicLocale,
+      indexable: isIndexablePublicSearch(window.location.search),
+      organizationDescription:
+        site?.seo?.home?.description || STOREFRONT_DEFAULT_DESCRIPTION,
+      alternates:
+        typeof document !== "undefined" &&
+        publicLocaleInfrastructureEnabledFromDocument(document)
+          ? publicAlternateLinks(
+              `/product/${encodeURIComponent(product.code || code)}`,
+              enabledLanguages
+            )
+          : [],
     });
-  }, [product, code]);
+  }, [code, enabledLanguages, product, publicLocale, site]);
 
   const units = useMemo(
     () => (product ? orderedSaleUnits(product) : ["piece"]),
@@ -103,7 +130,11 @@ export function ProductPage({ code }) {
   const categoryLabel = categoryDisplayNameFromCanonical(
     product.category,
     "",
-    storefrontCategoryDisplayOptions(locale)
+    storefrontCategoryDisplayOptions(
+      publicLocale,
+      product.categoryTranslations,
+      enabledLanguages
+    )
   );
 
   return (
@@ -118,7 +149,8 @@ export function ProductPage({ code }) {
           })
         }
       >
-        ← {categoryLabel || t("storefront.nav.catalog")}
+        <span className="sf-directional-back" aria-hidden="true">←</span>{" "}
+        {categoryLabel || t("storefront.nav.catalog")}
       </button>
 
       <div className="sf-product-layout">
@@ -132,10 +164,15 @@ export function ProductPage({ code }) {
         <div className="sf-product-info">
           <p className="sf-product-cat">{categoryLabel}</p>
           <h1>{product.name}</h1>
-          <p className="sf-product-code">{t("storefront.product.articleCode", { code: product.code })}</p>
+          <p className="sf-product-code">
+            {t("storefront.product.articleCode", { code: "" })}
+            <bdi dir="ltr">{product.code}</bdi>
+          </p>
 
           <div className="sf-price-block">
-            <strong>{price > 0 ? formatMoney(price) : t("storefront.price.onRequest")}</strong>
+            <strong>
+              {price > 0 ? <bdi dir="ltr">{formatMoney(price)}</bdi> : t("storefront.price.onRequest")}
+            </strong>
             <span className="sf-unit"> / {storefrontUnitLabel(unit, t)}</span>
           </div>
 

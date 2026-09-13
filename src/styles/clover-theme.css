@@ -10704,7 +10704,7 @@ html.clover-storefront-add-open body {
 .language-selector-menu {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
+  inset-inline-end: 0;
   z-index: 120;
   display: grid;
   gap: 4px;
@@ -10739,15 +10739,13 @@ html.clover-storefront-add-open body {
 .language-selector-login {
   position: absolute;
   top: 12px;
-  right: 12px;
-  left: auto;
+  inset-inline-end: 12px;
   z-index: 4;
 }
 
 @media (max-width: 640px) {
   .language-selector-login {
     top: 8px;
-    right: 8px;
-    left: auto;
+    inset-inline-end: 8px;
   }
 }

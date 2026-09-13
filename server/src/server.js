@@ -1991,7 +1991,11 @@ app.get("/api/health", (req, res) => {
 /** Публичные контакты и тексты витрины (без авторизации, без каталога). */
 app.get("/api/public/site", (req, res) => {
   try {
-    res.json({ site: getPublicSite() });
+    const language = String(req.query.language || "");
+    const site = getPublicSite(language);
+    res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+    res.setHeader("Content-Language", site.locale === "zh" ? "zh-CN" : site.locale);
+    res.json({ site });
   } catch (error) {
     console.error("public site failed", error);
     res.status(500).json({ error: "Не удалось загрузить данные сайта." });
@@ -2011,11 +2015,17 @@ app.get("/api/public/localization/runtime", (req, res) => {
       policy.effectiveLocale === "ru"
         ? undefined
         : readTranslationStore({ languageInternal: policy.effectiveLocale });
-    res.json(buildPublicLocalizationRuntimeSnapshot({
+    const snapshot = buildPublicLocalizationRuntimeSnapshot({
       requestedLanguage,
       settings,
       translationStore,
-    }));
+    });
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader(
+      "Content-Language",
+      snapshot.effectiveLocale === "zh-CN" ? "zh-CN" : snapshot.effectiveLocale
+    );
+    res.json(snapshot);
   } catch (error) {
     console.error("public localization runtime failed", error);
     res.status(500).json({ error: "Не удалось загрузить локализацию." });
@@ -2039,14 +2049,16 @@ app.get("/api/public/manager-contact", (req, res) => {
 /** Публичный каталог витрины clover-spb.ru (цены сайта, без матрицы ЛК). */
 app.get("/api/public/catalog", (req, res) => {
   try {
-    res.json(
-      getPublicCatalog({
+    const catalog = getPublicCatalog({
         category: String(req.query.category || ""),
         subcategory: String(req.query.subcategory || ""),
         facet: String(req.query.facet || ""),
         q: String(req.query.q || ""),
-      })
-    );
+        language: String(req.query.language || ""),
+      });
+    res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+    res.setHeader("Content-Language", catalog.locale === "zh" ? "zh-CN" : catalog.locale);
+    res.json(catalog);
   } catch (error) {
     console.error("public catalog failed", error);
     res.status(500).json({ error: "Не удалось загрузить каталог." });
@@ -2055,10 +2067,13 @@ app.get("/api/public/catalog", (req, res) => {
 
 app.get("/api/public/catalog/:code", (req, res) => {
   try {
-    const product = getPublicProductByCode(req.params.code);
+    const language = String(req.query.language || "");
+    const product = getPublicProductByCode(req.params.code, language);
     if (!product) {
       return res.status(404).json({ error: "Товар не найден." });
     }
+    res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+    res.setHeader("Content-Language", product.locale === "zh" ? "zh-CN" : product.locale);
     res.json({ product });
   } catch (error) {
     console.error("public product failed", error);
@@ -4741,6 +4756,7 @@ app.put(
         rejected: result.rejected,
         catalogVersion: result.settings.catalogVersion,
       });
+      scheduleSitemapRefresh("localization-settings");
       res.json({
         ok: true,
         settings: result.settings,
@@ -4793,6 +4809,9 @@ app.put(
         language: req.params.language,
         changed: result.changed === true,
       });
+      if (result.changed === true) {
+        scheduleSitemapRefresh("localization-translation");
+      }
       res.json({ ok: true, changed: result.changed === true });
     } catch (error) {
       next(error);
@@ -4816,6 +4835,9 @@ app.post(
         language: req.params.language,
         changed: result.changed === true,
       });
+      if (result.changed === true) {
+        scheduleSitemapRefresh("localization-translation-reset");
+      }
       res.json({ ok: true, changed: result.changed === true });
     } catch (error) {
       next(error);
@@ -4856,6 +4878,9 @@ app.put(
         field: req.params.field,
         changed: result.changed === true,
       });
+      if (result.changed === true) {
+        scheduleSitemapRefresh("product-translation");
+      }
       res.json({ ok: true, changed: result.changed === true, field: result.field });
     } catch (error) {
       next(error);
@@ -4882,6 +4907,9 @@ app.post(
         field: req.params.field,
         changed: result.changed === true,
       });
+      if (result.changed === true) {
+        scheduleSitemapRefresh("product-translation-reset");
+      }
       res.json({ ok: true, changed: result.changed === true, field: result.field });
     } catch (error) {
       next(error);

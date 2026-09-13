@@ -13,6 +13,30 @@ function seedKey(entityId, fieldKey) {
  * Brand «КЛЕВЕР» kept as КЛЕВЕР (established storefront brand spelling).
  */
 const SEEDS = {
+  [seedKey("home", "title")]: {
+    en: "Household goods, packaging and chemicals for HoReCa | КЛЕВЕР",
+    uz: "HoReCa uchun maishiy tovarlar, qadoqlash va kimyo | КЛЕВЕР",
+    ky: "HoReCa үчүн үй чарба товарлары, таңгак жана химия | КЛЕВЕР",
+    tg: "Молҳои хонагӣ, бастабандӣ ва кимиё барои HoReCa | КЛЕВЕР",
+    "zh-CN": "面向 HoReCa 的日用品、包装与化学品 | КЛЕВЕР",
+    ar: "سلع منزلية وتغليف ومواد كيميائية لـ HoReCa | КЛЕВЕР",
+  },
+  [seedKey("home", "description")]: {
+    en: "КЛЕВЕР supplies consumables for cafés, restaurants and hotels: disposable tableware, packaging, household chemicals and goods.",
+    uz: "КЛЕВЕР kafe, restoran va mehmonxonalar uchun sarflanuvchi materiallar: bir martalik idishlar, qadoqlash, maishiy kimyo va tovarlarni yetkazib beradi.",
+    ky: "КЛЕВЕР кафе, ресторан жана мейманканалар үчүн керектелүүчү материалдарды: бир жолку идиштерди, таңгакты, тиричилик химиясын жана товарларды жеткирет.",
+    tg: "КЛЕВЕР барои қаҳвахонаҳо, тарабхонаҳо ва меҳмонхонаҳо зарфҳои яккарата, бастабандӣ, кимиёи маишӣ ва молҳоро таъмин мекунад.",
+    "zh-CN": "КЛЕВЕР 为咖啡馆、餐厅和酒店供应一次性餐具、包装、日化用品及其他耗材。",
+    ar: "تورّد КЛЕВЕР مستلزمات المقاهي والمطاعم والفنادق: أدوات المائدة أحادية الاستخدام والتغليف والمواد الكيميائية المنزلية والسلع.",
+  },
+  [seedKey("catalog", "title")]: {
+    en: "Catalog",
+    uz: "Katalog",
+    ky: "Каталог",
+    tg: "Каталог",
+    "zh-CN": "目录",
+    ar: "الكتالوج",
+  },
   [seedKey("catalog", "descriptionTemplate")]: {
     en: "Catalog “{label}”: household goods, packaging and consumables for HoReCa. Order without registration on the КЛЕВЕР website.",
     uz: "Katalog “{label}”: HoReCa uchun maishiy tovarlar, qadoqlash va sarflanuvchi materiallar. КЛЕВЕР saytida ro‘yxatdan o‘tmasdan buyurtma bering.",
@@ -97,7 +121,7 @@ const SEEDS = {
 
 function assertCompleteSeeds() {
   const entries = listSeoCatalogEntries();
-  if (entries.length !== 10) {
+  if (entries.length !== 13) {
     throw new Error(`SEO seed catalog size mismatch: ${entries.length}`);
   }
   for (const entry of entries) {

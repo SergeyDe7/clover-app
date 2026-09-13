@@ -9,10 +9,16 @@
  */
 export const STOREFRONT_CATEGORY_ENABLED_LANGUAGES = Object.freeze(["ru"]);
 
-export function storefrontCategoryDisplayOptions(locale, translations = {}) {
+export function storefrontCategoryDisplayOptions(
+  locale,
+  translations = {},
+  enabledLanguages = STOREFRONT_CATEGORY_ENABLED_LANGUAGES
+) {
   return {
     language: locale,
-    enabledLanguages: STOREFRONT_CATEGORY_ENABLED_LANGUAGES,
+    enabledLanguages: Array.isArray(enabledLanguages)
+      ? enabledLanguages
+      : STOREFRONT_CATEGORY_ENABLED_LANGUAGES,
     translations:
       translations && typeof translations === "object" ? translations : {},
   };

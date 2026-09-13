@@ -19,14 +19,25 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getGlobalState } from "./db.js";
+import {
+  getGlobalState,
+  listProductTranslationRows,
+  listTranslationEntryRows,
+  listTranslationValueRows,
+} from "./db.js";
 import { DEFAULT_PRODUCTS, DEFAULT_SETTINGS } from "./defaults.js";
+import { readLocalizationSettings } from "./localizationStore.js";
 import {
   listPublicSitemapProducts,
   collectSitemapIndexSets,
   buildSitemapEntries,
   renderSitemapXml,
 } from "../../src/shared/sitemap/sitemapContract.js";
+import {
+  buildIndexableRouteDescriptors,
+  buildLocalizedRouteManifest,
+  renderLocalizedSitemapXml,
+} from "../../src/shared/sitemap/localizedSitemap.js";
 
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -39,6 +50,13 @@ let refreshReason = "";
 export function defaultSitemapOutPath() {
   return (
     process.env.SITEMAP_OUT || path.join(projectRoot, "dist/sitemap.xml")
+  );
+}
+
+export function defaultPublicRouteManifestPath() {
+  return (
+    process.env.PUBLIC_ROUTE_MANIFEST_OUT ||
+    path.join(path.dirname(defaultSitemapOutPath()), "public-route-manifest.json")
   );
 }
 
@@ -101,11 +119,13 @@ export function regenerateSitemapArtifact(reason = "") {
     return { skipped: true, reason: "disabled" };
   }
   const outPath = defaultSitemapOutPath();
+  const manifestPath = defaultPublicRouteManifestPath();
   const outDir = path.dirname(outPath);
   if (!existsSync(outDir) && !process.env.SITEMAP_OUT) {
     return { skipped: true, reason: "dist-missing" };
   }
   const tmpPath = `${outPath}.${process.pid}.tmp`;
+  const manifestTmpPath = `${manifestPath}.${process.pid}.tmp`;
   try {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const settings = getGlobalState("settings", DEFAULT_SETTINGS);
@@ -115,23 +135,62 @@ export function regenerateSitemapArtifact(reason = "") {
       oneCById: oneCByIdMap(oneCProducts),
     });
     const sets = collectSitemapIndexSets(publicProducts);
-    const locs = buildSitemapEntries({
-      categories: sets.categories,
-      subcategories: sets.subcategories,
-      productCodes: sets.productCodes,
-    });
+    const infrastructureEnabled =
+      String(process.env.CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED || "").trim() === "1";
+    let manifest = {
+      version: 1,
+      infrastructureEnabled: false,
+      enabledLanguages: ["ru"],
+      routes: {},
+    };
+    let xml;
+    let total;
+    if (infrastructureEnabled) {
+      const descriptors = buildIndexableRouteDescriptors({
+        categories: sets.categories,
+        subcategories: sets.subcategories,
+        publicProducts,
+      });
+      manifest = buildLocalizedRouteManifest({
+        descriptors,
+        enabledLanguages: readLocalizationSettings().enabledLanguages,
+        translationStore: {
+          entries: listTranslationEntryRows(),
+          values: listTranslationValueRows(),
+        },
+        productTranslations: listProductTranslationRows(),
+        products,
+        infoPages: settings.storefrontInfoPages,
+      });
+      xml = renderLocalizedSitemapXml(manifest);
+      total = Object.values(manifest.routes).filter(
+        (record) => !record.canonicalAlias
+      ).length;
+    } else {
+      const locs = buildSitemapEntries({
+        categories: sets.categories,
+        subcategories: sets.subcategories,
+        productCodes: sets.productCodes,
+      });
+      xml = renderSitemapXml(locs);
+      total = locs.length;
+    }
     mkdirSync(outDir, { recursive: true });
-    writeFileSync(tmpPath, renderSitemapXml(locs));
+    mkdirSync(path.dirname(manifestPath), { recursive: true });
+    writeFileSync(tmpPath, xml);
+    writeFileSync(manifestTmpPath, `${JSON.stringify(manifest)}\n`);
     renameSync(tmpPath, outPath);
+    renameSync(manifestTmpPath, manifestPath);
     return {
       ok: true,
-      total: locs.length,
+      total,
       reason: reason || "catalog",
       out: outPath,
     };
   } catch (error) {
     try {
       if (existsSync(tmpPath)) unlinkSync(tmpPath);
+      if (existsSync(manifestTmpPath)) unlinkSync(manifestTmpPath);
     } catch {
       // ignore tmp cleanup failure
     }

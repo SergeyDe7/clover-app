@@ -75,13 +75,22 @@ function FlagIcon({ language }) {
 }
 
 /** One compact, keyboard- and touch-friendly selector shared by application shells. */
-export function LanguageSelector({ onLanguageChange, className = "" }) {
+export function LanguageSelector({
+  onLanguageChange,
+  onLanguageAccepted,
+  onLanguageRejected,
+  availableLanguages,
+  className = "",
+}) {
   const { locale, enabledLanguages, setLanguage, t } = useLocalization();
   const selected = toPublicLocaleCode(locale);
   const accessibleLabel = t("admin.languages.language");
-  const options = getLanguageOptions(enabledLanguages);
+  const options = getLanguageOptions(
+    Array.isArray(availableLanguages) ? availableLanguages : enabledLanguages
+  );
   const selectedOption = options.find((option) => option.language === selected) || options[0];
   const [open, setOpen] = useState(false);
+  const [switchFailed, setSwitchFailed] = useState(false);
   const [focusedLanguage, setFocusedLanguage] = useState(selectedOption?.language || "ru");
   const triggerRef = useRef(null);
   const optionRefs = useRef(new Map());
@@ -104,8 +113,23 @@ export function LanguageSelector({ onLanguageChange, className = "" }) {
   function chooseLanguage(language) {
     if (!options.some((option) => option.language === language)) return;
     setOpen(false);
+    setSwitchFailed(false);
     if (typeof onLanguageChange === "function") onLanguageChange(language);
-    void setLanguage(language);
+    // Preference write stays synchronous in setLanguage; public URL changes only
+    // after that runtime request is accepted, so a failed switch cannot mix URL
+    // and last-valid runtime.
+    void setLanguage(language).then((result) => {
+      const ok = result === true || result?.ok === true;
+      const stale = result?.stale === true;
+      if (ok) {
+        setSwitchFailed(false);
+        if (typeof onLanguageAccepted === "function") onLanguageAccepted(language);
+        return;
+      }
+      if (stale) return;
+      setSwitchFailed(true);
+      if (typeof onLanguageRejected === "function") onLanguageRejected(language);
+    });
     triggerRef.current?.focus();
   }
 
@@ -166,8 +190,17 @@ export function LanguageSelector({ onLanguageChange, className = "" }) {
       className={`language-selector${className ? ` ${className}` : ""}`}
       ref={rootRef}
       data-selected-language={selectedOption.language}
+      data-language-switch-failed={switchFailed ? "1" : "0"}
     >
       <span className="language-selector-label">{accessibleLabel}</span>
+      <span
+        className="language-selector-label"
+        role="status"
+        aria-live="polite"
+        data-language-switch-status=""
+      >
+        {switchFailed ? t("shared.error.requestFailed") : ""}
+      </span>
       <button
         ref={triggerRef}
         className="language-selector-trigger"

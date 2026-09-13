@@ -9,6 +9,7 @@ import {
   applyStorefrontDocumentMeta,
   storefrontRouteDocumentMeta,
 } from "./seo.js";
+import { isIndexablePublicSearch } from "../../shared/i18n/publicLocaleRouting.js";
 import "./storefront.css";
 
 const CatalogPage = lazy(() =>
@@ -38,11 +39,17 @@ const InfoPage = lazy(() =>
   import("./pages/InfoPage.jsx").then((m) => ({ default: m.InfoPage }))
 );
 
-export default function StorefrontApp() {
+export default function StorefrontApp({ localization }) {
+  const {
+    enabledLanguages = ["ru"],
+    locale = "ru",
+    t = (key) => key,
+  } = localization || {};
   const [route, setRoute] = useState(() =>
     parseStorefrontRoute(window.location.pathname)
   );
-  const [site, setSite] = useState(() => peekPublicSite());
+  const routeLocale = route.locale || locale;
+  const [site, setSite] = useState(() => peekPublicSite(routeLocale));
 
   useEffect(() => {
     const onPop = () =>
@@ -88,7 +95,7 @@ export default function StorefrontApp() {
 
   useEffect(() => {
     let cancelled = false;
-    loadPublicSite()
+    loadPublicSite(routeLocale)
       .then((next) => {
         if (!cancelled) setSite(next);
       })
@@ -98,12 +105,19 @@ export default function StorefrontApp() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [routeLocale]);
 
   useEffect(() => {
     if (route.name === "product") return;
-    applyStorefrontDocumentMeta(storefrontRouteDocumentMeta(route, site));
-  }, [route, site]);
+    if (!site && routeLocale !== "ru") return;
+    applyStorefrontDocumentMeta(
+      storefrontRouteDocumentMeta(route, site, {
+        locale: routeLocale,
+        enabledLanguages,
+        indexable: isIndexablePublicSearch(window.location.search),
+      })
+    );
+  }, [enabledLanguages, route, routeLocale, site]);
 
   let page;
   let current = "home";
@@ -113,11 +127,14 @@ export default function StorefrontApp() {
         category={route.category || ""}
         subcategory={route.subcategory || ""}
         facet={route.facet || ""}
+        routeLocale={routeLocale}
       />
     );
     current = "catalog";
   } else if (route.name === "product") {
-    page = <ProductPage code={route.code} />;
+    page = (
+      <ProductPage code={route.code} routeLocale={routeLocale} site={site} />
+    );
     current = "catalog";
   } else if (route.name === "cart") {
     page = <CartPage />;
@@ -137,13 +154,20 @@ export default function StorefrontApp() {
   } else if (route.name === "info") {
     page = <InfoPage slug={route.slug} infoPages={site?.infoPages} />;
     current = `info:${route.slug}`;
+  } else if (route.name === "notFound") {
+    page = (
+      <div className="sf-info-page sf-not-found" role="status">
+        <h1>{t("shared.empty.notFound")}</h1>
+      </div>
+    );
+    current = "";
   } else {
     page = <HomePage />;
   }
 
   return (
     <div className={`sf-app${route.name === "catalog" ? " is-catalog" : ""}`}>
-      <StoreHeader current={current} />
+      <StoreHeader current={current} route={route} />
       <main className="sf-main">
         <Suspense fallback={null}>{page}</Suspense>
       </main>

@@ -5,8 +5,10 @@ import {
   canonicalizeProductCategory,
   canonicalizeProductSubcategory,
 } from "../../screens/storefront/productGroups.js";
+import { CANONICAL_OTHER_CATEGORY } from "../i18n/canonicalBusinessValues.js";
+import { PUBLIC_CANONICAL_ORIGIN } from "../publicSiteContract.js";
 
-export const SITEMAP_ORIGIN = "https://clover-spb.ru";
+export const SITEMAP_ORIGIN = PUBLIC_CANONICAL_ORIGIN;
 
 /** Static public paths that must appear in the sitemap (leading slash). */
 export const SITEMAP_STATIC_PATHS = Object.freeze([
@@ -34,6 +36,10 @@ export const SITEMAP_FORBIDDEN_PATH_PREFIXES = Object.freeze([
   "/admin",
   "/manager",
   "/install-app",
+]);
+
+export const SITEMAP_LOCALE_PATH_PREFIXES = Object.freeze([
+  "/ru",
   "/en",
   "/uz",
   "/ky",
@@ -161,7 +167,8 @@ export function listPublicSitemapProducts(
     seenCodes.add(code);
 
     const category = canonicalizeProductCategory(
-      String(product.category || "Прочее").trim() || "Прочее"
+      String(product.category || CANONICAL_OTHER_CATEGORY).trim() ||
+        CANONICAL_OTHER_CATEGORY
     );
     const subcategory = canonicalizeProductSubcategory(
       String(product.subcategory || "").trim()
@@ -272,7 +279,10 @@ ${urls}
 `;
 }
 
-export function isForbiddenSitemapUrl(loc) {
+export function isForbiddenSitemapUrl(
+  loc,
+  { allowLocalePrefixes = false } = {}
+) {
   let url;
   try {
     url = new URL(String(loc));
@@ -288,6 +298,11 @@ export function isForbiddenSitemapUrl(loc) {
   }
   for (const prefix of SITEMAP_FORBIDDEN_PATH_PREFIXES) {
     if (path === prefix || path.startsWith(`${prefix}/`)) return true;
+  }
+  if (!allowLocalePrefixes) {
+    for (const prefix of SITEMAP_LOCALE_PATH_PREFIXES) {
+      if (path === prefix || path.startsWith(`${prefix}/`)) return true;
+    }
   }
   return false;
 }

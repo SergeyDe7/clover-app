@@ -41,8 +41,10 @@ async function request(path, options = {}) {
 }
 
 export const storefrontApi = {
-  site() {
-    return request("/site");
+  site(language = "") {
+    const query = new URLSearchParams();
+    if (language) query.set("language", language);
+    return request(`/site${query.size ? `?${query}` : ""}`);
   },
   catalog(params = {}) {
     const query = new URLSearchParams();
@@ -50,11 +52,16 @@ export const storefrontApi = {
     if (params.subcategory) query.set("subcategory", params.subcategory);
     if (params.facet) query.set("facet", params.facet);
     if (params.q) query.set("q", params.q);
+    if (params.language) query.set("language", params.language);
     const suffix = query.toString() ? `?${query}` : "";
     return request(`/catalog${suffix}`);
   },
-  product(code) {
-    return request(`/catalog/${encodeURIComponent(code)}`);
+  product(code, language = "") {
+    const query = new URLSearchParams();
+    if (language) query.set("language", language);
+    return request(
+      `/catalog/${encodeURIComponent(code)}${query.size ? `?${query}` : ""}`
+    );
   },
   placeOrder(body) {
     return request("/orders", { method: "POST", body });

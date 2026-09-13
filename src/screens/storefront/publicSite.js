@@ -1,25 +1,31 @@
 import { storefrontApi } from "./publicApi.js";
 
-let cached = null;
-let inflight = null;
+const cached = new Map();
+const inflight = new Map();
 
-export function peekPublicSite() {
-  return cached;
+function localeKey(language) {
+  return String(language || "ru");
 }
 
-export function loadPublicSite() {
-  if (cached) return Promise.resolve(cached);
-  if (inflight) return inflight;
-  inflight = storefrontApi
-    .site()
+export function peekPublicSite(language = "ru") {
+  return cached.get(localeKey(language)) || null;
+}
+
+export function loadPublicSite(language = "ru") {
+  const key = localeKey(language);
+  if (cached.has(key)) return Promise.resolve(cached.get(key));
+  if (inflight.has(key)) return inflight.get(key);
+  const request = storefrontApi
+    .site(key)
     .then((payload) => {
       const site =
         payload?.site && typeof payload.site === "object" ? payload.site : {};
-      cached = site;
+      cached.set(key, site);
       return site;
     })
     .finally(() => {
-      inflight = null;
+      inflight.delete(key);
     });
-  return inflight;
+  inflight.set(key, request);
+  return request;
 }

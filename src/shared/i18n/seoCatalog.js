@@ -1,8 +1,12 @@
 /**
  * Code-owned Stage 5.2-B SEO metadata localization corpus.
- * Canonical RU source for the 10 SEO-specific route strings/templates.
+ * Canonical RU source for SEO-specific route strings/templates.
  * Browser-safe: no Node builtins / sourceHash / DB / filesystem.
  */
+import {
+  STOREFRONT_DEFAULT_DESCRIPTION,
+  STOREFRONT_DEFAULT_TITLE,
+} from "./storefrontSeoDefaults.js";
 
 export const SEO_NAMESPACE = "seo";
 export const SEO_ENTITY_TYPE = "route";
@@ -25,8 +29,23 @@ function freezeEntry(entry) {
   return Object.freeze({ ...entry, critical: true });
 }
 
-/** Exact Stage 5.2-B SEO identities (10). */
+/** Stage 5.2-B identities plus Stage 7 crawler-visible home/catalog fields. */
 const RAW_ENTRIES = Object.freeze([
+  Object.freeze({
+    entityId: "home",
+    fieldKey: "title",
+    sourceRu: STOREFRONT_DEFAULT_TITLE,
+  }),
+  Object.freeze({
+    entityId: "home",
+    fieldKey: "description",
+    sourceRu: STOREFRONT_DEFAULT_DESCRIPTION,
+  }),
+  Object.freeze({
+    entityId: "catalog",
+    fieldKey: "title",
+    sourceRu: "Каталог",
+  }),
   Object.freeze({
     entityId: "catalog",
     fieldKey: "descriptionTemplate",
@@ -98,8 +117,8 @@ function buildCatalog() {
     byEntityField.set(seoEntityFieldKey(raw.entityId, raw.fieldKey), entry);
   }
 
-  if (entries.length !== 10) {
-    throw new Error(`SEO catalog size mismatch: expected 10, got ${entries.length}`);
+  if (entries.length !== 13) {
+    throw new Error(`SEO catalog size mismatch: expected 13, got ${entries.length}`);
   }
 
   return {

@@ -243,9 +243,9 @@ assert.doesNotMatch(modeSrc, /PUBLIC_LANGUAGE_PREFIXES_ENABLED|extractPublicLang
 assert.doesNotMatch(modeSrc, /navigator\.language|Accept-Language/);
 assert.doesNotMatch(mainSrc, /navigator\.language|Accept-Language/);
 assert.doesNotMatch(modeSrc, /parts\[0\] === ["']en["']/);
-assert.match(modeSrc, /if \(parts\[0\] === "catalog"\)/);
-assert.match(modeSrc, /if \(parts\[0\] === "contacts"\)/);
-assert.match(modeSrc, /if \(parts\[0\] === "aktsii"\)/);
+assert.match(modeSrc, /parts\[0\] === "catalog"/);
+assert.match(modeSrc, /parts\[0\] === "contacts"/);
+assert.match(modeSrc, /parts\[0\] === "aktsii"/);
 assert.match(modeSrc, /STOREFRONT_INFO_SLUGS/);
 assert.match(urlsSrc, /VITE_CABINET_PATH \|\| "\/lk"/);
 assert.match(urlsSrc, /export function isCabinetPath/);

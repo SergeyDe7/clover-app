@@ -1,5 +1,11 @@
 import { STORE_HOSTS, CABINET_PATH, isCabinetPath } from "../../config/urls.js";
 import { STOREFRONT_INFO_SLUGS } from "./pages/infoPages.js";
+import {
+  isOperationalPublicPath,
+  publicLocaleInfrastructureEnabledFromDocument,
+  publicPathForLocale,
+  stripPublicLocalePrefix,
+} from "../../shared/i18n/publicLocaleRouting.js";
 
 const PREVIEW_PREFIX = "/vitrina";
 
@@ -39,64 +45,139 @@ export function normalizeStorefrontPath(pathname = window.location.pathname) {
   return raw || "/";
 }
 
-export function parseStorefrontRoute(pathname = window.location.pathname) {
-  const path = normalizeStorefrontPath(pathname);
-  const parts = path.split("/").filter(Boolean);
+export function isPublicLocaleRoutingEnabled() {
+  return (
+    typeof document !== "undefined" &&
+    publicLocaleInfrastructureEnabledFromDocument(document)
+  );
+}
 
-  if (parts.length === 0) return { name: "home" };
-  if (parts[0] === "catalog") {
+function decodeRoutePart(part) {
+  if (/%2f|%5c/i.test(part)) throw new Error("encoded separator");
+  return decodeURIComponent(part);
+}
+
+export function parseStorefrontRoute(
+  pathname = window.location.pathname,
+  { infrastructureEnabled = isPublicLocaleRoutingEnabled() } = {}
+) {
+  const normalized = normalizeStorefrontPath(pathname);
+  const prefixed = stripPublicLocalePrefix(normalized, {
+    infrastructureEnabled,
+  });
+  if (!prefixed.ok) {
     return {
-      name: "catalog",
-      category: parts[1] ? decodeURIComponent(parts[1]) : "",
-      subcategory: parts[2] ? decodeURIComponent(parts[2]) : "",
-      facet: parts[3] ? decodeURIComponent(parts[3]) : "",
+      name: "notFound",
+      locale: prefixed.locale || "ru",
+      reason: prefixed.reason,
     };
   }
-  if (parts[0] === "product" && parts[1]) {
-    return { name: "product", code: decodeURIComponent(parts[1]) };
+  if (prefixed.locale && isOperationalPublicPath(prefixed.pathname)) {
+    return {
+      name: "notFound",
+      locale: prefixed.locale,
+      reason: "locale-prefix-not-allowed",
+    };
   }
-  if (parts[0] === "cart") return { name: "cart" };
-  if (parts[0] === "checkout") return { name: "checkout" };
-  if (parts[0] === "contacts") return { name: "contacts" };
-  if (parts[0] === "aktsii") return { name: "aktsii" };
-  if (parts[0] === "install-app") return { name: "install-app" };
+
+  const path = prefixed.pathname;
+  let parts;
+  try {
+    parts = path.split("/").filter(Boolean).map(decodeRoutePart);
+  } catch {
+    return {
+      name: "notFound",
+      locale: prefixed.locale || "ru",
+      reason: "malformed-encoding",
+    };
+  }
+  const locale = infrastructureEnabled ? prefixed.locale || "ru" : null;
+  const withLocale = (route) => ({ ...route, locale });
+
+  if (parts.length === 0) return withLocale({ name: "home" });
+  if (parts[0] === "catalog" && parts.length <= 4) {
+    return withLocale({
+      name: "catalog",
+      category: parts[1] || "",
+      subcategory: parts[2] || "",
+      facet: parts[3] || "",
+    });
+  }
+  if (parts[0] === "product" && parts.length === 2 && parts[1]) {
+    return withLocale({ name: "product", code: parts[1] });
+  }
+  if (parts.length === 1 && parts[0] === "cart" && !prefixed.locale) {
+    return withLocale({ name: "cart" });
+  }
+  if (parts.length === 1 && parts[0] === "checkout" && !prefixed.locale) {
+    return withLocale({ name: "checkout" });
+  }
+  if (parts.length === 1 && parts[0] === "contacts") {
+    return withLocale({ name: "contacts" });
+  }
+  if (parts.length === 1 && parts[0] === "aktsii") {
+    return withLocale({ name: "aktsii" });
+  }
+  if (parts.length === 1 && parts[0] === "install-app" && !prefixed.locale) {
+    return withLocale({ name: "install-app" });
+  }
   if (parts.length === 1 && STOREFRONT_INFO_SLUGS.includes(parts[0])) {
-    return { name: "info", slug: parts[0] };
+    return withLocale({ name: "info", slug: parts[0] });
+  }
+  if (infrastructureEnabled) {
+    return withLocale({ name: "notFound", reason: "unknown-public-route" });
   }
   return { name: "home" };
 }
 
-export function storefrontHref(route) {
-  const prefix = isStoreHost() ? "" : PREVIEW_PREFIX;
-
-  if (!route || route === "home" || route.name === "home") {
-    return prefix || "/";
-  }
+export function storefrontRoutePath(route) {
+  if (!route || route === "home" || route.name === "home") return "/";
   if (typeof route === "string") {
-    const path = route.startsWith("/") ? route : `/${route}`;
-    return `${prefix}${path}`;
+    return route.startsWith("/") ? route : `/${route}`;
   }
   if (route.name === "catalog") {
-    if (!route.category) return `${prefix}/catalog`;
-    let path = `${prefix}/catalog/${encodeURIComponent(route.category)}`;
+    if (!route.category) return "/catalog";
+    let path = `/catalog/${encodeURIComponent(route.category)}`;
     if (route.subcategory) {
       path += `/${encodeURIComponent(route.subcategory)}`;
       if (route.facet) path += `/${encodeURIComponent(route.facet)}`;
     }
     return path;
   }
-  if (route.name === "product") {
-    return `${prefix}/product/${encodeURIComponent(route.code)}`;
-  }
-  if (route.name === "cart") return `${prefix}/cart`;
-  if (route.name === "checkout") return `${prefix}/checkout`;
-  if (route.name === "contacts") return `${prefix}/contacts`;
-  if (route.name === "aktsii") return `${prefix}/aktsii`;
-  if (route.name === "install-app") return `${prefix}/install-app`;
+  if (route.name === "product") return `/product/${encodeURIComponent(route.code)}`;
+  if (route.name === "cart") return "/cart";
+  if (route.name === "checkout") return "/checkout";
+  if (route.name === "contacts") return "/contacts";
+  if (route.name === "aktsii") return "/aktsii";
+  if (route.name === "install-app") return "/install-app";
   if (route.name === "info" && STOREFRONT_INFO_SLUGS.includes(route.slug)) {
-    return `${prefix}/${route.slug}`;
+    return `/${route.slug}`;
   }
-  return prefix || "/";
+  return "/";
+}
+
+export function storefrontHref(
+  route,
+  {
+    locale,
+    infrastructureEnabled = isPublicLocaleRoutingEnabled(),
+  } = {}
+) {
+  const prefix = isStoreHost() ? "" : PREVIEW_PREFIX;
+  const path = storefrontRoutePath(route);
+  const routeName = typeof route === "object" ? route?.name : String(route || "home");
+  const localeEligible = !["cart", "checkout", "install-app"].includes(routeName);
+
+  if (infrastructureEnabled && localeEligible) {
+    const current =
+      locale ||
+      parseStorefrontRoute(window.location.pathname, {
+        infrastructureEnabled: true,
+      }).locale ||
+      "ru";
+    return `${prefix}${publicPathForLocale(path, current)}`;
+  }
+  return path === "/" ? prefix || "/" : `${prefix}${path}`;
 }
 
 export { CABINET_PATH, isCabinetPath };
