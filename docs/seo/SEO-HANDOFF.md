@@ -1,6 +1,84 @@
 # CLOVER SEO HANDOFF
 
-## SEO-002 Google product soft 404
+## SEO-002 Google product soft 404 — current-state correction
+
+Git history: PR #99 merged.
+
+Coordinator-provided production evidence: GSC Live Test for product
+`НФ-00000243` rendered the real product page and reported
+«URL доступен Google»; an indexing request was submitted.
+
+This manual GSC evidence is coordinator-provided and was not independently
+reproduced by the SEO-004 agent.
+
+---
+
+## SEO-004 Priority B2B category pages
+
+TASK:
+SEO-004 Priority B2B category pages
+
+START_BASE:
+a845f30884714aadc24b61444936b8b393ae9d84
+
+FINAL_MAIN:
+a845f30884714aadc24b61444936b8b393ae9d84
+
+STATUS:
+PR_READY_NEEDS_RENDER_CHECK
+
+TARGETS:
+- Одноразовая посуда
+- Пакеты, упаковочные материалы
+- Хозяйственные товары
+
+IMPLEMENTED:
+- Storefront-local RU commercial resolver (`categoryCommercialSeo.js`) for
+  exactly 3 top-level categories when locale=ru and subcategory/facet empty
+- Commercial H1 + compact lead + crawlable «Популярные разделы» anchors
+- Lower B2B body + 3 benefits + 3 native `<details>` FAQs after products
+  (only when payload ready, products present, search query empty)
+- Locale-aware optional 3rd arg on `storefrontRouteDocumentMeta`;
+  StorefrontApp passes `locale` from `useLocalization()`
+- Deterministic verifier `verify-seo-004-commercial-categories.mjs`
+
+FILES:
+- NEW: `src/screens/storefront/categoryCommercialSeo.js`
+- NEW: `server/scripts/verify-seo-004-commercial-categories.mjs`
+- MOD: `src/screens/storefront/pages/CatalogPage.jsx`
+- MOD: `src/screens/storefront/seo.js`
+- MOD: `src/screens/storefront/StorefrontApp.jsx`
+- MOD: `src/screens/storefront/storefront.css`
+- MOD: `docs/seo/SEO-HANDOFF.md`
+
+TESTS:
+- SEO-004 verifier GREEN (RED first: exactly 3 records)
+- I18N 5.1 PASS; I18N 5.2-B PASS (`env -u DB_PATH`)
+- SEO-002 PASS; catalog stale-route / prefix-search / sale-price / scroll-top PASS
+- catalog tree-ui FAIL on START_BASE already (pre-existing CSS contract drift;
+  not introduced by SEO-004)
+- lint PASS; `git diff --check` PASS; safe build PASS; sitemap verify PASS
+
+I18N:
+- I18N corpus changed: NO
+- active overlap: I18N_FILE_OVERLAP=YES (`seo.js`, `CatalogPage.jsx`,
+  `StorefrontApp.jsx` — same UI surfaces as Stage 5.2-B; no equivalent
+  category-landing/FAQ architecture on unmerged I18N refs)
+- base stale: NO
+- merge gate required: YES
+
+PRODUCTION:
+NOT DEPLOYED
+
+NEXT:
+wait for I18N safe window;
+then fresh overlap/reconciliation check;
+then separate merge authorization;
+complete desktop/mobile render check on isolated preview.
+
+---
+
+## SEO-002 Google product soft 404 (historical pre-merge note)
 
 TASK:
 SEO-002 Google product soft 404

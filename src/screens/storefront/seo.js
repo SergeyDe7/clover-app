@@ -9,6 +9,7 @@ import {
   formatSeoTemplate,
   getSeoCanonicalField,
 } from "../../shared/i18n/seoCatalog.js";
+import { resolveCategoryCommercialSeo } from "./categoryCommercialSeo.js";
 
 export const STOREFRONT_SITE_NAME = "КЛЕВЕР";
 export const STOREFRONT_DEFAULT_TITLE = `${STOREFRONT_HERO_TITLE} | ${STOREFRONT_SITE_NAME}`;
@@ -95,7 +96,11 @@ export function applyStorefrontDocumentMeta({
   upsertMetaByName("twitter:image", ogImage);
 }
 
-export function storefrontRouteDocumentMeta(route, site) {
+export function storefrontRouteDocumentMeta(
+  route,
+  site,
+  { locale = "ru" } = {}
+) {
   if (!route || route.name === "home") {
     return {
       title: STOREFRONT_DEFAULT_TITLE,
@@ -104,6 +109,19 @@ export function storefrontRouteDocumentMeta(route, site) {
     };
   }
   if (route.name === "catalog") {
+    const commercial = resolveCategoryCommercialSeo({
+      category: route.category || "",
+      subcategory: route.subcategory || "",
+      facet: route.facet || "",
+      locale,
+    });
+    if (commercial) {
+      return {
+        title: commercial.metaTitle,
+        description: commercial.metaDescription,
+        path: storefrontHref(route),
+      };
+    }
     const parts = [route.category, route.subcategory, route.facet].filter(Boolean);
     const label = parts.length ? parts.join(" — ") : "Каталог";
     return {
