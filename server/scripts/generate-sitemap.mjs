@@ -55,18 +55,70 @@ async function main() {
       path.join(projectRoot, "src/shared/sitemap/sitemapContract.js")
     ).href
   );
+  const {
+    buildIndexableRouteDescriptors,
+    buildLocalizedRouteManifest,
+    renderLocalizedSitemapXml,
+  } = await import(
+    pathToFileURL(
+      path.join(projectRoot, "src/shared/sitemap/localizedSitemap.js")
+    ).href
+  );
 
-  function loadPublicProducts(dbPath) {
+  function readRows(db, sql) {
+    try {
+      return db.prepare(sql).all();
+    } catch {
+      return [];
+    }
+  }
+
+  function loadSitemapState(dbPath) {
     const db = new DatabaseSync(dbPath, { readOnly: true });
     try {
       const products = readAppStateJson(db, "products", []);
       const settings = readAppStateJson(db, "settings", {});
       const oneCProducts = readAppStateJson(db, "oneCProducts", []);
+      const localizationSettings = readAppStateJson(
+        db,
+        "localizationSettings",
+        { enabledLanguages: ["ru"] }
+      );
       const linked = settings.storefrontShowOnlyLinked !== false;
-      return listPublicSitemapProducts(products, {
+      const publicProducts = listPublicSitemapProducts(products, {
         storefrontShowOnlyLinked: linked,
         oneCById: oneCByIdMap(oneCProducts),
       });
+      const entries = readRows(
+        db,
+        `SELECT id, namespace, entity_type AS entityType, entity_id AS entityId,
+                field_key AS fieldKey, source_ru AS sourceRu,
+                source_hash AS sourceHash, critical
+         FROM translation_entries`
+      );
+      const values = readRows(
+        db,
+        `SELECT entry_id AS entryId, language_code AS languageCode, value, state,
+                source_hash AS sourceHash
+         FROM translation_values`
+      );
+      const productTranslations = readRows(
+        db,
+        `SELECT product_id AS productId, language_code AS languageCode,
+                field_key AS fieldKey, auto_value AS autoValue,
+                auto_source_hash AS autoSourceHash,
+                manual_value AS manualValue,
+                manual_source_hash AS manualSourceHash
+         FROM product_translations`
+      );
+      return {
+        products,
+        settings,
+        localizationSettings,
+        publicProducts,
+        translationStore: { entries, values },
+        productTranslations,
+      };
     } finally {
       db.close();
     }
@@ -85,19 +137,54 @@ async function main() {
     process.exit(1);
   }
 
-  const publicProducts = loadPublicProducts(dbPath);
+  const state = loadSitemapState(dbPath);
+  const publicProducts = state.publicProducts;
   const sets = collectSitemapIndexSets(publicProducts);
-  const locs = buildSitemapEntries({
-    categories: sets.categories,
-    subcategories: sets.subcategories,
-    productCodes: sets.productCodes,
-  });
-  const xml = renderSitemapXml(locs);
+  const infrastructureEnabled =
+    String(process.env.CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED || "").trim() === "1";
+  let manifest = {
+    version: 1,
+    infrastructureEnabled: false,
+    enabledLanguages: ["ru"],
+    routes: {},
+  };
+  let locs = [];
+  let xml;
+  if (infrastructureEnabled) {
+    const descriptors = buildIndexableRouteDescriptors({
+      categories: sets.categories,
+      subcategories: sets.subcategories,
+      publicProducts,
+    });
+    manifest = buildLocalizedRouteManifest({
+      descriptors,
+      enabledLanguages: state.localizationSettings.enabledLanguages,
+      translationStore: state.translationStore,
+      productTranslations: state.productTranslations,
+      products: state.products,
+      infoPages: state.settings.storefrontInfoPages,
+    });
+    locs = Object.values(manifest.routes)
+      .filter((record) => !record.canonicalAlias)
+      .map((record) => record.canonical);
+    xml = renderLocalizedSitemapXml(manifest);
+  } else {
+    locs = buildSitemapEntries({
+      categories: sets.categories,
+      subcategories: sets.subcategories,
+      productCodes: sets.productCodes,
+    });
+    xml = renderSitemapXml(locs);
+  }
 
   mkdirSync(path.dirname(outPath), { recursive: true });
   const tmpPath = `${outPath}.${process.pid}.tmp`;
   writeFileSync(tmpPath, xml);
   renameSync(tmpPath, outPath);
+  const manifestPath = path.join(path.dirname(outPath), "public-route-manifest.json");
+  const manifestTmpPath = `${manifestPath}.${process.pid}.tmp`;
+  writeFileSync(manifestTmpPath, `${JSON.stringify(manifest)}\n`);
+  renameSync(manifestTmpPath, manifestPath);
 
   console.log(
     JSON.stringify({
@@ -105,6 +192,8 @@ async function main() {
       db: dbPath,
       out: outPath,
       total: locs.length,
+      localizedRoutes: infrastructureEnabled,
+      enabledLanguages: manifest.enabledLanguages,
       static: SITEMAP_STATIC_PATHS.length,
       categories: sets.categories.length,
       subcategories: sets.subcategories.length,

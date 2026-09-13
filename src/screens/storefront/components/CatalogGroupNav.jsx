@@ -35,12 +35,22 @@ export function CatalogGroupNav({
   activeCategory = "",
   activeSubcategory = "",
   variant = "side",
+  translations = {},
+  language,
 }) {
-  const { t, locale } = useLocalization();
+  const { enabledLanguages, t, locale } = useLocalization();
+  const displayLanguage = language || locale;
   const groups = useMemo(() => {
     const canonical = buildGroupNav(categories);
-    return projectLocalizedGroupNav(canonical, storefrontCategoryDisplayOptions(locale));
-  }, [categories, locale]);
+    return projectLocalizedGroupNav(
+      canonical,
+      storefrontCategoryDisplayOptions(
+        displayLanguage,
+        translations,
+        enabledLanguages
+      )
+    );
+  }, [categories, displayLanguage, enabledLanguages, translations]);
   const [openParents, setOpenParents] = useState(() => new Set());
 
   const toggleParent = (name) => {

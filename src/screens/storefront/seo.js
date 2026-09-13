@@ -1,19 +1,35 @@
 import { PUBLIC_BASE_URL } from "../../config/urls.js";
-import { storefrontHref } from "./mode.js";
+import { storefrontHref, storefrontRoutePath } from "./mode.js";
 import {
   formatStorefrontDocumentTitle as formatInfoPageTitle,
   resolveStorefrontInfoPage,
 } from "../../shared/storefrontInfoPages.js";
-import { STOREFRONT_HERO_LEAD, STOREFRONT_HERO_TITLE } from "./siteCopy.js";
 import {
   formatSeoTemplate,
   getSeoCanonicalField,
 } from "../../shared/i18n/seoCatalog.js";
+import {
+  STOREFRONT_DEFAULT_DESCRIPTION,
+  STOREFRONT_DEFAULT_OG_IMAGE,
+  STOREFRONT_DEFAULT_TITLE,
+  STOREFRONT_SITE_NAME,
+} from "../../shared/i18n/storefrontSeoDefaults.js";
+import {
+  PUBLIC_CANONICAL_ORIGIN,
+  publicAlternateLinks,
+  publicDocumentPath,
+  publicLocaleInfrastructureEnabledFromDocument,
+  publicPathForLocale,
+} from "../../shared/i18n/publicLocaleRouting.js";
+import { categoryDisplayNameFromCanonical } from "../../shared/i18n/categoryDisplayProjection.js";
+import { storefrontCategoryDisplayOptions } from "../../shared/i18n/storefrontCategoryDisplay.js";
 
-export const STOREFRONT_SITE_NAME = "КЛЕВЕР";
-export const STOREFRONT_DEFAULT_TITLE = `${STOREFRONT_HERO_TITLE} | ${STOREFRONT_SITE_NAME}`;
-export const STOREFRONT_DEFAULT_DESCRIPTION = STOREFRONT_HERO_LEAD.slice(0, 160);
-export const STOREFRONT_DEFAULT_OG_IMAGE = "/apple-touch-icon.png";
+export {
+  STOREFRONT_DEFAULT_DESCRIPTION,
+  STOREFRONT_DEFAULT_OG_IMAGE,
+  STOREFRONT_DEFAULT_TITLE,
+  STOREFRONT_SITE_NAME,
+};
 
 export function storefrontSiteOrigin() {
   if (PUBLIC_BASE_URL) return PUBLIC_BASE_URL.replace(/\/$/, "");
@@ -56,6 +72,33 @@ function upsertLink(rel, href) {
   el.setAttribute("href", href);
 }
 
+function localizeOrganizationJsonLd({ organizationDescription } = {}) {
+  const script = document.querySelector('script[type="application/ld+json"]');
+  if (!script) return;
+  try {
+    const data = JSON.parse(script.textContent || "{}");
+    if (data["@type"] !== "Organization") return;
+    data.url = `${PUBLIC_CANONICAL_ORIGIN}${publicPathForLocale("/", "ru")}`;
+    if (organizationDescription) data.description = organizationDescription;
+    script.textContent = JSON.stringify(data);
+  } catch {
+    // Keep the existing valid block rather than dropping structured data.
+  }
+}
+
+function replaceAlternateLinks(alternates = []) {
+  for (const existing of document.querySelectorAll('link[rel="alternate"][hreflang]')) {
+    existing.remove();
+  }
+  for (const alternate of alternates) {
+    const link = document.createElement("link");
+    link.setAttribute("rel", "alternate");
+    link.setAttribute("hreflang", alternate.hreflang);
+    link.setAttribute("href", alternate.href);
+    document.head.appendChild(link);
+  }
+}
+
 export function formatStorefrontDocumentTitle(title) {
   return (
     formatInfoPageTitle(title, STOREFRONT_SITE_NAME) || STOREFRONT_DEFAULT_TITLE
@@ -68,8 +111,12 @@ export function applyStorefrontDocumentMeta({
   path,
   image,
   type = "website",
+  locale = "ru",
+  alternates = [],
+  indexable = true,
+  organizationDescription = "",
 } = {}) {
-  const origin = storefrontSiteOrigin();
+  const origin = alternates.length ? PUBLIC_CANONICAL_ORIGIN : storefrontSiteOrigin();
   const pageTitle = title || STOREFRONT_DEFAULT_TITLE;
   const pageDescription = description || STOREFRONT_DEFAULT_DESCRIPTION;
   const pagePath = path || storefrontHref("home");
@@ -79,7 +126,9 @@ export function applyStorefrontDocumentMeta({
 
   document.title = pageTitle;
   upsertMetaByName("description", pageDescription);
+  upsertMetaByName("robots", indexable ? "index,follow" : "noindex,follow");
   upsertLink("canonical", canonical);
+  replaceAlternateLinks(indexable ? alternates : []);
 
   upsertMetaByProperty("og:type", type);
   upsertMetaByProperty("og:site_name", STOREFRONT_SITE_NAME);
@@ -87,31 +136,105 @@ export function applyStorefrontDocumentMeta({
   upsertMetaByProperty("og:description", pageDescription);
   upsertMetaByProperty("og:url", canonical);
   upsertMetaByProperty("og:image", ogImage);
-  upsertMetaByProperty("og:locale", "ru_RU");
+  upsertMetaByProperty(
+    "og:locale",
+    {
+      ru: "ru_RU",
+      en: "en_US",
+      uz: "uz_UZ",
+      ky: "ky_KG",
+      tg: "tg_TJ",
+      zh: "zh_CN",
+      ar: "ar_SA",
+    }[locale] || "ru_RU"
+  );
 
   upsertMetaByName("twitter:card", "summary_large_image");
   upsertMetaByName("twitter:title", pageTitle);
   upsertMetaByName("twitter:description", pageDescription);
   upsertMetaByName("twitter:image", ogImage);
+  localizeOrganizationJsonLd({ organizationDescription });
 }
 
-export function storefrontRouteDocumentMeta(route, site) {
+export function storefrontRouteDocumentMeta(route, site, options = {}) {
+  const locale = options.locale || route?.locale || "ru";
+  const infrastructureEnabled =
+    options.infrastructureEnabled ??
+    (typeof document !== "undefined" &&
+      publicLocaleInfrastructureEnabledFromDocument(document));
+  const localeEligible = ![
+    "cart",
+    "checkout",
+    "install-app",
+    "notFound",
+  ].includes(route?.name);
+  const routeHref = (value) => {
+    const name = typeof value === "object" ? value?.name : String(value || "home");
+    const eligible = !["cart", "checkout", "install-app"].includes(name);
+    const canonicalPath = publicDocumentPath({
+      pathname: storefrontRoutePath(value),
+      locale,
+      infrastructureEnabled,
+      localeEligible: eligible,
+    });
+    if (!infrastructureEnabled && typeof window !== "undefined") {
+      return storefrontHref(value, { locale, infrastructureEnabled: false });
+    }
+    return canonicalPath;
+  };
+  const alternateList =
+    infrastructureEnabled && localeEligible && !route?.facet
+      ? publicAlternateLinks(
+          storefrontRoutePath(route),
+          options.enabledLanguages || ["ru"]
+        )
+      : [];
+  const common = {
+    locale,
+    organizationDescription:
+      site?.seo?.home?.description || STOREFRONT_DEFAULT_DESCRIPTION,
+    alternates: alternateList,
+    indexable: localeEligible && !route?.facet && options.indexable !== false,
+  };
   if (!route || route.name === "home") {
     return {
-      title: STOREFRONT_DEFAULT_TITLE,
-      description: STOREFRONT_DEFAULT_DESCRIPTION,
-      path: storefrontHref("home"),
+      title: site?.seo?.home?.title || STOREFRONT_DEFAULT_TITLE,
+      description:
+        site?.seo?.home?.description || STOREFRONT_DEFAULT_DESCRIPTION,
+      path: routeHref("home"),
+      ...common,
     };
   }
   if (route.name === "catalog") {
-    const parts = [route.category, route.subcategory, route.facet].filter(Boolean);
-    const label = parts.length ? parts.join(" — ") : "Каталог";
+    const categoryOptions = storefrontCategoryDisplayOptions(
+      locale,
+      site?.categoryTranslations,
+      options.enabledLanguages
+    );
+    const parts = [
+      route.category
+        ? categoryDisplayNameFromCanonical(route.category, "", categoryOptions)
+        : "",
+      route.subcategory
+        ? categoryDisplayNameFromCanonical(
+            route.subcategory,
+            route.category,
+            categoryOptions
+          )
+        : "",
+      route.facet,
+    ].filter(Boolean);
+    const label =
+      parts.length ? parts.join(" — ") : site?.seo?.catalog?.title || "Каталог";
     return {
       title: `${label} | ${STOREFRONT_SITE_NAME}`,
-      description: formatSeoTemplate(getSeoCanonicalField("catalog", "descriptionTemplate"), {
-        label,
-      }),
-      path: storefrontHref(route),
+      description: formatSeoTemplate(
+        site?.seo?.catalog?.descriptionTemplate ||
+          getSeoCanonicalField("catalog", "descriptionTemplate"),
+        { label }
+      ),
+      path: routeHref(route),
+      ...common,
     };
   }
   if (route.name === "product") {
@@ -120,36 +243,59 @@ export function storefrontRouteDocumentMeta(route, site) {
         code: route.code,
       }),
       description: STOREFRONT_DEFAULT_DESCRIPTION,
-      path: storefrontHref(route),
+      path: routeHref(route),
       type: "product",
+      ...common,
     };
   }
   if (route.name === "cart") {
     return {
       title: getSeoCanonicalField("cart", "title"),
       description: getSeoCanonicalField("cart", "description"),
-      path: storefrontHref(route),
+      path: routeHref(route),
+      ...common,
     };
   }
   if (route.name === "checkout") {
     return {
       title: getSeoCanonicalField("checkout", "title"),
       description: getSeoCanonicalField("checkout", "description"),
-      path: storefrontHref(route),
+      path: routeHref(route),
+      ...common,
+    };
+  }
+  if (route.name === "install-app") {
+    return {
+      title: STOREFRONT_DEFAULT_TITLE,
+      description: STOREFRONT_DEFAULT_DESCRIPTION,
+      path: routeHref(route),
+      ...common,
     };
   }
   if (route.name === "contacts") {
     return {
-      title: getSeoCanonicalField("contacts", "title"),
-      description: getSeoCanonicalField("contacts", "description"),
-      path: storefrontHref(route),
+      title:
+        site?.seo?.contacts?.title ||
+        getSeoCanonicalField("contacts", "title"),
+      description:
+        site?.seo?.contacts?.description ||
+        getSeoCanonicalField("contacts", "description"),
+      path: routeHref(route),
+      ...common,
     };
   }
   if (route.name === "aktsii") {
     return {
-      title: getSeoCanonicalField("aktsii", "title"),
-      description: getSeoCanonicalField("aktsii", "description"),
-      path: "https://clover-spb.ru/aktsii",
+      title:
+        site?.seo?.aktsii?.title ||
+        getSeoCanonicalField("aktsii", "title"),
+      description:
+        site?.seo?.aktsii?.description ||
+        getSeoCanonicalField("aktsii", "description"),
+      path: infrastructureEnabled
+        ? routeHref(route)
+        : "https://clover-spb.ru/aktsii",
+      ...common,
     };
   }
   if (route.name === "info") {
@@ -158,13 +304,16 @@ export function storefrontRouteDocumentMeta(route, site) {
       return {
         title: formatStorefrontDocumentTitle(page.title),
         description: page.description,
-        path: storefrontHref(route),
+        path: routeHref(route),
+        ...common,
       };
     }
   }
   return {
     title: STOREFRONT_DEFAULT_TITLE,
     description: STOREFRONT_DEFAULT_DESCRIPTION,
-    path: storefrontHref("home"),
+    path: routeHref("home"),
+    ...common,
+    indexable: false,
   };
 }

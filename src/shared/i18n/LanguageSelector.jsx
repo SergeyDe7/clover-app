@@ -75,11 +75,17 @@ function FlagIcon({ language }) {
 }
 
 /** One compact, keyboard- and touch-friendly selector shared by application shells. */
-export function LanguageSelector({ onLanguageChange, className = "" }) {
+export function LanguageSelector({
+  onLanguageChange,
+  availableLanguages,
+  className = "",
+}) {
   const { locale, enabledLanguages, setLanguage, t } = useLocalization();
   const selected = toPublicLocaleCode(locale);
   const accessibleLabel = t("admin.languages.language");
-  const options = getLanguageOptions(enabledLanguages);
+  const options = getLanguageOptions(
+    Array.isArray(availableLanguages) ? availableLanguages : enabledLanguages
+  );
   const selectedOption = options.find((option) => option.language === selected) || options[0];
   const [open, setOpen] = useState(false);
   const [focusedLanguage, setFocusedLanguage] = useState(selectedOption?.language || "ru");
@@ -105,6 +111,8 @@ export function LanguageSelector({ onLanguageChange, className = "" }) {
     if (!options.some((option) => option.language === language)) return;
     setOpen(false);
     if (typeof onLanguageChange === "function") onLanguageChange(language);
+    // Public Stage 7 navigation stays in the same event turn, so this synchronous
+    // preference write still runs in the same event turn after URL selection.
     void setLanguage(language);
     triggerRef.current?.focus();
   }

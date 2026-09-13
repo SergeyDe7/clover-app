@@ -8,6 +8,10 @@ import {
 import { getCartCount, subscribeCart } from "../cartStorage.js";
 import { storefrontHref } from "../mode.js";
 import { StorefrontContacts } from "./StorefrontContacts.jsx";
+import {
+  equivalentPublicLocaleHref,
+  publicLocaleInfrastructureEnabledFromDocument,
+} from "../../../shared/i18n/publicLocaleRouting.js";
 
 /** Compact mobile tools — known-good from 055c69f. */
 function IconCatalog() {
@@ -66,20 +70,52 @@ function IconPromo() {
   );
 }
 
-export function StoreHeader({ current }) {
-  const { t } = useLocalization();
+export function StoreHeader({ current, route }) {
+  const { enabledLanguages, locale, t } = useLocalization();
   const [count, setCount] = useState(getCartCount);
   useEffect(() => subscribeCart(() => setCount(getCartCount())), []);
+  const infrastructureEnabled =
+    typeof document !== "undefined" &&
+    publicLocaleInfrastructureEnabledFromDocument(document);
+  const routeLocale = route?.locale || locale;
+  const localeEligible = !["cart", "checkout", "install-app", "notFound"].includes(
+    route?.name
+  );
 
   function go(route) {
-    window.history.pushState({}, "", storefrontHref(route));
+    window.history.pushState(
+      {},
+      "",
+      storefrontHref(route, {
+        locale: routeLocale,
+        infrastructureEnabled,
+      })
+    );
     window.dispatchEvent(new PopStateEvent("popstate"));
+  }
+
+  function choosePublicLanguage(language) {
+    const href = equivalentPublicLocaleHref({
+      pathname: window.location.pathname,
+      search: window.location.search,
+      hash: window.location.hash,
+      locale: language,
+      enabledLanguages,
+      infrastructureEnabled,
+    });
+    if (!href) return false;
+    window.history.pushState({}, "", href);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    return true;
   }
 
   const link = (route, label, match) => (
     <a
       className={`sf-nav-link${current === match ? " is-active" : ""}`}
-      href={storefrontHref(route)}
+      href={storefrontHref(route, {
+        locale: routeLocale,
+        infrastructureEnabled,
+      })}
       onClick={(e) => {
         e.preventDefault();
         go(route);
@@ -93,7 +129,10 @@ export function StoreHeader({ current }) {
     <header className="sf-header">
       <a
         className="sf-brand"
-        href="/"
+        href={storefrontHref("home", {
+          locale: routeLocale,
+          infrastructureEnabled,
+        })}
         onClick={(e) => {
           e.preventDefault();
           go("home");
@@ -116,7 +155,10 @@ export function StoreHeader({ current }) {
       <div className="sf-header-actions">
         <a
           className="sf-header-tool sf-catalog-mobile"
-          href={storefrontHref({ name: "catalog" })}
+          href={storefrontHref({ name: "catalog" }, {
+            locale: routeLocale,
+            infrastructureEnabled,
+          })}
           aria-label={t("storefront.nav.catalog")}
           onClick={(e) => {
             e.preventDefault();
@@ -128,7 +170,10 @@ export function StoreHeader({ current }) {
         </a>
         <a
           className="sf-header-tool sf-aktsii-mobile"
-          href={storefrontHref({ name: "aktsii" })}
+          href={storefrontHref({ name: "aktsii" }, {
+            locale: routeLocale,
+            infrastructureEnabled,
+          })}
           aria-label={t("storefront.nav.promos")}
           onClick={(e) => {
             e.preventDefault();
@@ -152,7 +197,11 @@ export function StoreHeader({ current }) {
           {count > 0 ? <span className="sf-header-badge">{count > 99 ? "99+" : count}</span> : null}
         </a>
         <StorefrontContacts />
-        <LanguageSelector className="sf-language-selector" />
+        <LanguageSelector
+          className="sf-language-selector"
+          availableLanguages={localeEligible ? enabledLanguages : ["ru"]}
+          onLanguageChange={localeEligible ? choosePublicLanguage : undefined}
+        />
         <a
           className="sf-header-tool sf-login-mobile"
           href={cabinetLoginUrl("/")}

@@ -110,6 +110,9 @@ assert.equal(SEO_NAMESPACE, "seo");
 assert.equal(SEO_ENTITY_TYPE, "route");
 
 const EXPECTED_IDENTITIES = [
+  ["home", "title"],
+  ["home", "description"],
+  ["catalog", "title"],
   ["catalog", "descriptionTemplate"],
   ["product", "titleTemplate"],
   ["cart", "title"],
@@ -123,6 +126,10 @@ const EXPECTED_IDENTITIES = [
 ];
 
 const EXPECTED_RU_SOURCES = Object.freeze({
+  "home\0title": "Хозтовары, упаковка и химия для HoReCa | КЛЕВЕР",
+  "home\0description":
+    "Компания КЛЕВЕР поставляет расходные материалы для кафе, ресторанов и отелей: одноразовую посуду, упаковку, бытовую химию и хозяйственные товары. Заказывайте с ",
+  "catalog\0title": "Каталог",
   "catalog\0descriptionTemplate":
     "Каталог «{label}»: хозтовары, упаковка и расходники для HoReCa. Заказ без регистрации на сайте КЛЕВЕР.",
   "product\0titleTemplate": "Товар {code} | КЛЕВЕР",
@@ -138,8 +145,8 @@ const EXPECTED_RU_SOURCES = Object.freeze({
 });
 
 const catalogEntries = listSeoCatalogEntries();
-assert.equal(catalogEntries.length, 10, "exactly 10 SEO identities");
-assert.ok(catalogEntries.every((e) => e.critical === true), "all 10 critical");
+assert.equal(catalogEntries.length, 13, "Stage 5.2-B plus 3 Stage 7 SEO identities");
+assert.ok(catalogEntries.every((e) => e.critical === true), "all 13 critical");
 assert.ok(
   catalogEntries.every(
     (e) => e.namespace === "seo" && e.entityType === "route" && e.entityId && e.fieldKey && e.sourceRu
@@ -155,7 +162,7 @@ for (const [entityId, fieldKey] of EXPECTED_IDENTITIES) {
     `RU source ${entityId}/${fieldKey}`
   );
 }
-assert.equal(getSeoCatalogEntry("home", "title"), null, "no home SEO row");
+assert.ok(getSeoCatalogEntry("home", "title"), "Stage 7 home title SEO row");
 assert.equal(getSeoCatalogEntry("about", "title"), null, "no InfoPage SEO duplicate");
 assert.equal(getSeoCatalogEntry("disposable", "name"), null, "no category SEO duplicate");
 
@@ -165,7 +172,7 @@ assert.equal(/from ["'].*sourceHash/.test(catalogSrc), false);
 
 const seedMod = await import("../src/i18n/seoTranslationSeed.js");
 const { getSeoSeedTranslation, hasSeoSeed, listSeoSeedKeys } = seedMod;
-assert.equal(listSeoSeedKeys().length, 10);
+assert.equal(listSeoSeedKeys().length, 13);
 let seedCells = 0;
 for (const entry of catalogEntries) {
   assert.equal(hasSeoSeed(entry.entityId, entry.fieldKey), true);
@@ -177,7 +184,7 @@ for (const entry of catalogEntries) {
     seedCells += 1;
   }
 }
-assert.equal(seedCells, 60);
+assert.equal(seedCells, 78);
 assert.deepEqual([...TARGET_INTERNAL_LOCALES], ["en", "uz", "ky", "tg", "zh-CN", "ar"]);
 
 const {
@@ -297,7 +304,9 @@ assert.equal(
   "product title template must not remain duplicated in seo.js"
 );
 assert.equal(seoJs.includes('Корзина заказа на сайте компании КЛЕВЕР.'), false);
-assert.equal(seoJs.includes("og:locale\", \"ru_RU\""), true);
+assert.equal(seoJs.includes('"og:locale"'), true);
+assert.equal(seoJs.includes('"zh_CN"'), true);
+assert.equal(seoJs.includes('"ar_SA"'), true);
 
 const storeMod = await import("../src/localizationStore.js");
 const {
@@ -321,10 +330,10 @@ const store1 = readTranslationStore();
 const seoEntries = store1.entries.filter(
   (e) => e.namespace === "seo" && e.entityType === "route" && e.entityId
 );
-assert.equal(seoEntries.length, 10);
+assert.equal(seoEntries.length, 13);
 const seoIds = new Set(seoEntries.map((e) => e.id));
 const seoValues = store1.values.filter((v) => seoIds.has(v.entryId));
-assert.equal(seoValues.length, 60);
+assert.equal(seoValues.length, 78);
 assert.ok(seoValues.every((v) => v.state === "AUTO"));
 
 for (const [entityId, fieldKey] of EXPECTED_IDENTITIES) {
@@ -342,8 +351,8 @@ assert.equal(pageEntries.length, 21);
 const reports = completenessByLanguage(store1);
 for (const code of ["en", "uz", "ky", "tg", "zh", "ar"]) {
   const report = reports[code];
-  assert.equal(report.domains.seo.total, 10, `${code} seo.total`);
-  assert.equal(report.domains.seo.ready, 10, `${code} seo.ready`);
+  assert.equal(report.domains.seo.total, 13, `${code} seo.total`);
+  assert.equal(report.domains.seo.ready, 13, `${code} seo.ready`);
   assert.equal(report.domains.seo.complete, true, `${code} seo.complete`);
   assert.equal(report.domains.faq.total, 0, `${code} faq.total`);
   assert.equal(report.domains.faq.ready, 0, `${code} faq.ready`);
@@ -508,14 +517,14 @@ const seoViewSeo = seoView.filter((row) => row.namespace === "seo");
 const seoViewPages = seoView.filter((row) => row.namespace === "page");
 const seoViewProducts = seoView.filter((row) => row.namespace === "product");
 const seoViewCategories = seoView.filter((row) => row.namespace === "category");
-assert.equal(seoViewSeo.length, 10, "view=seo contains 10 SEO rows");
+assert.equal(seoViewSeo.length, 13, "view=seo contains 13 SEO rows");
 assert.equal(seoViewPages.length, 21, "view=seo contains 21 page rows");
 assert.equal(seoViewProducts.length, 0, "no products in seo view");
 assert.equal(seoViewCategories.length, 0, "no categories in seo view");
 
 const { stats: seoReadStats } = readSeoTranslationStore({ languageInternal: "en" });
-assert.equal(seoReadStats.seoCurrentEntries, 10);
-assert.ok(seoReadStats.seoNamespaceEntriesRead >= 10);
+assert.equal(seoReadStats.seoCurrentEntries, 13);
+assert.ok(seoReadStats.seoNamespaceEntriesRead >= 13);
 
 // Force stale SEO AUTO: bump entry sourceHash without refreshing AUTO value.
 const staleEntry = findTranslationEntryByEntityIdentity("seo", "route", "contacts", "title");
@@ -559,7 +568,7 @@ insertTranslationEntryRow({
 const seoViewAfterOrphan = listWorkspaceRows({ view: "seo", language: "en" }).filter(
   (row) => row.namespace === "seo"
 );
-assert.equal(seoViewAfterOrphan.length, 10, "orphan SEO not scanned into view=seo");
+assert.equal(seoViewAfterOrphan.length, 13, "orphan SEO not scanned into view=seo");
 assert.equal(
   seoViewAfterOrphan.some((row) => row.entityId === "orphan-route"),
   false

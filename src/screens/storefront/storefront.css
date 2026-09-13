@@ -2105,3 +2105,90 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
     min-width: 44px;
   }
 }
+
+/* Stage 7 public RTL: layout follows writing direction; business values stay isolated. */
+html[dir="rtl"] .sf-app {
+  direction: rtl;
+  text-align: start;
+}
+html[dir="rtl"] .sf-app :where(
+  .sf-header,
+  .sf-header-actions,
+  .sf-nav,
+  .sf-main,
+  .sf-catalog-layout,
+  .sf-product-layout,
+  .sf-card,
+  .sf-info-page,
+  .sf-modal,
+  .sf-dialog
+) {
+  min-width: 0;
+}
+html[dir="rtl"] .sf-header-badge {
+  right: auto;
+  inset-inline-end: -5px;
+}
+html[dir="rtl"] .sf-contacts-col::before,
+html[dir="rtl"] .sf-hero::before {
+  left: auto;
+  inset-inline-start: 0;
+}
+html[dir="rtl"] .sf-contacts-map-zoom {
+  right: auto;
+  inset-inline-end: 10px;
+}
+html[dir="rtl"] .sf-info-list {
+  padding-left: 0;
+  padding-inline-start: 20px;
+}
+html[dir="rtl"] .sf-category-tile,
+html[dir="rtl"] .sf-group-nav-row,
+html[dir="rtl"] .sf-cat-btn,
+html[dir="rtl"] .sf-chip,
+html[dir="rtl"] .sf-facet-item {
+  text-align: start;
+}
+html[dir="rtl"] .sf-cart-unit-price,
+html[dir="rtl"] .sf-cart-total,
+html[dir="rtl"] .sf-checkout-total {
+  text-align: end;
+}
+html[dir="rtl"] .sf-directional-back,
+html[dir="rtl"] .sf-group-tile-chevron {
+  display: inline-block;
+  transform: scaleX(-1);
+}
+html[dir="rtl"] .sf-group-tile:hover .sf-group-tile-chevron {
+  transform: scaleX(-1) translateX(3px);
+}
+.sf-app :where(
+  bdi,
+  [href^="tel:"],
+  [href^="mailto:"],
+  .sf-product-code,
+  .sf-product-price,
+  .sf-product-price-value,
+  .sf-price-block,
+  .sf-cart-price,
+  .sf-cart-unit-price,
+  .sf-cart-total,
+  .sf-checkout-total
+) {
+  unicode-bidi: isolate;
+}
+.sf-app :where(
+  [href^="tel:"],
+  [href^="mailto:"],
+  input[type="number"],
+  input[type="email"],
+  input[type="tel"]
+) {
+  direction: ltr;
+  text-align: start;
+}
+@media (max-width: 400px) {
+  html[dir="rtl"] .sf-header {
+    padding-inline: 4px;
+  }
+}

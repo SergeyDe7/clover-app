@@ -32,13 +32,10 @@ export function CatalogPage({
   category = "",
   subcategory = "",
   facet = "",
+  routeLocale,
 }) {
-  const { t, locale } = useLocalization();
-  const categoryDisplayName = categoryDisplayNameFromCanonical(
-    category,
-    "",
-    storefrontCategoryDisplayOptions(locale)
-  );
+  const { enabledLanguages, t, locale } = useLocalization();
+  const publicLocale = routeLocale || locale;
   const routeKey = catalogScrollRouteKey(category, subcategory, facet);
   const [catalogRouteSnapshot, setCatalogRouteSnapshot] = useState(null);
   const [error, setError] = useState("");
@@ -57,6 +54,7 @@ export function CatalogPage({
         category: category || undefined,
         subcategory: subcategory || undefined,
         facet: facet || undefined,
+        language: publicLocale,
       })
       .then((payload) => {
         if (!cancelled) {
@@ -69,7 +67,7 @@ export function CatalogPage({
     return () => {
       cancelled = true;
     };
-  }, [category, subcategory, facet, t]);
+  }, [category, subcategory, facet, publicLocale, t]);
 
   const prevRouteKeyRef = useRef(null);
   useLayoutEffect(() => {
@@ -99,6 +97,16 @@ export function CatalogPage({
   const { categories: navCategories, currentPayload } = useMemo(
     () => resolveStorefrontCatalogView(routeKey, catalogRouteSnapshot),
     [routeKey, catalogRouteSnapshot]
+  );
+  const categoryOptions = storefrontCategoryDisplayOptions(
+    publicLocale,
+    currentPayload?.categoryTranslations,
+    enabledLanguages
+  );
+  const categoryDisplayName = categoryDisplayNameFromCanonical(
+    category,
+    "",
+    categoryOptions
   );
 
   const products = useMemo(() => {
@@ -146,10 +154,10 @@ export function CatalogPage({
     return (
       projectLocalizedGroupNav(
         [{ name: category, children }],
-        storefrontCategoryDisplayOptions(locale)
+        categoryOptions
       )[0]?.children || []
     );
-  }, [category, locale]);
+  }, [category, categoryOptions]);
 
   const title = category ? categoryDisplayName : t("storefront.nav.catalog");
 
@@ -201,6 +209,8 @@ export function CatalogPage({
               activeCategory={category}
               activeSubcategory={subcategory}
               variant="side"
+              translations={currentPayload?.categoryTranslations}
+              language={publicLocale}
             />
           </div>
         </aside>

@@ -3,7 +3,10 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import "./styles/clover-theme.css";
 import { AppModalHost } from "./shared/AppModal.jsx";
-import { LocalizationProvider } from "./shared/i18n/LocalizationProvider.jsx";
+import {
+  LocalizationProvider,
+  useLocalization,
+} from "./shared/i18n/LocalizationProvider.jsx";
 import { shouldRenderStorefront } from "./screens/storefront/mode.js";
 
 // Витрина и ЛК — разные чанки: на витрине не тянем админку/клиентский кабинет.
@@ -12,6 +15,7 @@ const App = lazy(() => import("./App.jsx"));
 
 /** Reactive shell: storefront ↔ /lk without full document reload (no re-boot splash). */
 function RootShell() {
+  const localization = useLocalization();
   const [storefront, setStorefront] = useState(() => shouldRenderStorefront());
   useEffect(() => {
     const sync = () => setStorefront(shouldRenderStorefront());
@@ -22,7 +26,7 @@ function RootShell() {
     <>
       {!storefront ? <AppModalHost /> : null}
       <Suspense fallback={null}>
-        {storefront ? <StorefrontApp /> : <App />}
+        {storefront ? <StorefrontApp localization={localization} /> : <App />}
       </Suspense>
     </>
   );

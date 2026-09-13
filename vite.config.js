@@ -1,7 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
+import process from "node:process";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import {
+  renderPublicRouteHtml,
+  resolvePublicRouteRequest,
+} from "./src/shared/sitemap/publicRouteHtml.js";
 
 const proxy = {
   "/api": {
@@ -23,6 +28,13 @@ const allowedHosts = [
 ];
 
 const UI_BUILD_PLACEHOLDER = "%CLOVER_UI_BUILD%";
+const PUBLIC_LOCALE_ROUTES_PLACEHOLDER = "%CLOVER_PUBLIC_LOCALE_ROUTES%";
+
+function publicLocaleRoutesBuildValue() {
+  return String(process.env.CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED || "").trim() === "1"
+    ? "enabled"
+    : "disabled";
+}
 
 /** Каждый production build получает уникальный тег по hash entry-бандла — иначе localStorage не сбрасывает кэш. */
 function cloverUiBuildTag() {
@@ -30,7 +42,12 @@ function cloverUiBuildTag() {
     name: "clover-ui-build-tag",
     transformIndexHtml(html, ctx) {
       if (ctx.server) {
-        return html.replaceAll(UI_BUILD_PLACEHOLDER, "ui-dev");
+        return html
+          .replaceAll(UI_BUILD_PLACEHOLDER, "ui-dev")
+          .replaceAll(
+            PUBLIC_LOCALE_ROUTES_PLACEHOLDER,
+            publicLocaleRoutesBuildValue()
+          );
       }
       return html;
     },
@@ -44,7 +61,13 @@ function cloverUiBuildTag() {
       const buildTag = `ui-${date}-${hash}`;
       const indexPath = path.join(options.dir, "index.html");
       if (fs.existsSync(indexPath)) {
-        const html = fs.readFileSync(indexPath, "utf8").replaceAll(UI_BUILD_PLACEHOLDER, buildTag);
+        const html = fs
+          .readFileSync(indexPath, "utf8")
+          .replaceAll(UI_BUILD_PLACEHOLDER, buildTag)
+          .replaceAll(
+            PUBLIC_LOCALE_ROUTES_PLACEHOLDER,
+            publicLocaleRoutesBuildValue()
+          );
         fs.writeFileSync(indexPath, html);
       }
       // Stamp SW so installed PWAs detect a new worker every deploy (byte change → install/activate).
@@ -56,6 +79,82 @@ function cloverUiBuildTag() {
         fs.writeFileSync(swPath, sw);
       }
       console.log(`[clover-ui-build] ${buildTag}`);
+    },
+  };
+}
+
+function publicLocaleHtmlDelivery() {
+  return {
+    name: "clover-public-locale-html-delivery",
+    configurePreviewServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          next();
+          return;
+        }
+        const outDir = path.resolve(
+          server.config.root,
+          server.config.build.outDir
+        );
+        const requestPath = String(req.url || "/").split("?")[0];
+        if (requestPath === "/public-route-manifest.json") {
+          res.statusCode = 404;
+          res.setHeader("Cache-Control", "no-store");
+          res.end("Not found");
+          return;
+        }
+        const manifestPath = path.join(outDir, "public-route-manifest.json");
+        if (!fs.existsSync(manifestPath)) {
+          next();
+          return;
+        }
+        let manifest;
+        try {
+          manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+        } catch {
+          next();
+          return;
+        }
+        const resolution = resolvePublicRouteRequest(manifest, req.url || "/");
+        if (resolution.action === "pass") {
+          next();
+          return;
+        }
+        if (resolution.action === "redirect") {
+          res.statusCode = resolution.status;
+          res.setHeader("Location", resolution.location);
+          res.setHeader("Cache-Control", "public, max-age=300");
+          res.end();
+          return;
+        }
+        if (resolution.action === "error") {
+          res.statusCode = resolution.status;
+          res.setHeader("Content-Type", "text/plain; charset=utf-8");
+          res.setHeader("Cache-Control", "no-store");
+          res.end("Not found");
+          return;
+        }
+        const indexPath = path.join(outDir, "index.html");
+        if (!fs.existsSync(indexPath)) {
+          next();
+          return;
+        }
+        const html = renderPublicRouteHtml(
+          fs.readFileSync(indexPath, "utf8"),
+          resolution.record,
+          { indexable: resolution.indexable }
+        );
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Content-Language", resolution.record.locale === "zh" ? "zh-CN" : resolution.record.locale);
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Vary", "Accept-Encoding");
+        if (req.method === "HEAD") {
+          res.end();
+          return;
+        }
+        res.end(html);
+      });
     },
   };
 }
@@ -131,7 +230,13 @@ function noAssetSpaFallback() {
 }
 
 export default defineConfig({
-  plugins: [react(), cloverUiBuildTag(), noAssetSpaFallback(), cloverPreviewCacheHeaders()],
+  plugins: [
+    react(),
+    cloverUiBuildTag(),
+    publicLocaleHtmlDelivery(),
+    noAssetSpaFallback(),
+    cloverPreviewCacheHeaders(),
+  ],
   build: {
     rollupOptions: {
       output: {

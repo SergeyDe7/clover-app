@@ -78,7 +78,11 @@ assert.doesNotMatch(providerSrc, /localizationStore/);
 assert.doesNotMatch(providerSrc, /from ["'].*\/db\.js["']/);
 assert.doesNotMatch(providerSrc, /navigator\.language/);
 assert.doesNotMatch(providerSrc, /Accept-Language/);
-assert.doesNotMatch(providerSrc, /window\.location/);
+assert.match(
+  providerSrc,
+  /extractPublicLanguagePrefix\([\s\S]*infrastructureEnabled:\s*true/,
+  "Stage 7 may read an explicit public URL locale behind its build gate"
+);
 assert.doesNotMatch(providerSrc, /localStorage/);
 assert.doesNotMatch(providerSrc, /sessionStorage/);
 assert.doesNotMatch(providerSrc, /preferred_language/);
