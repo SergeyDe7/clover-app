@@ -224,7 +224,15 @@ function readChromeOffsetPx() {
   return Number.isFinite(n) && n > 0 ? n : 56;
 }
 
-export function ManagerNotificationBell({ notifications = [], open, onToggle, onOpen, onRead, onReadAll }) {
+export function ManagerNotificationBell({
+  notifications = [],
+  open,
+  onToggle,
+  onClose,
+  onOpen,
+  onRead,
+  onReadAll,
+}) {
   const { t } = useLocalization();
   const unread = notifications.filter((item) => !item.readAt);
   const rootRef = useRef(null);
@@ -234,12 +242,14 @@ export function ManagerNotificationBell({ notifications = [], open, onToggle, on
 
   const close = useCallback(() => {
     if (!open) return;
-    onToggle();
+    // Explicit close for outside/Escape (idempotent; avoids toggle races).
+    if (typeof onClose === "function") onClose();
+    else onToggle();
     // Return focus after React unmounts the portal (backdrop must not steal it).
     queueMicrotask(() => {
       triggerRef.current?.focus?.();
     });
-  }, [open, onToggle]);
+  }, [open, onClose, onToggle]);
 
   useLayoutEffect(() => {
     if (!open || typeof window === "undefined") {

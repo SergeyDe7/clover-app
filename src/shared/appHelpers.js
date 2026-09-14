@@ -3725,8 +3725,12 @@ html.clover-thankyou-open .app-top-chrome {
 .manager-bell-count { position: absolute; top: -4px; right: -4px; z-index: 2; min-width: 18px; min-height: 18px; height: auto; padding: 0 5px; border-radius: 999px; background: #c45c26; color: #fff; font-size: 11px; font-weight: 800; line-height: 1; display: grid; place-items: center; box-sizing: border-box; }
 /* Portaled to body: escapes .app-top-chrome stacking/container-type (same band as manager-contact). */
 .manager-bell-backdrop {
+  /* Start below sticky chrome so the bell stays hittable (no close→reopen via click retarget). */
   position: fixed;
-  inset: 0;
+  top: var(--clover-chrome-offset, 56px);
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 219;
   margin: 0;
   padding: 0;

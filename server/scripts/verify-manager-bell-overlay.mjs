@@ -30,6 +30,7 @@ assert.match(src, /queueMicrotask/);
 assert.match(src, /triggerRef\.current\?\.focus/);
 assert.match(src, /app-modal-shell/);
 assert.match(src, /max-width:\s*820px/);
+assert.match(src, /onClose/);
 // Backdrop closes via document pointerdown only — onClick would double-toggle.
 assert.doesNotMatch(
   src,
@@ -39,6 +40,11 @@ assert.doesNotMatch(
 assert.match(helpersCss, /manager-bell-backdrop/);
 assert.match(helpersCss, /z-index:\s*220/);
 assert.match(helpersCss, /z-index:\s*219/);
+assert.match(helpersCss, /--clover-chrome-offset/);
+assert.match(
+  helpersCss,
+  /\.manager-bell-backdrop\s*\{[^}]*top:\s*var\(--clover-chrome-offset/
+);
 
 assert.match(themeCss, /manager-bell-panel--portal/);
 assert.doesNotMatch(
