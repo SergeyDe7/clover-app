@@ -14,6 +14,8 @@ import {
   STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
   STOREFRONT_DEFAULT_HERO_SLIDES,
 } from "../../src/screens/storefront/siteCopy.js";
+import { isOperationalPublicPath } from "../../src/shared/i18n/publicLocaleRouting.js";
+import { resolvePublicRouteRequest } from "../../src/shared/sitemap/publicRouteHtml.js";
 
 assert.equal(normalizeStorefrontHeroSlides([]).length, 3);
 assert.equal(
@@ -90,6 +92,18 @@ assert.ok(STOREFRONT_SETTING_KEYS.includes("storefrontHeroIntervalSec"));
 for (const slide of STOREFRONT_DEFAULT_HERO_SLIDES) {
   const filePath = path.join(projectRoot, "public", slide.src.replace(/^\//, ""));
   assert.ok(existsSync(filePath), `Нет файла слайда ${slide.src}`);
+  assert.equal(
+    isOperationalPublicPath(slide.src),
+    true,
+    `${slide.src} must pass public-route middleware as a static asset`
+  );
+  assert.deepEqual(
+    resolvePublicRouteRequest(
+      { infrastructureEnabled: true, enabledLanguages: ["ru"], routes: {} },
+      slide.src
+    ),
+    { action: "pass" }
+  );
 }
 
 const home = readFileSync(
@@ -113,5 +127,12 @@ assert.match(admin, /buttonLabel/);
 assert.match(server, /\/api\/admin\/storefront\/hero-image/);
 assert.match(css, /\.sf-hero-dots/);
 assert.match(css, /\.sf-hero-slide-btn/);
+
+const viteConfig = readFileSync(path.join(projectRoot, "vite.config.js"), "utf8");
+assert.match(
+  viteConfig,
+  /url\.startsWith\("\/storefront\/"\)/,
+  "preview must 404 missing /storefront/* instead of SPA HTML fallback"
+);
 
 console.log("verify-storefront-hero-slides: ok");

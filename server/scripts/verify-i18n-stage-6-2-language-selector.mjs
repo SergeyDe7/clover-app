@@ -523,15 +523,24 @@ try {
 
 const storefrontHeader = read("src/screens/storefront/components/StoreHeader.jsx");
 const storefrontLanguageIndex = storefrontHeader.indexOf("<LanguageSelector");
-assert.ok(storefrontHeader.indexOf("<StorefrontContacts />") < storefrontLanguageIndex);
-assert.ok(storefrontLanguageIndex < storefrontHeader.indexOf('className="sf-header-tool sf-login-mobile"'));
-assert.ok(storefrontLanguageIndex < storefrontHeader.indexOf('className="sf-btn sf-btn-ghost sf-login sf-login-desktop"'));
+const storefrontLoginMobileIndex = storefrontHeader.indexOf(
+  'className="sf-header-tool sf-login-mobile"'
+);
+const storefrontLoginDesktopIndex = storefrontHeader.indexOf(
+  'className="sf-btn sf-btn-ghost sf-login sf-login-desktop"'
+);
+assert.ok(storefrontHeader.indexOf("<StorefrontContacts />") < storefrontLoginMobileIndex);
+assert.ok(storefrontLoginMobileIndex < storefrontLanguageIndex);
+assert.ok(storefrontLoginDesktopIndex < storefrontLanguageIndex);
 assert.match(read("src/screens/client/ClientScreen.jsx"), /onLanguageChange=\{onLanguageChange\}/);
 assert.match(
   read("src/screens/manager/ManagerScreen.jsx"),
   /showLanguageSelector=\{authUser\?\.role !== "admin"\}/
 );
-assert.match(read("src/shared/SharedPanels.jsx"), /showLanguageSelector \? \([\s\S]*<LanguageSelector onLanguageChange=\{onLanguageChange\}/);
+assert.match(
+  read("src/shared/SharedPanels.jsx"),
+  /showLanguageSelector \? \([\s\S]*<LanguageSelector[\s\S]*className="app-header-language-selector"[\s\S]*onLanguageChange=\{onLanguageChange\}/
+);
 assert.match(app, /<LanguageSelector className="language-selector-login" \/>/);
 const appCss = read("src/App.css");
 const themeCss = read("src/styles/clover-theme.css");
@@ -542,7 +551,13 @@ assert.match(themeCss, /\.language-selector-trigger,[\s\S]*\.language-selector-o
 assert.match(themeCss, /\.language-selector-trigger,[\s\S]*\.language-selector-option\s*\{[\s\S]*box-sizing:\s*border-box;/);
 assert.match(themeCss, /\.language-selector-trigger:focus-visible,[\s\S]*outline:\s*3px/);
 assert.match(themeCss, /\.language-selector-option-name\s*\{[\s\S]*position:\s*absolute;[\s\S]*clip:/);
+assert.match(themeCss, /\.app-header-language-selector \.language-flag/);
+assert.match(storefrontCss, /\.sf-language-selector \.language-flag/);
 assert.match(storefrontCss, /@media \(max-width:\s*400px\)[\s\S]*\.sf-header-actions\s*\{[\s\S]*gap:\s*0;[\s\S]*\.sf-language-selector \.language-selector-trigger\s*\{[\s\S]*width:\s*44px;/);
+assert.match(
+  read("src/screens/client/ManagerContact.jsx"),
+  /manager-contact-trigger--icon/
+);
 
 // A/L: endpoint is public/read-only and Stage 6.2 does not touch protected business contours.
 const server = read("server/src/server.js");

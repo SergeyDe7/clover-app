@@ -21,6 +21,8 @@ const OPERATIONAL_PREFIXES = new Set([
   "manager",
   "admin",
   "uploads",
+  // Bundled storefront static assets (hero slides under public/storefront/).
+  "storefront",
 ]);
 const OPERATIONAL_PATHS = new Set([
   "apple-touch-icon.png",

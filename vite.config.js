@@ -188,8 +188,9 @@ function cloverPreviewCacheHeaders() {
 }
 
 /**
- * SPA fallback must NOT swallow missing hashed assets as index.html —
- * phone then gets HTML as CSS → «только текст без оформления» + 2 логотипа.
+ * SPA fallback must NOT swallow missing static files as index.html —
+ * phone then gets HTML as CSS/image → broken UI / false-positive 200 pages.
+ * Applies to hashed /assets/* and bundled /storefront/* hero media.
  */
 function noAssetSpaFallback() {
   return {
@@ -197,16 +198,24 @@ function noAssetSpaFallback() {
     configurePreviewServer(server) {
       server.middlewares.use((req, res, next) => {
         const url = String(req.url || "").split("?")[0];
-        if (!url.startsWith("/assets/")) {
+        let relative = "";
+        if (url.startsWith("/assets/")) {
+          relative = url.replace(/^\/assets\//, "assets/");
+        } else if (url.startsWith("/storefront/")) {
+          relative = url.replace(/^\/storefront\//, "storefront/");
+        } else {
           next();
           return;
         }
-        const filePath = path.resolve(
-          server.config.root,
-          server.config.build.outDir,
-          url.replace(/^\/assets\//, "assets/")
-        );
-        if (fs.existsSync(filePath)) {
+        const outDir = path.resolve(server.config.root, server.config.build.outDir);
+        const filePath = path.resolve(outDir, relative);
+        if (filePath !== outDir && !filePath.startsWith(`${outDir}${path.sep}`)) {
+          res.statusCode = 404;
+          res.setHeader("Content-Type", "text/plain; charset=utf-8");
+          res.end("Not found");
+          return;
+        }
+        if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
           next();
           return;
         }
