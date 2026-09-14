@@ -1,6 +1,8 @@
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 // Раздел менеджера: центр уведомлений.
 import { writeManagerMoreTab, formatDateTime } from "../../shared/appHelpers";
+import { createPortal } from "react-dom";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const MANAGER_NOTIFICATION_META = {
   new_order: { labelKey: "client.order.new", tab: "orders" },
@@ -202,9 +204,9 @@ function NotificationCard({ item, onOpen, onRead }) {
             {!parsed.headline && item.title && <div className="manager-notification-meta">{item.title}</div>}
           </>
         )}
-        {!parsed.hideFooterTime && (
+        {item.createdAt && !parsed.hideFooterTime ? (
           <time className="manager-notification-time">{formatDateTime(item.createdAt)}</time>
-        )}
+        ) : null}
       </div>
       <div className="manager-notification-actions">
         <button className="primary-button" type="button" onClick={() => onOpen(item)}>{t("shared.action.open")}</button>
@@ -214,15 +216,175 @@ function NotificationCard({ item, onOpen, onRead }) {
   );
 }
 
+function readChromeOffsetPx() {
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue("--clover-chrome-offset")
+    .trim();
+  const n = Number.parseFloat(raw);
+  return Number.isFinite(n) && n > 0 ? n : 56;
+}
+
 export function ManagerNotificationBell({ notifications = [], open, onToggle, onOpen, onRead, onReadAll }) {
   const { t } = useLocalization();
   const unread = notifications.filter((item) => !item.readAt);
+  const rootRef = useRef(null);
+  const triggerRef = useRef(null);
+  const panelRef = useRef(null);
+  const [panelBox, setPanelBox] = useState(null);
+
+  const close = useCallback(() => {
+    if (!open) return;
+    onToggle();
+    // Return focus after React unmounts the portal (backdrop must not steal it).
+    queueMicrotask(() => {
+      triggerRef.current?.focus?.();
+    });
+  }, [open, onToggle]);
+
+  useLayoutEffect(() => {
+    if (!open || typeof window === "undefined") {
+      setPanelBox(null);
+      return undefined;
+    }
+    const place = () => {
+      const trigger = triggerRef.current?.getBoundingClientRect();
+      const chromeBottom = readChromeOffsetPx();
+      const mobile =
+        window.matchMedia && window.matchMedia("(max-width: 820px)").matches;
+      const gap = 8;
+      const top = Math.max(
+        chromeBottom,
+        trigger ? trigger.bottom : chromeBottom
+      ) + gap;
+      const maxHeight = Math.max(
+        160,
+        Math.min(
+          window.innerHeight - top - Math.max(12, Number(getComputedStyle(document.documentElement).paddingBottom) || 0) - 12,
+          mobile ? Math.min(window.innerHeight * 0.68, 480) : Math.min(window.innerHeight * 0.7, 420)
+        )
+      );
+      if (mobile) {
+        setPanelBox({
+          top,
+          left: 10,
+          right: 10,
+          width: "auto",
+          maxHeight,
+        });
+      } else {
+        const width = Math.min(360, window.innerWidth * 0.82);
+        const right = trigger
+          ? Math.max(8, window.innerWidth - trigger.right)
+          : 16;
+        setPanelBox({
+          top,
+          right,
+          left: "auto",
+          width,
+          maxHeight,
+        });
+      }
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open, unread.length]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (event) => {
+      if (event.key !== "Escape") return;
+      // AppModal (and similar) sit above the bell — let them own Escape first.
+      if (document.querySelector(".app-modal-shell")) return;
+      event.preventDefault();
+      close();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, close]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event) => {
+      const target = event.target;
+      if (rootRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      close();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open, close]);
+
+  const panel =
+    open && panelBox && typeof document !== "undefined"
+      ? createPortal(
+          <>
+            <button
+              type="button"
+              className="manager-bell-backdrop"
+              aria-label={t("shared.action.close")}
+              tabIndex={-1}
+            />
+            <div
+              ref={panelRef}
+              className="manager-bell-panel manager-bell-panel--portal"
+              role="dialog"
+              aria-modal="true"
+              aria-label={t("manager.notifications.title")}
+              style={{
+                top: panelBox.top,
+                left: panelBox.left,
+                right: panelBox.right,
+                width: panelBox.width,
+                maxHeight: panelBox.maxHeight,
+              }}
+            >
+              <div className="manager-notification-header">
+                <strong>
+                  {unread.length
+                    ? t("manager.notifications.titleWithCount", { count: unread.length })
+                    : t("manager.notifications.title")}
+                </strong>
+                {unread.length > 0 && (
+                  <button className="secondary-button" type="button" onClick={onReadAll}>
+                    {t("manager.markAllRead")}
+                  </button>
+                )}
+              </div>
+              {unread.length ? (
+                <div className="manager-notification-list">
+                  {unread.slice(0, 8).map((item) => (
+                    <NotificationCard
+                      key={item.id}
+                      item={item}
+                      onOpen={onOpen}
+                      onRead={onRead}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-box manager-notification-empty">
+                  {t("manager.noNewNotifications")}
+                </div>
+              )}
+            </div>
+          </>,
+          document.body
+        )
+      : null;
+
   return (
-    <div className="manager-bell">
+    <div className="manager-bell" ref={rootRef}>
       <button
+        ref={triggerRef}
         className="secondary-button manager-bell-trigger"
         type="button"
         aria-expanded={open}
+        aria-haspopup="dialog"
         aria-label={unread.length ? t("manager.notifications.countLabel", { count: unread.length }) : t("manager.notifications.title")}
         onClick={onToggle}
       >
@@ -230,32 +392,7 @@ export function ManagerNotificationBell({ notifications = [], open, onToggle, on
         <span className="manager-bell-label-short">{t("manager.notif")}</span>
         {unread.length > 0 && <span className="manager-bell-count">{unread.length}</span>}
       </button>
-      {open && (
-        <div className="manager-bell-panel">
-          <div className="manager-notification-header">
-            <strong>{unread.length ? t("manager.notifications.titleWithCount", { count: unread.length }) : t("manager.notifications.title")}</strong>
-            {unread.length > 0 && (
-              <button className="secondary-button" type="button" onClick={onReadAll}>{
-                t("manager.markAllRead")
-              }</button>
-            )}
-          </div>
-          {unread.length ? (
-            <div className="manager-notification-list">
-              {unread.slice(0, 8).map((item) => (
-                <NotificationCard
-                  key={item.id}
-                  item={item}
-                  onOpen={onOpen}
-                  onRead={onRead}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="empty-box manager-notification-empty">{t("manager.noNewNotifications")}</div>
-          )}
-        </div>
-      )}
+      {panel}
     </div>
   );
 }
