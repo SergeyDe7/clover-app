@@ -114,6 +114,22 @@ html.sf-catalog-lock .sf-header,
 .sf-nav-link { text-decoration: none; color: #5a5e5a; font-weight: 600; padding: 8px 12px; border-radius: 999px; transition: background .2s, color .2s; }
 .sf-nav-link:hover, .sf-nav-link.is-active { background: rgba(28, 31, 28, 0.06); color: #1c1f1c; }
 .sf-header-actions { display: flex; gap: 8px; align-items: center; }
+.sf-language-selector {
+  flex: 0 0 auto;
+  order: 99;
+}
+.sf-language-selector .language-selector-trigger {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  height: 44px;
+  padding: 8px;
+  box-sizing: border-box;
+}
+.sf-language-selector .language-flag {
+  width: 22px;
+  height: 15px;
+}
 a.sf-contacts-btn { display: none !important; }
 a.sf-contacts-mobile { display: none !important; }
 a.sf-cart-mobile { display: none !important; }

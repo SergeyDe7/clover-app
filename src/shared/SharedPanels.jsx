@@ -195,14 +195,17 @@ export function Header({
             </div>
           )}
           {children}
-          {showLanguageSelector ? (
-            <LanguageSelector onLanguageChange={onLanguageChange} />
-          ) : null}
           {onLogout && (
             <button className="header-button header-logout" type="button" onClick={onLogout}>{
               t("shared.signOut")
             }</button>
           )}
+          {showLanguageSelector ? (
+            <LanguageSelector
+              className="app-header-language-selector"
+              onLanguageChange={onLanguageChange}
+            />
+          ) : null}
         </div>
       </div>
       {nav ? <div className="app-header-nav">{nav}</div> : null}

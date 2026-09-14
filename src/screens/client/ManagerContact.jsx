@@ -9,6 +9,20 @@ import {
   getTelegramLink,
 } from "../../shared/appHelpers";
 
+/** Same compact phone glyph as storefront mobile header tools. */
+function IconPhone() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+      <path
+        d="M8.2 4.8c.4-.9 1.3-1.3 2.2-1.1l1.8.4c.8.2 1.4.8 1.5 1.6l.3 2.1c.1.7-.2 1.4-.8 1.8l-1.2.8c1 2 2.6 3.6 4.6 4.6l.8-1.2c.4-.6 1.1-.9 1.8-.8l2.1.3c.8.1 1.4.7 1.6 1.5l.4 1.8c.2.9-.2 1.8-1.1 2.2l-1.9.8c-1.2.5-2.6.2-3.7-.5-2.3-1.5-4.2-3.4-5.7-5.7-.7-1.1-1-2.5-.5-3.7l.8-1.9Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function ContactBody({ fullName, phoneLinks, phoneValue, hasAnyContact, maxLink, telegramLink }) {
   const { t } = useLocalization();
     return (
@@ -176,6 +190,7 @@ export function ManagerContact({ settings, variant = "popover" }) {
           className="manager-contact-trigger"
           type="button"
           aria-expanded={open}
+          aria-label={t("client.contact.manager")}
           onClick={() => setOpen((current) => !current)}
         >
           <span className="manager-contact-label-full">{t("client.contact.manager")}</span>
@@ -249,11 +264,14 @@ export function ManagerContact({ settings, variant = "popover" }) {
       }}
     >
       <button
-        className="manager-contact-trigger"
+        className="manager-contact-trigger manager-contact-trigger--icon"
         type="button"
         aria-expanded={open}
+        aria-label={t("client.contact.manager")}
+        title={t("client.contact.manager")}
         onClick={() => setOpen((current) => !current)}
       >
+        <IconPhone />
         <span className="manager-contact-label-full">{t("client.contact.manager")}</span>
         <span className="manager-contact-label-short">{t("shared.role.manager")}</span>
       </button>

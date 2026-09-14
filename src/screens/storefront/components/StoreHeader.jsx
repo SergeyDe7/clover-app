@@ -241,13 +241,6 @@ export function StoreHeader({ current, route }) {
           {count > 0 ? <span className="sf-header-badge">{count > 99 ? "99+" : count}</span> : null}
         </a>
         <StorefrontContacts />
-        <LanguageSelector
-          className="sf-language-selector"
-          availableLanguages={localeEligible ? enabledLanguages : ["ru"]}
-          onLanguageChange={localeEligible ? choosePublicLanguage : undefined}
-          onLanguageAccepted={localeEligible ? acceptPublicLanguageSwitch : undefined}
-          onLanguageRejected={localeEligible ? revertPublicLanguageSwitch : undefined}
-        />
         <a
           className="sf-header-tool sf-login-mobile"
           href={cabinetLoginUrl("/")}
@@ -264,6 +257,13 @@ export function StoreHeader({ current, route }) {
         >{
           t("storefront.signInToCabinet")
         }</a>
+        <LanguageSelector
+          className="sf-language-selector"
+          availableLanguages={localeEligible ? enabledLanguages : ["ru"]}
+          onLanguageChange={localeEligible ? choosePublicLanguage : undefined}
+          onLanguageAccepted={localeEligible ? acceptPublicLanguageSwitch : undefined}
+          onLanguageRejected={localeEligible ? revertPublicLanguageSwitch : undefined}
+        />
       </div>
     </header>
   );
