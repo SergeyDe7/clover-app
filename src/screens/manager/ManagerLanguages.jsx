@@ -96,6 +96,10 @@ export function ManagerLanguages() {
   const [pageMeta, setPageMeta] = useState(emptyWorkspacePageMeta());
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [overviewReady, setOverviewReady] = useState(false);
+  const [batchPreview, setBatchPreview] = useState(null);
+  const [batchStatus, setBatchStatus] = useState(null);
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchMessage, setBatchMessage] = useState("");
   const requestGenerationRef = useRef(0);
   const overviewGenerationRef = useRef(0);
   const languageRef = useRef("en");
@@ -177,6 +181,95 @@ export function ManagerLanguages() {
     }
   }, [t]);
 
+  const loadProductBatchPanel = useCallback(async () => {
+    try {
+      const [statusPayload, previewPayload] = await Promise.all([
+        api.getProductBatchTranslationStatus(),
+        api.getProductBatchTranslationPreview(),
+      ]);
+      setBatchStatus(statusPayload || null);
+      setBatchPreview(previewPayload?.preview || null);
+    } catch (error) {
+      setBatchMessage(errorDisplayMessage(error, t, "admin.languages.productBatch.error"));
+    }
+  }, [t]);
+
+  useEffect(() => {
+    loadProductBatchPanel();
+  }, [loadProductBatchPanel]);
+
+  const runProductBatch = useCallback(async () => {
+    if (batchBusy) return;
+    setBatchBusy(true);
+    setBatchMessage("");
+    try {
+      let preview = batchPreview;
+      if (!preview?.previewToken) {
+        const fresh = await api.getProductBatchTranslationPreview();
+        preview = fresh?.preview || null;
+        setBatchPreview(preview);
+      }
+      if (!preview) {
+        setBatchMessage(t("admin.languages.productBatch.error"));
+        return;
+      }
+      if (!preview.providerConfigured || preview.blockReason === "AZURE_NOT_CONFIGURED" || preview.blockReason === "PROVIDER_NOT_CONFIGURED" || preview.blockReason === "UNKNOWN_PROVIDER") {
+        setBatchMessage(
+          `${t("admin.languages.productBatch.notConfigured")} ${t("admin.languages.productBatch.notConfiguredHint")}`
+        );
+        return;
+      }
+      if (preview.blockReason === "LIMIT_EXCEEDED") {
+        setBatchMessage(t("admin.languages.productBatch.limitExceeded"));
+        return;
+      }
+      if (preview.blockReason === "NOTHING_TO_TRANSLATE" || preview.fieldCount === 0) {
+        setBatchMessage(t("admin.languages.productBatch.nothingToDo"));
+        return;
+      }
+      const confirmed = await appConfirm(
+        t("admin.languages.productBatch.confirm")
+          .replace("{fields}", String(preview.fieldCount))
+          .replace("{cost}", String(preview.estimatedAzureChars))
+      );
+      if (!confirmed) return;
+      setBatchMessage(t("admin.languages.productBatch.busy"));
+      const result = await api.runProductBatchTranslation(preview.previewToken);
+      if (result?.ok) {
+        setBatchMessage(
+          t("admin.languages.productBatch.success")
+            .replace("{written}", String(result.writtenAuto ?? 0))
+            .replace("{skippedManual}", String(result.skippedManual ?? 0))
+        );
+      } else {
+        const code = result?.errorCode || "";
+        if (
+          code === "AZURE_NOT_CONFIGURED" ||
+          code === "PROVIDER_NOT_CONFIGURED" ||
+          code === "UNKNOWN_PROVIDER"
+        ) {
+          setBatchMessage(
+            `${t("admin.languages.productBatch.notConfigured")} ${t("admin.languages.productBatch.notConfiguredHint")}`
+          );
+        } else if (code === "LIMIT_EXCEEDED") {
+          setBatchMessage(t("admin.languages.productBatch.limitExceeded"));
+        } else if (code === "SOURCE_CHANGED" || code === "PREVIEW_STALE") {
+          setBatchMessage(t("admin.languages.productBatch.sourceChanged"));
+        } else if (String(code).startsWith("AZURE_") || code === "PROVIDER_UNAVAILABLE") {
+          setBatchMessage(t("admin.languages.productBatch.azureUnavailable"));
+        } else {
+          setBatchMessage(result?.errorMessage || t("admin.languages.productBatch.error"));
+        }
+      }
+      await loadProductBatchPanel();
+      await loadOverview();
+    } catch (error) {
+      setBatchMessage(errorDisplayMessage(error, t, "admin.languages.productBatch.error"));
+      await loadProductBatchPanel();
+    } finally {
+      setBatchBusy(false);
+    }
+  }, [batchBusy, batchPreview, loadOverview, loadProductBatchPanel, t]);
   const fetchWorkspacePage = useCallback(
     async ({
       view: requestView,
@@ -585,6 +678,62 @@ export function ManagerLanguages() {
           );
         })}
       </div>
+
+      <section className="manager-languages-product-batch" aria-label={t("admin.languages.productBatch.title")}>
+        <div className="manager-languages-product-batch-copy">
+          <h3>{t("admin.languages.productBatch.title")}</h3>
+          <p>
+            {batchPreview?.providerConfigured
+              ? t("admin.languages.productBatch.previewHint")
+                  .replace("{fields}", String(batchPreview.fieldCount ?? 0))
+                  .replace("{products}", String(batchPreview.productCount ?? 0))
+                  .replace("{cost}", String(batchPreview.estimatedAzureChars ?? 0))
+                  .replace("{remaining}", String(batchPreview.monthlyRemaining ?? 0))
+              : batchPreview
+                ? `${t("admin.languages.productBatch.notConfigured")} ${t("admin.languages.productBatch.notConfiguredHint")} ${t("admin.languages.productBatch.previewHint")
+                    .replace("{fields}", String(batchPreview.fieldCount ?? 0))
+                    .replace("{products}", String(batchPreview.productCount ?? 0))
+                    .replace("{cost}", String(batchPreview.estimatedAzureChars ?? 0))
+                    .replace("{remaining}", "—")}`
+                : t("admin.languages.productBatch.refreshPreview")}
+          </p>
+          {batchPreview?.skippedManualCount > 0 ? (
+            <p>
+              {t("admin.languages.productBatch.skippedManual").replace(
+                "{count}",
+                String(batchPreview.skippedManualCount)
+              )}
+            </p>
+          ) : null}
+          {batchStatus?.lastRun?.status && batchStatus.lastRun.status !== "none" ? (
+            <p>
+              {t("admin.languages.productBatch.lastRun").replace(
+                "{status}",
+                String(batchStatus.lastRun.status)
+              )}
+            </p>
+          ) : null}
+          {batchMessage ? <p className="manager-languages-product-batch-message">{batchMessage}</p> : null}
+        </div>
+        <div className="manager-languages-product-batch-actions">
+          <button
+            type="button"
+            className="btn ghost"
+            disabled={batchBusy}
+            onClick={() => loadProductBatchPanel()}
+          >
+            {t("admin.languages.productBatch.refreshPreview")}
+          </button>
+          <button
+            type="button"
+            className="btn primary manager-languages-product-batch-run"
+            disabled={batchBusy}
+            onClick={() => runProductBatch()}
+          >
+            {t("admin.languages.productBatch.translateNew")}
+          </button>
+        </div>
+      </section>
 
       <div className="manager-languages-workspace" aria-busy={workspaceLoading ? "true" : undefined}>
         <nav className="manager-languages-tabs" aria-label={t("admin.languages.views")}>

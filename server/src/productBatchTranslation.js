@@ -1,0 +1,894 @@
+/**
+ * Stage 8: admin-only Azure batch for new/stale product AUTO translations.
+ * Reuses Stage 4 product_translations + semantics. Never overwrites MANUAL.
+ */
+
+import { createHash, randomUUID } from "node:crypto";
+import { sourceHash } from "../../src/shared/i18n/sourceHash.js";
+import {
+  PRODUCT_TRANSLATION_FIELDS,
+  canonicalProductId,
+  productFieldSource,
+  isTranslationRelevantProduct,
+} from "../../src/shared/i18n/productLocalization.js";
+import { TARGET_INTERNAL_LOCALES } from "../../src/shared/i18n/languageRegistry.js";
+import {
+  getProductTranslationRow,
+  listProductTranslationRows,
+  listGlossaryRows,
+  upsertProductTranslationRow,
+  writeAudit,
+  runInTransaction,
+  getProductTranslationUsageMonth,
+  upsertProductTranslationUsageMonth,
+  getLatestProductTranslationBatchRun,
+  insertProductTranslationBatchRun,
+  updateProductTranslationBatchRun,
+} from "./db.js";
+import { bumpLocalizationCatalogVersion } from "./localizationVersion.js";
+import {
+  PRODUCT_GLOSSARY_CONTEXTS,
+  validateProductTranslationSemantics,
+} from "./productLocalizationSemantics.js";
+import {
+  translationRelevantProducts,
+  listCanonicalProducts,
+} from "./productLocalizationStore.js";
+import {
+  AUTO_QUALITY,
+  TARGET_LANGUAGES,
+} from "./productAutoArtifact.js";
+import { DEFAULT_MONTHLY_LIMIT } from "./productAzureTranslator.js";
+import {
+  readProductTranslationProviderStatus,
+  resolveRuntimeProductTranslationProvider,
+} from "./productTranslationProvider.js";
+
+const TARGETS = TARGET_LANGUAGES.length
+  ? TARGET_LANGUAGES
+  : [...TARGET_INTERNAL_LOCALES];
+
+let runLock = false;
+
+function utcMonthKey(date = new Date()) {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function emptyUsage(monthKey, providerId = "azure") {
+  return {
+    providerId,
+    monthKey,
+    reservedChars: 0,
+    consumedChars: 0,
+    updatedAt: nowIso(),
+  };
+}
+
+export function readUsageSnapshot(
+  monthlyLimit = DEFAULT_MONTHLY_LIMIT,
+  monthKey = utcMonthKey(),
+  providerId = "azure"
+) {
+  const row =
+    getProductTranslationUsageMonth(monthKey, providerId) || emptyUsage(monthKey, providerId);
+  const reserved = Math.max(0, Number(row.reservedChars) || 0);
+  const consumed = Math.max(0, Number(row.consumedChars) || 0);
+  const limit =
+    monthlyLimit == null
+      ? null
+      : Math.max(0, Number(monthlyLimit) || DEFAULT_MONTHLY_LIMIT);
+  const remaining =
+    limit == null ? null : Math.max(0, limit - consumed - reserved);
+  return {
+    providerId,
+    monthKey,
+    monthlyLimit: limit,
+    monthlyConsumed: consumed,
+    monthlyReserved: reserved,
+    monthlyRemaining: remaining,
+  };
+}
+
+/**
+ * Atomically check remaining quota and reserve chars (BEGIN IMMEDIATE).
+ * Usage is scoped per providerId so providers never share a quota bucket.
+ */
+export function tryReserveUsageAtomic(monthKey, chars, monthlyLimit, providerId = "azure") {
+  const need = Math.max(0, Number(chars) || 0);
+  const limit = Math.max(0, Number(monthlyLimit) || DEFAULT_MONTHLY_LIMIT);
+  if (need === 0) return { ok: true, reserved: 0 };
+  return runInTransaction(() => {
+    const current =
+      getProductTranslationUsageMonth(monthKey, providerId) || emptyUsage(monthKey, providerId);
+    const reserved = Math.max(0, Number(current.reservedChars) || 0);
+    const consumed = Math.max(0, Number(current.consumedChars) || 0);
+    const remaining = Math.max(0, limit - consumed - reserved);
+    if (need > remaining) {
+      return { ok: false, remaining, reserved: 0 };
+    }
+    upsertProductTranslationUsageMonth({
+      providerId,
+      monthKey,
+      reservedChars: reserved + need,
+      consumedChars: consumed,
+      updatedAt: nowIso(),
+    });
+    return { ok: true, remaining: remaining - need, reserved: need };
+  });
+}
+
+/**
+ * Settle a prior reservation: consume billed chars, release only never-sent chars.
+ */
+function settleReservation(monthKey, { consumeChars = 0, releaseChars = 0 } = {}, providerId = "azure") {
+  const consume = Math.max(0, Number(consumeChars) || 0);
+  const release = Math.max(0, Number(releaseChars) || 0);
+  if (consume === 0 && release === 0) return;
+  runInTransaction(() => {
+    const current =
+      getProductTranslationUsageMonth(monthKey, providerId) || emptyUsage(monthKey, providerId);
+    const reserved = Math.max(0, Number(current.reservedChars) || 0);
+    const consumed = Math.max(0, Number(current.consumedChars) || 0);
+    upsertProductTranslationUsageMonth({
+      providerId,
+      monthKey,
+      reservedChars: Math.max(0, reserved - consume - release),
+      consumedChars: consumed + consume,
+      updatedAt: nowIso(),
+    });
+  });
+}
+
+function emptyStoredRow(productId, languageCode, fieldKey) {
+  return {
+    productId,
+    languageCode,
+    fieldKey,
+    autoValue: "",
+    autoSourceHash: "",
+    autoRunId: "",
+    autoGeneratedAt: "",
+    manualValue: "",
+    manualSourceHash: "",
+    updatedAt: "",
+    updatedBy: "",
+  };
+}
+
+/**
+ * Collect candidates: MISSING or STALE AUTO only. MANUAL (incl. stale) excluded.
+ */
+export function collectProductBatchCandidates(products = translationRelevantProducts()) {
+  const productList = (Array.isArray(products) ? products : []).filter(isTranslationRelevantProduct);
+  const stored = listProductTranslationRows();
+  const byKey = new Map();
+  for (const row of stored) {
+    byKey.set(`${row.productId}\0${row.languageCode}\0${row.fieldKey}`, row);
+  }
+
+  const candidates = [];
+  const skippedManual = [];
+  const productIds = new Set();
+  let sourceRuCharsUnique = 0;
+  const seenSourceCells = new Set();
+
+  for (const product of productList) {
+    const productId = canonicalProductId(product.id);
+    if (!productId) continue;
+    for (const field of PRODUCT_TRANSLATION_FIELDS) {
+      const sourceRu = productFieldSource(product, field);
+      if (!sourceRu) continue;
+      const currentHash = sourceHash(sourceRu);
+      let cellNeeded = false;
+      for (const language of TARGETS) {
+        const existing =
+          byKey.get(`${productId}\0${language}\0${field}`) ||
+          emptyStoredRow(productId, language, field);
+        const manual = String(existing.manualValue || "").trim();
+        if (manual) {
+          skippedManual.push({
+            productId,
+            field,
+            language,
+            reason: "MANUAL",
+          });
+          continue;
+        }
+        const auto = String(existing.autoValue || "").trim();
+        if (auto && existing.autoSourceHash === currentHash) {
+          continue;
+        }
+        const reason = auto ? "STALE_AUTO" : "MISSING";
+        candidates.push({
+          productId,
+          field,
+          language,
+          sourceRu,
+          sourceHash: currentHash,
+          reason,
+          sourceChars: sourceRu.length,
+        });
+        productIds.add(productId);
+        cellNeeded = true;
+      }
+      if (cellNeeded) {
+        const cellKey = `${productId}\0${field}`;
+        if (!seenSourceCells.has(cellKey)) {
+          seenSourceCells.add(cellKey);
+          sourceRuCharsUnique += sourceRu.length;
+        }
+      }
+    }
+  }
+
+  const estimatedAzureChars = candidates.reduce((sum, item) => sum + item.sourceChars, 0);
+  const previewFingerprint = createHash("sha256")
+    .update(
+      candidates
+        .map(
+          (c) =>
+            `${c.productId}\0${c.field}\0${c.language}\0${c.sourceHash}\0${c.reason}`
+        )
+        .sort()
+        .join("\n")
+    )
+    .digest("hex");
+
+  return {
+    candidates,
+    skippedManual,
+    fieldCount: candidates.length,
+    productCount: productIds.size,
+    sourceRuChars: sourceRuCharsUnique,
+    estimatedAzureChars,
+    previewToken: previewFingerprint,
+    targetLanguages: [...TARGETS],
+  };
+}
+
+export function buildProductBatchPreview(env = process.env, options = {}) {
+  const status = readProductTranslationProviderStatus(env);
+  const provider =
+    options.provider ||
+    (status.providerConfigured
+      ? resolveRuntimeProductTranslationProvider(env, { fetchImpl: options.fetchImpl })
+      : null);
+  const providerId = provider?.id || status.provider;
+  const monthlyLimit =
+    provider && typeof provider.monthlyLimit === "function"
+      ? provider.monthlyLimit()
+      : status.monthlyLimit;
+  const usage =
+    providerId === "disabled" || providerId === "unknown" || monthlyLimit == null
+      ? {
+          providerId,
+          monthKey: utcMonthKey(),
+          monthlyLimit: null,
+          monthlyConsumed: 0,
+          monthlyReserved: 0,
+          monthlyRemaining: null,
+        }
+      : readUsageSnapshot(monthlyLimit, utcMonthKey(), providerId);
+  const collected = collectProductBatchCandidates();
+  let blockReason = "";
+  if (!provider || !provider.isAvailable()) {
+    blockReason =
+      status.blockReason === "UNKNOWN_PROVIDER"
+        ? "UNKNOWN_PROVIDER"
+        : "PROVIDER_NOT_CONFIGURED";
+  } else if (collected.fieldCount === 0) {
+    blockReason = "NOTHING_TO_TRANSLATE";
+  } else if (
+    usage.monthlyRemaining != null &&
+    collected.estimatedAzureChars > usage.monthlyRemaining
+  ) {
+    blockReason = "LIMIT_EXCEEDED";
+  }
+
+  return {
+    provider: providerId === "azure" ? "azure" : status.provider,
+    providerConfigured: Boolean(provider?.isAvailable?.()),
+    region: provider?.describeRegion?.() || "",
+    usageUnit: provider?.usageUnit || status.usageUnit || "",
+    canRun: blockReason === "",
+    blockReason,
+    fieldCount: collected.fieldCount,
+    productCount: collected.productCount,
+    sourceRuChars: collected.sourceRuChars,
+    estimatedUsage: {
+      units: provider?.usageUnit || "chars",
+      amount: collected.estimatedAzureChars,
+    },
+    // Alias kept for existing admin UI (Azure char accounting).
+    estimatedAzureChars: collected.estimatedAzureChars,
+    monthlyLimit: usage.monthlyLimit,
+    monthlyConsumed: usage.monthlyConsumed,
+    monthlyReserved: usage.monthlyReserved,
+    monthlyRemaining: usage.monthlyRemaining,
+    monthKey: usage.monthKey,
+    skippedManualCount: collected.skippedManual.length,
+    skippedManual: collected.skippedManual.slice(0, 200),
+    previewToken: collected.previewToken,
+    targetLanguages: collected.targetLanguages,
+    quality: AUTO_QUALITY,
+  };
+}
+
+export function getProductBatchTranslatorStatus(env = process.env) {
+  const status = readProductTranslationProviderStatus(env);
+  const provider = status.providerConfigured
+    ? resolveRuntimeProductTranslationProvider(env)
+    : null;
+  const providerId = provider?.id || status.provider;
+  const monthlyLimit =
+    provider && typeof provider.monthlyLimit === "function"
+      ? provider.monthlyLimit()
+      : status.monthlyLimit;
+  const usage =
+    providerId === "disabled" || providerId === "unknown" || monthlyLimit == null
+      ? {
+          monthKey: utcMonthKey(),
+          monthlyLimit: null,
+          monthlyConsumed: 0,
+          monthlyReserved: 0,
+          monthlyRemaining: null,
+        }
+      : readUsageSnapshot(monthlyLimit, utcMonthKey(), providerId);
+  const last = getLatestProductTranslationBatchRun();
+  return {
+    provider: status.provider,
+    providerConfigured: status.providerConfigured,
+    region: status.region,
+    usageUnit: status.usageUnit,
+    monthlyLimit: usage.monthlyLimit,
+    monthlyConsumed: usage.monthlyConsumed,
+    monthlyReserved: usage.monthlyReserved,
+    monthlyRemaining: usage.monthlyRemaining,
+    monthKey: usage.monthKey,
+    lastRun: sanitizeRunPublic(last),
+  };
+}
+
+function sanitizeRunPublic(run) {
+  if (!run) {
+    return {
+      id: "",
+      status: "none",
+      errorCode: "",
+      errorMessage: "",
+      fieldCount: 0,
+      writtenAuto: 0,
+      skippedManual: 0,
+      estimatedAzureChars: 0,
+      consumedChars: 0,
+      createdAt: "",
+      updatedAt: "",
+    };
+  }
+  const result = typeof run.resultJson === "object" ? run.resultJson : {};
+  return {
+    id: run.id || "",
+    status: run.status || "",
+    errorCode: run.errorCode || "",
+    errorMessage: run.errorMessage || "",
+    fieldCount: Number(result.fieldCount) || 0,
+    writtenAuto: Number(result.writtenAuto) || 0,
+    skippedManual: Number(result.skippedManual) || 0,
+    estimatedAzureChars: Number(result.estimatedAzureChars) || 0,
+    consumedChars: Number(run.consumedChars) || 0,
+    createdAt: run.createdAt || "",
+    updatedAt: run.updatedAt || "",
+  };
+}
+
+export function getProductBatchLastRun() {
+  return { lastRun: sanitizeRunPublic(getLatestProductTranslationBatchRun()) };
+}
+
+async function translateCandidates(candidates, provider) {
+  const byLanguage = new Map();
+  for (const item of candidates) {
+    const list = byLanguage.get(item.language) || [];
+    list.push(item);
+    byLanguage.set(item.language, list);
+  }
+
+  const totalChars = candidates.reduce((sum, item) => sum + item.sourceChars, 0);
+  const results = [];
+  let billedChars = 0;
+
+  for (const [language, items] of byLanguage) {
+    const requestChars = items.reduce((sum, item) => sum + item.sourceChars, 0);
+    try {
+      const texts = items.map((item) => item.sourceRu);
+      const outcome = await provider.translateBatch({
+        texts,
+        sourceLocale: "ru",
+        targetLocale: language,
+      });
+      const confirmed = Math.max(0, Number(outcome?.confirmedUsage?.amount) || requestChars);
+      billedChars += confirmed;
+      const translated = outcome?.translations || [];
+      for (let i = 0; i < items.length; i += 1) {
+        results.push({
+          ...items[i],
+          value: translated[i],
+        });
+      }
+    } catch (error) {
+      const uncertain = Math.max(0, Number(error?.uncertainUsage?.amount) || 0);
+      const confirmed = Math.max(0, Number(error?.confirmedUsage?.amount) || 0);
+      const sentInCall = Math.max(
+        0,
+        Math.min(
+          requestChars,
+          uncertain ||
+            confirmed ||
+            Number(error?.billedChars) ||
+            (error?.azureRequestSent ? requestChars : 0)
+        )
+      );
+      billedChars += sentInCall;
+      error.usageBilledChars = billedChars;
+      error.usageReleaseChars = Math.max(0, totalChars - billedChars);
+      throw error;
+    }
+  }
+
+  return { results, billedChars, releaseChars: 0, totalChars };
+}
+
+function validatePrepared(items) {
+  const productsById = new Map();
+  for (const product of listCanonicalProducts()) {
+    const id = canonicalProductId(product?.id);
+    if (id) productsById.set(id, product);
+  }
+
+  const prepared = [];
+  for (const item of items) {
+    const product = productsById.get(item.productId);
+    if (!product) {
+      return { ok: false, code: "UNKNOWN_PRODUCT", item };
+    }
+    const liveSource = productFieldSource(product, item.field);
+    const liveHash = liveSource ? sourceHash(liveSource) : "";
+    if (!liveSource || liveHash !== item.sourceHash) {
+      return { ok: false, code: "SOURCE_CHANGED", item };
+    }
+    const existing =
+      getProductTranslationRow(item.productId, item.language, item.field) ||
+      emptyStoredRow(item.productId, item.language, item.field);
+    if (String(existing.manualValue || "").trim()) {
+      return { ok: false, code: "MANUAL_PROTECTED", item };
+    }
+    const glossaryEntries = listGlossaryRows().filter(
+      (row) => row.languageCode === item.language
+    );
+    const check = validateProductTranslationSemantics({
+      sourceRu: liveSource,
+      targetValue: item.value,
+      product,
+      glossaryEntries,
+      context: PRODUCT_GLOSSARY_CONTEXTS[item.field] || "",
+    });
+    if (!check.ok) {
+      return { ok: false, code: check.code || "SEMANTIC_FAIL", item };
+    }
+    prepared.push({
+      productId: item.productId,
+      language: item.language,
+      field: item.field,
+      value: item.value,
+      sourceHash: liveHash,
+      existing,
+    });
+  }
+  return { ok: true, prepared };
+}
+
+function applyPreparedWrites(prepared, { runId, actor }) {
+  const generatedAt = nowIso();
+  let written = 0;
+  runInTransaction(() => {
+    for (const item of prepared) {
+      const live =
+        getProductTranslationRow(item.productId, item.language, item.field) ||
+        emptyStoredRow(item.productId, item.language, item.field);
+      if (String(live.manualValue || "").trim()) {
+        const error = new Error("MANUAL protected during apply.");
+        error.code = "MANUAL_PROTECTED";
+        throw error;
+      }
+      const product = listCanonicalProducts().find(
+        (p) => canonicalProductId(p?.id) === item.productId
+      );
+      const liveSource = product ? productFieldSource(product, item.field) : "";
+      const liveHash = liveSource ? sourceHash(liveSource) : "";
+      if (!liveSource || liveHash !== item.sourceHash) {
+        const error = new Error("Source changed during apply.");
+        error.code = "SOURCE_CHANGED";
+        throw error;
+      }
+      upsertProductTranslationRow({
+        ...live,
+        productId: item.productId,
+        languageCode: item.language,
+        fieldKey: item.field,
+        autoValue: item.value,
+        autoSourceHash: liveHash,
+        autoRunId: runId,
+        autoGeneratedAt: generatedAt,
+        updatedAt: generatedAt,
+        updatedBy: String(actor || "azure-batch"),
+      });
+      written += 1;
+    }
+    if (written > 0) {
+      bumpLocalizationCatalogVersion(actor || "azure-product-batch");
+    }
+  });
+  return written;
+}
+
+function publicErrorMessage(code) {
+  switch (code) {
+    case "AZURE_NOT_CONFIGURED":
+    case "PROVIDER_NOT_CONFIGURED":
+    case "UNKNOWN_PROVIDER":
+      return "Автоперевод пока не подключён";
+    case "LIMIT_EXCEEDED":
+      return "Внутренний месячный лимит перевода исчерпан";
+    case "NOTHING_TO_TRANSLATE":
+      return "Новых или устаревших AUTO-полей нет";
+    case "SOURCE_CHANGED":
+    case "PREVIEW_STALE":
+      return "Русский источник изменился. Обновите предпросмотр";
+    case "AZURE_TIMEOUT":
+    case "AZURE_NETWORK_ERROR":
+    case "AZURE_HTTP_ERROR":
+    case "AZURE_INVALID_RESPONSE":
+    case "AZURE_EMPTY_TRANSLATION":
+    case "PROVIDER_UNAVAILABLE":
+      return "Сервис перевода недоступен. Повтор не выполнен автоматически";
+    case "BUSY":
+      return "Уже выполняется другой пакетный перевод";
+    case "CONFIRM_REQUIRED":
+      return "Требуется подтверждение запуска";
+    default:
+      return "Пакетный перевод не выполнен";
+  }
+}
+
+/**
+ * Confirmed batch run. `fetchImpl` injectable for tests. Never logs secrets/texts.
+ */
+export async function runProductBatchTranslation({
+  confirm = false,
+  previewToken = "",
+  actor = "admin",
+  env = process.env,
+  fetchImpl = globalThis.fetch,
+  /** Injected provider for tests only. Never resolved from env as "test". */
+  provider = null,
+  userId = null,
+  userEmail = "",
+  userRole = "admin",
+} = {}) {
+  if (confirm !== true) {
+    return {
+      ok: false,
+      errorCode: "CONFIRM_REQUIRED",
+      errorMessage: publicErrorMessage("CONFIRM_REQUIRED"),
+    };
+  }
+  if (runLock) {
+    return {
+      ok: false,
+      errorCode: "BUSY",
+      errorMessage: publicErrorMessage("BUSY"),
+    };
+  }
+  runLock = true;
+
+  let outstandingReserve = 0;
+  let outstandingConsume = 0;
+  let monthKey = utcMonthKey();
+  let providerId = "disabled";
+
+  try {
+  const status = readProductTranslationProviderStatus(env);
+  const activeProvider =
+    provider ||
+    resolveRuntimeProductTranslationProvider(env, { fetchImpl });
+  if (!activeProvider || !activeProvider.isAvailable()) {
+    const code =
+      status.blockReason === "UNKNOWN_PROVIDER"
+        ? "UNKNOWN_PROVIDER"
+        : "PROVIDER_NOT_CONFIGURED";
+    return {
+      ok: false,
+      errorCode: code,
+      errorMessage: publicErrorMessage(code),
+      providerConfigured: false,
+    };
+  }
+  providerId = String(activeProvider.id || "unknown");
+
+  const collected = collectProductBatchCandidates();
+  if (collected.fieldCount === 0) {
+    return {
+      ok: true,
+      identical: true,
+      writtenAuto: 0,
+      skippedManual: collected.skippedManual.length,
+      fieldCount: 0,
+      estimatedAzureChars: 0,
+      consumedChars: 0,
+      catalogVersionBumped: false,
+      message: publicErrorMessage("NOTHING_TO_TRANSLATE"),
+    };
+  }
+
+  if (String(previewToken || "") !== collected.previewToken) {
+    return {
+      ok: false,
+      errorCode: "PREVIEW_STALE",
+      errorMessage: publicErrorMessage("PREVIEW_STALE"),
+    };
+  }
+
+  const monthlyLimit =
+    typeof activeProvider.monthlyLimit === "function"
+      ? activeProvider.monthlyLimit()
+      : DEFAULT_MONTHLY_LIMIT;
+  const usage = readUsageSnapshot(monthlyLimit, utcMonthKey(), providerId);
+  monthKey = usage.monthKey;
+  const cost = collected.estimatedAzureChars;
+
+  const reserved = tryReserveUsageAtomic(monthKey, cost, monthlyLimit, providerId);
+  if (!reserved.ok) {
+    return {
+      ok: false,
+      errorCode: "LIMIT_EXCEEDED",
+      errorMessage: publicErrorMessage("LIMIT_EXCEEDED"),
+      monthlyRemaining: reserved.remaining,
+      estimatedAzureChars: cost,
+    };
+  }
+  outstandingReserve = cost;
+
+  const runId = randomUUID();
+  const createdAt = nowIso();
+
+  insertProductTranslationBatchRun({
+    id: runId,
+    status: "running",
+    providerId,
+    previewJson: {
+      fieldCount: collected.fieldCount,
+      productCount: collected.productCount,
+      estimatedAzureChars: cost,
+      previewToken: collected.previewToken,
+      skippedManualCount: collected.skippedManual.length,
+      providerId,
+    },
+    resultJson: {},
+    errorCode: "",
+    errorMessage: "",
+    reservedChars: cost,
+    consumedChars: 0,
+    createdAt,
+    updatedAt: createdAt,
+    createdBy: String(actor || ""),
+  });
+
+  const auditBase = {
+    runId,
+    providerId,
+    fieldCount: collected.fieldCount,
+    productCount: collected.productCount,
+    estimatedAzureChars: cost,
+    skippedManual: collected.skippedManual.length,
+    quality: AUTO_QUALITY,
+  };
+
+  const settle = (consumeChars, releaseChars) => {
+    settleReservation(monthKey, { consumeChars, releaseChars }, providerId);
+    outstandingReserve = 0;
+    outstandingConsume = 0;
+  };
+
+  let translated;
+  let billedChars = cost;
+  try {
+    const outcome = await translateCandidates(collected.candidates, activeProvider);
+    translated = outcome.results;
+    billedChars = outcome.billedChars;
+    outstandingConsume = billedChars;
+  } catch (error) {
+    const code = error?.code || "PROVIDER_UNAVAILABLE";
+    const consumeChars = Math.max(0, Number(error?.usageBilledChars) || 0);
+    const releaseChars = Math.max(
+      0,
+      Number(error?.usageReleaseChars) != null
+        ? Number(error.usageReleaseChars)
+        : cost - consumeChars
+    );
+    settle(consumeChars, releaseChars);
+
+    updateProductTranslationBatchRun({
+      id: runId,
+      status: "failed",
+      resultJson: {
+        ...auditBase,
+        writtenAuto: 0,
+        billedChars: consumeChars,
+        releasedChars: releaseChars,
+      },
+      errorCode: code,
+      errorMessage: publicErrorMessage(code),
+      reservedChars: 0,
+      consumedChars: consumeChars,
+      updatedAt: nowIso(),
+    });
+    writeAudit({
+      userId,
+      userEmail,
+      userRole,
+      action: "localization.product.batch.fail",
+      details: {
+        ...auditBase,
+        errorCode: code,
+        billedChars: consumeChars,
+        releasedChars: releaseChars,
+      },
+    });
+    return {
+      ok: false,
+      errorCode: code,
+      errorMessage: publicErrorMessage(code),
+      runId,
+      consumedChars: consumeChars,
+      releasedChars: releaseChars,
+    };
+  }
+
+  const validated = validatePrepared(translated);
+  if (!validated.ok) {
+    // Azure already returned translations: bill full successful volume.
+    settle(billedChars, 0);
+    updateProductTranslationBatchRun({
+      id: runId,
+      status: "failed",
+      resultJson: {
+        ...auditBase,
+        writtenAuto: 0,
+        billedChars,
+      },
+      errorCode: validated.code,
+      errorMessage: publicErrorMessage(validated.code),
+      reservedChars: 0,
+      consumedChars: billedChars,
+      updatedAt: nowIso(),
+    });
+    writeAudit({
+      userId,
+      userEmail,
+      userRole,
+      action: "localization.product.batch.fail",
+      details: { ...auditBase, errorCode: validated.code, billedChars },
+    });
+    return {
+      ok: false,
+      errorCode: validated.code,
+      errorMessage: publicErrorMessage(validated.code),
+      runId,
+      consumedChars: billedChars,
+    };
+  }
+
+  let written = 0;
+  try {
+    written = applyPreparedWrites(validated.prepared, { runId, actor });
+  } catch (error) {
+    const code = error?.code || "APPLY_FAILED";
+    settle(billedChars, 0);
+    updateProductTranslationBatchRun({
+      id: runId,
+      status: "failed",
+      resultJson: {
+        ...auditBase,
+        writtenAuto: 0,
+        billedChars,
+      },
+      errorCode: code,
+      errorMessage: publicErrorMessage(code),
+      reservedChars: 0,
+      consumedChars: billedChars,
+      updatedAt: nowIso(),
+    });
+    writeAudit({
+      userId,
+      userEmail,
+      userRole,
+      action: "localization.product.batch.fail",
+      details: { ...auditBase, errorCode: code, billedChars },
+    });
+    return {
+      ok: false,
+      errorCode: code,
+      errorMessage: publicErrorMessage(code),
+      runId,
+      consumedChars: billedChars,
+    };
+  }
+
+  settle(billedChars, 0);
+  updateProductTranslationBatchRun({
+    id: runId,
+    status: "succeeded",
+    resultJson: {
+      ...auditBase,
+      writtenAuto: written,
+      catalogVersionBumped: written > 0,
+      billedChars,
+    },
+    errorCode: "",
+    errorMessage: "",
+    reservedChars: 0,
+    consumedChars: billedChars,
+    updatedAt: nowIso(),
+  });
+  writeAudit({
+    userId,
+    userEmail,
+    userRole,
+    action: "localization.product.batch.success",
+    details: {
+      ...auditBase,
+      writtenAuto: written,
+      catalogVersionBumped: written > 0,
+      billedChars,
+    },
+  });
+
+  return {
+    ok: true,
+    identical: false,
+    runId,
+    writtenAuto: written,
+    skippedManual: collected.skippedManual.length,
+    fieldCount: collected.fieldCount,
+    estimatedAzureChars: cost,
+    consumedChars: billedChars,
+    catalogVersionBumped: written > 0,
+    quality: AUTO_QUALITY,
+  };
+  } finally {
+    if (outstandingReserve > 0) {
+      const releaseChars = Math.max(0, outstandingReserve - outstandingConsume);
+      settleReservation(
+        monthKey,
+        {
+          consumeChars: outstandingConsume,
+          releaseChars,
+        },
+        providerId
+      );
+    }
+    runLock = false;
+  }
+}
+
+export function __resetProductBatchRunLockForTests() {
+  runLock = false;
+}
+
+export { publicErrorMessage, DEFAULT_MONTHLY_LIMIT };

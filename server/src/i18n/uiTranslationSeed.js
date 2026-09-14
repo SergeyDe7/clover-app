@@ -617,6 +617,134 @@ export const SEEDS = {
     "zh-CN": "只有已就绪的语言才能对外启用。俄语始终开启。",
     "ar": "يمكن تفعيل لغة جاهزة فقط للعامة. الروسية مفعّلة دائمًا."
   },
+  "admin.languages.productBatch.title": {
+    "en": "Product batch translation",
+    "uz": "Mahsulotlar to‘plam tarjimasi",
+    "ky": "Товарлар топтомун которуу",
+    "tg": "Тарҷумаи баставии молҳо",
+    "zh-CN": "商品批量翻译",
+    "ar": "ترجمة المنتجات دفعة واحدة"
+  },
+  "admin.languages.productBatch.translateNew": {
+    "en": "Translate new products",
+    "uz": "Yangi mahsulotlarni tarjima qilish",
+    "ky": "Жаңы товарларды которуу",
+    "tg": "Тарҷумаи молҳои нав",
+    "zh-CN": "翻译新产品",
+    "ar": "ترجمة المنتجات الجديدة"
+  },
+  "admin.languages.productBatch.notConfigured": {
+    "en": "Automatic translation is not connected yet",
+    "uz": "Avtomatik tarjima hali ulanmagan",
+    "ky": "Автоматтык котормо азырынча туташтырылган эмес",
+    "tg": "Тарҷумаи худкор ҳанӯз пайваст нашудааст",
+    "zh-CN": "自动翻译尚未接入",
+    "ar": "الترجمة التلقائية غير متصلة بعد"
+  },
+  "admin.languages.productBatch.notConfiguredHint": {
+    "en": "Products without a translation are shown in Russian. A translator can be connected later.",
+    "uz": "Tarjimasi yo‘q mahsulotlar rus tilida ko‘rsatiladi. Tarjimonni keyinroq ulash mumkin.",
+    "ky": "Котормосу жок товарлар орус тилинде көрсөтүлөт. Котормочуну кийинчерээк туташтырууга болот.",
+    "tg": "Молҳои бе тарҷума ба забони русӣ нишон дода мешаванд. Тарҷумонро дертар пайваст кардан мумкин аст.",
+    "zh-CN": "没有翻译的商品以俄语显示。稍后可以接入翻译服务。",
+    "ar": "تُعرض المنتجات بلا ترجمة باللغة الروسية. يمكن ربط خدمة الترجمة لاحقًا."
+  },
+  "admin.languages.productBatch.previewHint": {
+    "en": "Will process: {fields} fields in {products} products. Cost: {cost} characters. Limit remaining: {remaining}.",
+    "uz": "Qayta ishlanadi: {products} ta mahsulotda {fields} ta maydon. Sarf: {cost} belgi. Limit qoldig‘i: {remaining}.",
+    "ky": "Иштелип чыгат: {products} товарда {fields} талаа. Чыгым: {cost} символ. Лимиттин калдыгы: {remaining}.",
+    "tg": "Коркард мешавад: {fields} майдон дар {products} мол. Хароҷот: {cost} аломат. Боқимондаи лимит: {remaining}.",
+    "zh-CN": "将处理：{products} 个商品中的 {fields} 个字段。消耗：{cost} 个字符。剩余限额：{remaining}。",
+    "ar": "سيتم معالجة: {fields} حقول في {products} منتجات. التكلفة: {cost} حرفًا. المتبقي من الحد: {remaining}."
+  },
+  "admin.languages.productBatch.confirm": {
+    "en": "Start translating {fields} fields? Cost ≈ {cost} characters.",
+    "uz": "{fields} ta maydonni tarjima qilishni boshlaymizmi? Sarf ≈ {cost} belgi.",
+    "ky": "{fields} талааны которууну баштайбызбы? Чыгым ≈ {cost} символ.",
+    "tg": "Тарҷумаи {fields} майдонро оғоз кунем? Хароҷот ≈ {cost} аломат.",
+    "zh-CN": "开始翻译 {fields} 个字段？消耗约 {cost} 个字符。",
+    "ar": "بدء ترجمة {fields} حقول؟ التكلفة ≈ {cost} حرفًا."
+  },
+  "admin.languages.productBatch.skippedManual": {
+    "en": "Skipped MANUAL: {count}",
+    "uz": "MANUAL o‘tkazib yuborildi: {count}",
+    "ky": "MANUAL өткөрүлдү: {count}",
+    "tg": "MANUAL гузаронида шуд: {count}",
+    "zh-CN": "已跳过 MANUAL：{count}",
+    "ar": "تم تخطي MANUAL: {count}"
+  },
+  "admin.languages.productBatch.success": {
+    "en": "Done: wrote {written} AUTO translations. Skipped MANUAL: {skippedManual}.",
+    "uz": "Tayyor: {written} ta AUTO yozildi. MANUAL o‘tkazildi: {skippedManual}.",
+    "ky": "Даяр: {written} AUTO жазылды. MANUAL өткөрүлдү: {skippedManual}.",
+    "tg": "Тайёр: {written} AUTO сабт шуд. MANUAL гузашт: {skippedManual}.",
+    "zh-CN": "完成：已写入 {written} 条 AUTO 翻译。已跳过 MANUAL：{skippedManual}。",
+    "ar": "تم: كُتبت {written} ترجمات AUTO. تم تخطي MANUAL: {skippedManual}."
+  },
+  "admin.languages.productBatch.nothingToDo": {
+    "en": "No new or stale AUTO fields.",
+    "uz": "Yangi yoki eskirgan AUTO maydonlar yo‘q.",
+    "ky": "Жаңы же эскирген AUTO талаалар жок.",
+    "tg": "Майдонҳои AUTO-и нав ё кӯҳна нестанд.",
+    "zh-CN": "没有新增或过期的 AUTO 字段。",
+    "ar": "لا توجد حقول AUTO جديدة أو قديمة."
+  },
+  "admin.languages.productBatch.limitExceeded": {
+    "en": "The internal monthly translation limit is exhausted.",
+    "uz": "Ichki oylik tarjima limiti tugagan.",
+    "ky": "Ички айлык котормо лимити түгөндү.",
+    "tg": "Лимити моҳонаи дохилии тарҷума тамом шуд.",
+    "zh-CN": "内部每月翻译限额已用尽。",
+    "ar": "تم استنفاد الحد الشهري الداخلي للترجمة."
+  },
+  "admin.languages.productBatch.sourceChanged": {
+    "en": "The Russian source changed. Refresh the preview.",
+    "uz": "Rus manbasi o‘zgardi. Ko‘rib chiqishni yangilang.",
+    "ky": "Орус булагы өзгөрдү. Алдын ала көрүүнү жаңыртыңыз.",
+    "tg": "Манбаи русӣ тағйир ёфт. Пешнамоишро навсозӣ кунед.",
+    "zh-CN": "俄语原文已更改。请刷新预览。",
+    "ar": "تغيّر المصدر الروسي. حدّث المعاينة."
+  },
+  "admin.languages.productBatch.azureUnavailable": {
+    "en": "Azure Translator is unavailable. No automatic retry was performed.",
+    "uz": "Azure Translator mavjud emas. Avtomatik qayta urinish bajarilmadi.",
+    "ky": "Azure Translator жеткиликсиз. Автоматтык кайра аракет жасалган жок.",
+    "tg": "Azure Translator дастнорас аст. Такрори худкор иҷро нашуд.",
+    "zh-CN": "Azure Translator 不可用。未自动重试。",
+    "ar": "مترجم Azure غير متاح. لم يُنفَّذ إعادة محاولة تلقائية."
+  },
+  "admin.languages.productBatch.lastRun": {
+    "en": "Last run: {status}",
+    "uz": "Oxirgi ishga tushirish: {status}",
+    "ky": "Акыркы иштетүү: {status}",
+    "tg": "Охирин иҷро: {status}",
+    "zh-CN": "上次运行：{status}",
+    "ar": "آخر تشغيل: {status}"
+  },
+  "admin.languages.productBatch.refreshPreview": {
+    "en": "Refresh estimate",
+    "uz": "Hisobni yangilash",
+    "ky": "Эсепти жаңыртуу",
+    "tg": "Навсозии ҳисоб",
+    "zh-CN": "刷新估算",
+    "ar": "تحديث التقدير"
+  },
+  "admin.languages.productBatch.busy": {
+    "en": "Translation in progress…",
+    "uz": "Tarjima ketmoqda…",
+    "ky": "Которуу жүрүп жатат…",
+    "tg": "Тарҷума идома дорад…",
+    "zh-CN": "正在翻译…",
+    "ar": "الترجمة قيد التنفيذ…"
+  },
+  "admin.languages.productBatch.error": {
+    "en": "Could not complete the product batch translation.",
+    "uz": "To‘plam tarjimasini bajarib bo‘lmadi.",
+    "ky": "Топтом котормосун аткаруу мүмкүн болбоду.",
+    "tg": "Тарҷумаи баставиро иҷро кардан нашуд.",
+    "zh-CN": "无法完成商品批量翻译。",
+    "ar": "تعذّر إكمال ترجمة المنتجات دفعة واحدة."
+  },
   "admin.languages.searchPlaceholder": {
     "en": "Russian text or key",
     "uz": "Ruscha matn yoki kalit",

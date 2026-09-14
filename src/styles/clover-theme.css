@@ -1660,6 +1660,53 @@ body:has(.clover-app) {
   background: var(--clover-surface-soft);
 }
 
+.manager-languages-product-batch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 16px 18px;
+  margin: 0 0 18px;
+  border: 1px solid var(--clover-border);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(34, 120, 80, 0.08), rgba(255, 255, 255, 0.7));
+}
+
+.manager-languages-product-batch-copy {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.manager-languages-product-batch-copy h3 {
+  margin: 0 0 6px;
+  font-size: 17px;
+  color: var(--clover-text);
+}
+
+.manager-languages-product-batch-copy p {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--clover-muted-strong);
+}
+
+.manager-languages-product-batch-message {
+  color: var(--clover-text) !important;
+  font-weight: 600;
+}
+
+.manager-languages-product-batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.manager-languages-product-batch-run {
+  min-height: 42px;
+  font-weight: 700;
+}
+
 .manager-languages-workspace {
   display: flex;
   flex-direction: column;

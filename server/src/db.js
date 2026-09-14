@@ -267,6 +267,43 @@ db.exec(`
 ensureColumn("product_translations", "auto_run_id", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("product_translations", "auto_generated_at", "TEXT NOT NULL DEFAULT ''");
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS product_translation_usage_months (
+    month_key TEXT PRIMARY KEY CHECK(length(trim(month_key)) = 7),
+    reserved_chars INTEGER NOT NULL DEFAULT 0 CHECK(reserved_chars >= 0),
+    consumed_chars INTEGER NOT NULL DEFAULT 0 CHECK(consumed_chars >= 0),
+    updated_at TEXT NOT NULL
+  ) STRICT;
+
+  CREATE TABLE IF NOT EXISTS product_translation_provider_usage (
+    provider_id TEXT NOT NULL CHECK(length(trim(provider_id)) > 0 AND length(trim(provider_id)) <= 32),
+    month_key TEXT NOT NULL CHECK(length(trim(month_key)) = 7),
+    reserved_chars INTEGER NOT NULL DEFAULT 0 CHECK(reserved_chars >= 0),
+    consumed_chars INTEGER NOT NULL DEFAULT 0 CHECK(consumed_chars >= 0),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(provider_id, month_key)
+  ) STRICT;
+
+  CREATE TABLE IF NOT EXISTS product_translation_batch_runs (
+    id TEXT PRIMARY KEY,
+    status TEXT NOT NULL CHECK(status IN ('running', 'succeeded', 'failed')),
+    preview_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    error_code TEXT NOT NULL DEFAULT '',
+    error_message TEXT NOT NULL DEFAULT '',
+    reserved_chars INTEGER NOT NULL DEFAULT 0 CHECK(reserved_chars >= 0),
+    consumed_chars INTEGER NOT NULL DEFAULT 0 CHECK(consumed_chars >= 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    created_by TEXT NOT NULL DEFAULT ''
+  ) STRICT;
+
+  CREATE INDEX IF NOT EXISTS idx_product_translation_batch_runs_updated
+    ON product_translation_batch_runs(updated_at DESC);
+`);
+
+ensureColumn("product_translation_batch_runs", "provider_id", "TEXT NOT NULL DEFAULT ''");
+
 export function getDatabasePath() {
   return databasePath;
 }
@@ -567,6 +604,157 @@ export function deleteProductTranslationRows(productId) {
   return db
     .prepare("DELETE FROM product_translations WHERE product_id = ?")
     .run(String(productId || "")).changes;
+}
+
+function mapUsageMonthRow(row) {
+  if (!row) return null;
+  return {
+    providerId: row.provider_id || "",
+    monthKey: row.month_key,
+    reservedChars: Number(row.reserved_chars) || 0,
+    consumedChars: Number(row.consumed_chars) || 0,
+    updatedAt: row.updated_at || "",
+  };
+}
+
+export function getProductTranslationUsageMonth(monthKey, providerId = "azure") {
+  const provider = String(providerId || "azure");
+  const keyed = mapUsageMonthRow(
+    db
+      .prepare(
+        `SELECT provider_id, month_key, reserved_chars, consumed_chars, updated_at
+         FROM product_translation_provider_usage
+         WHERE provider_id = ? AND month_key = ?`
+      )
+      .get(provider, String(monthKey || ""))
+  );
+  if (keyed) return keyed;
+  // Legacy single-provider table (pre provider_id). Only for azure continuity.
+  if (provider !== "azure") return null;
+  const legacy = db
+    .prepare(
+      `SELECT month_key, reserved_chars, consumed_chars, updated_at
+       FROM product_translation_usage_months
+       WHERE month_key = ?`
+    )
+    .get(String(monthKey || ""));
+  if (!legacy) return null;
+  return {
+    providerId: "azure",
+    monthKey: legacy.month_key,
+    reservedChars: Number(legacy.reserved_chars) || 0,
+    consumedChars: Number(legacy.consumed_chars) || 0,
+    updatedAt: legacy.updated_at || "",
+  };
+}
+
+export function upsertProductTranslationUsageMonth(row) {
+  const provider = String(row.providerId || "azure");
+  const monthKey = String(row.monthKey || "");
+  const reserved = Math.max(0, Number(row.reservedChars) || 0);
+  const consumed = Math.max(0, Number(row.consumedChars) || 0);
+  const updatedAt = String(row.updatedAt || now());
+  db.prepare(
+    `INSERT INTO product_translation_provider_usage(
+       provider_id, month_key, reserved_chars, consumed_chars, updated_at
+     ) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(provider_id, month_key) DO UPDATE SET
+       reserved_chars = excluded.reserved_chars,
+       consumed_chars = excluded.consumed_chars,
+       updated_at = excluded.updated_at`
+  ).run(provider, monthKey, reserved, consumed, updatedAt);
+}
+
+function mapBatchRunRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    status: row.status,
+    providerId: row.provider_id || "",
+    previewJson: parseJson(row.preview_json, {}),
+    resultJson: parseJson(row.result_json, {}),
+    errorCode: row.error_code || "",
+    errorMessage: row.error_message || "",
+    reservedChars: Number(row.reserved_chars) || 0,
+    consumedChars: Number(row.consumed_chars) || 0,
+    createdAt: row.created_at || "",
+    updatedAt: row.updated_at || "",
+    createdBy: row.created_by || "",
+  };
+}
+
+export function getLatestProductTranslationBatchRun() {
+  return mapBatchRunRow(
+    db
+      .prepare(
+        `SELECT id, status, provider_id, preview_json, result_json, error_code, error_message,
+                reserved_chars, consumed_chars, created_at, updated_at, created_by
+         FROM product_translation_batch_runs
+         ORDER BY updated_at DESC
+         LIMIT 1`
+      )
+      .get()
+  );
+}
+
+export function getProductTranslationBatchRun(id) {
+  return mapBatchRunRow(
+    db
+      .prepare(
+        `SELECT id, status, provider_id, preview_json, result_json, error_code, error_message,
+                reserved_chars, consumed_chars, created_at, updated_at, created_by
+         FROM product_translation_batch_runs
+         WHERE id = ?`
+      )
+      .get(String(id || ""))
+  );
+}
+
+export function insertProductTranslationBatchRun(row) {
+  db.prepare(
+    `INSERT INTO product_translation_batch_runs(
+       id, status, provider_id, preview_json, result_json, error_code, error_message,
+       reserved_chars, consumed_chars, created_at, updated_at, created_by
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    String(row.id || ""),
+    String(row.status || "running"),
+    String(row.providerId || ""),
+    JSON.stringify(row.previewJson || {}),
+    JSON.stringify(row.resultJson || {}),
+    String(row.errorCode || ""),
+    String(row.errorMessage || ""),
+    Math.max(0, Number(row.reservedChars) || 0),
+    Math.max(0, Number(row.consumedChars) || 0),
+    String(row.createdAt || now()),
+    String(row.updatedAt || now()),
+    String(row.createdBy || "")
+  );
+}
+
+export function updateProductTranslationBatchRun(row) {
+  db.prepare(
+    `UPDATE product_translation_batch_runs
+     SET status = ?,
+         preview_json = COALESCE(?, preview_json),
+         result_json = ?,
+         error_code = ?,
+         error_message = ?,
+         reserved_chars = ?,
+         consumed_chars = ?,
+         updated_at = ?
+     WHERE id = ?`
+  ).run(
+    String(row.status || ""),
+    row.previewJson != null ? JSON.stringify(row.previewJson) : null,
+    JSON.stringify(row.resultJson || {}),
+    String(row.errorCode || ""),
+    String(row.errorMessage || ""),
+    Math.max(0, Number(row.reservedChars) || 0),
+    Math.max(0, Number(row.consumedChars) || 0),
+    String(row.updatedAt || now()),
+    String(row.id || "")
+  );
 }
 
 export function listGlossaryRows() {
