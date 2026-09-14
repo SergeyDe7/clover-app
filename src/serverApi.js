@@ -500,6 +500,25 @@ export const api = {
     );
   },
 
+  getProductBatchTranslationStatus() {
+    return request("/admin/product-batch-translation/status");
+  },
+
+  getProductBatchTranslationPreview() {
+    return request("/admin/product-batch-translation/preview");
+  },
+
+  runProductBatchTranslation(previewToken) {
+    return request("/admin/product-batch-translation/run", {
+      method: "POST",
+      body: { confirm: true, previewToken },
+    });
+  },
+
+  getProductBatchTranslationLastRun() {
+    return request("/admin/product-batch-translation/last-run");
+  },
+
   getGlossaryEntries(filters = {}) {
     const params = new URLSearchParams();
     if (filters.query) params.set("query", String(filters.query));

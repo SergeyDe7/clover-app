@@ -12,9 +12,9 @@ const WORKTREE_DATA = path.resolve(workRoot, "server/data");
 const ARTIFACT = path.join(workRoot, "server/i18n-artifacts/stage4/manifest.json");
 const EXPECTED_MAIN = "cbd1d0e3ac831fd41126d4e6b0e7af446d436d42";
 const UI_CATALOG_BASE = 1856;
-const UI_CATALOG_ADDED = 44;
+const UI_CATALOG_ADDED = 60;
 const UI_CATALOG_REMOVED = 0;
-const UI_CATALOG_FINAL = 1900;
+const UI_CATALOG_FINAL = 1916;
 
 function rejectUnsafePath(candidate) {
   const resolved = path.resolve(candidate);

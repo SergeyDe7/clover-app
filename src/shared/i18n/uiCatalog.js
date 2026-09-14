@@ -536,7 +536,119 @@ const RAW_CATALOG = [
     "surface": "admin",
     "critical": true
   },
+    {
+    "key": "admin.languages.productBatch.title",
+    "sourceRu": "Пакетный перевод товаров",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
   {
+    "key": "admin.languages.productBatch.translateNew",
+    "sourceRu": "Перевести новые товары",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.productBatch.notConfigured",
+    "sourceRu": "Автоперевод пока не подключён",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.productBatch.notConfiguredHint",
+    "sourceRu": "Товары без перевода показываются на русском. Переводчик можно подключить позже.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.productBatch.previewHint",
+    "sourceRu": "Будет обработано: {fields} полей в {products} товарах. Расход: {cost} символов. Остаток лимита: {remaining}.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.productBatch.confirm",
+    "sourceRu": "Запустить перевод {fields} полей? Расход ≈ {cost} символов.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.productBatch.skippedManual",
+    "sourceRu": "Пропущено MANUAL: {count}",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": false
+  },
+  {
+    "key": "admin.languages.productBatch.success",
+    "sourceRu": "Готово: записано {written} AUTO-переводов. Пропущено MANUAL: {skippedManual}.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.productBatch.nothingToDo",
+    "sourceRu": "Новых или устаревших AUTO-полей нет.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.productBatch.limitExceeded",
+    "sourceRu": "Внутренний месячный лимит перевода исчерпан.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.productBatch.sourceChanged",
+    "sourceRu": "Русский источник изменился. Обновите предпросмотр.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.productBatch.azureUnavailable",
+    "sourceRu": "Azure Translator недоступен. Повтор не выполнен автоматически.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+  {
+    "key": "admin.languages.productBatch.lastRun",
+    "sourceRu": "Последний запуск: {status}",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": false
+  },
+  {
+    "key": "admin.languages.productBatch.refreshPreview",
+    "sourceRu": "Обновить расчёт",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": false
+  },
+  {
+    "key": "admin.languages.productBatch.busy",
+    "sourceRu": "Идёт перевод…",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": false
+  },
+  {
+    "key": "admin.languages.productBatch.error",
+    "sourceRu": "Не удалось выполнить пакетный перевод.",
+    "namespace": "ui",
+    "surface": "admin",
+    "critical": true
+  },
+{
     "key": "admin.languages.searchPlaceholder",
     "sourceRu": "Русский текст или ключ",
     "namespace": "ui",

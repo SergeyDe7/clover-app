@@ -130,6 +130,12 @@ import {
   saveGlossaryEntry,
   saveProductManualTranslation,
 } from "./productLocalizationStore.js";
+import {
+  buildProductBatchPreview,
+  getProductBatchLastRun,
+  getProductBatchTranslatorStatus,
+  runProductBatchTranslation,
+} from "./productBatchTranslation.js";
 import { commitCanonicalProducts } from "./productSourceCorpus.js";
 import { scheduleSitemapRefresh } from "./sitemapArtifact.js";
 import { localeChoices } from "../../src/shared/i18n/localizationSettings.js";
@@ -4911,6 +4917,69 @@ app.post(
         scheduleSitemapRefresh("product-translation-reset");
       }
       res.json({ ok: true, changed: result.changed === true, field: result.field });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  "/api/admin/product-batch-translation/status",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      res.json({ ok: true, ...getProductBatchTranslatorStatus() });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  "/api/admin/product-batch-translation/preview",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      res.json({ ok: true, preview: buildProductBatchPreview() });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  "/api/admin/product-batch-translation/run",
+  authRequired,
+  roleRequired("admin"),
+  async (req, res, next) => {
+    try {
+      const result = await runProductBatchTranslation({
+        confirm: req.body?.confirm === true,
+        previewToken: req.body?.previewToken || "",
+        actor: req.user?.email || req.user?.id || "admin",
+        userId: req.user?.id || null,
+        userEmail: req.user?.email || "",
+        userRole: req.user?.role || "admin",
+      });
+      if (result.catalogVersionBumped === true) {
+        scheduleSitemapRefresh("product-azure-batch");
+      }
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  "/api/admin/product-batch-translation/last-run",
+  authRequired,
+  roleRequired("admin"),
+  (req, res, next) => {
+    try {
+      res.json({ ok: true, ...getProductBatchLastRun() });
     } catch (error) {
       next(error);
     }
