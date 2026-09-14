@@ -356,7 +356,7 @@ for (const code of ["en", "uz", "ky", "tg", "zh", "ar"]) {
   assert.equal(report.domains.seo.complete, true, `${code} seo.complete`);
   assert.equal(report.domains.faq.total, 0, `${code} faq.total`);
   assert.equal(report.domains.faq.ready, 0, `${code} faq.ready`);
-  assert.equal(report.domains.faq.complete, false, `${code} faq.complete`);
+  assert.equal(report.domains.faq.complete, true, `${code} faq.complete (empty optional)`);
   assert.equal(report.complete, false, `${code} overall must stay false`);
 }
 

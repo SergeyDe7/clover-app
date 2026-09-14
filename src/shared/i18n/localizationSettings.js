@@ -28,6 +28,15 @@ export const COMPLETENESS_DOMAINS = Object.freeze([
   "checkout",
 ]);
 
+/**
+ * Domains that may be vacuously complete when the corpus is confirmed absent.
+ * Presence / load errors must be passed via options.domainCorpusStatus; otherwise
+ * unit callers without corpus status keep the vacuous-optional behaviour.
+ */
+export const OPTIONAL_EMPTY_COMPLETENESS_DOMAINS = Object.freeze(["faq"]);
+
+/** @typedef {"absent" | "present" | "error"} DomainCorpusStatus */
+
 const VIEW_NAMESPACES = Object.freeze({
   interface: ["ui"],
   products: ["product"],
@@ -103,7 +112,31 @@ function emptyDomainReport() {
   );
 }
 
-export function computeLanguageCompleteness(language, items = []) {
+function optionalEmptyDomainComplete(domain, report, options = {}) {
+  if (!OPTIONAL_EMPTY_COMPLETENESS_DOMAINS.includes(domain) || report.total !== 0) {
+    return null;
+  }
+  const status = options.domainCorpusStatus?.[domain];
+  if (status === "absent") {
+    report.corpusStatus = "absent";
+    return true;
+  }
+  if (status === "present") {
+    // Corpus rows exist but zero critical completeness cells were counted → fail closed.
+    report.corpusStatus = "present";
+    report.corpusMismatch = true;
+    return false;
+  }
+  if (status === "error") {
+    report.corpusStatus = "error";
+    return false;
+  }
+  // No status from caller (pure unit tests): vacuous optional remains allowed.
+  report.corpusStatus = "unspecified";
+  return true;
+}
+
+export function computeLanguageCompleteness(language, items = [], options = {}) {
   if (!isSupportedPublicLocale(language)) {
     const domains = emptyDomainReport();
     return { language: typeof language === "string" ? language : "", complete: false, domains };
@@ -137,7 +170,14 @@ export function computeLanguageCompleteness(language, items = []) {
   let complete = true;
   for (const domain of COMPLETENESS_DOMAINS) {
     const report = domains[domain];
-    report.complete = report.total > 0 && report.ready === report.total;
+    if (report.total === 0) {
+      const optional = optionalEmptyDomainComplete(domain, report, options);
+      report.complete = optional === null ? false : optional;
+    } else {
+      report.complete = report.ready === report.total;
+      const status = options.domainCorpusStatus?.[domain];
+      if (status) report.corpusStatus = status;
+    }
     if (!report.complete) complete = false;
   }
 

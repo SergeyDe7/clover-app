@@ -299,15 +299,30 @@ function completenessItems(store, productItems = null) {
   return items;
 }
 
+/**
+ * FAQ optional-empty applies only when the FAQ translation corpus is confirmed absent.
+ * Load/count failures must not be treated as an empty corpus.
+ */
+export function readFaqCorpusStatus() {
+  try {
+    const rows = listTranslationEntryRowsByNamespace("faq");
+    return Array.isArray(rows) && rows.length > 0 ? "present" : "absent";
+  } catch {
+    return "error";
+  }
+}
+
 export function completenessByLanguage(store = readTranslationStore()) {
   const productSnap = computeProductCompletenessSnapshot();
   const items = completenessItems(store, productSnap.items);
   const productFields = productSnap.fieldReports;
+  const domainCorpusStatus = { faq: readFaqCorpusStatus() };
   const reports = {};
   for (const code of PUBLIC_LOCALE_CODES) {
     reports[code] = {
-      ...computeLanguageCompleteness(code, items),
+      ...computeLanguageCompleteness(code, items, { domainCorpusStatus }),
       productFields: productFields[code] || null,
+      domainCorpusStatus,
     };
   }
   return reports;
