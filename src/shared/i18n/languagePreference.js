@@ -10,6 +10,14 @@ import {
 /** Centralized CLOVER localStorage key for UI language preference. */
 export const LANGUAGE_PREFERENCE_STORAGE_KEY = "clover-language-preference-v1";
 
+/**
+ * Session-scoped sticky marker for an explicit user language choice
+ * (selector or storefront URL prefix). Survives login bootstrap so
+ * profile.locale=ru cannot silently clobber the current choice.
+ * Absent sticky → Stage 6.1 profile authority unchanged.
+ */
+export const EXPLICIT_LANGUAGE_SESSION_KEY = "clover-language-explicit-v1";
+
 function storage() {
   try {
     if (typeof globalThis === "undefined") return null;
@@ -18,6 +26,19 @@ function storage() {
       return null;
     }
     return ls;
+  } catch {
+    return null;
+  }
+}
+
+function sessionStore() {
+  try {
+    if (typeof globalThis === "undefined") return null;
+    const ss = globalThis.sessionStorage;
+    if (!ss || typeof ss.getItem !== "function" || typeof ss.setItem !== "function") {
+      return null;
+    }
+    return ss;
   } catch {
     return null;
   }
@@ -59,6 +80,40 @@ export function writeLanguagePreference(locale) {
     return normalized;
   } catch {
     return null;
+  }
+}
+
+/** Record an explicit user choice for this browser tab/session. */
+export function markExplicitLanguageChoice(locale) {
+  const normalized = writeLanguagePreference(locale);
+  if (!normalized) return null;
+  const ss = sessionStore();
+  if (!ss) return normalized;
+  try {
+    ss.setItem(EXPLICIT_LANGUAGE_SESSION_KEY, normalized);
+  } catch {
+    // preference still written
+  }
+  return normalized;
+}
+
+export function readExplicitLanguageChoice() {
+  const ss = sessionStore();
+  if (!ss) return null;
+  try {
+    return normalizeLanguagePreference(ss.getItem(EXPLICIT_LANGUAGE_SESSION_KEY));
+  } catch {
+    return null;
+  }
+}
+
+export function clearExplicitLanguageChoice() {
+  const ss = sessionStore();
+  if (!ss) return;
+  try {
+    ss.removeItem(EXPLICIT_LANGUAGE_SESSION_KEY);
+  } catch {
+    // ignore
   }
 }
 

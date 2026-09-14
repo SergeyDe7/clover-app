@@ -18,6 +18,7 @@ import {
   productCatalogSearchHaystack,
 } from "../../shared/appHelpers";
 import { unitDisplayShort } from "../../shared/i18n/unitDisplay.js";
+import { productDisplayName } from "../../shared/i18n/productDisplayName.js";
 import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import {
   buildGroupNav,
@@ -28,7 +29,7 @@ import {
   subcategoryMatchesFilter,
 } from "../storefront/productGroups.js";
 import { projectLocalizedGroupNav } from "../../shared/i18n/categoryDisplayProjection.js";
-import { storefrontCategoryDisplayOptions } from "../../shared/i18n/storefrontCategoryDisplay.js";
+import { useCategoryDisplayOptions } from "../../shared/i18n/useCategoryTranslations.js";
 import { productImageSrc } from "../../shared/productPhoto";
 import { CatalogSearchInput } from "./CatalogSearchInput";
 import { EmptyState } from "../../shared/uxFeedback";
@@ -105,7 +106,8 @@ export function ClientCatalogAddPanel({
   onAdd,
   onRemove,
 }) {
-  const { t, locale } = useLocalization();
+  const { t } = useLocalization();
+  const categoryOptions = useCategoryDisplayOptions();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
@@ -152,8 +154,8 @@ export function ClientCatalogAddPanel({
     const canonical = buildGroupNav(
       activeProducts.map((item) => canonicalizeProductCategory(item.category || "Прочее"))
     );
-    return projectLocalizedGroupNav(canonical, storefrontCategoryDisplayOptions(locale));
-  }, [activeProducts, locale]);
+    return projectLocalizedGroupNav(canonical, categoryOptions);
+  }, [activeProducts, categoryOptions]);
 
   const activeCategory = String(category || "").trim()
     ? canonicalizeProductCategory(category)
@@ -165,10 +167,10 @@ export function ClientCatalogAddPanel({
     const children = getGroupChildren(activeCategory);
     const projected = projectLocalizedGroupNav(
       [{ name: activeCategory, children }],
-      storefrontCategoryDisplayOptions(locale)
+      categoryOptions
     );
     return projected[0]?.children || [];
-  }, [activeCategory, locale]);
+  }, [activeCategory, categoryOptions]);
 
   const sortedProducts = useMemo(
     () => activeProducts,
@@ -415,14 +417,14 @@ export function ClientCatalogAddPanel({
                       <img
                         className="product-image"
                         src={productImageSrc(product)}
-                        alt={product.name}
+                        alt={productDisplayName(product)}
                         loading="lazy"
                       />
                     ) : (
                       <span className="product-image-placeholder">{t("shared.media.noPhoto")}</span>
                     )}
                   </div>
-                  <h2>{product.name}</h2>
+                  <h2>{productDisplayName(product)}</h2>
                   <p className="product-code">{t("shared.article.prefix", { article: productArticle(product) || "—" })}</p>
                   <p className="product-price client-catalog-add-price">
                     {showPrices && price > 0 ? (

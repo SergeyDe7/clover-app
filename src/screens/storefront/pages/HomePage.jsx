@@ -9,8 +9,7 @@ import { storefrontHref } from "../mode.js";
 import {
   STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
   STOREFRONT_DEFAULT_HERO_SLIDES,
-  STOREFRONT_HERO_LEAD,
-  STOREFRONT_HERO_TITLE,
+  storefrontHeroCopy,
 } from "../siteCopy.js";
 
 function navigatePromoLink(link) {
@@ -26,7 +25,7 @@ function navigatePromoLink(link) {
 }
 
 export function HomePage() {
-  const { t } = useLocalization();
+  const { t, locale } = useLocalization();
   const [error, setError] = useState("");
   const [hero, setHero] = useState({
     title: "",
@@ -36,13 +35,14 @@ export function HomePage() {
     intervalSec: STOREFRONT_DEFAULT_HERO_INTERVAL_SEC,
   });
   const [homePromotions, setHomePromotions] = useState([]);
+  const [categoryTranslations, setCategoryTranslations] = useState(undefined);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     // Lightweight /api/public/site (hero settings) — not full catalog (~1.5MB).
     storefrontApi
-      .site()
+      .site(locale)
       .then((payload) => {
         if (cancelled) return;
         const site = payload?.site || {};
@@ -59,6 +59,11 @@ export function HomePage() {
         setHomePromotions(
           Array.isArray(site.homePromotions) ? site.homePromotions : []
         );
+        setCategoryTranslations(
+          site.categoryTranslations && typeof site.categoryTranslations === "object"
+            ? site.categoryTranslations
+            : {}
+        );
         setReady(true);
       })
       .catch((err) => {
@@ -69,21 +74,24 @@ export function HomePage() {
             slides: STOREFRONT_DEFAULT_HERO_SLIDES,
           }));
           setHomePromotions([]);
+          setCategoryTranslations({});
           setReady(true);
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [t]);
+  }, [locale, t]);
+
+  // undefined → GroupTile may self-fetch; {} after load is an explicit empty bag.
 
   return (
     <div className="sf-home">
       <section className="sf-hero sf-hero-compact" aria-label={t("storefront.cloverCompany")}>
         <div className="sf-hero-copy">
           <p className="sf-hero-brand">{t("storefront.brand.wordmark")}</p>
-          <h1>{hero.title || STOREFRONT_HERO_TITLE}</h1>
-          <p className="sf-hero-lead">{hero.lead || STOREFRONT_HERO_LEAD}</p>
+          <h1>{hero.title || storefrontHeroCopy(locale).title}</h1>
+          <p className="sf-hero-lead">{hero.lead || storefrontHeroCopy(locale).lead}</p>
         </div>
         {Array.isArray(hero.slides) ? (
           <HeroSlides slides={hero.slides} intervalSec={hero.intervalSec} />
@@ -140,7 +148,11 @@ export function HomePage() {
         {error ? <p className="sf-error">{error}</p> : null}
         <div className="sf-group-grid">
           {CLOVER_PRODUCT_GROUPS.map((name) => (
-            <GroupTile key={name} name={name} />
+            <GroupTile
+              key={name}
+              name={name}
+              translations={categoryTranslations}
+            />
           ))}
           {!ready && !error ? (
             <p className="sf-muted">{t("storefront.loadingCategories")}</p>

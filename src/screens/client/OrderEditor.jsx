@@ -1,4 +1,6 @@
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { categoryDisplayNameFromCanonical } from "../../shared/i18n/categoryDisplayProjection.js";
+import { useCategoryDisplayOptions } from "../../shared/i18n/useCategoryTranslations.js";
 // Редактор заказа клиента: каталог, корзина и оформление.
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -24,6 +26,8 @@ import {
   glueProductNameUnits,
 } from "../../shared/appHelpers";
 import { unitDisplayLabel, unitDisplayShort } from "../../shared/i18n/unitDisplay.js";
+import { productDisplayName } from "../../shared/i18n/productDisplayName.js";
+import { addressLabel } from "../../shared/i18n/displayLabels.js";
 import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import {
   getEarliestDeliveryDateIso,
@@ -67,21 +71,34 @@ function CatalogViewToggleIcon({ variant }) {
   );
 }
 
-function capitalizeRu(value) {
+function capitalizeLocale(value) {
   if (!value) return "";
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function getDeliveryDateParts(value) {
+function resolveDateLocale(locale) {
+  const code = String(locale || "ru").trim();
+  if (code === "zh") return "zh-CN";
+  return code || "ru";
+}
+
+function getDeliveryDateParts(value, locale = "ru") {
   if (!value) return null;
   try {
     const date = new Date(`${value}T12:00:00`);
     if (Number.isNaN(date.getTime())) return null;
+    const dateLocale = resolveDateLocale(locale);
     return {
       day: String(date.getDate()),
-      weekday: capitalizeRu(new Intl.DateTimeFormat("ru-RU", { weekday: "long" }).format(date)),
-      monthYear: capitalizeRu(
-        new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(date)
+      weekday: capitalizeLocale(
+        new Intl.DateTimeFormat(dateLocale, { weekday: "long" }).format(date)
+      ),
+      monthYear: capitalizeLocale(
+        new Intl.DateTimeFormat(dateLocale, {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }).format(date)
       ),
     };
   } catch {
@@ -118,7 +135,8 @@ export function OrderEditor({
   onOpenCatalogAdd: _onOpenCatalogAdd,
   embedded = false,
 }) {
-  const { t } = useLocalization();
+  const { t, locale } = useLocalization();
+  const categoryOptions = useCategoryDisplayOptions();
   const initialOrder = session.order || null;
   const savedDraft = session.mode === "new" && settings.enableDrafts ? safeRead(STORAGE.draft, null) : null;
   const initialSource = initialOrder || savedDraft || {};
@@ -648,7 +666,7 @@ export function OrderEditor({
   const grandTotal = roundPriceUp(total + deliveryFee);
   const cartCount =
     selectedItems.length + customItems.length + (deliveryFee > 0 ? 1 : 0);
-  const deliveryDateParts = getDeliveryDateParts(deliveryDate);
+  const deliveryDateParts = getDeliveryDateParts(deliveryDate, locale);
 
   // Дозаказ только из нового/повтора: в edit уже «Сохранить изменения».
   const addendumTarget = useMemo(
@@ -1450,7 +1468,9 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                         key={item}
                         onClick={() => setCategory(item)}
                       >
-                        {item}
+                        {item === "Все"
+                          ? t("shared.filter.all")
+                          : categoryDisplayNameFromCanonical(item, "", categoryOptions)}
                       </button>
                     ))}
                   </div>
@@ -1513,13 +1533,13 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                     {!isList && (
                       <div className="product-image-wrap">
                         {product.imageUrl ? (
-                          <img className="product-image" src={productImageSrc(product)} alt={product.name} loading="lazy" />
+                          <img className="product-image" src={productImageSrc(product)} alt={productDisplayName(product)} loading="lazy" />
                         ) : (
                           <span className="product-image-placeholder">{t("client.productPhotoIsNotUploadedYet")}</span>
                         )}
                       </div>
                     )}
-                    <h2>{isList ? glueProductNameUnits(product.name) : product.name}</h2>
+                    <h2>{isList ? glueProductNameUnits(productDisplayName(product)) : productDisplayName(product)}</h2>
                     <p className="product-code">{t("shared.article.prefix", { article: productArticle(product) })}</p>
                     <p className="product-price">
                       {settings.showPrices && price > 0
@@ -1862,7 +1882,8 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                   <option value="">{t("client.chooseAnAddress")}</option>
                   {addresses.map((item) => (
                     <option value={item.id} key={item.id}>
-                      {item.label}{item.isDefault ? t("client.primary") : ""} · {item.address}
+                      {addressLabel(item.label, t) || item.label}
+                      {item.isDefault ? t("client.primary") : ""} · {item.address}
                     </option>
                   ))}
                 </select>

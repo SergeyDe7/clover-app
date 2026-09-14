@@ -1,4 +1,5 @@
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { addressLabel } from "../../shared/i18n/displayLabels";
 // Панель управления адресами доставки клиента.
 import { useState } from "react";
 import { makeId } from "../../shared/appHelpers";
@@ -27,7 +28,9 @@ export function AddressesPanel({ addresses, onChange }) {
 
   const remove = async (item) => {
     const ok = await appConfirm({
-      title: t("shared.address.deleteNamed", { label: item.label }),
+      title: t("shared.address.deleteNamed", {
+        label: addressLabel(item.label, t) || item.label,
+      }),
       message: t("client.theAddressWillDisappearFromThe"),
       confirmLabel: t("shared.action.delete"),
       cancelLabel: t("shared.modal.cancel"),
@@ -57,7 +60,7 @@ export function AddressesPanel({ addresses, onChange }) {
           {addresses.map((item) => (
             <article className="address-card" key={item.id}>
               <div>
-                <div className="address-title"><h3>{item.label}</h3>{item.isDefault && <span className="badge green">{t("shared.address.primary")}</span>}</div>
+                <div className="address-title"><h3>{addressLabel(item.label, t) || item.label}</h3>{item.isDefault && <span className="badge green">{t("shared.address.primary")}</span>}</div>
                 <p>{item.address}</p>
               </div>
               <div className="inline-actions">

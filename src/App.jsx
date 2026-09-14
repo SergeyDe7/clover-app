@@ -1,8 +1,11 @@
 import { useLocalization } from "./shared/i18n/LocalizationProvider";
 import {
   createProfileLocaleCoordinator,
+  markExplicitLanguageChoice,
+  readExplicitLanguageChoice,
   syncBrowserPreferenceFromProfile,
 } from "./shared/i18n/languagePreference.js";
+import { applyProductDisplayNameMap } from "./shared/i18n/productDisplayName.js";
 import { LanguageSelector } from "./shared/i18n/LanguageSelector.jsx";
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
@@ -708,13 +711,35 @@ function App() {
     }
 
     setOrders(incomingOrders);
-    const nextProfile = profileLocaleResolution.profile;
+    const stickyLocale = readExplicitLanguageChoice();
+    let nextProfile = profileLocaleResolution.profile;
+    let shouldApplyRuntime = profileLocaleResolution.shouldApplyRuntime;
+    // Explicit storefront/login/LK choice (session sticky) wins over stale profile.locale
+    // for this tab; autosave then promotes it. No sticky → Stage 6.1 profile authority.
+    if (
+      data.user.role === "client" &&
+      stickyLocale &&
+      (!nextProfile?.locale || nextProfile.locale !== stickyLocale)
+    ) {
+      nextProfile = { ...nextProfile, locale: stickyLocale };
+      shouldApplyRuntime = true;
+      profileLocaleCoordinatorRef.current.recordExplicitChoice(
+        stickyLocale,
+        data.user.id
+      );
+    }
     setProfile(nextProfile);
-    // Stage 6.1: authenticated profile locale is authoritative and syncs to browser storage.
     if (data.user.role === "client") {
-      const profileLanguage = syncBrowserPreferenceFromProfile(nextProfile);
-      if (profileLanguage && profileLocaleResolution.shouldApplyRuntime) {
-        void setLanguage(profileLanguage);
+      if (stickyLocale) {
+        markExplicitLanguageChoice(stickyLocale);
+        if (shouldApplyRuntime) {
+          void setLanguage(stickyLocale);
+        }
+      } else {
+        const profileLanguage = syncBrowserPreferenceFromProfile(nextProfile);
+        if (profileLanguage && shouldApplyRuntime) {
+          void setLanguage(profileLanguage);
+        }
       }
     }
     setAddresses(
@@ -753,6 +778,10 @@ function App() {
     return true;
   };
 
+  const resolveProductBootstrapLanguage = () =>
+    // Sticky explicit choice only. When absent, server uses profile.locale (Stage 6.1).
+    readExplicitLanguageChoice() || "";
+
   const loadBootstrap = async ({ silent = false } = {}) => {
     const sequence = ++bootstrapSequenceRef.current;
     const profileLocaleRequest =
@@ -765,7 +794,7 @@ function App() {
     }
 
     try {
-      const data = await api.bootstrap();
+      const data = await api.bootstrap(resolveProductBootstrapLanguage());
       if (sequence !== bootstrapSequenceRef.current) return;
       const applied = applyBootstrap(data, {
         openClientOrderLanding: !silent,
@@ -864,7 +893,7 @@ function App() {
       requestInProgress = true;
 
       try {
-        const data = await api.bootstrap();
+        const data = await api.bootstrap(resolveProductBootstrapLanguage());
         if (!active) return;
 
         const incomingOrders = Array.isArray(data.orders) ? data.orders : [];
@@ -1044,7 +1073,7 @@ function App() {
 
       // Перед PUT менеджера подмешиваем серверные заказы,
       // чтобы устаревший локальный список не стёр новый заказ клиента.
-      const data = await api.bootstrap();
+      const data = await api.bootstrap(resolveProductBootstrapLanguage());
       const serverOrders = Array.isArray(data.orders) ? data.orders : [];
       const localById = new Map((orders || []).map((order) => [String(order.id), order]));
       const localIds = new Set(localById.keys());
@@ -1156,6 +1185,13 @@ function App() {
 
       setApiToken(result.token);
       profileLocaleCoordinatorRef.current.beginSession(result.user.id);
+      const stickyLocale = readExplicitLanguageChoice();
+      if (stickyLocale && result.user?.role === "client") {
+        profileLocaleCoordinatorRef.current.recordExplicitChoice(
+          stickyLocale,
+          result.user.id
+        );
+      }
       setAuthUser(result.user);
       setRole(result.user.role);
       setIsLoggedIn(true);
@@ -1559,7 +1595,7 @@ function App() {
         setOrders(previousOrders);
         if (error?.code === "MATRIX_PRODUCT_FORBIDDEN") {
           try {
-            const data = await api.bootstrap();
+            const data = await api.bootstrap(resolveProductBootstrapLanguage());
             skipNextOrdersSyncRef.current = true;
             if (Array.isArray(data.orders)) {
               setOrders(data.orders);
@@ -1627,7 +1663,7 @@ function App() {
         setSyncError(message);
         void appAlert({ title: t("auth.deletionWasNotCompleted"), message, tone: "danger" });
         try {
-          const data = await api.bootstrap();
+          const data = await api.bootstrap(resolveProductBootstrapLanguage());
           skipNextOrdersSyncRef.current = true;
           setOrders(Array.isArray(data.orders) ? data.orders : orders);
         } catch {
@@ -2135,14 +2171,27 @@ function App() {
         <ClientScreen
           profile={profile}
           setProfile={setProfile}
-          onLanguageChange={(locale) => {
+          onLanguageChange={async (locale) => {
             const explicitLocale =
               profileLocaleCoordinatorRef.current.recordExplicitChoice(
                 locale,
                 authUser?.id
               );
             if (explicitLocale) {
+              markExplicitLanguageChoice(explicitLocale);
               setProfile((current) => ({ ...current, locale: explicitLocale }));
+              try {
+                const overlay = await api.productDisplay(explicitLocale);
+                const displays = overlay?.displays || {};
+                setProducts((current) =>
+                  applyProductDisplayNameMap(current, displays)
+                );
+                setFullCatalogProducts((current) =>
+                  applyProductDisplayNameMap(current, displays)
+                );
+              } catch {
+                // Keep last displayNames; chrome locale still updates via setLanguage.
+              }
             }
           }}
           addresses={addresses}

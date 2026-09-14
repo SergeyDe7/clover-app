@@ -7,44 +7,39 @@ import {
   useState,
 } from "react";
 import { isLanguageEnabled, toPublicLocaleCode } from "./languageRegistry.js";
-import { readLanguagePreference, writeLanguagePreference } from "./languagePreference.js";
+import { readLanguagePreference, markExplicitLanguageChoice } from "./languagePreference.js";
 import { createLocalizationRuntime } from "./translationRuntime.js";
 import {
   applyRuntimeDocumentLocale,
   normalizePublicRuntimeSnapshot,
   createRuntimeSnapshotLoader,
 } from "./runtimeRequestGate.js";
-import { extractPublicLanguagePrefix } from "./languageResolver.js";
 import {
   publicLocaleInfrastructureEnabledFromDocument,
 } from "./publicLocaleRouting.js";
+import { resolvePublicSurfaceLocale } from "./publicSurfaceLocale.js";
 
 const RUNTIME_ENDPOINT = "/api/public/localization/runtime";
-const STOREFRONT_PREVIEW_PREFIX = "/vitrina";
 const defaultRuntime = Object.freeze({
   ...createLocalizationRuntime(),
   enabledLanguages: Object.freeze(["ru"]),
   catalogVersion: "",
-      setLanguage: async () => ({ ok: false, stale: false }),
+  setLanguage: async () => ({ ok: false, stale: false }),
   invalidateLanguageRequests: () => {},
 });
 const LocalizationContext = createContext(defaultRuntime);
 
+export { resolvePublicSurfaceLocale } from "./publicSurfaceLocale.js";
+
 function publicUrlLanguage() {
   if (typeof window === "undefined" || typeof document === "undefined") return "";
   if (!publicLocaleInfrastructureEnabledFromDocument(document)) return "";
-  let pathname = String(window.location?.pathname || "/");
-  if (pathname === "/lk" || pathname.startsWith("/lk/")) return "";
-  // Preview shell (/vitrina/…) must not hide the public locale segment.
-  if (pathname === STOREFRONT_PREVIEW_PREFIX || pathname === `${STOREFRONT_PREVIEW_PREFIX}/`) {
-    pathname = "/";
-  } else if (pathname.startsWith(`${STOREFRONT_PREVIEW_PREFIX}/`)) {
-    pathname = pathname.slice(STOREFRONT_PREVIEW_PREFIX.length) || "/";
-  }
-  const parsed = extractPublicLanguagePrefix(pathname, {
-    infrastructureEnabled: true,
-  });
-  return parsed.locale || "ru";
+  const { surface, urlLocale } = resolvePublicSurfaceLocale(
+    window.location?.pathname || "/"
+  );
+  if (surface === "cabinet") return "";
+  // Storefront load signal: explicit prefix wins; unprefixed → ru.
+  return urlLocale || "ru";
 }
 
 async function requestRuntimeSnapshot(language, signal) {
@@ -63,7 +58,7 @@ export function LocalizationProvider({
   locale,
   dictionaries,
 }) {
-  const initialPreference = useRef(readLanguagePreference());
+  const preferenceRef = useRef(readLanguagePreference());
   const [urlLanguage, setUrlLanguage] = useState(publicUrlLanguage);
   const [snapshot, setSnapshot] = useState(() => ({
     enabledLanguages: ["ru"],
@@ -83,8 +78,27 @@ export function LocalizationProvider({
   }, []);
 
   useEffect(() => {
-    const preferredLanguage =
-      locale || urlLanguage || initialPreference.current || "ru";
+    if (typeof window === "undefined") return;
+    const { surface, urlLocale } = resolvePublicSurfaceLocale(
+      window.location?.pathname || "/"
+    );
+
+    let preferredLanguage;
+    if (locale) {
+      preferredLanguage = locale;
+    } else if (surface === "storefront") {
+      // Prefixed public URLs are authoritative. Persist them so /lk inherits.
+      preferredLanguage = urlLocale || "ru";
+      if (urlLocale) {
+        const stored = markExplicitLanguageChoice(urlLocale);
+        if (stored) preferenceRef.current = stored;
+      }
+    } else {
+      // Cabinet: live preference (not a stale mount-time ref).
+      preferredLanguage =
+        readLanguagePreference() || preferenceRef.current || "ru";
+    }
+
     void loader.load(preferredLanguage);
   }, [locale, loader, urlLanguage]);
 
@@ -100,7 +114,8 @@ export function LocalizationProvider({
       catalogVersion: snapshot.catalogVersion,
       setLanguage: async (language) => {
         if (isLanguageEnabled(language, snapshot.enabledLanguages)) {
-          writeLanguagePreference(language);
+          const stored = markExplicitLanguageChoice(language);
+          if (stored) preferenceRef.current = stored;
         }
         const result = await loader.loadWithStatus(language);
         if (result.status === "stale") return { ok: false, stale: true };

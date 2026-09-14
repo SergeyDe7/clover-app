@@ -131,6 +131,10 @@ import {
   saveProductManualTranslation,
 } from "./productLocalizationStore.js";
 import {
+  attachClientProductDisplayNames,
+  buildClientProductDisplayNameMap,
+} from "./clientProductDisplay.js";
+import {
   buildProductBatchPreview,
   getProductBatchLastRun,
   getProductBatchTranslatorStatus,
@@ -2966,9 +2970,17 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     catalog.link?.personalManagerId
   );
 
+  const displayLanguage =
+    normalizeLanguagePreference(req.query?.language) ||
+    normalizeLanguagePreference(state.profile?.locale) ||
+    "";
+
   const clientPayload = {
     user: publicUser(req.user),
-    products: sanitizeProductsForClient(catalog.matrixProducts),
+    products: attachClientProductDisplayNames(
+      sanitizeProductsForClient(catalog.matrixProducts),
+      displayLanguage
+    ),
     catalogPolicy: catalog.policy,
     catalogPricesVersion: clientPricesRevision,
     orders: sanitizeOrdersForClient(listOrders(req.user.id)),
@@ -2988,11 +3000,40 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     clients: [],
     reconciliationRequests: listReconciliationRequests(req.user.id),
     services: { mail: publicMailStatus(), push: publicPushStatus() },
-    fullCatalogProducts: sanitizeProductsForClient(catalog.fullCatalogProducts),
+    fullCatalogProducts: attachClientProductDisplayNames(
+      sanitizeProductsForClient(catalog.fullCatalogProducts),
+      displayLanguage
+    ),
+    productDisplayLanguage: displayLanguage || "ru",
   };
 
   return res.json(clientPayload);
 });
+
+/** Display-only product name map for the active UI locale (provider-independent reads). */
+app.get(
+  "/api/client/product-display",
+  authRequired,
+  roleRequired("client"),
+  (req, res) => {
+    try {
+      const language =
+        normalizeLanguagePreference(req.query?.language) || "";
+      const storedProducts = getGlobalState("products", DEFAULT_PRODUCTS);
+      const products = Array.isArray(storedProducts) ? storedProducts : [];
+      const displays = buildClientProductDisplayNameMap(products, language);
+      res.setHeader("Cache-Control", "no-store");
+      res.json({
+        language: language || "ru",
+        displays,
+        count: Object.keys(displays).length,
+      });
+    } catch (error) {
+      console.error("client product-display failed", error);
+      res.status(500).json({ error: "Не удалось загрузить переводы товаров." });
+    }
+  }
+);
 
 app.post(
   "/api/state/my-matrix/add",
