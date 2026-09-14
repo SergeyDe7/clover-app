@@ -5971,17 +5971,24 @@ body:has(.clover-app) {
     display: inline !important;
   }
 
-  .clover-app .manager-bell-panel {
+  .clover-app .manager-bell-panel,
+  .manager-bell-panel.manager-bell-panel--portal {
     position: fixed !important;
     left: 10px !important;
     right: 10px !important;
-    top: 52px !important;
+    /* top comes from inline style (chrome height); CSS fallback if JS not ready */
+    top: calc(var(--clover-chrome-offset, 56px) + 8px);
     width: auto !important;
     max-width: none !important;
     max-height: min(68vh, 480px) !important;
     padding: 8px !important;
     border-radius: 14px !important;
-    z-index: 90 !important;
+    /* Above .app-top-chrome (100); below app modals (~1200); matches manager-contact */
+    z-index: 220 !important;
+  }
+
+  .manager-bell-backdrop {
+    z-index: 219 !important;
   }
 
   .clover-app .manager-notification-header {

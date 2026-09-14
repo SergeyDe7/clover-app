@@ -3723,19 +3723,33 @@ html.clover-thankyou-open .app-top-chrome {
 .manager-bell { position: relative; overflow: visible; }
 .manager-bell-label-short { display: none; }
 .manager-bell-count { position: absolute; top: -4px; right: -4px; z-index: 2; min-width: 18px; min-height: 18px; height: auto; padding: 0 5px; border-radius: 999px; background: #c45c26; color: #fff; font-size: 11px; font-weight: 800; line-height: 1; display: grid; place-items: center; box-sizing: border-box; }
-.manager-bell-panel {
-  position: absolute;
+/* Portaled to body: escapes .app-top-chrome stacking/container-type (same band as manager-contact). */
+.manager-bell-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 219;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.manager-bell-panel,
+.manager-bell-panel.manager-bell-panel--portal {
+  position: fixed;
   right: 0;
-  top: calc(100% + 8px);
+  top: calc(var(--clover-chrome-offset, 56px) + 8px);
   width: min(360px, 82vw);
   max-height: min(420px, 70vh);
   overflow: auto;
+  overscroll-behavior: contain;
   background: #fff;
   border: 1px solid #d7e1d4;
   border-radius: 16px;
   box-shadow: 0 16px 40px rgba(40, 64, 40, 0.16);
   padding: 10px;
-  z-index: 40;
+  z-index: 220;
+  box-sizing: border-box;
 }
 .manager-notification-header {
   display: flex;
