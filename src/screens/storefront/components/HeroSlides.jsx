@@ -64,15 +64,14 @@ export function HeroSlides({ slides, intervalSec }) {
   const current = list[index] || list[0];
   const href = resolveStorefrontHeroSlideHref(current, index);
   const installHref = isInstallHeroHref(href);
+  // Optional CMS operator button only — do not auto-inject a visible install CTA.
   const operatorButton = String(current?.buttonLabel || "").trim();
-  // Install banner: always expose a localized CTA (operator buttonLabel wins if set).
-  // Do not use raw CMS alt as the visible/accessible install label — it stays RU in prod.
-  const installCta =
-    installHref && !operatorButton ? t("storefront.appInstallGuide") : "";
-  const visibleBannerText = operatorButton || installCta;
+  // Accessible name: operator button, else localized install guide (never raw RU CMS alt).
   const linkLabel =
-    visibleBannerText ||
-    (!installHref ? String(current?.alt || "").trim() : "") ||
+    operatorButton ||
+    (installHref
+      ? t("storefront.appInstallGuide")
+      : String(current?.alt || "").trim()) ||
     t("storefront.appInstallGuide");
 
   const slideImgAlt = (slide, slideIndex) => {
@@ -126,22 +125,22 @@ export function HeroSlides({ slides, intervalSec }) {
         if (!loadedIndexes.has(slideIndex)) return null;
         const isFirstPaint = slideIndex === 0;
         return (
-        <img
-          key={slide.src}
-          src={slide.src}
-          alt={slideImgAlt(slide, slideIndex)}
-          width="1400"
-          height="746"
-          loading={isFirstPaint ? "eager" : "lazy"}
-          fetchPriority={isFirstPaint ? "high" : "low"}
-          decoding={isFirstPaint ? "sync" : "async"}
-          className={slideIndex === index ? "is-active" : ""}
-        />
-      );
+          <img
+            key={slide.src}
+            src={slide.src}
+            alt={slideImgAlt(slide, slideIndex)}
+            width="1400"
+            height="746"
+            loading={isFirstPaint ? "eager" : "lazy"}
+            fetchPriority={isFirstPaint ? "high" : "low"}
+            decoding={isFirstPaint ? "sync" : "async"}
+            className={slideIndex === index ? "is-active" : ""}
+          />
+        );
       })}
       {href ? (
         <a
-          className={`sf-hero-slide-link${visibleBannerText ? "" : " is-cover-only"}`}
+          className={`sf-hero-slide-link${operatorButton ? "" : " is-cover-only"}`}
           href={storefrontHref(heroRouteFromHref(href) || href)}
           aria-label={linkLabel}
           onClick={(event) => {
@@ -149,8 +148,8 @@ export function HeroSlides({ slides, intervalSec }) {
             openSlideLink();
           }}
         >
-          {visibleBannerText ? (
-            <span className="sf-hero-slide-btn">{visibleBannerText}</span>
+          {operatorButton ? (
+            <span className="sf-hero-slide-btn">{operatorButton}</span>
           ) : null}
         </a>
       ) : null}

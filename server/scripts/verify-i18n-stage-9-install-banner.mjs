@@ -31,7 +31,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const PRODUCTION_DATA = path.resolve("/opt/clover/clover-app/server/data");
 const evidenceDir = "/opt/clover/worktrees/build-artifacts/i18n-stage-9";
 const snapSrc = path.join(evidenceDir, "clover-readonly-snap-stage9-reopen.sqlite");
-const uiDist = path.join(evidenceDir, "ui-dist-install-banner");
+const uiDist = path.join(evidenceDir, "ui-dist-remove-install-cta");
 
 function rejectProd(candidate) {
   const resolved = path.resolve(candidate);
@@ -42,7 +42,7 @@ function rejectProd(candidate) {
 
 assert.equal(existsSync(CHROME), true);
 assert.equal(existsSync(snapSrc), true);
-assert.equal(existsSync(path.join(uiDist, "index.html")), true, "build ui-dist-install-banner first");
+assert.equal(existsSync(path.join(uiDist, "index.html")), true, "build ui-dist-remove-install-cta first");
 
 const tmp = mkdtempSync(path.join(tmpdir(), "clover-stage9-install-banner-"));
 const dbPath = path.join(tmp, "clover.sqlite");
@@ -60,16 +60,19 @@ writeLocalizationSettings({
 
 const report = {
   before: {
+    note: "PR #116 localized install route + auto-injected visible .sf-hero-slide-btn CTA; user confirmed CTA was unwanted",
     heroHrefFromEn: "/install-app",
     afterClickLang: "ru",
     afterClickH1: "Как установить на телефон",
     enPrefixedInstall: "Not found",
+    visibleCtaFromPr116: "storefront.appInstallGuide via .sf-hero-slide-btn",
   },
   browser: { ok: [], defects: [] },
   limitations: {
     safariIphonePhysicalInstall: "NOT VERIFIED",
     cmsHeroOperatorContent: "known localization limitation (separate from PWA install banner)",
     nativeSpeakerQuality: "NOT VERIFIED",
+    operatorButtonLabel: "CMS buttonLabel still renders .sf-hero-slide-btn if set (pre-existing)",
   },
 };
 
@@ -148,7 +151,17 @@ await waitHttp(`http://127.0.0.1:${uiPort}/`);
 
 const expectedH1 = {};
 const runtimeLabels = {};
-for (const locale of ["en", "uz", "ky", "tg", "zh", "ar"]) {
+const SOURCE_RU = {
+  h1: "Как установить на телефон",
+  cta: "Инструкция по установке приложения",
+  alt: "Мобильное приложение Clover",
+};
+for (const locale of ["ru", "en", "uz", "ky", "tg", "zh", "ar"]) {
+  if (locale === "ru") {
+    expectedH1.ru = SOURCE_RU.h1;
+    runtimeLabels.ru = { cta: SOURCE_RU.cta, alt: SOURCE_RU.alt };
+    continue;
+  }
   const runtime = await fetch(
     `http://127.0.0.1:${apiPort}/api/public/localization/runtime?language=${locale}`
   ).then((r) => r.json());
@@ -173,7 +186,7 @@ const browser = await chromium.launch({
 });
 
 try {
-  for (const locale of ["en", "uz", "ky", "tg", "zh", "ar"]) {
+  for (const locale of ["ru", "en", "uz", "ky", "tg", "zh", "ar"]) {
     const context = await browser.newContext({
       viewport: { width: 390, height: 844 },
       locale: locale === "zh" ? "zh-CN" : locale,
@@ -225,16 +238,19 @@ try {
         const img = document.querySelector(".sf-hero-visual img.is-active, .sf-hero-visual img");
         return {
           btn: (btn?.innerText || "").trim(),
+          btnPresent: Boolean(btn),
+          coverOnly: Boolean(a?.classList.contains("is-cover-only")),
           aria: (a?.getAttribute("aria-label") || "").trim(),
           alt: (img?.getAttribute("alt") || "").trim(),
         };
       });
-      if (banner.btn !== expectedBanner.cta) {
-        defect("banner-visible-text", JSON.stringify({ ...banner, expected: expectedBanner.cta }));
-      } else if (banner.btn === "Инструкция по установке приложения" && locale !== "ru") {
-        defect("banner-visible-text-ru", banner.btn);
+      // Visible auto-CTA must be absent (cover-only link).
+      if (banner.btnPresent || banner.btn) {
+        defect("banner-cta-absent", JSON.stringify(banner));
+      } else if (!banner.coverOnly) {
+        defect("banner-cover-only", JSON.stringify(banner));
       } else {
-        ok("banner-visible-text", banner.btn);
+        ok("banner-cta-absent", "no .sf-hero-slide-btn");
       }
       if (banner.aria !== expectedBanner.cta) {
         defect("banner-aria", JSON.stringify({ aria: banner.aria, expected: expectedBanner.cta }));
@@ -245,6 +261,30 @@ try {
         defect("banner-img-alt", JSON.stringify({ alt: banner.alt, expected: expectedBanner.alt }));
       } else {
         ok("banner-img-alt", banner.alt);
+      }
+
+      // Cover-only <a> remains keyboard-reachable (focusable link, no replacement text).
+      await hero.focus();
+      const focused = await page.evaluate(() => {
+        const el = document.activeElement;
+        return {
+          tag: el?.tagName || "",
+          className: el?.className || "",
+          href: el?.getAttribute?.("href") || "",
+          coverOnly: el?.classList?.contains("is-cover-only") || false,
+          hasVisibleBtn: Boolean(el?.querySelector?.(".sf-hero-slide-btn")),
+        };
+      });
+      if (
+        focused.tag === "A" &&
+        /sf-hero-slide-link/.test(focused.className) &&
+        focused.href === expectedHref &&
+        focused.coverOnly &&
+        !focused.hasVisibleBtn
+      ) {
+        ok("banner-keyboard-link", JSON.stringify(focused));
+      } else {
+        defect("banner-keyboard-link", JSON.stringify(focused));
       }
 
       await hero.click();
@@ -329,13 +369,16 @@ report.summary = {
 };
 mkdirSync(evidenceDir, { recursive: true });
 writeFileSync(
-  path.join(evidenceDir, "install-banner-verify.json"),
+  path.join(evidenceDir, "remove-install-cta-verify.json"),
   JSON.stringify(report, null, 2)
 );
 console.log(JSON.stringify(report.summary, null, 2));
 if (report.browser.defects.length) {
   for (const d of report.browser.defects) console.log("DEFECT", d.locale, d.name, d.detail);
-  process.exitCode = 2;
+  cleanup();
+  process.exit(2);
 } else {
-  console.log("verify-i18n-stage-9-install-banner: ok");
+  console.log("verify-i18n-stage-9-remove-install-cta: ok");
+  cleanup();
+  process.exit(0);
 }
