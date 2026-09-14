@@ -27,6 +27,12 @@ import {
   makeCatalogRouteSnapshot,
   resolveStorefrontCatalogView,
 } from "../catalogRouteSnapshot.js";
+import {
+  CATALOG_CARD_RENDER_BATCH,
+  nextRenderLimitAfterDemand,
+  scheduleCatalogRenderBump,
+  sliceSectionsToRenderLimit,
+} from "../catalogProgressiveRender.js";
 
 export function CatalogPage({
   category = "",
@@ -132,10 +138,78 @@ export function CatalogPage({
     }
     return groupProductsByCloverGroup(products);
   }, [category, subcategory, products, currentPayload]);
+
+  const totalCatalogCards = useMemo(
+    () => sections.reduce((sum, section) => sum + (section.products?.length || 0), 0),
+    [sections]
+  );
+  const [renderLimit, setRenderLimit] = useState(CATALOG_CARD_RENDER_BATCH);
+  const loadMoreSentinelRef = useRef(null);
+
+  useEffect(() => {
+    setRenderLimit(CATALOG_CARD_RENDER_BATCH);
+  }, [routeKey, query]);
+
+  useEffect(() => {
+    // Clamp after filter shrink; small result sets mount fully (no empty gap).
+    setRenderLimit((current) => {
+      if (totalCatalogCards <= 0) return CATALOG_CARD_RENDER_BATCH;
+      if (totalCatalogCards <= CATALOG_CARD_RENDER_BATCH) return totalCatalogCards;
+      return Math.min(current, totalCatalogCards);
+    });
+  }, [totalCatalogCards]);
+
+  useEffect(() => {
+    if (renderLimit >= totalCatalogCards) return undefined;
+    return scheduleCatalogRenderBump(() => {
+      setRenderLimit((current) =>
+        Math.min(current + CATALOG_CARD_RENDER_BATCH, totalCatalogCards)
+      );
+    });
+  }, [renderLimit, totalCatalogCards]);
+
+  // Fast scroll / near-end: demand more cards before the user hits an empty tail.
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    if (renderLimit >= totalCatalogCards) return undefined;
+    const revealMore = () => {
+      setRenderLimit((current) =>
+        nextRenderLimitAfterDemand(current, totalCatalogCards)
+      );
+    };
+    const onScroll = () => {
+      const doc = document.documentElement;
+      const remaining = doc.scrollHeight - window.scrollY - window.innerHeight;
+      if (remaining < window.innerHeight * 1.5) revealMore();
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    const node = loadMoreSentinelRef.current;
+    let observer = null;
+    if (node && typeof IntersectionObserver === "function") {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) revealMore();
+        },
+        { root: null, rootMargin: "400px 0px", threshold: 0 }
+      );
+      observer.observe(node);
+    }
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      observer?.disconnect();
+    };
+  }, [renderLimit, totalCatalogCards, routeKey, query]);
+
+  const visibleSections = useMemo(
+    () => sliceSectionsToRenderLimit(sections, renderLimit),
+    [sections, renderLimit]
+  );
+
   const imagePriorityById = useMemo(() => {
     const map = new Map();
     let index = 0;
-    for (const section of sections) {
+    for (const section of visibleSections) {
       for (const product of section.products || []) {
         // Render-order cursor; Map last-write wins if duplicate ids ever appear.
         // Canonical catalog products use unique ids; priority follows first render encounter.
@@ -146,7 +220,7 @@ export function CatalogPage({
       }
     }
     return map;
-  }, [sections]);
+  }, [visibleSections]);
 
   const localizedSubgroups = useMemo(() => {
     if (!category) return [];
@@ -327,7 +401,7 @@ export function CatalogPage({
 
           {error ? <p className="sf-error">{error}</p> : null}
 
-          {sections.map((section) => (
+          {visibleSections.map((section) => (
             <section className="sf-group-block" key={section.name}>
               {!category ? (
                 <div className="sf-group-head">
@@ -351,6 +425,14 @@ export function CatalogPage({
               </div>
             </section>
           ))}
+
+          {currentPayload && totalCatalogCards > 0 && renderLimit < totalCatalogCards ? (
+            <div
+              ref={loadMoreSentinelRef}
+              className="sf-catalog-load-sentinel"
+              aria-hidden="true"
+            />
+          ) : null}
 
           {!error && currentPayload && !products.length ? (
             <p className="sf-muted">

@@ -769,7 +769,9 @@ export function getPublicCatalog({
     getGlobalState("oneCPriceTypes", [])
   );
   const projection = publicTranslationProjection(language);
-  let products = listStorefrontProducts(settings, projection.locale);
+  // One pass: category counts + list filters share the same product projection.
+  const allProducts = listStorefrontProducts(settings, projection.locale);
+  let products = allProducts;
 
   const categoryFilter = String(category || "").trim();
   if (categoryFilter) {
@@ -820,12 +822,22 @@ export function getPublicCatalog({
 
   return {
     locale: projection.locale,
-    categories: buildCategories(listStorefrontProducts(settings)),
+    categories: buildCategories(allProducts),
     categoryTranslations: projection.categoryTranslations,
-    products,
+    // List cards need prices/units/images; details + priceSources are product-page only
+    // (/api/public/catalog/:code). Omitting them cuts ~2/3 of list JSON (memory/transfer);
+    // catalog long tasks are dominated by mounting cards, not JSON.parse.
+    products: products.map(toPublicCatalogListProduct),
     priceType,
     site: buildPublicSite(settings, new Date(), projection.locale),
   };
+}
+
+/** Catalog grid payload — omit fields fetched again on the product page. */
+export function toPublicCatalogListProduct(product) {
+  if (!product || typeof product !== "object") return product;
+  const { details: _details, priceSources: _priceSources, ...rest } = product;
+  return rest;
 }
 
 export function buildPublicSite(settingsInput, now = new Date(), language = "") {
