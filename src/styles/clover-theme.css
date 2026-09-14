@@ -5988,6 +5988,10 @@ body:has(.clover-app) {
   }
 
   .manager-bell-backdrop {
+    top: var(--clover-chrome-offset, 56px) !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
     z-index: 219 !important;
   }
 

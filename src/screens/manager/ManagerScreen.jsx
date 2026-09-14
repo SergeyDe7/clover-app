@@ -207,6 +207,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
               onToggle={() => {
                 setBellOpen((current) => !current);
               }}
+              onClose={() => setBellOpen(false)}
               onOpen={openFromNotification}
               onRead={(item) => { onReadNotification(item); }}
               onReadAll={() => { onReadAllNotifications(); setBellOpen(false); }}
