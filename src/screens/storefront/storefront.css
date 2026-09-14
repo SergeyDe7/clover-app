@@ -477,6 +477,14 @@ html.sf-catalog-lock .sf-main,
   gap: 10px;
   align-items: stretch;
 }
+.sf-catalog-load-sentinel {
+  width: 100%;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  pointer-events: none;
+}
 .sf-product-card {
   background: var(--clover-card-bg, #fff);
   border: 1px solid var(--clover-border, #dde5dc);
@@ -491,6 +499,9 @@ html.sf-catalog-lock .sf-main,
   min-height: 0;
   height: 100%;
   transition: transform .2s, box-shadow .2s;
+  /* Skip layout/paint for off-screen cards while React mounts the grid. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 360px;
 }
 .sf-product-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(28, 31, 28, 0.06); }
 .sf-product-media {
