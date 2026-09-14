@@ -379,7 +379,7 @@ assert.equal(
 );
 assert.equal(isIndexablePublicSearch("?utm_source=test&gclid=1"), true);
 assert.equal(isIndexablePublicSearch("?q=cup"), false);
-for (const name of ["cart", "checkout", "install-app"]) {
+for (const name of ["cart", "checkout"]) {
   assert.equal(
     publicDocumentPath({
       pathname: `/${name}`,
@@ -390,6 +390,15 @@ for (const name of ["cart", "checkout", "install-app"]) {
     `/${name}`
   );
 }
+assert.equal(
+  publicDocumentPath({
+    pathname: "/install-app",
+    locale: "en",
+    infrastructureEnabled: true,
+    localeEligible: true,
+  }),
+  "/en/install-app"
+);
 assert.equal(
   publicDocumentPath({
     pathname: "/catalog",
@@ -686,7 +695,7 @@ try {
   assert.deepEqual(parseHead(await query.text()).robots, ["noindex,follow"]);
   const tracking = await request("/en/catalog?utm_source=test");
   assert.deepEqual(parseHead(await tracking.text()).robots, ["index,follow"]);
-  for (const noindexPath of ["/cart", "/checkout", "/install-app"]) {
+  for (const noindexPath of ["/cart", "/checkout", "/install-app", "/en/install-app", "/ar/install-app"]) {
     const response = await request(noindexPath);
     assert.equal(response.status, 200, noindexPath);
     const head = parseHead(await response.text());

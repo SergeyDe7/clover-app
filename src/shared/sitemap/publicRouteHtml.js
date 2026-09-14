@@ -150,9 +150,7 @@ export function resolvePublicRouteRequest(manifest, rawUrl) {
     const noindex = describeNoindexPublicRoute(parsed.pathname, parsed.locale);
     if (noindex?.ok) {
       const locale = parsed.locale || DEFAULT_LOCALE;
-      const allowPrefix = !["cart", "checkout", "install-app"].includes(
-        noindex.name
-      );
+      const allowPrefix = !["cart", "checkout"].includes(noindex.name);
       const publicPath = allowPrefix
         ? publicPathForLocale(parsed.pathname, locale)
         : normalizePublicPathname(parsed.pathname);

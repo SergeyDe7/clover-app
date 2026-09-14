@@ -7,7 +7,11 @@ import {
   useState,
 } from "react";
 import { isLanguageEnabled, toPublicLocaleCode } from "./languageRegistry.js";
-import { readLanguagePreference, markExplicitLanguageChoice } from "./languagePreference.js";
+import {
+  readLanguagePreference,
+  readExplicitLanguageChoice,
+  markExplicitLanguageChoice,
+} from "./languagePreference.js";
 import { createLocalizationRuntime } from "./translationRuntime.js";
 import {
   applyRuntimeDocumentLocale,
@@ -38,8 +42,13 @@ function publicUrlLanguage() {
     window.location?.pathname || "/"
   );
   if (surface === "cabinet") return "";
-  // Storefront load signal: explicit prefix wins; unprefixed → ru.
-  return urlLocale || "ru";
+  // Prefixed URL wins. Unprefixed storefront (e.g. /install-app) keeps sticky/preference.
+  return (
+    urlLocale ||
+    readExplicitLanguageChoice() ||
+    readLanguagePreference() ||
+    "ru"
+  );
 }
 
 async function requestRuntimeSnapshot(language, signal) {
@@ -88,10 +97,17 @@ export function LocalizationProvider({
       preferredLanguage = locale;
     } else if (surface === "storefront") {
       // Prefixed public URLs are authoritative. Persist them so /lk inherits.
-      preferredLanguage = urlLocale || "ru";
+      // Unprefixed utility paths (install-app) must not silently reset sticky en→ru.
       if (urlLocale) {
+        preferredLanguage = urlLocale;
         const stored = markExplicitLanguageChoice(urlLocale);
         if (stored) preferenceRef.current = stored;
+      } else {
+        preferredLanguage =
+          readExplicitLanguageChoice() ||
+          readLanguagePreference() ||
+          preferenceRef.current ||
+          "ru";
       }
     } else {
       // Cabinet: live preference (not a stale mount-time ref).

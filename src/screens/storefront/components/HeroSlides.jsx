@@ -16,7 +16,9 @@ function prefersReducedMotion() {
 function heroRouteFromHref(href) {
   const path = String(href || "").trim();
   if (!path) return null;
-  if (path === "/install-app") return { name: "install-app" };
+  if (path === "/install-app" || path.endsWith("/install-app")) {
+    return { name: "install-app" };
+  }
   if (path === "/cart") return { name: "cart" };
   if (path === "/contacts") return { name: "contacts" };
   if (path === "/catalog" || path.startsWith("/catalog/")) {
@@ -37,6 +39,16 @@ function heroRouteFromHref(href) {
   return path;
 }
 
+/** Known default/CMS RU alts for the install hero slide → UI catalog. */
+const INSTALL_SLIDE_ALT_RU = new Set([
+  "Мобильное приложение Clover",
+  "Расходники для кафе и ресторанов",
+]);
+
+function isInstallHeroHref(href) {
+  return heroRouteFromHref(href)?.name === "install-app";
+}
+
 export function HeroSlides({ slides, intervalSec }) {
   const { t } = useLocalization();
   const list =
@@ -51,10 +63,28 @@ export function HeroSlides({ slides, intervalSec }) {
   const seconds = Number(intervalSec) || STOREFRONT_DEFAULT_HERO_INTERVAL_SEC;
   const current = list[index] || list[0];
   const href = resolveStorefrontHeroSlideHref(current, index);
+  const installHref = isInstallHeroHref(href);
+  const operatorButton = String(current?.buttonLabel || "").trim();
+  // Install banner: always expose a localized CTA (operator buttonLabel wins if set).
+  // Do not use raw CMS alt as the visible/accessible install label — it stays RU in prod.
+  const installCta =
+    installHref && !operatorButton ? t("storefront.appInstallGuide") : "";
+  const visibleBannerText = operatorButton || installCta;
   const linkLabel =
-    current?.buttonLabel ||
-    current?.alt ||
+    visibleBannerText ||
+    (!installHref ? String(current?.alt || "").trim() : "") ||
     t("storefront.appInstallGuide");
+
+  const slideImgAlt = (slide, slideIndex) => {
+    const raw = String(slide?.alt || "").trim();
+    const slideHref = resolveStorefrontHeroSlideHref(slide, slideIndex);
+    if (isInstallHeroHref(slideHref)) {
+      if (!raw || INSTALL_SLIDE_ALT_RU.has(raw)) {
+        return t("storefront.cloverMobileApp");
+      }
+    }
+    return raw;
+  };
 
   useEffect(() => {
     setIndex((currentIndex) => (currentIndex < list.length ? currentIndex : 0));
@@ -99,7 +129,7 @@ export function HeroSlides({ slides, intervalSec }) {
         <img
           key={slide.src}
           src={slide.src}
-          alt={slide.alt || ""}
+          alt={slideImgAlt(slide, slideIndex)}
           width="1400"
           height="746"
           loading={isFirstPaint ? "eager" : "lazy"}
@@ -107,11 +137,11 @@ export function HeroSlides({ slides, intervalSec }) {
           decoding={isFirstPaint ? "sync" : "async"}
           className={slideIndex === index ? "is-active" : ""}
         />
-        );
+      );
       })}
       {href ? (
         <a
-          className={`sf-hero-slide-link${current?.buttonLabel ? "" : " is-cover-only"}`}
+          className={`sf-hero-slide-link${visibleBannerText ? "" : " is-cover-only"}`}
           href={storefrontHref(heroRouteFromHref(href) || href)}
           aria-label={linkLabel}
           onClick={(event) => {
@@ -119,8 +149,8 @@ export function HeroSlides({ slides, intervalSec }) {
             openSlideLink();
           }}
         >
-          {current?.buttonLabel ? (
-            <span className="sf-hero-slide-btn">{current.buttonLabel}</span>
+          {visibleBannerText ? (
+            <span className="sf-hero-slide-btn">{visibleBannerText}</span>
           ) : null}
         </a>
       ) : null}

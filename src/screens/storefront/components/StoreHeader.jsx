@@ -85,9 +85,7 @@ export function StoreHeader({ current, route }) {
     typeof document !== "undefined" &&
     publicLocaleInfrastructureEnabledFromDocument(document);
   const routeLocale = route?.locale || locale;
-  const localeEligible = !["cart", "checkout", "install-app", "notFound"].includes(
-    route?.name
-  );
+  const localeEligible = !["cart", "checkout", "notFound"].includes(route?.name);
 
   useEffect(() => {
     const pending = pendingSwitchRef.current;

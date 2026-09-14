@@ -118,7 +118,8 @@ export function parseStorefrontRoute(
   if (parts.length === 1 && parts[0] === "aktsii") {
     return withLocale({ name: "aktsii" });
   }
-  if (parts.length === 1 && parts[0] === "install-app" && !prefixed.locale) {
+  // Locale-prefixed and bare /install-app both resolve (PWA guide must keep UI language).
+  if (parts.length === 1 && parts[0] === "install-app") {
     return withLocale({ name: "install-app" });
   }
   if (parts.length === 1 && STOREFRONT_INFO_SLUGS.includes(parts[0])) {
@@ -166,7 +167,7 @@ export function storefrontHref(
   const prefix = isStoreHost() ? "" : PREVIEW_PREFIX;
   const path = storefrontRoutePath(route);
   const routeName = typeof route === "object" ? route?.name : String(route || "home");
-  const localeEligible = !["cart", "checkout", "install-app"].includes(routeName);
+  const localeEligible = !["cart", "checkout"].includes(routeName);
 
   if (infrastructureEnabled && localeEligible) {
     const current =
