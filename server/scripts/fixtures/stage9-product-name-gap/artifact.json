@@ -1,0 +1,221 @@
+{
+  "format": "clover-stage9-product-name-gap",
+  "formatVersion": 1,
+  "quality": "AUTO_MACHINE_DRAFT",
+  "qualityNote": "Machine draft translations prepared for Stage 9 enablement gate. NOT verified by a native speaker. Brands, models, volumes and identity codes are preserved from the Russian source and catalog style.",
+  "nativeSpeakerVerified": false,
+  "baseMainSha": "44746e2627182d5d02aec3dffc621eb18146abc3",
+  "runId": "stage9-product-name-gap-723-725-v1",
+  "generatedAt": "2026-09-14T14:30:00.000Z",
+  "field": "name",
+  "productCount": 3,
+  "targetCellCount": 18,
+  "languages": ["en", "uz", "ky", "tg", "zh-CN", "ar"],
+  "sources": [
+    {
+      "productId": "723",
+      "code": "НФ-00003681",
+      "sourceRu": "Жидкое мыло Синергетик миндальное молочко 500 мл",
+      "sourceHash": "6257b2baa82897768db9e61ac7ae0d51ae5f6b08745b2bb7f9560d1798170505",
+      "characteristics": {
+        "brand": "Синергетик",
+        "volume": "500 мл",
+        "category": "Химия, чистящие средства",
+        "subcategory": "Мыло",
+        "saleUnits": ["piece"]
+      }
+    },
+    {
+      "productId": "724",
+      "code": "НФ-00000224",
+      "sourceRu": "Капхолдер крафт",
+      "sourceHash": "660683eb877b80f5dd37471701010822ef4b7028381aaf24f655acc2700d7a15",
+      "characteristics": {
+        "material": "крафт",
+        "category": "Одноразовая посуда",
+        "subcategory": "Стаканы",
+        "saleUnits": ["piece", "box"],
+        "pieceOrderMultiple": 50,
+        "boxSize": 1000
+      }
+    },
+    {
+      "productId": "725",
+      "code": "НФ-00000796",
+      "sourceRu": "Мыло-пена Keman S4 1л",
+      "sourceHash": "7257300b99d3c27fed7f0c555821f5502ff4430aaae77cbe96e5cdbb3964b7b1",
+      "characteristics": {
+        "brand": "Keman",
+        "model": "S4",
+        "volume": "1л",
+        "category": "Химия, чистящие средства",
+        "subcategory": "Мыло",
+        "saleUnits": ["piece"]
+      }
+    }
+  ],
+  "items": [
+    {
+      "productId": "723",
+      "field": "name",
+      "language": "en",
+      "sourceHash": "6257b2baa82897768db9e61ac7ae0d51ae5f6b08745b2bb7f9560d1798170505",
+      "sourceRu": "Жидкое мыло Синергетик миндальное молочко 500 мл",
+      "value": "liquid soap Synergetic almond milk 500 ml",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "723",
+      "field": "name",
+      "language": "uz",
+      "sourceHash": "6257b2baa82897768db9e61ac7ae0d51ae5f6b08745b2bb7f9560d1798170505",
+      "sourceRu": "Жидкое мыло Синергетик миндальное молочко 500 мл",
+      "value": "suyuq sovun Synergetic bodom suti 500 ml",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "723",
+      "field": "name",
+      "language": "ky",
+      "sourceHash": "6257b2baa82897768db9e61ac7ae0d51ae5f6b08745b2bb7f9560d1798170505",
+      "sourceRu": "Жидкое мыло Синергетик миндальное молочко 500 мл",
+      "value": "суюк самын Synergetic бадам сүтү 500 ml",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "723",
+      "field": "name",
+      "language": "tg",
+      "sourceHash": "6257b2baa82897768db9e61ac7ae0d51ae5f6b08745b2bb7f9560d1798170505",
+      "sourceRu": "Жидкое мыло Синергетик миндальное молочко 500 мл",
+      "value": "собуни моеъ Synergetic шири бодом 500 ml",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "723",
+      "field": "name",
+      "language": "zh-CN",
+      "sourceHash": "6257b2baa82897768db9e61ac7ae0d51ae5f6b08745b2bb7f9560d1798170505",
+      "sourceRu": "Жидкое мыло Синергетик миндальное молочко 500 мл",
+      "value": "洗手液 Synergetic 杏仁奶 500 ml",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "723",
+      "field": "name",
+      "language": "ar",
+      "sourceHash": "6257b2baa82897768db9e61ac7ae0d51ae5f6b08745b2bb7f9560d1798170505",
+      "sourceRu": "Жидкое мыло Синергетик миндальное молочко 500 мл",
+      "value": "صابون سائل Synergetic حليب لوز 500 ml",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "724",
+      "field": "name",
+      "language": "en",
+      "sourceHash": "660683eb877b80f5dd37471701010822ef4b7028381aaf24f655acc2700d7a15",
+      "sourceRu": "Капхолдер крафт",
+      "value": "cup holder kraft",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "724",
+      "field": "name",
+      "language": "uz",
+      "sourceHash": "660683eb877b80f5dd37471701010822ef4b7028381aaf24f655acc2700d7a15",
+      "sourceRu": "Капхолдер крафт",
+      "value": "stakan ushlagichi kraft",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "724",
+      "field": "name",
+      "language": "ky",
+      "sourceHash": "660683eb877b80f5dd37471701010822ef4b7028381aaf24f655acc2700d7a15",
+      "sourceRu": "Капхолдер крафт",
+      "value": "стакан кармагыч крафт",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "724",
+      "field": "name",
+      "language": "tg",
+      "sourceHash": "660683eb877b80f5dd37471701010822ef4b7028381aaf24f655acc2700d7a15",
+      "sourceRu": "Капхолдер крафт",
+      "value": "нигоҳдори пиёла крафт",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "724",
+      "field": "name",
+      "language": "zh-CN",
+      "sourceHash": "660683eb877b80f5dd37471701010822ef4b7028381aaf24f655acc2700d7a15",
+      "sourceRu": "Капхолдер крафт",
+      "value": "杯托 牛皮纸",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "724",
+      "field": "name",
+      "language": "ar",
+      "sourceHash": "660683eb877b80f5dd37471701010822ef4b7028381aaf24f655acc2700d7a15",
+      "sourceRu": "Капхолдер крафт",
+      "value": "حامل أكواب كرافت",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "725",
+      "field": "name",
+      "language": "en",
+      "sourceHash": "7257300b99d3c27fed7f0c555821f5502ff4430aaae77cbe96e5cdbb3964b7b1",
+      "sourceRu": "Мыло-пена Keman S4 1л",
+      "value": "soap-foam Keman S4 1 l",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "725",
+      "field": "name",
+      "language": "uz",
+      "sourceHash": "7257300b99d3c27fed7f0c555821f5502ff4430aaae77cbe96e5cdbb3964b7b1",
+      "sourceRu": "Мыло-пена Keman S4 1л",
+      "value": "sovun-ko‘pik Keman S4 1 l",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "725",
+      "field": "name",
+      "language": "ky",
+      "sourceHash": "7257300b99d3c27fed7f0c555821f5502ff4430aaae77cbe96e5cdbb3964b7b1",
+      "sourceRu": "Мыло-пена Keman S4 1л",
+      "value": "самын-көбүк Keman S4 1 l",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "725",
+      "field": "name",
+      "language": "tg",
+      "sourceHash": "7257300b99d3c27fed7f0c555821f5502ff4430aaae77cbe96e5cdbb3964b7b1",
+      "sourceRu": "Мыло-пена Keman S4 1л",
+      "value": "собун-кӯф Keman S4 1 l",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "725",
+      "field": "name",
+      "language": "zh-CN",
+      "sourceHash": "7257300b99d3c27fed7f0c555821f5502ff4430aaae77cbe96e5cdbb3964b7b1",
+      "sourceRu": "Мыло-пена Keman S4 1л",
+      "value": "皂-泡沫 Keman S4 1 l",
+      "quality": "AUTO_MACHINE_DRAFT"
+    },
+    {
+      "productId": "725",
+      "field": "name",
+      "language": "ar",
+      "sourceHash": "7257300b99d3c27fed7f0c555821f5502ff4430aaae77cbe96e5cdbb3964b7b1",
+      "sourceRu": "Мыло-пена Keman S4 1л",
+      "value": "صابون-رغوة Keman S4 1 l",
+      "quality": "AUTO_MACHINE_DRAFT"
+    }
+  ]
+}

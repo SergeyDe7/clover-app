@@ -221,7 +221,8 @@ for (const code of ["en", "uz", "ky", "tg", "zh", "ar"]) {
   assert.equal(report.domains.products.complete, false, `${code} products`);
   assert.equal(report.domains.categories.complete, true, `${code} categories`);
   assert.equal(report.domains.pages.complete, true, `${code} pages`);
-  assert.equal(report.domains.faq.complete, false, `${code} faq`);
+  assert.equal(report.domains.faq.total, 0, `${code} faq.total`);
+  assert.equal(report.domains.faq.complete, true, `${code} faq empty is optional`);
   assert.equal(report.domains.seo.complete, true, `${code} seo`);
   assert.equal(report.complete, false, `${code} overall`);
 }

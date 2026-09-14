@@ -20,6 +20,7 @@ import {
 } from "./publicLocaleRouting.js";
 
 const RUNTIME_ENDPOINT = "/api/public/localization/runtime";
+const STOREFRONT_PREVIEW_PREFIX = "/vitrina";
 const defaultRuntime = Object.freeze({
   ...createLocalizationRuntime(),
   enabledLanguages: Object.freeze(["ru"]),
@@ -32,8 +33,14 @@ const LocalizationContext = createContext(defaultRuntime);
 function publicUrlLanguage() {
   if (typeof window === "undefined" || typeof document === "undefined") return "";
   if (!publicLocaleInfrastructureEnabledFromDocument(document)) return "";
-  const pathname = String(window.location?.pathname || "/");
+  let pathname = String(window.location?.pathname || "/");
   if (pathname === "/lk" || pathname.startsWith("/lk/")) return "";
+  // Preview shell (/vitrina/…) must not hide the public locale segment.
+  if (pathname === STOREFRONT_PREVIEW_PREFIX || pathname === `${STOREFRONT_PREVIEW_PREFIX}/`) {
+    pathname = "/";
+  } else if (pathname.startsWith(`${STOREFRONT_PREVIEW_PREFIX}/`)) {
+    pathname = pathname.slice(STOREFRONT_PREVIEW_PREFIX.length) || "/";
+  }
   const parsed = extractPublicLanguagePrefix(pathname, {
     infrastructureEnabled: true,
   });
