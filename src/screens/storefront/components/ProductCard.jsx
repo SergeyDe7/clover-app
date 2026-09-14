@@ -1,6 +1,6 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { categoryDisplayNameFromCanonical } from "../../../shared/i18n/categoryDisplayProjection.js";
-import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
+import { useCategoryDisplayOptions } from "../../../shared/i18n/useCategoryTranslations.js";
 import { useEffect, useMemo, useState } from "react";
 import { formatMoney, navigateStorefront } from "./StoreHeader.jsx";
 import {
@@ -15,12 +15,17 @@ import {
 } from "./StorefrontUnitChoice.jsx";
 import { productCardImageLoadingAttrs } from "./productCardImage.js";
 
-export function ProductCard({ product, imagePriorityIndex = Number.POSITIVE_INFINITY }) {
-  const { t, locale } = useLocalization();
+export function ProductCard({
+  product,
+  imagePriorityIndex = Number.POSITIVE_INFINITY,
+  categoryTranslations,
+}) {
+  const { t } = useLocalization();
+  const categoryOptions = useCategoryDisplayOptions(categoryTranslations);
   const categoryLabel = categoryDisplayNameFromCanonical(
     product.category,
     "",
-    storefrontCategoryDisplayOptions(locale)
+    categoryOptions
   );
   const units = useMemo(() => orderedSaleUnits(product), [product]);
   const [unit, setUnit] = useState(() => units[0] || "piece");

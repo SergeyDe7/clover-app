@@ -409,7 +409,7 @@ export function CatalogPage({
                     {categoryDisplayNameFromCanonical(
                       section.name,
                       "",
-                      storefrontCategoryDisplayOptions(locale)
+                      categoryOptions
                     )}
                   </h2>
                 </div>
@@ -420,6 +420,7 @@ export function CatalogPage({
                     key={product.id}
                     product={product}
                     imagePriorityIndex={imagePriorityById.get(product.id)}
+                    categoryTranslations={currentPayload?.categoryTranslations}
                   />
                 ))}
               </div>

@@ -13,10 +13,12 @@ function weekdayLabels(t) {
   return [t("client.mo"), t("client.tu"), t("client.we"), t("client.th"), t("client.fr"), t("client.sa"), t("client.su")];
 }
 
-function monthTitle(year, monthIndex) {
-  const label = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" }).format(
-    new Date(year, monthIndex, 1)
-  );
+function monthTitle(year, monthIndex, locale = "ru") {
+  const dateLocale = locale === "zh" ? "zh-CN" : locale || "ru";
+  const label = new Intl.DateTimeFormat(dateLocale, {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(year, monthIndex, 1));
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
@@ -39,7 +41,7 @@ function buildMonthCells(year, monthIndex) {
 }
 
 export function DeliveryDateCalendar({ value, earliestIso, onPick }) {
-  const { t } = useLocalization();
+  const { t, locale } = useLocalization();
   const initial = parseLocalIsoDate(value) || parseLocalIsoDate(earliestIso) || new Date();
   const [cursor, setCursor] = useState({
     year: initial.getFullYear(),
@@ -73,7 +75,7 @@ export function DeliveryDateCalendar({ value, earliestIso, onPick }) {
         <button type="button" className="header-button" disabled={!canGoPrev} onClick={() => shiftMonth(-1)} aria-label={t("client.previousMonth")}>
           ←
         </button>
-        <strong>{monthTitle(cursor.year, cursor.month)}</strong>
+        <strong>{monthTitle(cursor.year, cursor.month, locale)}</strong>
         <button type="button" className="header-button" onClick={() => shiftMonth(1)} aria-label={t("client.nextMonth")}>
           →
         </button>

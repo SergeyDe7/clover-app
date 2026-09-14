@@ -1,6 +1,6 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { categoryDisplayNameFromCanonical } from "../../../shared/i18n/categoryDisplayProjection.js";
-import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
+import { useCategoryDisplayOptions } from "../../../shared/i18n/useCategoryTranslations.js";
 import { GroupIcon } from "./GroupIcon.jsx";
 import { getGroupMeta } from "../productGroups.js";
 import { navigateStorefront } from "./StoreHeader.jsx";
@@ -32,12 +32,18 @@ function productsCountLabel(count, t) {
   return `${n} ${word}`;
 }
 
-export function GroupTile({ name, count = null, className = "" }) {
-  const { t, locale } = useLocalization();
+export function GroupTile({
+  name,
+  count = null,
+  className = "",
+  translations,
+}) {
+  const { t } = useLocalization();
+  const categoryOptions = useCategoryDisplayOptions(translations);
   const displayName = categoryDisplayNameFromCanonical(
     name,
     "",
-    storefrontCategoryDisplayOptions(locale)
+    categoryOptions
   );
   const meta = getGroupMeta(name);
   const showCount =

@@ -330,8 +330,18 @@ export const api = {
     });
   },
 
-  bootstrap() {
-    return request("/bootstrap", { timeoutMs: BOOTSTRAP_TIMEOUT_MS });
+  bootstrap(language = "") {
+    const query = new URLSearchParams();
+    if (language) query.set("language", language);
+    const suffix = query.toString() ? `?${query}` : "";
+    return request(`/bootstrap${suffix}`, { timeoutMs: BOOTSTRAP_TIMEOUT_MS });
+  },
+
+  productDisplay(language = "") {
+    const query = new URLSearchParams();
+    if (language) query.set("language", language);
+    const suffix = query.toString() ? `?${query}` : "";
+    return request(`/client/product-display${suffix}`);
   },
 
   saveOrders(orders) {

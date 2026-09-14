@@ -1,11 +1,9 @@
 /**
- * Stage 5.1 storefront category display options.
+ * Storefront / cabinet category display options.
  *
- * Production freeze: only RU is enabled. Live category translation bags / foreign
- * activation transport belong to Stage 6 — do not invent selectors or locale URLs here.
- *
- * Projection remains capable of controlled foreign rendering when a caller explicitly
- * supplies an allowed locale + prepared translations (tests / future Stage 6 wiring).
+ * Default enabledLanguages stays ["ru"] (fail-closed) when callers omit the live
+ * policy. Stage 9+ screens must pass LocalizationProvider.enabledLanguages plus
+ * the public categoryTranslations bag so foreign labels can render.
  */
 export const STOREFRONT_CATEGORY_ENABLED_LANGUAGES = Object.freeze(["ru"]);
 

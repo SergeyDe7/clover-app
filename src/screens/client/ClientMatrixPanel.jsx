@@ -1,4 +1,6 @@
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { categoryDisplayNameFromCanonical } from "../../shared/i18n/categoryDisplayProjection.js";
+import { useCategoryDisplayOptions } from "../../shared/i18n/useCategoryTranslations.js";
 // Панель персональной матрицы товаров клиента.
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -12,6 +14,7 @@ import {
   productCatalogSearchHaystack,
 } from "../../shared/appHelpers";
 import { unitDisplayLabel, unitDisplayShort } from "../../shared/i18n/unitDisplay.js";
+import { productDisplayName } from "../../shared/i18n/productDisplayName.js";
 import { sortProductsWithLidsGrouped } from "../../shared/productCatalogOrder.js";
 import { productImageSrc } from "../../shared/productPhoto";
 import { CatalogSearchInput } from "./CatalogSearchInput";
@@ -29,6 +32,7 @@ export function ClientMatrixPanel({
   onCreateOrder,
 }) {
   const { t } = useLocalization();
+  const categoryOptions = useCategoryDisplayOptions();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Все");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -128,7 +132,7 @@ export function ClientMatrixPanel({
               key={item}
               onClick={() => setCategory(item)}
             >
-              {item === "Все" ? t("shared.filter.all") : item}
+              {item === "Все" ? t("shared.filter.all") : categoryDisplayNameFromCanonical(item, "", categoryOptions)}
             </button>
           ))}
         </div>
@@ -158,7 +162,7 @@ export function ClientMatrixPanel({
       ) : (
         <p className="client-matrix-meta">
           {t("client.matrix.activePositions", { count: activeProducts.length })}
-          {activeCategory !== "Все" ? t("client.matrix.categoryCount", { name: activeCategory, count: filtered.length }) : ""}
+          {activeCategory !== "Все" ? t("client.matrix.categoryCount", { name: categoryDisplayNameFromCanonical(activeCategory, "", categoryOptions), count: filtered.length }) : ""}
         </p>
       )}
 
@@ -210,12 +214,12 @@ export function ClientMatrixPanel({
               </div>
               <div className="product-image-wrap">
                 {product.imageUrl ? (
-                  <img className="product-image" src={productImageSrc(product)} alt={product.name} loading="lazy" />
+                  <img className="product-image" src={productImageSrc(product)} alt={productDisplayName(product)} loading="lazy" />
                 ) : (
                   <span className="product-image-placeholder">{t("shared.media.noPhoto")}</span>
                 )}
               </div>
-              <h2>{product.name}</h2>
+              <h2>{productDisplayName(product)}</h2>
               <p className="product-code">{t("shared.article.prefix", { article: productArticle(product) || "—" })}</p>
               <p className="product-price">
                 {settings?.showPrices && price > 0 ? (
