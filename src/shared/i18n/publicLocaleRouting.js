@@ -287,10 +287,14 @@ export function resolvePublicUrlLocale({
 export function describeNoindexPublicRoute(pathname, locale = null) {
   const path = normalizePublicPathname(pathname);
   const parts = path.split("/").filter(Boolean);
-  if (parts.length === 1 && ["cart", "checkout", "install-app"].includes(parts[0])) {
+  if (parts.length === 1 && ["cart", "checkout"].includes(parts[0])) {
     return locale
       ? { ok: false, reason: "locale-prefix-not-allowed" }
       : { ok: true, name: parts[0], pathname: path };
+  }
+  // Install guide is localizable and noindex (prefixed or bare).
+  if (parts.length === 1 && parts[0] === "install-app") {
+    return { ok: true, name: "install-app", pathname: path };
   }
   if (parts[0] === "catalog" && parts.length === 4) {
     return { ok: true, name: "catalog", facet: parts[3], pathname: path };

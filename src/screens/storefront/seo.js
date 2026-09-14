@@ -162,15 +162,10 @@ export function storefrontRouteDocumentMeta(route, site, options = {}) {
     options.infrastructureEnabled ??
     (typeof document !== "undefined" &&
       publicLocaleInfrastructureEnabledFromDocument(document));
-  const localeEligible = ![
-    "cart",
-    "checkout",
-    "install-app",
-    "notFound",
-  ].includes(route?.name);
+  const localeEligible = !["cart", "checkout", "notFound"].includes(route?.name);
   const routeHref = (value) => {
     const name = typeof value === "object" ? value?.name : String(value || "home");
-    const eligible = !["cart", "checkout", "install-app"].includes(name);
+    const eligible = !["cart", "checkout"].includes(name);
     const canonicalPath = publicDocumentPath({
       pathname: storefrontRoutePath(value),
       locale,
@@ -270,6 +265,9 @@ export function storefrontRouteDocumentMeta(route, site, options = {}) {
       description: STOREFRONT_DEFAULT_DESCRIPTION,
       path: routeHref(route),
       ...common,
+      // Utility PWA guide: localizable, but stay noindex (Stage 7 contract).
+      indexable: false,
+      alternates: [],
     };
   }
   if (route.name === "contacts") {
