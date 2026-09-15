@@ -314,9 +314,16 @@ const RAW_CATALOG = [
   },
   {
     "key": "auth.documentTitle",
-    "sourceRu": "Личный кабинет | КЛЕВЕР",
+    "sourceRu": "Вход | КЛЕВЕР",
     "namespace": "ui",
     "surface": "auth",
+    "critical": false
+  },
+  {
+    "key": "client.documentTitle",
+    "sourceRu": "Личный кабинет | КЛЕВЕР",
+    "namespace": "ui",
+    "surface": "client",
     "critical": false
   },
   {

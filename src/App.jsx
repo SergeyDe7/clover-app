@@ -597,12 +597,15 @@ function mergeOrdersFromServer(previous, incoming, { clientMode = false } = {}) 
 
 function App() {
   const { t, setLanguage, invalidateLanguageRequests } = useLocalization();
-  useEffect(() => {
-    document.title = t("auth.documentTitle");
-  }, [t]);
   const [role, setRole] = useState("client");
   const [authUser, setAuthUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getApiToken()));
+  useEffect(() => {
+    // Login keeps «Вход»; authenticated cabinet uses «Личный кабинет».
+    document.title = isLoggedIn
+      ? t("client.documentTitle")
+      : t("auth.documentTitle");
+  }, [t, isLoggedIn]);
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState("");
   const [loading, setLoading] = useState(Boolean(getApiToken()));

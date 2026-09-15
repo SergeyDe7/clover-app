@@ -369,6 +369,14 @@ export const SEEDS = {
     "zh-CN": "登录 | CLOVER",
     "ar": "تسجيل الدخول | CLOVER"
   },
+  "client.documentTitle": {
+    "en": "Personal account | CLOVER",
+    "uz": "Shaxsiy kabinet | CLOVER",
+    "ky": "Жеке кабинет | CLOVER",
+    "tg": "Кабинети шахсӣ | CLOVER",
+    "zh-CN": "个人账户 | CLOVER",
+    "ar": "الحساب الشخصي | CLOVER"
+  },
   "manager.nav.orders": {
     "en": "Orders",
     "uz": "Buyurtmalar",
