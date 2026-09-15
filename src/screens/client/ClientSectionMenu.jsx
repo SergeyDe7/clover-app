@@ -16,11 +16,11 @@ export function ClientSectionMenu({
   const rootRef = useRef(null);
   const { t } = useLocalization();
   const SHORT_LABELS = {
-    matrix: t("client.matrix.short"),
-    catalog: t("storefront.nav.catalog"),
-    orders: t("manager.nav.orders"),
-    reconciliation: t("client.reconciliation"),
-    cabinet: t("manager.nav.settings"),
+    matrix: t("client.nav.matrix"),
+    catalog: t("client.nav.catalog"),
+    orders: t("client.nav.orders"),
+    reconciliation: t("client.nav.reconciliation"),
+    cabinet: t("client.nav.cabinet"),
   };
   const active = tabs.find(([id]) => id === activeId) || tabs[0];
   const activeLabel =

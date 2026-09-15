@@ -17,7 +17,12 @@ export function storefrontCategoryDisplayOptions(
     enabledLanguages: Array.isArray(enabledLanguages)
       ? enabledLanguages
       : STOREFRONT_CATEGORY_ENABLED_LANGUAGES,
+    // Preserve undefined (= bag still loading) so projection can withhold RU.
     translations:
-      translations && typeof translations === "object" ? translations : {},
+      translations === undefined
+        ? undefined
+        : translations && typeof translations === "object"
+          ? translations
+          : {},
   };
 }
