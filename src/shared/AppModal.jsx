@@ -118,6 +118,38 @@ export async function appAlert({
   });
 }
 
+/**
+ * Multi-choice dialog. Distinguishes explicit choice values from dismiss.
+ * @param {object} options
+ * @param {string} [options.title]
+ * @param {string} [options.message]
+ * @param {Array<{ value: string, label: string, tone?: string }>} options.choices
+ * @returns {Promise<string|null>} selected value, or null on Escape/backdrop/close/host-unavailable
+ */
+export async function appChoice({
+  title,
+  message = "",
+  choices = [],
+  tone = "default",
+} = {}) {
+  const list = Array.isArray(choices)
+    ? choices.filter((item) => item && item.value != null && String(item.label || "").trim())
+    : [];
+  if (!list.length) return null;
+
+  const host = await ensureHost();
+  // Fail closed: never map dismiss to a destructive value via window.confirm.
+  if (!host) return null;
+
+  return host({
+    mode: "choice",
+    title,
+    message,
+    choices: list,
+    tone,
+  });
+}
+
 function toneCardClass(tone) {
   if (tone === "danger") return "app-modal-tone-danger";
   if (tone === "warn") return "app-modal-tone-warn";
@@ -167,7 +199,9 @@ export function AppModalHost() {
       if (event.key === "Escape") {
         const { resolve, mode } = dialog;
         setDialog(null);
-        resolve(mode === "confirm" ? false : undefined);
+        if (mode === "confirm") resolve(false);
+        else if (mode === "choice") resolve(null);
+        else resolve(undefined);
       }
     };
     const html = document.documentElement;
@@ -207,13 +241,14 @@ export function AppModalHost() {
   if (!dialog || typeof document === "undefined") return null;
 
   const isConfirm = dialog.mode === "confirm";
+  const isChoice = dialog.mode === "choice";
   const resolvedTitle = nonEmptyText(
     isOmitted(dialog.title)
-      ? isConfirm
+      ? isConfirm || isChoice
         ? t("shared.modal.confirmTitle")
         : t("shared.modal.alertTitle")
       : dialog.title,
-    isConfirm ? HOST_UNAVAILABLE_RU.confirmTitle : HOST_UNAVAILABLE_RU.alertTitle
+    isConfirm || isChoice ? HOST_UNAVAILABLE_RU.confirmTitle : HOST_UNAVAILABLE_RU.alertTitle
   );
   const resolvedConfirmLabel = nonEmptyText(
     isOmitted(dialog.confirmLabel)
@@ -239,12 +274,15 @@ export function AppModalHost() {
     dialog.tone === "danger"
       ? "danger-button order-thankyou-button"
       : "primary-button order-thankyou-button";
+  const choiceList = isChoice && Array.isArray(dialog.choices) ? dialog.choices : [];
 
   const close = (value) => {
     const { resolve } = dialog;
     setDialog(null);
     resolve(value);
   };
+
+  const dismissValue = isConfirm ? false : isChoice ? null : undefined;
 
   const overlayStyle = {
     position: "fixed",
@@ -299,7 +337,7 @@ export function AppModalHost() {
       className={`order-thankyou app-modal-shell${isMobile ? " order-thankyou-mobile" : ""}`}
       role="presentation"
       style={overlayStyle}
-      onClick={() => close(isConfirm ? false : undefined)}
+      onClick={() => close(dismissValue)}
     >
       <div
         className={`order-thankyou-card ${toneCardClass(dialog.tone)}`.trim()}
@@ -334,25 +372,57 @@ export function AppModalHost() {
             </ul>
           </details>
         ) : null}
-        <div className={`app-modal-actions${isConfirm ? "" : " app-modal-actions-single"}`}>
-          {isConfirm ? (
+        {isChoice ? (
+          <div className="app-modal-actions app-modal-actions-choice">
+            {choiceList.map((choice, index) => {
+              const choiceTone = choice.tone || "default";
+              const className =
+                choiceTone === "danger"
+                  ? "danger-button order-thankyou-button"
+                  : choiceTone === "secondary"
+                    ? "secondary-button order-thankyou-button"
+                    : "primary-button order-thankyou-button";
+              return (
+                <button
+                  key={`${choice.value}-${index}`}
+                  className={className}
+                  type="button"
+                  autoFocus={index === 0}
+                  onClick={() => close(choice.value)}
+                >
+                  {choice.label}
+                </button>
+              );
+            })}
             <button
-              className="secondary-button order-thankyou-button"
+              className="secondary-button order-thankyou-button app-modal-choice-cancel"
               type="button"
-              onClick={() => close(false)}
+              onClick={() => close(null)}
             >
               {resolvedCancelLabel}
             </button>
-          ) : null}
-          <button
-            className={confirmClass}
-            type="button"
-            autoFocus
-            onClick={() => close(isConfirm ? true : undefined)}
-          >
-            {resolvedConfirmLabel}
-          </button>
-        </div>
+          </div>
+        ) : (
+          <div className={`app-modal-actions${isConfirm ? "" : " app-modal-actions-single"}`}>
+            {isConfirm ? (
+              <button
+                className="secondary-button order-thankyou-button"
+                type="button"
+                onClick={() => close(false)}
+              >
+                {resolvedCancelLabel}
+              </button>
+            ) : null}
+            <button
+              className={confirmClass}
+              type="button"
+              autoFocus
+              onClick={() => close(isConfirm ? true : undefined)}
+            >
+              {resolvedConfirmLabel}
+            </button>
+          </div>
+        )}
       </div>
     </div>,
     document.documentElement

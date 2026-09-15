@@ -1748,6 +1748,55 @@ const RAW_CATALOG = [
     "critical": true
   },
   {
+    "key": "client.cart.unitChange.title",
+    "sourceRu": "Изменить единицу измерения?",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.cart.unitChange.question",
+    "sourceRu": "Вы хотите изменить единицу измерения или удалить товар из заказа?",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.cart.unitChange.transition",
+    "sourceRu": "{quantity} {oldUnit} → {quantity} {newUnit}",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.cart.unitChange.invalidMultiple",
+    "sourceRu": "Количество {quantity} не кратно шагу {multiple} для единицы «{unit}».",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.cart.unitChange.changeAction",
+    "sourceRu": "Изменить",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.cart.itemDelete.title",
+    "sourceRu": "Удалить позицию из заказа?",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
+    "key": "client.cart.itemDelete.question",
+    "sourceRu": "Точно хотите удалить эту позицию из заказа?",
+    "namespace": "ui",
+    "surface": "client",
+    "critical": true
+  },
+  {
     "key": "client.orPlaceTheOrderWithPaid",
     "sourceRu": "либо оформите заказ с платной доставкой.",
     "namespace": "ui",

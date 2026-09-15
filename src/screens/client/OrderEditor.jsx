@@ -43,8 +43,20 @@ import { productImageSrc } from "../../shared/productPhoto";
 import { ManagerContact } from "./ManagerContact";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
 import { CatalogSearchInput } from "./CatalogSearchInput";
-import { appAlert, appConfirm } from "../../shared/AppModal";
+import { appAlert, appChoice, appConfirm } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
+import {
+  applyCatalogUnitResetState,
+  canOpenCartMutationDialog,
+  cartRowPendingKey,
+  classifyCartSwipeGesture,
+  removeCustomItemFromList,
+  removeProductFromCartState,
+  resolveCustomQtyDeltaAction,
+  resolveCustomQtyDraftCommit,
+  shouldSuppressUnitChoiceForDirtyDraft,
+  validateCartUnitChange,
+} from "../../shared/clientCartMutations";
 
 function CatalogViewToggleIcon({ variant }) {
     if (variant === "list") {
@@ -165,6 +177,8 @@ export function OrderEditor({
   );
   /** Черновик ввода в поле шт (чтобы «100» не сбрасывалось на «1» при наборе). */
   const [qtyDrafts, setQtyDrafts] = useState({});
+  /** Draft for custom-item qty so typing "0" does not delete until confirm. */
+  const [customQtyDrafts, setCustomQtyDrafts] = useState({});
   const [units, setUnits] = useState(() => {
     const result = {};
     (initialSource.items || []).forEach((item) => {
@@ -185,6 +199,8 @@ export function OrderEditor({
         }))
       : initialSource.customItems || []
   );
+  /** Visual busy key for the row that owns an open cart destructive dialog. */
+  const [cartRowPending, setCartRowPending] = useState(null);
   const [deliveryDate, setDeliveryDate] = useState(() => {
     const initial = initialSource.firstDeliveryDate || "";
     if (!initial) return "";
@@ -204,6 +220,16 @@ export function OrderEditor({
   const catalogToolbarRef = useRef(null);
   const cartSlotRef = useRef(null);
   const cartPanelRef = useRef(null);
+  const cartSheetHeadingRef = useRef(null);
+  const cartRowElsRef = useRef(new Map());
+  const cartMutationDialogPendingRef = useRef(false);
+  const suppressUnitChoiceIdsRef = useRef(new Set());
+  const swipeGestureRef = useRef(null);
+  const customItemsRef = useRef(customItems);
+  const customQtyDraftsRef = useRef(customQtyDrafts);
+  const customQtyBusyRef = useRef(new Set());
+  customItemsRef.current = customItems;
+  customQtyDraftsRef.current = customQtyDrafts;
   const earliestDeliveryDate = getEarliestDeliveryDateIso();
 
   // Один layout-pass: сначала сетка каталог|корзина, потом fixed-тулбар.
@@ -717,10 +743,156 @@ export function OrderEditor({
     });
   };
 
-  const changeQuantity = (id, delta, step = 1) => {
+  const clearCustomQtyDraft = (id) => {
+    setCustomQtyDrafts((current) => {
+      if (current[id] === undefined) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  };
+
+  const focusAfterCartDelete = (rowKey) => {
+    window.setTimeout(() => {
+      const map = cartRowElsRef.current;
+      const keys = [...map.keys()];
+      const idx = keys.indexOf(rowKey);
+      const nextKey = idx >= 0 ? keys[idx + 1] || keys[idx - 1] : null;
+      const nextEl = nextKey ? map.get(nextKey) : null;
+      if (nextEl && typeof nextEl.focus === "function") {
+        nextEl.focus();
+        return;
+      }
+      cartSheetHeadingRef.current?.focus?.();
+    }, 0);
+  };
+
+  const withCartMutationDialog = async (rowKey, run) => {
+    if (!canOpenCartMutationDialog(cartMutationDialogPendingRef.current)) {
+      return null;
+    }
+    cartMutationDialogPendingRef.current = true;
+    setCartRowPending(rowKey);
+    try {
+      return await run();
+    } finally {
+      cartMutationDialogPendingRef.current = false;
+      setCartRowPending(null);
+    }
+  };
+
+  const markSuppressUnitChoice = (productId) => {
+    if (shouldSuppressUnitChoiceForDirtyDraft(qtyDrafts[productId] !== undefined)) {
+      suppressUnitChoiceIdsRef.current.add(String(productId));
+    }
+  };
+
+  const clearSuppressUnitChoice = (productId) => {
+    suppressUnitChoiceIdsRef.current.delete(String(productId));
+  };
+
+  const consumeSuppressUnitChoice = (productId) => {
+    const sid = String(productId);
+    if (suppressUnitChoiceIdsRef.current.has(sid)) {
+      suppressUnitChoiceIdsRef.current.delete(sid);
+      return true;
+    }
+    return false;
+  };
+
+  const removeCartProduct = (id) => {
+    setCart((currentCart) => {
+      const snapshot = removeProductFromCartState({
+        cart: currentCart,
+        cartOrder: [],
+        qtyDrafts: {},
+        productId: id,
+      });
+      return snapshot.cart;
+    });
+    setCartOrder((currentOrder) =>
+      removeProductFromCartState({
+        cart: {},
+        cartOrder: currentOrder,
+        qtyDrafts: {},
+        productId: id,
+      }).cartOrder
+    );
+    setQtyDrafts((currentDrafts) =>
+      removeProductFromCartState({
+        cart: {},
+        cartOrder: [],
+        qtyDrafts: currentDrafts,
+        productId: id,
+      }).qtyDrafts
+    );
+  };
+
+  const requestRemoveCartProduct = async (id, { trigger = null } = {}) => {
+    const rowKey = cartRowPendingKey("product", id);
+    try {
+      const result = await withCartMutationDialog(rowKey, async () => {
+        const ok = await appConfirm({
+          title: t("client.cart.itemDelete.title"),
+          message: t("client.cart.itemDelete.question"),
+          confirmLabel: t("shared.action.delete"),
+          cancelLabel: t("shared.modal.cancel"),
+          tone: "danger",
+        });
+        if (!ok) return false;
+        removeCartProduct(id);
+        return true;
+      });
+      if (result === true) {
+        focusAfterCartDelete(rowKey);
+      } else if (result === false && trigger?.focus) {
+        trigger.focus();
+      }
+      return result === true;
+    } finally {
+      // Zero-draft + unit pointerdown may disable the unit button before click,
+      // so consumeSuppressUnitChoice never runs. Always release after delete flow.
+      clearSuppressUnitChoice(id);
+    }
+  };
+
+  const removeCustomItem = (id) => {
+    setCustomItems((current) => removeCustomItemFromList(current, id));
+    clearCustomQtyDraft(id);
+  };
+
+  const requestRemoveCustomItem = async (id, { trigger = null } = {}) => {
+    const rowKey = cartRowPendingKey("custom", id);
+    const result = await withCartMutationDialog(rowKey, async () => {
+      const ok = await appConfirm({
+        title: t("client.cart.itemDelete.title"),
+        message: t("client.cart.itemDelete.question"),
+        confirmLabel: t("shared.action.delete"),
+        cancelLabel: t("shared.modal.cancel"),
+        tone: "danger",
+      });
+      if (!ok) return false;
+      removeCustomItem(id);
+      return true;
+    });
+    if (result === true) {
+      focusAfterCartDelete(rowKey);
+    } else if (result === false && trigger?.focus) {
+      trigger.focus();
+    }
+    return result === true;
+  };
+
+  const changeQuantity = async (id, delta, step = 1, trigger = null) => {
     const orderStep = Math.max(1, Number(step) || 1);
+    const currentQty = Number(cart[id]) || 0;
+    const nextValue = Math.max(0, currentQty + delta * orderStep);
+    if (nextValue <= 0 && currentQty > 0) {
+      clearQtyDraft(id);
+      await requestRemoveCartProduct(id, { trigger });
+      return;
+    }
     clearQtyDraft(id);
-    const nextValue = Math.max(0, (Number(cart[id]) || 0) + delta * orderStep);
     syncCartOrder(id, nextValue);
     setCart((current) => {
       const next = { ...current };
@@ -730,8 +902,7 @@ export function OrderEditor({
     });
   };
 
-  const setItemQuantity = (id, value, multiplier = 1, orderStep = 1) => {
-    const nextValue = fromQuantityInputValue(value, multiplier, orderStep);
+  const setItemQuantityPositive = (id, nextValue) => {
     syncCartOrder(id, nextValue);
     setCart((current) => {
       const next = { ...current };
@@ -741,9 +912,18 @@ export function OrderEditor({
     });
   };
 
-  const commitQtyDraft = (id, multiplier = 1, orderStep = 1) => {
+  const commitQtyDraft = async (id, multiplier = 1, orderStep = 1, trigger = null) => {
     if (qtyDrafts[id] === undefined) return;
-    setItemQuantity(id, qtyDrafts[id], multiplier, orderStep);
+    const draftValue = qtyDrafts[id];
+    const nextValue = fromQuantityInputValue(draftValue, multiplier, orderStep);
+    if (nextValue <= 0) {
+      const removed = await requestRemoveCartProduct(id, { trigger });
+      if (!removed) {
+        clearQtyDraft(id);
+      }
+      return;
+    }
+    setItemQuantityPositive(id, nextValue);
     clearQtyDraft(id);
   };
 
@@ -752,35 +932,283 @@ export function OrderEditor({
     return quantity ? String(toQuantityInputValue(quantity, multiplier)) : "";
   };
 
-  const setProductUnit = (productId, nextUnit) => {
+  /** Catalog card: legacy unit switch resets/removes selected qty. */
+  const setCatalogProductUnit = (productId, nextUnit) => {
     const product = products.find((item) => item.id === productId);
     const currentUnit =
       units[productId] || (product ? orderedSaleUnits(product)[0] : nextUnit);
     if (currentUnit === nextUnit) return;
 
-    clearQtyDraft(productId);
-    setUnits((current) => ({ ...current, [productId]: nextUnit }));
-    if (productId in cart || String(productId) in cart) {
-      syncCartOrder(productId, 0);
-      setCart((current) => {
-        if (!(productId in current)) return current;
-        const next = { ...current };
-        delete next[productId];
-        return next;
+    const snapshot = applyCatalogUnitResetState({
+      cart,
+      units,
+      cartOrder,
+      qtyDrafts,
+      productId,
+      nextUnit,
+    });
+    // If product was not in cart, only update units (same as legacy when not in cart).
+    if (!(productId in cart || String(productId) in cart)) {
+      clearQtyDraft(productId);
+      setUnits((current) => ({ ...current, [productId]: nextUnit }));
+      return;
+    }
+    setUnits(snapshot.units);
+    setCart(snapshot.cart);
+    setCartOrder(snapshot.cartOrder);
+    setQtyDrafts(snapshot.qtyDrafts);
+  };
+
+  /** Cart sheet only: CHANGE / DELETE / DISMISS via appChoice. */
+  const requestCartProductUnitChange = async (productId, nextUnit, trigger = null) => {
+    if (consumeSuppressUnitChoice(productId)) {
+      return;
+    }
+    if (shouldSuppressUnitChoiceForDirtyDraft(qtyDrafts[productId] !== undefined)) {
+      return;
+    }
+
+    const product = products.find((item) => String(item.id) === String(productId));
+    const currentUnit =
+      units[productId] || (product ? orderedSaleUnits(product)[0] : nextUnit);
+    if (currentUnit === nextUnit) return;
+
+    const quantity = Number(cart[productId] ?? cart[String(productId)]) || 0;
+    if (quantity <= 0) {
+      setCatalogProductUnit(productId, nextUnit);
+      return;
+    }
+
+    const rowKey = cartRowPendingKey("product", productId);
+    const decision = await withCartMutationDialog(rowKey, async () => {
+      const transition = t("client.cart.unitChange.transition", {
+        quantity,
+        oldUnit: unitDisplayShort(currentUnit, t) || unitDisplayLabel(currentUnit, t),
+        newUnit: unitDisplayShort(nextUnit, t) || unitDisplayLabel(nextUnit, t),
       });
+      const message = `${t("client.cart.unitChange.question")}\n\n${transition}`;
+      return appChoice({
+        title: t("client.cart.unitChange.title"),
+        message,
+        choices: [
+          {
+            value: "change",
+            label: t("client.cart.unitChange.changeAction"),
+            tone: "default",
+          },
+          {
+            value: "delete",
+            label: t("shared.action.delete"),
+            tone: "danger",
+          },
+        ],
+      });
+    });
+
+    if (decision == null) {
+      trigger?.focus?.();
+      return;
+    }
+
+    if (decision === "delete") {
+      removeCartProduct(productId);
+      focusAfterCartDelete(rowKey);
+      return;
+    }
+
+    if (decision !== "change") {
+      trigger?.focus?.();
+      return;
+    }
+
+    const liveQuantity =
+      Number(cart[productId] ?? cart[String(productId)]) || quantity;
+    const validation = validateCartUnitChange({
+      product,
+      nextUnit,
+      quantity: liveQuantity,
+      orderedSaleUnits: product ? orderedSaleUnits(product) : [],
+      getUnitOrderStep,
+    });
+    if (!validation.ok) {
+      if (validation.reason === "invalid_multiple") {
+        await appAlert({
+          title: t("shared.modal.alertTitle"),
+          message: t("client.cart.unitChange.invalidMultiple", {
+            quantity: validation.quantity,
+            multiple: validation.multiple,
+            unit: unitDisplayShort(nextUnit, t) || unitDisplayLabel(nextUnit, t),
+          }),
+          tone: "warn",
+        });
+      }
+      trigger?.focus?.();
+      return;
+    }
+
+    setUnits((current) => ({ ...current, [productId]: nextUnit }));
+    setCart((current) => {
+      const q = Number(current[productId] ?? current[String(productId)]);
+      if (!Number.isFinite(q) || q <= 0) return current;
+      if (productId in current) return { ...current, [productId]: q };
+      return { ...current, [String(productId)]: q };
+    });
+    clearQtyDraft(productId);
+    trigger?.focus?.();
+  };
+
+  const changeCustomQuantity = async (id, delta, trigger = null) => {
+    const sid = String(id);
+    if (customQtyBusyRef.current.has(sid)) return;
+    customQtyBusyRef.current.add(sid);
+    try {
+      const current = customItemsRef.current.find((item) => String(item.id) === sid);
+      if (!current) return;
+      const draftValue = customQtyDraftsRef.current[id] ?? customQtyDraftsRef.current[sid];
+      const action = resolveCustomQtyDeltaAction({
+        committedQuantity: current.quantity,
+        draftValue,
+        delta,
+      });
+
+      if (action.clearDraft) {
+        clearCustomQtyDraft(id);
+        const nextDrafts = { ...customQtyDraftsRef.current };
+        delete nextDrafts[id];
+        delete nextDrafts[sid];
+        customQtyDraftsRef.current = nextDrafts;
+      }
+
+      if (action.type === "confirm_delete") {
+        await requestRemoveCustomItem(id, { trigger });
+        return;
+      }
+
+      if (action.type === "set_quantity") {
+        const nextList = customItemsRef.current.map((item) =>
+          String(item.id) === sid ? { ...item, quantity: action.quantity } : item
+        );
+        customItemsRef.current = nextList;
+        setCustomItems(nextList);
+      }
+    } finally {
+      customQtyBusyRef.current.delete(sid);
     }
   };
 
-  const changeCustomQuantity = (id, delta) => {
-    setCustomItems((current) =>
-      current
-        .map((item) => {
-          if (item.id !== id) return item;
-          const quantity = Math.max(0, (Number(item.quantity) || 0) + delta);
-          return { ...item, quantity };
-        })
-        .filter((item) => Number(item.quantity) > 0)
-    );
+  const commitCustomQtyDraft = async (id, trigger = null) => {
+    const sid = String(id);
+    if (customQtyBusyRef.current.has(sid)) return;
+    const draftValue = customQtyDraftsRef.current[id] ?? customQtyDraftsRef.current[sid];
+    if (draftValue === undefined) return;
+
+    customQtyBusyRef.current.add(sid);
+    try {
+      const current = customItemsRef.current.find((item) => String(item.id) === sid);
+      const action = resolveCustomQtyDraftCommit({
+        committedQuantity: current?.quantity,
+        draftValue,
+      });
+      if (action.type === "noop") return;
+
+      if (action.clearDraft) {
+        clearCustomQtyDraft(id);
+        const nextDrafts = { ...customQtyDraftsRef.current };
+        delete nextDrafts[id];
+        delete nextDrafts[sid];
+        customQtyDraftsRef.current = nextDrafts;
+      }
+
+      if (action.type === "confirm_delete") {
+        const removed = await requestRemoveCustomItem(id, { trigger });
+        if (!removed) {
+          // cancel: committed quantity remains; draft already cleared
+          return;
+        }
+        return;
+      }
+
+      if (action.type === "set_quantity") {
+        const nextList = customItemsRef.current.map((item) =>
+          String(item.id) === sid ? { ...item, quantity: action.quantity } : item
+        );
+        customItemsRef.current = nextList;
+        setCustomItems(nextList);
+      }
+    } finally {
+      customQtyBusyRef.current.delete(sid);
+    }
+  };
+
+  const customQuantityFieldValue = (item) => {
+    if (customQtyDrafts[item.id] !== undefined) return customQtyDrafts[item.id];
+    return item.quantity ? String(item.quantity) : "";
+  };
+
+  const isNarrowTouchContext = () => {
+    if (typeof window === "undefined") return false;
+    const narrow = window.matchMedia?.("(max-width: 900px)")?.matches;
+    return Boolean(narrow);
+  };
+
+  const onCartRowPointerDown = (event, kind, id) => {
+    if (event.pointerType !== "touch") return;
+    if (!isNarrowTouchContext()) return;
+    if (kind === "delivery") return;
+    swipeGestureRef.current = {
+      kind,
+      id: String(id),
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      dx: 0,
+      dy: 0,
+      el: event.currentTarget,
+    };
+  };
+
+  const onCartRowPointerMove = (event) => {
+    const gesture = swipeGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    gesture.dx = event.clientX - gesture.startX;
+    gesture.dy = event.clientY - gesture.startY;
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    if (!reduceMotion && gesture.el && gesture.dx < 0) {
+      const tx = Math.max(gesture.dx, -96);
+      gesture.el.style.transform = `translateX(${tx}px)`;
+    }
+  };
+
+  const resetSwipeVisual = (el) => {
+    if (!el) return;
+    el.style.transform = "";
+  };
+
+  const onCartRowPointerUp = async (event) => {
+    const gesture = swipeGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    swipeGestureRef.current = null;
+    const { dx, dy, kind, id, el } = gesture;
+    const classified = classifyCartSwipeGesture({ dx, dy });
+    if (classified !== "swipe-left") {
+      resetSwipeVisual(el);
+      return;
+    }
+    resetSwipeVisual(el);
+    if (kind === "product") {
+      await requestRemoveCartProduct(id, { trigger: el });
+    } else if (kind === "custom") {
+      await requestRemoveCustomItem(id, { trigger: el });
+    }
+  };
+
+  const onCartRowPointerCancel = (event) => {
+    const gesture = swipeGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    resetSwipeVisual(gesture.el);
+    swipeGestureRef.current = null;
   };
 
   const clearCart = async () => {
@@ -797,6 +1225,7 @@ export function OrderEditor({
     setCartOrder([]);
     setCustomItems([]);
     setQtyDrafts({});
+    setCustomQtyDrafts({});
   };
 
   const openCartForCheckout = () => {
@@ -964,6 +1393,7 @@ export function OrderEditor({
         setCart({});
         setCustomItems([]);
         setQtyDrafts({});
+        setCustomQtyDrafts({});
       })
       .catch(() => {
         draftSaveLockedRef.current = false;
@@ -1555,7 +1985,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                               className={sole || unit === item ? "active" : ""}
                               type="button"
                               key={item}
-                              onClick={() => setProductUnit(product.id, item)}
+                              onClick={() => setCatalogProductUnit(product.id, item)}
                             >
                               {unitDisplayShort(item, t) || unitDisplayLabel(item, t)}
                             </button>
@@ -1563,7 +1993,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                         })}
                       </div>
                       <div className="quantity-control">
-                        <button type="button" onClick={() => changeQuantity(product.id, -1, orderStep)} aria-label={t("shared.qty.decrease")}>−</button>
+                        <button type="button" onClick={(e) => void changeQuantity(product.id, -1, orderStep, e.currentTarget)} aria-label={t("shared.qty.decrease")}>−</button>
                         <div className="quantity-input-wrap">
                           <input
                             className="quantity-input"
@@ -1574,11 +2004,11 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                             value={quantityFieldValue(product.id, quantity, multiplier)}
                             placeholder="0"
                             onChange={(e) => setQtyDrafts((current) => ({ ...current, [product.id]: e.target.value }))}
-                            onBlur={() => commitQtyDraft(product.id, multiplier, orderStep)}
+                            onBlur={(e) => void commitQtyDraft(product.id, multiplier, orderStep, e.currentTarget)}
                           />
                           <small>{quantityInputUnitLabel(unit, multiplier, t)}</small>
                         </div>
-                        <button type="button" onClick={() => changeQuantity(product.id, 1, orderStep)} aria-label={t("shared.qty.increase")}>+</button>
+                        <button type="button" onClick={() => void changeQuantity(product.id, 1, orderStep)} aria-label={t("shared.qty.increase")}>+</button>
                       </div>
                     </div>
                   </article>
@@ -1704,7 +2134,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
             <div className="cart-sheet-panel">
               <div className="cart-sheet-head">
                 <div>
-                  <strong>{t("storefront.nav.cart")}</strong>
+                  <strong ref={cartSheetHeadingRef} tabIndex={-1}>{t("storefront.nav.cart")}</strong>
                   <p className="muted small">{cartCount ? t("client.orders.positionCount", { count: cartCount }) : t("shared.empty.blank")}</p>
                 </div>
                 <button className="header-button" type="button" onClick={() => setCartSheetOpen(false)}>{
@@ -1727,8 +2157,23 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                 />
               ) : (
                 <div className="cart-sheet-list">
-                  {selectedItems.map((item) => (
-                    <div className="cart-sheet-item" key={item.productId}>
+                  {selectedItems.map((item) => {
+                    const rowKey = cartRowPendingKey("product", item.productId);
+                    const rowBusy = cartRowPending === rowKey;
+                    return (
+                    <div
+                      className={`cart-sheet-item${rowBusy ? " is-cart-row-pending" : ""}`}
+                      key={item.productId}
+                      tabIndex={-1}
+                      ref={(el) => {
+                        if (el) cartRowElsRef.current.set(rowKey, el);
+                        else cartRowElsRef.current.delete(rowKey);
+                      }}
+                      onPointerDown={(e) => onCartRowPointerDown(e, "product", item.productId)}
+                      onPointerMove={onCartRowPointerMove}
+                      onPointerUp={(e) => void onCartRowPointerUp(e)}
+                      onPointerCancel={onCartRowPointerCancel}
+                    >
                       <div className="cart-sheet-item-head">
                         <div className="cart-sheet-item-main">
                           <strong>{item.name}</strong>
@@ -1755,7 +2200,15 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                                   className={sole || item.unit === unitId ? "active" : ""}
                                   type="button"
                                   key={unitId}
-                                  onClick={() => setProductUnit(item.productId, unitId)}
+                                  disabled={rowBusy}
+                                  onPointerDown={() => markSuppressUnitChoice(item.productId)}
+                                  onClick={(e) =>
+                                    void requestCartProductUnitChange(
+                                      item.productId,
+                                      unitId,
+                                      e.currentTarget
+                                    )
+                                  }
                                 >
                                   {unitDisplayShort(unitId, t) || unitDisplayLabel(unitId, t)}
                                 </button>
@@ -1763,7 +2216,21 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                             })()}
                           </div>
                           <div className="quantity-control cart-sheet-qty">
-                            <button type="button" onClick={() => changeQuantity(item.productId, -1, item.orderStep)} aria-label={t("shared.qty.decrease")}>−</button>
+                            <button
+                              type="button"
+                              disabled={rowBusy}
+                              onClick={(e) =>
+                                void changeQuantity(
+                                  item.productId,
+                                  -1,
+                                  item.orderStep,
+                                  e.currentTarget
+                                )
+                              }
+                              aria-label={t("shared.qty.decrease")}
+                            >
+                              −
+                            </button>
                             <div className="quantity-input-wrap">
                               <input
                                 className="quantity-input"
@@ -1771,20 +2238,51 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                                 min="0"
                                 step={quantityInputStep(item.multiplier, item.orderStep)}
                                 inputMode="numeric"
+                                disabled={rowBusy}
                                 value={quantityFieldValue(item.productId, item.quantity, item.multiplier)}
                                 onChange={(e) => setQtyDrafts((current) => ({ ...current, [item.productId]: e.target.value }))}
-                                onBlur={() => commitQtyDraft(item.productId, item.multiplier, item.orderStep)}
+                                onBlur={(e) =>
+                                  void commitQtyDraft(
+                                    item.productId,
+                                    item.multiplier,
+                                    item.orderStep,
+                                    e.currentTarget
+                                  )
+                                }
                               />
                               <small>{quantityInputUnitLabel(item.unit, item.multiplier, t)}</small>
                             </div>
-                            <button type="button" onClick={() => changeQuantity(item.productId, 1, item.orderStep)} aria-label={t("shared.qty.increase")}>+</button>
+                            <button
+                              type="button"
+                              disabled={rowBusy}
+                              onClick={() => void changeQuantity(item.productId, 1, item.orderStep)}
+                              aria-label={t("shared.qty.increase")}
+                            >
+                              +
+                            </button>
                           </div>
                         </div>
                       </div>
                     </div>
-                  ))}
-                  {customItems.map((item) => (
-                    <div className="cart-sheet-item" key={item.id}>
+                    );
+                  })}
+                  {customItems.map((item) => {
+                    const rowKey = cartRowPendingKey("custom", item.id);
+                    const rowBusy = cartRowPending === rowKey;
+                    return (
+                    <div
+                      className={`cart-sheet-item${rowBusy ? " is-cart-row-pending" : ""}`}
+                      key={item.id}
+                      tabIndex={-1}
+                      ref={(el) => {
+                        if (el) cartRowElsRef.current.set(rowKey, el);
+                        else cartRowElsRef.current.delete(rowKey);
+                      }}
+                      onPointerDown={(e) => onCartRowPointerDown(e, "custom", item.id)}
+                      onPointerMove={onCartRowPointerMove}
+                      onPointerUp={(e) => void onCartRowPointerUp(e)}
+                      onPointerCancel={onCartRowPointerCancel}
+                    >
                       <div className="cart-sheet-item-head">
                         <div className="cart-sheet-item-main">
                           <strong>{item.name}</strong>
@@ -1792,31 +2290,48 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                         </div>
                         <div className="cart-sheet-item-actions">
                           <div className="quantity-control cart-sheet-qty">
-                            <button type="button" onClick={() => changeCustomQuantity(item.id, -1)} aria-label={t("shared.qty.decrease")}>−</button>
+                            <button
+                              type="button"
+                              disabled={rowBusy}
+                              onClick={(e) => void changeCustomQuantity(item.id, -1, e.currentTarget)}
+                              aria-label={t("shared.qty.decrease")}
+                            >
+                              −
+                            </button>
                             <div className="quantity-input-wrap">
                               <input
                                 className="quantity-input"
                                 type="number"
                                 min="0"
                                 inputMode="numeric"
-                                value={item.quantity || ""}
+                                disabled={rowBusy}
+                                value={customQuantityFieldValue(item)}
                                 onChange={(e) => {
-                                  const quantity = Math.max(0, Number.parseInt(e.target.value, 10) || 0);
-                                  setCustomItems((current) =>
-                                    current
-                                      .map((row) => (row.id === item.id ? { ...row, quantity } : row))
-                                      .filter((row) => Number(row.quantity) > 0)
-                                  );
+                                  const value = e.target.value;
+                                  setCustomQtyDrafts((current) => {
+                                    const next = { ...current, [item.id]: value };
+                                    customQtyDraftsRef.current = next;
+                                    return next;
+                                  });
                                 }}
+                                onBlur={(e) => void commitCustomQtyDraft(item.id, e.currentTarget)}
                               />
                               <small>{item.unit || "шт."}</small>
                             </div>
-                            <button type="button" onClick={() => changeCustomQuantity(item.id, 1)} aria-label={t("shared.qty.increase")}>+</button>
+                            <button
+                              type="button"
+                              disabled={rowBusy}
+                              onClick={(e) => void changeCustomQuantity(item.id, 1, e.currentTarget)}
+                              aria-label={t("shared.qty.increase")}
+                            >
+                              +
+                            </button>
                           </div>
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                   {deliveryFee > 0 ? (
                     <div className="cart-sheet-item cart-sheet-item--delivery" key="clover-delivery-spb">
                       <div className="cart-sheet-item-head">

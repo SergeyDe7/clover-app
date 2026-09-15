@@ -7544,6 +7544,55 @@ html.clover-cart-open body {
   animation: order-thankyou-text-in 0.7s ease-out 0.52s both;
 }
 
+.app-modal-actions-choice {
+  grid-template-columns: 1fr;
+  width: min(100%, 340px);
+  max-width: 100%;
+}
+
+.app-modal-actions-choice .danger-button {
+  outline: 1px solid rgba(176, 48, 48, 0.35);
+}
+
+.app-modal-actions-choice .order-thankyou-button,
+.app-modal-actions-choice .secondary-button,
+.app-modal-actions-choice .primary-button,
+.app-modal-actions-choice .danger-button {
+  min-height: 48px;
+  width: 100% !important;
+}
+
+@media (min-width: 901px) {
+  .app-modal-actions-choice {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .app-modal-actions-choice .app-modal-choice-cancel {
+    grid-column: 1 / -1;
+  }
+}
+
+.clover-app .cart-sheet-item {
+  touch-action: pan-y;
+  will-change: transform;
+}
+
+.clover-app .cart-sheet-item.is-cart-row-pending {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.clover-app .cart-sheet-item--delivery {
+  touch-action: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clover-app .cart-sheet-item {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
 .app-modal-actions-single {
   grid-template-columns: 1fr;
 }
