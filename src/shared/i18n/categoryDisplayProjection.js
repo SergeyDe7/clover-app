@@ -22,7 +22,26 @@ function isEnabledForeign(language, enabledLanguages) {
 }
 
 /**
+ * True when foreign category labels may render without a RU flash.
+ * - ru: always ready
+ * - foreign + language not yet in enabledLanguages: not ready (runtime still loading)
+ * - foreign + translations === undefined: bag still loading
+ * - foreign + object bag (even empty): ready; missing keys fall back to RU
+ */
+export function categoryDisplayLabelsReady({
+  language = "ru",
+  enabledLanguages = ["ru"],
+  translations,
+} = {}) {
+  const requested = String(language || "").trim();
+  if (!requested || requested === "ru") return true;
+  if (!isEnabledForeign(language, enabledLanguages)) return false;
+  return translations !== undefined;
+}
+
+/**
  * Resolve visible label. Missing/disabled → RU source.
+ * Foreign + translations === undefined → "" (pending; callers must skeleton).
  */
 export function resolveCategoryDisplayName({
   sourceRu,
@@ -33,7 +52,13 @@ export function resolveCategoryDisplayName({
   translations = {},
 } = {}) {
   const ru = String(sourceRu || "");
-  if (!isEnabledForeign(language, enabledLanguages)) return ru;
+  if (!isEnabledForeign(language, enabledLanguages)) {
+    // Foreign URL/locale before enabledLanguages includes it: withhold RU.
+    const requested = String(language || "").trim();
+    if (requested && requested !== "ru") return "";
+    return ru;
+  }
+  if (translations === undefined) return "";
   const key = categoryEntityKey(entityType, entityId);
   const bag = translations && typeof translations === "object" ? translations : {};
   const translated = bag[key];

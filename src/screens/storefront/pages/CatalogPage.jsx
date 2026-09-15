@@ -2,6 +2,7 @@ import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { errorDisplayMessage } from "../../../shared/i18n/errorDisplay.js";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
+import { peekPublicSite, loadPublicSite } from "../publicSite.js";
 import {
   catalogScrollRouteKey,
   navigateStorefront,
@@ -16,7 +17,7 @@ import {
   getSubgroupFacets,
   groupProductsByCloverGroup,
 } from "../productGroups.js";
-import { projectLocalizedGroupNav, categoryDisplayNameFromCanonical } from "../../../shared/i18n/categoryDisplayProjection.js";
+import { projectLocalizedGroupNav, categoryDisplayNameFromCanonical, categoryDisplayLabelsReady } from "../../../shared/i18n/categoryDisplayProjection.js";
 import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
 import {
   matchesCatalogPrefixSearch,
@@ -34,6 +35,23 @@ import {
   sliceSectionsToRenderLimit,
 } from "../catalogProgressiveRender.js";
 
+function bagFromSite(locale) {
+  const site = peekPublicSite(locale);
+  const bag = site?.categoryTranslations;
+  return bag && typeof bag === "object" && Object.keys(bag).length > 0
+    ? bag
+    : undefined;
+}
+
+function normalizeTranslationBag(bag, locale) {
+  if (!bag || typeof bag !== "object") return undefined;
+  const keys = Object.keys(bag).length;
+  // Foreign locales: an empty bag is not "ready" — it produces a RU flash.
+  // Keep pending until a non-empty projection arrives (or locale is ru).
+  if (String(locale || "ru") !== "ru" && keys === 0) return undefined;
+  return bag;
+}
+
 export function CatalogPage({
   category = "",
   subcategory = "",
@@ -50,6 +68,42 @@ export function CatalogPage({
   const [treeOpen, setTreeOpen] = useState(false);
   // Mobile + category: search after chips so products start higher; desktop keeps top search.
   const [inlineSearch, setInlineSearch] = useState(false);
+  // Keep last-good translation bag across route changes so H1/nav never flash RU
+  // while the next catalog payload is in flight. Seed from site cache when present
+  // (home → category) so the first catalog paint already has foreign labels.
+  const translationBagRef = useRef(bagFromSite(publicLocale));
+  const translationLocaleRef = useRef(publicLocale);
+  const [, setTranslationBagEpoch] = useState(0);
+
+  const publishTranslationBag = (bag) => {
+    const next = normalizeTranslationBag(bag, publicLocale);
+    if (!next) return;
+    const prev = translationBagRef.current;
+    translationBagRef.current = next;
+    if (prev !== next) setTranslationBagEpoch((n) => n + 1);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    // Warm site bag for cold/direct URL before/while catalog fetch runs.
+    if (publicLocale && publicLocale !== "ru") {
+      const existing = bagFromSite(publicLocale);
+      if (existing) {
+        publishTranslationBag(existing);
+      } else {
+        loadPublicSite(publicLocale)
+          .then((site) => {
+            if (cancelled) return;
+            publishTranslationBag(site?.categoryTranslations);
+          })
+          .catch(() => {});
+      }
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- publish uses publicLocale
+  }, [publicLocale]);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,16 +158,37 @@ export function CatalogPage({
     () => resolveStorefrontCatalogView(routeKey, catalogRouteSnapshot),
     [routeKey, catalogRouteSnapshot]
   );
+
+  if (translationLocaleRef.current !== publicLocale) {
+    translationLocaleRef.current = publicLocale;
+    translationBagRef.current = bagFromSite(publicLocale);
+  }
+  if (currentPayload) {
+    const nextBag = normalizeTranslationBag(
+      currentPayload.categoryTranslations,
+      publicLocale
+    );
+    if (nextBag) translationBagRef.current = nextBag;
+  }
+  const effectiveTranslations =
+    (currentPayload &&
+      normalizeTranslationBag(currentPayload.categoryTranslations, publicLocale)) ||
+    translationBagRef.current ||
+    bagFromSite(publicLocale);
+
   const categoryOptions = storefrontCategoryDisplayOptions(
     publicLocale,
-    currentPayload?.categoryTranslations,
+    effectiveTranslations,
     enabledLanguages
   );
-  const categoryDisplayName = categoryDisplayNameFromCanonical(
-    category,
-    "",
-    categoryOptions
-  );
+  const labelsReady = categoryDisplayLabelsReady(categoryOptions);
+  const categoryDisplayName = labelsReady
+    ? categoryDisplayNameFromCanonical(category, "", categoryOptions)
+    : "";
+  const subcategoryDisplayName =
+    labelsReady && subcategory
+      ? categoryDisplayNameFromCanonical(subcategory, category, categoryOptions)
+      : "";
 
   const products = useMemo(() => {
     if (!currentPayload) return [];
@@ -223,7 +298,7 @@ export function CatalogPage({
   }, [visibleSections]);
 
   const localizedSubgroups = useMemo(() => {
-    if (!category) return [];
+    if (!category || !labelsReady) return [];
     const children = getGroupChildren(category);
     return (
       projectLocalizedGroupNav(
@@ -231,9 +306,15 @@ export function CatalogPage({
         categoryOptions
       )[0]?.children || []
     );
-  }, [category, categoryOptions]);
+  }, [category, categoryOptions, labelsReady]);
 
-  const title = category ? categoryDisplayName : t("storefront.nav.catalog");
+  const title = !category
+    ? t("storefront.nav.catalog")
+    : !labelsReady
+      ? ""
+      : subcategory
+        ? subcategoryDisplayName || categoryDisplayName
+        : categoryDisplayName;
 
   const searchToolbar = (
     <div className="sf-catalog-toolbar">
@@ -259,7 +340,13 @@ export function CatalogPage({
             aria-expanded={treeOpen}
             onClick={() => setTreeOpen((open) => !open)}
           >
-            <span>{category ? categoryDisplayName : t("client.catalog.categories")}</span>
+            <span>
+              {category
+                ? labelsReady
+                  ? categoryDisplayName
+                  : "\u00a0"
+                : t("client.catalog.categories")}
+            </span>
             <svg
               className="sf-catalog-tree-toggle-icon"
               viewBox="0 0 12 12"
@@ -278,14 +365,20 @@ export function CatalogPage({
           </button>
           <p className="sf-catalog-side-title">{t("storefront.nav.catalog")}</p>
           <div className="sf-catalog-tree-body">
-            <CatalogGroupNav
-              categories={navCategories}
-              activeCategory={category}
-              activeSubcategory={subcategory}
-              variant="side"
-              translations={currentPayload?.categoryTranslations}
-              language={publicLocale}
-            />
+            {labelsReady ? (
+              <CatalogGroupNav
+                categories={navCategories}
+                activeCategory={category}
+                activeSubcategory={subcategory}
+                variant="side"
+                translations={effectiveTranslations}
+                language={publicLocale}
+              />
+            ) : (
+              <p className="sf-muted" aria-busy="true">
+                {t("storefront.loadingCategories")}
+              </p>
+            )}
           </div>
         </aside>
 
@@ -314,7 +407,7 @@ export function CatalogPage({
                           navigateStorefront({ name: "catalog", category })
                         }
                       >
-                        {categoryDisplayName}
+                        {labelsReady ? categoryDisplayName : "\u00a0"}
                       </button>
                     </>
                   ) : null}
@@ -325,7 +418,9 @@ export function CatalogPage({
                     </>
                   ) : null}
                 </nav>
-                <h1>{title}</h1>
+                <h1 aria-busy={!labelsReady ? "true" : undefined}>
+                  {labelsReady ? title : "\u00a0"}
+                </h1>
               </div>
             </header>
           ) : (
@@ -406,11 +501,13 @@ export function CatalogPage({
               {!category ? (
                 <div className="sf-group-head">
                   <h2>
-                    {categoryDisplayNameFromCanonical(
-                      section.name,
-                      "",
-                      categoryOptions
-                    )}
+                    {labelsReady
+                      ? categoryDisplayNameFromCanonical(
+                          section.name,
+                          "",
+                          categoryOptions
+                        )
+                      : "\u00a0"}
                   </h2>
                 </div>
               ) : null}
@@ -420,7 +517,7 @@ export function CatalogPage({
                     key={product.id}
                     product={product}
                     imagePriorityIndex={imagePriorityById.get(product.id)}
-                    categoryTranslations={currentPayload?.categoryTranslations}
+                    categoryTranslations={effectiveTranslations}
                   />
                 ))}
               </div>

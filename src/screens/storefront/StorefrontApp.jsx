@@ -49,7 +49,12 @@ export default function StorefrontApp({ localization }) {
     parseStorefrontRoute(window.location.pathname)
   );
   const routeLocale = route.locale || locale;
-  const [site, setSite] = useState(() => peekPublicSite(routeLocale));
+  // Cart/checkout URLs are unprefixed; keep chrome + CMS info pages on the
+  // sticky UI locale instead of falling back to RU registry headings.
+  const contentLocale = ["cart", "checkout"].includes(route.name)
+    ? locale
+    : routeLocale;
+  const [site, setSite] = useState(() => peekPublicSite(contentLocale));
 
   useEffect(() => {
     const onPop = () =>
@@ -95,7 +100,7 @@ export default function StorefrontApp({ localization }) {
 
   useEffect(() => {
     let cancelled = false;
-    loadPublicSite(routeLocale)
+    loadPublicSite(contentLocale)
       .then((next) => {
         if (!cancelled) setSite(next);
       })
@@ -105,19 +110,19 @@ export default function StorefrontApp({ localization }) {
     return () => {
       cancelled = true;
     };
-  }, [routeLocale]);
+  }, [contentLocale]);
 
   useEffect(() => {
     if (route.name === "product") return;
-    if (!site && routeLocale !== "ru") return;
+    if (!site && contentLocale !== "ru") return;
     applyStorefrontDocumentMeta(
       storefrontRouteDocumentMeta(route, site, {
-        locale: routeLocale,
+        locale: contentLocale,
         enabledLanguages,
         indexable: isIndexablePublicSearch(window.location.search),
       })
     );
-  }, [enabledLanguages, route, routeLocale, site]);
+  }, [enabledLanguages, route, contentLocale, site]);
 
   let page;
   let current = "home";
@@ -152,7 +157,14 @@ export default function StorefrontApp({ localization }) {
     page = <InstallAppPage />;
     current = "home";
   } else if (route.name === "info") {
-    page = <InfoPage slug={route.slug} infoPages={site?.infoPages} />;
+    page =
+      contentLocale !== "ru" && !site ? (
+        <div className="sf-info-page" aria-busy="true" role="status">
+          <p className="sf-muted">{t("storefront.loadingCategories")}</p>
+        </div>
+      ) : (
+        <InfoPage slug={route.slug} infoPages={site?.infoPages} />
+      );
     current = `info:${route.slug}`;
   } else if (route.name === "notFound") {
     page = (
@@ -171,7 +183,13 @@ export default function StorefrontApp({ localization }) {
       <main className="sf-main">
         <Suspense fallback={null}>{page}</Suspense>
       </main>
-      {route.name === "catalog" ? null : (
+      {route.name === "catalog" ? null : contentLocale !== "ru" && !site ? (
+        <footer className="sf-footer" aria-busy="true">
+          <div className="sf-footer-primary">
+            <p className="sf-footer-copy">{t("storefront.footer.copyright")}</p>
+          </div>
+        </footer>
+      ) : (
         <StoreFooter current={current} infoPages={site?.infoPages} />
       )}
     </div>

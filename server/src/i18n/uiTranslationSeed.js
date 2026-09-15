@@ -50,36 +50,36 @@ export const SEEDS = {
     "ar": "التفاصيل"
   },
   "shared.modal.orderContents": {
-    "en": "Order contents",
+    "en": "Order details",
     "uz": "Buyurtma tarkibi",
     "ky": "Заказдын курамы",
-    "tg": "Таркиби фармоиш",
-    "zh-CN": "订单内容",
-    "ar": "محتويات الطلب"
+    "tg": "Мундариҷаи фармоиш",
+    "zh-CN": "订单明细",
+    "ar": "تفاصيل الطلب"
   },
   "auth.login.title": {
-    "en": "Client portal",
-    "uz": "Shaxsiy kabinet",
-    "ky": "Жеке кабинет",
-    "tg": "Кабинети шахсӣ",
-    "zh-CN": "个人账户",
-    "ar": "الحساب الشخصي"
+    "en": "Sign in",
+    "uz": "Kirish",
+    "ky": "Кирүү",
+    "tg": "Вуруд",
+    "zh-CN": "登录",
+    "ar": "تسجيل الدخول"
   },
   "auth.login.submit": {
     "en": "Sign in",
     "uz": "Kirish",
     "ky": "Кирүү",
-    "tg": "Даромадан",
+    "tg": "Вуруд",
     "zh-CN": "登录",
-    "ar": "دخول"
+    "ar": "تسجيل الدخول"
   },
   "auth.login.email": {
-    "en": "Login",
+    "en": "Username",
     "uz": "Login",
     "ky": "Логин",
     "tg": "Логин",
-    "zh-CN": "登录名",
-    "ar": "اسم الدخول"
+    "zh-CN": "用户名",
+    "ar": "اسم المستخدم"
   },
   "auth.login.password": {
     "en": "Password",
@@ -149,8 +149,8 @@ export const SEEDS = {
     "en": "Create account",
     "uz": "Ro‘yxatdan o‘tish",
     "ky": "Катталуу",
-    "tg": "Бақайдгирӣ",
-    "zh-CN": "注册",
+    "tg": "Сабти ном",
+    "zh-CN": "创建账户",
     "ar": "إنشاء حساب"
   },
   "auth.register.company": {
@@ -322,12 +322,12 @@ export const SEEDS = {
     "ar": "العودة لتسجيل الدخول"
   },
   "auth.accessHint": {
-    "en": "A manager can give you access to the client portal",
-    "uz": "Shaxsiy kabinetga kirishni menejerdan olishingiz mumkin",
-    "ky": "Жеке кабинетке кирүүнү менеджерден ала аласыз",
-    "tg": "Дастрасӣ ба кабинети шахсиро аз менеҷер гирифта метавонед",
-    "zh-CN": "可向经理申请个人账户权限",
-    "ar": "يمكنك الحصول على دخول البوابة من المدير"
+    "en": "A manager can give you account access",
+    "uz": "Kabinetga kirishni menejerdan olishingiz mumkin",
+    "ky": "Кабинетке кирүүнү менеджерден ала аласыз",
+    "tg": "Дастрасӣ ба кабинет аз менеҷер",
+    "zh-CN": "可向经理申请账户权限",
+    "ar": "يمكنك الحصول على صلاحية الحساب من المدير"
   },
   "auth.devLink": {
     "en": "Test link for local setup:",
@@ -362,12 +362,12 @@ export const SEEDS = {
     "ar": "أُلغي الدخول بـ Face ID."
   },
   "auth.documentTitle": {
-    "en": "Client portal | CLOVER",
-    "uz": "Shaxsiy kabinet | CLOVER",
-    "ky": "Жеке кабинет | CLOVER",
-    "tg": "Кабинети шахсӣ | CLOVER",
-    "zh-CN": "个人账户 | CLOVER",
-    "ar": "الحساب الشخصي | CLOVER"
+    "en": "Sign in | CLOVER",
+    "uz": "Kirish | CLOVER",
+    "ky": "Кирүү | CLOVER",
+    "tg": "Вуруд | CLOVER",
+    "zh-CN": "登录 | CLOVER",
+    "ar": "تسجيل الدخول | CLOVER"
   },
   "manager.nav.orders": {
     "en": "Orders",
@@ -474,20 +474,20 @@ export const SEEDS = {
     "ar": "السجل"
   },
   "client.nav.matrix": {
-    "en": "My matrix",
-    "uz": "Matritsam",
-    "ky": "Матрицам",
-    "tg": "Матрицаи ман",
-    "zh-CN": "我的矩阵",
-    "ar": "مصفوفتي"
+    "en": "My products",
+    "uz": "Mahsulotlarim",
+    "ky": "Товарларым",
+    "tg": "Молҳои ман",
+    "zh-CN": "我的商品",
+    "ar": "منتجاتي"
   },
   "client.nav.catalog": {
-    "en": "Add products from the catalog",
-    "uz": "Katalogdan mahsulot qo‘shish",
-    "ky": "Каталогдон товар кошуу",
-    "tg": "Иловаи мол аз каталог",
-    "zh-CN": "从目录添加商品",
-    "ar": "إضافة منتجات من الكتالوج"
+    "en": "Browse catalog",
+    "uz": "Katalogdan qo‘shish",
+    "ky": "Каталогдон кошуу",
+    "tg": "Аз каталог",
+    "zh-CN": "浏览商品",
+    "ar": "تصفح الكتالوج"
   },
   "client.nav.orders": {
     "en": "My orders",
@@ -498,12 +498,12 @@ export const SEEDS = {
     "ar": "طلباتي"
   },
   "client.nav.reconciliation": {
-    "en": "Reconciliation statement",
-    "uz": "Solishtirma dalolatnoma",
-    "ky": "Салыштыруу актысы",
-    "tg": "Санадҳои муқоиса",
+    "en": "Statement",
+    "uz": "Solishtirma",
+    "ky": "Салыштыруу",
+    "tg": "Санад муқоиса",
     "zh-CN": "对账单",
-    "ar": "كشف المطابقة"
+    "ar": "كشف حساب"
   },
   "client.nav.cabinet": {
     "en": "Settings",
@@ -534,7 +534,7 @@ export const SEEDS = {
     "uz": "Katalog",
     "ky": "Каталог",
     "tg": "Каталог",
-    "zh-CN": "目录",
+    "zh-CN": "商品目录",
     "ar": "الكتالوج"
   },
   "storefront.nav.cart": {
@@ -546,28 +546,28 @@ export const SEEDS = {
     "ar": "السلة"
   },
   "storefront.nav.checkout": {
-    "en": "Place order",
-    "uz": "Buyurtma rasmiylashtirish",
-    "ky": "Заказ тариздөө",
-    "tg": "Расмӣ кардани фармоиш",
-    "zh-CN": "下单",
+    "en": "Checkout",
+    "uz": "Buyurtma berish",
+    "ky": "Заказ берүү",
+    "tg": "Фармоиш додан",
+    "zh-CN": "去结算",
     "ar": "إتمام الطلب"
   },
   "storefront.search.placeholder": {
     "en": "Search",
-    "uz": "Qidiruv",
+    "uz": "Qidirish",
     "ky": "Издөө",
     "tg": "Ҷустуҷӯ",
-    "zh-CN": "搜索",
-    "ar": "بحث"
+    "zh-CN": "搜索商品",
+    "ar": "ابحث"
   },
   "storefront.cart.empty": {
-    "en": "Cart is empty",
+    "en": "Your cart is empty",
     "uz": "Savat bo‘sh",
-    "ky": "Себет бош",
-    "tg": "Сабад холӣ аст",
-    "zh-CN": "购物车是空的",
-    "ar": "السلة فارغة"
+    "ky": "Себетиңиз бош",
+    "tg": "Сабади шумо холӣ аст",
+    "zh-CN": "您的购物车为空",
+    "ar": "سلتك فارغة"
   },
   "storefront.footer.copyright": {
     "en": "© Clover",
@@ -1178,12 +1178,12 @@ export const SEEDS = {
     "ar": "عنوان التسليم"
   },
   "client.address.empty": {
-    "en": "No addresses yet.",
-    "uz": "Hozircha manzillar yo‘q.",
-    "ky": "Азырынча даректер жок.",
-    "tg": "Ҳоло суроғаҳо нест.",
-    "zh-CN": "暂无地址。",
-    "ar": "لا توجد عناوين بعد."
+    "en": "No saved addresses yet.",
+    "uz": "Saqlangan manzillar yo‘q.",
+    "ky": "Сакталган даректер жок.",
+    "tg": "Суроғаҳои захирашуда нестанд.",
+    "zh-CN": "还没有保存的地址。",
+    "ar": "لا توجد عناوين محفوظة بعد."
   },
   "client.address.emptyHint": {
     "en": "No addresses yet. Add an address before creating an order.",
@@ -1226,12 +1226,12 @@ export const SEEDS = {
     "ar": "الإشعارات"
   },
   "checkout.cart.positions": {
-    "en": "pos.",
-    "uz": "poz.",
-    "ky": "поз.",
-    "tg": "поз.",
-    "zh-CN": "项",
-    "ar": "بند"
+    "en": "items",
+    "uz": "ta",
+    "ky": "даана",
+    "tg": "адад",
+    "zh-CN": "件",
+    "ar": "قطعة"
   },
   "admin.languages.label.ru": {
     "en": "Russian",
@@ -1546,7 +1546,7 @@ export const SEEDS = {
     "ar": "أدخل عنوان التسليم"
   },
   "checkout.submitOrder": {
-    "en": "Submit order",
+    "en": "Place order",
     "uz": "Buyurtmani yuborish",
     "ky": "Заказды жөнөтүү",
     "tg": "Фиристодани фармоиш",
@@ -1914,12 +1914,12 @@ export const SEEDS = {
     "ar": "إلى المصفوفة"
   },
   "client.matrix.short": {
-    "en": "Matrix",
-    "uz": "Matritsa",
-    "ky": "Матрица",
-    "tg": "Матрица",
-    "zh-CN": "矩阵",
-    "ar": "المصفوفة"
+    "en": "Products",
+    "uz": "Mahsulotlar",
+    "ky": "Товарлар",
+    "tg": "Молҳо",
+    "zh-CN": "商品",
+    "ar": "منتجات"
   },
   "client.mo": {
     "en": "Mo",
@@ -2106,12 +2106,12 @@ export const SEEDS = {
     "ar": "تُحسب الكمية بالقطعة"
   },
   "client.reconciliation": {
-    "en": "Reconciliation",
-    "uz": "Solishtirish",
+    "en": "Statement",
+    "uz": "Solishtirma",
     "ky": "Салыштыруу",
-    "tg": "Муқоиса",
-    "zh-CN": "对账",
-    "ar": "المطابقة"
+    "tg": "Санад муқоиса",
+    "zh-CN": "对账单",
+    "ar": "كشف حساب"
   },
   "client.removeFromMatrix": {
     "en": "Remove from matrix",
@@ -6634,12 +6634,12 @@ export const SEEDS = {
     "ar": "فارغ حاليًا"
   },
   "shared.empty.notFound": {
-    "en": "Not found",
-    "uz": "Topilmadi",
-    "ky": "Табылган жок",
-    "tg": "Ёфт нашуд",
-    "zh-CN": "未找到",
-    "ar": "غير موجود"
+    "en": "Page not found",
+    "uz": "Sahifa topilmadi",
+    "ky": "Бет табылган жок",
+    "tg": "Саҳифа ёфт нашуд",
+    "zh-CN": "页面未找到",
+    "ar": "الصفحة غير موجودة"
   },
   "shared.empty.short": {
     "en": "Empty",
@@ -7218,12 +7218,12 @@ export const SEEDS = {
     "ar": "هذا الجهاز أو المتصفح لا يدعم Face ID أو البصمة أو مفاتيح المرور."
   },
   "shared.toMyOrders": {
-    "en": "To my orders",
+    "en": "View my orders",
     "uz": "Buyurtmalarimga",
     "ky": "Заказдарыма",
-    "tg": "Ба фармоишҳои ман",
-    "zh-CN": "前往我的订单",
-    "ar": "إلى طلباتي"
+    "tg": "Фармоишҳои ман",
+    "zh-CN": "查看我的订单",
+    "ar": "عرض طلباتي"
   },
   "shared.usernameOrLink": {
     "en": "username or link",
@@ -7410,12 +7410,12 @@ export const SEEDS = {
     "ar": "التنقل"
   },
   "storefront.nav.backToCatalog": {
-    "en": "To catalog",
+    "en": "Back to catalog",
     "uz": "Katalogga",
     "ky": "Каталогго",
     "tg": "Ба каталог",
-    "zh-CN": "返回目录",
-    "ar": "إلى الكتالوج"
+    "zh-CN": "返回商品目录",
+    "ar": "العودة إلى الكتالوج"
   },
   "storefront.nav.contacts": {
     "en": "Contacts",
@@ -7434,12 +7434,12 @@ export const SEEDS = {
     "ar": "الرئيسية"
   },
   "storefront.nav.homeLink": {
-    "en": "To home",
-    "uz": "Bosh sahifaga",
-    "ky": "Башкы бетке",
-    "tg": "Ба саҳифаи асосӣ",
-    "zh-CN": "回到首页",
-    "ar": "إلى الرئيسية"
+    "en": "Home",
+    "uz": "Bosh sahifa",
+    "ky": "Башкы бет",
+    "tg": "Саҳифаи асосӣ",
+    "zh-CN": "首页",
+    "ar": "الرئيسية"
   },
   "storefront.nav.promos": {
     "en": "Promotions",
@@ -7786,12 +7786,12 @@ export const SEEDS = {
     "ar": "لا توجد صلاحية كافية لإدارة المديرين."
   },
   "checkout.accepted": {
-    "en": "Order accepted",
+    "en": "Order received",
     "uz": "Buyurtma qabul qilindi",
     "ky": "Заказ кабыл алынды",
     "tg": "Фармоиш қабул шуд",
-    "zh-CN": "订单已接受",
-    "ar": "تم قبول الطلب"
+    "zh-CN": "订单已收到",
+    "ar": "تم استلام طلبك"
   },
   "checkout.addToCart": {
     "en": "Add to cart",
@@ -7799,7 +7799,7 @@ export const SEEDS = {
     "ky": "Себетке",
     "tg": "Ба сабад",
     "zh-CN": "加入购物车",
-    "ar": "إلى السلة"
+    "ar": "أضف إلى السلة"
   },
   "checkout.backToCart": {
     "en": "Back to cart",
@@ -7859,19 +7859,19 @@ export const SEEDS = {
   },
   "checkout.title": {
     "en": "Checkout",
-    "uz": "Buyurtmani rasmiylashtirish",
-    "ky": "Заказды тариздөө",
-    "tg": "Барасмиятдарории фармоиш",
-    "zh-CN": "订单结算",
+    "uz": "Buyurtma berish",
+    "ky": "Заказ берүү",
+    "tg": "Фармоиш додан",
+    "zh-CN": "结算",
     "ar": "إتمام الطلب"
   },
   "checkout.titleShort": {
     "en": "Checkout",
-    "uz": "Rasmiylashtirish",
-    "ky": "Тариздөө",
-    "tg": "Барасмиятдарорӣ",
-    "zh-CN": "结账",
-    "ar": "إتمام الطلب"
+    "uz": "Buyurtma",
+    "ky": "Заказ",
+    "tg": "Фармоиш",
+    "zh-CN": "结算",
+    "ar": "الطلب"
   },
   "checkout.total": {
     "en": "Total",
@@ -8021,9 +8021,9 @@ export const SEEDS = {
     "en": "Go to cart",
     "uz": "Savatga o‘tish",
     "ky": "Себетке өтүү",
-    "tg": "Гузаштан ба сабад",
-    "zh-CN": "前往购物车",
-    "ar": "الانتقال إلى السلة"
+    "tg": "Ба сабад",
+    "zh-CN": "去购物车",
+    "ar": "إلى السلة"
   },
   "client.inTheMatrix": {
     "en": "In the matrix:",
@@ -8154,12 +8154,12 @@ export const SEEDS = {
     "ar": "جارٍ تجهيز الصورة…"
   },
   "client.productMatrix": {
-    "en": "Product matrix",
-    "uz": "Mahsulotlar matritsasi",
-    "ky": "Товарлар матрицасы",
-    "tg": "Матрицаи молҳо",
-    "zh-CN": "商品矩阵",
-    "ar": "مصفوفة المنتجات"
+    "en": "My products",
+    "uz": "Mahsulotlarim",
+    "ky": "Товарларым",
+    "tg": "Молҳои ман",
+    "zh-CN": "我的商品",
+    "ar": "منتجاتي"
   },
   "client.productPhotoIsNotUploadedYet": {
     "en": "Product photo is not uploaded yet",
@@ -11474,12 +11474,12 @@ export const SEEDS = {
     "ar": "في أسفل الشاشة اضغط الزر بمربع وسهم لأعلى (مشاركة)."
   },
   "storefront.cabinet": {
-    "en": "Portal",
-    "uz": "LK",
-    "ky": "ЖК",
-    "tg": "ЛК",
-    "zh-CN": "门户",
-    "ar": "البوابة"
+    "en": "Account",
+    "uz": "Kabinet",
+    "ky": "Кабинет",
+    "tg": "Кабинет",
+    "zh-CN": "账户",
+    "ar": "حسابي"
   },
   "storefront.call": {
     "en": "Call",
@@ -11538,12 +11538,12 @@ export const SEEDS = {
     "ar": "لم تُحدد جهات الاتصال بعد."
   },
   "storefront.emptyForNowAddProductsFrom": {
-    "en": "Empty for now — add products from the catalog.",
-    "uz": "Hozircha bo‘sh — katalogdan mahsulot qo‘shing.",
-    "ky": "Азырынча бош — каталогдон товар кошуңуз.",
-    "tg": "Ҳоло холӣ — аз каталог мол илова кунед.",
-    "zh-CN": "暂时为空 — 请从目录添加商品。",
-    "ar": "فارغ الآن — أضف منتجات من الكتالوج."
+    "en": "Your cart is empty. Browse the catalog to add products.",
+    "uz": "Savat bo‘sh. Mahsulot qo‘shish uchun katalogni oching.",
+    "ky": "Себетиңиз бош. Товар кошуу үчүн каталогду ачыңыз.",
+    "tg": "Сабади шумо холӣ аст. Барои иловаи мол каталогро кушоед.",
+    "zh-CN": "购物车是空的。去商品目录添加商品吧。",
+    "ar": "سلتك فارغة. تصفح الكتالوج لإضافة منتجات."
   },
   "storefront.howAndroidChecksSitesInstalledOutside": {
     "en": "— how Android checks sites installed outside Play Store.",
@@ -11626,12 +11626,12 @@ export const SEEDS = {
     "ar": "«المزيد»"
   },
   "storefront.nav.toCatalog": {
-    "en": "To catalog",
-    "uz": "Katalogga",
-    "ky": "Каталогго",
-    "tg": "Ба каталог",
-    "zh-CN": "前往目录",
-    "ar": "إلى الكتالوج"
+    "en": "Go to catalog",
+    "uz": "Katalogga o‘tish",
+    "ky": "Каталогго өтүү",
+    "tg": "Ба каталог гузаштан",
+    "zh-CN": "进入商品目录",
+    "ar": "الذهاب إلى الكتالوج"
   },
   "storefront.noRegistrationNeededEnterContactDetails": {
     "en": "No registration needed — enter contact details.",
@@ -11706,12 +11706,12 @@ export const SEEDS = {
     "ar": "مرّر القائمة واختر «إلى الشاشة الرئيسية» → «إضافة». ستظهر أيقونة Clover على سطح المكتب."
   },
   "storefront.signInToCabinet": {
-    "en": "Sign in to the portal",
-    "uz": "LKga kirish",
-    "ky": "Жеке кабинетке кирүү",
-    "tg": "Даромадан ба ЛК",
-    "zh-CN": "登录个人账户",
-    "ar": "دخول البوابة"
+    "en": "Sign in",
+    "uz": "Kabinetga kirish",
+    "ky": "Кабинетке кирүү",
+    "tg": "Вуруд ба кабинет",
+    "zh-CN": "登录账户",
+    "ar": "تسجيل الدخول"
   },
   "storefront.signInToTheCabinetOrders": {
     "en": "Sign in to the portal — orders, the product matrix and delivery statuses will be at hand. Order notifications work in the installed app. The first open may take a few seconds — then it loads faster.",
@@ -11786,12 +11786,12 @@ export const SEEDS = {
     "ar": "الإجمالي:"
   },
   "storefront.websitePricesWithoutPersonalCabinetTerms": {
-    "en": "Website prices — without personal account terms.",
-    "uz": "Sayt narxlari — LK shaxsiy shartlarisiz.",
-    "ky": "Сайт баалары — жеке кабинеттин жеке шарттарысыз.",
-    "tg": "Нархҳои сайт — бе шартҳои шахсии ЛК.",
-    "zh-CN": "网站价格 — 不含门户个人条件。",
-    "ar": "أسعار الموقع — دون شروط الحساب الشخصي."
+    "en": "Website prices — account terms do not apply.",
+    "uz": "Sayt narxlari — kabinet shartlarisiz.",
+    "ky": "Сайт баалары — кабинет шарттарысыз.",
+    "tg": "Нархҳои сайт — бе шартҳои кабинет.",
+    "zh-CN": "网站标价 — 不含账户专属条件。",
+    "ar": "أسعار الموقع — دون شروط الحساب."
   },
   "storefront.weWillContactYouToConfirm": {
     "en": ". We will contact you to confirm.",
@@ -13314,12 +13314,12 @@ export const SEEDS = {
     "ar": "السلة ({count})"
   },
   "storefront.nav.cartAriaCount": {
-    "en": "Cart: {count} lines",
-    "uz": "Savat: {count} qator",
-    "ky": "Себет: {count} сап",
-    "tg": "Сабад: {count} сатр",
-    "zh-CN": "购物车：{count} 行",
-    "ar": "السلة: {count} بندًا"
+    "en": "Cart: {count} items",
+    "uz": "Savat: {count} ta",
+    "ky": "Себет: {count} даана",
+    "tg": "Сабад: {count} адад",
+    "zh-CN": "购物车：{count} 件",
+    "ar": "السلة: {count} قطعة"
   },
   "storefront.hero.slideAria": {
     "en": "Slide {index}",
@@ -14282,12 +14282,12 @@ export const SEEDS = {
     "ar": "سانت بطرسبرغ · طلب أقل من {amount}"
   },
   "checkout.summary.goodsCountAmount": {
-    "en": "Items: {count} pos. · {amount}",
-    "uz": "Mahsulotlar: {count} poz. · {amount}",
-    "ky": "Товарлар: {count} поз. · {amount}",
-    "tg": "Молҳо: {count} поз. · {amount}",
-    "zh-CN": "商品：{count} 项 · {amount}",
-    "ar": "المنتجات: {count} صنف · {amount}"
+    "en": "Items: {count} · {amount}",
+    "uz": "Mahsulotlar: {count} · {amount}",
+    "ky": "Товарлар: {count} · {amount}",
+    "tg": "Молҳо: {count} · {amount}",
+    "zh-CN": "商品：{count} · {amount}",
+    "ar": "السلع: {count} · {amount}"
   },
   "storefront.install.iosOpenSafari": {
     "en": "Go to {host} in Safari. Installing to the home screen is not available in Chrome and other browsers on iOS.",

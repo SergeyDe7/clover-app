@@ -146,14 +146,19 @@ export function HomePage() {
           <h2>{t("storefront.popularCategories")}</h2>
         </div>
         {error ? <p className="sf-error">{error}</p> : null}
-        <div className="sf-group-grid">
-          {CLOVER_PRODUCT_GROUPS.map((name) => (
-            <GroupTile
-              key={name}
-              name={name}
-              translations={categoryTranslations}
-            />
-          ))}
+        <div
+          className="sf-group-grid"
+          aria-busy={!ready && !error ? "true" : undefined}
+        >
+          {ready
+            ? CLOVER_PRODUCT_GROUPS.map((name) => (
+                <GroupTile
+                  key={name}
+                  name={name}
+                  translations={categoryTranslations}
+                />
+              ))
+            : null}
           {!ready && !error ? (
             <p className="sf-muted">{t("storefront.loadingCategories")}</p>
           ) : null}

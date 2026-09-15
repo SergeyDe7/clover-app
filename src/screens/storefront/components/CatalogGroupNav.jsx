@@ -1,7 +1,10 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { useMemo, useState } from "react";
 import { buildGroupNav, canonicalizeProductSubcategory } from "../productGroups.js";
-import { projectLocalizedGroupNav } from "../../../shared/i18n/categoryDisplayProjection.js";
+import {
+  categoryDisplayLabelsReady,
+  projectLocalizedGroupNav,
+} from "../../../shared/i18n/categoryDisplayProjection.js";
 import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
 import { navigateStorefront } from "./StoreHeader.jsx";
 
@@ -35,22 +38,22 @@ export function CatalogGroupNav({
   activeCategory = "",
   activeSubcategory = "",
   variant = "side",
-  translations = {},
+  translations,
   language,
 }) {
   const { enabledLanguages, t, locale } = useLocalization();
   const displayLanguage = language || locale;
+  const categoryOptions = storefrontCategoryDisplayOptions(
+    displayLanguage,
+    translations,
+    enabledLanguages
+  );
+  const labelsReady = categoryDisplayLabelsReady(categoryOptions);
   const groups = useMemo(() => {
+    if (!labelsReady) return [];
     const canonical = buildGroupNav(categories);
-    return projectLocalizedGroupNav(
-      canonical,
-      storefrontCategoryDisplayOptions(
-        displayLanguage,
-        translations,
-        enabledLanguages
-      )
-    );
-  }, [categories, displayLanguage, enabledLanguages, translations]);
+    return projectLocalizedGroupNav(canonical, categoryOptions);
+  }, [categories, categoryOptions, labelsReady]);
   const [openParents, setOpenParents] = useState(() => new Set());
 
   const toggleParent = (name) => {
@@ -87,6 +90,7 @@ export function CatalogGroupNav({
     <nav
       className={`sf-group-nav sf-group-nav-${variant}`}
       aria-label={t("storefront.productGroups")}
+      aria-busy={!labelsReady ? "true" : undefined}
     >
       <button
         type="button"
@@ -95,6 +99,10 @@ export function CatalogGroupNav({
       >
         {t("shared.filter.all")}
       </button>
+
+      {!labelsReady ? (
+        <p className="sf-muted">{t("storefront.loadingCategories")}</p>
+      ) : null}
 
       {groups.map((group) => {
         const hasChildren = group.children.length > 0;

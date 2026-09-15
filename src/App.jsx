@@ -73,7 +73,13 @@ function LoginView({ onAuth, authBusy, authError }) {
   const params = new URLSearchParams(window.location.search);
   const verifyToken = params.get("verify") || "";
   const resetToken = params.get("reset") || "";
-  const [mode, setMode] = useState(resetToken ? "reset" : "login");
+  const modeParam = String(params.get("mode") || "").toLowerCase();
+  const initialMode = resetToken
+    ? "reset"
+    : modeParam === "register" || modeParam === "forgot"
+      ? modeParam
+      : "login";
+  const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({
     companyName: "",
     contactName: "",

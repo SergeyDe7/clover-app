@@ -69,12 +69,19 @@ export function LocalizationProvider({
 }) {
   const preferenceRef = useRef(readLanguagePreference());
   const [urlLanguage, setUrlLanguage] = useState(publicUrlLanguage);
-  const [snapshot, setSnapshot] = useState(() => ({
-    enabledLanguages: ["ru"],
-    catalogVersion: "",
-    locale: publicUrlLanguage() || "ru",
-    dictionaries: dictionaries || {},
-  }));
+  const [snapshot, setSnapshot] = useState(() => {
+    // Provisional: include URL/sticky foreign locale in enabledLanguages so
+    // category projection does not treat the first paint as RU-only (flash).
+    const initialLocale = toPublicLocaleCode(publicUrlLanguage() || "ru") || "ru";
+    const provisionalEnabled =
+      initialLocale === "ru" ? ["ru"] : ["ru", initialLocale];
+    return {
+      enabledLanguages: provisionalEnabled,
+      catalogVersion: "",
+      locale: initialLocale,
+      dictionaries: dictionaries || {},
+    };
+  });
   const loader = useRef(createRuntimeSnapshotLoader({
     requestSnapshot: requestRuntimeSnapshot,
     applySnapshot: setSnapshot,

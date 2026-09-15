@@ -1,5 +1,8 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
-import { categoryDisplayNameFromCanonical } from "../../../shared/i18n/categoryDisplayProjection.js";
+import {
+  categoryDisplayLabelsReady,
+  categoryDisplayNameFromCanonical,
+} from "../../../shared/i18n/categoryDisplayProjection.js";
 import { useCategoryDisplayOptions } from "../../../shared/i18n/useCategoryTranslations.js";
 import { GroupIcon } from "./GroupIcon.jsx";
 import { getGroupMeta } from "../productGroups.js";
@@ -40,20 +43,20 @@ export function GroupTile({
 }) {
   const { t } = useLocalization();
   const categoryOptions = useCategoryDisplayOptions(translations);
-  const displayName = categoryDisplayNameFromCanonical(
-    name,
-    "",
-    categoryOptions
-  );
+  const labelsReady = categoryDisplayLabelsReady(categoryOptions);
+  const displayName = labelsReady
+    ? categoryDisplayNameFromCanonical(name, "", categoryOptions)
+    : "";
   const meta = getGroupMeta(name);
   const showCount =
     count !== null && count !== undefined && Number.isFinite(Number(count));
-  const lines = groupNameLines(name, displayName);
+  const lines = labelsReady ? groupNameLines(name, displayName) : null;
 
   return (
     <button
       type="button"
       className={`sf-group-tile ${className}`.trim()}
+      aria-busy={!labelsReady ? "true" : undefined}
       onClick={() =>
         navigateStorefront({
           name: "catalog",
@@ -65,15 +68,21 @@ export function GroupTile({
         <GroupIcon name={meta.icon} />
       </span>
       <span className="sf-group-tile-body">
-        <span className={`sf-group-tile-name${lines ? " is-two-line" : ""}`}>
+        <span
+          className={`sf-group-tile-name${lines ? " is-two-line" : ""}${
+            !labelsReady ? " sf-locale-pending" : ""
+          }`}
+        >
           {lines ? (
             <>
               {lines[0]}
               <br />
               {lines[1]}
             </>
-          ) : (
+          ) : labelsReady ? (
             displayName
+          ) : (
+            "\u00a0"
           )}
         </span>
         {showCount ? (

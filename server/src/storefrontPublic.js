@@ -60,7 +60,9 @@ import {
 import {
   normalizeStorefrontInfoPages,
   resolveStorefrontInfoPage,
+  STOREFRONT_INFO_SLUGS,
 } from "../../src/shared/storefrontInfoPages.js";
+import { getInfoPageBodyBlocks } from "./i18n/infoPageBodyTranslationSeed.js";
 import {
   buildProductTranslationCellMap,
   projectLocalizedProductDisplay,
@@ -159,10 +161,13 @@ function publicTranslationProjection(language) {
 
 function projectPublicInfoPages(infoPages, projection) {
   if (projection.locale === "ru") return infoPages;
-  const out = {};
-  for (const slug of Object.keys(infoPages || {})) {
+  const out = { ...(infoPages && typeof infoPages === "object" ? infoPages : {}) };
+  // Project every registry slug so footer/legal links never fall back to RU
+  // when CMS storefrontInfoPages omitted a page that still exists in the catalog.
+  for (const slug of STOREFRONT_INFO_SLUGS) {
     const page = resolveStorefrontInfoPage(slug, infoPages);
     if (!page) continue;
+    const localizedBlocks = getInfoPageBodyBlocks(slug, projection.locale);
     out[slug] = {
       ...page,
       heading:
@@ -177,6 +182,7 @@ function projectPublicInfoPages(infoPages, projection) {
         projection.infoTranslations.get(
           `page\0info\0${slug}\0description`
         ) || page.description,
+      ...(localizedBlocks ? { blocks: localizedBlocks } : {}),
     };
   }
   return out;
