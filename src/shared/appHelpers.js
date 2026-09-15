@@ -5,6 +5,7 @@ import { assignCloverTaxonomy, canonicalizeProductCategory } from "../screens/st
 import { uiText } from "./i18n/translationRuntime.js";
 import { exchangeStatusLabel as exchangeStatusCodeLabel } from "./i18n/displayLabels.js";
 import { normalizeLanguagePreference } from "./i18n/languagePreference.js";
+import { unitDisplayShort } from "./i18n/unitDisplay.js";
 
 export const MANAGER_ACTIVE_TAB_KEY = "clover-manager-active-tab-v1";
 
@@ -7111,8 +7112,14 @@ export function quantityInputStep(multiplier, orderStep = 1) {
   return Math.max(1, Number(orderStep) || 1);
 }
 
-export function quantityInputUnitLabel(unit, multiplier) {
-  if (Math.max(1, Number(multiplier) || 1) > 1) return "шт.";
+/** Подпись единицы у поля количества. С `t` — штатная i18n; без `t` — RU fallback (тесты/legacy). */
+export function quantityInputUnitLabel(unit, multiplier, t) {
+  if (Math.max(1, Number(multiplier) || 1) > 1) {
+    return typeof t === "function" ? unitDisplayShort("piece", t) : "шт.";
+  }
+  if (typeof t === "function") {
+    return unitDisplayShort(unit, t) || UNIT_CONFIG[unit]?.shortLabel || "шт.";
+  }
   return UNIT_CONFIG[unit]?.shortLabel || "шт.";
 }
 

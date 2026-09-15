@@ -1576,7 +1576,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                             onChange={(e) => setQtyDrafts((current) => ({ ...current, [product.id]: e.target.value }))}
                             onBlur={() => commitQtyDraft(product.id, multiplier, orderStep)}
                           />
-                          <small>{quantityInputUnitLabel(unit, multiplier)}</small>
+                          <small>{quantityInputUnitLabel(unit, multiplier, t)}</small>
                         </div>
                         <button type="button" onClick={() => changeQuantity(product.id, 1, orderStep)} aria-label={t("shared.qty.increase")}>+</button>
                       </div>
@@ -1775,7 +1775,7 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                                 onChange={(e) => setQtyDrafts((current) => ({ ...current, [item.productId]: e.target.value }))}
                                 onBlur={() => commitQtyDraft(item.productId, item.multiplier, item.orderStep)}
                               />
-                              <small>{quantityInputUnitLabel(item.unit, item.multiplier)}</small>
+                              <small>{quantityInputUnitLabel(item.unit, item.multiplier, t)}</small>
                             </div>
                             <button type="button" onClick={() => changeQuantity(item.productId, 1, item.orderStep)} aria-label={t("shared.qty.increase")}>+</button>
                           </div>
