@@ -2001,6 +2001,62 @@ export const SEEDS = {
     "zh-CN": "订单购物车",
     "ar": "سلة الطلب"
   },
+  "client.cart.unitChange.title": {
+    "en": "Change unit of measure?",
+    "uz": "O‘lchov birligini o‘zgartirasizmi?",
+    "ky": "Өлчөө бирдигин өзгөртөсүзбү?",
+    "tg": "Воҳиди ченакро иваз мекунед?",
+    "zh-CN": "更改计量单位？",
+    "ar": "تغيير وحدة القياس؟"
+  },
+  "client.cart.unitChange.question": {
+    "en": "Do you want to change the unit of measure or remove the item from the order?",
+    "uz": "O‘lchov birligini o‘zgartirmoqchimisiz yoki mahsulotni buyurtmadan olib tashlamoqchimisiz?",
+    "ky": "Өлчөө бирдигин өзгөрткүңүз келеби же товарды заказдан алып салгыңыз келеби?",
+    "tg": "Мехоҳед воҳиди ченакро иваз кунед ё молро аз фармоиш нест кунед?",
+    "zh-CN": "您要更改计量单位，还是从订单中删除该商品？",
+    "ar": "هل تريد تغيير وحدة القياس أم حذف المنتج من الطلب؟"
+  },
+  "client.cart.unitChange.transition": {
+    "en": "From {quantity} {oldUnit} to {quantity} {newUnit}",
+    "uz": "{quantity} {oldUnit} dan {quantity} {newUnit} ga",
+    "ky": "{quantity} {oldUnit} дан {quantity} {newUnit} га",
+    "tg": "Аз {quantity} {oldUnit} ба {quantity} {newUnit}",
+    "zh-CN": "从 {quantity} {oldUnit} 到 {quantity} {newUnit}",
+    "ar": "من {quantity} {oldUnit} إلى {quantity} {newUnit}"
+  },
+  "client.cart.unitChange.invalidMultiple": {
+    "en": "Quantity {quantity} is not a multiple of step {multiple} for unit “{unit}”.",
+    "uz": "{quantity} miqdori “{unit}” birligi uchun {multiple} qadamiga karrali emas.",
+    "ky": "{quantity} саны “{unit}” бирдиги үчүн {multiple} кадамына эселенүүчү эмес.",
+    "tg": "Миқдори {quantity} барои воҳиди «{unit}» ба қадами {multiple} зарб намешавад.",
+    "zh-CN": "数量 {quantity} 不是单位“{unit}”步长 {multiple} 的倍数。",
+    "ar": "الكمية {quantity} ليست من مضاعفات الخطوة {multiple} للوحدة «{unit}»."
+  },
+  "client.cart.unitChange.changeAction": {
+    "en": "Change",
+    "uz": "O‘zgartirish",
+    "ky": "Өзгөртүү",
+    "tg": "Иваз кардан",
+    "zh-CN": "更改",
+    "ar": "تغيير"
+  },
+  "client.cart.itemDelete.title": {
+    "en": "Remove item from the order?",
+    "uz": "Pozitsiyani buyurtmadan olib tashlaysizmi?",
+    "ky": "Позицияны заказдан алып саласызбы?",
+    "tg": "Позитсияро аз фармоиш нест мекунед?",
+    "zh-CN": "从订单中删除该商品？",
+    "ar": "حذف المنتج من الطلب؟"
+  },
+  "client.cart.itemDelete.question": {
+    "en": "Are you sure you want to remove this item from the order?",
+    "uz": "Haqiqatan ham bu pozitsiyani buyurtmadan olib tashlamoqchimisiz?",
+    "ky": "Чын эле бул позицияны заказдан алып салгыңыз келеби?",
+    "tg": "Муътақидед, ки мехоҳед ин позитсияро аз фармоиш нест кунед?",
+    "zh-CN": "确定要从订单中删除该商品吗？",
+    "ar": "هل تريد بالتأكيد حذف هذا المنتج من الطلب؟"
+  },
   "client.orPlaceTheOrderWithPaid": {
     "en": "or place the order with paid delivery.",
     "uz": "yoki pullik yetkazib berish bilan buyurtma bering.",
