@@ -45,4 +45,5 @@ ONEC_DEFAULT_EXCHANGE_DATABASE=TEST
 ## Не смешивать
 
 - TEST и VLAVKA не забирают чужие `ready`.
+- У каждого контура **свой** inbound exchange credential (`ONEC_TEST_EXCHANGE_API_KEY` / `ONEC_VLAVKA_EXCHANGE_API_KEY`). Cross-use → 403, без mutation. `ONEC_API_KEY` не даёт multi-contour inbound authority.
 - Последняя успешная выгрузка номенклатуры/контрагентов **перезаписывает** каталог поиска в Clover. Для рабочей витрины выгружайте из **VLAVKA**.

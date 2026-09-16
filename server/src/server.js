@@ -1,9 +1,8 @@
 import "dotenv/config";
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { networkInterfaces } from "node:os";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -262,6 +261,11 @@ import {
   TEST_DATABASE_NAME,
   validatePriceRequirements,
 } from "./oneCPriceSync.js";
+import {
+  assertOneCContourAuthConfig,
+  authorizeOneCContour,
+  createOneCAuthMiddleware,
+} from "./oneCContourAuth.js";
 import {
   buildSalePriceRequirements,
   mergeOneCPriceTypes,
@@ -948,90 +952,33 @@ function clearLoginLimit(email) {
 }
 
 
-function secureEqual(left, right) {
-  const a = Buffer.from(String(left || ""));
-  const b = Buffer.from(String(right || ""));
-  return a.length === b.length && a.length > 0 && timingSafeEqual(a, b);
-}
-
-function isPlaceholderSecret(value) {
-  return /^(?:change[_-]?me(?:[_-].*)?|secret|development-secret|clover-local-development-secret-change-before-production)$/i
-    .test(String(value || "").trim());
-}
-
-function normalizeRemoteAddress(value) {
-  return String(value || "").replace(/^::ffff:/, "").split("%")[0];
-}
-
-function localMachineAddresses() {
-  const addresses = new Set(["127.0.0.1", "::1"]);
-  for (const entries of Object.values(networkInterfaces())) {
-    for (const item of entries || []) {
-      if (item?.address) addresses.add(normalizeRemoteAddress(item.address));
-    }
-  }
-  return addresses;
-}
-
-const oneCLocalAddresses = localMachineAddresses();
-
 function oneCAuthRequired(req, res, next) {
-  const configuredKey = String(process.env.ONEC_API_KEY || "").trim();
-  const bearer = String(req.headers.authorization || "").startsWith("Bearer ")
-    ? String(req.headers.authorization).slice(7)
-    : "";
-  const supplied = String(req.headers["x-clover-key"] || bearer || "").trim();
-
-  if (configuredKey.length >= 24 && !isPlaceholderSecret(configuredKey)) {
-    if (secureEqual(supplied, configuredKey)) return next();
-    writeAudit({ action: "one-c.auth.denied", details: { ip: req.ip || "", mode: "api-key" } });
-    return res.status(401).json({ error: "Неверный ключ обмена Clover." });
-  }
-
-  // По умолчанию false: локальный bypass только после явного ONEC_ALLOW_LOCAL_WITHOUT_KEY=true.
-  const allowLocal =
-    String(process.env.ONEC_ALLOW_LOCAL_WITHOUT_KEY || "false").toLowerCase() === "true";
-  const remoteAddress = normalizeRemoteAddress(req.socket?.remoteAddress || req.ip);
-  if (allowLocal && oneCLocalAddresses.has(remoteAddress)) {
-    return next();
-  }
-
-  writeAudit({ action: "one-c.auth.denied", details: { ip: req.ip || "", mode: "key-required" } });
-  return res.status(503).json({
-    error:
-      "Ключ обмена с 1С не настроен. Укажите ONEC_API_KEY или явно разрешите локальный обмен ONEC_ALLOW_LOCAL_WITHOUT_KEY=true.",
-  });
+  return createOneCAuthMiddleware({ writeAudit })(req, res, next);
 }
 
-/** Строгий TEST-only gate; текущие маршруты используют requireOneCAllowedDatabase. */
+/** Строгий TEST-only gate; retained for TEST-only routes. */
 // eslint-disable-next-line no-unused-vars -- retained for TEST-only routes
 function requireOneCTestDatabase(req, res) {
-  const database = extractOneCDatabase(req);
+  const database = authorizeOneCContour(req, res, {
+    isAllowedDatabase: (value) => isTestDatabase(value),
+  });
+  if (!database) return null;
   if (!isTestDatabase(database)) {
     res.status(403).json({
       error:
         "Этот обмен разрешён только для базы 1С TEST. Укажите заголовок X-Clover-Database: TEST.",
+      code: "ONEC_CONTOUR_MISMATCH",
     });
     return null;
   }
   return database;
 }
 
-/** Pull/ACK/цены: TEST всегда; другие базы — только при ONEC_PROD_EXCHANGE_ENABLED=true. */
+/** Pull/ACK/цены: authenticated contour only; request contour cannot escalate authority. */
 function requireOneCAllowedDatabase(req, res) {
-  const database = extractOneCDatabase(req);
-  if (!isAllowedOneCDatabase(database)) {
-    const allowed = parseAllowedOneCDatabases().join(", ");
-    res.status(403).json({
-      error: isProdExchangeEnabled()
-        ? `Этот обмен разрешён для баз 1С: ${allowed}. Укажите заголовок X-Clover-Database.`
-        : "Сейчас разрешён только обмен с 1С TEST (prod-контур выключен). Укажите X-Clover-Database: TEST.",
-      allowedDatabases: parseAllowedOneCDatabases(),
-      prodEnabled: isProdExchangeEnabled(),
-    });
-    return null;
-  }
-  return database;
+  return authorizeOneCContour(req, res, {
+    isAllowedDatabase: (value) => isAllowedOneCDatabase(value),
+  });
 }
 
 function resolveManagerExchangeDatabase(req) {
@@ -4215,6 +4162,7 @@ app.post("/api/one-c/orders/:orderId/ack", (req, res) => {
   ) {
     return res.status(409).json({
       error: `Заказ стоит в очереди контура ${previous.database}, а ACK пришёл от ${ackDatabase}.`,
+      code: "ONEC_CONTOUR_MISMATCH",
     });
   }
 
@@ -4445,6 +4393,16 @@ app.post("/api/one-c/orders/accepted", (req, res) => {
   }
 
   const exchange = normalizeExchangeState(payload.exchange);
+  if (
+    exchange.database &&
+    exchange.database !== acceptedDatabase &&
+    exchange.status !== "not_sent"
+  ) {
+    return res.status(409).json({
+      error: `Заказ относится к контуру ${exchange.database}, а запрос пришёл от ${acceptedDatabase}.`,
+      code: "ONEC_CONTOUR_MISMATCH",
+    });
+  }
   if (exchange.status !== "sent") {
     return res.status(409).json({
       error:
@@ -7477,13 +7435,17 @@ app.get(
 );
 
 app.get("/api/one-c/reconciliation/requests", (req, res) => {
+  const database = requireOneCAllowedDatabase(req, res);
+  if (!database) return;
   const status = String(req.query.status || "new");
   const requests = listReconciliationRequests().filter((item) => !status || item.status === status);
-  res.json({ ok: true, requests });
+  res.json({ ok: true, database, requests });
 });
 
 app.post("/api/one-c/reconciliation/:requestId/result", (req, res, next) => {
   try {
+    const database = requireOneCAllowedDatabase(req, res);
+    if (!database) return;
     const current = getReconciliationRequestInternal(req.params.requestId);
     if (!current) return res.status(404).json({ error: "Запрос акта сверки не найден." });
     const base64 = String(req.body?.fileBase64 || "").replace(/^data:application\/pdf;base64,/, "");
@@ -8100,6 +8062,13 @@ try {
   }
 } catch (error) {
   console.error("Не удалось создать автоматическую резервную копию", error);
+}
+
+try {
+  assertOneCContourAuthConfig();
+} catch (error) {
+  console.error(error.message || error);
+  process.exit(1);
 }
 
 app.listen(port, host, () => {

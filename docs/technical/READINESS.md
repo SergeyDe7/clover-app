@@ -40,7 +40,7 @@
 
 1. Windows VM + Node ≥ 22.13 + внутренний IP.
 2. `server/.env` из `docs/deploy/server.env.datacenter.example`.
-3. Ключ `ONEC_API_KEY`, `ONEC_ALLOW_LOCAL_WITHOUT_KEY=false`.
+3. Отдельные inbound ключи `ONEC_TEST_EXCHANGE_API_KEY` / `ONEC_VLAVKA_EXCHANGE_API_KEY`; `ONEC_API_KEY` только outbound; `ONEC_ALLOW_LOCAL_WITHOUT_KEY=false`.
 4. Автозапуск: `tools\Install-CloverAutostart.ps1` (Планировщик, не Windows Service).
 5. Firewall: порты 5273 и 4100 в LAN.
 6. Приёмка: 2 тестовых заказа с сервера в 1С TEST.

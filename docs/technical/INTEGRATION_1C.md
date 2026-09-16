@@ -9,16 +9,21 @@
 
 Очередь: 1С **сама забирает** заказ из Clover (pull), затем подтверждает ACK.
 
-## Auth
+## Auth (SEC-001 contour binding)
 
-Входящие маршруты `/api/one-c/*` требуют:
+Входящие маршруты `/api/one-c/*`: **authenticated credential → server-owned contour**.
+Requested `database` never chooses authority.
 
-- заголовок `X-Clover-Key` (или Bearer) = `ONEC_API_KEY` из `server/.env` (≥24 символов, не placeholder), **или**
-- локальный доступ **только** при явном `ONEC_ALLOW_LOCAL_WITHOUT_KEY=true` (по умолчанию в коде `false`).
+- `X-Clover-Key` или `Authorization: Bearer` = contour exchange key:
+  - `ONEC_TEST_EXCHANGE_API_KEY` → только **TEST**
+  - `ONEC_VLAVKA_EXCHANGE_API_KEY` → только **VLAVKA**
+- Если оба заголовка заданы и значения различаются — отказ (400), без silent priority.
+- Optional `X-Clover-Database` / body / query contour must match the authenticated contour (иначе 403). Missing contour uses the authenticated contour (never a hidden VLAVKA default).
+- `ONEC_API_KEY` — **только outbound** Clover → 1C (черновики/health). Не авторизует inbound multi-contour.
+- Local bypass `ONEC_ALLOW_LOCAL_WITHOUT_KEY=true`: только TEST-only, loopback, non-prod; never VLAVKA / multi-contour.
+- Legacy inbound via `ONEC_API_KEY` только с явным `ONEC_LEGACY_INBOUND_KEY_CONTOUR=TEST|VLAVKA` (OFF by default; forbidden when prod/VLAVKA enabled).
 
-Обязательный заголовок среды: `X-Clover-Database` — имя базы из allowlist (`TEST` или `VLAVKA`). Пустой / не из списка — `403`.
-
-Ключ **не** публиковать в Git, чат и скриншоты.
+Ключи **не** публиковать в Git, чат и скриншоты.
 
 ## Маршруты
 

@@ -74,6 +74,9 @@ export function resolveOneCRuntimeConfig(publicConfig = {}) {
   const baseUrl = envBaseUrl ? normalizeBaseUrl(envBaseUrl) : stored.baseUrl;
   const username = String(process.env.ONEC_USERNAME || stored.username || "").trim();
   const password = String(process.env.ONEC_PASSWORD || "");
+  // OUTBOUND only (Clover → 1C). Does not authorize inbound /api/one-c/*
+  // multi-contour routes. Inbound uses ONEC_TEST_EXCHANGE_API_KEY /
+  // ONEC_VLAVKA_EXCHANGE_API_KEY (see oneCContourAuth.js).
   const apiKey = String(process.env.ONEC_API_KEY || "");
   const envWriteEnabled = ["1", "true", "yes", "on"].includes(
     String(process.env.ONEC_WRITE_ENABLED || "").toLowerCase()
