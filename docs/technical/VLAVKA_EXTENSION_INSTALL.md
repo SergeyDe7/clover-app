@@ -43,13 +43,15 @@ X-Clover-Database → "VLAVKA"
 1. Backup VLAVKA + Clover (включая `server/.env`).
 2. На DC: записать новый `ONEC_VLAVKA_EXCHANGE_API_KEY` в `server/.env` (helper/runbook владельца), restart API по штатному runbook.
 3. В конфигураторе VLAVKA: расширение **CloverExchange** → модуль **Clover_ОбменКлиент** → изменить **только** `ПолучитьКлючОбмена()` на тот же новый секрет.
-4. `X-Clover-Database` оставить `"VLAVKA"`. Остальной модуль не трогать без отдельной задачи.
+4. `X-Clover-Database` оставить `"VLAVKA"`. JSON `body.database` (в т.ч. purchase-prices) — тоже `"VLAVKA"` (или через `ПолучитьИмяБазыОбмена()`). Остальной модуль не трогать без отдельной задачи.
 5. Проверка без пилотного заказа: кнопка «Получить заказ» при пустой очереди → «Нет новых заказов».
 
 ### Что не делать
 
 - Не ставить shared key (один секрет на TEST и VLAVKA).
 - Не возвращать в заголовке `TEST` из рабочей базы.
+- Не оставлять `body.database = "TEST"` при header `VLAVKA` — сервер ответит `ONEC_CONTOUR_CONFLICT` (SEC-001).
+- Не вставлять as-is `one_c_patches/price_types/ПОЛНЫЙ_МОДУЛЬ_вставить_целиком.txt` в VLAVKA (это TEST-only шаблон).
 - Не включать TEST в allowlist «на всякий случай» без отдельного `ONEC_TEST_EXCHANGE_API_KEY`.
 - Не выгружать каталог из TEST поверх VLAVKA без необходимости — последняя выгрузка перезаписывает поиск в Clover.
 
@@ -103,7 +105,7 @@ Clover принимает выгрузки из баз **текущего allowl
 | Команды / кнопки меню Clover | «Получить заказ», цены и т.д. |
 | Подписки на `ЗаказПокупателя` | Статус «Принят» после смены состояния в 1С |
 
-Обязательные отличия в VLAVKA: `X-Clover-Database = "VLAVKA"` и отдельный `ПолучитьКлючОбмена()` ↔ `ONEC_VLAVKA_EXCHANGE_API_KEY`.
+Обязательные отличия в VLAVKA: `X-Clover-Database = "VLAVKA"` (или `ПолучитьИмяБазыОбмена()`), тот же контур в JSON `body.database` для purchase-prices, и отдельный `ПолучитьКлючОбмена()` ↔ `ONEC_VLAVKA_EXCHANGE_API_KEY`.
 
 ### Способ A (аварийный): `.cfe` из TEST → VLAVKA
 

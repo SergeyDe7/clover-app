@@ -1,14 +1,21 @@
 // Вставить в Clover_ОбменКлиент рабочей базы VLAVKA
 // (вместо варианта с "TEST" из копии).
+// Ключ: ONEC_VLAVKA_EXCHANGE_API_KEY (не shared с TEST).
+// Любой JSON body.database (например purchase-prices) должен быть "VLAVKA"
+// — тот же контур, что X-Clover-Database. Иначе ONEC_CONTOUR_CONFLICT.
+
+Функция ПолучитьИмяБазыОбмена() Экспорт
+	Возврат "VLAVKA";
+КонецФункции
 
 Функция ПолучитьКлючОбмена() Экспорт
-	Возврат "***REPLACE_WITH_ONEC_API_KEY***"; // тот же ключ, что в TEST / server/.env ONEC_API_KEY
+	Возврат "***REPLACE_WITH_ONEC_VLAVKA_EXCHANGE_API_KEY***";
 КонецФункции
 
 Процедура ДобавитьЗаголовкиОбмена(ЗапросHTTP) Экспорт
 	КлючОбмена = ПолучитьКлючОбмена();
 	ЗапросHTTP.Заголовки.Вставить("X-Clover-Key", КлючОбмена);
 	ЗапросHTTP.Заголовки.Вставить("Authorization", "Bearer " + КлючОбмена);
-	ЗапросHTTP.Заголовки.Вставить("X-Clover-Database", "VLAVKA");
+	ЗапросHTTP.Заголовки.Вставить("X-Clover-Database", ПолучитьИмяБазыОбмена());
 	ЗапросHTTP.Заголовки.Вставить("X-Clover-Protocol", "2");
 КонецПроцедуры
