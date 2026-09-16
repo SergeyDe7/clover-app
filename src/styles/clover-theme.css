@@ -3020,6 +3020,33 @@ body:has(.clover-app) {
   white-space: nowrap !important;
 }
 
+.client-section-menu-trigger--matrix-icon {
+  width: auto !important;
+  min-width: 44px !important;
+  max-width: none !important;
+  min-height: 44px !important;
+  height: 44px !important;
+  padding: 0 10px !important;
+  justify-content: center !important;
+  gap: 4px !important;
+}
+
+.client-section-menu-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 20px !important;
+  height: 20px !important;
+  flex: 0 0 auto !important;
+  color: inherit !important;
+}
+
+.client-section-menu-icon svg {
+  display: block !important;
+  width: 18px !important;
+  height: 18px !important;
+}
+
 .client-section-menu.open .client-section-menu-trigger,
 .client-section-menu-trigger:hover {
   background: #eef7eb !important;
@@ -5823,6 +5850,15 @@ body:has(.clover-app) {
     gap: 4px !important;
   }
 
+  .client-section-menu-trigger--matrix-icon {
+    width: auto !important;
+    min-width: 44px !important;
+    max-width: none !important;
+    min-height: 44px !important;
+    height: 44px !important;
+    padding: 0 10px !important;
+  }
+
   .client-section-menu-label {
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -7544,10 +7580,15 @@ html.clover-cart-open body {
   animation: order-thankyou-text-in 0.7s ease-out 0.52s both;
 }
 
+/* Unit CHANGE/DELETE on one row; CANCEL full width (mobile + desktop). */
 .app-modal-actions-choice {
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   width: min(100%, 340px);
   max-width: 100%;
+}
+
+.app-modal-actions-choice .app-modal-choice-cancel {
+  grid-column: 1 / -1;
 }
 
 .app-modal-actions-choice .danger-button {
@@ -7558,18 +7599,12 @@ html.clover-cart-open body {
 .app-modal-actions-choice .secondary-button,
 .app-modal-actions-choice .primary-button,
 .app-modal-actions-choice .danger-button {
-  min-height: 48px;
+  min-height: 44px;
   width: 100% !important;
-}
-
-@media (min-width: 901px) {
-  .app-modal-actions-choice {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .app-modal-actions-choice .app-modal-choice-cancel {
-    grid-column: 1 / -1;
-  }
+  white-space: normal;
+  text-wrap: balance;
+  line-height: 1.25;
+  padding-inline: 10px;
 }
 
 .clover-app .cart-sheet-item {
@@ -7627,13 +7662,21 @@ html.clover-cart-open body {
   background: transparent !important;
 }
 
-/* На телефоне «Отмена / Очистить» остаются в ряд, без переполнения */
+/* На телефоне confirm «Отмена / Ок» остаются в ряд; choice — 2+Cancel full. */
 @media (max-width: 900px) {
   .order-thankyou-mobile .app-modal-actions {
     width: min(100%, 340px);
     max-width: calc(100vw - 48px);
     grid-template-columns: 1fr 1fr;
     gap: 10px;
+  }
+
+  .order-thankyou-mobile .app-modal-actions.app-modal-actions-choice {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .order-thankyou-mobile .app-modal-actions-choice .app-modal-choice-cancel {
+    grid-column: 1 / -1;
   }
 
   .order-thankyou-mobile .app-modal-actions-single {
@@ -7654,6 +7697,16 @@ html.clover-cart-open body {
   .app-modal-actions,
   .order-thankyou-mobile .app-modal-actions {
     grid-template-columns: 1fr;
+  }
+
+  .app-modal-actions.app-modal-actions-choice,
+  .order-thankyou-mobile .app-modal-actions.app-modal-actions-choice {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .app-modal-actions-choice .app-modal-choice-cancel,
+  .order-thankyou-mobile .app-modal-actions-choice .app-modal-choice-cancel {
+    grid-column: 1 / -1;
   }
 }
 
@@ -10010,6 +10063,13 @@ html.clover-storefront-add-open body {
     padding: 8px 10px !important;
     font-size: 13px !important;
   }
+
+  .clover-app-client .client-section-menu-trigger--matrix-icon {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    height: 44px !important;
+    padding: 0 10px !important;
+  }
 }
 
 @media (min-width: 901px) {
@@ -10957,6 +11017,13 @@ html.clover-storefront-add-open body {
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
+}
+
+.clover-app-client .app-header-with-between .client-section-menu-trigger--matrix-icon {
+  width: auto !important;
+  min-width: 44px !important;
+  max-width: none !important;
+  flex: 0 0 auto !important;
 }
 
 @media (max-width: 640px) {
