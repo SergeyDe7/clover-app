@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
 
-/** Same 4-tile grid mark as catalog cards toggle — matrix / product grid. */
+/** Same 4-tile grid mark as catalog cards toggle — section menu mark on mobile. */
 function MatrixGridIcon() {
   return (
-    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" focusable="false">
       <rect x="1.5" y="1.5" width="5.75" height="5.75" rx="1.25" fill="currentColor" />
       <rect x="8.75" y="1.5" width="5.75" height="5.75" rx="1.25" fill="currentColor" />
       <rect x="1.5" y="8.75" width="5.75" height="5.75" rx="1.25" fill="currentColor" />
@@ -16,7 +16,7 @@ function MatrixGridIcon() {
 /**
  * Телефон: одна кнопка разделов ЛК (Заказ / Мои заказы / …).
  * На десктопе в ClientScreen остаётся ряд кнопок client-nav.
- * Активная «Моя матрица» — компактная иконка сетки (текст остаётся в aria-label).
+ * Всегда компактная иконка сетки + caret; текст раздела — в aria-label.
  */
 export function ClientSectionMenu({
   tabs,
@@ -39,7 +39,6 @@ export function ClientSectionMenu({
   const activeKey = active?.[0];
   const activeLabel =
     SHORT_LABELS[activeKey] || active?.[1] || t("shared.nav.menu");
-  const matrixIconActive = activeKey === "matrix";
   const totalBadge = Number(ordersBadge) + Number(actsBadge);
 
   useEffect(() => {
@@ -64,37 +63,24 @@ export function ClientSectionMenu({
       className={open ? "client-section-menu open" : "client-section-menu"}
     >
       <button
-        className={
-          matrixIconActive
-            ? "client-section-menu-trigger client-section-menu-trigger--matrix-icon"
-            : "client-section-menu-trigger"
-        }
+        className="client-section-menu-trigger client-section-menu-trigger--icon"
         type="button"
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={activeLabel}
         onClick={() => setOpen((value) => !value)}
       >
-        {matrixIconActive ? (
-          <span className="client-section-menu-icon" aria-hidden="true">
+        <span className="client-section-menu-cluster" aria-hidden="true">
+          <span className="client-section-menu-icon">
             <MatrixGridIcon />
           </span>
-        ) : (
-          <span className="client-section-menu-label">{activeLabel}</span>
-        )}
-        <span
-          className={
-            totalBadge > 0
-              ? "client-section-menu-badge"
-              : "client-section-menu-badge is-empty"
-          }
-          aria-hidden="true"
-        >
-          {totalBadge > 0 ? (totalBadge > 99 ? "99+" : totalBadge) : ""}
+          <span className="client-section-menu-caret">▾</span>
         </span>
-        <span className="client-section-menu-caret" aria-hidden="true">
-          ▾
-        </span>
+        {totalBadge > 0 ? (
+          <span className="client-section-menu-badge" aria-hidden="true">
+            {totalBadge > 99 ? "99+" : totalBadge}
+          </span>
+        ) : null}
       </button>
       {open ? (
         <div className="client-section-menu-panel" role="menu">
