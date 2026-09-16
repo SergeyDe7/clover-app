@@ -46,6 +46,8 @@ const CHECK_FILES = [
   "scripts/verify-onec-price-sync.mjs",
   "scripts/verify-v17-ui.mjs",
   "scripts/verify-orders-hardening.mjs",
+  "scripts/verify-s2-new-001-order-preserve.mjs",
+  "scripts/verify-s2-new-001-concurrency.mjs",
   "scripts/verify-onec-claim-auth.mjs",
   "scripts/verify-sec-001-contour-credentials.mjs",
   "scripts/verify-onec-contour-module-sources.mjs",
