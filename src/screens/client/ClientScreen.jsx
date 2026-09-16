@@ -535,16 +535,19 @@ function ClientDashboard({
           }
           between={
             isNarrow ? (
-              <ClientSectionMenu
-                tabs={primaryTabs}
-                activeId={tab}
-                onSelect={selectTab}
-                ordersBadge={active.length}
-                actsBadge={readyActsBadge}
-              />
+              <span className="app-header-between-spacer" aria-hidden="true" />
             ) : null
           }
         >
+          {isNarrow ? (
+            <ClientSectionMenu
+              tabs={primaryTabs}
+              activeId={tab}
+              onSelect={selectTab}
+              ordersBadge={active.length}
+              actsBadge={readyActsBadge}
+            />
+          ) : null}
           <ManagerContact settings={settings} />
         </Header>
       </StickyCabinetChrome>
