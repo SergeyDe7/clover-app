@@ -5837,7 +5837,8 @@ body:has(.clover-app) {
     flex: 1 1 auto !important;
     max-width: none !important;
     min-width: 0 !important;
-    justify-content: stretch !important;
+    /* Hug the actions cluster (phone / language / logout), not the logo. */
+    justify-content: flex-end !important;
     z-index: 1 !important;
   }
 
@@ -5910,8 +5911,11 @@ body:has(.clover-app) {
   }
 
   .client-section-menu-panel {
-    left: 0;
-    right: auto;
+    /* Trigger sits next to phone on the trailing side — open toward the logo. */
+    inset-inline-start: auto;
+    inset-inline-end: 0;
+    left: auto;
+    right: 0;
     transform: none;
     width: min(220px, 70vw);
   }
@@ -11044,6 +11048,7 @@ html.clover-storefront-add-open body {
   flex: 1 1 auto !important;
   min-width: 0 !important;
   max-width: none !important;
+  justify-content: flex-end !important;
 }
 
 .clover-app-client .app-header-with-between .client-section-menu {
