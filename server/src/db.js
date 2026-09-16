@@ -14,13 +14,34 @@ import {
 } from "./orderClientEdit.js";
 
 /**
- * Test-only hooks. Production leaves callbacks null.
- * Use object mutation (ESM live bindings are read-only from importers).
+ * Test-only hooks for S2-NEW-001 concurrency verifiers.
+ * Registration and invocation are no-ops unless NODE_ENV === "test".
+ * Production runtime never calls hooks even if a property is mutated.
  */
+let beforeClientMergeHook = null;
+
+function isReplaceOrdersTestRuntime() {
+  return process.env.NODE_ENV === "test";
+}
+
 export const replaceOrdersTestHooks = {
-  /** @type {null | ((ctx: { userId: string }) => void)} */
-  beforeClientMerge: null,
+  get beforeClientMerge() {
+    return isReplaceOrdersTestRuntime() ? beforeClientMergeHook : null;
+  },
+  set beforeClientMerge(value) {
+    if (!isReplaceOrdersTestRuntime()) {
+      beforeClientMergeHook = null;
+      return;
+    }
+    beforeClientMergeHook = typeof value === "function" ? value : null;
+  },
 };
+
+function runReplaceOrdersBeforeClientMergeHook(ctx) {
+  if (!isReplaceOrdersTestRuntime()) return;
+  if (typeof beforeClientMergeHook !== "function") return;
+  beforeClientMergeHook(ctx);
+}
 
 const currentFile = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFile);
@@ -1391,9 +1412,7 @@ export function replaceOrders({
     // authoritative for any order the client may not mutate/delete.
     let ordersToWrite = normalizedOrders;
     if (!managerMode && userId) {
-      if (typeof replaceOrdersTestHooks.beforeClientMerge === "function") {
-        replaceOrdersTestHooks.beforeClientMerge({ userId: String(userId) });
-      }
+      runReplaceOrdersBeforeClientMergeHook({ userId: String(userId) });
       const settings = {
         ...DEFAULT_SETTINGS,
         ...getGlobalState("settings", DEFAULT_SETTINGS),

@@ -87,6 +87,7 @@ function assertManagerSnapshot(order, label) {
 }
 
 async function runDbUnit() {
+  process.env.NODE_ENV = "test";
   process.env.DB_PATH = databasePath;
   process.env.JWT_SECRET = jwtSecret;
   process.env.MANAGER_EMAIL = "";
@@ -566,12 +567,111 @@ console.log("RESET_OK", race.status);
   }
 }
 
+function runProductionHookNegative() {
+  // Isolated child: NODE_ENV=production must ignore installed hooks.
+  const prodDb = path.join(temp, "prod-hook.sqlite");
+  const script = path.join(temp, "prod-hook-negative.mjs");
+  writeFileSync(
+    script,
+    `
+process.env.NODE_ENV = "production";
+process.env.DB_PATH = ${JSON.stringify(prodDb)};
+process.env.JWT_SECRET = ${JSON.stringify(jwtSecret)};
+process.env.MANAGER_EMAIL = "";
+process.env.MANAGER_PASSWORD = "";
+import { createRequire } from "node:module";
+import assert from "node:assert/strict";
+const require = createRequire(${JSON.stringify(path.join(serverDir, "package.json"))});
+const bcrypt = require("bcryptjs");
+const dbMod = await import(${JSON.stringify(
+      pathToFileURL(path.join(serverDir, "src/db.js")).href
+    )});
+const { createUser, replaceOrders, listOrders, setGlobalState } = dbMod;
+
+let invocations = 0;
+dbMod.replaceOrdersTestHooks.beforeClientMerge = () => {
+  invocations += 1;
+  throw new Error("production hook must not run");
+};
+assert.equal(
+  dbMod.replaceOrdersTestHooks.beforeClientMerge,
+  null,
+  "getter must hide hook outside NODE_ENV=test"
+);
+
+const passwordHash = bcrypt.hashSync("ProdHookPass!1", 4);
+const client = createUser({
+  email: "prod-hook@test.local",
+  passwordHash,
+  role: "client",
+  emailVerified: true,
+  approvalStatus: "approved",
+});
+setGlobalState("settings", {
+  allowClientEdit: true,
+  allowClientDelete: true,
+});
+const nowIso = "2026-09-16T12:00:00.000Z";
+const draft = {
+  id: "o-new",
+  clientId: client.id,
+  status: "Новый",
+  exchange: { status: "not_sent" },
+  items: [{ id: "l1", productId: "p1", quantity: 1, unit: "piece", unitPrice: 10, lineTotal: 10 }],
+  customItems: [],
+  createdAt: nowIso,
+  updatedAt: nowIso,
+};
+const accepted = {
+  id: "o-acc",
+  clientId: client.id,
+  status: "Принят",
+  exchange: { status: "not_sent", documentId: "1C-KEEP", oneCNumber: "UNF-1" },
+  oneCDocumentId: "1C-KEEP",
+  items: [{ id: "l2", productId: "p1", quantity: 2, unit: "piece", unitPrice: 10, lineTotal: 20 }],
+  customItems: [],
+  total: 20,
+  amount: 20,
+  createdAt: nowIso,
+  updatedAt: nowIso,
+};
+replaceOrders({ orders: [draft, accepted], userId: client.id, managerMode: true });
+replaceOrders({ orders: [draft], userId: client.id, managerMode: false });
+assert.equal(invocations, 0, "hook must not run in production");
+const after = listOrders(client.id);
+assert.ok(after.find((o) => o.id === "o-acc"), "protected order preserved without hook");
+assert.equal(after.find((o) => o.id === "o-acc")?.oneCDocumentId, "1C-KEEP");
+console.log("PASS prod.hook-negative: invocations=0, protected preserved");
+`
+  );
+  const run = spawnSync(process.execPath, [script], {
+    cwd: serverDir,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      NODE_ENV: "production",
+      DB_PATH: prodDb,
+      JWT_SECRET: jwtSecret,
+      MANAGER_EMAIL: "",
+      MANAGER_PASSWORD: "",
+    },
+  });
+  if (run.status !== 0) {
+    throw new Error(
+      `production-hook-negative failed: ${run.stderr || run.stdout}`
+    );
+  }
+  assert.match(run.stdout, /PASS prod\.hook-negative/);
+  console.log("PASS prod.hook-negative: production ignores test hooks");
+}
+
 async function main() {
   console.log("TEMP_DB", databasePath);
   try {
     // Fresh DB for unit
     rmSync(databasePath, { force: true });
     await runDbUnit();
+    runProductionHookNegative();
     const seeded = seedHttp();
     await runHttp(seeded);
     console.log("\n=== verify-s2-new-001-concurrency: OK ===");
