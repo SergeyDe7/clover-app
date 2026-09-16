@@ -3020,15 +3020,29 @@ body:has(.clover-app) {
   white-space: nowrap !important;
 }
 
-.client-section-menu-trigger--matrix-icon {
-  width: auto !important;
-  min-width: 44px !important;
-  max-width: none !important;
+/* Compact LK section selector: icon + caret centered as one group (all tabs). */
+.client-section-menu-trigger--icon {
+  display: inline-flex !important;
+  position: relative !important;
+  width: 64px !important;
+  min-width: 62px !important;
+  max-width: 68px !important;
   min-height: 44px !important;
   height: 44px !important;
-  padding: 0 10px !important;
+  padding: 8px 10px !important;
   justify-content: center !important;
-  gap: 4px !important;
+  align-items: center !important;
+  gap: 0 !important;
+  flex: 0 0 auto !important;
+}
+
+.client-section-menu-cluster {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
 }
 
 .client-section-menu-icon {
@@ -3043,8 +3057,8 @@ body:has(.clover-app) {
 
 .client-section-menu-icon svg {
   display: block !important;
-  width: 18px !important;
-  height: 18px !important;
+  width: 20px !important;
+  height: 20px !important;
 }
 
 .client-section-menu.open .client-section-menu-trigger,
@@ -3062,6 +3076,9 @@ body:has(.clover-app) {
 }
 
 .client-section-menu-badge {
+  position: absolute;
+  top: -4px;
+  inset-inline-end: -4px;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -3076,16 +3093,32 @@ body:has(.clover-app) {
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
-}
-
-.client-section-menu-badge.is-empty {
-  visibility: hidden;
+  z-index: 1;
 }
 
 .client-section-menu-caret {
-  flex: 0 0 auto;
-  font-size: 11px;
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 12px !important;
+  height: 12px !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
   opacity: 0.75;
+  transform: none !important;
+  transform-origin: 50% 45% !important;
+  transition: transform 0.15s ease !important;
+}
+
+.client-section-menu.open .client-section-menu-caret {
+  transform: rotate(180deg) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .client-section-menu-caret {
+    transition: none !important;
+  }
 }
 
 .client-section-menu-panel {
@@ -5850,13 +5883,16 @@ body:has(.clover-app) {
     gap: 4px !important;
   }
 
-  .client-section-menu-trigger--matrix-icon {
-    width: auto !important;
-    min-width: 44px !important;
-    max-width: none !important;
+  .client-section-menu-trigger--icon {
+    width: 64px !important;
+    min-width: 62px !important;
+    max-width: 68px !important;
     min-height: 44px !important;
     height: 44px !important;
-    padding: 0 10px !important;
+    padding: 8px 10px !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 0 !important;
   }
 
   .client-section-menu-label {
@@ -10064,11 +10100,14 @@ html.clover-storefront-add-open body {
     font-size: 13px !important;
   }
 
-  .clover-app-client .client-section-menu-trigger--matrix-icon {
-    min-width: 44px !important;
+  .clover-app-client .client-section-menu-trigger--icon {
+    width: 64px !important;
+    min-width: 62px !important;
+    max-width: 68px !important;
     min-height: 44px !important;
     height: 44px !important;
-    padding: 0 10px !important;
+    padding: 8px 10px !important;
+    justify-content: center !important;
   }
 }
 
@@ -11008,9 +11047,10 @@ html.clover-storefront-add-open body {
 }
 
 .clover-app-client .app-header-with-between .client-section-menu {
-  width: 100%;
-  max-width: 100%;
+  width: auto;
+  max-width: none;
   min-width: 0;
+  flex: 0 0 auto;
 }
 
 .clover-app-client .app-header-with-between .client-section-menu-trigger {
@@ -11019,11 +11059,13 @@ html.clover-storefront-add-open body {
   max-width: 100% !important;
 }
 
-.clover-app-client .app-header-with-between .client-section-menu-trigger--matrix-icon {
-  width: auto !important;
-  min-width: 44px !important;
-  max-width: none !important;
+.clover-app-client .app-header-with-between .client-section-menu-trigger--icon {
+  width: 64px !important;
+  min-width: 62px !important;
+  max-width: 68px !important;
   flex: 0 0 auto !important;
+  justify-content: center !important;
+  align-items: center !important;
 }
 
 @media (max-width: 640px) {
