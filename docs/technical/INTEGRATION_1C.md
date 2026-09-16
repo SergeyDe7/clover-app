@@ -2,11 +2,11 @@
 
 ## Режим
 
-Прод-контур на DC: `ONEC_PROD_EXCHANGE_ENABLED=true`.  
+Прод-контур на DC: `ONEC_PROD_EXCHANGE_ENABLED=true`.
 Allowlist задаётся явно через `ONEC_ALLOWED_DATABASES` (**TEST не добавляется автоматически**).
 
 Текущий рабочий путь владельца — **VLAVKA-only**:
-`ONEC_ALLOWED_DATABASES=VLAVKA`, `ONEC_DEFAULT_EXCHANGE_DATABASE=VLAVKA`.  
+`ONEC_ALLOWED_DATABASES=VLAVKA`, `ONEC_DEFAULT_EXCHANGE_DATABASE=VLAVKA`.
 TEST — необязательный отдельный контур: включайте в allowlist и выдавайте `ONEC_TEST_EXCHANGE_API_KEY` только если TEST снова нужен.
 
 Установка расширения и пилот: [`VLAVKA_EXTENSION_INSTALL.md`](./VLAVKA_EXTENSION_INSTALL.md), обзор: [`PROD_CONTOUR.md`](./PROD_CONTOUR.md).

@@ -24,7 +24,7 @@ X-Clover-Database → "VLAVKA"
 ПолучитьКлючОбмена() → отдельный VLAVKA exchange credential
 ```
 
-Адрес Clover (`192.168.155.15`, порт `4100`) — как в текущем TEST.  
+Адрес Clover (`192.168.155.15`, порт `4100`) — как в текущем TEST.
 Ключ обмена VLAVKA: `ONEC_VLAVKA_EXCHANGE_API_KEY` на сервере. TEST key (`ONEC_TEST_EXCHANGE_API_KEY`) нужен только если TEST явно в allowlist. Shared key между контурами запрещён (SEC-001).
 
 ---
