@@ -2973,6 +2973,16 @@ body:has(.clover-app) {
   z-index: 40;
 }
 
+/* Empty flex spacer keeps app-header-with-between layout without hosting controls. */
+.clover-app .app-header-between-spacer {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  height: 0;
+  pointer-events: none;
+}
+
 .clover-app .app-header-with-between .app-header-top {
   display: flex !important;
   flex-direction: row !important;
@@ -5837,8 +5847,7 @@ body:has(.clover-app) {
     flex: 1 1 auto !important;
     max-width: none !important;
     min-width: 0 !important;
-    /* Hug the actions cluster (phone / language / logout), not the logo. */
-    justify-content: flex-end !important;
+    justify-content: stretch !important;
     z-index: 1 !important;
   }
 
@@ -5911,13 +5920,14 @@ body:has(.clover-app) {
   }
 
   .client-section-menu-panel {
-    /* Trigger sits next to phone on the trailing side — open toward the logo. */
-    inset-inline-start: auto;
-    inset-inline-end: 0;
-    left: auto;
-    right: 0;
+    /* Anchor to the selector; open toward inline-start so the panel stays in-viewport. */
+    inset-inline-start: 0;
+    inset-inline-end: auto;
+    left: 0;
+    right: auto;
     transform: none;
     width: min(220px, 70vw);
+    max-width: calc(100vw - 12px);
   }
 
   .clover-app .app-header-with-nav .app-header-logo-button {
@@ -11048,29 +11058,55 @@ html.clover-storefront-add-open body {
   flex: 1 1 auto !important;
   min-width: 0 !important;
   max-width: none !important;
-  justify-content: flex-end !important;
 }
 
-.clover-app-client .app-header-with-between .client-section-menu {
+.clover-app-client .app-header-actions .client-section-menu {
+  position: relative;
+  flex: 0 0 auto;
   width: auto;
   max-width: none;
   min-width: 0;
-  flex: 0 0 auto;
 }
 
-.clover-app-client .app-header-with-between .client-section-menu-trigger {
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-}
-
-.clover-app-client .app-header-with-between .client-section-menu-trigger--icon {
+.clover-app-client .app-header-actions .client-section-menu-trigger--icon {
   width: 64px !important;
   min-width: 62px !important;
   max-width: 68px !important;
   flex: 0 0 auto !important;
   justify-content: center !important;
   align-items: center !important;
+}
+
+/* ≤340: compact selector 56×44 so header fits without overlap. */
+@media (max-width: 340px) {
+  .clover-app .app-header-with-between .app-header-logo-button {
+    max-width: min(24vw, 68px) !important;
+  }
+
+  .clover-app .app-header-with-between .app-header-actions,
+  .clover-app-client .app-header-actions {
+    gap: 4px !important;
+  }
+
+  .clover-app-client .app-header-actions .client-section-menu-trigger--icon,
+  .client-section-menu-trigger--icon {
+    width: 56px !important;
+    min-width: 56px !important;
+    max-width: 56px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 8px 6px !important;
+  }
+
+  .client-section-menu-caret {
+    width: 10px !important;
+    height: 10px !important;
+    font-size: 10px !important;
+  }
+
+  .clover-app-client .app-header-with-between .header-logout {
+    padding: 8px 7px !important;
+  }
 }
 
 @media (max-width: 640px) {
