@@ -536,7 +536,10 @@ const cells = {
   },
 };
 const projected = projectLocalizedProductDisplay(product, "en", ["ru", "en"], cells);
-assert.equal(projected.name, autoA);
+// Display-only title polish: first lowercase letter-run is capitalized; stored AUTO unchanged.
+const projectedAutoName = "200 Ml cup «Мега» (50), код CL-722";
+assert.equal(projected.name, projectedAutoName);
+assert.equal(autoA, "200 ml cup «Мега» (50), код CL-722");
 assert.equal(projected.storefrontDetails.description, "200 ml cup for drinks");
 assert.equal(projected.pricePiece, product.pricePiece);
 const ruOnly = projectLocalizedProductDisplay(product, "en", ["ru"], cells);
