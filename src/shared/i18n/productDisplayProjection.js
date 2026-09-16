@@ -4,6 +4,7 @@ import {
   exactTranslationTargetInternal,
   toPublicLocaleCode,
 } from "./languageRegistry.js";
+import { normalizeProductDisplayTitle } from "./normalizeProductDisplayTitle.js";
 
 function asCells(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return {};
@@ -64,8 +65,12 @@ export function projectLocalizedProductDisplay(
   for (const field of PRODUCT_TRANSLATION_FIELDS) {
     const translated = publicCellDisplayValue(cells[field], currentFieldSourceHash(product, field));
     if (!translated) continue;
-    if (field === "name") overlay.name = translated;
-    else details[field] = translated;
+    if (field === "name") {
+      // Display-only: polish foreign translated title; never touch RU fallback.
+      overlay.name = normalizeProductDisplayTitle(translated, publicCode);
+    } else {
+      details[field] = translated;
+    }
   }
   overlay.storefrontDetails = details;
   return overlay;
