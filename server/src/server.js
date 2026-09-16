@@ -103,6 +103,7 @@ import {
 import {
   assertClientMayEditExistingOrder,
   assertClientOrderOwnership,
+  mergeClientOrdersPreservingProtected,
 } from "./orderClientEdit.js";
 import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
 import {
@@ -3037,19 +3038,47 @@ app.post(
 );
 
 app.put("/api/state/orders", authRequired, async (req, res) => {
-  const incomingOrders = Array.isArray(req.body?.orders)
+  let incomingOrders = Array.isArray(req.body?.orders)
     ? req.body.orders
     : [];
   const previousOrders = isStaffRole(req.user.role)
     ? listOrders(null, { includeDeleted: true })
     : listOrders(req.user.id, { includeDeleted: true });
-  const previousById = new Map(previousOrders.map((order) => [String(order.id), order]));
+  // Deep-clone snapshots so request pipelines cannot mutate authoritative state.
+  const previousById = new Map(
+    previousOrders.map((order) => [
+      String(order.id),
+      JSON.parse(JSON.stringify(order)),
+    ])
+  );
 
   if (isStaffRole(req.user.role)) {
     const safety = assertSafeManagerOrderReplace(previousOrders, incomingOrders);
     if (!safety.ok) {
       return res.status(safety.status || 409).json({ error: safety.error });
     }
+  }
+
+  // S2-NEW-001: client omit must not drop accepted/locked/non-deletable orders.
+  // Merge uses only server-scoped previousOrders for req.user.id.
+  if (isClientRole(req.user.role)) {
+    const preserveSettings = {
+      ...DEFAULT_SETTINGS,
+      ...getGlobalState("settings", DEFAULT_SETTINGS),
+    };
+    const planned = mergeClientOrdersPreservingProtected({
+      previousOrders,
+      incomingOrders,
+      settings: preserveSettings,
+    });
+    if (!planned.ok) {
+      return res.status(planned.statusCode || 400).json({
+        error: planned.error,
+        code: planned.code,
+        orderId: planned.orderId,
+      });
+    }
+    incomingOrders = planned.orders;
   }
 
   let orders = lockOrderTrashFields(
@@ -3205,6 +3234,8 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
       const grandTotal = orderMoneyTotal(order);
       return { ...order, total: grandTotal, amount: grandTotal };
     });
+    // Protected-order authority is the DB re-read inside replaceOrders
+    // (S2-NEW-001), not a request-start previousById snapshot.
   } else if (isStaffRole(req.user.role)) {
     const settings = {
       ...DEFAULT_SETTINGS,
@@ -3229,6 +3260,11 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     userId: req.user.id,
     managerMode: isStaffRole(req.user.role),
   });
+  // Client writes may have substituted latest DB protected rows inside the
+  // transaction — refresh so response/notifications match committed state.
+  if (isClientRole(req.user.role)) {
+    orders = listOrders(req.user.id, { includeDeleted: true });
+  }
   auditFromRequest(req, "orders.save", { count: orders.length });
 
   if (isClientRole(req.user.role)) {
