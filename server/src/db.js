@@ -8,6 +8,19 @@ import {
   DEFAULT_PRODUCTS,
   DEFAULT_SETTINGS,
 } from "./defaults.js";
+import {
+  isClientOrderDeletableByOmission,
+  isClientOrderMutable,
+} from "./orderClientEdit.js";
+
+/**
+ * Test-only hooks. Production leaves callbacks null.
+ * Use object mutation (ESM live bindings are read-only from importers).
+ */
+export const replaceOrdersTestHooks = {
+  /** @type {null | ((ctx: { userId: string }) => void)} */
+  beforeClientMerge: null,
+};
 
 const currentFile = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFile);
@@ -1374,10 +1387,70 @@ export function replaceOrders({
   db.exec("BEGIN IMMEDIATE");
 
   try {
+    // Client path (S2-NEW-001): latest DB state inside this transaction is
+    // authoritative for any order the client may not mutate/delete.
+    let ordersToWrite = normalizedOrders;
+    if (!managerMode && userId) {
+      if (typeof replaceOrdersTestHooks.beforeClientMerge === "function") {
+        replaceOrdersTestHooks.beforeClientMerge({ userId: String(userId) });
+      }
+      const settings = {
+        ...DEFAULT_SETTINGS,
+        ...getGlobalState("settings", DEFAULT_SETTINGS),
+      };
+      const existing = listOrders(userId, { includeDeleted: true });
+      const existingById = new Map(
+        existing.map((order) => [String(order?.id || "").trim(), order])
+      );
+      const seen = new Set();
+      ordersToWrite = [];
+
+      for (const order of normalizedOrders) {
+        const id = String(order?.id || "").trim();
+        if (!id) continue;
+        seen.add(id);
+        const current = existingById.get(id);
+        // Included but now locked/accepted in DB → keep DB byte-for-byte.
+        if (current && !isClientOrderMutable(current, settings)) {
+          ordersToWrite.push(JSON.parse(JSON.stringify(current)));
+          continue;
+        }
+        ordersToWrite.push(order);
+      }
+
+      for (const prior of existing) {
+        const id = String(prior?.id || "").trim();
+        if (!id || seen.has(id)) continue;
+        if (isClientOrderDeletableByOmission(prior, settings)) continue;
+        // Omitted and not client-deletable (incl. mid-request accept) → keep DB.
+        ordersToWrite.push(JSON.parse(JSON.stringify(prior)));
+        seen.add(id);
+      }
+    }
+
     if (managerMode) {
       db.exec("DELETE FROM orders");
     } else {
-      db.prepare("DELETE FROM orders WHERE user_id = ?").run(userId);
+      // Only delete ids outside the final authoritative keep-set.
+      // Empty keep-set ⇒ only deletable drafts remained (or none).
+      const keepIds = [
+        ...new Set(
+          ordersToWrite
+            .map((order) => String(order?.id || "").trim())
+            .filter(Boolean)
+        ),
+      ];
+      if (keepIds.length === 0) {
+        db.prepare("DELETE FROM orders WHERE user_id = ?").run(userId);
+      } else {
+        const placeholders = keepIds.map(() => "?").join(", ");
+        db.prepare(
+          `DELETE FROM orders WHERE user_id = ? AND id NOT IN (${placeholders})`
+        ).run(userId, ...keepIds);
+        db.prepare(
+          `DELETE FROM orders WHERE user_id = ? AND id IN (${placeholders})`
+        ).run(userId, ...keepIds);
+      }
     }
 
     const insert = db.prepare(`
@@ -1391,7 +1464,7 @@ export function replaceOrders({
       VALUES (?, ?, ?, ?, ?)
     `);
 
-    for (const order of normalizedOrders) {
+    for (const order of ordersToWrite) {
       const ownerId = resolveOrderUserId(
         order,
         managerMode ? null : userId
