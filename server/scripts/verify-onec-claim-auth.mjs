@@ -16,13 +16,31 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const serverSource = readFileSync(path.join(root, "server/src/server.js"), "utf8");
 const envExample = readFileSync(path.join(root, "server/.env.example"), "utf8");
 
+const contourAuthSource = readFileSync(
+  path.join(root, "server/src/oneCContourAuth.js"),
+  "utf8"
+);
 assert.ok(
-  serverSource.includes('ONEC_ALLOW_LOCAL_WITHOUT_KEY || "false"'),
+  contourAuthSource.includes('ONEC_ALLOW_LOCAL_WITHOUT_KEY || "false"'),
   "Локальный oneC без ключа по умолчанию должен быть false."
 );
 assert.ok(
   envExample.includes("ONEC_ALLOW_LOCAL_WITHOUT_KEY=false"),
   ".env.example должен рекомендовать false для локального bypass."
+);
+assert.ok(
+  envExample.includes("ONEC_TEST_EXCHANGE_API_KEY=") &&
+    envExample.includes("ONEC_VLAVKA_EXCHANGE_API_KEY="),
+  ".env.example должен документировать отдельные contour credentials."
+);
+assert.ok(
+  serverSource.includes("createOneCAuthMiddleware") &&
+    serverSource.includes("authorizeOneCContour"),
+  "Inbound /api/one-c должен использовать contour credential binding."
+);
+assert.ok(
+  !serverSource.includes('configuredKey = String(process.env.ONEC_API_KEY || "")'),
+  "Legacy shared ONEC_API_KEY must not authorize inbound multi-contour routes."
 );
 assert.ok(
   serverSource.includes("function claimOrderForOneC"),
@@ -37,7 +55,11 @@ assert.ok(
   "Pull/ACK/каталог должны использовать allowlist баз (prod-контур)."
 );
 assert.ok(
-  serverSource.includes("ONEC_PROD_EXCHANGE_ENABLED"),
+  serverSource.includes("ONEC_PROD_EXCHANGE_ENABLED") ||
+    contourAuthSource.includes("ONEC_PROD_EXCHANGE_ENABLED") ||
+    readFileSync(path.join(root, "server/src/oneCPriceSync.js"), "utf8").includes(
+      "ONEC_PROD_EXCHANGE_ENABLED"
+    ),
   "Prod-контур должен читаться из ONEC_PROD_EXCHANGE_ENABLED."
 );
 assert.ok(

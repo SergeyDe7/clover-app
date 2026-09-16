@@ -2,23 +2,33 @@
 
 ## Режим
 
-Прод-контур на DC включён: allowlist баз **`TEST,VLAVKA`** (`ONEC_ALLOWED_DATABASES`), флаг `ONEC_PROD_EXCHANGE_ENABLED=true`.  
-Очередь менеджера по умолчанию — **TEST** (`ONEC_DEFAULT_EXCHANGE_DATABASE=TEST`); в ЛК можно выбрать контур **VLAVKA** для конкретного заказа.
+Прод-контур на DC: `ONEC_PROD_EXCHANGE_ENABLED=true`.
+Allowlist задаётся явно через `ONEC_ALLOWED_DATABASES` (**TEST не добавляется автоматически**).
+
+Текущий рабочий путь владельца — **VLAVKA-only**:
+`ONEC_ALLOWED_DATABASES=VLAVKA`, `ONEC_DEFAULT_EXCHANGE_DATABASE=VLAVKA`.
+TEST — необязательный отдельный контур: включайте в allowlist и выдавайте `ONEC_TEST_EXCHANGE_API_KEY` только если TEST снова нужен.
 
 Установка расширения и пилот: [`VLAVKA_EXTENSION_INSTALL.md`](./VLAVKA_EXTENSION_INSTALL.md), обзор: [`PROD_CONTOUR.md`](./PROD_CONTOUR.md).
 
 Очередь: 1С **сама забирает** заказ из Clover (pull), затем подтверждает ACK.
 
-## Auth
+## Auth (SEC-001 contour binding)
 
-Входящие маршруты `/api/one-c/*` требуют:
+Входящие маршруты `/api/one-c/*`: **authenticated credential → server-owned contour**.
+Requested `database` never chooses authority.
 
-- заголовок `X-Clover-Key` (или Bearer) = `ONEC_API_KEY` из `server/.env` (≥24 символов, не placeholder), **или**
-- локальный доступ **только** при явном `ONEC_ALLOW_LOCAL_WITHOUT_KEY=true` (по умолчанию в коде `false`).
+- `X-Clover-Key` или `Authorization: Bearer` = contour exchange key:
+  - `ONEC_TEST_EXCHANGE_API_KEY` → только **TEST** (требуется, только если TEST в allowlist)
+  - `ONEC_VLAVKA_EXCHANGE_API_KEY` → только **VLAVKA** (требуется, если VLAVKA в allowlist)
+- Если оба заголовка заданы и значения различаются — отказ (400), без silent priority.
+- Optional `X-Clover-Database` / body / query contour must match the authenticated contour (иначе 403). Missing contour uses the authenticated contour.
+- Auth responses **не** раскрывают `allowedDatabases` / `prodEnabled`.
+- `ONEC_API_KEY` — **только outbound** Clover → 1C (черновики/health). Не авторизует inbound multi-contour.
+- Local bypass `ONEC_ALLOW_LOCAL_WITHOUT_KEY=true`: только TEST-only, loopback, non-prod; never VLAVKA / multi-contour / VLAVKA-only.
+- Legacy inbound via `ONEC_API_KEY` только с явным `ONEC_LEGACY_INBOUND_KEY_CONTOUR=TEST|VLAVKA` (OFF by default; forbidden when prod/VLAVKA enabled).
 
-Обязательный заголовок среды: `X-Clover-Database` — имя базы из allowlist (`TEST` или `VLAVKA`). Пустой / не из списка — `403`.
-
-Ключ **не** публиковать в Git, чат и скриншоты.
+Ключи **не** публиковать в Git, чат и скриншоты.
 
 ## Маршруты
 

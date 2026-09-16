@@ -42,21 +42,25 @@ export function isProdExchangeEnabled(
 
 /**
  * Список имён баз 1С для pull/ACK/цен.
- * TEST всегда сохраняется. Другие — только при ONEC_PROD_EXCHANGE_ENABLED=true.
+ * Без ONEC_PROD_EXCHANGE_ENABLED — только TEST.
+ * С prod-флагом — ровно то, что в ONEC_ALLOWED_DATABASES (TEST не добавляется автоматически).
+ * Пустой/отсутствующий список при prod → TEST (безопасный fallback).
  */
 export function parseAllowedOneCDatabases(
-  envValue = process.env.ONEC_ALLOWED_DATABASES
+  envValue = process.env.ONEC_ALLOWED_DATABASES,
+  prodEnabled = isProdExchangeEnabled()
 ) {
-  const parsed = String(envValue || TEST_DATABASE_NAME)
+  if (!prodEnabled) {
+    return [TEST_DATABASE_NAME];
+  }
+  const parsed = String(envValue ?? "")
     .split(/[,;\s]+/)
     .map((item) => normalizeOneCDatabaseName(item))
     .filter(Boolean);
-  const allowed = new Set(parsed.length ? parsed : [TEST_DATABASE_NAME]);
-  allowed.add(TEST_DATABASE_NAME);
-  if (!isProdExchangeEnabled()) {
+  if (!parsed.length) {
     return [TEST_DATABASE_NAME];
   }
-  return [...allowed];
+  return [...new Set(parsed)];
 }
 
 export function isAllowedOneCDatabase(value) {
@@ -68,11 +72,12 @@ export function isAllowedOneCDatabase(value) {
 export function defaultExchangeDatabase(
   value = process.env.ONEC_DEFAULT_EXCHANGE_DATABASE
 ) {
-  const preferred = normalizeOneCDatabaseName(value || TEST_DATABASE_NAME);
-  if (preferred && isAllowedOneCDatabase(preferred)) {
+  const allowed = parseAllowedOneCDatabases();
+  const preferred = normalizeOneCDatabaseName(value || "");
+  if (preferred && allowed.includes(preferred)) {
     return preferred;
   }
-  return TEST_DATABASE_NAME;
+  return allowed[0] || TEST_DATABASE_NAME;
 }
 
 export function publicOneCExchangeStatus() {
