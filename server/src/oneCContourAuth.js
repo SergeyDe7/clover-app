@@ -6,6 +6,9 @@
  *
  * ONEC_API_KEY remains outbound-only (Clover → 1C) unless an explicit single-contour
  * legacy inbound flag is set (OFF by default).
+ *
+ * Contour keys are required only for contours present in the active allowlist.
+ * VLAVKA-only (prod + ALLOWED=VLAVKA) does not require ONEC_TEST_EXCHANGE_API_KEY.
  */
 import { createHash, timingSafeEqual } from "node:crypto";
 import {
@@ -68,25 +71,12 @@ export function isValidExchangeCredential(value) {
   return key.length >= MIN_KEY_LEN && !isPlaceholderSecret(key);
 }
 
-/**
- * @returns {{
- *   identities: Array<{contour: string, credentialId: string, digest: Buffer}>,
- *   errors: string[],
- *   localBypassAllowed: boolean,
- *   legacyInboundContour: string,
- * }}
- */
 /** Allowlist for a given env object (does not leak process.env into unit tests). */
 function allowedDatabasesForEnv(env) {
-  const prodEnabled = isProdExchangeEnabled(env.ONEC_PROD_EXCHANGE_ENABLED);
-  if (!prodEnabled) return [ONEC_CONTOUR_TEST];
-  const parsed = String(env.ONEC_ALLOWED_DATABASES || ONEC_CONTOUR_TEST)
-    .split(/[,;\s]+/)
-    .map((item) => normalizeOneCDatabaseName(item))
-    .filter(Boolean);
-  const allowed = new Set(parsed.length ? parsed : [ONEC_CONTOUR_TEST]);
-  allowed.add(ONEC_CONTOUR_TEST);
-  return [...allowed];
+  return parseAllowedOneCDatabases(
+    env.ONEC_ALLOWED_DATABASES,
+    isProdExchangeEnabled(env.ONEC_PROD_EXCHANGE_ENABLED)
+  );
 }
 
 export function loadOneCContourCredentialConfig(env = process.env) {
@@ -94,7 +84,8 @@ export function loadOneCContourCredentialConfig(env = process.env) {
   const identities = [];
   const prodEnabled = isProdExchangeEnabled(env.ONEC_PROD_EXCHANGE_ENABLED);
   const allowed = allowedDatabasesForEnv(env);
-  const allowVlavka = allowed.includes(ONEC_CONTOUR_VLAVKA) || prodEnabled;
+  const allowTest = allowed.includes(ONEC_CONTOUR_TEST);
+  const allowVlavka = allowed.includes(ONEC_CONTOUR_VLAVKA);
 
   const testKey = clean(env.ONEC_TEST_EXCHANGE_API_KEY);
   const vlavkaKey = clean(env.ONEC_VLAVKA_EXCHANGE_API_KEY);
@@ -139,9 +130,7 @@ export function loadOneCContourCredentialConfig(env = process.env) {
       errors.push(
         "ONEC_LEGACY_INBOUND_KEY_CONTOUR requires a valid ONEC_API_KEY (≥24, non-placeholder)"
       );
-    } else if (
-      identities.some((item) => item.contour === legacyContour)
-    ) {
+    } else if (identities.some((item) => item.contour === legacyContour)) {
       // Prefer dedicated exchange key; do not register duplicate contour identity.
     } else {
       identities.push({
@@ -152,14 +141,13 @@ export function loadOneCContourCredentialConfig(env = process.env) {
     }
   }
 
-  // Optional: reject legacy contour not in allowlist
   if (legacyContour && !allowed.includes(legacyContour)) {
     errors.push(
       "ONEC_LEGACY_INBOUND_KEY_CONTOUR must be in the active allowlist"
     );
   }
 
-  // Detect identical TEST/VLAVKA secrets.
+  // Detect identical TEST/VLAVKA secrets when both are configured.
   if (
     isValidExchangeCredential(testKey) &&
     isValidExchangeCredential(vlavkaKey) &&
@@ -183,12 +171,15 @@ export function loadOneCContourCredentialConfig(env = process.env) {
     (item) => item.contour === ONEC_CONTOUR_VLAVKA
   );
 
-  if (prodEnabled || allowVlavka) {
-    if (!hasTest) errors.push("ONEC_TEST_EXCHANGE_API_KEY is required");
-    if (!hasVlavka) errors.push("ONEC_VLAVKA_EXCHANGE_API_KEY is required");
-  } else {
-    // TEST-only may start without inbound keys (routes return 401). Multi-contour
-    // / production exchange requires dedicated credentials above.
+  // Require a dedicated inbound key only for each allowlisted contour.
+  if (allowTest && !hasTest) {
+    // TEST-only non-prod may start without inbound keys (routes return 401).
+    if (prodEnabled || allowVlavka || allowed.length !== 1) {
+      errors.push("ONEC_TEST_EXCHANGE_API_KEY is required");
+    }
+  }
+  if (allowVlavka && !hasVlavka) {
+    errors.push("ONEC_VLAVKA_EXCHANGE_API_KEY is required");
   }
 
   const allowLocalRaw =
@@ -201,7 +192,7 @@ export function loadOneCContourCredentialConfig(env = process.env) {
       prodEnabled ||
       allowVlavka ||
       allowed.length !== 1 ||
-      !allowed.includes(ONEC_CONTOUR_TEST)
+      !allowTest
     ) {
       errors.push(
         "ONEC_ALLOW_LOCAL_WITHOUT_KEY is only allowed for TEST-only non-production configuration"
@@ -400,7 +391,7 @@ export function authorizeOneCContour(req, res, {
     return null;
   }
 
-  // Missing request contour → use authenticated contour (never hidden VLAVKA default).
+  // Missing request contour → use authenticated contour (never a hidden default).
   const contour = requested.contour || auth.contour;
 
   if (requested.contour && requested.contour !== auth.contour) {
@@ -420,13 +411,10 @@ export function authorizeOneCContour(req, res, {
   }
 
   if (!isAllowedDatabase(contour)) {
+    // No allowlist / prodEnabled disclosure in auth responses.
     res.status(403).json({
-      error: isProdExchangeEnabled()
-        ? "Этот обмен запрещён для указанного контура 1С."
-        : "Сейчас разрешён только обмен с 1С TEST (prod-контур выключен).",
+      error: "Этот обмен запрещён для указанного контура 1С.",
       code: "ONEC_AUTH_DENIED",
-      allowedDatabases: parseAllowedOneCDatabases(),
-      prodEnabled: isProdExchangeEnabled(),
     });
     return null;
   }

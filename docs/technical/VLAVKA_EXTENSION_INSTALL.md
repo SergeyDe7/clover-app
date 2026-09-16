@@ -25,7 +25,7 @@ X-Clover-Database → "VLAVKA"
 ```
 
 Адрес Clover (`192.168.155.15`, порт `4100`) — как в текущем TEST.  
-Ключ обмена **не** совпадает с TEST: VLAVKA использует `ONEC_VLAVKA_EXCHANGE_API_KEY`, TEST — `ONEC_TEST_EXCHANGE_API_KEY`. Shared key между контурами запрещён (SEC-001).
+Ключ обмена VLAVKA: `ONEC_VLAVKA_EXCHANGE_API_KEY` на сервере. TEST key (`ONEC_TEST_EXCHANGE_API_KEY`) нужен только если TEST явно в allowlist. Shared key между контурами запрещён (SEC-001).
 
 ---
 
@@ -83,7 +83,7 @@ X-Clover-Database → "VLAVKA"
 Образец целиком: `one_c_patches/vlavka/ЗАГОЛОВКИ_VLAVKA.txt` (в репозитории на DC / на моноблоке в `clover-app`).
 
 6. Проверьте рядом:
-   - `ПолучитьКлючОбмена()` — **отдельный** ключ VLAVKA (`ONEC_VLAVKA_EXCHANGE_API_KEY` на сервере), **не** тот же, что TEST (`ONEC_TEST_EXCHANGE_API_KEY`). Shared key между контурами запрещён. Ключ в чат не копировать.
+   - `ПолучитьКлючОбмена()` — ключ VLAVKA (`ONEC_VLAVKA_EXCHANGE_API_KEY` на сервере). Не использовать shared/TEST key, если TEST снова включат — у TEST должен быть отдельный `ONEC_TEST_EXCHANGE_API_KEY`. Ключ в чат не копировать.
    - HTTP-соединение на Clover: хост **`192.168.155.15`**, порт **`4100`** (как сейчас в рабочем TEST после переезда в ДЦ).
 7. Ctrl+S → **Обновить конфигурацию базы данных** → **Да**.
 8. Закройте конфигуратор. Откройте VLAVKA в режиме **1С:Предприятие**.

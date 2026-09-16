@@ -57,10 +57,25 @@ withEnv(
   () => {
     assert.equal(isProdExchangeEnabled(), true);
     assert.ok(parseAllowedOneCDatabases().includes("VLAVKA"));
+    assert.ok(parseAllowedOneCDatabases().includes("TEST"));
     assert.equal(isAllowedOneCDatabase("VLAVKA"), true);
     assert.equal(defaultExchangeDatabase(), "TEST");
     const status = publicOneCExchangeStatus();
     assert.equal(status.prodEnabled, true);
+  }
+);
+
+withEnv(
+  {
+    ONEC_PROD_EXCHANGE_ENABLED: "true",
+    ONEC_ALLOWED_DATABASES: "VLAVKA",
+    ONEC_DEFAULT_EXCHANGE_DATABASE: "VLAVKA",
+  },
+  () => {
+    assert.deepEqual(parseAllowedOneCDatabases(), ["VLAVKA"]);
+    assert.equal(isAllowedOneCDatabase("VLAVKA"), true);
+    assert.equal(isAllowedOneCDatabase("TEST"), false);
+    assert.equal(defaultExchangeDatabase(), "VLAVKA");
   }
 );
 

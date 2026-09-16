@@ -220,6 +220,44 @@ function orderFingerprint(order) {
   assertOneCContourAuthConfig(testOnly);
   mark("P", true, "TEST-only");
 
+  // VLAVKA-only: TEST key not required; VLAVKA key required; TEST not auto-added.
+  const vlavkaOnlyOk = {
+    ONEC_PROD_EXCHANGE_ENABLED: "true",
+    ONEC_ALLOWED_DATABASES: "VLAVKA",
+    ONEC_DEFAULT_EXCHANGE_DATABASE: "VLAVKA",
+    ONEC_VLAVKA_EXCHANGE_API_KEY: VLAVKA_KEY,
+    ONEC_TEST_EXCHANGE_API_KEY: "",
+    ONEC_ALLOW_LOCAL_WITHOUT_KEY: "false",
+  };
+  const vlavkaOnlyCfg = assertOneCContourAuthConfig(vlavkaOnlyOk);
+  mark(
+    "YA",
+    vlavkaOnlyCfg.allowedDatabases.length === 1 &&
+      vlavkaOnlyCfg.allowedDatabases[0] === "VLAVKA" &&
+      !vlavkaOnlyCfg.allowedDatabases.includes("TEST"),
+    vlavkaOnlyCfg.allowedDatabases.join(",")
+  );
+
+  const vlavkaOnlyNoVlavkaKey = loadOneCContourCredentialConfig({
+    ...vlavkaOnlyOk,
+    ONEC_VLAVKA_EXCHANGE_API_KEY: "",
+  });
+  mark(
+    "YB",
+    vlavkaOnlyNoVlavkaKey.errors.some((e) => /VLAVKA_EXCHANGE_API_KEY is required/i.test(e)),
+    vlavkaOnlyNoVlavkaKey.errors.join(";")
+  );
+
+  const bypassVlavkaOnly = loadOneCContourCredentialConfig({
+    ...vlavkaOnlyOk,
+    ONEC_ALLOW_LOCAL_WITHOUT_KEY: "true",
+  });
+  mark(
+    "YC",
+    bypassVlavkaOnly.errors.some((e) => /LOCAL_WITHOUT_KEY/i.test(e)),
+    bypassVlavkaOnly.errors.join(";")
+  );
+
   const bypassVlavka = loadOneCContourCredentialConfig({
     ONEC_PROD_EXCHANGE_ENABLED: "true",
     ONEC_ALLOWED_DATABASES: "TEST,VLAVKA",
@@ -284,7 +322,7 @@ function orderFingerprint(order) {
     "outbound still resolves ONEC_API_KEY"
   );
 
-  // Missing contour never defaults to VLAVKA
+  // Missing contour uses authenticated contour (TEST auth → TEST)
   const fakeReq = {
     oneCAuth: { contour: "TEST", credentialId: "test-exchange" },
     headers: {},
@@ -307,6 +345,28 @@ function orderFingerprint(order) {
     isAllowedDatabase: () => true,
   });
   mark("X", contour === "TEST" && fakeReq.oneCContour === "TEST", String(contour));
+
+  // Auth deny must not disclose allowlist / prodEnabled
+  fakeRes.statusCode = 0;
+  fakeRes.body = null;
+  authorizeOneCContour(
+    {
+      oneCAuth: { contour: "TEST", credentialId: "test-exchange" },
+      headers: {},
+      body: {},
+      query: {},
+    },
+    fakeRes,
+    { isAllowedDatabase: () => false }
+  );
+  mark(
+    "YD",
+    fakeRes.statusCode === 403 &&
+      fakeRes.body?.code === "ONEC_AUTH_DENIED" &&
+      !Object.prototype.hasOwnProperty.call(fakeRes.body || {}, "allowedDatabases") &&
+      !Object.prototype.hasOwnProperty.call(fakeRes.body || {}, "prodEnabled"),
+    JSON.stringify(fakeRes.body)
+  );
 
   void SHORT_KEY;
 }
@@ -747,6 +807,184 @@ try {
     leakHay.includes(VLAVKA_KEY) ||
     leakHay.includes(UNKNOWN_KEY);
   mark("R", !leaked, leaked ? "key present in logs/errors" : "clean");
+
+  // --- VLAVKA-only HTTP matrix (second isolated server) ---
+  try {
+    child.kill("SIGTERM");
+  } catch {
+    /* ignore */
+  }
+
+  const vlavkaPort = await listenPort();
+  const vlavkaBase = `http://127.0.0.1:${vlavkaPort}`;
+  const vlavkaChild = spawn(process.execPath, [path.join(workRoot, "server/src/server.js")], {
+    cwd: tempDir,
+    env: {
+      PATH: process.env.PATH,
+      HOME: tempDir,
+      NODE_ENV: "test",
+      DB_PATH: dbPath,
+      JWT_SECRET: jwtSecret,
+      HOST: "127.0.0.1",
+      PORT: String(vlavkaPort),
+      CLOVER_SERVER_BACKUP_DIR: backupDir,
+      CLOVER_UPLOADS_DIR: uploadDir,
+      APP_PUBLIC_URL: vlavkaBase,
+      ALLOW_LAN_ORIGINS: "false",
+      ONEC_PROD_EXCHANGE_ENABLED: "true",
+      ONEC_ALLOWED_DATABASES: "VLAVKA",
+      ONEC_DEFAULT_EXCHANGE_DATABASE: "VLAVKA",
+      ONEC_VLAVKA_EXCHANGE_API_KEY: VLAVKA_KEY,
+      ONEC_TEST_EXCHANGE_API_KEY: "",
+      ONEC_API_KEY: OUTBOUND_KEY,
+      ONEC_ALLOW_LOCAL_WITHOUT_KEY: "false",
+      ONEC_WRITE_ENABLED: "false",
+      SMTP_HOST: "",
+      TELEGRAM_BOT_TOKEN: "",
+      MANAGER_EMAIL: "",
+      HTTP_PROXY: "",
+      HTTPS_PROXY: "",
+      ALL_PROXY: "",
+      NO_PROXY: "*",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  try {
+    await waitForListen(vlavkaChild);
+
+    const voQs = (key, database) =>
+      httpJson(vlavkaBase, "GET", "/api/one-c/queue-status", {
+        headers: {
+          "X-Clover-Key": key,
+          ...(database ? { "X-Clover-Database": database } : {}),
+        },
+      });
+
+    const ye = await voQs(VLAVKA_KEY, "VLAVKA");
+    mark("YE", ye.status === 200 && ye.json?.database === "VLAVKA", `${ye.status} ${ye.text}`);
+
+    const yf = await voQs(VLAVKA_KEY, "TEST");
+    mark(
+      "YF",
+      yf.status === 403 && yf.json?.code === "ONEC_CONTOUR_MISMATCH",
+      `${yf.status} ${yf.text}`
+    );
+
+    const yg = await voQs(VLAVKA_KEY, "");
+    mark(
+      "YG",
+      yg.status === 200 && yg.json?.database === "VLAVKA",
+      `${yg.status} ${yg.text}`
+    );
+
+    const yh = await voQs(UNKNOWN_KEY, "VLAVKA");
+    mark(
+      "YH",
+      yh.status === 401 &&
+        !Object.prototype.hasOwnProperty.call(yh.json || {}, "allowedDatabases") &&
+        !Object.prototype.hasOwnProperty.call(yh.json || {}, "prodEnabled") &&
+        !String(yh.text || "").includes("VLAVKA") &&
+        !String(yh.text || "").includes("TEST,") &&
+        !String(yh.text || "").includes("allowedDatabases"),
+      `${yh.status} ${yh.text}`
+    );
+
+    // Seed TEST-contour order: VLAVKA auth must not claim/ACK/accepted it.
+    const voOrderId = "sec001-order-vlavka-only-test-target";
+    insertOrder(dbPath, {
+      id: voOrderId,
+      number: "CL-SEC001-VO",
+      userId: "user-sec001",
+      status: "Новый",
+      items: [],
+      exchange: {
+        status: "sending",
+        database: "TEST",
+        attempts: 1,
+        channel: "onec-pull",
+        lastAttemptAt: new Date().toISOString(),
+        message: "should-stay-untouched",
+      },
+    });
+    const beforeVo = orderFingerprint(readOrder(dbPath, voOrderId));
+
+    const yiAck = await httpJson(vlavkaBase, "POST", `/api/one-c/orders/${voOrderId}/ack`, {
+      headers: {
+        "X-Clover-Key": VLAVKA_KEY,
+        "X-Clover-Database": "VLAVKA",
+      },
+      body: {
+        orderNumber: "CL-SEC001-VO",
+        documentNumber: "DOC-VO-SHOULD-NOT",
+      },
+    });
+    const afterVoAck = orderFingerprint(readOrder(dbPath, voOrderId));
+    mark(
+      "YI",
+      (yiAck.status === 409 || yiAck.status === 403) && beforeVo === afterVoAck,
+      `ack=${yiAck.status} mutated=${beforeVo !== afterVoAck} ${yiAck.text}`
+    );
+
+    const yjAcc = await httpJson(vlavkaBase, "POST", "/api/one-c/orders/accepted", {
+      headers: {
+        "X-Clover-Key": VLAVKA_KEY,
+        "X-Clover-Database": "VLAVKA",
+      },
+      body: {
+        orderNumber: "CL-SEC001-VO",
+        documentNumber: "DOC-VO-SHOULD-NOT",
+        oneCState: "Обработан",
+      },
+    });
+    const afterVoAcc = orderFingerprint(readOrder(dbPath, voOrderId));
+    mark(
+      "YJ",
+      (yjAcc.status === 409 || yjAcc.status === 403 || yjAcc.status === 404) &&
+        beforeVo === afterVoAcc,
+      `accepted=${yjAcc.status} mutated=${beforeVo !== afterVoAcc} ${yjAcc.text}`
+    );
+
+    // Claim path: TEST database header denied for VLAVKA key (no mutation of queue order).
+    insertOrder(dbPath, {
+      id: "sec001-order-vlavka-only-ready",
+      number: "CL-SEC001-VO-READY",
+      userId: "user-sec001",
+      status: "Новый",
+      items: [],
+      exchange: {
+        status: "ready",
+        database: "TEST",
+        attempts: 0,
+        channel: "onec-pull",
+        lastAttemptAt: "",
+        message: "ready-test-must-not-claim",
+      },
+    });
+    const beforeClaim = orderFingerprint(readOrder(dbPath, "sec001-order-vlavka-only-ready"));
+    const ykClaim = await httpJson(vlavkaBase, "POST", "/api/one-c/test-order", {
+      headers: {
+        "X-Clover-Key": VLAVKA_KEY,
+        "X-Clover-Database": "TEST",
+        "X-Clover-Protocol": "2",
+      },
+      body: {},
+    });
+    const afterClaim = orderFingerprint(readOrder(dbPath, "sec001-order-vlavka-only-ready"));
+    mark(
+      "YK",
+      ykClaim.status === 403 &&
+        ykClaim.json?.code === "ONEC_CONTOUR_MISMATCH" &&
+        beforeClaim === afterClaim,
+      `claim=${ykClaim.status} mutated=${beforeClaim !== afterClaim} ${ykClaim.text}`
+    );
+  } finally {
+    try {
+      vlavkaChild.kill("SIGTERM");
+    } catch {
+      /* ignore */
+    }
+  }
 
   console.log("verify-sec-001-contour-credentials: ok");
   console.log(JSON.stringify(results, null, 2));
