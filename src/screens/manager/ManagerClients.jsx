@@ -889,6 +889,7 @@ export function ManagerClients({
   /** Снимок id позиций матрицы — чтобы новые из Excel сразу были в списке. */
   const [matrixListSnapshot, setMatrixListSnapshot] = useState({});
   const snapshotClientRef = useRef("");
+  const manualPriceConfigClientIdsRef = useRef(new Set());
   /** Отмеченные в списке матрицы для удаления. Не равно составу матрицы. */
   const [matrixPickIds, setMatrixPickIds] = useState({});
   const [matrixWindowClientId, setMatrixWindowClientId] = useState("");
@@ -1401,7 +1402,14 @@ export function ManagerClients({
 
     try {
       setClientLinks(nextLinks);
-      const saved = await api.saveClientLinks(nextLinks);
+      const manualPriceConfigClientIds =
+        manualPriceConfigClientIdsRef.current.has(String(clientId))
+          ? [clientId]
+          : [];
+      const saved = await api.saveClientLinks(
+        { [clientId]: nextLink },
+        { manualPriceConfigClientIds }
+      );
       if (saved?.clientLinks && typeof saved.clientLinks === "object") {
         // Берём сохранённую матрицу клиента целиком — иначе bootstrap/merge
         // может вернуть устаревший полный словарь со старыми id.
@@ -1449,6 +1457,7 @@ export function ManagerClients({
         return next;
       });
       dirtyClientLinkIdsRef?.current?.delete(clientId);
+      manualPriceConfigClientIdsRef.current.delete(String(clientId));
       setMatrixSaveState((current) => ({
         ...current,
         [clientId]: { status: "saved", message: t("manager.matrixSaved") },
@@ -2257,6 +2266,9 @@ export function ManagerClients({
                               const keepMarkup =
                                 link.defaultPricingMode === "purchase_markup" ||
                                 Number(link.defaultMarkupPercent) > 0;
+                              manualPriceConfigClientIdsRef.current.add(
+                                String(client.id)
+                              );
                               updateLink(client.id, {
                                 oneCPriceTypeId: nextId,
                                 oneCPriceTypeName: selected?.name || "",
@@ -2290,6 +2302,9 @@ export function ManagerClients({
                             value={link.defaultPricingMode || "base"}
                             onChange={(event) => {
                               const mode = event.target.value;
+                              manualPriceConfigClientIdsRef.current.add(
+                                String(client.id)
+                              );
                               updateLink(client.id, {
                                 defaultPricingMode: mode,
                                 ...(mode === "one_c_price_type"
@@ -2333,6 +2348,9 @@ export function ManagerClients({
                                   ...current,
                                   [client.id]: value,
                                 }));
+                                manualPriceConfigClientIdsRef.current.add(
+                                  String(client.id)
+                                );
                                 updateLink(client.id, {
                                   defaultMarkupPercent: normalizePercentInput(value),
                                   defaultPricingMode: "purchase_markup",

@@ -220,6 +220,7 @@ import {
   autoLinkCloverClients,
   buildOneCClientCandidates,
   buildOneCClientsSummary,
+  clientPriceTypeSource,
   linkCloverClient,
   mergeClientLinksPreservingOneCLinks,
   normalizeOneCClient,
@@ -673,6 +674,7 @@ function sanitizeClientLinkForClient(link = {}) {
       key === "defaultPricingMode" ||
       key === "oneCPriceTypeId" ||
       key === "oneCPriceTypeName" ||
+      key === "oneCPriceTypeSource" ||
       key === "personalPrices" ||
       key === "personalManagerId" ||
       key === "oneCId" ||
@@ -1480,6 +1482,7 @@ function normalizeClientLink(value) {
     defaultMarkupPercent: defaultPricing.markupPercent,
     oneCPriceTypeId,
     oneCPriceTypeName,
+    oneCPriceTypeSource: clientPriceTypeSource(link),
     personalPrices:
       link.personalPrices &&
       typeof link.personalPrices === "object"
@@ -5412,53 +5415,73 @@ app.put(
   roleRequired("manager"),
   (req, res) => {
     const incomingLinks = req.body?.clientLinks || {};
-    const storedLinks = getGlobalState("clientLinks", {});
-    const clientLinks = mergeClientLinksPreservingOneCLinks(
-      incomingLinks,
-      storedLinks
-    );
-    // Полный снимок матрицы с UI: personalPrices и matrixProductIds заменяем целиком,
-    // иначе нельзя сбросить состав матрицы / индивидуальные цены.
-    for (const clientId of Object.keys(incomingLinks || {})) {
-      const raw = incomingLinks[clientId];
-      if (!raw || typeof raw !== "object") continue;
-      const patch = { ...(clientLinks[clientId] || {}) };
-      let changed = false;
-      if (Object.prototype.hasOwnProperty.call(raw, "personalPrices")) {
-        const prices =
-          raw.personalPrices &&
-          typeof raw.personalPrices === "object" &&
-          !Array.isArray(raw.personalPrices)
-            ? raw.personalPrices
-            : {};
-        patch.personalPrices = { ...prices };
-        changed = true;
-      }
-      if (Object.prototype.hasOwnProperty.call(raw, "matrixProductIds")) {
-        const rawIds = Array.isArray(raw.matrixProductIds)
-          ? raw.matrixProductIds
-          : [];
-        // Уникальные id — защита от дублей в матрице клиента.
-        const seen = new Set();
-        const unique = [];
-        for (const id of rawIds) {
-          const key = String(id);
-          if (!key || seen.has(key)) continue;
-          seen.add(key);
-          unique.push(id);
+    const incomingClientIds = new Set(Object.keys(incomingLinks));
+    const manualPriceConfigClientIds = Array.isArray(
+      req.body?.manualPriceConfigClientIds
+    )
+      ? [
+          ...new Set(
+            req.body.manualPriceConfigClientIds
+              .map((id) => String(id || "").trim())
+              .filter((id) => id && incomingClientIds.has(id))
+          ),
+        ].slice(0, 500)
+      : null;
+    const clientLinks = runInTransaction(() => {
+      const storedLinks = getGlobalState("clientLinks", {});
+      const mergedLinks = mergeClientLinksPreservingOneCLinks(
+        incomingLinks,
+        storedLinks,
+        { manualPriceConfigClientIds }
+      );
+      // Полный снимок матрицы с UI: personalPrices и matrixProductIds заменяем целиком,
+      // иначе нельзя сбросить состав матрицы / индивидуальные цены.
+      for (const clientId of Object.keys(incomingLinks || {})) {
+        const raw = incomingLinks[clientId];
+        if (!raw || typeof raw !== "object") continue;
+        const patch = { ...(mergedLinks[clientId] || {}) };
+        let changed = false;
+        if (Object.prototype.hasOwnProperty.call(raw, "personalPrices")) {
+          const prices =
+            raw.personalPrices &&
+            typeof raw.personalPrices === "object" &&
+            !Array.isArray(raw.personalPrices)
+              ? raw.personalPrices
+              : {};
+          patch.personalPrices = { ...prices };
+          changed = true;
         }
-        patch.matrixProductIds = unique;
-        changed = true;
+        if (Object.prototype.hasOwnProperty.call(raw, "matrixProductIds")) {
+          const rawIds = Array.isArray(raw.matrixProductIds)
+            ? raw.matrixProductIds
+            : [];
+          // Уникальные id — защита от дублей в матрице клиента.
+          const seen = new Set();
+          const unique = [];
+          for (const id of rawIds) {
+            const key = String(id);
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+            unique.push(id);
+          }
+          patch.matrixProductIds = unique;
+          changed = true;
+        }
+        if (changed) {
+          mergedLinks[clientId] = patch;
+        }
       }
-      if (changed) {
-        clientLinks[clientId] = patch;
-      }
-    }
-    setGlobalState("clientLinks", clientLinks);
-    // Смена матрицы/вида цен/наценки — клиентский ЛК должен перечитать каталог.
-    setGlobalState("catalogPricesVersion", new Date().toISOString());
-    auditFromRequest(req, "client.matrix.save", {
-      clients: Object.keys(clientLinks).length,
+      setGlobalState("clientLinks", mergedLinks);
+      // Смена матрицы/вида цен/наценки — клиентский ЛК должен перечитать каталог.
+      setGlobalState("catalogPricesVersion", new Date().toISOString());
+      writeAudit({
+        userId: req.user?.id || null,
+        userEmail: req.user?.email || "",
+        userRole: req.user?.role || "",
+        action: "client.matrix.save",
+        details: { clients: Object.keys(mergedLinks).length },
+      });
+      return mergedLinks;
     });
 
     res.json({ ok: true, clientLinks });
@@ -6787,105 +6810,118 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
   try {
     const sourceDatabase = requireOneCAllowedDatabase(req, res);
     if (!sourceDatabase) return;
-    const { mkdirSync, writeFileSync } = await import("node:fs");
     const receivedAt = new Date().toISOString();
     const allOneCClients = normalizeOneCClients(req.body?.items);
     const clients = listClients();
-    const currentLinks = getGlobalState("clientLinks", {});
-    const candidateMap = buildOneCClientCandidates(
-      clients,
-      currentLinks,
-      allOneCClients
-    );
-    // Кандидаты для подсказок — выборочно; для поиска менеджера — полный список.
-    const relevantOneCClients = selectRelevantOneCClients(
-      clients,
-      currentLinks,
-      allOneCClients,
-      candidateMap
-    );
-    const retainedIds = new Set(relevantOneCClients.map((item) => item.id));
-    const cleanCandidateMap = Object.fromEntries(
-      Object.entries(candidateMap).map(([clientId, items]) => [
-        clientId,
-        (Array.isArray(items) ? items : [])
-          .filter((item) => retainedIds.has(item.id))
-          .map(({ score, reason, ...item }) => ({ item, score, reason })),
-      ])
-    );
+    const { linked, relevantOneCClients } = runInTransaction(() => {
+      const currentLinks = getGlobalState("clientLinks", {});
+      const candidateMap = buildOneCClientCandidates(
+        clients,
+        currentLinks,
+        allOneCClients
+      );
+      // Кандидаты для подсказок — выборочно; для поиска менеджера — полный список.
+      const relevant = selectRelevantOneCClients(
+        clients,
+        currentLinks,
+        allOneCClients,
+        candidateMap
+      );
+      const retainedIds = new Set(relevant.map((item) => item.id));
+      const cleanCandidates = Object.fromEntries(
+        Object.entries(candidateMap).map(([clientId, items]) => [
+          clientId,
+          (Array.isArray(items) ? items : [])
+            .filter((item) => retainedIds.has(item.id))
+            .map(({ score, reason, ...item }) => ({ item, score, reason })),
+        ])
+      );
 
-    const linked = autoLinkCloverClients(
-      clients,
-      currentLinks,
-      allOneCClients,
-      receivedAt
-    );
-    setGlobalState("oneCClients", linked.oneCClients);
-    setGlobalState("oneCClientCandidates", cleanCandidateMap);
-    if (linked.changed) setGlobalState("clientLinks", linked.clientLinks);
+      const nextLinked = autoLinkCloverClients(
+        clients,
+        currentLinks,
+        allOneCClients,
+        receivedAt
+      );
+      const harvestedTypes = allOneCClients
+        .filter((item) => item.priceTypeId)
+        .map((item) => ({
+          id: item.priceTypeId,
+          code: item.priceTypeCode || "",
+          name: item.priceTypeName || item.priceTypeCode || item.priceTypeId,
+        }));
+      const union = harvestedTypes.length
+        ? normalizeOneCPriceTypes([
+            ...normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", [])),
+            ...harvestedTypes,
+          ])
+        : null;
+      const meta = {
+        receivedAt,
+        sourceDatabase,
+        lastAutoLinkAt: receivedAt,
+        lastReport: nextLinked.report,
+        candidateMap: cleanCandidates,
+      };
 
-    // Справочник видов цен — из выгрузки контрагентов (поля договора).
-    const harvestedTypes = allOneCClients
-      .filter((item) => item.priceTypeId)
-      .map((item) => ({
-        id: item.priceTypeId,
-        code: item.priceTypeCode || "",
-        name: item.priceTypeName || item.priceTypeCode || item.priceTypeId,
-      }));
-    if (harvestedTypes.length) {
-      const union = normalizeOneCPriceTypes([
-        ...normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", [])),
-        ...harvestedTypes,
-      ]);
-      setGlobalState("oneCPriceTypes", union);
-      setGlobalState("oneCPriceTypesMeta", {
-        updatedAt: receivedAt,
-        source: "clients-preview",
-        accepted: union.length,
+      setGlobalState("oneCClients", nextLinked.oneCClients);
+      setGlobalState("oneCClientCandidates", cleanCandidates);
+      if (nextLinked.changed) {
+        setGlobalState("clientLinks", nextLinked.clientLinks);
+      }
+      if (union) {
+        setGlobalState("oneCPriceTypes", union);
+        setGlobalState("oneCPriceTypesMeta", {
+          updatedAt: receivedAt,
+          source: "clients-preview",
+          accepted: union.length,
+        });
+      }
+      setGlobalState("oneCClientsMeta", meta);
+      writeAudit({
+        action: "one-c.clients.receive",
+        details: {
+          database: sourceDatabase,
+          scanned: allOneCClients.length,
+          received: nextLinked.oneCClients.length,
+          relevant: relevant.length,
+          autoLinked: nextLinked.report.autoLinked,
+          candidateClients: Object.values(cleanCandidates).filter(
+            (items) => Array.isArray(items) && items.length
+          ).length,
+          mode: "full-catalog-for-search",
+        },
       });
-    }
 
-    const meta = {
-      receivedAt,
-      sourceDatabase,
-      lastAutoLinkAt: receivedAt,
-      lastReport: linked.report,
-      candidateMap: cleanCandidateMap,
-    };
-    setGlobalState("oneCClientsMeta", meta);
+      return {
+        linked: nextLinked,
+        relevantOneCClients: relevant,
+      };
+    });
 
     const previewDirectory = path.resolve(serverDirectory, "data", "one-c-preview");
-    mkdirSync(previewDirectory, { recursive: true });
-    writeFileSync(
-      path.resolve(previewDirectory, "clients-preview.json"),
-      JSON.stringify({
-        receivedAt,
-        database: sourceDatabase,
-        data: {
-          sourceCount: allOneCClients.length,
-          retainedCount: allOneCClients.length,
-          relevantCount: relevantOneCClients.length,
-          mode: "full-catalog-for-search",
-          items: allOneCClients,
-        },
-      }, null, 2),
-      "utf8"
-    );
-
-    writeAudit({
-      action: "one-c.clients.receive",
-      details: {
-        database: sourceDatabase,
-        scanned: allOneCClients.length,
-        received: linked.oneCClients.length,
-        relevant: relevantOneCClients.length,
-        autoLinked: linked.report.autoLinked,
-        candidateClients: Object.values(cleanCandidateMap).filter(
-          (items) => Array.isArray(items) && items.length
-        ).length,
-        mode: "full-catalog-for-search",
-      },
-    });
+    try {
+      mkdirSync(previewDirectory, { recursive: true });
+      writeFileSync(
+        path.resolve(previewDirectory, "clients-preview.json"),
+        JSON.stringify({
+          receivedAt,
+          database: sourceDatabase,
+          data: {
+            sourceCount: allOneCClients.length,
+            retainedCount: allOneCClients.length,
+            relevantCount: relevantOneCClients.length,
+            mode: "full-catalog-for-search",
+            items: allOneCClients,
+          },
+        }, null, 2),
+        "utf8"
+      );
+    } catch (artifactError) {
+      // Диагностический JSON не является authoritative state и не должен
+      // превращать успешно закоммиченную транзакцию в ошибочный HTTP-ответ.
+      console.error("Не удалось записать clients-preview artifact", artifactError);
+    }
 
     res.json({
       ok: true,
@@ -7023,15 +7059,35 @@ app.post(
   roleRequired("manager"),
   (req, res) => {
     const clients = listClients();
-    const links = getGlobalState("clientLinks", {});
-    const oneCClients = getGlobalState("oneCClients", []);
     const linkedAt = new Date().toISOString();
-    const linked = autoLinkCloverClients(clients, links, oneCClients, linkedAt);
-    if (linked.changed) setGlobalState("clientLinks", linked.clientLinks);
-    const previousMeta = getGlobalState("oneCClientsMeta", {});
-    const meta = { ...previousMeta, lastAutoLinkAt: linkedAt, lastReport: linked.report };
-    setGlobalState("oneCClientsMeta", meta);
-    auditFromRequest(req, "one-c.clients.auto-link", linked.report);
+    const { linked, meta } = runInTransaction(() => {
+      const links = getGlobalState("clientLinks", {});
+      const oneCClients = getGlobalState("oneCClients", []);
+      const nextLinked = autoLinkCloverClients(
+        clients,
+        links,
+        oneCClients,
+        linkedAt
+      );
+      if (nextLinked.changed) {
+        setGlobalState("clientLinks", nextLinked.clientLinks);
+      }
+      const previousMeta = getGlobalState("oneCClientsMeta", {});
+      const nextMeta = {
+        ...previousMeta,
+        lastAutoLinkAt: linkedAt,
+        lastReport: nextLinked.report,
+      };
+      setGlobalState("oneCClientsMeta", nextMeta);
+      writeAudit({
+        userId: req.user?.id || null,
+        userEmail: req.user?.email || "",
+        userRole: req.user?.role || "",
+        action: "one-c.clients.auto-link",
+        details: nextLinked.report,
+      });
+      return { linked: nextLinked, meta: nextMeta };
+    });
     res.json({
       ok: true,
       clientLinks: linked.clientLinks,

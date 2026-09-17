@@ -2,6 +2,38 @@ function cleanText(value) {
   return String(value ?? "").trim();
 }
 
+function cleanPriceTypeId(value) {
+  return ["string", "number", "bigint"].includes(typeof value)
+    ? cleanText(value)
+    : "";
+}
+
+const ONE_C_PRICE_TYPE_SOURCE_MANUAL = "manual";
+const ONE_C_PRICE_TYPE_SOURCE_AUTO = "one_c_auto";
+const SERVER_OWNED_PRICE_TYPE_FIELDS = new Set(["oneCPriceTypeSource"]);
+const MANUAL_PRICE_CONFIG_FIELDS = new Set([
+  "oneCPriceTypeId",
+  "oneCPriceTypeName",
+  "defaultPricingMode",
+  "defaultMarkupPercent",
+]);
+
+/**
+ * Missing provenance with a populated legacy value is deliberately classified
+ * as unknown, not manual. Unknown legacy values are protected until a manager
+ * explicitly changes the pricing configuration.
+ */
+export function clientPriceTypeSource(link = {}) {
+  const source = cleanText(link.oneCPriceTypeSource);
+  if (
+    source === ONE_C_PRICE_TYPE_SOURCE_MANUAL ||
+    source === ONE_C_PRICE_TYPE_SOURCE_AUTO
+  ) {
+    return source;
+  }
+  return cleanPriceTypeId(link.oneCPriceTypeId) ? "legacy_unknown" : "";
+}
+
 function lower(value) {
   return cleanText(value).toLocaleLowerCase("ru-RU").replaceAll("ё", "е");
 }
@@ -30,19 +62,43 @@ function pushIndex(map, key, item) {
   map.set(key, bucket);
 }
 
-/** Поля вида цен для clientLink — 1С (договор) источник истины по виду, не по режиму наценки. */
+/** 1С может заполнять пустую/auto-категорию, но не manual/legacy_unknown. */
 function priceTypeFieldsFromOneCClient(item = {}, current = {}) {
-  const priceTypeId = cleanText(item.priceTypeId);
-  // Пустой вид из 1С не затирает уже выбранный в Clover (пока расширение не догрузило поле).
+  const priceTypeId = cleanPriceTypeId(item.priceTypeId);
+  // Пустой/невалидный вид из 1С не очищает уже выбранный в Clover.
   if (!priceTypeId) return {};
+  const currentPriceTypeId = cleanPriceTypeId(current.oneCPriceTypeId);
+  const currentSource = clientPriceTypeSource(current);
+  if (
+    currentSource === ONE_C_PRICE_TYPE_SOURCE_MANUAL ||
+    currentSource === "legacy_unknown"
+  ) {
+    return {};
+  }
+
+  const oneCPriceTypeName =
+    cleanText(item.priceTypeName) || cleanText(item.priceTypeCode);
   const keepMarkup =
     String(current.defaultPricingMode || "").trim() === "purchase_markup" ||
     Number(current.defaultMarkupPercent) > 0;
+  const defaultPricingMode = keepMarkup
+    ? "purchase_markup"
+    : "one_c_price_type";
+  if (
+    currentSource === ONE_C_PRICE_TYPE_SOURCE_AUTO &&
+    currentPriceTypeId === priceTypeId &&
+    cleanText(current.oneCPriceTypeName) === oneCPriceTypeName &&
+    cleanText(current.defaultPricingMode) === defaultPricingMode
+  ) {
+    return {};
+  }
+
   return {
     oneCPriceTypeId: priceTypeId,
-    oneCPriceTypeName: cleanText(item.priceTypeName) || cleanText(item.priceTypeCode),
+    oneCPriceTypeName,
+    oneCPriceTypeSource: ONE_C_PRICE_TYPE_SOURCE_AUTO,
     // Не сбрасываем «закупка/категория + %» при выгрузке контрагентов.
-    defaultPricingMode: keepMarkup ? "purchase_markup" : "one_c_price_type",
+    defaultPricingMode,
   };
 }
 
@@ -54,8 +110,8 @@ export function normalizeOneCClient(item = {}) {
     inn: cleanText(item.inn ?? item.INN ?? item.taxId),
     phone: cleanText(item.phone ?? item.telephone),
     email: cleanText(item.email ?? item.mail),
-    // Вид цен с договора контрагента в 1С (источник истины для Clover).
-    priceTypeId: cleanText(
+    // Вид цен с договора контрагента в 1С (auto-источник, если Clover разрешает обновление).
+    priceTypeId: cleanPriceTypeId(
       item.priceTypeId ??
         item.oneCPriceTypeId ??
         item.видЦенId ??
@@ -378,9 +434,26 @@ const ONE_C_CLIENT_LINK_FIELDS = [
   "oneCLinkedAt",
 ];
 
-export function mergeClientLinksPreservingOneCLinks(incomingLinks, storedLinks) {
+function comparablePricingMode(value) {
+  const mode = cleanText(value);
+  return ["base", "purchase_markup", "one_c_price_type"].includes(mode)
+    ? mode
+    : "base";
+}
+
+export function mergeClientLinksPreservingOneCLinks(
+  incomingLinks,
+  storedLinks,
+  { manualPriceConfigClientIds = null } = {}
+) {
   const incoming = incomingLinks && typeof incomingLinks === "object" ? incomingLinks : {};
   const stored = storedLinks && typeof storedLinks === "object" ? storedLinks : {};
+  const hasManualIntentProtocol = Array.isArray(manualPriceConfigClientIds);
+  const manualIntentIds = new Set(
+    (hasManualIntentProtocol ? manualPriceConfigClientIds : [])
+      .map((id) => cleanText(id))
+      .filter(Boolean)
+  );
   const allIds = new Set([...Object.keys(stored), ...Object.keys(incoming)]);
   const result = {};
 
@@ -399,9 +472,24 @@ export function mergeClientLinksPreservingOneCLinks(incomingLinks, storedLinks) 
       incoming[clientId] && typeof incoming[clientId] === "object"
         ? incoming[clientId]
         : {};
+    const hasManualPriceIntent = manualIntentIds.has(cleanText(clientId));
+    // Provenance назначает только сервер. Клиент выражает действие изменением
+    // ценовой конфигурации, но не может прислать manual/auto напрямую. Новый
+    // клиент API также не может вернуть stale price config без явного intent.
+    const safeIncoming = Object.fromEntries(
+      Object.entries(rawIncoming).filter(
+        ([field]) =>
+          !SERVER_OWNED_PRICE_TYPE_FIELDS.has(field) &&
+          !(
+            hasManualIntentProtocol &&
+            !hasManualPriceIntent &&
+            MANUAL_PRICE_CONFIG_FIELDS.has(field)
+          )
+      )
+    );
     // Nested-merge: partial / пустые nested не затирают matrixProductIds и personalPrices.
-    const next = { ...previous, ...rawIncoming };
-    if (Object.prototype.hasOwnProperty.call(rawIncoming, "personalPrices")) {
+    const next = { ...previous, ...safeIncoming };
+    if (Object.prototype.hasOwnProperty.call(safeIncoming, "personalPrices")) {
       const prevPrices =
         previous.personalPrices &&
         typeof previous.personalPrices === "object" &&
@@ -409,16 +497,16 @@ export function mergeClientLinksPreservingOneCLinks(incomingLinks, storedLinks) 
           ? previous.personalPrices
           : {};
       const incPrices =
-        rawIncoming.personalPrices &&
-        typeof rawIncoming.personalPrices === "object" &&
-        !Array.isArray(rawIncoming.personalPrices)
-          ? rawIncoming.personalPrices
+        safeIncoming.personalPrices &&
+        typeof safeIncoming.personalPrices === "object" &&
+        !Array.isArray(safeIncoming.personalPrices)
+          ? safeIncoming.personalPrices
           : {};
       next.personalPrices = { ...prevPrices, ...incPrices };
     }
-    if (Object.prototype.hasOwnProperty.call(rawIncoming, "matrixProductIds")) {
-      const incIds = Array.isArray(rawIncoming.matrixProductIds)
-        ? rawIncoming.matrixProductIds
+    if (Object.prototype.hasOwnProperty.call(safeIncoming, "matrixProductIds")) {
+      const incIds = Array.isArray(safeIncoming.matrixProductIds)
+        ? safeIncoming.matrixProductIds
         : null;
       if (incIds === null) {
         next.matrixProductIds = Array.isArray(previous.matrixProductIds)
@@ -428,6 +516,25 @@ export function mergeClientLinksPreservingOneCLinks(incomingLinks, storedLinks) 
         // Явный массив с UI (в том числе []) — полный снимок матрицы, не partial.
         next.matrixProductIds = incIds;
       }
+    }
+    const manualPriceConfigChanged =
+      (Object.prototype.hasOwnProperty.call(safeIncoming, "oneCPriceTypeId") &&
+        cleanText(safeIncoming.oneCPriceTypeId) !==
+          cleanText(previous.oneCPriceTypeId)) ||
+      (Object.prototype.hasOwnProperty.call(safeIncoming, "oneCPriceTypeName") &&
+        cleanText(safeIncoming.oneCPriceTypeName) !==
+          cleanText(previous.oneCPriceTypeName)) ||
+      (Object.prototype.hasOwnProperty.call(safeIncoming, "defaultPricingMode") &&
+        comparablePricingMode(safeIncoming.defaultPricingMode) !==
+          comparablePricingMode(previous.defaultPricingMode)) ||
+      (Object.prototype.hasOwnProperty.call(safeIncoming, "defaultMarkupPercent") &&
+        Number(safeIncoming.defaultMarkupPercent || 0) !==
+          Number(previous.defaultMarkupPercent || 0));
+    if (
+      manualPriceConfigChanged &&
+      (!hasManualIntentProtocol || hasManualPriceIntent)
+    ) {
+      next.oneCPriceTypeSource = ONE_C_PRICE_TYPE_SOURCE_MANUAL;
     }
     const incomingId = cleanText(next.oneCId);
     const storedId = cleanText(previous.oneCId);
