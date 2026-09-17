@@ -56,10 +56,12 @@ import {
   listPushSubscriptions,
   deletePushSubscription,
   listManagerNotifications,
+  getManagerNotification,
   markManagerNotificationRead,
   markManagerNotificationsReadBySource,
   markManagerNotificationsReadForOrder,
   markAllManagerNotificationsRead,
+  markManagerNotificationsReadByIds,
   listPasskeys,
   getPasskey,
   savePasskey,
@@ -74,11 +76,13 @@ import {
   EMPTY_LINK,
 } from "./defaults.js";
 import {
+  assertRestorableBackup,
   cleanupOldBackups,
   createServerBackup,
   ensureDailyBackup,
   listServerBackups,
-  resolveBackupPath,
+  openBackupReadStream,
+  publicBackupMetadata,
   restoreServerBackup,
 } from "./backups.js";
 import {
@@ -105,7 +109,19 @@ import {
   assertClientOrderOwnership,
   mergeClientOrdersPreservingProtected,
 } from "./orderClientEdit.js";
-import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffPermissionsPayload, STAFF_FEATURE_IDS } from "./roles.js";
+import { hasRole, isClientRole, isStaffRole, parseStaffPermissions, staffCanManageStaff, staffPermissionsPayload, STAFF_FEATURE_IDS, explicitFullStaffPermissionsPayload, emptyStaffPermissionsPayload } from "./roles.js";
+import {
+  applyStaffRoutePolicy,
+  evaluateManagerMigrate,
+  evaluateStaffFeature,
+} from "./staffPolicy.js";
+import { projectStaffBootstrap } from "./staffBootstrap.js";
+import {
+  projectManagerNotifications,
+  projectManagerNotificationStatus,
+  staffCanSeeNotification,
+  visibleUnreadNotificationIds,
+} from "./staffNotifications.js";
 import {
   completenessByLanguage,
   initializeLocalizationCatalog,
@@ -517,8 +533,8 @@ function publicUser(user) {
     disabledAt: user.disabled_at || user.disabledAt || "",
     permissions: isStaffRole(user.role)
       ? {
-          tabs: permissions.fullAccess ? [...STAFF_FEATURE_IDS] : permissions.tabs,
-          manageStaff: permissions.manageStaff !== false,
+          tabs: Array.isArray(permissions.tabs) ? permissions.tabs : [],
+          manageStaff: permissions.manageStaff === true,
           fullAccess: permissions.fullAccess || user.role === "admin",
         }
       : undefined,
@@ -925,9 +941,31 @@ function roleRequired(...roles) {
         error: "Недостаточно прав для этого действия.",
       });
     }
+    const normalizedAllowed = allowed.map((item) => String(item || "").trim().toLowerCase());
+    const managerRoute =
+      normalizedAllowed.includes("manager") && !normalizedAllowed.includes("admin");
+    if (managerRoute) {
+      const decision = applyStaffRoutePolicy(req);
+      if (!decision.allow) {
+        return res.status(403).json({
+          error: decision.error,
+          code: decision.code,
+        });
+      }
+    }
 
     next();
   };
+}
+
+function rejectUnlessStaffFeature(req, res, featureId) {
+  const decision = evaluateStaffFeature(req.user, featureId);
+  if (decision.allow) return false;
+  res.status(403).json({
+    error: decision.error,
+    code: decision.code,
+  });
+  return true;
 }
 
 function checkLoginLimit(email) {
@@ -1143,14 +1181,16 @@ const managerClientPasswordSchema = z.object({
   password: z.string().min(6).max(200),
 });
 
-const managerCreateSchema = z.object({
-  email: z.string().trim().email().max(200),
-  password: z.string().min(6).max(200),
-  fullName: z.string().trim().max(160).optional(),
-  phone: z.string().trim().max(50).optional(),
-  max: z.string().trim().max(120).optional(),
-  telegram: z.string().trim().max(120).optional(),
-});
+const managerCreateSchema = z
+  .object({
+    email: z.string().trim().email().max(200),
+    password: z.string().min(6).max(200),
+    fullName: z.string().trim().max(160).optional(),
+    phone: z.string().trim().max(50).optional(),
+    max: z.string().trim().max(120).optional(),
+    telegram: z.string().trim().max(120).optional(),
+  })
+  .strict();
 
 const staffContactSchema = z.object({
   fullName: z.string().trim().max(160).optional(),
@@ -1163,11 +1203,20 @@ const staffPasswordSchema = z.object({
   password: z.string().min(6).max(200),
 });
 
-const staffPermissionsSchema = z.object({
-  tabs: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
-  manageStaff: z.boolean().optional(),
-  fullAccess: z.boolean().optional(),
-});
+const staffFeatureId = z
+  .string()
+  .trim()
+  .min(1)
+  .max(40)
+  .refine((id) => STAFF_FEATURE_IDS.includes(id), "unknown staff feature");
+
+const staffPermissionsSchema = z
+  .object({
+    tabs: z.array(staffFeatureId).max(STAFF_FEATURE_IDS.length).optional(),
+    manageStaff: z.boolean().optional(),
+    fullAccess: z.boolean().optional(),
+  })
+  .strict();
 
 const loginSchema = z.object({
   email: z.string().trim().email().max(200),
@@ -2123,7 +2172,7 @@ app.post("/api/auth/register", async (req, res, next) => {
     queueManagerNotification({
       type: "client_registration",
       title: "Новая регистрация клиента",
-      body: `${input.companyName} · ${input.contactName} · ${input.phone}`,
+      body: String(input.companyName || "Новая регистрация"),
       url: `/?managerTab=clients&client=${encodeURIComponent(user.id)}`,
       sourceId: user.id,
     });
@@ -2545,18 +2594,21 @@ app.patch(
       assertCanManageTargetStaff(req, target);
       const input = staffPermissionsSchema.parse(req.body || {});
       let payload;
-      if (input.fullAccess || !Array.isArray(input.tabs)) {
-        payload = staffPermissionsPayload({
-          manageStaff: input.manageStaff,
-        });
-      } else {
+      if (input.fullAccess === true) {
+        payload = explicitFullStaffPermissionsPayload(input.manageStaff === true);
+      } else if (Array.isArray(input.tabs)) {
         payload = staffPermissionsPayload({
           tabs: input.tabs,
-          manageStaff: input.manageStaff,
+          manageStaff: input.manageStaff === true,
         });
+      } else {
+        payload = {
+          ...emptyStaffPermissionsPayload(),
+          manageStaff: input.manageStaff === true,
+        };
       }
       if (target.role === "admin") {
-        payload = { manageStaff: true };
+        payload = explicitFullStaffPermissionsPayload(true);
       }
       const updated = setStaffPermissions(target.id, payload);
       auditFromRequest(req, "manager.permissions.set", {
@@ -2858,38 +2910,30 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
       ])
     );
 
-    return res.json({
-      user: publicUser(req.user),
-      products: managerProducts,
-      // fullCatalogProducts намеренно не дублируем — клиент UI берёт products
-      catalogPolicy: {
-        matrixMode: "all",
-        allowFullCatalog: true,
-        matrixReady: true,
-        matrixProductIds: [],
-      },
-      catalogPricesVersion: String(
-        getGlobalState("catalogPricesVersion", "") || ""
-      ),
-      orders: listOrders(),
-      trashedOrders: listTrashedOrders(),
-      profile: {},
-      addresses: [],
-      favorites: [],
-      settings,
-      clientLinks: normalizedClientLinks,
-      clients: listClients(),
-      reconciliationRequests: listReconciliationRequests(),
-      managerNotifications: listManagerNotifications({ limit: 100 }),
-      oneCPriceTypes: normalizeOneCPriceTypes(
-        getGlobalState("oneCPriceTypes", [])
-      ),
-      services: {
-        mail: publicMailStatus(),
-        push: publicPushStatus(),
-        managerNotifications: publicManagerNotificationStatus(settings),
-      },
-    });
+    return res.json(
+      projectStaffBootstrap({
+        user: publicUser(req.user),
+        products: managerProducts,
+        settings,
+        clientLinks: normalizedClientLinks,
+        clients: listClients(),
+        orders: listOrders(),
+        trashedOrders: listTrashedOrders(),
+        reconciliationRequests: listReconciliationRequests(),
+        managerNotifications: listManagerNotifications({ limit: 100 }),
+        oneCPriceTypes: normalizeOneCPriceTypes(
+          getGlobalState("oneCPriceTypes", [])
+        ),
+        catalogPricesVersion: String(
+          getGlobalState("catalogPricesVersion", "") || ""
+        ),
+        services: {
+          mail: publicMailStatus(),
+          push: publicPushStatus(),
+          managerNotifications: publicManagerNotificationStatus(settings),
+        },
+      })
+    );
   }
 
   const state = getClientState(req.user.id);
@@ -3038,6 +3082,9 @@ app.post(
 );
 
 app.put("/api/state/orders", authRequired, async (req, res) => {
+  if (isStaffRole(req.user.role) && rejectUnlessStaffFeature(req, res, "orders")) {
+    return;
+  }
   let incomingOrders = Array.isArray(req.body?.orders)
     ? req.body.orders
     : [];
@@ -3378,6 +3425,10 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
 });
 
 app.post("/api/state/orders/:orderId/trash", authRequired, (req, res) => {
+  const isStaff = isStaffRole(req.user.role);
+  if (isStaff && rejectUnlessStaffFeature(req, res, "orders")) {
+    return;
+  }
   const settings = {
     ...DEFAULT_SETTINGS,
     ...getGlobalState("settings", DEFAULT_SETTINGS),
@@ -3388,7 +3439,6 @@ app.post("/api/state/orders/:orderId/trash", authRequired, (req, res) => {
   }
 
   const order = stored.payload;
-  const isStaff = isStaffRole(req.user.role);
   const isOwner =
     isClientRole(req.user.role) && String(stored.userId) === String(req.user.id);
 
@@ -5465,33 +5515,48 @@ app.post(
   authRequired,
   roleRequired("manager"),
   (req, res) => {
-    if (
-      Array.isArray(req.body?.products) &&
-      req.body.products.length
-    ) {
-      const storedProducts = getGlobalState("products", DEFAULT_PRODUCTS);
-      const products = mergeProductsPreservingOneCLinks(
-        req.body.products.map(stripRuntimeProductPricing),
-        storedProducts
-      );
-      commitCanonicalProducts( products);
-    }
-
-    if (req.body?.settings) {
-      setGlobalState("settings", {
-        ...getGlobalState("settings", DEFAULT_SETTINGS),
-        ...req.body.settings,
+    const decision = evaluateManagerMigrate({ user: req.user, body: req.body || {} });
+    if (!decision.ok) {
+      return res.status(decision.status).json({
+        error: decision.error,
+        code: decision.code,
+        ...(decision.fields ? { fields: decision.fields } : {}),
       });
     }
+    const { plan } = decision;
+    runInTransaction(() => {
+      if (plan.products) {
+        const storedProducts = getGlobalState("products", DEFAULT_PRODUCTS);
+        const products = mergeProductsPreservingOneCLinks(
+          req.body.products.map(stripRuntimeProductPricing),
+          storedProducts
+        );
+        commitCanonicalProducts(products);
+      }
 
-    if (req.body?.clientLinks) {
-      const storedLinks = getGlobalState("clientLinks", {});
-      const clientLinks = mergeClientLinksPreservingOneCLinks(
-        req.body.clientLinks,
-        storedLinks
-      );
-      setGlobalState("clientLinks", clientLinks);
-    }
+      if (plan.settings) {
+        const current = {
+          ...DEFAULT_SETTINGS,
+          ...getGlobalState("settings", DEFAULT_SETTINGS),
+        };
+        setGlobalState("settings", {
+          ...current,
+          ...plan.settings,
+          deliveryZones: Object.prototype.hasOwnProperty.call(plan.settings, "deliveryZones")
+            ? sanitizeDeliveryZones(plan.settings.deliveryZones)
+            : current.deliveryZones,
+        });
+      }
+
+      if (plan.clientLinks) {
+        const storedLinks = getGlobalState("clientLinks", {});
+        const clientLinks = mergeClientLinksPreservingOneCLinks(
+          req.body.clientLinks,
+          storedLinks
+        );
+        setGlobalState("clientLinks", clientLinks);
+      }
+    });
 
     res.json({ ok: true });
   }
@@ -5774,21 +5839,23 @@ app.delete(
 app.get(
   "/api/admin/backups",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
   (req, res) => {
-    res.json({ backups: listServerBackups() });
+    res.json({ backups: listServerBackups().map(publicBackupMetadata) });
   }
 );
 
 app.post(
   "/api/admin/backups",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
   (req, res) => {
-    const backup = createServerBackup({
-      label: req.body?.label || "manual",
-      reason: req.body?.reason || "Ручная резервная копия",
-    });
+    const backup = publicBackupMetadata(
+      createServerBackup({
+        label: req.body?.label || "manual",
+        reason: req.body?.reason || "Ручная резервная копия",
+      })
+    );
     auditFromRequest(req, "backup.create", backup);
     res.status(201).json({ ok: true, backup });
   }
@@ -5797,7 +5864,7 @@ app.post(
 app.post(
   "/api/admin/backups/cleanup",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
   (req, res) => {
     const result = cleanupOldBackups({
       maxFiles: Number(req.body?.maxFiles) || 50,
@@ -5812,11 +5879,16 @@ app.post(
 app.get(
   "/api/admin/backups/:fileName/download",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
   (req, res, next) => {
     try {
-      const filePath = resolveBackupPath(req.params.fileName);
-      res.download(filePath, path.basename(filePath));
+      const stream = openBackupReadStream(req.params.fileName);
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${path.basename(String(req.params.fileName || ""))}"`
+      );
+      stream.pipe(res);
     } catch (error) {
       next(error);
     }
@@ -5826,9 +5898,10 @@ app.get(
 app.post(
   "/api/admin/backups/:fileName/restore",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
   (req, res, next) => {
     try {
+      assertRestorableBackup(req.params.fileName);
       createServerBackup({
         label: "before-restore",
         reason: "Автоматическая копия перед восстановлением",
@@ -7299,7 +7372,10 @@ app.post(
       testMode: isTestDatabase(targetDatabase),
       queued: validation.ready,
       notificationsCleared: notificationsCleared.changed,
-      managerNotifications: listManagerNotifications({ limit: 100 }),
+      managerNotifications: projectManagerNotifications(
+        req.user,
+        listManagerNotifications({ limit: 100 })
+      ),
     });
   }
 );
@@ -7513,6 +7589,9 @@ app.post("/api/one-c/reconciliation/:requestId/result", (req, res, next) => {
 });
 
 app.get("/api/reconciliation", authRequired, (req, res) => {
+  if (isStaffRole(req.user.role) && rejectUnlessStaffFeature(req, res, "acts")) {
+    return;
+  }
   const requests = isStaffRole(req.user.role)
     ? listReconciliationRequests()
     : listReconciliationRequests(req.user.id);
@@ -7674,6 +7753,9 @@ app.post(
 app.get("/api/reconciliation/:requestId/file", authRequired, (req, res) => {
   const request = getReconciliationRequestInternal(req.params.requestId);
   if (!request) return res.status(404).json({ error: "Запрос акта сверки не найден." });
+  if (isStaffRole(req.user.role) && rejectUnlessStaffFeature(req, res, "acts")) {
+    return;
+  }
   if (!isStaffRole(req.user.role) && String(request.user_id) !== String(req.user.id)) {
     return res.status(403).json({ error: "Недостаточно прав для скачивания этого файла." });
   }
@@ -7721,7 +7803,10 @@ app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("m
     user: publicUser(refreshed),
     clients: listClients(),
     mail: { sent: Boolean(mail.sent) },
-    managerNotifications: listManagerNotifications({ limit: 100 }),
+    managerNotifications: projectManagerNotifications(
+      req.user,
+      listManagerNotifications({ limit: 100 })
+    ),
   });
 });
 
@@ -7925,25 +8010,36 @@ app.delete(
 
 app.get("/api/admin/notifications", authRequired, roleRequired("manager"), (req, res) => {
   const unreadOnly = String(req.query?.unread || "") === "1";
-  const limit = Number(req.query?.limit || 100);
+  const limit = Math.min(Math.max(Number(req.query?.limit || 100) || 100, 1), 500);
   const settings = getGlobalState("settings", DEFAULT_SETTINGS);
+  const visible = projectManagerNotifications(
+    req.user,
+    listManagerNotifications({ unreadOnly, limit: 500 })
+  ).slice(0, limit);
   res.json({
-    notifications: listManagerNotifications({ unreadOnly, limit }),
-    status: publicManagerNotificationStatus(settings),
+    notifications: visible,
+    status: projectManagerNotificationStatus(req.user, settings),
   });
 });
 
 app.patch("/api/admin/notifications/:notificationId/read", authRequired, roleRequired("manager"), (req, res) => {
-  const notification = markManagerNotificationRead(req.params.notificationId);
-  if (!notification) return res.status(404).json({ error: "Уведомление не найдено." });
+  const stored = getManagerNotification(req.params.notificationId);
+  if (!staffCanSeeNotification(req.user, stored)) {
+    return res.status(404).json({ error: "Уведомление не найдено." });
+  }
+  const notification = markManagerNotificationRead(stored.id);
   auditFromRequest(req, "manager.notification.read", { notificationId: notification.id });
   res.json({ ok: true, notification });
 });
 
 app.post("/api/admin/notifications/read-all", authRequired, roleRequired("manager"), (req, res) => {
-  const result = markAllManagerNotificationsRead();
-  auditFromRequest(req, "manager.notification.read_all", result);
-  res.json({ ok: true, ...result });
+  const ids = visibleUnreadNotificationIds(
+    req.user,
+    listManagerNotifications({ unreadOnly: true, limit: 500 })
+  );
+  const result = markManagerNotificationsReadByIds(ids);
+  auditFromRequest(req, "manager.notification.read_all", { changed: result.changed });
+  res.json({ ok: true, changed: result.changed, readAt: result.readAt });
 });
 
 app.post("/api/admin/notifications/test", authRequired, roleRequired("manager"), async (req, res, next) => {
@@ -7956,7 +8052,11 @@ app.post("/api/admin/notifications/test", authRequired, roleRequired("manager"),
       sourceId: `test-${randomUUID()}`,
     });
     auditFromRequest(req, "manager.notification.test", { delivery: result.delivery || [] });
-    res.json({ ok: true, result, status: publicManagerNotificationStatus() });
+    res.json({
+      ok: true,
+      result,
+      status: projectManagerNotificationStatus(req.user),
+    });
   } catch (error) { next(error); }
 });
 
@@ -8009,7 +8109,7 @@ app.get(
 app.post(
   "/api/admin/reset",
   authRequired,
-  roleRequired("manager"),
+  roleRequired("admin"),
   (req, res) => {
     if (!isAdminFullResetAllowed(req)) {
       return res.status(403).json({

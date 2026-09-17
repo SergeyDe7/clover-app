@@ -51,7 +51,7 @@ function ToggleSetting({ title, description, value, onChange }) {
   return <article className="setting-card"><div><h3>{title}</h3><p>{description}</p></div><button className={value ? "toggle active" : "toggle"} type="button" onClick={() => onChange(!value)} aria-label={title}><span /></button></article>;
 }
 
-function ManagerNotificationSettings({ settings, set }) {
+function ManagerNotificationSettings({ settings, set, authUser }) {
   const { t } = useLocalization();
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -133,7 +133,9 @@ function ManagerNotificationSettings({ settings, set }) {
       </div>
       <p className="manager-contact-help">{t("manager.theTelegramBotTokenAndSmtp")}</p>
       <div className="inline-actions">
-        <button className="primary-button" type="button" disabled={busy} onClick={test}>{busy ? t("manager.checking") : t("manager.sendATestNotification")}</button>
+        {authUser?.role === "admin" ? (
+          <button className="primary-button" type="button" disabled={busy} onClick={test}>{busy ? t("manager.checking") : t("manager.sendATestNotification")}</button>
+        ) : null}
         <button className="secondary-button" type="button" disabled={busy} onClick={loadStatus}>{t("manager.refreshStatus")}</button>
       </div>
       {message && <div className="request-photo-status">{message}</div>}
@@ -402,7 +404,7 @@ export function ManagerSettings({ settings, setSettings, authUser }) {
 
       <DeliveryOneCSettings settings={settings} set={set} />
       <DeliveryZonesSettings settings={settings} set={set} />
-      <ManagerNotificationSettings settings={settings} set={set} />
+      <ManagerNotificationSettings settings={settings} set={set} authUser={authUser} />
       <PushSettings />
 
       <div className="settings-grid">
