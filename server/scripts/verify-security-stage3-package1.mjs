@@ -7,28 +7,39 @@
  * No production env, DB, 1C, email, Telegram, MAX, or Web Push.
  */
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { request as httpsRequest } from "node:https";
 import { Readable } from "node:stream";
 import { EventEmitter } from "node:events";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
 
+import {
+  executeClientRegistration,
+  executeForgotPassword,
+  executeResendVerification,
+} from "../src/authIssuance.js";
 import {
   allowDevelopmentAuthLinks,
   publicBaseUrl,
   publicCabinetUrl,
 } from "../src/authUrlPolicy.js";
 import {
+  createOneCDraft,
   previewOneCCatalog,
   resolveOneCRuntimeConfig,
+  resolveTrustedOneCOrigin,
   sanitizeOneCConfig,
   testOneCConnection,
 } from "../src/oneC.js";
+import { readBoundedResponse } from "../src/outboundResponse.js";
 import { downloadBinary } from "../src/productEnrichment.js";
 import { upsertPushSubscriptionRecord } from "../src/pushSubscriptionOwnership.js";
+import { resetPasswordEmail, verificationEmail } from "../src/mailer.js";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDirectory, "../..");
@@ -153,6 +164,71 @@ function nodeResponse({ statusCode = 200, headers = {}, chunks = [] } = {}) {
   response.statusCode = statusCode;
   response.headers = headers;
   return response;
+}
+
+function createAuthSpies({ existingUser = null } = {}) {
+  const calls = {
+    findUserByEmail: [],
+    createUser: [],
+    createAuthToken: [],
+    sendCloverMail: [],
+    hashPassword: [],
+    writeAudit: [],
+    queueManagerNotification: [],
+  };
+  const deps = {
+    env: {
+      APP_PUBLIC_URL: "https://public.example.invalid",
+      CABINET_PATH: "/lk",
+    },
+    findUserByEmail(email) {
+      calls.findUserByEmail.push(email);
+      return existingUser;
+    },
+    async hashPassword(password) {
+      calls.hashPassword.push(password);
+      return "hash-fixture";
+    },
+    createUser(payload) {
+      calls.createUser.push(payload);
+      return { id: "user-1", email: payload.email, role: "client" };
+    },
+    createPlainToken() {
+      return "plain-token-fixture";
+    },
+    tokenHash(value) {
+      return `hashed:${value}`;
+    },
+    createAuthToken(payload) {
+      calls.createAuthToken.push(payload);
+    },
+    verificationEmail({ verifyUrl, companyName }) {
+      return { subject: "verify", text: `${companyName}:${verifyUrl}`, html: verifyUrl };
+    },
+    resetPasswordEmail({ resetUrl }) {
+      return { subject: "reset", text: resetUrl, html: resetUrl };
+    },
+    async sendCloverMail(payload) {
+      calls.sendCloverMail.push(payload);
+      return { sent: true };
+    },
+    writeAudit(payload) {
+      calls.writeAudit.push(payload);
+    },
+    queueManagerNotification(payload) {
+      calls.queueManagerNotification.push(payload);
+    },
+    getClientState() {
+      return { profile: { companyName: "ACME" } };
+    },
+    isClientRole() {
+      return true;
+    },
+    publicMailStatus() {
+      return { configured: false };
+    },
+  };
+  return { calls, deps };
 }
 
 function requestFactory(responseBuilder, observations = {}) {
@@ -544,6 +620,11 @@ test("SEC3-004: mixed DNS and redirects are denied; public HTTPS is DNS-pinned",
       pinned.push({ address, family });
     });
     assert.deepEqual(pinned, [{ address: "93.184.216.34", family: 4 }]);
+    let allForm;
+    observations.options.lookup("image.example.invalid", { all: true }, (_error, result) => {
+      allForm = result;
+    });
+    assert.deepEqual(allForm, [{ address: "93.184.216.34", family: 4 }]);
     assert.equal(observations.options.servername, "image.example.invalid");
 
     await assert.rejects(
@@ -653,4 +734,439 @@ test("SEC3-010: push endpoint ownership is not reassigned on conflict", () => {
     database.close();
     rmSync(temp, { recursive: true, force: true });
   }
+});
+
+test("SEC3-001 live handlers wire orchestration instead of inline token writes", () => {
+  const serverSource = readFileSync(path.join(repositoryRoot, "server/src/server.js"), "utf8");
+  assert.match(serverSource, /liveAuthIssuanceDeps\(\)/u);
+  const routes = [
+    ["/api/auth/register", "executeClientRegistration("],
+    ["/api/auth/resend-verification", "executeResendVerification("],
+    ["/api/auth/forgot-password", "executeForgotPassword("],
+  ];
+  for (const [route, call] of routes) {
+    const start = serverSource.indexOf(`app.post("${route}"`);
+    assert.ok(start >= 0, route);
+    const next = serverSource.indexOf("\napp.post(\"", start + 10);
+    const slice = serverSource.slice(start, next === -1 ? undefined : next);
+    assert.ok(slice.includes(call), `${route} must call ${call}`);
+    assert.doesNotMatch(slice, /createAuthToken\(/u);
+    assert.doesNotMatch(slice, /createUser\(/u);
+    assert.doesNotMatch(slice, /sendCloverMail\(/u);
+    assert.doesNotMatch(slice, /req\.get\(["']host["']\)/u);
+    assert.doesNotMatch(slice, /X-Forwarded-Host/iu);
+  }
+});
+
+test("SEC3-001 missing or invalid APP_PUBLIC_URL does not persist user, token, or mail", async () => {
+  const registerInput = {
+    email: "client@example.invalid",
+    password: "fixture-password",
+    companyName: "ACME",
+    contactName: "Anna",
+    phone: "+70000000000",
+    req: spoofedRequest(),
+  };
+  const existing = {
+    id: "user-existing",
+    email: "client@example.invalid",
+    role: "client",
+    email_verified: 0,
+  };
+
+  for (const env of [
+    {},
+    { APP_PUBLIC_URL: "http://public.example.invalid" },
+    { APP_PUBLIC_URL: "https://evil.example.invalid/path" },
+  ]) {
+    const registerSpies = createAuthSpies();
+    registerSpies.deps.env = env;
+    await expectCodeAsync(
+      () => executeClientRegistration(registerInput, registerSpies.deps),
+      env.APP_PUBLIC_URL ? (
+        String(env.APP_PUBLIC_URL).startsWith("http://")
+          ? "AUTH_PUBLIC_URL_HTTPS_REQUIRED"
+          : "AUTH_PUBLIC_URL_INVALID"
+      ) : "AUTH_PUBLIC_URL_REQUIRED"
+    );
+    assert.equal(registerSpies.calls.createUser.length, 0);
+    assert.equal(registerSpies.calls.createAuthToken.length, 0);
+    assert.equal(registerSpies.calls.sendCloverMail.length, 0);
+    assert.equal(registerSpies.calls.hashPassword.length, 0);
+
+    const resendSpies = createAuthSpies({ existingUser: existing });
+    resendSpies.deps.env = env;
+    await expectCodeAsync(
+      () => executeResendVerification(
+        { email: existing.email, req: spoofedRequest() },
+        resendSpies.deps
+      ),
+      env.APP_PUBLIC_URL ? (
+        String(env.APP_PUBLIC_URL).startsWith("http://")
+          ? "AUTH_PUBLIC_URL_HTTPS_REQUIRED"
+          : "AUTH_PUBLIC_URL_INVALID"
+      ) : "AUTH_PUBLIC_URL_REQUIRED"
+    );
+    assert.equal(resendSpies.calls.createAuthToken.length, 0);
+    assert.equal(resendSpies.calls.sendCloverMail.length, 0);
+    assert.equal(resendSpies.calls.findUserByEmail.length, 0);
+
+    const forgotSpies = createAuthSpies({ existingUser: existing });
+    forgotSpies.deps.env = env;
+    await expectCodeAsync(
+      () => executeForgotPassword(
+        { email: existing.email, req: spoofedRequest() },
+        forgotSpies.deps
+      ),
+      env.APP_PUBLIC_URL ? (
+        String(env.APP_PUBLIC_URL).startsWith("http://")
+          ? "AUTH_PUBLIC_URL_HTTPS_REQUIRED"
+          : "AUTH_PUBLIC_URL_INVALID"
+      ) : "AUTH_PUBLIC_URL_REQUIRED"
+    );
+    assert.equal(forgotSpies.calls.createAuthToken.length, 0);
+    assert.equal(forgotSpies.calls.sendCloverMail.length, 0);
+    assert.equal(forgotSpies.calls.findUserByEmail.length, 0);
+  }
+});
+
+test("SEC3-001 canonical HTTPS origin keeps register, resend, and forgot issuance", async () => {
+  const req = spoofedRequest("attacker.example.invalid");
+  const registerSpies = createAuthSpies();
+  const registered = await executeClientRegistration({
+    email: "client@example.invalid",
+    password: "fixture-password",
+    companyName: "ACME",
+    contactName: "Anna",
+    phone: "+70000000000",
+    req,
+  }, registerSpies.deps);
+  assert.equal(registered.status, 201);
+  assert.equal(registerSpies.calls.createUser.length, 1);
+  assert.equal(registerSpies.calls.createAuthToken.length, 1);
+  assert.equal(registerSpies.calls.sendCloverMail.length, 1);
+  assert.equal(
+    registerSpies.calls.createAuthToken[0].tokenHash,
+    "hashed:plain-token-fixture"
+  );
+  assert.match(
+    registerSpies.calls.sendCloverMail[0].text,
+    /https:\/\/public\.example\.invalid\/lk\/\?verify=plain-token-fixture/u
+  );
+  assert.equal(registered.body.developmentLink, undefined);
+  assert.doesNotMatch(JSON.stringify(registered.body), /plain-token-fixture|attacker/u);
+
+  const resendSpies = createAuthSpies({
+    existingUser: {
+      id: "user-1",
+      email: "client@example.invalid",
+      role: "client",
+      email_verified: 0,
+    },
+  });
+  const resent = await executeResendVerification(
+    { email: "client@example.invalid", req },
+    resendSpies.deps
+  );
+  assert.equal(resent.status, 200);
+  assert.equal(resendSpies.calls.createAuthToken.length, 1);
+  assert.equal(resendSpies.calls.sendCloverMail.length, 1);
+  assert.equal(resent.body.developmentLink, undefined);
+  assert.doesNotMatch(JSON.stringify(resent.body), /plain-token-fixture|attacker/u);
+
+  const forgotSpies = createAuthSpies({
+    existingUser: {
+      id: "user-1",
+      email: "client@example.invalid",
+      role: "client",
+    },
+  });
+  const forgot = await executeForgotPassword(
+    { email: "client@example.invalid", req },
+    forgotSpies.deps
+  );
+  assert.equal(forgot.status, 200);
+  assert.equal(forgotSpies.calls.createAuthToken.length, 1);
+  assert.equal(forgotSpies.calls.sendCloverMail.length, 1);
+  assert.match(
+    forgotSpies.calls.sendCloverMail[0].text,
+    /https:\/\/public\.example\.invalid\/lk\/\?reset=plain-token-fixture/u
+  );
+  assert.equal(forgot.body.developmentLink, undefined);
+  assert.doesNotMatch(JSON.stringify(forgot.body), /plain-token-fixture|attacker/u);
+});
+
+test("SEC3-001 mailer boundary embeds the canonical URL only", () => {
+  const verifyUrl = "https://public.example.invalid/lk/?verify=fixture-token";
+  const message = verificationEmail({ companyName: "ACME", verifyUrl });
+  assert.match(message.text, /https:\/\/public\.example\.invalid\/lk\/\?verify=fixture-token/u);
+  assert.match(message.html, /href="https:\/\/public\.example\.invalid\/lk\/\?verify=fixture-token"/u);
+  assert.doesNotMatch(message.text, /evil|Host|X-Forwarded/u);
+  const reset = resetPasswordEmail({
+    resetUrl: "https://public.example.invalid/lk/?reset=fixture-token",
+  });
+  assert.match(reset.text, /https:\/\/public\.example\.invalid\/lk\/\?reset=fixture-token/u);
+});
+
+test("SEC3-002 createOneCDraft uses the same env-owned requestJson path", async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url: String(url), redirect: options?.redirect });
+    return jsonResponse({ ok: true, documentId: "DOC-1" });
+  };
+  await withEnv({
+    ONEC_BASE_URL: undefined,
+    ONEC_WRITE_ENABLED: "true",
+    ONEC_USERNAME: "fixture-user",
+    ONEC_PASSWORD: "synthetic-password-fixture-only",
+    ONEC_API_KEY: "synthetic-api-key-fixture-only",
+  }, () => withFetch(fetchImpl, async () => {
+    await expectCodeAsync(
+      () => createOneCDraft(
+        { mode: "real", allowDraftCreation: true, baseUrl: "http://127.0.0.1:9" },
+        { cloverId: "fixture-order" },
+        { env: process.env, fetchImpl }
+      ),
+      "ONEC_TRUSTED_ORIGIN_REQUIRED"
+    );
+  }));
+  assert.equal(calls.length, 0);
+
+  await withEnv({
+    ONEC_BASE_URL: "https://onec.example.invalid",
+    ONEC_WRITE_ENABLED: "true",
+    ONEC_USERNAME: "fixture-user",
+    ONEC_PASSWORD: "synthetic-password-fixture-only",
+    ONEC_API_KEY: "synthetic-api-key-fixture-only",
+  }, () => withFetch(fetchImpl, async () => {
+    const result = await createOneCDraft(
+      { mode: "real", allowDraftCreation: true, baseUrl: "http://127.0.0.1:9" },
+      { cloverId: "fixture-order" },
+      { env: process.env, fetchImpl }
+    );
+    assert.equal(result.ok, true);
+  }));
+  assert.equal(calls.length, 1);
+  assert.equal(new URL(calls[0].url).origin, "https://onec.example.invalid");
+  assert.equal(calls[0].redirect, "manual");
+});
+
+test("SEC3-003 production HTTP exception is RFC1918 only; loopback needs a proven non-production gate", async () => {
+  let fetchCalls = 0;
+  const fetchImpl = async () => {
+    fetchCalls += 1;
+    return jsonResponse({ ok: true });
+  };
+  await withEnv({
+    NODE_ENV: "test",
+    ONEC_BASE_URL: "http://127.0.0.1:8080",
+    ONEC_ALLOW_INSECURE_HTTP: "true",
+    ONEC_ALLOW_DEV_INSECURE_LOOPBACK: undefined,
+  }, () => withFetch(fetchImpl, async () => {
+    await expectCodeAsync(
+      () => testOneCConnection({ mode: "real" }, { env: process.env, fetchImpl }),
+      "ONEC_INSECURE_HTTP_TARGET_INVALID"
+    );
+  }));
+
+  expectCode(
+    () => resolveTrustedOneCOrigin({
+      NODE_ENV: "production",
+      ONEC_BASE_URL: "http://127.0.0.1:8080",
+      ONEC_ALLOW_INSECURE_HTTP: "true",
+      ONEC_ALLOW_DEV_INSECURE_LOOPBACK: "true",
+    }),
+    "ONEC_INSECURE_HTTP_TARGET_INVALID"
+  );
+  expectCode(
+    () => resolveTrustedOneCOrigin({
+      NODE_ENV: "",
+      ONEC_BASE_URL: "http://127.0.0.1:8080",
+      ONEC_ALLOW_INSECURE_HTTP: "true",
+      ONEC_ALLOW_DEV_INSECURE_LOOPBACK: "true",
+    }),
+    "ONEC_INSECURE_HTTP_TARGET_INVALID"
+  );
+  assert.equal(
+    resolveTrustedOneCOrigin({
+      NODE_ENV: "production",
+      ONEC_BASE_URL: "http://10.20.30.40:8080",
+      ONEC_ALLOW_INSECURE_HTTP: "true",
+    }),
+    "http://10.20.30.40:8080"
+  );
+
+  await withEnv({
+    NODE_ENV: "test",
+    ONEC_BASE_URL: "http://127.0.0.1:8080",
+    ONEC_ALLOW_INSECURE_HTTP: "true",
+    ONEC_ALLOW_DEV_INSECURE_LOOPBACK: "true",
+    ONEC_USERNAME: "fixture-user",
+    ONEC_PASSWORD: "synthetic-password-fixture-only",
+  }, () => withFetch(fetchImpl, async () => {
+    const result = await testOneCConnection({ mode: "real" }, { env: process.env, fetchImpl });
+    assert.equal(result.ok, true);
+  }));
+  assert.equal(fetchCalls, 1);
+});
+
+test("SEC3-004 enrichment stores images only through downloadBinary", () => {
+  const productSource = readFileSync(
+    path.join(repositoryRoot, "server/src/productEnrichment.js"),
+    "utf8"
+  );
+  assert.match(productSource, /const \{ buffer \} = await downloadBinary\(imageUrl\)/u);
+  assert.doesNotMatch(productSource, /redirect:\s*["']follow["']/u);
+  assert.doesNotMatch(productSource, /arrayBuffer\(\)/u);
+});
+
+test("SEC3-005 gzip Content-Length does not truncate a decompressed 1C body", async () => {
+  const payload = JSON.stringify({ ok: true, service: "fixture" });
+  const compressedLength = gzipSync(Buffer.from(payload)).length;
+  const fetchImpl = async () => new Response(payload, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Length": String(compressedLength),
+      "Content-Encoding": "gzip",
+    },
+  });
+  await withEnv({
+    ONEC_BASE_URL: "https://onec.example.invalid",
+  }, () => withFetch(fetchImpl, async () => {
+    const result = await testOneCConnection({ mode: "real" }, { env: process.env, fetchImpl });
+    assert.equal(result.ok, true);
+  }));
+});
+
+test("SEC3-005 oversized decompressed stream is aborted despite a small Content-Length", async () => {
+  let pulled = 0;
+  let cancelled = 0;
+  const stream = new ReadableStream({
+    pull(controller) {
+      pulled += 1;
+      if (pulled > 8) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(new Uint8Array(1024).fill(65));
+    },
+    cancel() {
+      cancelled += 1;
+    },
+  });
+  await assert.rejects(
+    () => readBoundedResponse(
+      {
+        headers: {
+          "content-length": "54",
+          "content-encoding": "gzip",
+        },
+        body: stream,
+      },
+      { maxBytes: 2048, enforceContentLength: false }
+    ),
+    (error) => error?.code === "UPSTREAM_RESPONSE_TOO_LARGE"
+  );
+  assert.ok(pulled <= 3, `expected abort after decompressed limit, pulled=${pulled}`);
+  assert.ok(cancelled >= 1, "oversized stream must be cancelled");
+
+  let livePulled = 0;
+  const liveStream = new ReadableStream({
+    pull(controller) {
+      livePulled += 1;
+      if (livePulled > 8) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(new Uint8Array(1024).fill(123));
+    },
+  });
+  const fetchImpl = async () => new Response(liveStream, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Length": "54",
+    },
+  });
+  await withEnv({
+    ONEC_BASE_URL: "https://onec.example.invalid",
+    ONEC_MAX_RESPONSE_BYTES: "2048",
+  }, () => withFetch(fetchImpl, async () => {
+    await expectCodeAsync(
+      () => testOneCConnection({ mode: "real" }, { env: process.env, fetchImpl }),
+      "UPSTREAM_RESPONSE_TOO_LARGE"
+    );
+  }));
+  assert.ok(livePulled <= 4, `1C path must stop the decompressed stream, pulled=${livePulled}`);
+});
+
+test("SEC3-004 Node 22 https.request lookup uses {all:true} and honors the connect-time pin", async () => {
+  assert.match(process.version, /^v22\./u);
+  const seen = [];
+  await new Promise((resolve) => {
+    const req = httpsRequest({
+      hostname: "image.example.invalid",
+      port: 1,
+      path: "/",
+      method: "GET",
+      servername: "image.example.invalid",
+      lookup(hostname, options, callback) {
+        seen.push({
+          hostname,
+          all: Boolean(options?.all),
+          family: options?.family,
+        });
+        if (options?.all) {
+          callback(null, [{ address: "203.0.113.10", family: 4 }]);
+          return;
+        }
+        callback(null, "203.0.113.10", 4);
+      },
+    }, (response) => {
+      response.resume();
+      resolve();
+    });
+    req.on("error", () => resolve());
+    req.setTimeout(2000, () => {
+      req.destroy();
+      resolve();
+    });
+    req.end();
+  });
+  assert.ok(seen.length >= 1, "Node 22 must invoke options.lookup at connect time");
+  assert.equal(seen[0].all, true);
+  assert.equal(seen[0].hostname, "image.example.invalid");
+
+  let scalarError = "";
+  await new Promise((resolve) => {
+    const req = httpsRequest({
+      hostname: "image.example.invalid",
+      port: 1,
+      path: "/",
+      method: "GET",
+      lookup(_hostname, _options, callback) {
+        callback(null, "203.0.113.10", 4);
+      },
+    }, (response) => {
+      response.resume();
+      resolve();
+    });
+    req.on("error", (error) => {
+      scalarError = String(error?.code || error?.message || "");
+      resolve();
+    });
+    req.setTimeout(2000, () => {
+      req.destroy();
+      resolve();
+    });
+    req.end();
+  });
+  assert.match(scalarError, /ERR_INVALID_IP_ADDRESS|undefined/u);
+});
+
+test("SEC3-010 production db.js wrapper still delegates to the ownership helper", () => {
+  const dbSource = readFileSync(path.join(repositoryRoot, "server/src/db.js"), "utf8");
+  assert.match(dbSource, /upsertPushSubscriptionRecord\(db,/u);
+  assert.doesNotMatch(dbSource, /user_id\s*=\s*excluded\.user_id/u);
 });

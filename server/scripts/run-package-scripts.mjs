@@ -43,6 +43,7 @@ const CHECK_FILES = [
   "src/matrixGuard.js",
   "src/oneC.js",
   "src/authUrlPolicy.js",
+  "src/authIssuance.js",
   "src/outboundResponse.js",
   "src/remoteImagePolicy.js",
   "src/pushSubscriptionOwnership.js",

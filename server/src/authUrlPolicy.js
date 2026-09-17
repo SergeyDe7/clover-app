@@ -33,6 +33,14 @@ function isLoopbackAddress(value) {
   return isLoopbackHostname(address);
 }
 
+function hasC0OrDel(value) {
+  for (const ch of String(value || "")) {
+    const code = ch.codePointAt(0);
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
+
 export function resolveCanonicalAuthOrigin(env = process.env) {
   const raw = String(env.APP_PUBLIC_URL || "").trim();
   if (!raw) {
@@ -41,7 +49,7 @@ export function resolveCanonicalAuthOrigin(env = process.env) {
       "Публичный адрес Clover не настроен."
     );
   }
-  if (/[\u0000-\u001f\u007f\\]/u.test(raw)) {
+  if (hasC0OrDel(raw) || raw.includes("\\")) {
     throw policyError(
       "AUTH_PUBLIC_URL_INVALID",
       "Публичный адрес Clover настроен некорректно."
@@ -93,7 +101,10 @@ export function buildCanonicalCabinetUrl(env = process.env) {
   if (
     !rawPath.startsWith("/") ||
     rawPath.startsWith("//") ||
-    /[\u0000-\u001f\u007f\\?#]/u.test(rawPath)
+    hasC0OrDel(rawPath) ||
+    rawPath.includes("\\") ||
+    rawPath.includes("?") ||
+    rawPath.includes("#")
   ) {
     throw policyError(
       "AUTH_CABINET_PATH_INVALID",

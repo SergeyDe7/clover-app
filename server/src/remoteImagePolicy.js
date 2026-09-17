@@ -16,6 +16,14 @@ function imagePolicyError(code, message, status = 422, cause) {
   return error;
 }
 
+function hasC0OrDel(value) {
+  for (const ch of String(value || "")) {
+    const code = ch.codePointAt(0);
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
+
 function normalizedIpHost(value) {
   return String(value || "").replace(/^\[|\]$/gu, "").split("%")[0];
 }
@@ -137,7 +145,7 @@ export async function resolvePublicImageTarget(
   { lookup = dnsLookup } = {}
 ) {
   const raw = String(rawUrl || "").trim();
-  if (!raw || /[\u0000-\u001f\u007f\\]/u.test(raw)) {
+  if (!raw || hasC0OrDel(raw) || raw.includes("\\")) {
     throw imagePolicyError(
       "REMOTE_IMAGE_URL_DENIED",
       "Адрес удалённого изображения отклонён политикой безопасности."
@@ -247,7 +255,14 @@ export async function downloadRemoteImage(
         headers,
         signal: controller.signal,
         servername: isIP(target.hostname) ? undefined : target.hostname,
-        lookup(_hostname, _options, callback) {
+        lookup(_hostname, options, callback) {
+          if (options?.all) {
+            callback(null, [{
+              address: target.pinned.address,
+              family: target.pinned.family,
+            }]);
+            return;
+          }
           callback(null, target.pinned.address, target.pinned.family);
         },
       };

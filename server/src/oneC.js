@@ -43,26 +43,49 @@ function hostnameWithoutBrackets(value) {
   return String(value || "").replace(/^\[|\]$/gu, "").split("%")[0].toLowerCase();
 }
 
-function isTrustedInsecureHttpLiteral(hostname) {
-  const host = hostnameWithoutBrackets(hostname);
-  const family = isIP(host);
-  if (family === 4) {
-    const parts = host.split(".").map(Number);
-    const [a, b] = parts;
-    if (a === 10 || a === 127) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    return false;
-  }
-  if (family === 6) {
-    if (host === "::1") return true;
-    if (host.startsWith("::ffff:")) {
-      return isTrustedInsecureHttpLiteral(host.slice("::ffff:".length));
-    }
-    const first = host.split(":", 1)[0];
-    return first.startsWith("fc") || first.startsWith("fd");
+function hasC0OrDel(value) {
+  for (const ch of String(value || "")) {
+    const code = ch.codePointAt(0);
+    if (code <= 0x1f || code === 0x7f) return true;
   }
   return false;
+}
+
+function isRfc1918Ipv4Literal(hostname) {
+  const host = hostnameWithoutBrackets(hostname);
+  if (isIP(host) !== 4) return false;
+  const parts = host.split(".").map(Number);
+  const [a, b] = parts;
+  if (a === 10) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
+}
+
+function isLoopbackLiteral(hostname) {
+  const host = hostnameWithoutBrackets(hostname);
+  if (host === "::1") return true;
+  if (host.startsWith("::ffff:")) {
+    return isLoopbackLiteral(host.slice("::ffff:".length));
+  }
+  if (isIP(host) === 4) {
+    return host.split(".").map(Number)[0] === 127;
+  }
+  return false;
+}
+
+function isProvenNonProductionRuntime(env = {}) {
+  const nodeEnv = String(env.NODE_ENV || "").trim().toLowerCase();
+  return nodeEnv === "development" || nodeEnv === "test";
+}
+
+function isTrustedInsecureHttpLiteral(hostname, env = {}) {
+  if (isRfc1918Ipv4Literal(hostname)) return true;
+  return (
+    enabled(env.ONEC_ALLOW_DEV_INSECURE_LOOPBACK) &&
+    isProvenNonProductionRuntime(env) &&
+    isLoopbackLiteral(hostname)
+  );
 }
 
 function normalizeBaseUrl(value) {
@@ -101,7 +124,7 @@ export function resolveTrustedOneCOrigin(env = process.env, { warn } = {}) {
       "Не заполнен адрес опубликованной базы 1С."
     );
   }
-  if (/[\u0000-\u001f\u007f]/u.test(raw)) {
+  if (hasC0OrDel(raw)) {
     throw policyError(
       "ONEC_TRUSTED_ORIGIN_INVALID",
       "Адрес 1С настроен некорректно."
@@ -139,7 +162,7 @@ export function resolveTrustedOneCOrigin(env = process.env, { warn } = {}) {
         "HTTP для 1С запрещён без явного серверного разрешения."
       );
     }
-    if (!isTrustedInsecureHttpLiteral(url.hostname)) {
+    if (!isTrustedInsecureHttpLiteral(url.hostname, env)) {
       throw policyError(
         "ONEC_INSECURE_HTTP_TARGET_INVALID",
         "Незащищённый HTTP к 1С разрешён только для доверенного частного литерала."
@@ -166,7 +189,7 @@ function assertSafeEndpointPath(value, fallback) {
     raw.includes("\\") ||
     raw.includes("..") ||
     /%2e/iu.test(raw) ||
-    /[\u0000-\u001f\u007f]/u.test(raw)
+    hasC0OrDel(raw)
   ) {
     throw policyError(
       "ONEC_ENDPOINT_PATH_INVALID",
@@ -349,6 +372,8 @@ async function requestJson(config, endpointPath, options = {}, deps = {}) {
     const buffer = await readBoundedResponse(response, {
       maxBytes,
       signal: controller.signal,
+      // Node fetch decompresses; Content-Length is the compressed size.
+      enforceContentLength: false,
     });
     const text = buffer.toString("utf8");
     let payload = {};
