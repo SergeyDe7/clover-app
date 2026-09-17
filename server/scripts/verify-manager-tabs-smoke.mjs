@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { staffHasFeature } from "../../src/shared/appHelpers.js";
+import { staffHasFeature, STAFF_FEATURE_IDS } from "../../src/shared/appHelpers.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const managerDir = path.join(root, "src/screens/manager");
@@ -176,8 +176,19 @@ assert.equal(
     },
     "orders"
   ),
+  false,
+  "manager fullAccess без явного списка вкладок не должен получать orders"
+);
+assert.equal(
+  staffHasFeature(
+    {
+      role: "manager",
+      permissions: { tabs: [...STAFF_FEATURE_IDS] },
+    },
+    "orders"
+  ),
   true,
-  "manager fullAccess должен сохранять доступ к orders"
+  "явный полный набор STAFF_FEATURE_IDS должен давать orders"
 );
 assert.ok(
   screenSource.includes("ManagerNotificationBell"),

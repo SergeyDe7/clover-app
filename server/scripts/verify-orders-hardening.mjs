@@ -74,7 +74,7 @@ const migrateManagerIdx = serverSource.indexOf('"/api/migrate/manager"');
 assert.ok(migrateManagerIdx > 0, "migrate/manager должен существовать.");
 const migrateManagerSlice = serverSource.slice(
   migrateManagerIdx,
-  migrateManagerIdx + 1200
+  migrateManagerIdx + 2800
 );
 assert.ok(
   migrateManagerSlice.includes("mergeProductsPreservingOneCLinks"),

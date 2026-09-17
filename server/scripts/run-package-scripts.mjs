@@ -21,6 +21,11 @@ const CHECK_FILES = [
   "src/onecClaimRequeue.js",
   "src/orderStatus.js",
   "src/roles.js",
+  "src/staffPolicy.js",
+  "src/staffBootstrap.js",
+  "src/staffNotifications.js",
+  "src/staffPermissionsMigrate.js",
+  "scripts/verify-staff-notifications.mjs",
   "src/clientSettings.js",
   "src/staffAccessVault.js",
   "src/oneCSearchIndex.js",
@@ -63,6 +68,9 @@ const CHECK_FILES = [
   "scripts/verify-staff-access-vault.mjs",
   "scripts/verify-staff-access-ui.mjs",
   "scripts/verify-manager-permissions.mjs",
+  "scripts/prove-s2-pkg2-base-fail.mjs",
+  "scripts/verify-s2-pkg2-permissions-migrate-backups.mjs",
+  "scripts/verify-legacy-staff-permissions-migrate.mjs",
   "scripts/verify-ui-build-tag.mjs",
 ];
 
