@@ -8,6 +8,14 @@ import { fileURLToPath } from "node:url";
 
 const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+function processFailed(result) {
+  return Boolean(result.signal) || result.status !== 0;
+}
+
+if (!processFailed({ status: null, signal: "SIGTERM" })) {
+  throw new Error("Signalled child processes must fail the package runner.");
+}
+
 const CHECK_FILES = [
   "src/server.js",
   "src/db.js",
@@ -42,6 +50,7 @@ const CHECK_FILES = [
   "scripts/verify-onec-products.mjs",
   "scripts/verify-product-delete.mjs",
   "scripts/verify-onec-clients.mjs",
+  "scripts/verify-manual-client-price-type.mjs",
   "scripts/verify-create-product-from-onec.mjs",
   "scripts/verify-order-payload.mjs",
   "scripts/apply-onec-links.mjs",
@@ -85,6 +94,7 @@ const TEST_ONEC = [
   "scripts/verify-onec-products.mjs",
   "scripts/verify-product-delete.mjs",
   "scripts/verify-onec-clients.mjs",
+  "scripts/verify-manual-client-price-type.mjs",
   "scripts/verify-create-product-from-onec.mjs",
   "scripts/verify-order-payload.mjs",
   "scripts/verify-db-preservation.mjs",
@@ -123,9 +133,25 @@ function run(args) {
   if (result.error) {
     throw result.error;
   }
-  if (result.status) {
-    process.exit(result.status);
+  if (processFailed(result)) {
+    process.exit(Number.isInteger(result.status) ? result.status : 1);
   }
+}
+
+function gitOutput(args) {
+  const result = spawnSync("git", args, {
+    cwd: path.resolve(serverRoot, ".."),
+    encoding: "utf8",
+  });
+  if (result.error) throw result.error;
+  if (processFailed(result)) {
+    throw new Error(
+      `git ${args.join(" ")} failed${
+        result.signal ? ` with ${result.signal}` : ""
+      }: ${result.stderr || result.stdout}`
+    );
+  }
+  return String(result.stdout || "").trim();
 }
 
 const mode = process.argv[2];
@@ -134,8 +160,18 @@ if (mode === "check") {
     run(["--check", file]);
   }
 } else if (mode === "test:onec") {
+  const reviewBase =
+    String(process.env.CLOVER_VERIFY_BASE_SHA || "").trim() ||
+    gitOutput(["merge-base", "HEAD", "origin/main"]);
+  const reviewHead =
+    String(process.env.CLOVER_VERIFY_HEAD_SHA || "").trim() ||
+    gitOutput(["rev-parse", "HEAD"]);
   for (const file of TEST_ONEC) {
-    run([file]);
+    run(
+      file === "scripts/verify-manual-client-price-type.mjs"
+        ? [file, "--base", reviewBase, "--head", reviewHead]
+        : [file]
+    );
   }
 } else {
   console.error("usage: node scripts/run-package-scripts.mjs <check|test:onec>");

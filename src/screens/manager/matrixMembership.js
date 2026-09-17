@@ -1,5 +1,111 @@
 import { uniqueMatrixProductIds } from "./matrixIds.js";
-import { normalizeProduct } from "../../shared/appHelpers.js";
+import { EMPTY_LINK, normalizeProduct } from "../../shared/appHelpers.js";
+
+export function buildClientPriceTypeSelectionIntent({
+  clientId,
+  link = {},
+  nextPriceTypeId = "",
+  oneCPriceTypes = [],
+} = {}) {
+  const nextId = String(nextPriceTypeId || "").trim();
+  const selected = (Array.isArray(oneCPriceTypes) ? oneCPriceTypes : []).find(
+    (item) => String(item?.id || "") === nextId
+  );
+  const keepMarkup =
+    link.defaultPricingMode === "purchase_markup" ||
+    Number(link.defaultMarkupPercent) > 0;
+  return {
+    patch: {
+      oneCPriceTypeId: nextId,
+      oneCPriceTypeName: selected?.name || "",
+      defaultPricingMode: nextId
+        ? keepMarkup
+          ? "purchase_markup"
+          : "one_c_price_type"
+        : keepMarkup
+          ? "purchase_markup"
+          : link.defaultPricingMode === "one_c_price_type"
+            ? "base"
+            : link.defaultPricingMode || "base",
+    },
+    manualPriceConfigClientIds: String(clientId || "").trim()
+      ? [clientId]
+      : [],
+  };
+}
+
+export function mergeManualPriceIntentIds(currentIds, incomingIds) {
+  const next = new Set(
+    currentIds instanceof Set
+      ? [...currentIds].map((id) => String(id || "").trim()).filter(Boolean)
+      : []
+  );
+  for (const id of Array.isArray(incomingIds) ? incomingIds : []) {
+    const normalized = String(id || "").trim();
+    if (normalized) next.add(normalized);
+  }
+  return next;
+}
+
+export function buildClientLinkSavePayload(
+  clientId,
+  nextLink,
+  manualPriceIntentIds
+) {
+  const normalizedClientId = String(clientId || "").trim();
+  const intentIds =
+    manualPriceIntentIds instanceof Set
+      ? manualPriceIntentIds
+      : new Set(
+          (Array.isArray(manualPriceIntentIds) ? manualPriceIntentIds : [])
+            .map((id) => String(id || "").trim())
+            .filter(Boolean)
+        );
+  return {
+    clientLinks: { [clientId]: nextLink },
+    manualPriceConfigClientIds:
+      normalizedClientId && intentIds.has(normalizedClientId) ? [clientId] : [],
+  };
+}
+
+/**
+ * Применяет authoritative ответ только к сохранённому клиенту.
+ * Полный server snapshot не должен затирать dirty-состояние соседних клиентов.
+ */
+export function mergeSavedClientLinkResponse(
+  currentLinks,
+  clientId,
+  savedLinks,
+  fallbackLink
+) {
+  const current =
+    currentLinks && typeof currentLinks === "object" ? currentLinks : {};
+  const saved =
+    savedLinks && typeof savedLinks === "object" ? savedLinks : {};
+  const savedLink =
+    saved[clientId] && typeof saved[clientId] === "object"
+      ? saved[clientId]
+      : null;
+
+  return {
+    ...current,
+    [clientId]: savedLink
+      ? {
+          ...EMPTY_LINK,
+          ...savedLink,
+          matrixProductIds: Array.isArray(savedLink.matrixProductIds)
+            ? savedLink.matrixProductIds
+            : [],
+        }
+      : {
+          ...EMPTY_LINK,
+          ...(current[clientId] || {}),
+          ...(fallbackLink && typeof fallbackLink === "object"
+            ? fallbackLink
+            : {}),
+        },
+  };
+}
 
 /** Состав матрицы клиента: id товаров и oneCId, которые уже в матрице. */
 export function getClientMatrixMembership(link, products) {

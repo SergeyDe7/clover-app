@@ -613,10 +613,10 @@ export const api = {
     });
   },
 
-  saveClientLinks(clientLinks) {
+  saveClientLinks(clientLinks, { manualPriceConfigClientIds = [] } = {}) {
     return request("/state/client-links", {
       method: "PUT",
-      body: { clientLinks },
+      body: { clientLinks, manualPriceConfigClientIds },
     });
   },
 

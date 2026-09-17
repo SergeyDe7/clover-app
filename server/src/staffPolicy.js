@@ -188,7 +188,12 @@ const STOREFRONT_DETAILS_KEYS = Object.freeze([
 ]);
 const STOREFRONT_PRICING_KEYS = Object.freeze(["source", ...PRODUCT_UNIT_KEYS]);
 
-export const CLIENT_LINK_MIGRATE_ALLOWLIST = Object.freeze(Object.keys(EMPTY_LINK));
+export const CLIENT_LINK_MIGRATE_ALLOWLIST = Object.freeze([
+  ...Object.keys(EMPTY_LINK),
+  // Server-owned provenance принимаем только для безопасного игнорирования:
+  // migrate не должен отклонять остальные легитимные поля старого snapshot.
+  "oneCPriceTypeSource",
+]);
 
 const DELIVERY_ZONE_KEYS = Object.freeze(["id", "name", "enabled", "freeFrom", "fee"]);
 const HERO_SLIDE_KEYS = Object.freeze(["src", "alt", "href", "buttonLabel"]);
