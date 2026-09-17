@@ -7,6 +7,7 @@
 import { mkdirSync, promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { downloadRemoteImage } from "./remoteImagePolicy.js";
 
 const PRODUCT_PHOTO_SIZE = 800;
 const USER_AGENT = (() => {
@@ -652,38 +653,35 @@ export async function searchProductImages(query, webHits = []) {
     .sort((a, b) => (b.preference || 0) - (a.preference || 0));
 }
 
-async function downloadBinary(url, timeoutMs = 15000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+export async function downloadBinary(url, timeoutMs = 15000, deps = {}) {
+  const { headers: extraHeaders, ...rest } = deps;
   let referer = "https://duckduckgo.com/";
   try {
-    referer = new URL(url).origin + "/";
+    referer = `${new URL(url).origin}/`;
   } catch {
     // keep default
   }
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": BROWSER_UA,
-        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-        Referer: referer,
-      },
-      redirect: "follow",
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const type = String(response.headers.get("content-type") || "").toLowerCase();
-    if (!type.startsWith("image/") && !type.includes("octet-stream")) {
-      throw new Error(`Ответ не является изображением (${type || "unknown"}).`);
-    }
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.length < 1024 || buffer.length > 8 * 1024 * 1024) {
-      throw new Error("Неподходящий размер файла изображения.");
-    }
-    return { buffer, contentType: type.startsWith("image/") ? type : "image/jpeg" };
-  } finally {
-    clearTimeout(timer);
+  const result = await downloadRemoteImage(url, {
+    timeoutMs,
+    ...rest,
+    headers: {
+      "User-Agent": BROWSER_UA,
+      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      Referer: referer,
+      ...(extraHeaders || {}),
+    },
+  });
+  const type = String(result.contentType || "").toLowerCase();
+  if (!type.startsWith("image/") && !type.includes("octet-stream")) {
+    throw new Error(`Ответ не является изображением (${type || "unknown"}).`);
   }
+  if (result.buffer.length < 1024) {
+    throw new Error("Неподходящий размер файла изображения.");
+  }
+  return {
+    buffer: result.buffer,
+    contentType: type.startsWith("image/") ? type : "image/jpeg",
+  };
 }
 
 /**

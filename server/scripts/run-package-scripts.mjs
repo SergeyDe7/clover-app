@@ -42,6 +42,12 @@ const CHECK_FILES = [
   "src/oneCSearchIndex.js",
   "src/matrixGuard.js",
   "src/oneC.js",
+  "src/authUrlPolicy.js",
+  "src/authIssuance.js",
+  "src/outboundResponse.js",
+  "src/remoteImagePolicy.js",
+  "src/pushSubscriptionOwnership.js",
+  "src/productEnrichment.js",
   "src/oneCProducts.js",
   "src/oneCClients.js",
   "src/pricing.js",
@@ -88,6 +94,7 @@ const CHECK_FILES = [
   "scripts/verify-s2-new-002-vault-concurrency.mjs",
   "scripts/verify-s2-new-002-password-storage.mjs",
   "scripts/verify-ui-build-tag.mjs",
+  "scripts/verify-security-stage3-package1.mjs",
 ];
 
 const TEST_ONEC = [

@@ -64,7 +64,6 @@ import {
   markManagerNotificationRead,
   markManagerNotificationsReadBySource,
   markManagerNotificationsReadForOrder,
-  markAllManagerNotificationsRead,
   markManagerNotificationsReadByIds,
   listPasskeys,
   getPasskey,
@@ -216,6 +215,15 @@ import {
   scheduleProductWebEnrichment,
   enrichProductCardFromWeb,
 } from "./productEnrichment.js";
+import {
+  publicCabinetUrl,
+  allowDevelopmentAuthLinks,
+} from "./authUrlPolicy.js";
+import {
+  executeClientRegistration,
+  executeForgotPassword,
+  executeResendVerification,
+} from "./authIssuance.js";
 import {
   autoLinkCloverClients,
   buildOneCClientCandidates,
@@ -834,30 +842,6 @@ function tokenHash(value) {
 
 function createPlainToken() {
   return randomBytes(32).toString("base64url");
-}
-
-function publicBaseUrl(req) {
-  const configured = String(process.env.APP_PUBLIC_URL || "").trim().replace(/\/$/, "");
-  if (configured) return configured;
-  return `${req.protocol}://${req.get("host")}`.replace(/\/$/, "");
-}
-
-/** URL ЛК на каноническом домене (витрина занимает корень хоста). */
-function publicCabinetUrl(req) {
-  const base = publicBaseUrl(req);
-  let path = String(process.env.CABINET_PATH || "/lk").trim();
-  if (!path.startsWith("/")) path = `/${path}`;
-  path = path.replace(/\/$/, "") || "/lk";
-  return `${base}${path}`;
-}
-
-function allowDevelopmentAuthLinks(req) {
-  if (String(process.env.ALLOW_DEV_AUTH_LINKS || "true") !== "true") return false;
-  const hostName = String(req.hostname || "").toLowerCase();
-  const remoteAddress = String(req.socket?.remoteAddress || "");
-  const loopbackHost = ["localhost", "127.0.0.1", "::1"].includes(hostName);
-  const loopbackClient = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(remoteAddress);
-  return loopbackHost && loopbackClient;
 }
 
 function isConfiguredPublicUrlLocal() {
@@ -2149,75 +2133,43 @@ app.post("/api/public/orders", async (req, res) => {
   }
 });
 
+function liveAuthIssuanceDeps() {
+  return {
+    publicCabinetUrl,
+    allowDevelopmentAuthLinks,
+    findUserByEmail,
+    createUser,
+    hashPassword,
+    createAuthToken,
+    createPlainToken,
+    tokenHash,
+    sendCloverMail,
+    verificationEmail,
+    resetPasswordEmail,
+    writeAudit,
+    queueManagerNotification,
+    getClientState,
+    isClientRole,
+    publicMailStatus,
+  };
+}
+
 app.post("/api/auth/register", async (req, res, next) => {
   try {
     const input = registerSchema.parse(req.body);
-    const email = normalizeEmail(input.email);
-
-    if (findUserByEmail(email)) {
-      return res.status(409).json({
-        error: "Аккаунт с такой почтой уже существует.",
-      });
-    }
-
-    const passwordHash = await hashPassword(input.password);
-    const user = createUser({
-      email,
-      passwordHash,
-      role: "client",
-      emailVerified: false,
-      approvalStatus: "pending",
-      profile: {
+    const result = await executeClientRegistration(
+      {
+        email: normalizeEmail(input.email),
+        password: input.password,
         companyName: input.companyName,
         contactName: input.contactName,
         phone: input.phone,
-        email,
+        req,
       },
-    });
-
-    const plainToken = createPlainToken();
-    createAuthToken({
-      userId: user.id,
-      type: "verify_email",
-      tokenHash: tokenHash(plainToken),
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    });
-    const verifyUrl = `${publicCabinetUrl(req)}/?verify=${encodeURIComponent(plainToken)}`;
-    const message = verificationEmail({ companyName: input.companyName, verifyUrl });
-    let mail = { sent: false, reason: "unknown" };
-    try {
-      mail = await sendCloverMail({ to: email, ...message });
-    } catch (mailError) {
-      console.error("Не удалось отправить письмо подтверждения", mailError);
-      mail = { sent: false, reason: "send_failed" };
-    }
-
-    writeAudit({
-      userId: user.id,
-      userEmail: user.email,
-      userRole: user.role,
-      action: "auth.register",
-      details: { companyName: input.companyName, mailSent: Boolean(mail.sent) },
-    });
-
-    queueManagerNotification({
-      type: "client_registration",
-      title: "Новая регистрация клиента",
-      body: String(input.companyName || "Новая регистрация"),
-      url: `/?managerTab=clients&client=${encodeURIComponent(user.id)}`,
-      sourceId: user.id,
-    });
-
-    setNoStore(res);
-    res.status(201).json({
-      ok: true,
-      requiresEmailVerification: true,
-      message: mail.sent
-        ? "Регистрация создана. Подтвердите электронную почту по ссылке из письма."
-        : "Регистрация создана. Отправка писем пока не настроена — используйте тестовую ссылку на этом компьютере.",
-      mail: { sent: Boolean(mail.sent), status: publicMailStatus() },
-      developmentLink: allowDevelopmentAuthLinks(req) ? verifyUrl : undefined,
-    });
+      liveAuthIssuanceDeps()
+    );
+    if (result.status === 201) setNoStore(res);
+    res.status(result.status).json(result.body);
   } catch (error) {
     next(error);
   }
@@ -2253,31 +2205,12 @@ app.post("/api/auth/verify-email", (req, res, next) => {
 app.post("/api/auth/resend-verification", async (req, res, next) => {
   try {
     const input = forgotPasswordSchema.parse(req.body);
-    const email = normalizeEmail(input.email);
-    const user = findUserByEmail(email);
-    let developmentLink;
-    if (user && !user.email_verified) {
-      const plainToken = createPlainToken();
-      createAuthToken({
-        userId: user.id,
-        type: "verify_email",
-        tokenHash: tokenHash(plainToken),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      });
-      const verifyUrl = `${publicCabinetUrl(req)}/?verify=${encodeURIComponent(plainToken)}`;
-      const companyName = isClientRole(user.role)
-        ? getClientState(user.id).profile?.companyName
-        : "Менеджер Clover";
-      const message = verificationEmail({ companyName, verifyUrl });
-      try { await sendCloverMail({ to: email, ...message }); } catch (error) { console.error(error); }
-      if (allowDevelopmentAuthLinks(req)) developmentLink = verifyUrl;
-    }
+    const result = await executeResendVerification(
+      { email: normalizeEmail(input.email), req },
+      liveAuthIssuanceDeps()
+    );
     setNoStore(res);
-    res.json({
-      ok: true,
-      message: "Если аккаунт существует и почта ещё не подтверждена, новое письмо отправлено.",
-      developmentLink,
-    });
+    res.status(result.status).json(result.body);
   } catch (error) {
     next(error);
   }
@@ -2286,32 +2219,12 @@ app.post("/api/auth/resend-verification", async (req, res, next) => {
 app.post("/api/auth/forgot-password", async (req, res, next) => {
   try {
     const input = forgotPasswordSchema.parse(req.body);
-    const email = normalizeEmail(input.email);
-    const user = findUserByEmail(email);
-    let developmentLink;
-    if (user) {
-      const plainToken = createPlainToken();
-      createAuthToken({
-        userId: user.id,
-        type: "reset_password",
-        tokenHash: tokenHash(plainToken),
-        expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-      });
-      const resetUrl = `${publicCabinetUrl(req)}/?reset=${encodeURIComponent(plainToken)}`;
-      const message = resetPasswordEmail({ resetUrl });
-      try { await sendCloverMail({ to: email, ...message }); } catch (error) { console.error(error); }
-      if (allowDevelopmentAuthLinks(req)) developmentLink = resetUrl;
-      writeAudit({
-        userId: user.id, userEmail: user.email, userRole: user.role,
-        action: "auth.password.reset.request", details: {},
-      });
-    }
+    const result = await executeForgotPassword(
+      { email: normalizeEmail(input.email), req },
+      liveAuthIssuanceDeps()
+    );
     setNoStore(res);
-    res.json({
-      ok: true,
-      message: "Если аккаунт существует, на его почту отправлена ссылка для восстановления пароля.",
-      developmentLink,
-    });
+    res.status(result.status).json(result.body);
   } catch (error) {
     next(error);
   }
