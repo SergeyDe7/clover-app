@@ -51,11 +51,12 @@ function ClientAccessPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [revealed, setRevealed] = useState({});
   const [copiedKey, setCopiedKey] = useState("");
   const [passwordClientId, setPasswordClientId] = useState("");
   const [passwordDraft, setPasswordDraft] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
+  /** One-shot plaintext after set/reset; never from list API. Cleared when editor closes. */
+  const [oneShotPassword, setOneShotPassword] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -172,12 +173,14 @@ function ClientAccessPanel() {
 
   const openPasswordEditor = (item) => {
     setPasswordClientId(item.clientId);
+    setOneShotPassword("");
     setPasswordDraft(generateAccessPassword());
   };
 
   const cancelPasswordEditor = () => {
     setPasswordClientId("");
     setPasswordDraft("");
+    setOneShotPassword("");
   };
 
   const savePassword = async (item) => {
@@ -193,10 +196,12 @@ function ClientAccessPanel() {
     setPasswordBusy(true);
     try {
       const result = await api.setClientPassword(item.clientId, password);
-      void result;
+      const once = String(result?.temporaryPassword || password).trim();
       await load();
-      setRevealed((current) => ({ ...current, [item.clientId]: true }));
-      cancelPasswordEditor();
+      if (once) {
+        setOneShotPassword(once);
+        setPasswordDraft(once);
+      }
     } catch (saveError) {
       await appAlert({
         title: t("shared.error.saveFailed"),
@@ -229,7 +234,7 @@ function ClientAccessPanel() {
       </div>
 
       <p className="muted small" style={{ margin: "0 0 12px" }}>{
-        t("manager.cabinetLoginsAndPasswordsWrittenTo")
+        t("admin.passwordsFromBeforeThisLogCannot")
       }</p>
 
       {error ? <div className="sync-error">{error}</div> : null}
@@ -238,10 +243,11 @@ function ClientAccessPanel() {
       ) : filtered.length ? (
         <div className="access-vault-list">
           {filtered.map((item) => {
-            const showPassword = Boolean(revealed[item.clientId]);
             const loginKey = `${item.clientId}:login`;
             const passKey = `${item.clientId}:password`;
             const editing = String(passwordClientId) === String(item.clientId);
+            const oneShot =
+              editing && oneShotPassword ? oneShotPassword : "";
             return (
               <article className="access-vault-card" key={item.clientId}>
                 <div className="access-vault-card-top">
@@ -252,9 +258,14 @@ function ClientAccessPanel() {
                         t("manager.noContactGiven")}
                     </span>
                   </div>
-                  <span className={item.hasPassword ? "badge green" : "badge yellow"}>
-                    {item.hasPassword ? t("shared.passwordSaved") : t("shared.noPassword")}
-                  </span>
+                  <div className="access-vault-field-actions" style={{ gap: 6 }}>
+                    <span className={item.hasPassword ? "badge green" : "badge yellow"}>
+                      {item.hasPassword ? t("shared.passwordSaved") : t("shared.noPassword")}
+                    </span>
+                    {item.resetRequired ? (
+                      <span className="badge yellow">{t("auth.reset.title")}</span>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="access-vault-fields">
@@ -273,42 +284,30 @@ function ClientAccessPanel() {
                   <div className="access-vault-field">
                     <span>{t("auth.login.password")}</span>
                     <code>
-                      {item.hasPassword
-                        ? showPassword
-                          ? item.password
-                          : "••••••••••"
-                        : t("shared.notSaved")}
+                      {oneShot
+                        ? oneShot
+                        : item.hasPassword
+                          ? "••••••••••"
+                          : t("shared.notSaved")}
                     </code>
                     <div className="access-vault-field-actions">
+                      {oneShot ? (
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => handleCopy(passKey, oneShot)}
+                        >
+                          {copiedKey === passKey ? t("shared.action.copied") : t("shared.action.copy")}
+                        </button>
+                      ) : null}
                       {item.hasPassword ? (
-                        <>
-                          <button
-                            className="secondary-button"
-                            type="button"
-                            onClick={() =>
-                              setRevealed((current) => ({
-                                ...current,
-                                [item.clientId]: !current[item.clientId],
-                              }))
-                            }
-                          >
-                            {showPassword ? t("shared.action.hide") : t("shared.action.show")}
-                          </button>
-                          <button
-                            className="secondary-button"
-                            type="button"
-                            onClick={() => handleCopy(passKey, item.password)}
-                          >
-                            {copiedKey === passKey ? t("shared.action.copied") : t("shared.action.copy")}
-                          </button>
-                          <button
-                            className="secondary-button"
-                            type="button"
-                            onClick={() => openPasswordEditor(item)}
-                          >{
-                            t("manager.change")
-                          }</button>
-                        </>
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => openPasswordEditor(item)}
+                        >{
+                          t("manager.change")
+                        }</button>
                       ) : (
                         <button
                           className="secondary-button"
@@ -325,41 +324,57 @@ function ClientAccessPanel() {
                 {editing ? (
                   <div className="access-vault-password-editor">
                     <label className="field">{
-                      t("auth.reset.title")
+                      oneShot ? t("shared.passwordUpdated") : t("auth.reset.title")
                       }<input
                         type="text"
                         autoComplete="off"
                         minLength={6}
                         value={passwordDraft}
-                        onChange={(event) => setPasswordDraft(event.target.value)}
+                        onChange={(event) => {
+                          setOneShotPassword("");
+                          setPasswordDraft(event.target.value);
+                        }}
                         disabled={passwordBusy}
+                        readOnly={Boolean(oneShot)}
                       />
                     </label>
                     <div className="access-vault-field-actions">
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        disabled={passwordBusy}
-                        onClick={() => setPasswordDraft(generateAccessPassword())}
-                      >{
-                        t("manager.generate")
-                      }</button>
+                      {oneShot ? (
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => handleCopy(passKey, oneShot)}
+                        >
+                          {copiedKey === passKey ? t("shared.action.copied") : t("shared.action.copy")}
+                        </button>
+                      ) : (
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={passwordBusy}
+                          onClick={() => setPasswordDraft(generateAccessPassword())}
+                        >{
+                          t("manager.generate")
+                        }</button>
+                      )}
                       <button
                         className="secondary-button"
                         type="button"
                         disabled={passwordBusy}
                         onClick={cancelPasswordEditor}
                       >{
-                        t("shared.modal.cancel")
+                        oneShot ? t("shared.action.close") : t("shared.modal.cancel")
                       }</button>
-                      <button
-                        className="primary-button"
-                        type="button"
-                        disabled={passwordBusy}
-                        onClick={() => savePassword(item)}
-                      >
-                        {passwordBusy ? t("shared.status.saving") : t("auth.reset.submit")}
-                      </button>
+                      {!oneShot ? (
+                        <button
+                          className="primary-button"
+                          type="button"
+                          disabled={passwordBusy}
+                          onClick={() => savePassword(item)}
+                        >
+                          {passwordBusy ? t("shared.status.saving") : t("auth.reset.submit")}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
@@ -423,7 +438,7 @@ export function ManagerAccessVault({ authUser }) {
           <p className="eyebrow">{t("manager.nav.more")}</p>
           <h2 id="access-vault-title">{t("manager.nav.access")}</h2>
           <p className="muted small" style={{ margin: "6px 0 0" }}>{
-            t("manager.clientsCabinetLoginsManagersLoginsPasswords")
+            t("admin.passwordsFromBeforeThisLogCannot")
           }</p>
         </div>
       </header>

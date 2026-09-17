@@ -694,11 +694,14 @@ async function main() {
     );
 
     const allowedAccess = await api(base, "/api/admin/client-access", { token: tokens.allowed });
+    const allowedBody = JSON.stringify(allowedAccess.json || {});
     note(
       "allowed.access",
       allowedAccess.status === 200 &&
-        JSON.stringify(allowedAccess.json || {}).includes("VaultSecretPass!9"),
-      `status=${allowedAccess.status}`
+        !allowedBody.includes("VaultSecretPass!9") &&
+        !(allowedAccess.json?.items || []).some((item) => item?.password) &&
+        (allowedAccess.json?.items || []).some((item) => item?.hasPassword === true),
+      `status=${allowedAccess.status} noPlaintext=${!allowedBody.includes("VaultSecretPass!9")}`
     );
 
     const malformedProducts = await api(base, "/api/state/products", {
