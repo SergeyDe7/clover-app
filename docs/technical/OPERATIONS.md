@@ -41,6 +41,7 @@ Linux safety: `daily-backup.sh` ставит `umask 077`, держит non-block
 
 - `ONEC_VLAVKA_EXCHANGE_API_KEY` (и `ONEC_TEST_EXCHANGE_API_KEY` только если TEST в allowlist); `ONEC_API_KEY` (outbound only); `ONEC_ALLOW_LOCAL_WITHOUT_KEY`
 - `ONEC_BASE_URL`, `ONEC_USERNAME`, `ONEC_PASSWORD` (исходящие вызовы)
+- `ONEC_ALLOW_INSECURE_HTTP` — только `true` для исходящего HTTP к точному частному литералу 1С; HTTPS к 1С флаг не требует
 - `ONEC_WRITE_ENABLED` — по умолчанию `false` (запись черновиков в 1С выкл.)
 - `JWT_SECRET`, SMTP, VAPID, Passkey — для домена/HTTPS
 
