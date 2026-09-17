@@ -1,6 +1,15 @@
 /** Оперативное хранилище метаданных доступов клиентов (без plaintext-паролей в новых записях). */
 
-import { getGlobalState, setGlobalState, getPasswordAuthMetaByIds } from "./db.js";
+import {
+  db,
+  setGlobalState,
+  getPasswordAuthMetaByIds,
+  runInTransaction,
+} from "./db.js";
+import {
+  readVaultStateStrict,
+  stripForbiddenCredentialFields,
+} from "./credentialVaultInspector.js";
 
 const VAULT_KEY = "clientAccessVault";
 
@@ -10,19 +19,22 @@ function cleanText(value) {
 
 function stripSecretFields(entry) {
   if (!entry || typeof entry !== "object") return {};
-  const next = { ...entry };
-  delete next.password;
-  delete next.passwordHash;
-  delete next.password_hash;
-  delete next.plainPassword;
-  delete next.temporaryPassword;
-  return next;
+  return stripForbiddenCredentialFields(entry);
+}
+
+function vaultJsonInvalidError() {
+  const err = new Error("clientAccessVault json invalid");
+  err.code = "VAULT_JSON_INVALID";
+  return err;
 }
 
 /** Exact vault from DB (may still contain legacy plaintext until opt-in migration). */
 export function readClientAccessVaultRaw() {
-  const raw = getGlobalState(VAULT_KEY, {});
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const state = readVaultStateStrict(db, VAULT_KEY);
+  if (!state.parseOk) {
+    throw vaultJsonInvalidError();
+  }
+  const raw = state.vault || {};
   const copy = {};
   for (const [id, entry] of Object.entries(raw)) {
     copy[id] =
@@ -54,33 +66,46 @@ export function writeClientAccessVault(vault) {
   setGlobalState(VAULT_KEY, vault && typeof vault === "object" ? vault : {});
 }
 
+/**
+ * Atomic read-modify-write of the vault under BEGIN IMMEDIATE.
+ * Prevents lost updates when two writers touch different users.
+ */
+export function mutateClientAccessVault(mutator) {
+  return runInTransaction(() => {
+    const vault = readClientAccessVaultRaw();
+    const result = mutator(vault);
+    writeClientAccessVault(vault);
+    return result;
+  });
+}
+
 export function upsertClientAccessEntry(clientId, patch = {}, actor = {}) {
   const id = cleanText(clientId);
   if (!id) return null;
-  const vault = readClientAccessVaultRaw();
-  const previousRaw =
-    vault[id] && typeof vault[id] === "object" ? vault[id] : {};
-  const previous = stripSecretFields(previousRaw);
-  const next = stripSecretFields({
-    clientId: id,
-    login: cleanText(patch.login ?? previous.login),
-    companyName: cleanText(patch.companyName ?? previous.companyName),
-    contactName: cleanText(patch.contactName ?? previous.contactName),
-    note: cleanText(patch.note ?? previous.note),
-    resetRequired:
-      typeof patch.resetRequired === "boolean"
-        ? patch.resetRequired
-        : Boolean(previous.resetRequired),
-    updatedAt: new Date().toISOString(),
-    updatedBy: cleanText(actor.email || actor.id || previous.updatedBy),
+  return mutateClientAccessVault((vault) => {
+    const previousRaw =
+      vault[id] && typeof vault[id] === "object" ? vault[id] : {};
+    const previous = stripSecretFields(previousRaw);
+    const next = stripSecretFields({
+      clientId: id,
+      login: cleanText(patch.login ?? previous.login),
+      companyName: cleanText(patch.companyName ?? previous.companyName),
+      contactName: cleanText(patch.contactName ?? previous.contactName),
+      note: cleanText(patch.note ?? previous.note),
+      resetRequired:
+        typeof patch.resetRequired === "boolean"
+          ? patch.resetRequired
+          : Boolean(previous.resetRequired),
+      updatedAt: new Date().toISOString(),
+      updatedBy: cleanText(actor.email || actor.id || previous.updatedBy),
+    });
+    if (!next.login && !next.companyName && !next.contactName && !next.note) {
+      return previous.login || previous.companyName ? previous : null;
+    }
+    // Replace only this entry without password; leave other entries untouched.
+    vault[id] = next;
+    return next;
   });
-  if (!next.login && !next.companyName && !next.contactName && !next.note) {
-    return previous.login || previous.companyName ? previous : null;
-  }
-  // Replace only this entry without password; leave other entries untouched.
-  vault[id] = next;
-  writeClientAccessVault(vault);
-  return next;
 }
 
 /**
@@ -135,11 +160,11 @@ export function saveClientAccessCredentials(clientId, credentials = {}, actor = 
 export function removeClientAccessEntry(clientId) {
   const id = cleanText(clientId);
   if (!id) return false;
-  const vault = readClientAccessVaultRaw();
-  if (!Object.prototype.hasOwnProperty.call(vault, id)) return false;
-  delete vault[id];
-  writeClientAccessVault(vault);
-  return true;
+  return mutateClientAccessVault((vault) => {
+    if (!Object.prototype.hasOwnProperty.call(vault, id)) return false;
+    delete vault[id];
+    return true;
+  });
 }
 
 /** Список доступов без plaintext/hash. hasPassword — из users.password_hash. */

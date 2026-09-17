@@ -61,6 +61,10 @@ export const db = new DatabaseSync(databasePath, {
   enableForeignKeyConstraints: true,
 });
 
+// Apply busy_timeout before any schema/migration work so concurrent writers wait.
+db.exec("PRAGMA busy_timeout = 8000");
+db.exec("PRAGMA journal_mode = WAL");
+
 function tableColumns(tableName) {
   return new Set(
     db.prepare(`PRAGMA table_info(${tableName})`).all().map((row) => row.name)
@@ -74,9 +78,6 @@ function ensureColumn(tableName, columnName, definition) {
 }
 
 db.exec(`
-  PRAGMA journal_mode = WAL;
-  PRAGMA busy_timeout = 5000;
-
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
@@ -345,8 +346,15 @@ export function getDatabasePath() {
   return databasePath;
 }
 
+/** Nested callers join the open IMMEDIATE transaction (no nested BEGIN). */
+let transactionDepth = 0;
+
 export function runInTransaction(fn) {
+  if (transactionDepth > 0) {
+    return fn();
+  }
   db.exec("BEGIN IMMEDIATE");
+  transactionDepth += 1;
   try {
     const result = fn();
     db.exec("COMMIT");
@@ -358,6 +366,8 @@ export function runInTransaction(fn) {
       // ignore rollback failure after a failed begin/commit
     }
     throw error;
+  } finally {
+    transactionDepth = Math.max(0, transactionDepth - 1);
   }
 }
 

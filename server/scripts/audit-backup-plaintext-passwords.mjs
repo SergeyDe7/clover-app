@@ -2,6 +2,8 @@
  * Read-only audit of Clover backup archives for plaintext credential storage.
  * Prints only path/identifier + aggregate counts/fingerprint — never values.
  *
+ * Uses shared credentialVaultInspector (same rules as migration).
+ *
  * Usage:
  *   node scripts/audit-backup-plaintext-passwords.mjs /path/to/backup.zip [more...]
  *   node scripts/audit-backup-plaintext-passwords.mjs --dir /path/to/backups
@@ -18,9 +20,35 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import {
+  CLIENT_VAULT_KEY,
+  STAFF_VAULT_KEY,
+  SAFE_CREDENTIAL_METADATA_KEYS,
+  entryHasForbiddenCredential,
+  extractVaultsFromSnapshot,
+  isForbiddenCredentialKey,
+  parseVaultJsonStrict,
+  walkVaultEntries,
+} from "../src/credentialVaultInspector.js";
 
 const require = createRequire(import.meta.url);
 const AdmZip = require("adm-zip");
+
+/** Explicit list for tests/docs; detection uses isForbiddenCredentialKey. */
+const VAULT_SECRET_FIELDS = [
+  "password",
+  "plainPassword",
+  "plaintextPassword",
+  "temporaryPassword",
+  "currentPassword",
+  "newPassword",
+  "passphrase",
+  "credential",
+  "secret",
+  "token",
+  "passwordHash",
+  "password_hash",
+];
 
 function fingerprintFile(filePath) {
   const st = statSync(filePath);
@@ -33,74 +61,16 @@ function fingerprintFile(filePath) {
   };
 }
 
-function parseJsonSafe(text) {
+function parseJsonStrict(text) {
   try {
-    return JSON.parse(text);
+    return { ok: true, value: JSON.parse(text) };
   } catch {
-    return null;
+    return { ok: false, value: null };
   }
 }
 
-function walkVaultEntries(vault) {
-  const entries = vault && typeof vault === "object" && !Array.isArray(vault) ? vault : {};
-  let total = 0;
-  let withPlaintextPassword = 0;
-  for (const entry of Object.values(entries)) {
-    total += 1;
-    if (entry && typeof entry === "object") {
-      const password = String(entry.password ?? "").trim();
-      if (password) withPlaintextPassword += 1;
-    }
-  }
-  return { total, withPlaintextPassword };
-}
-
-function extractVaultsFromSnapshot(snapshot) {
-  const found = { clientAccessVault: null, staffAccessVault: null };
-  if (!snapshot || typeof snapshot !== "object") return found;
-
-  const consider = (key, value) => {
-    if (key === "clientAccessVault") found.clientAccessVault = value;
-    if (key === "staffAccessVault") found.staffAccessVault = value;
-  };
-
-  if (Array.isArray(snapshot.appState)) {
-    for (const row of snapshot.appState) {
-      const key = row?.key;
-      const raw = row?.value_json ?? row?.valueJson ?? row?.value;
-      const parsed = typeof raw === "string" ? parseJsonSafe(raw) : raw;
-      consider(key, parsed);
-    }
-  }
-
-  if (snapshot.app_state && typeof snapshot.app_state === "object") {
-    for (const [key, value] of Object.entries(snapshot.app_state)) {
-      consider(key, typeof value === "string" ? parseJsonSafe(value) : value);
-    }
-  }
-
-  if (snapshot.state && typeof snapshot.state === "object") {
-    for (const [key, value] of Object.entries(snapshot.state)) {
-      consider(key, value);
-    }
-  }
-
-  // Common Clover export shape: { appState: { key: value } } flattened via exportDatabaseSnapshot
-  for (const [key, value] of Object.entries(snapshot)) {
-    if (key === "clientAccessVault" || key === "staffAccessVault") {
-      consider(key, value);
-    }
-  }
-
-  if (Array.isArray(snapshot.globalState)) {
-    for (const row of snapshot.globalState) {
-      const key = row?.key;
-      const raw = row?.value_json ?? row?.value;
-      consider(key, typeof raw === "string" ? parseJsonSafe(raw) : raw);
-    }
-  }
-
-  return found;
+function entryHasPlaintextSecret(entry) {
+  return entryHasForbiddenCredential(entry);
 }
 
 function countUsers(snapshot) {
@@ -115,90 +85,76 @@ function countUsers(snapshot) {
   return { total: users.length, withHashField };
 }
 
+function failReport(abs, fp, error) {
+  return {
+    path: abs,
+    fingerprint: fp,
+    ok: false,
+    error,
+    plaintextPasswordEntries: null,
+    hasPlaintextCredentials: null,
+    vaultEntries: null,
+    users: null,
+  };
+}
+
 function auditBackup(filePath) {
   const abs = path.resolve(filePath);
   let fp;
   try {
     fp = fingerprintFile(abs);
-  } catch (error) {
-    return {
-      path: abs,
-      fingerprint: null,
-      ok: false,
-      error: "unreadable",
-      plaintextPasswordEntries: null,
-      hasPlaintextCredentials: null,
-    };
+  } catch {
+    return failReport(abs, null, "unreadable");
   }
 
   let zip;
   try {
     zip = new AdmZip(abs);
   } catch {
-    return {
-      path: abs,
-      fingerprint: fp,
-      ok: false,
-      error: "unreadable/corrupt archive",
-      plaintextPasswordEntries: null,
-      hasPlaintextCredentials: null,
-    };
+    return failReport(abs, fp, "unreadable/corrupt archive");
   }
 
   let entry;
   try {
     entry = zip.getEntry("snapshot.json");
   } catch {
-    return {
-      path: abs,
-      fingerprint: fp,
-      ok: false,
-      error: "unreadable/corrupt archive",
-      plaintextPasswordEntries: null,
-      hasPlaintextCredentials: null,
-    };
+    return failReport(abs, fp, "unreadable/corrupt archive");
   }
 
   if (!entry) {
-    return {
-      path: abs,
-      fingerprint: fp,
-      ok: false,
-      error: "snapshot.json missing",
-      plaintextPasswordEntries: null,
-      hasPlaintextCredentials: null,
-    };
+    return failReport(abs, fp, "snapshot.json missing");
   }
 
   let rawText = "";
   try {
     rawText = entry.getData().toString("utf8");
   } catch {
-    return {
-      path: abs,
-      fingerprint: fp,
-      ok: false,
-      error: "snapshot.json unreadable",
-      plaintextPasswordEntries: null,
-      hasPlaintextCredentials: null,
-    };
+    return failReport(abs, fp, "snapshot.json unreadable");
   }
 
-  const snapshot = parseJsonSafe(rawText);
-  if (!snapshot || typeof snapshot !== "object") {
-    return {
-      path: abs,
-      fingerprint: fp,
-      ok: false,
-      error: "snapshot.json invalid",
-      plaintextPasswordEntries: null,
-      hasPlaintextCredentials: null,
-    };
+  const snapshotParsed = parseJsonStrict(rawText);
+  if (!snapshotParsed.ok || !snapshotParsed.value || typeof snapshotParsed.value !== "object") {
+    return failReport(abs, fp, "snapshot.json invalid");
   }
+  const snapshot = snapshotParsed.value;
 
   const vaults = extractVaultsFromSnapshot(snapshot);
-  const client = walkVaultEntries(vaults.clientAccessVault);
-  const staff = walkVaultEntries(vaults.staffAccessVault);
+  if (vaults.parseErrors.length > 0) {
+    return failReport(
+      abs,
+      fp,
+      `vault json invalid: ${[...new Set(vaults.parseErrors)].join(",")}`
+    );
+  }
+
+  const client =
+    vaults.clientAccessVault === undefined
+      ? { total: 0, withPlaintextPassword: 0 }
+      : walkVaultEntries(vaults.clientAccessVault || {});
+  const staff =
+    vaults.staffAccessVault === undefined
+      ? { total: 0, withPlaintextPassword: 0 }
+      : walkVaultEntries(vaults.staffAccessVault || {});
   const users = countUsers(snapshot);
   const plaintextPasswordEntries = client.withPlaintextPassword + staff.withPlaintextPassword;
   return {
@@ -248,15 +204,8 @@ function main() {
   const reports = files.map((file) => {
     try {
       return auditBackup(file);
-    } catch (error) {
-      return {
-        path: path.resolve(file),
-        fingerprint: null,
-        ok: false,
-        error: "unreadable/corrupt archive",
-        plaintextPasswordEntries: null,
-        hasPlaintextCredentials: null,
-      };
+    } catch {
+      return failReport(path.resolve(file), null, "unreadable/corrupt archive");
     }
   });
   const withPlaintext = reports.filter((r) => r.hasPlaintextCredentials === true);
@@ -285,11 +234,21 @@ function main() {
       2
     )
   );
-  // Exit 0 always for audit tool (informational). Callers decide cutover.
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main();
 }
 
-export { auditBackup, extractVaultsFromSnapshot, walkVaultEntries };
+export {
+  auditBackup,
+  extractVaultsFromSnapshot,
+  walkVaultEntries,
+  entryHasPlaintextSecret,
+  isForbiddenCredentialKey,
+  parseVaultJsonStrict,
+  VAULT_SECRET_FIELDS,
+  SAFE_CREDENTIAL_METADATA_KEYS,
+  CLIENT_VAULT_KEY,
+  STAFF_VAULT_KEY,
+};

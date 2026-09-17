@@ -1,6 +1,15 @@
 /** Оперативное хранилище метаданных доступов staff. Без plaintext в новых записях. */
 
-import { getGlobalState, setGlobalState, getPasswordAuthMetaByIds } from "./db.js";
+import {
+  db,
+  setGlobalState,
+  getPasswordAuthMetaByIds,
+  runInTransaction,
+} from "./db.js";
+import {
+  readVaultStateStrict,
+  stripForbiddenCredentialFields,
+} from "./credentialVaultInspector.js";
 
 const VAULT_KEY = "staffAccessVault";
 
@@ -10,19 +19,22 @@ function cleanText(value) {
 
 function stripSecretFields(entry) {
   if (!entry || typeof entry !== "object") return {};
-  const next = { ...entry };
-  delete next.password;
-  delete next.passwordHash;
-  delete next.password_hash;
-  delete next.plainPassword;
-  delete next.temporaryPassword;
-  return next;
+  return stripForbiddenCredentialFields(entry);
+}
+
+function vaultJsonInvalidError() {
+  const err = new Error("staffAccessVault json invalid");
+  err.code = "VAULT_JSON_INVALID";
+  return err;
 }
 
 /** Exact vault from DB (may still contain legacy plaintext until opt-in migration). */
 export function readStaffAccessVaultRaw() {
-  const raw = getGlobalState(VAULT_KEY, {});
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const state = readVaultStateStrict(db, VAULT_KEY);
+  if (!state.parseOk) {
+    throw vaultJsonInvalidError();
+  }
+  const raw = state.vault || {};
   const copy = {};
   for (const [id, entry] of Object.entries(raw)) {
     copy[id] =
@@ -50,30 +62,43 @@ export function writeStaffAccessVault(vault) {
   setGlobalState(VAULT_KEY, vault && typeof vault === "object" ? vault : {});
 }
 
+/**
+ * Atomic read-modify-write of the vault under BEGIN IMMEDIATE.
+ * Prevents lost updates when two writers touch different users.
+ */
+export function mutateStaffAccessVault(mutator) {
+  return runInTransaction(() => {
+    const vault = readStaffAccessVaultRaw();
+    const result = mutator(vault);
+    writeStaffAccessVault(vault);
+    return result;
+  });
+}
+
 export function upsertStaffAccessEntry(userId, patch = {}, actor = {}) {
   const id = cleanText(userId);
   if (!id) return null;
-  const vault = readStaffAccessVaultRaw();
-  const previousRaw =
-    vault[id] && typeof vault[id] === "object" ? vault[id] : {};
-  const previous = stripSecretFields(previousRaw);
-  const next = stripSecretFields({
-    userId: id,
-    login: cleanText(patch.login ?? previous.login),
-    role: cleanText(patch.role ?? previous.role),
-    resetRequired:
-      typeof patch.resetRequired === "boolean"
-        ? patch.resetRequired
-        : Boolean(previous.resetRequired),
-    updatedAt: new Date().toISOString(),
-    updatedBy: cleanText(actor.email || actor.id || previous.updatedBy),
+  return mutateStaffAccessVault((vault) => {
+    const previousRaw =
+      vault[id] && typeof vault[id] === "object" ? vault[id] : {};
+    const previous = stripSecretFields(previousRaw);
+    const next = stripSecretFields({
+      userId: id,
+      login: cleanText(patch.login ?? previous.login),
+      role: cleanText(patch.role ?? previous.role),
+      resetRequired:
+        typeof patch.resetRequired === "boolean"
+          ? patch.resetRequired
+          : Boolean(previous.resetRequired),
+      updatedAt: new Date().toISOString(),
+      updatedBy: cleanText(actor.email || actor.id || previous.updatedBy),
+    });
+    if (!next.login && !next.role) {
+      return previous.login || previous.role ? previous : null;
+    }
+    vault[id] = next;
+    return next;
   });
-  if (!next.login && !next.role) {
-    return previous.login || previous.role ? previous : null;
-  }
-  vault[id] = next;
-  writeStaffAccessVault(vault);
-  return next;
 }
 
 /**
@@ -122,11 +147,11 @@ export function saveStaffAccessCredentials(userId, credentials = {}, actor = {})
 export function removeStaffAccessEntry(userId) {
   const id = cleanText(userId);
   if (!id) return false;
-  const vault = readStaffAccessVaultRaw();
-  if (!Object.prototype.hasOwnProperty.call(vault, id)) return false;
-  delete vault[id];
-  writeStaffAccessVault(vault);
-  return true;
+  return mutateStaffAccessVault((vault) => {
+    if (!Object.prototype.hasOwnProperty.call(vault, id)) return false;
+    delete vault[id];
+    return true;
+  });
 }
 
 /** Дополняет список staff metadata пароля. Никогда не добавляет plaintext/hash. */

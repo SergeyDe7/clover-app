@@ -516,6 +516,7 @@ app.use("/api/public", (req, res, next) => {
   next();
 });
 app.use(express.json({ limit: "24mb" }));
+app.use(credentialNoStoreMiddleware);
 app.use("/uploads/reconciliation", (req, res) => res.status(404).end());
 app.use("/uploads", express.static(uploadsDirectory, { maxAge: "1h" }));
 
@@ -787,6 +788,25 @@ function rememberStaffPassword(user, _password, actor = {}) {
 function setNoStore(res) {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Pragma", "no-cache");
+}
+
+/** Credential surface: auth, passkeys, password set, staff create — success and error paths. */
+function isCredentialNoStorePath(pathname) {
+  const p = String(pathname || "");
+  if (p.startsWith("/api/auth/")) return true;
+  if (p.startsWith("/api/passkeys")) return true;
+  if (p === "/api/admin/managers") return true;
+  if (p === "/api/admin/staff") return true;
+  if (p.startsWith("/api/admin/client-access")) return true;
+  if (/\/password\/?$/.test(p)) return true;
+  return false;
+}
+
+function credentialNoStoreMiddleware(req, res, next) {
+  if (isCredentialNoStorePath(req.path)) {
+    setNoStore(res);
+  }
+  next();
 }
 
 function cleanText(value) {
@@ -2185,6 +2205,7 @@ app.post("/api/auth/register", async (req, res, next) => {
       sourceId: user.id,
     });
 
+    setNoStore(res);
     res.status(201).json({
       ok: true,
       requiresEmailVerification: true,
@@ -2248,6 +2269,7 @@ app.post("/api/auth/resend-verification", async (req, res, next) => {
       try { await sendCloverMail({ to: email, ...message }); } catch (error) { console.error(error); }
       if (allowDevelopmentAuthLinks(req)) developmentLink = verifyUrl;
     }
+    setNoStore(res);
     res.json({
       ok: true,
       message: "Если аккаунт существует и почта ещё не подтверждена, новое письмо отправлено.",
@@ -2281,6 +2303,7 @@ app.post("/api/auth/forgot-password", async (req, res, next) => {
         action: "auth.password.reset.request", details: {},
       });
     }
+    setNoStore(res);
     res.json({
       ok: true,
       message: "Если аккаунт существует, на его почту отправлена ссылка для восстановления пароля.",
@@ -2405,6 +2428,7 @@ app.post("/api/auth/change-password", authRequired, async (req, res, next) => {
 app.post("/api/auth/logout-other-sessions", authRequired, (req, res) => {
   const updatedUser = revokeOtherSessions(req.user.id);
   auditFromRequest(req, "auth.sessions.revoke_other", {});
+  setNoStore(res);
   res.json({
     ok: true,
     message: "Другие сессии завершены.",
@@ -2885,6 +2909,7 @@ app.post("/api/passkeys/authentication/verify", async (req, res, next) => {
       action: "auth.login.passkey",
       details: { credentialId: credential.id, mode: email ? "account" : "discoverable" },
     });
+    setNoStore(res);
     res.json({ token: signToken(user), user: publicUser(user) });
   } catch (error) {
     next(error);

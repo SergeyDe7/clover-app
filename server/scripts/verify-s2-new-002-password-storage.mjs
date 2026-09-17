@@ -283,9 +283,13 @@ async function main() {
     const managerToken = await login(base, "s2n2-manager@test.local");
     const clientToken = await login(base, "s2n2-client@test.local");
     const restrictedToken = await login(base, "s2n2-restricted@test.local");
-    note("login.roles", true, "admin/manager/client/restricted");
+    note(
+      "login.roles",
+      Boolean(adminToken && managerToken && clientToken && restrictedToken),
+      "admin/manager/client/restricted tokens issued"
+    );
 
-    // Registration stores hash only
+    // Registration stores hash only + no-store
     const regPass = "RegOnlyHash!1";
     const reg = await api(base, "/api/auth/register", {
       method: "POST",
@@ -298,6 +302,51 @@ async function main() {
       },
     });
     note("register.created", reg.status === 201, `status=${reg.status}`);
+    note(
+      "register.no-store",
+      String(reg.headers.get("cache-control") || "").includes("no-store"),
+      String(reg.headers.get("cache-control") || "")
+    );
+
+    const verifyBad = await api(base, "/api/auth/verify-email", {
+      method: "POST",
+      body: { token: "invalid-token" },
+    });
+    note(
+      "verify-email.error.no-store",
+      String(verifyBad.headers.get("cache-control") || "").includes("no-store"),
+      `status=${verifyBad.status} cache=${verifyBad.headers.get("cache-control")}`
+    );
+
+    const loginBad = await api(base, "/api/auth/login", {
+      method: "POST",
+      body: { email: "nobody@test.local", password: "WrongPass!1" },
+    });
+    note(
+      "login.error.no-store",
+      String(loginBad.headers.get("cache-control") || "").includes("no-store"),
+      `status=${loginBad.status} cache=${loginBad.headers.get("cache-control")}`
+    );
+
+    const passkeyOpts = await api(base, "/api/passkeys/authentication/options", {
+      method: "POST",
+      body: {},
+    });
+    note(
+      "passkey.auth-options.no-store",
+      String(passkeyOpts.headers.get("cache-control") || "").includes("no-store"),
+      `status=${passkeyOpts.status} cache=${passkeyOpts.headers.get("cache-control")}`
+    );
+    const passkeyRegOpts = await api(base, "/api/passkeys/registration/options", {
+      method: "POST",
+      token: managerToken,
+      body: {},
+    });
+    note(
+      "passkey.reg-options.no-store",
+      String(passkeyRegOpts.headers.get("cache-control") || "").includes("no-store"),
+      `status=${passkeyRegOpts.status} cache=${passkeyRegOpts.headers.get("cache-control")}`
+    );
     {
       const db = openDb();
       const counts = inspectPlaintextPasswordVaultCounts(db);
@@ -403,7 +452,36 @@ async function main() {
     });
     note("manager.new-password-works", managerNewLogin.status === 200, `status=${managerNewLogin.status}`);
 
-    // Cross-user: manager cannot set admin password without rights — already covered by assertCanSetStaffPassword
+    // Legacy JWT without sessionEpoch must not bypass revocation after password change.
+    {
+      const jwt = require("jsonwebtoken");
+      const legacy = jwt.sign(
+        { sub: ids.managerId, role: "manager" },
+        jwtSecret,
+        { issuer: "clover-server", audience: "clover-app", expiresIn: "1h" }
+      );
+      const legacyBoot = await api(base, "/api/bootstrap", { token: legacy });
+      note(
+        "legacy-jwt-no-epoch-revoked",
+        legacyBoot.status === 401,
+        `status=${legacyBoot.status}`
+      );
+    }
+
+    // Staff set-password no-store
+    note(
+      "admin.staff-password.no-store",
+      String(adminSet.headers.get("cache-control") || "").includes("no-store"),
+      String(adminSet.headers.get("cache-control") || "")
+    );
+    note(
+      "client.set-password.no-store",
+      String(setClient.headers.get("cache-control") || "").includes("no-store"),
+      String(setClient.headers.get("cache-control") || "")
+    );
+
+    // Cross-user: only admin can manage staff passwords (actorCanManageStaff).
+    // Full manager still denied when targeting admin.
     const cross = await api(base, `/api/admin/staff/${ids.adminId}/password`, {
       method: "POST",
       token: managerNewLogin.json.token,
@@ -411,17 +489,14 @@ async function main() {
     });
     note(
       "cross-user.staff-password",
-      cross.status === 403 || cross.status === 200,
-      `status=${cross.status} (admin may allow manageStaff)`
+      cross.status === 403,
+      `status=${cross.status}`
     );
-    // Manager with full permissions might manage staff — if 200, admin old password must fail and sessions revoked.
-    if (cross.status === 200) {
-      const adminRelogin = await api(base, "/api/auth/login", {
-        method: "POST",
-        body: { email: "s2n2-admin@test.local", password: "CrossHack!1" },
-      });
-      note("cross-user.admin-new-works", adminRelogin.status === 200, `status=${adminRelogin.status}`);
-    }
+    const adminStill = await api(base, "/api/auth/login", {
+      method: "POST",
+      body: { email: "s2n2-admin@test.local", password },
+    });
+    note("login.admin-unchanged", adminStill.status === 200, `status=${adminStill.status}`);
 
     // Bootstrap / export hygiene
     const boot = await api(base, "/api/bootstrap", { token: adminToken });
@@ -466,7 +541,7 @@ async function main() {
     );
     note(
       "backup.no-plaintext-values",
-      !/LegacyPlain!9|LegacyStaff!9|ClientNewPass!2|ManagerNewPass!2/.test(snapText),
+      !/LegacyPlain!9|LegacyStaff!9|ClientNewPass!2|ManagerNewPass!2|CrossHack!1/.test(snapText),
       "no known plaintext secrets"
     );
     // Structural: vault password fields absent in app_state vaults
@@ -478,7 +553,13 @@ async function main() {
         if (row?.key !== "clientAccessVault" && row?.key !== "staffAccessVault") continue;
         const vault = typeof row.value_json === "string" ? JSON.parse(row.value_json) : row.value_json;
         for (const entry of Object.values(vault || {})) {
-          if (entry && typeof entry === "object" && String(entry.password || "").trim()) {
+          if (
+            entry &&
+            typeof entry === "object" &&
+            ["password", "plainPassword", "temporaryPassword", "passwordHash", "password_hash"].some(
+              (k) => String(entry[k] || "").trim()
+            )
+          ) {
             vaultPasswordFields += 1;
           }
         }
@@ -493,11 +574,147 @@ async function main() {
     );
 
     // Login still works after backup artifact created
-    const adminStill = await api(base, "/api/auth/login", {
+    const adminAfterBackup = await api(base, "/api/auth/login", {
       method: "POST",
       body: { email: "s2n2-admin@test.local", password },
     });
-    note("login.after-backup", adminStill.status === 200 || adminStill.status === 401, `status=${adminStill.status}`);
+    note("login.after-backup", adminAfterBackup.status === 200, `status=${adminAfterBackup.status}`);
+
+    // Audit tool: corrupt vault JSON must NOT be false-clean + recursive forbidden fields
+    {
+      const { auditBackup } = await import("../scripts/audit-backup-plaintext-passwords.mjs");
+      const corruptVaultZip = path.join(temp, "corrupt-vault.zip");
+      const bad = new AdmZip();
+      bad.addFile(
+        "snapshot.json",
+        Buffer.from(
+          JSON.stringify({
+            version: 5,
+            users: [],
+            appState: [{ key: "clientAccessVault", value_json: "{not-valid-json" }],
+          })
+        )
+      );
+      bad.writeZip(corruptVaultZip);
+      const auditCorrupt = auditBackup(corruptVaultZip);
+      note(
+        "audit.corrupt-vault-not-clean",
+        auditCorrupt.ok === false && auditCorrupt.hasPlaintextCredentials === null,
+        `ok=${auditCorrupt.ok} has=${auditCorrupt.hasPlaintextCredentials} err=${auditCorrupt.error}`
+      );
+
+      const forbiddenFields = [
+        "password",
+        "Password",
+        "plainPassword",
+        "plaintextPassword",
+        "temporaryPassword",
+        "currentPassword",
+        "newPassword",
+        "passphrase",
+        "credential",
+        "secret",
+        "token",
+        "passwordHash",
+        "password_hash",
+      ];
+      for (const field of forbiddenFields) {
+        const zipPathField = path.join(temp, `field-${field}.zip`);
+        const z = new AdmZip();
+        z.addFile(
+          "snapshot.json",
+          Buffer.from(
+            JSON.stringify({
+              version: 5,
+              users: [],
+              appState: [
+                {
+                  key: "clientAccessVault",
+                  value_json: JSON.stringify({
+                    id1: { login: "a@test.local", [field]: "ShouldCount!1", companyName: "X" },
+                  }),
+                },
+              ],
+            })
+          )
+        );
+        z.writeZip(zipPathField);
+        const audited = auditBackup(zipPathField);
+        note(
+          `audit.forbidden.${field}`,
+          audited.ok === true && audited.hasPlaintextCredentials === true,
+          `ok=${audited.ok} has=${audited.hasPlaintextCredentials}`
+        );
+      }
+
+      const nestedZip = path.join(temp, "nested-secret.zip");
+      const nz = new AdmZip();
+      nz.addFile(
+        "snapshot.json",
+        Buffer.from(
+          JSON.stringify({
+            version: 5,
+            users: [],
+            appState: [
+              {
+                key: "staffAccessVault",
+                value_json: JSON.stringify({
+                  s1: { login: "m@test.local", nested: { items: [{ token: "t" }] } },
+                }),
+              },
+            ],
+          })
+        )
+      );
+      nz.writeZip(nestedZip);
+      const auditNested = auditBackup(nestedZip);
+      note(
+        "audit.nested-token-detected",
+        auditNested.ok === true && auditNested.hasPlaintextCredentials === true,
+        `ok=${auditNested.ok} has=${auditNested.hasPlaintextCredentials}`
+      );
+
+      const safeZip = path.join(temp, "safe-meta.zip");
+      const sz = new AdmZip();
+      sz.addFile(
+        "snapshot.json",
+        Buffer.from(
+          JSON.stringify({
+            version: 5,
+            users: [{ id: "u1", password_hash: "$2a$04$abcdefghijklmnopqrstuv" }],
+            appState: [
+              {
+                key: "clientAccessVault",
+                value_json: JSON.stringify({
+                  id1: {
+                    login: "a@test.local",
+                    hasPassword: true,
+                    passwordUpdatedAt: "2026-01-01T00:00:00.000Z",
+                    passwordChangedAt: "2026-01-01T00:00:00.000Z",
+                    resetRequired: false,
+                    companyName: "Safe",
+                  },
+                }),
+              },
+            ],
+          })
+        )
+      );
+      sz.writeZip(safeZip);
+      const auditSafe = auditBackup(safeZip);
+      note(
+        "audit.safe-metadata-clean",
+        auditSafe.ok === true && auditSafe.hasPlaintextCredentials === false,
+        `ok=${auditSafe.ok} has=${auditSafe.hasPlaintextCredentials}`
+      );
+
+      const cleanAudit = auditBackup(zipPath);
+      note(
+        "audit.clean-backup",
+        cleanAudit.ok === true && cleanAudit.hasPlaintextCredentials === false,
+        `ok=${cleanAudit.ok} has=${cleanAudit.hasPlaintextCredentials}`
+      );
+    }
 
     note("db.plaintext-zero", vaultHasPlaintextPassword() === 0, `count=${vaultHasPlaintextPassword()}`);
 
@@ -507,7 +724,7 @@ async function main() {
       token: managerNewLogin.json.token,
       body: { password: "EscalationPass!1", role: "admin", permissions: { fullAccess: true } },
     });
-    note("body.role-ignored", escalate.status === 200 || escalate.status === 400 || escalate.status === 403, `status=${escalate.status}`);
+    note("body.role-ignored", escalate.status === 200, `status=${escalate.status}`);
     {
       const db = openDb();
       const role = db.prepare("SELECT role FROM users WHERE id = ?").get(ids.clientId)?.role;
