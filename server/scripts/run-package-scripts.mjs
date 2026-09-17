@@ -25,6 +25,8 @@ const CHECK_FILES = [
   "src/staffBootstrap.js",
   "src/staffNotifications.js",
   "src/staffPermissionsMigrate.js",
+  "src/passwordHash.js",
+  "src/passwordVaultMigrate.js",
   "scripts/verify-staff-notifications.mjs",
   "src/clientSettings.js",
   "src/staffAccessVault.js",
@@ -71,6 +73,8 @@ const CHECK_FILES = [
   "scripts/prove-s2-pkg2-base-fail.mjs",
   "scripts/verify-s2-pkg2-permissions-migrate-backups.mjs",
   "scripts/verify-legacy-staff-permissions-migrate.mjs",
+  "scripts/verify-s2-new-002-migration.mjs",
+  "scripts/verify-s2-new-002-password-storage.mjs",
   "scripts/verify-ui-build-tag.mjs",
 ];
 
