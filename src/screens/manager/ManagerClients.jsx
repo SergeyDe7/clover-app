@@ -44,6 +44,9 @@ import {
 } from "./matrixIds";
 import { downloadClientMatrixExcel } from "../../shared/matrixExcelImport";
 import {
+  buildClientLinkSavePayload,
+  buildClientPriceTypeSelectionIntent,
+  mergeManualPriceIntentIds,
   mergeProductsFromCatalogResponse,
   mergeSavedClientLinkResponse,
 } from "./matrixMembership";
@@ -1405,13 +1408,17 @@ export function ManagerClients({
 
     try {
       setClientLinks(nextLinks);
-      const manualPriceConfigClientIds =
-        manualPriceConfigClientIdsRef.current.has(String(clientId))
-          ? [clientId]
-          : [];
+      const savePayload = buildClientLinkSavePayload(
+        clientId,
+        nextLink,
+        manualPriceConfigClientIdsRef.current
+      );
       const saved = await api.saveClientLinks(
-        { [clientId]: nextLink },
-        { manualPriceConfigClientIds }
+        savePayload.clientLinks,
+        {
+          manualPriceConfigClientIds:
+            savePayload.manualPriceConfigClientIds,
+        }
       );
       if (saved?.clientLinks && typeof saved.clientLinks === "object") {
         // Берём authoritative ответ только текущего клиента. Полный server
@@ -2253,29 +2260,22 @@ export function ManagerClients({
                           }<select
                             value={link.oneCPriceTypeId || ""}
                             onChange={(event) => {
-                              const nextId = event.target.value;
-                              const selected = (oneCPriceTypes || []).find(
-                                (item) => String(item.id) === String(nextId)
+                              const priceTypeChange =
+                                buildClientPriceTypeSelectionIntent({
+                                  clientId: client.id,
+                                  link,
+                                  nextPriceTypeId: event.target.value,
+                                  oneCPriceTypes,
+                                });
+                              manualPriceConfigClientIdsRef.current =
+                                mergeManualPriceIntentIds(
+                                  manualPriceConfigClientIdsRef.current,
+                                  priceTypeChange.manualPriceConfigClientIds
+                                );
+                              updateLink(
+                                client.id,
+                                priceTypeChange.patch
                               );
-                              const keepMarkup =
-                                link.defaultPricingMode === "purchase_markup" ||
-                                Number(link.defaultMarkupPercent) > 0;
-                              manualPriceConfigClientIdsRef.current.add(
-                                String(client.id)
-                              );
-                              updateLink(client.id, {
-                                oneCPriceTypeId: nextId,
-                                oneCPriceTypeName: selected?.name || "",
-                                defaultPricingMode: nextId
-                                  ? keepMarkup
-                                    ? "purchase_markup"
-                                    : "one_c_price_type"
-                                  : keepMarkup
-                                    ? "purchase_markup"
-                                    : link.defaultPricingMode === "one_c_price_type"
-                                      ? "base"
-                                      : link.defaultPricingMode || "base",
-                              });
                             }}
                           >
                             <option value="">{t("manager.notSet")}</option>

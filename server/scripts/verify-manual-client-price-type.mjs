@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   autoLinkCloverClients,
+  clientPriceTypeSource,
   mergeClientLinksPreservingOneCLinks,
 } from "../src/oneCClients.js";
 import { buildSalePriceRequirements } from "../src/oneCSalePrices.js";
@@ -225,6 +226,14 @@ const legacyUnknown = {
   oneCPriceTypeName: typeA.priceTypeName,
   defaultPricingMode: "one_c_price_type",
 };
+const assertLegacyUnknownClassification = (classifier) => {
+  assert.equal(
+    classifier(legacyUnknown),
+    "legacy_unknown",
+    "Непустая legacy-запись без provenance обязана классифицироваться как legacy_unknown."
+  );
+};
+assertLegacyUnknownClassification(clientPriceTypeSource);
 const legacyAfter = autoLinkCloverClients(
   [cloverClient],
   { [cloverClient.id]: legacyUnknown },
@@ -233,6 +242,7 @@ const legacyAfter = autoLinkCloverClients(
 ).clientLinks[cloverClient.id];
 assert.equal(legacyAfter.oneCPriceTypeId, typeA.priceTypeId);
 assert.equal(legacyAfter.oneCPriceTypeSource, undefined);
+assert.equal(clientPriceTypeSource(legacyAfter), "legacy_unknown");
 
 const legacyMinimal = {
   oneCId: typeA.id,
@@ -255,6 +265,72 @@ assert.equal(legacyRoundTrip.managerNote, "Unrelated legacy edit");
 assert.equal(legacyRoundTrip.oneCPriceTypeId, typeA.priceTypeId);
 assert.equal(legacyRoundTrip.oneCPriceTypeSource, undefined);
 assert.equal(legacyRoundTrip.defaultPricingMode, undefined);
+assert.equal(clientPriceTypeSource(legacyRoundTrip), "legacy_unknown");
+
+const legacyManualChange = mergeClientLinksPreservingOneCLinks(
+  {
+    [cloverClient.id]: {
+      oneCPriceTypeId: typeC.priceTypeId,
+      oneCPriceTypeName: typeC.priceTypeName,
+      defaultPricingMode: "one_c_price_type",
+    },
+  },
+  { [cloverClient.id]: legacyUnknown },
+  { manualPriceConfigClientIds: [cloverClient.id] }
+)[cloverClient.id];
+assert.equal(legacyManualChange.oneCPriceTypeId, typeC.priceTypeId);
+assert.equal(legacyManualChange.oneCPriceTypeSource, "manual");
+assert.equal(clientPriceTypeSource(legacyManualChange), "manual");
+
+const emptyLegacyLink = {
+  oneCId: typeB.id,
+  oneCPriceTypeId: "",
+  oneCPriceTypeName: "",
+};
+assert.equal(clientPriceTypeSource(emptyLegacyLink), "");
+const emptyLegacyAfterAuto = autoLinkCloverClients(
+  [cloverClient],
+  { [cloverClient.id]: emptyLegacyLink },
+  [typeB],
+  firstSyncAt
+).clientLinks[cloverClient.id];
+assert.equal(emptyLegacyAfterAuto.oneCPriceTypeId, typeB.priceTypeId);
+assert.equal(emptyLegacyAfterAuto.oneCPriceTypeSource, "one_c_auto");
+assert.equal(clientPriceTypeSource(emptyLegacyAfterAuto), "one_c_auto");
+
+const classifierMutationDirectory = mkdtempSync(
+  path.join(tmpdir(), "clover-legacy-classifier-mutant-")
+);
+const oneCClientsSource = readFileSync(
+  path.join(serverRoot, "src", "oneCClients.js"),
+  "utf8"
+);
+const legacyFallbackSource =
+  'return cleanPriceTypeId(link.oneCPriceTypeId) ? "legacy_unknown" : "";';
+assert.ok(oneCClientsSource.includes(legacyFallbackSource));
+const mutatedClassifierSource = oneCClientsSource.replace(
+  legacyFallbackSource,
+  'return cleanPriceTypeId(link.oneCPriceTypeId) ? "manual" : "";'
+);
+const mutatedClassifierPath = path.join(
+  classifierMutationDirectory,
+  "oneCClients-mutated.mjs"
+);
+writeFileSync(mutatedClassifierPath, mutatedClassifierSource);
+const mutatedClassifierModule = await import(
+  `${pathToFileURL(mutatedClassifierPath).href}?mutation=${Date.now()}`
+);
+assert.equal(
+  mutatedClassifierModule.clientPriceTypeSource(legacyUnknown),
+  "manual"
+);
+assert.throws(
+  () =>
+    assertLegacyUnknownClassification(
+      mutatedClassifierModule.clientPriceTypeSource
+    ),
+  /legacy_unknown/
+);
 
 // A stale UI snapshot cannot revert an auto value without explicit price intent.
 const staleSnapshot = mergeClientLinksPreservingOneCLinks(
