@@ -1,5 +1,44 @@
 import { uniqueMatrixProductIds } from "./matrixIds.js";
-import { normalizeProduct } from "../../shared/appHelpers.js";
+import { EMPTY_LINK, normalizeProduct } from "../../shared/appHelpers.js";
+
+/**
+ * Применяет authoritative ответ только к сохранённому клиенту.
+ * Полный server snapshot не должен затирать dirty-состояние соседних клиентов.
+ */
+export function mergeSavedClientLinkResponse(
+  currentLinks,
+  clientId,
+  savedLinks,
+  fallbackLink
+) {
+  const current =
+    currentLinks && typeof currentLinks === "object" ? currentLinks : {};
+  const saved =
+    savedLinks && typeof savedLinks === "object" ? savedLinks : {};
+  const savedLink =
+    saved[clientId] && typeof saved[clientId] === "object"
+      ? saved[clientId]
+      : null;
+
+  return {
+    ...current,
+    [clientId]: savedLink
+      ? {
+          ...EMPTY_LINK,
+          ...savedLink,
+          matrixProductIds: Array.isArray(savedLink.matrixProductIds)
+            ? savedLink.matrixProductIds
+            : [],
+        }
+      : {
+          ...EMPTY_LINK,
+          ...(current[clientId] || {}),
+          ...(fallbackLink && typeof fallbackLink === "object"
+            ? fallbackLink
+            : {}),
+        },
+  };
+}
 
 /** Состав матрицы клиента: id товаров и oneCId, которые уже в матрице. */
 export function getClientMatrixMembership(link, products) {

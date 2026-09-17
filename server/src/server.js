@@ -5426,7 +5426,7 @@ app.put(
               .filter((id) => id && incomingClientIds.has(id))
           ),
         ].slice(0, 500)
-      : null;
+      : [];
     const clientLinks = runInTransaction(() => {
       const storedLinks = getGlobalState("clientLinks", {});
       const mergedLinks = mergeClientLinksPreservingOneCLinks(
@@ -5627,7 +5627,8 @@ app.post(
         const storedLinks = getGlobalState("clientLinks", {});
         const clientLinks = mergeClientLinksPreservingOneCLinks(
           req.body.clientLinks,
-          storedLinks
+          storedLinks,
+          { manualPriceConfigClientIds: [] }
         );
         setGlobalState("clientLinks", clientLinks);
       }

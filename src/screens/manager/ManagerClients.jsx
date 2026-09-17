@@ -43,7 +43,10 @@ import {
   uniqueMatrixProductIds,
 } from "./matrixIds";
 import { downloadClientMatrixExcel } from "../../shared/matrixExcelImport";
-import { mergeProductsFromCatalogResponse } from "./matrixMembership";
+import {
+  mergeProductsFromCatalogResponse,
+  mergeSavedClientLinkResponse,
+} from "./matrixMembership";
 
 /** Цена из вида цен 1С (категория клиента), с масштабом от шт. */
 function typedSalePriceForUnit(product, priceTypeId, unit) {
@@ -1411,26 +1414,17 @@ export function ManagerClients({
         { manualPriceConfigClientIds }
       );
       if (saved?.clientLinks && typeof saved.clientLinks === "object") {
-        // Берём сохранённую матрицу клиента целиком — иначе bootstrap/merge
-        // может вернуть устаревший полный словарь со старыми id.
+        // Берём authoritative ответ только текущего клиента. Полный server
+        // snapshot не должен затирать dirty-состояние соседних клиентов.
         const savedLink = saved.clientLinks[clientId];
-        setClientLinks((current) => ({
-          ...current,
-          ...(saved.clientLinks || {}),
-          [clientId]: savedLink
-            ? {
-                ...EMPTY_LINK,
-                ...savedLink,
-                matrixProductIds: Array.isArray(savedLink.matrixProductIds)
-                  ? savedLink.matrixProductIds
-                  : [],
-              }
-            : {
-                ...EMPTY_LINK,
-                ...(current[clientId] || {}),
-                ...nextLink,
-              },
-        }));
+        setClientLinks((current) =>
+          mergeSavedClientLinkResponse(
+            current,
+            clientId,
+            saved.clientLinks,
+            nextLink
+          )
+        );
         const savedIds = savedLink?.matrixProductIds;
         setMatrixListSnapshot((current) => ({
           ...current,

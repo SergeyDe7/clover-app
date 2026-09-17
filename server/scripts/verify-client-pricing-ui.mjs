@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFrontendUiSource } from "./readFrontendUiSource.mjs";
+import { mergeSavedClientLinkResponse } from "../../src/screens/manager/matrixMembership.js";
 
 const source = readFrontendUiSource();
 
@@ -62,9 +63,46 @@ assert.ok(
   source.includes("{ [clientId]: nextLink }") &&
     source.includes("{ manualPriceConfigClientIds }") &&
     source.includes("manualPriceConfigClientIdsRef.current.add") &&
-    source.includes("saveClientMatrix(client.id, link)"),
+    source.includes("saveClientMatrix(client.id, link)") &&
+    source.includes("mergeSavedClientLinkResponse") &&
+    !source.includes("...(saved.clientLinks || {})"),
   "Матрица должна сохранять только текущего клиента и явно отмечать ручную ценовую настройку."
 );
+
+const dirtyClientA = {
+  managerNote: "A unsaved",
+  oneCPriceTypeId: "type-a-local",
+};
+const currentLinks = {
+  a: dirtyClientA,
+  b: { managerNote: "B local" },
+};
+const reconciled = mergeSavedClientLinkResponse(
+  currentLinks,
+  "b",
+  {
+    a: { managerNote: "A stale from DB", oneCPriceTypeId: "type-a-stale" },
+    b: { managerNote: "B saved", matrixProductIds: ["p1"] },
+  },
+  currentLinks.b
+);
+assert.strictEqual(
+  reconciled.a,
+  dirtyClientA,
+  "Сохранение B не должно заменять dirty-состояние A полным server snapshot."
+);
+assert.equal(reconciled.b.managerNote, "B saved");
+assert.deepEqual(reconciled.b.matrixProductIds, ["p1"]);
+
+const missingSavedClient = mergeSavedClientLinkResponse(
+  currentLinks,
+  "b",
+  { a: { managerNote: "A stale from DB" } },
+  { managerNote: "B fallback", matrixProductIds: ["p2"] }
+);
+assert.strictEqual(missingSavedClient.a, dirtyClientA);
+assert.equal(missingSavedClient.b.managerNote, "B fallback");
+assert.deepEqual(missingSavedClient.b.matrixProductIds, ["p2"]);
 
 assert.ok(
   !source.includes("scheduleSync(() => api.saveClientLinks(clientLinks))"),

@@ -444,13 +444,12 @@ function comparablePricingMode(value) {
 export function mergeClientLinksPreservingOneCLinks(
   incomingLinks,
   storedLinks,
-  { manualPriceConfigClientIds = null } = {}
+  { manualPriceConfigClientIds = [] } = {}
 ) {
   const incoming = incomingLinks && typeof incomingLinks === "object" ? incomingLinks : {};
   const stored = storedLinks && typeof storedLinks === "object" ? storedLinks : {};
-  const hasManualIntentProtocol = Array.isArray(manualPriceConfigClientIds);
   const manualIntentIds = new Set(
-    (hasManualIntentProtocol ? manualPriceConfigClientIds : [])
+    (Array.isArray(manualPriceConfigClientIds) ? manualPriceConfigClientIds : [])
       .map((id) => cleanText(id))
       .filter(Boolean)
   );
@@ -481,7 +480,6 @@ export function mergeClientLinksPreservingOneCLinks(
         ([field]) =>
           !SERVER_OWNED_PRICE_TYPE_FIELDS.has(field) &&
           !(
-            hasManualIntentProtocol &&
             !hasManualPriceIntent &&
             MANUAL_PRICE_CONFIG_FIELDS.has(field)
           )
@@ -532,7 +530,7 @@ export function mergeClientLinksPreservingOneCLinks(
           Number(previous.defaultMarkupPercent || 0));
     if (
       manualPriceConfigChanged &&
-      (!hasManualIntentProtocol || hasManualPriceIntent)
+      hasManualPriceIntent
     ) {
       next.oneCPriceTypeSource = ONE_C_PRICE_TYPE_SOURCE_MANUAL;
     }
