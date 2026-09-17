@@ -59,9 +59,11 @@ assert.ok(
 );
 
 assert.ok(
-  source.includes("await api.saveClientLinks(nextLinks)") &&
+  source.includes("{ [clientId]: nextLink }") &&
+    source.includes("{ manualPriceConfigClientIds }") &&
+    source.includes("manualPriceConfigClientIdsRef.current.add") &&
     source.includes("saveClientMatrix(client.id, link)"),
-  "Матрица должна иметь явную кнопку сохранения на сервер."
+  "Матрица должна сохранять только текущего клиента и явно отмечать ручную ценовую настройку."
 );
 
 assert.ok(
