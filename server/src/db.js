@@ -12,6 +12,8 @@ import {
   isClientOrderDeletableByOmission,
   isClientOrderMutable,
 } from "./orderClientEdit.js";
+import { emptyStaffPermissionsPayload, staffPermissionsPayload } from "./roles.js";
+import { maybeApplyLegacyManagerPermissionsMigration } from "./staffPermissionsMigrate.js";
 
 /**
  * Test-only hooks for S2-NEW-001 concurrency verifiers.
@@ -889,6 +891,7 @@ ensureColumn("users", "password_changed_at", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("users", "last_login_at", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("users", "disabled_at", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("users", "permissions_json", "TEXT NOT NULL DEFAULT '{}'");
+maybeApplyLegacyManagerPermissionsMigration(db);
 
 /** Discoverable Face ID: challenge может быть без user_id (пустая строка) — FK мешает. */
 function relaxWebAuthnChallengeUserFk() {
@@ -1188,9 +1191,10 @@ export function createUser({
     db.prepare(`
       INSERT INTO users(
         id, email, password_hash, role, created_at,
-        email_verified, approval_status, password_changed_at, last_login_at
+        email_verified, approval_status, password_changed_at, last_login_at,
+        permissions_json
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, '', '')
+      VALUES (?, ?, ?, ?, ?, ?, ?, '', '', ?)
     `).run(
       id,
       email.toLowerCase(),
@@ -1198,7 +1202,10 @@ export function createUser({
       role,
       createdAt,
       emailVerified ? 1 : 0,
-      approvalStatus
+      approvalStatus,
+      role === "manager"
+        ? JSON.stringify(emptyStaffPermissionsPayload())
+        : "{}"
     );
 
     if (role === "client") {
@@ -1799,8 +1806,9 @@ export function setStaffDisabled(userId, disabled) {
 }
 
 export function setStaffPermissions(userId, permissions) {
-  const payload =
-    permissions && typeof permissions === "object" ? permissions : {};
+  const payload = staffPermissionsPayload(
+    permissions && typeof permissions === "object" ? permissions : {}
+  );
   db.prepare(`
     UPDATE users
     SET permissions_json = ?
@@ -2085,6 +2093,12 @@ export function createManagerNotification({
   };
 }
 
+export function getManagerNotification(id) {
+  return managerNotificationRow(
+    db.prepare(`SELECT * FROM manager_notifications WHERE id = ?`).get(String(id || ""))
+  );
+}
+
 export function listManagerNotifications({ unreadOnly = false, limit = 100 } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 500);
   const rows = unreadOnly
@@ -2162,6 +2176,19 @@ export function markAllManagerNotificationsRead() {
     SET read_at = ?
     WHERE read_at = ''
   `).run(readAt);
+  return { changed: Number(result.changes || 0), readAt };
+}
+
+export function markManagerNotificationsReadByIds(ids) {
+  const readAt = now();
+  const unique = [...new Set((Array.isArray(ids) ? ids : []).map((id) => String(id || "").trim()).filter(Boolean))];
+  if (!unique.length) return { changed: 0, readAt };
+  const placeholders = unique.map(() => "?").join(", ");
+  const result = db.prepare(`
+    UPDATE manager_notifications
+    SET read_at = ?
+    WHERE read_at = '' AND id IN (${placeholders})
+  `).run(readAt, ...unique);
   return { changed: Number(result.changes || 0), readAt };
 }
 

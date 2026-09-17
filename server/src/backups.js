@@ -1,9 +1,16 @@
 import {
   chmodSync,
+  closeSync,
+  constants as fsConstants,
+  createReadStream,
   existsSync,
+  fstatSync,
+  lstatSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   unlinkSync,
@@ -52,6 +59,25 @@ function ensureSecureFile(filePath) {
 
 ensureSecureDir(backupDirectory);
 mkdirSync(uploadsDirectory, { recursive: true });
+
+function canonicalBackupDirectory() {
+  try {
+    return realpathSync.native(backupDirectory);
+  } catch {
+    try {
+      return realpathSync(backupDirectory);
+    } catch {
+      return path.resolve(backupDirectory);
+    }
+  }
+}
+
+const CANONICAL_BACKUP_DIR = canonicalBackupDirectory();
+
+function isInsideBackupDir(resolvedPath) {
+  const resolved = path.resolve(resolvedPath);
+  return resolved === CANONICAL_BACKUP_DIR || resolved.startsWith(CANONICAL_BACKUP_DIR + path.sep);
+}
 function cleanLabel(value) {
   const result = String(value || "manual")
     .trim()
@@ -72,19 +98,129 @@ function isBackupName(fileName) {
   return fileName.endsWith(".zip") || fileName.endsWith(".json");
 }
 
-export function resolveBackupPath(fileName) {
-  const safeName = path.basename(String(fileName || ""));
+function backupPathError(message, status = 400, code = "BACKUP_PATH_INVALID") {
+  const error = new Error(message);
+  error.status = status;
+  error.code = code;
+  return error;
+}
 
-  if (!isBackupName(safeName)) {
-    throw new Error("Некорректное имя резервной копии.");
+export function resolveBackupPath(fileName) {
+  const raw = String(fileName || "");
+  if (!raw || raw.includes("\0") || raw.includes("..") || raw.includes("/") || raw.includes("\\")) {
+    throw backupPathError("Некорректный путь резервной копии.");
+  }
+  const safeName = path.basename(raw);
+
+  if (safeName !== raw || !isBackupName(safeName)) {
+    throw backupPathError("Некорректное имя резервной копии.");
   }
 
-  const resolved = path.resolve(backupDirectory, safeName);
-  if (!resolved.startsWith(backupDirectory + path.sep)) {
-    throw new Error("Некорректный путь резервной копии.");
+  const resolved = path.resolve(CANONICAL_BACKUP_DIR, safeName);
+  if (!isInsideBackupDir(resolved)) {
+    throw backupPathError("Некорректный путь резервной копии.");
   }
 
   return resolved;
+}
+
+function openBackupFd(fileName) {
+  const filePath = resolveBackupPath(fileName);
+  let lst;
+  try {
+    lst = lstatSync(filePath);
+  } catch {
+    throw backupPathError("Резервная копия не найдена.", 404, "BACKUP_NOT_FOUND");
+  }
+  if (lst.isSymbolicLink()) {
+    throw backupPathError("Некорректный путь резервной копии.", 400, "BACKUP_SYMLINK");
+  }
+  if (!lst.isFile()) {
+    throw backupPathError("Некорректный путь резервной копии.");
+  }
+
+  const flags =
+    fsConstants.O_RDONLY |
+    (typeof fsConstants.O_NOFOLLOW === "number" ? fsConstants.O_NOFOLLOW : 0);
+  let fd;
+  try {
+    fd = openSync(filePath, flags);
+  } catch (error) {
+    if (error?.code === "ELOOP" || error?.code === "EPERM") {
+      throw backupPathError("Некорректный путь резервной копии.", 400, "BACKUP_SYMLINK");
+    }
+    throw backupPathError("Резервная копия не найдена.", 404, "BACKUP_NOT_FOUND");
+  }
+
+  try {
+    const opened = fstatSync(fd);
+    if (!opened.isFile()) {
+      closeSync(fd);
+      throw backupPathError("Некорректный путь резервной копии.");
+    }
+    let real;
+    try {
+      real = realpathSync.native(filePath);
+    } catch {
+      real = realpathSync(filePath);
+    }
+    if (!isInsideBackupDir(real)) {
+      closeSync(fd);
+      throw backupPathError("Некорректный путь резервной копии.", 400, "BACKUP_SYMLINK");
+    }
+    return { fd, filePath, fileName: path.basename(filePath) };
+  } catch (error) {
+    try {
+      closeSync(fd);
+    } catch {
+      /* ignore */
+    }
+    throw error;
+  }
+}
+
+export function openBackupReadStream(fileName) {
+  const opened = openBackupFd(fileName);
+  return createReadStream("", { fd: opened.fd });
+}
+
+export function readBackupFileBuffer(fileName) {
+  const opened = openBackupFd(fileName);
+  try {
+    return readFileSync(opened.fd);
+  } finally {
+    closeSync(opened.fd);
+  }
+}
+
+export function publicBackupMetadata(item = {}) {
+  return {
+    fileName: item.fileName,
+    createdAt: item.createdAt,
+    reason: item.reason,
+    size: item.size,
+    format: item.format,
+    includesPhotos: Boolean(item.includesPhotos),
+    photoCount: Number(item.photoCount) || 0,
+  };
+}
+
+export function assertRestorableBackup(fileName) {
+  const buffer = readBackupFileBuffer(fileName);
+  try {
+    if (String(fileName).endsWith(".json")) {
+      const parsed = JSON.parse(buffer.toString("utf8"));
+      if (!parsed || typeof parsed !== "object") {
+        throw new Error("invalid json snapshot");
+      }
+    } else {
+      readZipMetadata(buffer);
+    }
+  } catch (error) {
+    if (error?.status) throw error;
+    throw backupPathError("Резервная копия повреждена и не может быть восстановлена.", 409, "BACKUP_INTEGRITY");
+  }
+  return resolveBackupPath(fileName);
 }
 
 function listUploadFiles(directory = uploadsDirectory, prefix = "") {
@@ -101,8 +237,8 @@ function listUploadFiles(directory = uploadsDirectory, prefix = "") {
   return files.sort();
 }
 
-function readZipMetadata(filePath) {
-  const zip = new AdmZip(filePath);
+function readZipMetadata(source) {
+  const zip = new AdmZip(source);
   const manifestEntry = zip.getEntry("manifest.json");
   const snapshotEntry = zip.getEntry("snapshot.json");
 
@@ -173,10 +309,24 @@ export function createServerBackup({
 
 export function listServerBackups() {
   return readdirSync(backupDirectory)
-    .filter(isBackupName)
+    .filter((fileName) => {
+      if (!isBackupName(fileName)) return false;
+      try {
+        const lst = lstatSync(path.join(CANONICAL_BACKUP_DIR, fileName));
+        return lst.isFile() && !lst.isSymbolicLink();
+      } catch {
+        return false;
+      }
+    })
     .map((fileName) => {
       const filePath = resolveBackupPath(fileName);
-      const stats = statSync(filePath);
+      let stats;
+      try {
+        stats = lstatSync(filePath);
+        if (stats.isSymbolicLink() || !stats.isFile()) return null;
+      } catch {
+        return null;
+      }
       let reason = "Резервная копия";
       let createdAt = stats.mtime.toISOString();
       let format = fileName.endsWith(".zip") ? "full" : "legacy";
@@ -184,13 +334,14 @@ export function listServerBackups() {
       let photoCount = 0;
 
       try {
+        const buffer = readBackupFileBuffer(fileName);
         if (fileName.endsWith(".zip")) {
-          const { manifest, snapshot } = readZipMetadata(filePath);
+          const { manifest, snapshot } = readZipMetadata(buffer);
           reason = manifest.reason || snapshot.reason || reason;
           createdAt = manifest.exportedAt || snapshot.exportedAt || createdAt;
           photoCount = Number(manifest.photoCount) || 0;
         } else {
-          const parsed = JSON.parse(readFileSync(filePath, "utf8"));
+          const parsed = JSON.parse(buffer.toString("utf8"));
           reason = parsed.reason || reason;
           createdAt = parsed.exportedAt || createdAt;
         }
@@ -198,7 +349,7 @@ export function listServerBackups() {
         reason = "Файл требует проверки";
       }
 
-      return {
+      return publicBackupMetadata({
         fileName,
         createdAt,
         reason,
@@ -206,8 +357,9 @@ export function listServerBackups() {
         format,
         includesPhotos,
         photoCount,
-      };
+      });
     })
+    .filter(Boolean)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
@@ -241,14 +393,10 @@ function restorePhotosFromZip(zip) {
 }
 
 export function restoreServerBackup(fileName) {
-  const filePath = resolveBackupPath(fileName);
+  const buffer = readBackupFileBuffer(fileName);
 
-  if (!existsSync(filePath)) {
-    throw new Error("Резервная копия не найдена.");
-  }
-
-  if (fileName.endsWith(".json")) {
-    const snapshot = JSON.parse(readFileSync(filePath, "utf8"));
+  if (String(fileName).endsWith(".json")) {
+    const snapshot = JSON.parse(buffer.toString("utf8"));
     importDatabaseSnapshot(snapshot);
     return {
       ...snapshot,
@@ -257,7 +405,7 @@ export function restoreServerBackup(fileName) {
     };
   }
 
-  const { snapshot, zip } = readZipMetadata(filePath);
+  const { snapshot, zip } = readZipMetadata(buffer);
   importDatabaseSnapshot(snapshot);
   const restoredPhotos = restorePhotosFromZip(zip);
 

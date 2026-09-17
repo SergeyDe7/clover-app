@@ -45,17 +45,15 @@ async function copyText(value) {
 
 function permissionsFromUser(user) {
   const permissions = user?.permissions || {};
-  if (user?.role === "admin" || permissions.fullAccess || !Array.isArray(permissions.tabs)) {
-    return {
-      fullAccess: true,
-      tabs: [...STAFF_FEATURE_IDS],
-      manageStaff: permissions.manageStaff !== false,
-    };
-  }
+  const tabs = Array.isArray(permissions.tabs)
+    ? permissions.tabs.filter((id) => STAFF_FEATURE_IDS.includes(id))
+    : [];
+  const fullAccess =
+    user?.role === "admin" || tabs.length === STAFF_FEATURE_IDS.length;
   return {
-    fullAccess: false,
-    tabs: permissions.tabs.filter((id) => STAFF_FEATURE_IDS.includes(id)),
-    manageStaff: permissions.manageStaff !== false,
+    fullAccess,
+    tabs: fullAccess ? [...STAFF_FEATURE_IDS] : tabs,
+    manageStaff: permissions.manageStaff === true,
   };
 }
 
@@ -278,10 +276,10 @@ export function AdminRolePanel({ currentUser }) {
   const savePermissions = async (user) => {
     if (!draftPermissions) return;
     const payload = draftPermissions.fullAccess || user.role === "admin"
-      ? { fullAccess: true, manageStaff: draftPermissions.manageStaff !== false }
+      ? { tabs: [...STAFF_FEATURE_IDS], manageStaff: draftPermissions.manageStaff === true, fullAccess: true }
       : {
-          tabs: draftPermissions.tabs.length ? draftPermissions.tabs : [...STAFF_FEATURE_IDS],
-          manageStaff: draftPermissions.manageStaff !== false,
+          tabs: Array.isArray(draftPermissions.tabs) ? draftPermissions.tabs : [],
+          manageStaff: draftPermissions.manageStaff === true,
         };
     setBusyId(user.id);
     setError("");

@@ -56,8 +56,8 @@ export function staffHasFeature(authUser, featureId) {
   }
   if (authUser.role === "admin") return true;
   const permissions = authUser.permissions;
-  if (!permissions || permissions.fullAccess) return true;
-  const tabs = Array.isArray(permissions.tabs) ? permissions.tabs : STAFF_FEATURE_IDS;
+  if (!permissions) return false;
+  const tabs = Array.isArray(permissions.tabs) ? permissions.tabs : [];
   if (id === "more") {
     return ["access", "settings", "backup", "audit"].some((item) => tabs.includes(item));
   }

@@ -225,16 +225,29 @@ async function sendManagerPush(notification, settings) {
   // поэтому push уходил в no_push_subscription. Берём staff (manager+admin),
   // клиентов listStaffUsers не возвращает. listManagerUsers не меняем:
   // он ещё нужен для email-fallback.
+  const { projectManagerNotifications, staffCanSeeNotification } = await import(
+    "./staffNotifications.js"
+  );
   const managers = listStaffUsers();
-  const badgeCount = listManagerNotifications({ unreadOnly: true, limit: 500 }).length;
+  const unread = listManagerNotifications({ unreadOnly: true, limit: 500 });
   const results = await Promise.all(
-    managers.map((manager) => sendOrderPush(manager.id, {
-      title: notification.title,
-      body: notification.body,
-      url: toCabinetRelativeUrl(notification.url || "/?section=manager-notifications"),
-      tag: `manager-${notification.type}-${notification.sourceId || notification.id}`,
-      badgeCount,
-    }))
+    managers.map((manager) => {
+      if (!staffCanSeeNotification(manager, notification)) {
+        return Promise.resolve({
+          enabled: false,
+          sent: 0,
+          failed: 0,
+          skipped: "feature",
+        });
+      }
+      return sendOrderPush(manager.id, {
+        title: notification.title,
+        body: notification.body,
+        url: toCabinetRelativeUrl(notification.url || "/?section=manager-notifications"),
+        tag: `manager-${notification.type}-${notification.sourceId || notification.id}`,
+        badgeCount: projectManagerNotifications(manager, unread).length,
+      });
+    })
   );
   return {
     channel: "push",
@@ -299,6 +312,16 @@ export async function notifyManagers(event = {}) {
   }
 
   const notification = created.notification;
+  const skipDelivery = /^(true|1|yes)$/i.test(
+    String(process.env.CLOVER_SKIP_NOTIFICATION_DELIVERY || "").trim()
+  );
+  if (skipDelivery) {
+    return {
+      ...created,
+      delivery: [{ channel: "dry-run", sent: false, reason: "skipped" }],
+    };
+  }
+
   const tasks = [];
   if (settings.managerNotifyEmail) {
     tasks.push(sendEmail(notification, settings, event));
