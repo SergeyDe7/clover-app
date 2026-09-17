@@ -217,6 +217,11 @@ import {
   enrichProductCardFromWeb,
 } from "./productEnrichment.js";
 import {
+  publicBaseUrl,
+  publicCabinetUrl,
+  allowDevelopmentAuthLinks,
+} from "./authUrlPolicy.js";
+import {
   autoLinkCloverClients,
   buildOneCClientCandidates,
   buildOneCClientsSummary,
@@ -834,30 +839,6 @@ function tokenHash(value) {
 
 function createPlainToken() {
   return randomBytes(32).toString("base64url");
-}
-
-function publicBaseUrl(req) {
-  const configured = String(process.env.APP_PUBLIC_URL || "").trim().replace(/\/$/, "");
-  if (configured) return configured;
-  return `${req.protocol}://${req.get("host")}`.replace(/\/$/, "");
-}
-
-/** URL ЛК на каноническом домене (витрина занимает корень хоста). */
-function publicCabinetUrl(req) {
-  const base = publicBaseUrl(req);
-  let path = String(process.env.CABINET_PATH || "/lk").trim();
-  if (!path.startsWith("/")) path = `/${path}`;
-  path = path.replace(/\/$/, "") || "/lk";
-  return `${base}${path}`;
-}
-
-function allowDevelopmentAuthLinks(req) {
-  if (String(process.env.ALLOW_DEV_AUTH_LINKS || "true") !== "true") return false;
-  const hostName = String(req.hostname || "").toLowerCase();
-  const remoteAddress = String(req.socket?.remoteAddress || "");
-  const loopbackHost = ["localhost", "127.0.0.1", "::1"].includes(hostName);
-  const loopbackClient = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(remoteAddress);
-  return loopbackHost && loopbackClient;
 }
 
 function isConfiguredPublicUrlLocal() {

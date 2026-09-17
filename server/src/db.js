@@ -15,6 +15,7 @@ import { emptyStaffPermissionsPayload, staffPermissionsPayload } from "./roles.j
 import { maybeApplyLegacyManagerPermissionsMigration } from "./staffPermissionsMigrate.js";
 import { maybeApplyStripPlaintextPasswordsMigration } from "./passwordVaultMigrate.js";
 import { hashPasswordSync, passwordHashMeta } from "./passwordHash.js";
+import { upsertPushSubscriptionRecord } from "./pushSubscriptionOwnership.js";
 
 /**
  * Test-only hooks for S2-NEW-001 concurrency verifiers.
@@ -2027,29 +2028,12 @@ export function deleteReconciliationRequest(id) {
 }
 
 export function upsertPushSubscription({ userId, subscription, preferences = {} }) {
-  const endpoint = String(subscription?.endpoint || "");
-  if (!endpoint) throw new Error("В push-подписке отсутствует endpoint.");
-  const updatedAt = now();
-  const existing = db.prepare(`SELECT id, created_at FROM push_subscriptions WHERE endpoint = ?`).get(endpoint);
-  const id = existing?.id || randomUUID();
-  const createdAt = existing?.created_at || updatedAt;
-  db.prepare(`
-    INSERT INTO push_subscriptions(
-      id, user_id, endpoint, subscription_json, order_events, promotions, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(endpoint) DO UPDATE SET
-      user_id = excluded.user_id,
-      subscription_json = excluded.subscription_json,
-      order_events = excluded.order_events,
-      promotions = excluded.promotions,
-      updated_at = excluded.updated_at
-  `).run(
-    id, String(userId), endpoint, JSON.stringify(subscription),
-    1,
-    preferences.promotions ? 1 : 0,
-    createdAt, updatedAt
-  );
-  return { id, endpoint, orderEvents: true, promotions: Boolean(preferences.promotions) };
+  return upsertPushSubscriptionRecord(db, {
+    userId,
+    subscription,
+    preferences,
+    timestamp: now(),
+  });
 }
 
 export function listPushSubscriptions(userId = null, kind = "all") {

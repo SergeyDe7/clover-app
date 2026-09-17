@@ -1,4 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { isIP } from "node:net";
+import {
+  boundedResponseLimit,
+  readBoundedResponse,
+} from "./outboundResponse.js";
 
 export const DEFAULT_ONE_C_CONFIG = {
   mode: "simulation",
@@ -23,6 +28,43 @@ function normalizePath(value, fallback) {
   return raw.startsWith("/") ? raw : `/${raw}`;
 }
 
+function policyError(code, message, status = 503) {
+  const error = new Error(message);
+  error.code = code;
+  error.status = status;
+  return error;
+}
+
+function enabled(value) {
+  return /^(?:1|true|yes|on)$/iu.test(String(value || "").trim());
+}
+
+function hostnameWithoutBrackets(value) {
+  return String(value || "").replace(/^\[|\]$/gu, "").split("%")[0].toLowerCase();
+}
+
+function isTrustedInsecureHttpLiteral(hostname) {
+  const host = hostnameWithoutBrackets(hostname);
+  const family = isIP(host);
+  if (family === 4) {
+    const parts = host.split(".").map(Number);
+    const [a, b] = parts;
+    if (a === 10 || a === 127) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    return false;
+  }
+  if (family === 6) {
+    if (host === "::1") return true;
+    if (host.startsWith("::ffff:")) {
+      return isTrustedInsecureHttpLiteral(host.slice("::ffff:".length));
+    }
+    const first = host.split(":", 1)[0];
+    return first.startsWith("fc") || first.startsWith("fd");
+  }
+  return false;
+}
+
 function normalizeBaseUrl(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -31,18 +73,108 @@ function normalizeBaseUrl(value) {
   try {
     url = new URL(raw);
   } catch {
-    throw new Error("Адрес 1С должен начинаться с http:// или https://.");
+    const error = new Error("Адрес 1С должен начинаться с http:// или https://.");
+    error.code = "ONEC_TRUSTED_ORIGIN_INVALID";
+    throw error;
   }
 
   if (!["http:", "https:"].includes(url.protocol)) {
-    throw new Error("Для подключения к 1С разрешены только HTTP и HTTPS.");
+    const error = new Error("Для подключения к 1С разрешены только HTTP и HTTPS.");
+    error.code = "ONEC_TRUSTED_ORIGIN_INVALID";
+    throw error;
   }
 
   if (url.username || url.password) {
-    throw new Error("Не указывайте логин и пароль внутри адреса 1С.");
+    const error = new Error("Не указывайте логин и пароль внутри адреса 1С.");
+    error.code = "ONEC_TRUSTED_ORIGIN_INVALID";
+    throw error;
   }
 
   return trimSlash(url.toString());
+}
+
+export function resolveTrustedOneCOrigin(env = process.env, { warn } = {}) {
+  const raw = String(env.ONEC_BASE_URL || "").trim();
+  if (!raw) {
+    throw policyError(
+      "ONEC_TRUSTED_ORIGIN_REQUIRED",
+      "Не заполнен адрес опубликованной базы 1С."
+    );
+  }
+  if (/[\u0000-\u001f\u007f]/u.test(raw)) {
+    throw policyError(
+      "ONEC_TRUSTED_ORIGIN_INVALID",
+      "Адрес 1С настроен некорректно."
+    );
+  }
+
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw policyError(
+      "ONEC_TRUSTED_ORIGIN_INVALID",
+      "Адрес 1С настроен некорректно."
+    );
+  }
+
+  if (
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    url.pathname.includes("..") ||
+    url.pathname.includes("//")
+  ) {
+    throw policyError(
+      "ONEC_TRUSTED_ORIGIN_INVALID",
+      "Адрес 1С настроен некорректно."
+    );
+  }
+
+  if (url.protocol === "http:") {
+    if (!enabled(env.ONEC_ALLOW_INSECURE_HTTP)) {
+      throw policyError(
+        "ONEC_INSECURE_HTTP_DISABLED",
+        "HTTP для 1С запрещён без явного серверного разрешения."
+      );
+    }
+    if (!isTrustedInsecureHttpLiteral(url.hostname)) {
+      throw policyError(
+        "ONEC_INSECURE_HTTP_TARGET_INVALID",
+        "Незащищённый HTTP к 1С разрешён только для доверенного частного литерала."
+      );
+    }
+    warn?.(
+      "ONEC_ALLOW_INSECURE_HTTP: исходящий HTTP к доверенному частному адресу 1С разрешён явно."
+    );
+  } else if (url.protocol !== "https:") {
+    throw policyError(
+      "ONEC_TRUSTED_ORIGIN_INVALID",
+      "Для подключения к 1С разрешены только HTTP и HTTPS."
+    );
+  }
+
+  return trimSlash(url.toString());
+}
+
+function assertSafeEndpointPath(value, fallback) {
+  const raw = normalizePath(value, fallback);
+  if (
+    !raw.startsWith("/") ||
+    raw.startsWith("//") ||
+    raw.includes("\\") ||
+    raw.includes("..") ||
+    /%2e/iu.test(raw) ||
+    /[\u0000-\u001f\u007f]/u.test(raw)
+  ) {
+    throw policyError(
+      "ONEC_ENDPOINT_PATH_INVALID",
+      "Путь HTTP-сервиса 1С настроен некорректно.",
+      500
+    );
+  }
+  return raw;
 }
 
 export function sanitizeOneCConfig(value = {}) {
@@ -68,18 +200,18 @@ export function sanitizeOneCConfig(value = {}) {
   };
 }
 
-export function resolveOneCRuntimeConfig(publicConfig = {}) {
+export function resolveOneCRuntimeConfig(publicConfig = {}, env = process.env) {
   const stored = sanitizeOneCConfig(publicConfig);
-  const envBaseUrl = String(process.env.ONEC_BASE_URL || "").trim();
+  const envBaseUrl = String(env.ONEC_BASE_URL || "").trim();
   const baseUrl = envBaseUrl ? normalizeBaseUrl(envBaseUrl) : stored.baseUrl;
-  const username = String(process.env.ONEC_USERNAME || stored.username || "").trim();
-  const password = String(process.env.ONEC_PASSWORD || "");
+  const username = String(env.ONEC_USERNAME || stored.username || "").trim();
+  const password = String(env.ONEC_PASSWORD || "");
   // OUTBOUND only (Clover → 1C). Does not authorize inbound /api/one-c/*
   // multi-contour routes. Inbound uses ONEC_TEST_EXCHANGE_API_KEY /
   // ONEC_VLAVKA_EXCHANGE_API_KEY (see oneCContourAuth.js).
-  const apiKey = String(process.env.ONEC_API_KEY || "");
+  const apiKey = String(env.ONEC_API_KEY || "");
   const envWriteEnabled = ["1", "true", "yes", "on"].includes(
-    String(process.env.ONEC_WRITE_ENABLED || "").toLowerCase()
+    String(env.ONEC_WRITE_ENABLED || "").toLowerCase()
   );
 
   return {
@@ -91,7 +223,7 @@ export function resolveOneCRuntimeConfig(publicConfig = {}) {
     writeEnabled: stored.allowDraftCreation && envWriteEnabled,
     secretConfigured: Boolean(password || apiKey),
     baseUrlFromEnv: Boolean(envBaseUrl),
-    usernameFromEnv: Boolean(process.env.ONEC_USERNAME),
+    usernameFromEnv: Boolean(env.ONEC_USERNAME),
     mode: stored.mode === "real" ? "real" : "simulation",
   };
 }
@@ -116,16 +248,32 @@ export function publicOneCStatus(publicConfig = {}) {
       writeEnabled: runtime.writeEnabled,
       baseUrlFromEnv: runtime.baseUrlFromEnv,
       usernameFromEnv: runtime.usernameFromEnv,
-      readyForRead: runtime.mode === "simulation" || Boolean(runtime.baseUrl),
+      readyForRead: runtime.mode === "simulation" || Boolean(runtime.baseUrlFromEnv),
       readyForWrite:
         runtime.mode === "simulation" ||
-        Boolean(runtime.baseUrl && runtime.secretConfigured && runtime.writeEnabled),
+        Boolean(runtime.baseUrlFromEnv && runtime.secretConfigured && runtime.writeEnabled),
     },
   };
 }
 
 function buildUrl(baseUrl, endpointPath, query = {}) {
-  const url = new URL(`${trimSlash(baseUrl)}${normalizePath(endpointPath)}`);
+  const safePath = assertSafeEndpointPath(endpointPath);
+  const base = trimSlash(baseUrl);
+  const url = new URL(`${base}${safePath}`);
+  if (!String(url.href).startsWith(`${base}/`) && url.href !== `${base}${safePath}`) {
+    throw policyError(
+      "ONEC_ENDPOINT_PATH_INVALID",
+      "Путь HTTP-сервиса 1С настроен некорректно.",
+      500
+    );
+  }
+  if (url.origin !== new URL(base).origin) {
+    throw policyError(
+      "ONEC_ENDPOINT_PATH_INVALID",
+      "Путь HTTP-сервиса 1С настроен некорректно.",
+      500
+    );
+  }
   for (const [key, value] of Object.entries(query || {})) {
     if (value !== undefined && value !== null && value !== "") {
       url.searchParams.set(key, String(value));
@@ -155,17 +303,21 @@ export function buildOneCAuthHeaders(config) {
   return headers;
 }
 
-async function requestJson(config, endpointPath, options = {}) {
-  if (!config.baseUrl) {
-    throw new Error("Не заполнен адрес опубликованной базы 1С.");
-  }
-
+async function requestJson(config, endpointPath, options = {}, deps = {}) {
+  const env = deps.env || process.env;
+  const fetchImpl = deps.fetchImpl || globalThis.fetch;
+  const trustedBase = resolveTrustedOneCOrigin(env, { warn: deps.warn });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  const maxBytes = boundedResponseLimit(env.ONEC_MAX_RESPONSE_BYTES, {
+    fallback: 2 * 1024 * 1024,
+    minimum: 1024,
+    maximum: 16 * 1024 * 1024,
+  });
 
   try {
-    const response = await fetch(
-      buildUrl(config.baseUrl, endpointPath, options.query),
+    const response = await fetchImpl(
+      buildUrl(trustedBase, endpointPath, options.query),
       {
         method: options.method || "GET",
         headers: {
@@ -174,10 +326,31 @@ async function requestJson(config, endpointPath, options = {}) {
         },
         body: options.body ? JSON.stringify(options.body) : undefined,
         signal: controller.signal,
+        redirect: "manual",
       }
     );
 
-    const text = await response.text();
+    const status = Number(response.status) || 0;
+    if (status >= 300 && status < 400) {
+      try {
+        if (typeof response.body?.cancel === "function") {
+          await response.body.cancel();
+        }
+      } catch {
+        // Best effort after a redirect denial.
+      }
+      throw policyError(
+        "ONEC_REDIRECT_DENIED",
+        "Перенаправление ответа 1С отклонено.",
+        502
+      );
+    }
+
+    const buffer = await readBoundedResponse(response, {
+      maxBytes,
+      signal: controller.signal,
+    });
+    const text = buffer.toString("utf8");
     let payload = {};
     try {
       payload = text ? JSON.parse(text) : {};
@@ -210,8 +383,9 @@ async function requestJson(config, endpointPath, options = {}) {
   }
 }
 
-export async function testOneCConnection(publicConfig = {}) {
-  const config = resolveOneCRuntimeConfig(publicConfig);
+export async function testOneCConnection(publicConfig = {}, deps = {}) {
+  const env = deps.env || process.env;
+  const config = resolveOneCRuntimeConfig(publicConfig, env);
 
   if (config.mode === "simulation") {
     return {
@@ -225,7 +399,7 @@ export async function testOneCConnection(publicConfig = {}) {
     };
   }
 
-  const payload = await requestJson(config, config.healthPath);
+  const payload = await requestJson(config, config.healthPath, {}, deps);
   return {
     ok: payload?.ok !== false,
     mode: "real",
@@ -277,8 +451,9 @@ function simulatedProducts(limit) {
   return items.slice(0, limit);
 }
 
-export async function previewOneCCatalog(publicConfig, type, limit = 20) {
-  const config = resolveOneCRuntimeConfig(publicConfig);
+export async function previewOneCCatalog(publicConfig, type, limit = 20, deps = {}) {
+  const env = deps.env || process.env;
+  const config = resolveOneCRuntimeConfig(publicConfig, env);
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
 
   if (config.mode === "simulation") {
@@ -295,10 +470,10 @@ export async function previewOneCCatalog(publicConfig, type, limit = 20) {
     };
   }
 
-  const path = type === "clients" ? config.clientsPath : config.productsPath;
-  const payload = await requestJson(config, path, {
+  const catalogPath = type === "clients" ? config.clientsPath : config.productsPath;
+  const payload = await requestJson(config, catalogPath, {
     query: { limit: safeLimit },
-  });
+  }, deps);
   const items = Array.isArray(payload?.items) ? payload.items : [];
 
   return {
@@ -312,8 +487,9 @@ export async function previewOneCCatalog(publicConfig, type, limit = 20) {
   };
 }
 
-export async function createOneCDraft(publicConfig, orderPayload) {
-  const config = resolveOneCRuntimeConfig(publicConfig);
+export async function createOneCDraft(publicConfig, orderPayload, deps = {}) {
+  const env = deps.env || process.env;
+  const config = resolveOneCRuntimeConfig(publicConfig, env);
 
   if (config.mode === "simulation") {
     const stamp = Date.now();
@@ -350,7 +526,7 @@ export async function createOneCDraft(publicConfig, orderPayload) {
         conduct: false,
       },
     },
-  });
+  }, deps);
 
   if (payload?.ok === false) {
     throw new Error(payload?.error || "1С не создала черновик заказа.");
