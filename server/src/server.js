@@ -217,7 +217,6 @@ import {
   enrichProductCardFromWeb,
 } from "./productEnrichment.js";
 import {
-  publicBaseUrl,
   publicCabinetUrl,
   allowDevelopmentAuthLinks,
 } from "./authUrlPolicy.js";

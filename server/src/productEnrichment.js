@@ -672,7 +672,7 @@ export async function downloadBinary(url, timeoutMs = 15000, deps = {}) {
     },
   });
   const type = String(result.contentType || "").toLowerCase();
-  if (type && !type.startsWith("image/") && !type.includes("octet-stream")) {
+  if (!type.startsWith("image/") && !type.includes("octet-stream")) {
     throw new Error(`Ответ не является изображением (${type || "unknown"}).`);
   }
   if (result.buffer.length < 1024) {

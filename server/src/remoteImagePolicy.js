@@ -106,9 +106,21 @@ function isPublicIpv6(value) {
   }
   // Only global-unicast 2000::/3 is allowed.
   if ((first & 0xe000) !== 0x2000) return false;
-  // Documentation and benchmarking ranges are not routable application targets.
+  // Documentation, benchmarking, 6to4, Teredo and NAT64 are not application targets.
   if (first === 0x2001 && second === 0x0db8) return false;
   if (first === 0x2001 && second === 0x0002) return false;
+  if (first === 0x2002) return false;
+  if (first === 0x2001 && second === 0x0000) return false;
+  if (
+    first === 0x0064 &&
+    second === 0xff9b &&
+    third === 0 &&
+    fourth === 0 &&
+    fifth === 0 &&
+    sixth === 0
+  ) {
+    return false;
+  }
   return true;
 }
 

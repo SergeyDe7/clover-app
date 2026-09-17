@@ -25,7 +25,7 @@ export function upsertPushSubscriptionRecord(database, {
   }
   const rowId = existing?.id || id || randomUUID();
   const createdAt = existing?.created_at || updatedAt;
-  database.prepare(`
+  const result = database.prepare(`
     INSERT INTO push_subscriptions(
       id, user_id, endpoint, subscription_json, order_events, promotions, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -34,6 +34,7 @@ export function upsertPushSubscriptionRecord(database, {
       order_events = excluded.order_events,
       promotions = excluded.promotions,
       updated_at = excluded.updated_at
+    WHERE push_subscriptions.user_id = excluded.user_id
   `).run(
     rowId,
     String(userId),
@@ -44,6 +45,12 @@ export function upsertPushSubscriptionRecord(database, {
     createdAt,
     updatedAt
   );
+  if (!result.changes) {
+    const error = new Error("Этот канал уведомлений уже привязан к другому пользователю.");
+    error.code = "PUSH_ENDPOINT_OWNERSHIP_CONFLICT";
+    error.status = 409;
+    throw error;
+  }
   return {
     id: rowId,
     endpoint,

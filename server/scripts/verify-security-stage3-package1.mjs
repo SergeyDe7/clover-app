@@ -479,6 +479,10 @@ test("SEC3-004: remote image fetch denies private/credentialed targets before ne
       () => downloadBinary("https://127.0.0.1/a.jpg", 15000, imageDeps),
       "REMOTE_IMAGE_ADDRESS_DENIED"
     );
+    await expectCodeAsync(
+      () => downloadBinary("https://[2002:a9fe:a9fe::1]/a.jpg", 15000, imageDeps),
+      "REMOTE_IMAGE_ADDRESS_DENIED"
+    );
   });
   assert.equal(fetchCalls, 0);
 });
@@ -541,6 +545,18 @@ test("SEC3-004: mixed DNS and redirects are denied; public HTTPS is DNS-pinned",
     });
     assert.deepEqual(pinned, [{ address: "93.184.216.34", family: 4 }]);
     assert.equal(observations.options.servername, "image.example.invalid");
+
+    await assert.rejects(
+      () => downloadBinary("https://image.example.invalid/a.jpg", 15000, {
+        lookup: async () => [{ address: "93.184.216.34", family: 4 }],
+        httpsRequest: requestFactory(() => nodeResponse({
+          headers: { "content-length": "2048" },
+          chunks: [Buffer.alloc(2048, 1)],
+        })),
+        maxBytes: 4096,
+      }),
+      /не является изображением/u
+    );
   });
   assert.equal(fetchCalls, 0);
 });
