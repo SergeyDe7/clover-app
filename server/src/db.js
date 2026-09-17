@@ -3,7 +3,6 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import bcrypt from "bcryptjs";
 import {
   DEFAULT_PRODUCTS,
   DEFAULT_SETTINGS,
@@ -14,6 +13,8 @@ import {
 } from "./orderClientEdit.js";
 import { emptyStaffPermissionsPayload, staffPermissionsPayload } from "./roles.js";
 import { maybeApplyLegacyManagerPermissionsMigration } from "./staffPermissionsMigrate.js";
+import { maybeApplyStripPlaintextPasswordsMigration } from "./passwordVaultMigrate.js";
+import { hashPasswordSync, passwordHashMeta } from "./passwordHash.js";
 
 /**
  * Test-only hooks for S2-NEW-001 concurrency verifiers.
@@ -892,6 +893,7 @@ ensureColumn("users", "last_login_at", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("users", "disabled_at", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("users", "permissions_json", "TEXT NOT NULL DEFAULT '{}'");
 maybeApplyLegacyManagerPermissionsMigration(db);
+maybeApplyStripPlaintextPasswordsMigration(db);
 
 /** Discoverable Face ID: challenge может быть без user_id (пустая строка) — FK мешает. */
 function relaxWebAuthnChallengeUserFk() {
@@ -1100,6 +1102,37 @@ export function setGlobalState(key, value) {
       value_json = excluded.value_json,
       updated_at = excluded.updated_at
   `).run(key, JSON.stringify(value), now());
+}
+
+/**
+ * Safe password metadata for API/UI. Never returns hash or plaintext.
+ * @param {string[]} userIds
+ * @returns {Map<string, { hasPassword: boolean, algorithm: string, cost: number|null }>}
+ */
+export function getPasswordAuthMetaByIds(userIds = []) {
+  const map = new Map();
+  const ids = [...new Set((Array.isArray(userIds) ? userIds : []).map((id) => String(id || "").trim()).filter(Boolean))];
+  if (!ids.length) return map;
+  const placeholders = ids.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `SELECT id, password_hash FROM users WHERE id IN (${placeholders})`
+    )
+    .all(...ids);
+  for (const row of rows) {
+    const meta = passwordHashMeta(row.password_hash);
+    map.set(String(row.id), {
+      hasPassword: Boolean(meta.usable),
+      algorithm: meta.algorithm,
+      cost: meta.cost,
+    });
+  }
+  for (const id of ids) {
+    if (!map.has(id)) {
+      map.set(id, { hasPassword: false, algorithm: "", cost: null });
+    }
+  }
+  return map;
 }
 
 export function ensureGlobalState() {
@@ -2306,7 +2339,7 @@ export function seedManager() {
   const existing = findUserByEmail(email);
   if (existing) return;
 
-  const passwordHash = bcrypt.hashSync(password, 12);
+  const passwordHash = hashPasswordSync(password, 12);
   createUser({
     email,
     passwordHash,

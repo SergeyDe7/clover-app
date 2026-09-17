@@ -73,7 +73,8 @@ export function AdminRolePanel({ currentUser }) {
   const [expandedId, setExpandedId] = useState("");
   const [draftPassword, setDraftPassword] = useState("");
   const [draftPermissions, setDraftPermissions] = useState(null);
-  const [revealed, setRevealed] = useState({});
+  /** One-shot plaintext by user id after set/reset; never from list API. Cleared when editor closes. */
+  const [oneShotById, setOneShotById] = useState({});
   const [copiedKey, setCopiedKey] = useState("");
   const [draftContacts, setDraftContacts] = useState(null);
   const { t } = useLocalization();
@@ -112,6 +113,7 @@ export function AdminRolePanel({ currentUser }) {
     if (!expandedUser) {
       setDraftPermissions(null);
       setDraftPassword("");
+      setOneShotById({});
       setDraftContacts(null);
       return;
     }
@@ -123,7 +125,7 @@ export function AdminRolePanel({ currentUser }) {
       max: String(expandedUser.max || ""),
       telegram: String(expandedUser.telegram || ""),
     });
-  }, [expandedUser]);
+  }, [expandedUser?.id]);
 
   const savedPasswordCount = useMemo(
     () => staff.filter((item) => item.hasPassword).length,
@@ -192,10 +194,17 @@ export function AdminRolePanel({ currentUser }) {
     setError("");
     setNotice("");
     try {
-      await api.createManager(nextEmail, nextPassword, contact);
+      const result = await api.createManager(nextEmail, nextPassword, contact);
+      const once = String(result?.temporaryPassword || nextPassword).trim();
+      const createdId = result?.manager?.id ? String(result.manager.id) : "";
       setNotice(t("admin.staff.managerCreated", { email: nextEmail }));
       setFormKey((value) => value + 1);
       await load();
+      if (once && createdId) {
+        setOneShotById({ [createdId]: once });
+        setDraftPassword("");
+        setExpandedId(createdId);
+      }
     } catch (err) {
       const message = errorDisplayMessage(err, t, "manager.error.managerCreateFailed");
       setError(message);
@@ -259,10 +268,14 @@ export function AdminRolePanel({ currentUser }) {
     setBusyId(user.id);
     setError("");
     try {
-      await api.setStaffPassword(user.id, draftPassword);
-      setDraftPassword("");
-      setRevealed((current) => ({ ...current, [user.id]: true }));
+      const password = draftPassword.trim();
+      const result = await api.setStaffPassword(user.id, password);
+      const once = String(result?.temporaryPassword || password).trim();
       await load();
+      if (once) {
+        setOneShotById({ [String(user.id)]: once });
+        setDraftPassword("");
+      }
       setNotice(t("shared.passwordUpdated"));
     } catch (err) {
       const message = errorDisplayMessage(err, t, "shared.error.saveFailed");
@@ -328,7 +341,7 @@ export function AdminRolePanel({ currentUser }) {
           <p className="eyebrow">{t("admin.accessManagers")}</p>
           <h3>{t("admin.managerAdministration")}</h3>
           <p>{
-            t("admin.createAccountsRevokeAccessChangePasswords")
+            t("admin.passwordsFromBeforeThisLogCannot")
           }</p>
         </div>
       </div>
@@ -344,7 +357,7 @@ export function AdminRolePanel({ currentUser }) {
           onSubmit={createManager}
         >
           <h3>{t("shared.createManager")}</h3>
-          <p className="muted small">{t("admin.passwordMustBeAtLeast6")}</p>
+          <p className="muted small">{t("shared.passwordMustBeAtLeast6")}</p>
           <div className="form-grid">
             <label className="field">
               Email
@@ -438,7 +451,9 @@ export function AdminRolePanel({ currentUser }) {
 
       <p className="muted small" style={{ marginTop: 18 }}>
         {t("admin.staff.adminsNowCount", { count: adminCount })}
-        {canManageStaff ? t("admin.staff.passwordJournalCount", { count: savedPasswordCount }) : null}
+        {canManageStaff
+          ? ` · ${t("manager.access.withPasswordCount", { count: savedPasswordCount })}`
+          : null}
       </p>
 
       <div className="exchange-actions" style={{ marginTop: 10 }}>
@@ -451,9 +466,10 @@ export function AdminRolePanel({ currentUser }) {
         {staff.map((user) => {
           const isSelf = String(user.id) === String(currentUser?.id);
           const isExpanded = String(expandedId) === String(user.id);
-          const showPassword = Boolean(revealed[user.id]);
           const loginKey = `${user.id}:login`;
           const passKey = `${user.id}:password`;
+          const oneShot = oneShotById[String(user.id)] || "";
+          const passwordEditorValue = oneShot || draftPassword;
           return (
             <div key={user.id} className="manager-contact-settings staff-user-card" style={{ marginTop: 0 }}>
               <div className="staff-card-top">
@@ -474,6 +490,9 @@ export function AdminRolePanel({ currentUser }) {
                       <span className={user.hasPassword ? "badge green" : "badge yellow"}>
                         {user.hasPassword ? t("shared.passwordSaved") : t("shared.noPassword")}
                       </span>
+                    ) : null}
+                    {canManageStaff && user.resetRequired ? (
+                      <span className="badge yellow">{t("auth.reset.title")}</span>
                     ) : null}
                   </div>
                 </div>
@@ -506,7 +525,16 @@ export function AdminRolePanel({ currentUser }) {
                       type="button"
                       disabled={busyId === user.id}
                       aria-expanded={isExpanded}
-                      onClick={() => setExpandedId(isExpanded ? "" : user.id)}
+                      onClick={() => {
+                        if (isExpanded) {
+                          setExpandedId("");
+                          setOneShotById({});
+                          setDraftPassword("");
+                        } else {
+                          setDraftPassword("");
+                          setExpandedId(user.id);
+                        }
+                      }}
                     >
                       {isExpanded ? t("shared.action.collapse") : t("shared.management")}
                     </button>
@@ -531,42 +559,30 @@ export function AdminRolePanel({ currentUser }) {
                   <div className="access-vault-field">
                     <span>{t("auth.login.password")}</span>
                     <code>
-                      {user.hasPassword
-                        ? showPassword
-                          ? user.password
-                          : "••••••••••"
-                        : t("shared.notSaved")}
+                      {oneShot
+                        ? oneShot
+                        : user.hasPassword
+                          ? "••••••••••"
+                          : t("shared.notSaved")}
                     </code>
                     <div className="access-vault-field-actions">
+                      {oneShot ? (
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => void handleCopy(passKey, oneShot)}
+                        >
+                          {copiedKey === passKey ? t("shared.action.copied") : t("shared.action.copy")}
+                        </button>
+                      ) : null}
                       {user.hasPassword ? (
-                        <>
-                          <button
-                            className="secondary-button"
-                            type="button"
-                            onClick={() =>
-                              setRevealed((current) => ({
-                                ...current,
-                                [user.id]: !current[user.id],
-                              }))
-                            }
-                          >
-                            {showPassword ? t("shared.action.hide") : t("shared.action.show")}
-                          </button>
-                          <button
-                            className="secondary-button"
-                            type="button"
-                            onClick={() => void handleCopy(passKey, user.password)}
-                          >
-                            {copiedKey === passKey ? t("shared.action.copied") : t("shared.action.copy")}
-                          </button>
-                          <button
-                            className="secondary-button"
-                            type="button"
-                            onClick={() => setExpandedId(String(user.id))}
-                          >{
-                            t("manager.change")
-                          }</button>
-                        </>
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => setExpandedId(String(user.id))}
+                        >{
+                          t("manager.change")
+                        }</button>
                       ) : (
                         <button
                           className="secondary-button"
@@ -704,35 +720,64 @@ export function AdminRolePanel({ currentUser }) {
                       <p className="muted small">{
                         t("admin.setOrChangeTheAdministratorPassword")
                       }</p>
-                    ) : null}
+                    ) : (
+                      <p className="muted small">{
+                        t("admin.passwordsFromBeforeThisLogCannot")
+                      }</p>
+                    )}
                     <div className="staff-edit-password">
                       <label className="field">
-                        {user.hasPassword ? t("auth.reset.title") : t("auth.login.password")}
+                        {oneShot
+                          ? t("shared.passwordUpdated")
+                          : user.hasPassword
+                            ? t("auth.reset.title")
+                            : t("auth.login.password")}
                         <input
                           type="text"
                           autoComplete="new-password"
                           minLength={6}
-                          value={draftPassword}
-                          onChange={(event) => setDraftPassword(event.target.value)}
+                          value={passwordEditorValue}
+                          onChange={(event) => {
+                            setOneShotById((current) => {
+                              if (!current[String(user.id)]) return current;
+                              const next = { ...current };
+                              delete next[String(user.id)];
+                              return next;
+                            });
+                            setDraftPassword(event.target.value);
+                          }}
                           placeholder={t("shared.atLeast6Characters")}
+                          readOnly={Boolean(oneShot)}
                         />
                       </label>
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        disabled={busyId === user.id}
-                        onClick={() => setDraftPassword(generateAccessPassword())}
-                      >{
-                        t("manager.generate")
-                      }</button>
-                      <button
-                        className="primary-button"
-                        type="button"
-                        disabled={busyId === user.id || draftPassword.length < 6}
-                        onClick={() => void savePassword(user)}
-                      >
-                        {user.hasPassword ? t("shared.changePassword2") : t("auth.reset.submit")}
-                      </button>
+                      {oneShot ? (
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => void handleCopy(passKey, oneShot)}
+                        >
+                          {copiedKey === passKey ? t("shared.action.copied") : t("shared.action.copy")}
+                        </button>
+                      ) : (
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={busyId === user.id}
+                          onClick={() => setDraftPassword(generateAccessPassword())}
+                        >{
+                          t("manager.generate")
+                        }</button>
+                      )}
+                      {!oneShot ? (
+                        <button
+                          className="primary-button"
+                          type="button"
+                          disabled={busyId === user.id || draftPassword.length < 6}
+                          onClick={() => void savePassword(user)}
+                        >
+                          {user.hasPassword ? t("shared.changePassword2") : t("auth.reset.submit")}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
 

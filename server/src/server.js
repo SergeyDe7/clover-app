@@ -7,9 +7,13 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import multer from "multer";
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
+import {
+  hashPassword,
+  needsPasswordRehash,
+  verifyPassword,
+} from "./passwordHash.js";
 import {
   createUser,
   findUserByEmail,
@@ -759,26 +763,30 @@ function auditFromRequest(req, action, details = {}) {
   }
 }
 
-function rememberStaffPassword(user, password, actor = {}) {
+function rememberStaffPassword(user, _password, actor = {}) {
   const userId = cleanText(user?.id);
   const login = cleanText(user?.email);
-  const plainPassword = cleanText(password);
-  if (!userId || !login || !plainPassword || !isStaffRole(user?.role)) {
+  if (!userId || !login || !isStaffRole(user?.role)) {
     return;
   }
   try {
+    // S2-NEW-002: metadata only — never persist plaintext password.
     saveStaffAccessCredentials(
       userId,
       {
         login,
-        password: plainPassword,
         role: user.role,
       },
       actor
     );
   } catch (error) {
-    console.error("Не удалось сохранить пароль менеджера в журнал доступов", error);
+    console.error("Не удалось сохранить метаданные доступа менеджера", error);
   }
+}
+
+function setNoStore(res) {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
 }
 
 function cleanText(value) {
@@ -2129,7 +2137,7 @@ app.post("/api/auth/register", async (req, res, next) => {
       });
     }
 
-    const passwordHash = await bcrypt.hash(input.password, 12);
+    const passwordHash = await hashPassword(input.password);
     const user = createUser({
       email,
       passwordHash,
@@ -2290,13 +2298,14 @@ app.post("/api/auth/reset-password", async (req, res, next) => {
     if (!token) {
       return res.status(400).json({ error: "Ссылка восстановления недействительна или уже использована." });
     }
-    const passwordHash = await bcrypt.hash(input.password, 12);
+    const passwordHash = await hashPassword(input.password);
     updateUserPassword(token.userId, passwordHash);
     const user = findUserById(token.userId);
     writeAudit({
       userId: user?.id || token.userId, userEmail: user?.email || "", userRole: user?.role || "",
       action: "auth.password.reset.complete", details: {},
     });
+    setNoStore(res);
     res.json({ ok: true, message: "Новый пароль сохранён. Теперь можно войти." });
   } catch (error) {
     next(error);
@@ -2315,7 +2324,7 @@ app.post("/api/auth/login", async (req, res, next) => {
     }
 
     const user = findUserByEmail(email);
-    if (!user || !(await bcrypt.compare(input.password, user.password_hash))) {
+    if (!user || !(await verifyPassword(input.password, user.password_hash))) {
       return res.status(401).json({ error: "Неверная почта или пароль." });
     }
     if (!user.email_verified) {
@@ -2341,11 +2350,21 @@ app.post("/api/auth/login", async (req, res, next) => {
 
     clearLoginLimit(email);
     markUserLogin(user.id);
+    let sessionUser = user;
+    if (needsPasswordRehash(user.password_hash)) {
+      try {
+        const upgraded = await hashPassword(input.password);
+        sessionUser = updateUserPassword(user.id, upgraded) || user;
+      } catch (rehashError) {
+        console.error("Не удалось обновить формат пароля после входа", rehashError);
+      }
+    }
     writeAudit({
-      userId: user.id, userEmail: user.email, userRole: user.role,
+      userId: sessionUser.id, userEmail: sessionUser.email, userRole: sessionUser.role,
       action: "auth.login", details: {},
     });
-    res.json({ token: signToken(user), user: publicUser(user) });
+    setNoStore(res);
+    res.json({ token: signToken(sessionUser), user: publicUser(sessionUser) });
   } catch (error) {
     next(error);
   }
@@ -2361,16 +2380,17 @@ app.post("/api/auth/change-password", authRequired, async (req, res, next) => {
     }
     const input = changePasswordSchema.parse(req.body);
     const user = findUserByEmail(req.user.email);
-    if (!user || !(await bcrypt.compare(input.currentPassword, user.password_hash))) {
+    if (!user || !(await verifyPassword(input.currentPassword, user.password_hash))) {
       return res.status(400).json({ error: "Текущий пароль указан неверно." });
     }
     if (input.currentPassword === input.newPassword) {
       return res.status(400).json({ error: "Новый пароль должен отличаться от текущего." });
     }
-    const passwordHash = await bcrypt.hash(input.newPassword, 12);
+    const passwordHash = await hashPassword(input.newPassword);
     const updatedUser = updateUserPassword(user.id, passwordHash);
     rememberStaffPassword(updatedUser, input.newPassword, req.user);
     auditFromRequest(req, "auth.password.change", { otherSessionsEnded: true });
+    setNoStore(res);
     res.json({
       ok: true,
       message: "Пароль изменён. Другие сессии завершены.",
@@ -2402,7 +2422,7 @@ app.post("/api/admin/managers", authRequired, roleRequired("manager"), async (re
     if (findUserByEmail(email)) {
       return res.status(409).json({ error: "Аккаунт с такой почтой уже существует." });
     }
-    const passwordHash = await bcrypt.hash(input.password, 12);
+    const passwordHash = await hashPassword(input.password);
     // Сразу можно войти (без письма-подтверждения).
     const user = createUser({
       email,
@@ -2419,6 +2439,7 @@ app.post("/api/admin/managers", authRequired, roleRequired("manager"), async (re
     });
     rememberStaffPassword(user, input.password, req.user);
     auditFromRequest(req, "manager.create", { managerId: user.id });
+    setNoStore(res);
     res.status(201).json({
       ok: true,
       manager: {
@@ -2429,7 +2450,9 @@ app.post("/api/admin/managers", authRequired, roleRequired("manager"), async (re
         telegram: contact.telegram,
       },
       requiresEmailVerification: false,
-      message: "Менеджер создан. Можно сразу войти по email и паролю. Пароль сохранён в «Ещё → Доступы → Менеджеры».",
+      temporaryPassword: input.password,
+      message:
+        "Менеджер создан. Можно сразу войти по email и паролю. Пароль показан один раз и не хранится в журнале доступов.",
     });
   } catch (error) {
     next(error);
@@ -2443,6 +2466,7 @@ app.get("/api/admin/staff", authRequired, roleRequired("manager"), (req, res) =>
     (req.user.role === "admin" || adminCount === 0);
   const canManageStaff = actorCanManageStaff(req);
   const staff = listStaffUsers().map(withStaffContactFields);
+  setNoStore(res);
   res.json({
     ok: true,
     staff: canManageStaff ? attachStaffAccess(staff) : staff,
@@ -2539,14 +2563,17 @@ app.post(
       const target = findUserById(String(req.params.userId || "").trim());
       assertCanSetStaffPassword(req, target);
       const input = staffPasswordSchema.parse(req.body);
-      const passwordHash = await bcrypt.hash(input.password, 12);
+      const passwordHash = await hashPassword(input.password);
       const updated = updateUserPassword(target.id, passwordHash);
       rememberStaffPassword(updated, input.password, req.user);
       auditFromRequest(req, "manager.password.set", { managerId: target.id });
+      setNoStore(res);
       res.json({
         ok: true,
-        message: "Пароль обновлён. Старые сессии менеджера завершены. Новый пароль сохранён в «Ещё → Доступы → Менеджеры».",
+        message:
+          "Пароль обновлён. Старые сессии менеджера завершены. Пароль показан один раз и не хранится в журнале доступов.",
         user: publicUser(updated),
+        temporaryPassword: input.password,
       });
     } catch (error) {
       next(error);
@@ -7816,6 +7843,7 @@ app.get(
   roleRequired("manager"),
   (req, res) => {
     const items = listClientAccessEntries(listClients());
+    setNoStore(res);
     res.json({
       ok: true,
       items,
@@ -7836,6 +7864,7 @@ app.delete(
     auditFromRequest(req, "client.access.vault_remove", {
       clientId: req.params.clientId,
     });
+    setNoStore(res);
     res.json({
       ok: true,
       items: listClientAccessEntries(listClients()),
@@ -7851,7 +7880,7 @@ app.post("/api/admin/clients", authRequired, roleRequired("manager"), async (req
     if (findUserByEmail(email)) {
       return res.status(409).json({ error: "Аккаунт с такой почтой уже существует." });
     }
-    const passwordHash = await bcrypt.hash(input.password, 12);
+    const passwordHash = await hashPassword(input.password);
     const user = createUser({
       email,
       passwordHash,
@@ -7874,7 +7903,6 @@ app.post("/api/admin/clients", authRequired, roleRequired("manager"), async (req
       user.id,
       {
         login: email,
-        password: input.password,
         companyName: input.companyName,
         contactName: input.contactName,
       },
@@ -7888,15 +7916,17 @@ app.post("/api/admin/clients", authRequired, roleRequired("manager"), async (req
       matrixProductIds: [],
     });
     setGlobalState("clientLinks", clientLinks);
+    setNoStore(res);
     res.status(201).json({
       ok: true,
       message:
-        "Клиент создан. Логин и пароль сохранены в «Ещё → Доступы».",
+        "Клиент создан. Пароль показан один раз и не хранится в журнале доступов.",
       client: listClients().find((item) => String(item.id) === String(user.id)) || null,
       user: publicUser(user),
       clients: listClients(),
       clientLinks,
       login: email,
+      temporaryPassword: input.password,
       access,
     });
   } catch (error) {
@@ -7915,7 +7945,7 @@ app.post(
       if (!clientUser || clientUser.role !== "client") {
         return res.status(404).json({ error: "Клиент Clover не найден." });
       }
-      const passwordHash = await bcrypt.hash(input.password, 12);
+      const passwordHash = await hashPassword(input.password);
       const updated = updateUserPassword(clientUser.id, passwordHash);
       // Чтобы клиент мог войти сразу после выдачи пароля менеджером.
       if (!updated?.email_verified) {
@@ -7935,18 +7965,19 @@ app.post(
         clientUser.id,
         {
           login: refreshed?.email || clientUser.email,
-          password: input.password,
           companyName: clientCard.companyName || "",
           contactName: clientCard.contactName || "",
         },
         req.user
       );
+      setNoStore(res);
       res.json({
         ok: true,
         message:
-          "Пароль обновлён и сохранён в «Ещё → Доступы».",
+          "Пароль обновлён. Показан один раз и не хранится в журнале доступов. Старые сессии клиента завершены.",
         user: publicUser(refreshed),
         login: refreshed?.email || clientUser.email,
+        temporaryPassword: input.password,
         clients: listClients(),
         access,
       });
