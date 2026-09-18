@@ -12962,6 +12962,48 @@ const RAW_CATALOG = [
     "critical": true
   },
   {
+    "key": "auth.error.invalidCredentials",
+    "sourceRu": "Неверная почта или пароль",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "auth.error.tooManyAttempts",
+    "sourceRu": "Слишком много попыток. Попробуйте позже",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "auth.error.emailNotVerified",
+    "sourceRu": "Подтвердите электронную почту по ссылке из письма.",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "auth.error.accountDisabled",
+    "sourceRu": "Доступ закрыт. Обратитесь к администратору.",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "auth.error.accountPending",
+    "sourceRu": "Регистрация подтверждена по почте и ожидает одобрения менеджера.",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
+    "key": "auth.error.accountRejected",
+    "sourceRu": "Регистрация отклонена. Свяжитесь с менеджером.",
+    "namespace": "ui",
+    "surface": "auth",
+    "critical": true
+  },
+  {
     "key": "auth.error.faceIdLoginFailed",
     "sourceRu": "Не удалось войти по Face ID. Если ключ добавляли раньше — укажите почту или добавьте Face ID заново в профиле.",
     "namespace": "ui",

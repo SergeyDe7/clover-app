@@ -68,6 +68,8 @@ export {
 export { unitDisplayLabel, unitDisplayShort, UNIT_DISPLAY_KEYS } from "./unitDisplay.js";
 export { translationStoreToDictionaries } from "./translationStoreProjection.js";
 export {
+  AUTH_ERROR_CODES,
+  AUTH_ERROR_KEY_BY_CODE,
   DEFAULT_ERROR_DISPLAY_KEY,
   DOMAIN_ERROR_CODES,
   DOMAIN_ERROR_KEY_BY_CODE,

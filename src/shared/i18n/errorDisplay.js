@@ -28,6 +28,16 @@ export const DOMAIN_ERROR_CODES = Object.freeze([
   "EXCEL_NO_NAME_ROWS",
 ]);
 
+/** Finite auth/login codes. Locale-independent technical authority. */
+export const AUTH_ERROR_CODES = Object.freeze([
+  "AUTH_INVALID_CREDENTIALS",
+  "AUTH_RATE_LIMITED",
+  "EMAIL_NOT_VERIFIED",
+  "ACCOUNT_DISABLED",
+  "ACCOUNT_PENDING",
+  "ACCOUNT_REJECTED",
+]);
+
 export const TRANSPORT_ERROR_KEY_BY_CODE = Object.freeze({
   TIMEOUT: "shared.error.timeout",
   NETWORK: "shared.error.network",
@@ -51,9 +61,19 @@ export const DOMAIN_ERROR_KEY_BY_CODE = Object.freeze({
   EXCEL_NO_NAME_ROWS: "shared.error.excelNoNameRows",
 });
 
+export const AUTH_ERROR_KEY_BY_CODE = Object.freeze({
+  AUTH_INVALID_CREDENTIALS: "auth.error.invalidCredentials",
+  AUTH_RATE_LIMITED: "auth.error.tooManyAttempts",
+  EMAIL_NOT_VERIFIED: "auth.error.emailNotVerified",
+  ACCOUNT_DISABLED: "auth.error.accountDisabled",
+  ACCOUNT_PENDING: "auth.error.accountPending",
+  ACCOUNT_REJECTED: "auth.error.accountRejected",
+});
+
 export const ERROR_DISPLAY_KEY_BY_CODE = Object.freeze({
   ...TRANSPORT_ERROR_KEY_BY_CODE,
   ...DOMAIN_ERROR_KEY_BY_CODE,
+  ...AUTH_ERROR_KEY_BY_CODE,
 });
 
 export const PUSH_RESTORE_HINT_KEY = "shared.push.restoreHint";

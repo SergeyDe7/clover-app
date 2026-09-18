@@ -30,11 +30,20 @@ function inferTransportCode(status, payload) {
   return "REQUEST_FAILED";
 }
 
-function makeTransportError(code, { status = 0, payload, message } = {}) {
+function parseRetryAfterSeconds(response) {
+  const raw = response?.headers?.get?.("Retry-After");
+  if (raw == null || raw === "") return undefined;
+  const seconds = Number(String(raw).trim());
+  if (!Number.isInteger(seconds) || seconds < 0 || seconds > 86400) return undefined;
+  return seconds;
+}
+
+function makeTransportError(code, { status = 0, payload, message, retryAfterSeconds } = {}) {
   const error = new Error(message || TRANSPORT_RU[code] || TRANSPORT_RU.REQUEST_FAILED);
   error.status = status;
   error.code = code;
   if (payload !== undefined) error.payload = payload;
+  if (retryAfterSeconds !== undefined) error.retryAfterSeconds = retryAfterSeconds;
   return error;
 }
 
@@ -139,6 +148,7 @@ async function request(path, options = {}) {
       status: response.status,
       payload,
       message: payload.error || TRANSPORT_RU[code] || TRANSPORT_RU.REQUEST_FAILED,
+      retryAfterSeconds: parseRetryAfterSeconds(response),
     });
   }
 

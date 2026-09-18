@@ -14817,6 +14817,54 @@ export const SEEDS = {
     "zh-CN": "点击“启用通知”以在此设备上恢复推送。",
     "ar": "اضغط «تفعيل الإشعارات» لاستعادة التنبيهات على هذا الجهاز."
   },
+  "auth.error.invalidCredentials": {
+    "en": "Invalid email or password",
+    "uz": "Pochta yoki parol noto‘g‘ri",
+    "ky": "Почта же сырсөз туура эмес",
+    "tg": "Почта ё парол нодуруст аст",
+    "zh-CN": "邮箱或密码不正确",
+    "ar": "بريد أو كلمة مرور غير صحيحة"
+  },
+  "auth.error.tooManyAttempts": {
+    "en": "Too many attempts. Try again later",
+    "uz": "Urinishlar juda ko‘p. Keyinroq urinib ko‘ring",
+    "ky": "Аракеттер өтө көп. Кийинчерээк кайталаңыз",
+    "tg": "Кӯшишҳо зиёданд. Дертар кӯшиш кунед",
+    "zh-CN": "尝试次数过多。请稍后再试",
+    "ar": "محاولات كثيرة جدًا. حاول لاحقًا"
+  },
+  "auth.error.emailNotVerified": {
+    "en": "Confirm your email using the link from the message.",
+    "uz": "Xatdagi havola orqali elektron pochtani tasdiqlang.",
+    "ky": "Каттагы шилтеме аркылуу электрондук почтаны ырастаңыз.",
+    "tg": "Почтаи электрониро тавассути пайванд аз нома тасдиқ кунед.",
+    "zh-CN": "请通过邮件中的链接确认电子邮箱。",
+    "ar": "أكّد البريد الإلكتروني عبر الرابط في الرسالة."
+  },
+  "auth.error.accountDisabled": {
+    "en": "Access is closed. Contact an administrator.",
+    "uz": "Kirish yopilgan. Administratorga murojaat qiling.",
+    "ky": "Кирүү жабык. Администраторго кайрылыңыз.",
+    "tg": "Дастрасӣ баста аст. Ба маъмур муроҷиат кунед.",
+    "zh-CN": "访问已关闭。请联系管理员。",
+    "ar": "الوصول مغلق. تواصل مع المسؤول."
+  },
+  "auth.error.accountPending": {
+    "en": "Email is confirmed. The account is waiting for manager approval.",
+    "uz": "Pochta tasdiqlangan. Akkount menejer tasdig‘ini kutmoqda.",
+    "ky": "Почта ырасталды. Аккаунт менеджердин жактыруусун күтүп жатат.",
+    "tg": "Почта тасдиқ шуд. Ҳисоб интизори тасдиқи менеҷер аст.",
+    "zh-CN": "邮箱已确认。账号正在等待经理批准。",
+    "ar": "تم تأكيد البريد. الحساب ينتظر موافقة المدير."
+  },
+  "auth.error.accountRejected": {
+    "en": "Registration was declined. Contact a manager.",
+    "uz": "Ro‘yxatdan o‘tish rad etildi. Menejerga murojaat qiling.",
+    "ky": "Каттоо четке кагылды. Менеджерге кайрылыңыз.",
+    "tg": "Бақайдгирӣ рад шуд. Бо менеҷер тамос гиред.",
+    "zh-CN": "注册被拒绝。请联系经理。",
+    "ar": "رُفض التسجيل. تواصل مع المدير."
+  },
   "auth.error.faceIdLoginFailed": {
     "en": "Face ID sign-in failed. If you added a key earlier, enter your email or add Face ID again in the profile.",
     "uz": "Face ID orqali kirib bo‘lmadi. Kalitni oldin qo‘shgan bo‘lsangiz, pochta kiriting yoki profilida Face ID-ni qayta qo‘shing.",

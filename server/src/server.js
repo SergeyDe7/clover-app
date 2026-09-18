@@ -769,8 +769,14 @@ function auditFromRequest(req, action, details = {}) {
       action,
       details,
     });
+    return true;
   } catch (error) {
-    console.error("Не удалось записать действие в журнал", error);
+    console.error("Не удалось записать действие в журнал", {
+      action: String(action || ""),
+      userId: req.user?.id || null,
+      name: error?.name || "",
+    });
+    return false;
   }
 }
 
@@ -778,7 +784,7 @@ function rememberStaffPassword(user, _password, actor = {}) {
   const userId = cleanText(user?.id);
   const login = cleanText(user?.email);
   if (!userId || !login || !isStaffRole(user?.role)) {
-    return;
+    return false;
   }
   try {
     // S2-NEW-002: metadata only — never persist plaintext password.
@@ -790,8 +796,13 @@ function rememberStaffPassword(user, _password, actor = {}) {
       },
       actor
     );
+    return true;
   } catch (error) {
-    console.error("Не удалось сохранить метаданные доступа менеджера", error);
+    console.error("Не удалось сохранить метаданные доступа менеджера", {
+      userId,
+      name: error?.name || "",
+    });
+    return false;
   }
 }
 
@@ -982,12 +993,15 @@ function rejectUnlessStaffFeature(req, res, featureId) {
   return true;
 }
 
+const LOGIN_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const LOGIN_LIMIT_MAX = 20;
+
 function checkLoginLimit(email) {
   const key = normalizeEmail(email);
   const current = loginAttempts.get(key);
   const now = Date.now();
 
-  if (!current || now - current.startedAt > 10 * 60 * 1000) {
+  if (!current || now - current.startedAt > LOGIN_LIMIT_WINDOW_MS) {
     loginAttempts.set(key, {
       count: 1,
       startedAt: now,
@@ -997,11 +1011,33 @@ function checkLoginLimit(email) {
 
   current.count += 1;
 
-  return current.count <= 20;
+  return current.count <= LOGIN_LIMIT_MAX;
+}
+
+function loginLimitRetryAfterSeconds(email) {
+  const current = loginAttempts.get(normalizeEmail(email));
+  if (!current?.startedAt) return 0;
+  const remainingMs = LOGIN_LIMIT_WINDOW_MS - (Date.now() - current.startedAt);
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return 0;
+  return Math.ceil(remainingMs / 1000);
 }
 
 function clearLoginLimit(email) {
-  loginAttempts.delete(normalizeEmail(email));
+  const key = normalizeEmail(email);
+  if (!key) return;
+  loginAttempts.delete(key);
+}
+
+function sendAuthRateLimited(res, email) {
+  const retryAfter = loginLimitRetryAfterSeconds(email);
+  setNoStore(res);
+  if (retryAfter > 0) {
+    res.setHeader("Retry-After", String(retryAfter));
+  }
+  return res.status(429).json({
+    error: "Слишком много попыток. Попробуйте позже.",
+    code: "AUTH_RATE_LIMITED",
+  });
 }
 
 
@@ -2238,14 +2274,34 @@ app.post("/api/auth/reset-password", async (req, res, next) => {
       return res.status(400).json({ error: "Ссылка восстановления недействительна или уже использована." });
     }
     const passwordHash = await hashPassword(input.password);
-    updateUserPassword(token.userId, passwordHash);
-    const user = findUserById(token.userId);
-    writeAudit({
-      userId: user?.id || token.userId, userEmail: user?.email || "", userRole: user?.role || "",
-      action: "auth.password.reset.complete", details: {},
-    });
+    const user = updateUserPassword(token.userId, passwordHash);
+    if (!user) {
+      return res.status(500).json({
+        error: "Не удалось сохранить пароль.",
+        code: "PASSWORD_WRITE_FAILED",
+      });
+    }
+    if (user.email) clearLoginLimit(user.email);
+    const warnings = [];
+    try {
+      writeAudit({
+        userId: user.id, userEmail: user.email || "", userRole: user.role || "",
+        action: "auth.password.reset.complete", details: {},
+      });
+    } catch (auditError) {
+      console.error("Не удалось записать действие в журнал", {
+        action: "auth.password.reset.complete",
+        userId: user.id,
+        name: auditError?.name || "",
+      });
+      warnings.push("AUDIT_WRITE_FAILED");
+    }
     setNoStore(res);
-    res.json({ ok: true, message: "Новый пароль сохранён. Теперь можно войти." });
+    res.json({
+      ok: true,
+      message: "Новый пароль сохранён. Теперь можно войти.",
+      ...(warnings.length ? { warnings } : {}),
+    });
   } catch (error) {
     next(error);
   }
@@ -2257,28 +2313,33 @@ app.post("/api/auth/login", async (req, res, next) => {
     const email = normalizeEmail(input.email);
 
     if (!checkLoginLimit(email)) {
-      return res.status(429).json({
-        error: "Слишком много попыток входа. Попробуйте через несколько минут.",
-      });
+      return sendAuthRateLimited(res, email);
     }
 
     const user = findUserByEmail(email);
     if (!user || !(await verifyPassword(input.password, user.password_hash))) {
-      return res.status(401).json({ error: "Неверная почта или пароль." });
+      setNoStore(res);
+      return res.status(401).json({
+        error: "Неверная почта или пароль.",
+        code: "AUTH_INVALID_CREDENTIALS",
+      });
     }
     if (!user.email_verified) {
+      setNoStore(res);
       return res.status(403).json({
         code: "EMAIL_NOT_VERIFIED",
         error: "Подтвердите электронную почту по ссылке из письма.",
       });
     }
     if (user.disabled_at) {
+      setNoStore(res);
       return res.status(403).json({
         code: "ACCOUNT_DISABLED",
         error: "Доступ закрыт. Обратитесь к администратору.",
       });
     }
-  if (isClientRole(user.role) && user.approval_status !== "approved") {
+    if (isClientRole(user.role) && user.approval_status !== "approved") {
+      setNoStore(res);
       return res.status(403).json({
         code: user.approval_status === "rejected" ? "ACCOUNT_REJECTED" : "ACCOUNT_PENDING",
         error: user.approval_status === "rejected"
@@ -2327,13 +2388,26 @@ app.post("/api/auth/change-password", authRequired, async (req, res, next) => {
     }
     const passwordHash = await hashPassword(input.newPassword);
     const updatedUser = updateUserPassword(user.id, passwordHash);
-    rememberStaffPassword(updatedUser, input.newPassword, req.user);
-    auditFromRequest(req, "auth.password.change", { otherSessionsEnded: true });
+    if (!updatedUser) {
+      return res.status(500).json({
+        error: "Не удалось сохранить пароль.",
+        code: "PASSWORD_WRITE_FAILED",
+      });
+    }
+    if (updatedUser.email) clearLoginLimit(updatedUser.email);
+    const warnings = [];
+    if (!rememberStaffPassword(updatedUser, input.newPassword, req.user)) {
+      warnings.push("ACCESS_VAULT_UPDATE_FAILED");
+    }
+    if (!auditFromRequest(req, "auth.password.change", { otherSessionsEnded: true })) {
+      warnings.push("AUDIT_WRITE_FAILED");
+    }
     setNoStore(res);
     res.json({
       ok: true,
       message: "Пароль изменён. Другие сессии завершены.",
       token: signToken(updatedUser),
+      ...(warnings.length ? { warnings } : {}),
     });
   } catch (error) {
     next(error);
@@ -2505,8 +2579,20 @@ app.post(
       const input = staffPasswordSchema.parse(req.body);
       const passwordHash = await hashPassword(input.password);
       const updated = updateUserPassword(target.id, passwordHash);
-      rememberStaffPassword(updated, input.password, req.user);
-      auditFromRequest(req, "manager.password.set", { managerId: target.id });
+      if (!updated) {
+        return res.status(500).json({
+          error: "Не удалось сохранить пароль.",
+          code: "PASSWORD_WRITE_FAILED",
+        });
+      }
+      if (updated.email) clearLoginLimit(updated.email);
+      const warnings = [];
+      if (!rememberStaffPassword(updated, input.password, req.user)) {
+        warnings.push("ACCESS_VAULT_UPDATE_FAILED");
+      }
+      if (!auditFromRequest(req, "manager.password.set", { managerId: target.id })) {
+        warnings.push("AUDIT_WRITE_FAILED");
+      }
       setNoStore(res);
       res.json({
         ok: true,
@@ -2514,6 +2600,7 @@ app.post(
           "Пароль обновлён. Старые сессии менеджера завершены. Пароль показан один раз и не хранится в журнале доступов.",
         user: publicUser(updated),
         temporaryPassword: input.password,
+        ...(warnings.length ? { warnings } : {}),
       });
     } catch (error) {
       next(error);
@@ -5415,6 +5502,7 @@ app.post(
           ([, value]) => String(value || "").trim()
         )
       ),
+      email: normalizeEmail(req.user.email),
     };
     const addressesIncoming = Array.isArray(req.body?.addresses)
       ? req.body.addresses
@@ -5426,10 +5514,8 @@ app.post(
       ? req.body.orders
       : [];
 
-    setClientStateField(req.user.id, "profile", {
-      ...profile,
-      email: profile.email || req.user.email,
-    });
+    // Клиент не может сменить email/логин через migrate (localStorage).
+    setClientStateField(req.user.id, "profile", profile);
     // Не затираем серверные адреса пустым localStorage при migrate после смены пароля.
     const addresses =
       addressesIncoming.length > 0
@@ -7942,39 +8028,76 @@ app.post(
       }
       const passwordHash = await hashPassword(input.password);
       const updated = updateUserPassword(clientUser.id, passwordHash);
+      if (!updated) {
+        return res.status(500).json({
+          error: "Не удалось сохранить пароль.",
+          code: "PASSWORD_WRITE_FAILED",
+        });
+      }
       // Чтобы клиент мог войти сразу после выдачи пароля менеджером.
-      if (!updated?.email_verified) {
+      if (!updated.email_verified) {
         setUserEmailVerified(clientUser.id, true);
       }
-      if (updated?.approval_status !== "approved") {
+      if (updated.approval_status !== "approved") {
         setUserApprovalStatus(clientUser.id, "approved");
       }
       const refreshed = findUserById(clientUser.id) || updated;
-      auditFromRequest(req, "client.password.set_by_manager", {
+      const loginEmail = normalizeEmail(refreshed?.email || clientUser.email);
+      clearLoginLimit(loginEmail);
+      try {
+        const state = getClientState(clientUser.id);
+        const profile =
+          state?.profile && typeof state.profile === "object" ? state.profile : {};
+        if (normalizeEmail(profile.email) !== loginEmail) {
+          setClientStateField(clientUser.id, "profile", {
+            ...profile,
+            email: loginEmail,
+          });
+        }
+      } catch (profileError) {
+        console.error(
+          "Не удалось выровнять email профиля после смены пароля клиента",
+          { clientId: clientUser.id, name: profileError?.name || "" }
+        );
+      }
+      const warnings = [];
+      if (!auditFromRequest(req, "client.password.set_by_manager", {
         clientId: clientUser.id,
-      });
+      })) {
+        warnings.push("AUDIT_WRITE_FAILED");
+      }
       const clientCard =
         listClients().find((item) => String(item.id) === String(clientUser.id)) ||
         {};
-      const access = saveClientAccessCredentials(
-        clientUser.id,
-        {
-          login: refreshed?.email || clientUser.email,
-          companyName: clientCard.companyName || "",
-          contactName: clientCard.contactName || "",
-        },
-        req.user
-      );
+      let access = null;
+      try {
+        access = saveClientAccessCredentials(
+          clientUser.id,
+          {
+            login: loginEmail,
+            companyName: clientCard.companyName || "",
+            contactName: clientCard.contactName || "",
+          },
+          req.user
+        );
+      } catch (vaultError) {
+        console.error(
+          "Не удалось обновить журнал доступов после смены пароля клиента",
+          { clientId: clientUser.id, name: vaultError?.name || "" }
+        );
+        warnings.push("ACCESS_VAULT_UPDATE_FAILED");
+      }
       setNoStore(res);
       res.json({
         ok: true,
         message:
           "Пароль обновлён. Показан один раз и не хранится в журнале доступов. Старые сессии клиента завершены.",
         user: publicUser(refreshed),
-        login: refreshed?.email || clientUser.email,
+        login: loginEmail,
         temporaryPassword: input.password,
         clients: listClients(),
         access,
+        ...(warnings.length ? { warnings } : {}),
       });
     } catch (error) {
       next(error);

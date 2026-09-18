@@ -19,6 +19,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { inspectPlaintextPasswordVaultCounts } from "../src/passwordVaultMigrate.js";
+import { publicCabinetUrl } from "../src/authUrlPolicy.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const serverDir = path.join(root, "server");
@@ -232,6 +233,17 @@ console.log(JSON.stringify({
 }
 
 async function main() {
+  try {
+    publicCabinetUrl({}, {});
+    note("register.policy.missing-public-url", false, "expected AUTH_PUBLIC_URL_REQUIRED");
+  } catch (error) {
+    note(
+      "register.policy.missing-public-url",
+      error.status === 503 && error.code === "AUTH_PUBLIC_URL_REQUIRED",
+      `status=${error.status || 0} code=${error.code || ""}`
+    );
+  }
+
   const ids = seed();
   note("baseline.plaintext-present", vaultHasPlaintextPassword() > 0, `count=${vaultHasPlaintextPassword()}`);
 
@@ -264,6 +276,9 @@ async function main() {
       BACKUP_DIR: backupDir,
       SMTP_HOST: "",
       TELEGRAM_BOT_TOKEN: "",
+      APP_PUBLIC_URL: `http://127.0.0.1:${port}`,
+      ALLOW_DEV_AUTH_LINKS: "1",
+      CABINET_PATH: "/lk",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -301,7 +316,7 @@ async function main() {
         phone: "+70000000000",
       },
     });
-    note("register.created", reg.status === 201, `status=${reg.status}`);
+    note("register.created", reg.status === 201, `status=${reg.status} code=${reg.json?.code || ""}`);
     note(
       "register.no-store",
       String(reg.headers.get("cache-control") || "").includes("no-store"),
