@@ -3,7 +3,6 @@ import {
   closeSync,
   constants as fsConstants,
   createReadStream,
-  existsSync,
   fstatSync,
   lstatSync,
   mkdirSync,
@@ -182,6 +181,72 @@ function openBackupFd(fileName) {
 export function openBackupReadStream(fileName) {
   const opened = openBackupFd(fileName);
   return createReadStream("", { fd: opened.fd });
+}
+
+export const BACKUP_DOWNLOAD_CACHE_CONTROL = "private, no-store";
+
+export function backupDownloadFileName(fileName) {
+  return path.basename(String(fileName || ""));
+}
+
+export function applyBackupDownloadCacheHeaders(res) {
+  res.setHeader("Cache-Control", BACKUP_DOWNLOAD_CACHE_CONTROL);
+}
+
+export function applyBackupDownloadBodyHeaders(res, fileName) {
+  const safeName = backupDownloadFileName(fileName);
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${safeName}"`
+  );
+}
+
+export function buildBackupDownloadAuditDetails({
+  result,
+  fileName,
+  code,
+} = {}) {
+  const details = {
+    result: result === "success" ? "success" : "error",
+  };
+  const safeName = backupDownloadFileName(fileName);
+  if (safeName && safeName === path.basename(safeName) && !safeName.includes("\0")) {
+    details.fileName = safeName;
+  }
+  if (details.result === "error") {
+    details.code = String(code || "BACKUP_DOWNLOAD_FAILED").slice(0, 80);
+  }
+  return details;
+}
+
+export function executeBackupDownload({
+  fileName,
+  res,
+  openStream = openBackupReadStream,
+} = {}) {
+  applyBackupDownloadCacheHeaders(res);
+  try {
+    const stream = openStream(fileName);
+    applyBackupDownloadBodyHeaders(res, fileName);
+    if (stream && typeof stream.pipe === "function") {
+      stream.pipe(res);
+    }
+    return {
+      ok: true,
+      audit: buildBackupDownloadAuditDetails({ result: "success", fileName }),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error,
+      audit: buildBackupDownloadAuditDetails({
+        result: "error",
+        fileName,
+        code: error?.code || "BACKUP_DOWNLOAD_FAILED",
+      }),
+    };
+  }
 }
 
 export function readBackupFileBuffer(fileName) {

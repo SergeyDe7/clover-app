@@ -83,11 +83,17 @@ import {
   cleanupOldBackups,
   createServerBackup,
   ensureDailyBackup,
+  executeBackupDownload,
   listServerBackups,
-  openBackupReadStream,
   publicBackupMetadata,
   restoreServerBackup,
 } from "./backups.js";
+import {
+  CLIENT_PREVIEW_FILE,
+  PRODUCTS_PREVIEW_FILE,
+  toClientPreviewItems,
+  writePreviewArtifact,
+} from "./previewArtifact.js";
 import {
   assertSafeManagerOrderReplace,
   alignLinePricesToCeilTotal,
@@ -5973,16 +5979,13 @@ app.get(
   authRequired,
   roleRequired("admin"),
   (req, res, next) => {
-    try {
-      const stream = openBackupReadStream(req.params.fileName);
-      res.setHeader("Content-Type", "application/zip");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="${path.basename(String(req.params.fileName || ""))}"`
-      );
-      stream.pipe(res);
-    } catch (error) {
-      next(error);
+    const outcome = executeBackupDownload({
+      fileName: req.params.fileName,
+      res,
+    });
+    auditFromRequest(req, "backup.download", outcome.audit);
+    if (!outcome.ok) {
+      next(outcome.error);
     }
   }
 );
@@ -6087,7 +6090,6 @@ app.post(
 );
 app.post("/api/one-c/products-preview", async (req, res, next) => {
   try {
-    const { mkdirSync, writeFileSync } = await import("node:fs");
     const receivedAt = new Date().toISOString();
     // Allowlist (TEST / VLAVKA при prod). Каталог принимаем из любой разрешённой базы.
     const sourceDatabase = requireOneCAllowedDatabase(req, res);
@@ -6121,33 +6123,22 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
       "data",
       "one-c-preview"
     );
-    mkdirSync(previewDirectory, { recursive: true });
-
-    const filePath = path.resolve(
-      previewDirectory,
-      "products-preview.json"
-    );
-    writeFileSync(
-      filePath,
-      JSON.stringify(
-        {
-          receivedAt,
-          database: sourceDatabase,
-          data: {
-            sourceCount: allOneCProducts.length,
-            retainedCount: allOneCProducts.length,
-            relevantCount: relevantOneCProducts.length,
-            candidateProducts: Object.values(preliminaryCandidateMap).filter(
-              (items) => Array.isArray(items) && items.length
-            ).length,
-            mode: "full-catalog-for-search",
-            items: allOneCProducts,
-          },
+    writePreviewArtifact(
+      path.resolve(previewDirectory, PRODUCTS_PREVIEW_FILE),
+      {
+        receivedAt,
+        database: sourceDatabase,
+        data: {
+          sourceCount: allOneCProducts.length,
+          retainedCount: allOneCProducts.length,
+          relevantCount: relevantOneCProducts.length,
+          candidateProducts: Object.values(preliminaryCandidateMap).filter(
+            (items) => Array.isArray(items) && items.length
+          ).length,
+          mode: "full-catalog-for-search",
+          items: allOneCProducts,
         },
-        null,
-        2
-      ),
-      "utf8"
+      }
     );
 
     const linked = autoLinkCloverProducts(
@@ -6920,10 +6911,9 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
 
     const previewDirectory = path.resolve(serverDirectory, "data", "one-c-preview");
     try {
-      mkdirSync(previewDirectory, { recursive: true });
-      writeFileSync(
-        path.resolve(previewDirectory, "clients-preview.json"),
-        JSON.stringify({
+      writePreviewArtifact(
+        path.resolve(previewDirectory, CLIENT_PREVIEW_FILE),
+        {
           receivedAt,
           database: sourceDatabase,
           data: {
@@ -6931,10 +6921,9 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
             retainedCount: allOneCClients.length,
             relevantCount: relevantOneCClients.length,
             mode: "full-catalog-for-search",
-            items: allOneCClients,
+            items: toClientPreviewItems(allOneCClients),
           },
-        }, null, 2),
-        "utf8"
+        }
       );
     } catch (artifactError) {
       // Диагностический JSON не является authoritative state и не должен
