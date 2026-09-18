@@ -43,6 +43,18 @@ function leakBlob() {
   return `SQL ${MARKER_PATH} token=${MARKER_TOKEN} email=${MARKER_EMAIL} phone=${MARKER_PHONE}\r\nINFO fake-severity\u001b[31m`;
 }
 
+function normalizeSourceNewlines(text) {
+  return String(text).replace(/\r\n/gu, "\n").replace(/\r/gu, "\n");
+}
+
+function readRepoSource(relativePath) {
+  const normalized = normalizeSourceNewlines(
+    readFileSync(path.join(repositoryRoot, relativePath), "utf8")
+  );
+  assert.ok(normalized.length > 0, `${relativePath} is empty`);
+  return normalized;
+}
+
 function dumpValue(value) {
   if (value instanceof Error) {
     return {
@@ -360,12 +372,22 @@ test("audit access: unauthenticated and client are denied by live policy", () =>
   });
   assert.equal(client.allow, false);
 
-  const serverSource = readFileSync(
-    path.join(repositoryRoot, "server/src/server.js"),
-    "utf8"
+  const serverSource = readRepoSource("server/src/server.js");
+  const crlfSnippet = 'app.get(\r\n  "/api/admin/audit"';
+  assert.equal(
+    normalizeSourceNewlines(crlfSnippet).includes('app.get(\n  "/api/admin/audit"'),
+    true
+  );
+  assert.equal(
+    normalizeSourceNewlines('app.get(\r\n  "/api/other"').includes('app.get(\n  "/api/admin/audit"'),
+    false
+  );
+  assert.equal(
+    serverSource.includes('app.get(\n  "/api/admin/audit-missing-probe"'),
+    false
   );
   const start = serverSource.indexOf('app.get(\n  "/api/admin/audit"');
-  assert.ok(start >= 0);
+  assert.ok(start >= 0, "audit route source snippet must still be found after LF/CRLF normalization");
   const slice = serverSource.slice(start, start + 400);
   assert.match(slice, /authRequired/u);
   assert.match(slice, /roleRequired\("manager"\)/u);
@@ -403,11 +425,9 @@ test("audit access: manager without feature is denied; admin/manager with audit 
 });
 
 test("audit actor/action/timestamp are server-owned in live writers", () => {
-  const serverSource = readFileSync(
-    path.join(repositoryRoot, "server/src/server.js"),
-    "utf8"
-  );
+  const serverSource = readRepoSource("server/src/server.js");
   const fnStart = serverSource.indexOf("function auditFromRequest");
+  assert.ok(fnStart >= 0, "auditFromRequest must remain locatable after LF/CRLF normalization");
   const fn = serverSource.slice(fnStart, fnStart + 700);
   assert.match(fn, /userId: req\.user\?\.id/u);
   assert.match(fn, /userEmail: req\.user\?\.email/u);
@@ -415,37 +435,28 @@ test("audit actor/action/timestamp are server-owned in live writers", () => {
   assert.doesNotMatch(fn, /req\.body\?\.action/u);
   assert.doesNotMatch(fn, /req\.body\?\.createdAt/u);
 
-  const dbSource = readFileSync(
-    path.join(repositoryRoot, "server/src/db.js"),
-    "utf8"
-  );
+  const dbSource = readRepoSource("server/src/db.js");
   assert.match(dbSource, /created_at\s*\n\s*\)\s*\n\s*VALUES \(\?, \?, \?, \?, \?, \?, \?\)/u);
   assert.match(dbSource, /now\(\)/u);
 });
 
 test("log injection: UI does not render raw upstream message or HTML", () => {
-  const auditSource = readFileSync(
-    path.join(repositoryRoot, "src/screens/manager/ManagerAudit.jsx"),
-    "utf8"
-  );
+  const auditSource = readRepoSource("src/screens/manager/ManagerAudit.jsx");
   assert.doesNotMatch(auditSource, /dangerouslySetInnerHTML/u);
   assert.doesNotMatch(auditSource, /details\.message/u);
   assert.match(auditSource, /details\.code/u);
-  const serverSource = readFileSync(
-    path.join(repositoryRoot, "server/src/server.js"),
-    "utf8"
-  );
+  const serverSource = readRepoSource("server/src/server.js");
+  const auditStart = serverSource.indexOf("/api/admin/audit");
+  const resetStart = serverSource.indexOf("/api/admin/reset");
+  assert.ok(auditStart >= 0 && resetStart > auditStart);
   assert.doesNotMatch(
-    serverSource.slice(serverSource.indexOf("/api/admin/audit"), serverSource.indexOf("/api/admin/reset")),
+    serverSource.slice(auditStart, resetStart),
     /<script/u
   );
 });
 
 test("live 1C handlers wire public error helper instead of error.message", () => {
-  const serverSource = readFileSync(
-    path.join(repositoryRoot, "server/src/server.js"),
-    "utf8"
-  );
+  const serverSource = readRepoSource("server/src/server.js");
   for (const route of [
     "/api/admin/one-c/test",
     "/api/admin/one-c/preview/:type",
@@ -630,18 +641,9 @@ test("SEC3-007: logger does not throw on cyclic extra fields", () => {
 });
 
 test("SEC3-007: leftover production dumps are wired to logSafe", () => {
-  const serverSource = readFileSync(
-    path.join(repositoryRoot, "server/src/server.js"),
-    "utf8"
-  );
-  const dbSource = readFileSync(
-    path.join(repositoryRoot, "server/src/db.js"),
-    "utf8"
-  );
-  const pushSource = readFileSync(
-    path.join(repositoryRoot, "server/src/push.js"),
-    "utf8"
-  );
+  const serverSource = readRepoSource("server/src/server.js");
+  const dbSource = readRepoSource("server/src/db.js");
+  const pushSource = readRepoSource("server/src/push.js");
   assert.doesNotMatch(serverSource, /console\.error\(\s*error\s*\)/u);
   assert.doesNotMatch(serverSource, /console\.error\([^;]*error\?\.message/u);
   assert.doesNotMatch(serverSource, /console\.error\([^;]*mailError/u);
