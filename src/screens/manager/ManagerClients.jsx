@@ -534,9 +534,15 @@ function ManagerClientEditor({
     setPasswordBusy(true);
     try {
       const result = await api.setClientPassword(client.id, password);
-      void result;
       await onReload();
-      setPasswordDraft("");
+      const once = String(result?.temporaryPassword || password).trim();
+      setPasswordDraft(once);
+      const login = String(result?.login || client.email || "").trim();
+      setMessage(
+        login
+          ? `${t("shared.passwordUpdated")} ${t("manager.clients.loginStaysEmail", { email: login })}`
+          : t("shared.passwordUpdated")
+      );
     } catch (saveError) {
       await appAlert({
         title: t("manager.error.passwordChangeFailed"),

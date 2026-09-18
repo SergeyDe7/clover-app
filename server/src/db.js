@@ -1197,6 +1197,8 @@ export function ensureGlobalState() {
 }
 
 export function findUserByEmail(email) {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!normalized) return undefined;
   return db
     .prepare(`
       SELECT id, email, password_hash, role, created_at, email_verified, approval_status,
@@ -1204,7 +1206,7 @@ export function findUserByEmail(email) {
       FROM users
       WHERE email = ?
     `)
-    .get(email.toLowerCase());
+    .get(normalized);
 }
 
 export function findUserById(id) {
@@ -1667,7 +1669,7 @@ export function listClients() {
 
     return {
       id: row.id,
-      email: profile.email || row.email,
+      email: String(row.email || "").trim().toLowerCase() || profile.email || "",
       companyName: profile.companyName || "",
       contactName: primary?.name || profile.contactName || "",
       phone: primary?.phone || profile.phone || "",

@@ -62,6 +62,15 @@ assert.ok(panel.includes('t("shared.yourPassword")'), "AdminRolePanel: нет б
 assert.ok(!panel.includes("canManageStaff && !isSelf"), "AdminRolePanel: Управление скрыто для своей карточки");
 
 const settings = readFileSync(path.join(root, "src/screens/manager/ManagerSettings.jsx"), "utf8");
+const clientsPath = path.join(root, "src/screens/manager/ManagerClients.jsx");
+const clients = readFileSync(clientsPath, "utf8");
+assert.ok(clients.includes("temporaryPassword"), "ManagerClients: нет one-shot temporaryPassword");
+assert.ok(clients.includes('t("shared.passwordUpdated")'), "ManagerClients: нет подтверждения сохранения пароля");
+assert.ok(!/void result/.test(clients), "ManagerClients: не должен игнорировать ответ setClientPassword");
+assert.ok(
+  !/setPasswordDraft\(""\)/.test(clients.split("const savePassword")[1]?.split("return (")[0] || ""),
+  "ManagerClients: успешная смена пароля не должна очищать поле без one-shot"
+);
 assert.ok(settings.includes("allowPasswordChange={!isAdmin}"), "ManagerSettings: пароль админа не убран из настроек");
 
 console.log("verify-staff-access-ui: ok");

@@ -17,6 +17,8 @@ import {
 } from "../src/i18n/uiTranslationSeed.js";
 import { scanSource, AUTHORITY_CALLEE_NAMES } from "./i18n-stage31-ast-scan.mjs";
 import {
+  AUTH_ERROR_CODES,
+  AUTH_ERROR_KEY_BY_CODE,
   DEFAULT_ERROR_DISPLAY_KEY,
   DOMAIN_ERROR_CODES,
   DOMAIN_ERROR_KEY_BY_CODE,
@@ -187,6 +189,11 @@ for (const code of DOMAIN_ERROR_CODES) {
   const key = DOMAIN_ERROR_KEY_BY_CODE[code];
   assert.equal(hasCatalogKey(key), true, `domain map key missing from catalog: ${code} -> ${key}`);
 }
+for (const code of AUTH_ERROR_CODES) {
+  const key = AUTH_ERROR_KEY_BY_CODE[code];
+  assert.equal(typeof key, "string");
+  assert.equal(hasCatalogKey(key), true, `auth map key missing from catalog: ${code} -> ${key}`);
+}
 for (const [code, key] of Object.entries(ERROR_DISPLAY_KEY_BY_CODE)) {
   assert.equal(hasCatalogKey(key), true, `projection map key missing: ${code} -> ${key}`);
   assert.equal(isKnownErrorCode(code), true);
@@ -200,6 +207,27 @@ assert.equal(
 assert.equal(
   errorDisplayMessage({ code: "NETWORK", message: "raw-network", status: 0 }, tLookup),
   "T:shared.error.network"
+);
+assert.equal(
+  errorDisplayMessage(
+    { code: "AUTH_INVALID_CREDENTIALS", message: "SQLException: users.password_hash", status: 401 },
+    tLookup
+  ),
+  "T:auth.error.invalidCredentials"
+);
+assert.equal(
+  errorDisplayMessage(
+    { code: "AUTH_RATE_LIMITED", message: "try again in 573 seconds", status: 429 },
+    tLookup
+  ),
+  "T:auth.error.tooManyAttempts"
+);
+assert.doesNotMatch(
+  errorDisplayMessage(
+    { code: "AUTH_RATE_LIMITED", message: "try again in 573 seconds", status: 429, retryAfterSeconds: 573 },
+    tLookup
+  ),
+  /573/
 );
 assert.equal(
   errorDisplayMessage({ message: "Неизвестная сырая ошибка сервера XYZ" }, tLookup),

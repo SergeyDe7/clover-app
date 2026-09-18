@@ -93,6 +93,8 @@ const CHECK_FILES = [
   "scripts/verify-s2-new-002-audit-recursive.mjs",
   "scripts/verify-s2-new-002-vault-concurrency.mjs",
   "scripts/verify-s2-new-002-password-storage.mjs",
+  "scripts/verify-admin-client-password-login.mjs",
+  "scripts/verify-auth-login-error-display.mjs",
   "scripts/verify-ui-build-tag.mjs",
   "scripts/verify-security-stage3-package1.mjs",
 ];
