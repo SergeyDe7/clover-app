@@ -45,6 +45,47 @@ assert.ok(
 );
 assert.ok(scriptSrc.includes("BUILD_WT") || scriptSrc.includes("worktree"), "off-live build worktree");
 assert.ok(scriptSrc.includes("STAGED_DIST") || scriptSrc.includes("staged"), "staged dist");
+assert.ok(
+  scriptSrc.includes("CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED"),
+  "isolated build must receive locale-route flag"
+);
+assert.ok(
+  scriptSrc.includes("--require-flag"),
+  "deploy must require an explicit locale-route flag"
+);
+assert.ok(
+  scriptSrc.includes("--locale-env-file"),
+  "deploy must pass a locale-only env path, not Node --env-file"
+);
+assert.equal(
+  /\s--env-file\b/.test(scriptSrc),
+  false,
+  "Node --env-file would load the full dotenv into process.env"
+);
+assert.ok(
+  scriptSrc.includes("--fail-if-disabled-with-foreign-languages"),
+  "deploy must treat foreign DB languages as inconsistency when disabled"
+);
+assert.equal(
+  /node "\$\{ASSERT_JS\}"[\s\S]*?--flag-value/.test(scriptSrc),
+  false,
+  "print-expect must not take an awk/process.env fallback as --flag-value"
+);
+assert.equal(
+  /^\s*source\s+/m.test(scriptSrc),
+  false,
+  "deploy must not source dotenv"
+);
+assert.ok(
+  scriptSrc.includes("assert-locale-route-release.mjs") ||
+    scriptSrc.includes("locale-route artifacts rejected"),
+  "pre-cutover locale-route guard must exist"
+);
+assert.equal(
+  /\$\{NPM_BIN\}"\s+run build -- --outDir/.test(scriptSrc),
+  false,
+  "must not pass --outDir through npm run build"
+);
 // Committed normal default for readiness window must be 60 (sandbox may still override via env).
 assert.match(
   scriptSrc,
@@ -95,6 +136,12 @@ function initSandbox(label) {
   writeFileSync(path.join(live, "dist/sitemap.xml"), "<urlset></urlset>");
   writeFileSync(path.join(live, "package.json"), JSON.stringify({ scripts: { build: "node ./fake-build.js" } }));
   writeFileSync(path.join(live, "server/src/server.js"), "console.log('api-old')\n");
+  mkdirSync(path.join(live, "server"), { recursive: true });
+  writeFileSync(path.join(live, ".gitignore"), "server/.env\n");
+  writeFileSync(
+    path.join(live, "server/.env"),
+    "CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED=0\n"
+  );
 
   // Fake git repo with two commits.
   execFileSync("git", ["init"], { cwd: live });
@@ -116,8 +163,27 @@ const out = path.join(process.cwd(), 'dist');
 fs.mkdirSync(out, { recursive: true });
 const tag = process.env.FAKE_BUILD_TAG || 'ui-NEW';
 const js = process.env.FAKE_BUILD_JS || '/assets/index-NEW.js';
-fs.writeFileSync(path.join(out, 'index.html'), '<meta name="clover-ui-build" content="' + tag + '"><script src="' + js + '"></script>');
-fs.writeFileSync(path.join(out, 'sitemap.xml'), '<urlset><url><loc>https://example.test/</loc></url></urlset>');
+const forcedLocale = process.env.FAKE_LOCALE_ARTIFACTS || '';
+const localeEnabled = forcedLocale === 'enabled' || (forcedLocale !== 'disabled' && process.env.CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED === '1');
+const localeStamp = localeEnabled ? 'enabled' : 'disabled';
+fs.writeFileSync(path.join(out, 'index.html'), '<meta name="clover-ui-build" content="' + tag + '"><meta name="clover-public-locale-routes" content="' + localeStamp + '"><script src="' + js + '"></script>');
+if (localeEnabled) {
+  fs.writeFileSync(path.join(out, 'public-route-manifest.json'), JSON.stringify({
+    version: 1,
+    infrastructureEnabled: true,
+    enabledLanguages: ['ru','en'],
+    routes: {
+      '/ru/': { pathname: '/ru/', locale: 'ru', direction: 'ltr', canonical: 'https://clover-spb.ru/ru/', alternates: [{hreflang:'ru',href:'https://clover-spb.ru/ru/'},{hreflang:'en',href:'https://clover-spb.ru/en/'},{hreflang:'x-default',href:'https://clover-spb.ru/ru/'}] },
+      '/ru/catalog': { pathname: '/ru/catalog', locale: 'ru', direction: 'ltr', canonical: 'https://clover-spb.ru/ru/catalog', alternates: [] },
+      '/en/': { pathname: '/en/', locale: 'en', direction: 'ltr', canonical: 'https://clover-spb.ru/en/', alternates: [] },
+      '/en/catalog': { pathname: '/en/catalog', locale: 'en', direction: 'ltr', canonical: 'https://clover-spb.ru/en/catalog', alternates: [] }
+    }
+  }));
+  fs.writeFileSync(path.join(out, 'sitemap.xml'), '<urlset><url><loc>https://clover-spb.ru/ru/</loc></url><url><loc>https://clover-spb.ru/en/</loc></url></urlset>');
+} else {
+  fs.writeFileSync(path.join(out, 'public-route-manifest.json'), JSON.stringify({ version:1, infrastructureEnabled:false, enabledLanguages:['ru'], routes:{} }));
+  fs.writeFileSync(path.join(out, 'sitemap.xml'), '<urlset><url><loc>https://example.test/</loc></url></urlset>');
+}
 if (process.env.FAKE_BUILD_FAIL === '1') {
   console.error('fake build fail');
   process.exit(1);
@@ -496,6 +562,91 @@ exit 2
   assert.equal(readFileSync(path.join(box.state, "restart_count"), "utf8").trim(), "0");
   assert.doesNotMatch(res.stdout, /Deploy OK/);
   console.log("L_CROSS_DEVICE_REFUSAL:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- M. EXPECTED ENABLED + DISABLED ARTIFACTS REFUSED BEFORE CUTOVER ---
+{
+  const box = initSandbox("locale-guard-reject");
+  mkdirSync(path.join(box.live, "server"), { recursive: true });
+  writeFileSync(path.join(box.live, "server/.env"), "CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED=1\n");
+  const before = liveSha(box);
+  const beforeTag = liveTag(box);
+  const res = runDeploy(box, box.newSha, { FAKE_LOCALE_ARTIFACTS: "disabled" });
+  assert.notEqual(res.status, 0, "disabled locale artifacts must fail deploy");
+  assert.match(
+    `${res.stderr}\n${res.stdout}`,
+    /locale-route|refusing cutover|artifacts rejected/i
+  );
+  assert.equal(liveSha(box), before, "source unchanged when locale guard rejects");
+  assert.equal(liveTag(box), beforeTag, "dist unchanged when locale guard rejects");
+  assert.equal(readFileSync(path.join(box.state, "restart_count"), "utf8").trim(), "0");
+  assert.doesNotMatch(res.stdout, /Deploy OK/);
+  console.log("M_LOCALE_GUARD_REJECTS_DISABLED:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- N. EXPECTED ENABLED + ENABLED ARTIFACTS ALLOW CUTOVER ---
+{
+  const box = initSandbox("locale-guard-accept");
+  mkdirSync(path.join(box.live, "server"), { recursive: true });
+  writeFileSync(path.join(box.live, "server/.env"), "CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED=1\n");
+  const res = runDeploy(box, box.newSha);
+  assert.equal(res.status, 0, `enabled locale deploy failed: ${res.stderr}\n${res.stdout}`);
+  assert.equal(liveSha(box), box.newSha);
+  assert.match(res.stdout, /Deploy OK/);
+  console.log("N_LOCALE_GUARD_ACCEPTS_ENABLED:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- O. MISSING REQUIRED FLAG STOPS BEFORE CUTOVER ---
+{
+  const box = initSandbox("locale-flag-missing");
+  rmSync(path.join(box.live, "server/.env"), { force: true });
+  const before = liveSha(box);
+  const beforeTag = liveTag(box);
+  const res = runDeploy(box, box.newSha);
+  assert.notEqual(res.status, 0, "missing locale flag must fail deploy");
+  assert.match(
+    `${res.stderr}\n${res.stdout}`,
+    /required locale-route flag|flag file missing|refusing cutover/i
+  );
+  assert.equal(liveSha(box), before, "source unchanged when required flag is missing");
+  assert.equal(liveTag(box), beforeTag, "dist unchanged when required flag is missing");
+  assert.equal(readFileSync(path.join(box.state, "restart_count"), "utf8").trim(), "0");
+  assert.doesNotMatch(res.stdout, /Deploy OK/);
+  console.log("O_REQUIRED_LOCALE_FLAG_MISSING:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- P. EXPLICIT DISABLED IS KEPT (NOT ENABLED FROM ENV LEAK) ---
+{
+  const box = initSandbox("locale-flag-disabled");
+  const res = runDeploy(box, box.newSha, { CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED: "1" });
+  assert.equal(res.status, 0, `intentional disabled deploy failed: ${res.stderr}\n${res.stdout}`);
+  assert.equal(liveSha(box), box.newSha);
+  const html = readFileSync(path.join(box.live, "dist/index.html"), "utf8");
+  assert.match(html, /content="disabled"/);
+  assert.doesNotMatch(html, /content="enabled"/);
+  console.log("P_EXPLICIT_DISABLED_KEPT:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- Q. ENV FILE WITHOUT THE REQUIRED KEY STOPS BEFORE CUTOVER ---
+{
+  const box = initSandbox("locale-flag-key-absent");
+  writeFileSync(path.join(box.live, "server/.env"), "OTHER_SECRET=do-not-enable\n");
+  const before = liveSha(box);
+  const res = runDeploy(box, box.newSha, { CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED: "1" });
+  assert.notEqual(res.status, 0, "missing key must fail even if process.env has 1");
+  assert.match(
+    `${res.stderr}\n${res.stdout}`,
+    /required CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED missing|required locale-route flag/i
+  );
+  assert.equal(liveSha(box), before);
+  assert.equal(`${res.stderr}\n${res.stdout}`.includes("do-not-enable"), false);
+  assert.doesNotMatch(res.stdout, /Deploy OK/);
+  console.log("Q_REQUIRED_LOCALE_FLAG_KEY_ABSENT:PASS");
   rmSync(box.root, { recursive: true, force: true });
 }
 

@@ -38,6 +38,7 @@ import {
   buildLocalizedRouteManifest,
   renderLocalizedSitemapXml,
 } from "../../src/shared/sitemap/localizedSitemap.js";
+import { isPublicLocaleRoutesEnabledFromEnv } from "../../src/shared/i18n/localeRoutesBuildFlag.js";
 
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -135,8 +136,7 @@ export function regenerateSitemapArtifact(reason = "") {
       oneCById: oneCByIdMap(oneCProducts),
     });
     const sets = collectSitemapIndexSets(publicProducts);
-    const infrastructureEnabled =
-      String(process.env.CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED || "").trim() === "1";
+    const infrastructureEnabled = isPublicLocaleRoutesEnabledFromEnv();
     let manifest = {
       version: 1,
       infrastructureEnabled: false,

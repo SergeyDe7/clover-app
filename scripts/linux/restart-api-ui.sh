@@ -280,8 +280,75 @@ if [[ ! -f "${DB_PATH_BUILD}" ]]; then
   die "DB for sitemap build not found: ${DB_PATH_BUILD}"
 fi
 
+# Isolated worktrees do not contain server/.env. Pass only the locale-route
+# boolean into the off-live build — never source the rest of dotenv, never
+# treat DB languages as a substitute for the explicit flag.
+LOCALE_ENV_FILE="${ROOT}/server/.env"
+ASSERT_JS="${BUILD_WT}/server/scripts/assert-locale-route-release.mjs"
+if [[ ! -f "${ASSERT_JS}" ]]; then
+  ASSERT_JS="${ROOT}/server/scripts/assert-locale-route-release.mjs"
+fi
+EXPECT_LOCALE=""
+if [[ -f "${ASSERT_JS}" ]]; then
+  PRINT_EXPECT_ARGS=(
+    --print-expect
+    --require-flag
+    --locale-env-file "${LOCALE_ENV_FILE}"
+    --db "${DB_PATH_BUILD}"
+  )
+  if [[ "${CLOVER_DEPLOY_ALLOW_DISABLED_LOCALE_ROUTES:-}" != "1" ]]; then
+    PRINT_EXPECT_ARGS+=(--fail-if-disabled-with-foreign-languages)
+  fi
+  EXPECT_LOCALE="$(node -- "${ASSERT_JS}" "${PRINT_EXPECT_ARGS[@]}")" \
+    || die "required locale-route flag is missing, unreadable, or inconsistent with configuration; refusing cutover"
+  EXPECT_LOCALE="$(printf '%s' "${EXPECT_LOCALE}" | tr -d '[:space:]')"
+else
+  if [[ ! -f "${LOCALE_ENV_FILE}" ]]; then
+    die "required locale-route flag file missing (${LOCALE_ENV_FILE}); refusing cutover"
+  fi
+  set +e
+  LOCALE_FLAG_VALUE="$(
+    awk -F= '
+      $1 ~ /^[[:space:]]*(export[[:space:]]+)?CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED[[:space:]]*$/ {
+        found=1
+        v=$2
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+        gsub(/^["'"'"']|["'"'"']$/, "", v)
+        val=v
+      }
+      END {
+        if (!found) exit 3
+        printf "%s", val
+      }
+    ' "${LOCALE_ENV_FILE}"
+  )"
+  FLAG_READ_STATUS=$?
+  set -e
+  if [[ "${FLAG_READ_STATUS}" -eq 3 ]]; then
+    die "required CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED missing in ${LOCALE_ENV_FILE}; refusing cutover"
+  fi
+  if [[ "${FLAG_READ_STATUS}" -ne 0 ]]; then
+    die "failed to read locale-route flag from ${LOCALE_ENV_FILE}; refusing cutover"
+  fi
+  if [[ "${LOCALE_FLAG_VALUE}" == "1" ]]; then
+    EXPECT_LOCALE="enabled"
+  else
+    EXPECT_LOCALE="disabled"
+  fi
+fi
+if [[ "${EXPECT_LOCALE}" == "enabled" ]]; then
+  export CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED=1
+  echo "Locale routes: isolated build enabling public locale infrastructure"
+elif [[ "${EXPECT_LOCALE}" == "disabled" ]]; then
+  export CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED=0
+  echo "Locale routes: isolated build keeping public locale infrastructure disabled"
+else
+  die "locale-route expect must be enabled or disabled, got: ${EXPECT_LOCALE}"
+fi
+
 echo "Building release off live path into staged dist..."
 # IMPORTANT: build must NOT write into live ROOT/dist.
+# Do not use `npm run build -- --outDir …`: extra args attach to generate-sitemap, not Vite.
 BUILD_PREV_PWD="$(pwd)"
 cd "${BUILD_WT}"
 export DB_PATH="${DB_PATH_BUILD}"
@@ -311,6 +378,28 @@ cd "${BUILD_PREV_PWD}"
 read_dist_meta "${STAGED_DIST}" || die "staged dist missing build tag/bundle"
 echo "Staged UI build tag: ${BUILD_TAG}"
 echo "Staged UI bundle: ${MAIN_JS}"
+
+if [[ "${EXPECT_LOCALE}" == "enabled" ]]; then
+  if [[ -f "${ASSERT_JS}" ]]; then
+    node "${ASSERT_JS}" --dist "${STAGED_DIST}" --db "${DB_PATH_BUILD}" --expect enabled \
+      || die "locale-route artifacts rejected; live source/dist/services unchanged"
+  else
+    if ! grep -q 'name="clover-public-locale-routes"' "${STAGED_DIST}/index.html" \
+      || ! grep -q 'content="enabled"' "${STAGED_DIST}/index.html"; then
+      die "locale-route HTML stamp is not enabled; refusing cutover"
+    fi
+    if [[ ! -f "${STAGED_DIST}/public-route-manifest.json" ]] \
+      || ! grep -q '"infrastructureEnabled":true' "${STAGED_DIST}/public-route-manifest.json"; then
+      die "locale-route manifest is disabled or missing; refusing cutover"
+    fi
+    if grep -q '"routes":{}' "${STAGED_DIST}/public-route-manifest.json"; then
+      die "locale-route manifest routes are empty; refusing cutover"
+    fi
+    if grep -q '<loc>https://clover-spb.ru/</loc>' "${STAGED_DIST}/sitemap.xml"; then
+      die "sitemap has unprefixed homepage; refusing cutover"
+    fi
+  fi
+fi
 
 # Pre-cutover validation complete. Live dist still untouched until here.
 echo "Cutover: switching source to ${TARGET_SHA} and promoting staged dist..."

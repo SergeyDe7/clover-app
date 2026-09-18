@@ -1,0 +1,29 @@
+{
+  "langs": ["ru", "en", "uz", "ky", "tg", "zh", "ar"],
+  "catalogVersion": 28,
+  "product": {
+    "id": "fixture-product-1",
+    "code": "SMOKE-001",
+    "oneCId": "fixture-onec-1",
+    "name": "Fixture dish soap 500 ml",
+    "category": "Fixture category",
+    "subcategory": "",
+    "active": true,
+    "showOnStorefront": true,
+    "price": 120,
+    "imageUrl": "/clover-logo.png",
+    "storefrontDetails": {
+      "description": "Anonymized fixture product for isolated SEO browser smoke.",
+      "composition": "",
+      "characteristics": ""
+    }
+  },
+  "site": {
+    "heroTitle": "Fixture storefront",
+    "heroLead": "Isolated SEO browser smoke fixture",
+    "heroSlides": [{ "src": "/storefront/hero-horeca.png", "alt": "fixture-hero" }],
+    "homePromotions": [],
+    "categoryTranslations": {},
+    "seo": { "home": { "description": "Fixture SEO smoke" } }
+  }
+}

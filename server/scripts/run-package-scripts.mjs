@@ -95,6 +95,11 @@ const CHECK_FILES = [
   "scripts/verify-s2-new-002-password-storage.mjs",
   "scripts/verify-admin-client-password-login.mjs",
   "scripts/verify-auth-login-error-display.mjs",
+  "scripts/assert-locale-route-release.mjs",
+  "scripts/verify-locale-route-release.mjs",
+  "scripts/verify-seo-portable-launcher.mjs",
+  "scripts/verify-seo-build-readonly.mjs",
+  "scripts/verify-seo-locale-html-preview.mjs",
   "scripts/verify-ui-build-tag.mjs",
   "scripts/verify-security-stage3-package1.mjs",
 ];

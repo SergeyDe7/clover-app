@@ -1,0 +1,89 @@
+{
+  "SEO_BROWSER_SMOKE": "PASS",
+  "SIMPLE_JS_PROBE": "PASS",
+  "CANDIDATE_BROWSER_SMOKE": "PASS",
+  "host": "DESKTOP-LPFP961",
+  "remoteSsh": false,
+  "productionUnchanged": true,
+  "chromePath": "Google Chrome (Program Files)",
+  "dist": "<test-root>/tools/seo-browser-smoke-portable/work/dist",
+  "distInsideTestFolder": true,
+  "fixtureDb": "<omitted-anonymized-fixture; not in git>",
+  "pages": 21,
+  "checkedUrlPaths": [
+    "/ru/",
+    "/ru/catalog",
+    "/ru/product/SMOKE-001",
+    "/en/",
+    "/en/catalog",
+    "/en/product/SMOKE-001",
+    "/uz/",
+    "/uz/catalog",
+    "/uz/product/SMOKE-001",
+    "/ky/",
+    "/ky/catalog",
+    "/ky/product/SMOKE-001",
+    "/tg/",
+    "/tg/catalog",
+    "/tg/product/SMOKE-001",
+    "/zh/",
+    "/zh/catalog",
+    "/zh/product/SMOKE-001",
+    "/ar/",
+    "/ar/catalog",
+    "/ar/product/SMOKE-001"
+  ],
+  "unknownPathProbe": {
+    "path": "/this-path-does-not-exist-seo-probe-9f3a",
+    "expectedStatus": 404
+  },
+  "simple": {
+    "console": [],
+    "pageerror": [],
+    "requestfailed": [],
+    "at": "2026-09-18T13:37:25.294Z"
+  },
+  "candidate": {
+    "console": [],
+    "pageerror": [],
+    "requestfailed": [],
+    "at": "2026-09-18T13:39:51.385Z",
+    "sessionLogNote": "run.mjs resetPageLog() on each goto; JSON retains only the last page. Last page: console=[], pageerror=[], requestfailed=[]."
+  },
+  "identity": {
+    "branch": "agent/fix-seo-locale-routes-on-main",
+    "archiveHead": "df38cd12ffaa06ba57ccd14966da5fb0358b37ae",
+    "baselineMain": "df38cd12ffaa06ba57ccd14966da5fb0358b37ae",
+    "packedAtUtc": "20260918T133028Z",
+    "archiveSha256": "eeb8223d79a0705c30107f15a9f7acbb406274f753fff71c992bb7fe995b0c13",
+    "includesPrebuiltCandidateDist": false,
+    "windowsCompatibilityVerifiedOnPack": false,
+    "candidateUiBuild": "ui-20260918-BJ_YbAhT",
+    "indexAsset": "assets/index-BJ_YbAhT.js",
+    "productionUiAtHandoff": "ui-20260918-BTQzg2Z6",
+    "worktree": "/opt/clover/worktrees/fix-seo-locale-routes-on-main"
+  },
+  "manifest": {
+    "infrastructureEnabled": true,
+    "origin": "https://clover-spb.ru",
+    "enabledLanguages": [
+      "ru",
+      "en",
+      "uz",
+      "ky",
+      "tg",
+      "zh",
+      "ar"
+    ],
+    "routeCount": 91
+  },
+  "windowsHarnessFix": {
+    "file": "tools/seo-browser-smoke-portable/Run-SeoBrowserSmoke.ps1",
+    "diff": "tools/seo-browser-smoke-portable/evidence/windows-harness-Run-SeoBrowserSmoke.diff",
+    "reason": "PowerShell 5.1 captured native node stdout as Prepare-CandidateDist output, so CLOVER_SEO_DIST became concatenated logs instead of the dist path.",
+    "checksWeakened": false
+  },
+  "reportPath": "tools/seo-browser-smoke-portable/evidence/seo-browser-smoke-report.windows.json",
+  "phase": "candidate+simple",
+  "at": "2026-09-18T13:40:48.556Z"
+}
