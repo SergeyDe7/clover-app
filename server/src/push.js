@@ -2,6 +2,7 @@ import {
   deletePushSubscription,
   listPushSubscriptions,
 } from "./db.js";
+import { logCaughtError } from "./safeLog.js";
 
 function config() {
   const publicKey = String(process.env.VAPID_PUBLIC_KEY || "").trim();
@@ -31,8 +32,8 @@ async function loadWebPush() {
   return webpush;
 }
 
-export async function sendPushToSubscriptions(subscriptions, payload) {
-  const webpush = await loadWebPush();
+export async function sendPushToSubscriptions(subscriptions, payload, deps = {}) {
+  const webpush = deps.webpush || await loadWebPush();
   if (!webpush) return { enabled: false, sent: 0, failed: 0 };
 
   let sent = 0;
@@ -49,7 +50,7 @@ export async function sendPushToSubscriptions(subscriptions, payload) {
       if ([404, 410].includes(Number(error?.statusCode))) {
         deletePushSubscription(item.userId, item.endpoint);
       } else {
-        console.error("Push notification error", error?.message || error);
+        logCaughtError("push.send", error, { component: "push" });
       }
     }
   }
