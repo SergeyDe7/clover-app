@@ -109,8 +109,10 @@ const CHECK_FILES = [
   "scripts/verify-security-stage3-package3.mjs",
   "src/previewArtifact.js",
   "src/auditRetention.js",
+  "src/runtimeFilePermissions.js",
   "src/safeFsPath.js",
   "scripts/run-audit-retention.mjs",
+  "scripts/run-runtime-permissions.mjs",
 ];
 
 const TEST_ONEC = [

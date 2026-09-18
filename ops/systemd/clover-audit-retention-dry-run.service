@@ -1,0 +1,18 @@
+[Unit]
+Description=Clover audit retention dry-run (no --apply)
+After=network.target
+# Source-controlled only. Install/start requires a separate production approval.
+# Does not contain secrets. Logs are aggregated counts from the CLI JSON.
+
+[Service]
+Type=oneshot
+User=clover
+Group=clover
+UMask=0077
+WorkingDirectory=/opt/clover/clover-app/server
+Environment=DB_PATH=/opt/clover/clover-app/server/data/clover.sqlite
+Environment=CLOVER_AUDIT_RETENTION_ALLOW_PRODUCTION=1
+ExecStart=/opt/clover/clover-app/scripts/linux/run-audit-retention.sh --max-age-days 365
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true

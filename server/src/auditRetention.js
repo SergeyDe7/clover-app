@@ -4,16 +4,23 @@ import {
   assertNoSymlinkPathComponents,
   isSymlinkOrJunction,
   nativeRealpath,
+  sameCanonicalPath,
 } from "./safeFsPath.js";
 
 export const AUDIT_RETENTION_DEFAULT_MAX_AGE_DAYS = 365;
 export const AUDIT_RETENTION_MAX_AGE_SOURCE_DEFAULT = "AUDIT_RETENTION_DEFAULT_MAX_AGE_DAYS";
 export const AUDIT_RETENTION_MAX_AGE_SOURCE_CLI = "cli";
 export const AUDIT_EMAIL_REDACTED = "";
+export const PRODUCTION_REPOSITORY_ROOT = "/opt/clover/clover-app";
 export const PRODUCTION_DATA_MARKER = "/opt/clover/clover-app/server/data";
+export const PRODUCTION_LIVE_DB_RELATIVE = "server/data/clover.sqlite";
 
 export function isExplicitApply(options = {}) {
   return options.apply === true;
+}
+
+export function productionLiveDbPath() {
+  return path.resolve(PRODUCTION_REPOSITORY_ROOT, PRODUCTION_LIVE_DB_RELATIVE);
 }
 
 export function auditRetentionCutoffIso(now, maxAgeDays = AUDIT_RETENTION_DEFAULT_MAX_AGE_DAYS) {
@@ -46,49 +53,100 @@ export function isWorktreeDataDbPath(candidate, repositoryRoot) {
   return posix === worktreeData || posix.startsWith(`${worktreeData}/`);
 }
 
-export function assertRetentionDbPathAllowed(
-  candidate,
-  { repositoryRoot, allowProduction = false, fs } = {}
-) {
-  const resolved = path.resolve(String(candidate || ""));
-  if (!String(candidate || "").trim()) {
-    const error = new Error("Refusing empty DB_PATH");
-    error.code = "AUDIT_RETENTION_DB_PATH_DENIED";
-    throw error;
-  }
-  if (isProductionLookingDbPath(resolved) && allowProduction !== true) {
-    const error = new Error("Refusing production DB_PATH");
-    error.code = "AUDIT_RETENTION_DB_PATH_DENIED";
-    throw error;
-  }
-  if (repositoryRoot && isWorktreeDataDbPath(resolved, repositoryRoot)) {
-    const error = new Error("Refusing worktree DB_PATH");
-    error.code = "AUDIT_RETENTION_DB_PATH_DENIED";
-    throw error;
-  }
+export function isPathProvenProductionRepositoryRoot(repositoryRoot) {
+  if (!repositoryRoot) return false;
+  return sameCanonicalPath(repositoryRoot, PRODUCTION_REPOSITORY_ROOT);
+}
 
+export function isExactLiveDbPath(candidate, repositoryRoot) {
+  if (!repositoryRoot) return false;
+  return sameCanonicalPath(
+    candidate,
+    path.resolve(repositoryRoot, PRODUCTION_LIVE_DB_RELATIVE)
+  );
+}
+
+function denyRetentionPath(message) {
+  const error = new Error(message);
+  error.code = "AUDIT_RETENTION_DB_PATH_DENIED";
+  throw error;
+}
+
+export function isExactProductionLiveException({
+  candidate,
+  repositoryRoot,
+  allowProduction = false,
+} = {}) {
+  return (
+    allowProduction === true &&
+    isPathProvenProductionRepositoryRoot(repositoryRoot) &&
+    isExactLiveDbPath(candidate, repositoryRoot) &&
+    sameCanonicalPath(candidate, productionLiveDbPath())
+  );
+}
+
+export function assertProvenProductionRepositoryRoot(repositoryRoot, { fs } = {}) {
+  if (!isPathProvenProductionRepositoryRoot(repositoryRoot)) {
+    denyRetentionPath("Refusing unproven production repository root");
+  }
   const io = fs || { lstatSync, realpathSync };
+  const resolved = path.resolve(repositoryRoot);
   try {
     assertNoSymlinkPathComponents(resolved, { allowMissing: false, fs: io });
   } catch (error) {
     if (error?.code === "SAFE_PATH_SYMLINK") {
-      const denied = new Error("Refusing symlink DB_PATH");
-      denied.code = "AUDIT_RETENTION_DB_PATH_DENIED";
-      throw denied;
+      denyRetentionPath("Refusing symlink DB_PATH");
     }
     if (error?.code === "SAFE_PATH_MISSING") {
-      const missing = new Error("DB_PATH does not exist");
-      missing.code = "AUDIT_RETENTION_DB_PATH_DENIED";
-      throw missing;
+      denyRetentionPath("Refusing unproven production repository root");
+    }
+    throw error;
+  }
+  const stats = io.lstatSync(resolved);
+  if (isSymlinkOrJunction(stats) || !stats.isDirectory()) {
+    denyRetentionPath("Refusing unproven production repository root");
+  }
+  return resolved;
+}
+
+export function assertRetentionDbPathAllowed(
+  candidate,
+  { repositoryRoot, allowProduction = false, fs } = {}
+) {
+  if (!String(candidate || "").trim()) {
+    denyRetentionPath("Refusing empty DB_PATH");
+  }
+  const resolved = path.resolve(String(candidate || ""));
+  const io = fs || { lstatSync, realpathSync };
+  const earlyException = isExactProductionLiveException({
+    candidate: resolved,
+    repositoryRoot,
+    allowProduction,
+  });
+  if (!earlyException) {
+    if (isProductionLookingDbPath(resolved)) {
+      denyRetentionPath("Refusing production DB_PATH");
+    }
+    if (repositoryRoot && isWorktreeDataDbPath(resolved, repositoryRoot)) {
+      denyRetentionPath("Refusing worktree DB_PATH");
+    }
+  }
+
+  try {
+    assertNoSymlinkPathComponents(resolved, { allowMissing: false, fs: io });
+  } catch (error) {
+    if (error?.code === "SAFE_PATH_SYMLINK") {
+      denyRetentionPath("Refusing symlink DB_PATH");
+    }
+    if (error?.code === "SAFE_PATH_MISSING") {
+      denyRetentionPath("DB_PATH does not exist");
     }
     throw error;
   }
 
   const stats = io.lstatSync(resolved);
   if (isSymlinkOrJunction(stats) || !stats.isFile()) {
-    const error = new Error("DB_PATH must be a regular file");
-    error.code = "AUDIT_RETENTION_DB_PATH_DENIED";
-    throw error;
+    denyRetentionPath("DB_PATH must be a regular file");
   }
 
   const canonical = path.resolve(nativeRealpath(resolved, io));
@@ -96,33 +154,30 @@ export function assertRetentionDbPathAllowed(
   try {
     assertNoSymlinkPathComponents(canonical, { allowMissing: false, fs: io });
   } catch (_error) {
-    const denied = new Error("Refusing symlink DB_PATH");
-    denied.code = "AUDIT_RETENTION_DB_PATH_DENIED";
-    throw denied;
+    denyRetentionPath("Refusing symlink DB_PATH");
   }
   const canonicalStats = io.lstatSync(canonical);
   if (isSymlinkOrJunction(canonicalStats) || !canonicalStats.isFile()) {
-    const error = new Error("DB_PATH must be a regular file");
-    error.code = "AUDIT_RETENTION_DB_PATH_DENIED";
-    throw error;
+    denyRetentionPath("DB_PATH must be a regular file");
   }
 
-  if (
-    allowProduction !== true &&
-    (isProductionLookingDbPath(canonical) || isProductionLookingDbPath(canonicalParent))
-  ) {
-    const error = new Error("Refusing production DB_PATH");
-    error.code = "AUDIT_RETENTION_DB_PATH_DENIED";
-    throw error;
+  if (isExactProductionLiveException({
+    candidate: canonical,
+    repositoryRoot,
+    allowProduction,
+  })) {
+    assertProvenProductionRepositoryRoot(repositoryRoot, { fs: io });
+    return canonical;
+  }
+  if (isProductionLookingDbPath(canonical) || isProductionLookingDbPath(canonicalParent)) {
+    denyRetentionPath("Refusing production DB_PATH");
   }
   if (
     repositoryRoot &&
     (isWorktreeDataDbPath(canonical, repositoryRoot) ||
       isWorktreeDataDbPath(canonicalParent, repositoryRoot))
   ) {
-    const error = new Error("Refusing worktree DB_PATH");
-    error.code = "AUDIT_RETENTION_DB_PATH_DENIED";
-    throw error;
+    denyRetentionPath("Refusing worktree DB_PATH");
   }
   return canonical;
 }
