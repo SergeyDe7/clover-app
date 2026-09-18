@@ -103,13 +103,13 @@ Units (not installed by this package):
 - `ops/systemd/clover-audit-retention-dry-run.service` — no `--apply`
 - `ops/systemd/clover-audit-retention-apply.service` — literal `--apply` only here
 - `ops/systemd/clover-audit-retention.timer` — `Persistent=true`, `Unit=clover-audit-retention-apply.service`
-- `scripts/linux/run-audit-retention.sh` — `umask 077`, non-blocking `flock`, no secrets. At commit: `git add --chmod=+x` so the blob is `100755` (ExecStart calls the script directly).
+- `scripts/linux/run-audit-retention.sh` — `umask 077`, non-blocking `flock`, no secrets. At commit: `git add --chmod=+x` so the blob is `100755` (ExecStart calls the script directly). Wrapper root is the real path of the script (`.../scripts/linux/run-audit-retention.sh` → repository root). `CLOVER_ROOT` is accepted only when it canonicalizes to that same root; otherwise it is rejected. `DB_PATH` is always `<validated-root>/server/data/clover.sqlite`. A symlink invocation does not take root from the symlink directory.
 
 Contract:
 
 - `User=clover`, `Group=clover` (same as `clover-api.service`)
 - TTL `--max-age-days 365`
-- `DB_PATH=/opt/clover/clover-app/server/data/clover.sqlite`
+- `DB_PATH=<validated-root>/server/data/clover.sqlite` (production unit: `/opt/clover/clover-app/server/data/clover.sqlite`)
 - `CLOVER_AUDIT_RETENTION_ALLOW_PRODUCTION=1`
 - CLI JSON is aggregated (`scanned` / `wouldAnonymize` / `anonymized`); no PII
 - Parallel runs refused via `Type=oneshot` + `flock -n` (busy → exit 75)
@@ -117,10 +117,11 @@ Contract:
 
 Owner decision: proposed calendar is monthly `*-*-01 03:40:00` (after daily backup 03:15). Change `OnCalendar` only with approval.
 
-Before any future enable:
+Before any future enable or the first timer start:
 
 1. Backup.
 2. Successful production dry-run of the path-gate (this closeout supplies the gate; the dry-run itself still needs a separate production approval).
+3. A separate owner approval that **apply** is intended, including catch-up apply from a missed slot.
 
 Copy units (does not enable):
 
@@ -137,7 +138,7 @@ Manual dry-run after copy (separate approval):
 sudo systemctl start clover-audit-retention-dry-run.service
 ```
 
-`Persistent=true` means a later `enable --now` can immediately start **apply** if the last `*-*-01 03:40:00` was missed. Before enable: only the dry-run unit; do not enable the timer unless that catch-up apply is explicitly intended.
+Timer catch-up warning: `Persistent=true` means that starting the timer after a missed `*-*-01 03:40:00` slot can immediately start **apply** (`clover-audit-retention-apply.service`). This is not a dry-run. Do **not** treat `systemctl enable --now clover-audit-retention.timer` as a simple install step. Copy + `daemon-reload` does not enable the timer. Before the first timer start: backup, a successful production dry-run, and a separate owner approval for apply (including an immediate catch-up apply).
 
 Enable/start timer (forbidden in this package; requires a later explicit approval):
 
@@ -155,6 +156,18 @@ sudo rm -f /etc/systemd/system/clover-audit-retention.timer \
   /etc/systemd/system/clover-audit-retention-dry-run.service
 sudo systemctl daemon-reload
 ```
+
+## Accepted residuals (not a remote bypass)
+
+These leftovers stay after Package 3. They are documented here so an operator who reads only this closeout sees them.
+
+- **Hard-link residual.** `lstat` sees a regular file. A second name for the same inode is not excluded: `realpath` does not collapse a hard-link, and chmod / `DatabaseSync` operate on the inode. Path-gate and the DAC helper do not compare `nlink`.
+- **Short TOCTOU.** There is a short window between path / `lstat` checks and `chmod` / `DatabaseSync` open. Apply re-`lstat`s and skips a symlink that appears in that window; a replacement of the same path with another regular file can still win the race.
+- **Trusted rollback plan JSON.** `--rollback --plan` reads a file the operator supplies. Paths and relatives are re-validated against the exact allowlist and canonical root; `from` modes are not schema-limited. A tampered plan on an allowlisted relative can restore a wider mode. Keep the plan mode `600` and treat it as trusted.
+
+These residuals do **not** give a remote bypass. Retention and the DAC helper are not started by the public API. The timer is not enabled by this package. Using a hard-link, winning the chmod/open race, or supplying a rollback plan requires a trusted local operator (or an already-local write) on the host filesystem next to the live files.
+
+Mitigation already in this package: exact allowlist, canonical proven root, symlink/junction rejection, trusted plan path, backup before apply, and postcheck after apply.
 
 ## Residual production gates
 

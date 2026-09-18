@@ -1472,6 +1472,10 @@ test("SEC3-013: systemd units have no secrets, clover user, timer contract, no o
   assert.match(wrapper, /\bflock -n 9\b/u);
   assert.match(wrapper, /run-audit-retention\.mjs" "\$@"/u);
   assert.doesNotMatch(wrapper, / --apply/u);
+  assert.doesNotMatch(wrapper, /CLOVER_ROOT:-\/opt\/clover\/clover-app/u);
+  assert.match(wrapper, /CLOVER_ROOT does not match wrapper repository root/u);
+  assert.match(wrapper, /export DB_PATH="\$ROOT\/server\/data\/clover\.sqlite"/u);
+  assert.match(wrapper, /CLOVER_AUDIT_RETENTION_RESOLVE_ONLY/u);
   assert.doesNotMatch(adopt, /clover-audit-retention/u);
   assert.doesNotMatch(
     readRepoSource("server/scripts/run-runtime-permissions.mjs"),
@@ -1480,4 +1484,104 @@ test("SEC3-013: systemd units have no secrets, clover user, timer contract, no o
   assert.equal(RUNTIME_PERMISSION_TARGETS.some((row) => row.relative === "server/data/clover.sqlite"), true);
   assert.equal(RUNTIME_DIR_MODE, 0o700);
   assert.equal(RUNTIME_FILE_MODE, 0o600);
+});
+
+function normalizePosixPath(value) {
+  return String(value).replaceAll("\\", "/").replace(/\/+$/u, "").toLowerCase();
+}
+
+function spawnWrapperResolve(wrapperPath, extraEnv = {}) {
+  return spawnSync(resolveBash(), [toBashPath(wrapperPath)], {
+    cwd: path.dirname(wrapperPath),
+    env: {
+      ...process.env,
+      ...extraEnv,
+      CLOVER_AUDIT_RETENTION_RESOLVE_ONLY: "1",
+    },
+    encoding: "utf8",
+  });
+}
+
+test("SEC3-013: closeout documents hard-link, TOCTOU, trusted plan, and Persistent catch-up", () => {
+  const closeout = readRepoSource("docs/technical/SECURITY_STAGE3_PACKAGE3_CLOSEOUT.md");
+  assert.match(closeout, /Hard-link residual/u);
+  assert.match(closeout, /`lstat` sees a regular file/u);
+  assert.match(closeout, /same inode/u);
+  assert.match(closeout, /Short TOCTOU/u);
+  assert.match(closeout, /chmod/u);
+  assert.match(closeout, /DatabaseSync/u);
+  assert.match(closeout, /Trusted rollback plan JSON/u);
+  assert.match(closeout, /do \*\*not\*\* give a remote bypass/u);
+  assert.match(closeout, /exact allowlist/u);
+  assert.match(closeout, /canonical proven root/u);
+  assert.match(closeout, /Timer catch-up warning/u);
+  assert.match(closeout, /Persistent=true/u);
+  assert.match(closeout, /immediately start \*\*apply\*\*/u);
+  assert.match(closeout, /Do \*\*not\*\* treat `systemctl enable --now clover-audit-retention\.timer` as a simple install step/u);
+  assert.match(closeout, /Before the first timer start: backup, a successful production dry-run, and a separate owner approval for apply/u);
+});
+
+test("SEC3-013: wrapper pins repository root and ignores malicious CLOVER_ROOT", () => {
+  const wrapperSource = readRepoSource("scripts/linux/run-audit-retention.sh");
+  assert.match(wrapperSource, /BASH_SOURCE\[0\]/u);
+  assert.match(wrapperSource, /resolve_canonical/u);
+  assert.match(wrapperSource, /CLOVER_ROOT does not match wrapper repository root/u);
+  assert.match(wrapperSource, /export DB_PATH="\$ROOT\/server\/data\/clover\.sqlite"/u);
+  assert.doesNotMatch(wrapperSource, /ROOT="\$\{CLOVER_ROOT:-\/opt\/clover\/clover-app\}"/u);
+  assert.doesNotMatch(wrapperSource, /DB_PATH="\$\{DB_PATH:-\$ROOT\/server\/data\/clover\.sqlite\}"/u);
+
+  const fixture = makeTempRoot("wrap-root");
+  const other = makeTempRoot("wrap-other");
+  const linkDir = makeTempRoot("wrap-link");
+  try {
+    const destDir = path.join(fixture, "scripts", "linux");
+    mkdirSync(destDir, { recursive: true });
+    const wrapper = path.join(destDir, "run-audit-retention.sh");
+    writeFileSync(wrapper, readFileSync(RETENTION_WRAPPER));
+    chmodSync(wrapper, 0o755);
+
+    const expectedRoot = normalizePosixPath(toBashPath(fixture));
+    const expectedDb = `${expectedRoot}/server/data/clover.sqlite`;
+    const bash = resolveBash();
+    const pinned = spawnWrapperResolve(wrapper, {
+      DB_PATH: path.join(other, "evil.sqlite"),
+      CLOVER_ROOT: "",
+    });
+    if (pinned.error && pinned.error.code === "ENOENT") {
+      assert.match(wrapperSource, /export DB_PATH="\$ROOT\/server\/data\/clover\.sqlite"/u);
+      return;
+    }
+    assert.equal(pinned.status, 0, pinned.stderr || pinned.stdout);
+    const pinnedBody = JSON.parse(String(pinned.stdout).trim());
+    assert.equal(normalizePosixPath(pinnedBody.root), expectedRoot);
+    assert.equal(normalizePosixPath(pinnedBody.dbPath), expectedDb);
+
+    const matching = spawnWrapperResolve(wrapper, { CLOVER_ROOT: toBashPath(fixture) });
+    assert.equal(matching.status, 0, matching.stderr || matching.stdout);
+    const matchingBody = JSON.parse(String(matching.stdout).trim());
+    assert.equal(normalizePosixPath(matchingBody.root), expectedRoot);
+    assert.equal(normalizePosixPath(matchingBody.dbPath), expectedDb);
+
+    const malicious = spawnWrapperResolve(wrapper, { CLOVER_ROOT: toBashPath(other) });
+    assert.notEqual(malicious.status, 0);
+    assert.match(String(malicious.stderr), /CLOVER_ROOT does not match wrapper repository root/u);
+    assert.doesNotMatch(String(malicious.stdout), /"root":/u);
+
+    const link = path.join(linkDir, "run-audit-retention.sh");
+    const symlinkOk = trySymlink(wrapper, link);
+    if (symlinkOk) {
+      const viaLink = spawnWrapperResolve(link);
+      assert.equal(viaLink.status, 0, viaLink.stderr || viaLink.stdout);
+      const viaLinkBody = JSON.parse(String(viaLink.stdout).trim());
+      assert.equal(normalizePosixPath(viaLinkBody.root), expectedRoot);
+      assert.equal(normalizePosixPath(viaLinkBody.dbPath), expectedDb);
+    } else {
+      assert.match(wrapperSource, /symlink invocation cannot take ROOT/u);
+    }
+    assert.ok(bash);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+    rmSync(other, { recursive: true, force: true });
+    rmSync(linkDir, { recursive: true, force: true });
+  }
 });
