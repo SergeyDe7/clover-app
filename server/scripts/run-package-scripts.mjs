@@ -20,6 +20,7 @@ const CHECK_FILES = [
   "src/server.js",
   "src/db.js",
   "src/backups.js",
+  "src/sitemapArtifact.js",
   "src/mailer.js",
   "src/push.js",
   "src/managerNotifications.js",
@@ -42,6 +43,8 @@ const CHECK_FILES = [
   "src/oneCSearchIndex.js",
   "src/matrixGuard.js",
   "src/oneC.js",
+  "src/oneCPublicError.js",
+  "src/safeLog.js",
   "src/authUrlPolicy.js",
   "src/authIssuance.js",
   "src/outboundResponse.js",
@@ -102,6 +105,7 @@ const CHECK_FILES = [
   "scripts/verify-seo-locale-html-preview.mjs",
   "scripts/verify-ui-build-tag.mjs",
   "scripts/verify-security-stage3-package1.mjs",
+  "scripts/verify-security-stage3-package2.mjs",
 ];
 
 const TEST_ONEC = [

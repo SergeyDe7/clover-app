@@ -16,6 +16,7 @@ import { maybeApplyLegacyManagerPermissionsMigration } from "./staffPermissionsM
 import { maybeApplyStripPlaintextPasswordsMigration } from "./passwordVaultMigrate.js";
 import { hashPasswordSync, passwordHashMeta } from "./passwordHash.js";
 import { upsertPushSubscriptionRecord } from "./pushSubscriptionOwnership.js";
+import { logSafe } from "./safeLog.js";
 
 /**
  * Test-only hooks for S2-NEW-001 concurrency verifiers.
@@ -2344,7 +2345,11 @@ export function seedManager() {
     approvalStatus: "approved",
   });
 
-  console.log(`Создан менеджер ${email}. Требуется подтверждение email.`);
+  logSafe("info", {
+    event: "db.seed.manager",
+    code: "MANAGER_SEEDED",
+    component: "db",
+  });
 }
 
 export function resetServerData() {

@@ -56,6 +56,18 @@ function rejectUnsafePath(candidate) {
   }
 }
 
+function normalizeSourceNewlines(text) {
+  return String(text).replace(/\r\n/gu, "\n").replace(/\r/gu, "\n");
+}
+
+function readRepoSource(relativePath) {
+  const normalized = normalizeSourceNewlines(
+    readFileSync(path.join(repositoryRoot, relativePath), "utf8")
+  );
+  assert.ok(normalized.length > 0, `${relativePath} is empty`);
+  return normalized;
+}
+
 function expectCode(fn, code) {
   assert.throws(fn, (error) => {
     assert.equal(error?.code, code);
@@ -737,7 +749,7 @@ test("SEC3-010: push endpoint ownership is not reassigned on conflict", () => {
 });
 
 test("SEC3-001 live handlers wire orchestration instead of inline token writes", () => {
-  const serverSource = readFileSync(path.join(repositoryRoot, "server/src/server.js"), "utf8");
+  const serverSource = readRepoSource("server/src/server.js");
   assert.match(serverSource, /liveAuthIssuanceDeps\(\)/u);
   const routes = [
     ["/api/auth/register", "executeClientRegistration("],
@@ -1011,10 +1023,7 @@ test("SEC3-003 production HTTP exception is RFC1918 only; loopback needs a prove
 });
 
 test("SEC3-004 enrichment stores images only through downloadBinary", () => {
-  const productSource = readFileSync(
-    path.join(repositoryRoot, "server/src/productEnrichment.js"),
-    "utf8"
-  );
+  const productSource = readRepoSource("server/src/productEnrichment.js");
   assert.match(productSource, /const \{ buffer \} = await downloadBinary\(imageUrl\)/u);
   assert.doesNotMatch(productSource, /redirect:\s*["']follow["']/u);
   assert.doesNotMatch(productSource, /arrayBuffer\(\)/u);
@@ -1101,8 +1110,7 @@ test("SEC3-005 oversized decompressed stream is aborted despite a small Content-
   assert.ok(livePulled <= 4, `1C path must stop the decompressed stream, pulled=${livePulled}`);
 });
 
-test("SEC3-004 Node 22 https.request lookup uses {all:true} and honors the connect-time pin", async () => {
-  assert.match(process.version, /^v22\./u);
+test("SEC3-004 https.request lookup uses {all:true} and honors the connect-time pin", async () => {
   const seen = [];
   await new Promise((resolve) => {
     const req = httpsRequest({
@@ -1134,7 +1142,7 @@ test("SEC3-004 Node 22 https.request lookup uses {all:true} and honors the conne
     });
     req.end();
   });
-  assert.ok(seen.length >= 1, "Node 22 must invoke options.lookup at connect time");
+  assert.ok(seen.length >= 1, "https.request must invoke options.lookup at connect time");
   assert.equal(seen[0].all, true);
   assert.equal(seen[0].hostname, "image.example.invalid");
 
@@ -1166,7 +1174,7 @@ test("SEC3-004 Node 22 https.request lookup uses {all:true} and honors the conne
 });
 
 test("SEC3-010 production db.js wrapper still delegates to the ownership helper", () => {
-  const dbSource = readFileSync(path.join(repositoryRoot, "server/src/db.js"), "utf8");
+  const dbSource = readRepoSource("server/src/db.js");
   assert.match(dbSource, /upsertPushSubscriptionRecord\(db,/u);
   assert.doesNotMatch(dbSource, /user_id\s*=\s*excluded\.user_id/u);
 });

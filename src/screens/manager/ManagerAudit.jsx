@@ -145,7 +145,9 @@ function formatAuditDetails(item, t) {
         detail: details.configuration || t("manager.audit.connectionChecked"),
       });
     case "exchange.connection.error":
-      return details.message || t("manager.connectionError");
+      return details.correlationId
+        ? `${t("manager.connectionError")} ${details.correlationId}`
+        : t("manager.connectionError");
     case "exchange.catalog.preview":
       return t("manager.audit.catalogPreview", {
         type: details.type === "clients" ? t("manager.counterparties") : t("manager.nomenclature"),
@@ -154,7 +156,7 @@ function formatAuditDetails(item, t) {
     case "exchange.catalog.error":
       return t("manager.audit.catalogError", {
         type: details.type || t("manager.audit.directory"),
-        message: details.message || t("manager.audit.errorWord"),
+        message: details.code || t("manager.audit.errorWord"),
       });
     case "one-c.products.receive":
       return t("manager.audit.nomenclatureReceived", {
@@ -177,7 +179,7 @@ function formatAuditDetails(item, t) {
     case "exchange.send.draft.error":
       return t("manager.audit.orderError", {
         number: details.orderNumber || dash,
-        message: details.message || t("manager.audit.errorWord"),
+        message: details.code || t("manager.audit.errorWord"),
       });
     default:
       return "";

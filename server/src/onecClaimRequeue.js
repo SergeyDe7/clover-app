@@ -1,5 +1,6 @@
 import { listOrders, updateOrderPayload, writeAudit } from "./db.js";
 import { releaseExpiredClaimExchange } from "./exchange.js";
+import { logCaughtError } from "./safeLog.js";
 
 /**
  * Возвращает истёкшие claim (sending → ready) и пишет audit.
@@ -28,4 +29,14 @@ export function releaseExpiredOneCClaims(nowMs = Date.now()) {
     released += 1;
   }
   return released;
+}
+
+export function runOneCClaimRequeueTick(deps = {}) {
+  const release = deps.releaseExpiredOneCClaims || releaseExpiredOneCClaims;
+  try {
+    return release();
+  } catch (error) {
+    logCaughtError("onec.claim.requeue", error, { component: "oneC" });
+    return 0;
+  }
 }

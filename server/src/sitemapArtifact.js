@@ -27,6 +27,7 @@ import {
 } from "./db.js";
 import { DEFAULT_PRODUCTS, DEFAULT_SETTINGS } from "./defaults.js";
 import { readLocalizationSettings } from "./localizationStore.js";
+import { logCaughtError } from "./safeLog.js";
 import {
   listPublicSitemapProducts,
   collectSitemapIndexSets,
@@ -194,10 +195,7 @@ export function regenerateSitemapArtifact(reason = "") {
     } catch {
       // ignore tmp cleanup failure
     }
-    console.error(
-      `[sitemap] runtime regenerate failed (${reason || "catalog"}):`,
-      error
-    );
+    logCaughtError("sitemap.regenerate", error, { component: "sitemap" });
     return { ok: false, error: String(error?.message || error) };
   }
 }

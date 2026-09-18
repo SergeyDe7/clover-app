@@ -2,6 +2,7 @@ import {
   allowDevelopmentAuthLinks as defaultAllowDevelopmentAuthLinks,
   publicCabinetUrl as defaultPublicCabinetUrl,
 } from "./authUrlPolicy.js";
+import { logSafe } from "./safeLog.js";
 
 function required(deps, name) {
   const fn = deps?.[name];
@@ -74,8 +75,12 @@ export async function executeClientRegistration(input, deps = {}) {
   let mail;
   try {
     mail = await sendCloverMail({ to: input.email, ...message });
-  } catch (mailError) {
-    console.error("Не удалось отправить письмо подтверждения", mailError);
+  } catch (_mailError) {
+    logSafe("error", {
+      event: "auth.mail.verification",
+      code: "MAIL_SEND_FAILED",
+      component: "authIssuance",
+    });
     mail = { sent: false, reason: "send_failed" };
   }
   mail = mail || { sent: false, reason: "unknown" };
@@ -141,8 +146,12 @@ export async function executeResendVerification(input, deps = {}) {
     const message = verificationEmail({ companyName, verifyUrl });
     try {
       await sendCloverMail({ to: input.email, ...message });
-    } catch (error) {
-      console.error(error);
+    } catch (_error) {
+      logSafe("error", {
+        event: "auth.mail.resend",
+        code: "MAIL_SEND_FAILED",
+        component: "authIssuance",
+      });
     }
     if (developmentLinkAllowed(input.req, env, deps)) developmentLink = verifyUrl;
   }
@@ -183,8 +192,12 @@ export async function executeForgotPassword(input, deps = {}) {
     const message = resetPasswordEmail({ resetUrl });
     try {
       await sendCloverMail({ to: input.email, ...message });
-    } catch (error) {
-      console.error(error);
+    } catch (_error) {
+      logSafe("error", {
+        event: "auth.mail.reset",
+        code: "MAIL_SEND_FAILED",
+        component: "authIssuance",
+      });
     }
     if (developmentLinkAllowed(input.req, env, deps)) developmentLink = resetUrl;
     writeAudit({

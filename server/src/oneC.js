@@ -4,6 +4,12 @@ import {
   boundedResponseLimit,
   readBoundedResponse,
 } from "./outboundResponse.js";
+import {
+  ONEC_PUBLIC_MESSAGE,
+  oneCCodedError,
+  oneCUpstreamError,
+  sanitizeThrownOneCError,
+} from "./oneCPublicError.js";
 
 export const DEFAULT_ONE_C_CONFIG = {
   mode: "simulation",
@@ -384,25 +390,12 @@ async function requestJson(config, endpointPath, options = {}, deps = {}) {
     }
 
     if (!response.ok) {
-      const message =
-        payload?.error ||
-        payload?.message ||
-        `1С вернула HTTP ${response.status}.`;
-      const error = new Error(message);
-      error.status = response.status;
-      error.payload = payload;
-      throw error;
+      throw oneCUpstreamError(response.status);
     }
 
     return payload;
   } catch (error) {
-    if (error?.name === "AbortError") {
-      throw new Error(
-        `1С не ответила за ${Math.round(config.timeoutMs / 1000)} секунд.`,
-        { cause: error }
-      );
-    }
-    throw error;
+    throw sanitizeThrownOneCError(error);
   } finally {
     clearTimeout(timeout);
   }
@@ -532,13 +525,17 @@ export async function createOneCDraft(publicConfig, orderPayload, deps = {}) {
   }
 
   if (!config.writeEnabled) {
-    throw new Error(
-      "Создание черновиков в рабочей 1С заблокировано. Для включения нужны расширение, резервная копия и ONEC_WRITE_ENABLED=true в server/.env."
+    throw oneCCodedError(
+      "ONEC_WRITE_DISABLED",
+      ONEC_PUBLIC_MESSAGE.ONEC_WRITE_DISABLED
     );
   }
 
   if (!config.secretConfigured) {
-    throw new Error("Не настроен пароль или API-ключ для подключения к 1С.");
+    throw oneCCodedError(
+      "ONEC_SECRET_MISSING",
+      ONEC_PUBLIC_MESSAGE.ONEC_SECRET_MISSING
+    );
   }
 
   const payload = await requestJson(config, config.draftOrderPath, {
@@ -554,7 +551,7 @@ export async function createOneCDraft(publicConfig, orderPayload, deps = {}) {
   }, deps);
 
   if (payload?.ok === false) {
-    throw new Error(payload?.error || "1С не создала черновик заказа.");
+    throw oneCUpstreamError(0);
   }
 
   return {

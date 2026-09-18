@@ -101,7 +101,7 @@ import {
   summarizeExchange,
   validateOrderFor1C,
 } from "./exchange.js";
-import { releaseExpiredOneCClaims } from "./onecClaimRequeue.js";
+import { releaseExpiredOneCClaims, runOneCClaimRequeueTick } from "./onecClaimRequeue.js";
 import {
   applyOneCAcceptedStatus,
   applyOrderStatusPolicy,
@@ -219,6 +219,8 @@ import {
   publicCabinetUrl,
   allowDevelopmentAuthLinks,
 } from "./authUrlPolicy.js";
+import { logCaughtError, logSafe } from "./safeLog.js";
+import { logOneCFailure, presentUnhandledOneCError } from "./oneCPublicError.js";
 import {
   executeClientRegistration,
   executeForgotPassword,
@@ -770,11 +772,11 @@ function auditFromRequest(req, action, details = {}) {
       details,
     });
     return true;
-  } catch (error) {
-    console.error("Не удалось записать действие в журнал", {
-      action: String(action || ""),
-      userId: req.user?.id || null,
-      name: error?.name || "",
+  } catch (_error) {
+    logSafe("error", {
+      event: "audit.write",
+      code: "AUDIT_WRITE_FAILED",
+      component: "audit",
     });
     return false;
   }
@@ -797,10 +799,11 @@ function rememberStaffPassword(user, _password, actor = {}) {
       actor
     );
     return true;
-  } catch (error) {
-    console.error("Не удалось сохранить метаданные доступа менеджера", {
-      userId,
-      name: error?.name || "",
+  } catch (_error) {
+    logSafe("error", {
+      event: "staff.access.metadata",
+      code: "STAFF_ACCESS_SAVE_FAILED",
+      component: "staff",
     });
     return false;
   }
@@ -1213,7 +1216,7 @@ function reconciliationPeriodText(request) {
 
 function queueManagerNotification(event) {
   notifyManagers(event).catch((error) => {
-    console.error("Manager notification error", error?.message || error);
+    logCaughtError("manager.notification", error, { component: "notifications" });
   });
 }
 
@@ -1785,11 +1788,7 @@ function startOneCClaimRequeueTimer() {
   const intervalMs =
     Number.isFinite(raw) && raw >= 5_000 ? raw : ONEC_CLAIM_REQUEUE_INTERVAL_MS;
   const timer = setInterval(() => {
-    try {
-      releaseExpiredOneCClaims();
-    } catch (error) {
-      console.error("one-c claim auto-requeue failed", error);
-    }
+    runOneCClaimRequeueTick();
   }, intervalMs);
   if (typeof timer.unref === "function") timer.unref();
   return timer;
@@ -2055,7 +2054,10 @@ app.get("/api/public/site", (req, res) => {
     res.setHeader("Content-Language", site.locale === "zh" ? "zh-CN" : site.locale);
     res.json({ site });
   } catch (error) {
-    console.error("public site failed", error);
+    logCaughtError("http.public.site", error, {
+      component: "public",
+      httpStatus: 500,
+    });
     res.status(500).json({ error: "Не удалось загрузить данные сайта." });
   }
 });
@@ -2085,7 +2087,10 @@ app.get("/api/public/localization/runtime", (req, res) => {
     );
     res.json(snapshot);
   } catch (error) {
-    console.error("public localization runtime failed", error);
+    logCaughtError("http.public.localization", error, {
+      component: "public",
+      httpStatus: 500,
+    });
     res.status(500).json({ error: "Не удалось загрузить локализацию." });
   }
 });
@@ -2118,7 +2123,10 @@ app.get("/api/public/catalog", (req, res) => {
     res.setHeader("Content-Language", catalog.locale === "zh" ? "zh-CN" : catalog.locale);
     res.json(catalog);
   } catch (error) {
-    console.error("public catalog failed", error);
+    logCaughtError("http.public.catalog", error, {
+      component: "public",
+      httpStatus: 500,
+    });
     res.status(500).json({ error: "Не удалось загрузить каталог." });
   }
 });
@@ -2134,7 +2142,10 @@ app.get("/api/public/catalog/:code", (req, res) => {
     res.setHeader("Content-Language", product.locale === "zh" ? "zh-CN" : product.locale);
     res.json({ product });
   } catch (error) {
-    console.error("public product failed", error);
+    logCaughtError("http.public.product", error, {
+      component: "public",
+      httpStatus: 500,
+    });
     res.status(500).json({ error: "Не удалось загрузить товар." });
   }
 });
@@ -2289,10 +2300,9 @@ app.post("/api/auth/reset-password", async (req, res, next) => {
         action: "auth.password.reset.complete", details: {},
       });
     } catch (auditError) {
-      console.error("Не удалось записать действие в журнал", {
-        action: "auth.password.reset.complete",
-        userId: user.id,
-        name: auditError?.name || "",
+      logCaughtError("audit.write", auditError, {
+        code: "AUDIT_WRITE_FAILED",
+        component: "audit",
       });
       warnings.push("AUDIT_WRITE_FAILED");
     }
@@ -2356,7 +2366,7 @@ app.post("/api/auth/login", async (req, res, next) => {
         const upgraded = await hashPassword(input.password);
         sessionUser = updateUserPassword(user.id, upgraded) || user;
       } catch (rehashError) {
-        console.error("Не удалось обновить формат пароля после входа", rehashError);
+        logCaughtError("auth.password.rehash", rehashError, { component: "auth" });
       }
     }
     writeAudit({
@@ -3076,7 +3086,10 @@ app.get(
         count: Object.keys(displays).length,
       });
     } catch (error) {
-      console.error("client product-display failed", error);
+      logCaughtError("http.client.product-display", error, {
+        component: "server",
+        httpStatus: 500,
+      });
       res.status(500).json({ error: "Не удалось загрузить переводы товаров." });
     }
   }
@@ -3464,7 +3477,7 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
           : changes.join("; "),
         url: `/?order=${encodeURIComponent(order.id)}`,
         tag: `order-${order.id}`,
-      }).catch((error) => console.error("Push order update error", error));
+      }).catch((error) => logCaughtError("push.order.update", error, { component: "push" }));
     }
   }
 
@@ -3659,7 +3672,7 @@ function notifyClientOrderStatusChanged(order, _previousStatus) {
     body: `статус: ${order.status}`,
     url: `/?order=${encodeURIComponent(order.id)}`,
     tag: `order-${order.id}`,
-  }).catch((error) => console.error("Push order status error", error));
+  }).catch((error) => logCaughtError("push.order.status", error, { component: "push" }));
 }
 
 app.patch(
@@ -4858,7 +4871,11 @@ app.put(
     // Best-effort cleanup: a single unlink failure must not abort audit/sitemap/response.
     cleanupObsoleteStorefrontUploads(obsoleteUploadUrls, {
       deleteUrl: removeUploadedImage,
-      log: (message) => console.error(message),
+      log: () => logSafe("error", {
+        event: "storefront.upload.cleanup",
+        code: "CLEANUP_FAILED",
+        component: "storefront",
+      }),
     });
 
     auditFromRequest(req, "storefront.settings.save", {
@@ -6056,13 +6073,15 @@ app.post(
       });
       res.json({ ok: true, result, ...publicOneCStatus(config) });
     } catch (error) {
+      const presented = logOneCFailure("onec.connection.test", error, {
+        route: "/api/admin/one-c/test",
+        component: "oneC",
+      });
       auditFromRequest(req, "exchange.connection.error", {
         ok: false,
-        message: error.message,
+        ...presented.auditDetails,
       });
-      res.status(error?.status >= 400 && error?.status < 600 ? 502 : 400).json({
-        error: error.message,
-      });
+      res.status(presented.httpStatus).json(presented.body);
     }
   }
 );
@@ -6920,7 +6939,9 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
     } catch (artifactError) {
       // Диагностический JSON не является authoritative state и не должен
       // превращать успешно закоммиченную транзакцию в ошибочный HTTP-ответ.
-      console.error("Не удалось записать clients-preview artifact", artifactError);
+      logCaughtError("onec.clients.preview-artifact", artifactError, {
+        component: "oneC",
+      });
     }
 
     res.json({
@@ -7117,13 +7138,16 @@ app.get(
       });
       res.json(result);
     } catch (error) {
+      const presented = logOneCFailure("onec.catalog.preview", error, {
+        route: "/api/admin/one-c/preview/:type",
+        component: "oneC",
+        type,
+      });
       auditFromRequest(req, "exchange.catalog.error", {
         type,
-        message: error.message,
+        ...presented.auditDetails,
       });
-      res.status(error?.status >= 400 && error?.status < 600 ? 502 : 400).json({
-        error: error.message,
-      });
+      res.status(presented.httpStatus).json(presented.body);
     }
   }
 );
@@ -7220,6 +7244,11 @@ app.post(
         validation,
       });
     } catch (error) {
+      const presented = logOneCFailure("onec.draft.create", error, {
+        route: "/api/admin/one-c/orders/:orderId/draft",
+        component: "oneC",
+        orderId: stored.id,
+      });
       const previous = normalizeExchangeState(stored.payload.exchange);
       const attemptedAt = new Date().toISOString();
       const exchange = {
@@ -7229,7 +7258,9 @@ app.post(
         checkedAt: attemptedAt,
         lastAttemptAt: attemptedAt,
         channel: "onec",
-        message: error.message,
+        message: presented.exchangeMessage,
+        code: presented.body.code,
+        correlationId: presented.body.correlationId,
       };
       const order = updateOrderPayload(stored.id, {
         ...stored.payload,
@@ -7239,10 +7270,10 @@ app.post(
       auditFromRequest(req, "exchange.send.draft.error", {
         orderId: order.id,
         orderNumber: order.number,
-        message: error.message,
+        ...presented.auditDetails,
       });
-      res.status(error?.status >= 400 && error?.status < 600 ? 502 : 400).json({
-        error: error.message,
+      res.status(presented.httpStatus).json({
+        ...presented.body,
         order,
         exchange,
       });
@@ -7689,7 +7720,7 @@ app.post("/api/one-c/reconciliation/:requestId/result", (req, res, next) => {
       body: "PDF получен из 1С и доступен в Clover.",
       url: "/?section=reconciliation",
       tag: `reconciliation-${request.id}`,
-    }).catch((error) => console.error(error));
+    }).catch((error) => logCaughtError("push.reconciliation", error, { component: "push" }));
     res.json({ ok: true, requestId: request.id, status: request.status });
   } catch (error) {
     next(error);
@@ -7751,7 +7782,7 @@ app.patch("/api/admin/reconciliation/:requestId", authRequired, roleRequired("ma
       body: request.status === "ready" ? "Акт сверки готов к скачиванию." : `Статус запроса: ${request.status}`,
       url: "/?section=reconciliation",
       tag: `reconciliation-${request.id}`,
-    }).catch((error) => console.error(error));
+    }).catch((error) => logCaughtError("push.reconciliation", error, { component: "push" }));
     res.json({ ok: true, request });
   } catch (error) { next(error); }
 });
@@ -7775,7 +7806,7 @@ app.delete(
       try {
         unlinkSync(deleted.file_path);
       } catch (error) {
-        console.error("Reconciliation file cleanup error", error);
+        logCaughtError("reconciliation.file.cleanup", error, { component: "reconciliation" });
       }
     }
 
@@ -7823,7 +7854,7 @@ app.post(
       sendOrderPush(request.userId, {
         title: "Акт сверки готов", body: "Откройте Clover, чтобы скачать PDF.",
         url: "/?section=reconciliation", tag: `reconciliation-${request.id}`,
-      }).catch((error) => console.error(error));
+      }).catch((error) => logCaughtError("push.reconciliation", error, { component: "push" }));
 
       const clientUser = findUserById(request.userId);
       let mail = { sent: false, reason: "account_not_found" };
@@ -7849,7 +7880,7 @@ app.post(
             }],
           });
         } catch (mailError) {
-          console.error("Reconciliation email error", mailError);
+          logCaughtError("mail.reconciliation", mailError, { component: "mail" });
           mail = { sent: false, reason: "send_failed" };
         }
       }
@@ -7903,7 +7934,7 @@ app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("m
         ...approvalEmail({ approved: status === "approved" }),
       });
     } catch (mailError) {
-      console.error("Approval email error", mailError);
+      logCaughtError("mail.approval", mailError, { component: "mail" });
     }
   }
   res.json({
@@ -8055,10 +8086,9 @@ app.post(
           });
         }
       } catch (profileError) {
-        console.error(
-          "Не удалось выровнять email профиля после смены пароля клиента",
-          { clientId: clientUser.id, name: profileError?.name || "" }
-        );
+        logCaughtError("client.profile.email-align", profileError, {
+          component: "auth",
+        });
       }
       const warnings = [];
       if (!auditFromRequest(req, "client.password.set_by_manager", {
@@ -8081,10 +8111,7 @@ app.post(
           req.user
         );
       } catch (vaultError) {
-        console.error(
-          "Не удалось обновить журнал доступов после смены пароля клиента",
-          { clientId: clientUser.id, name: vaultError?.name || "" }
-        );
+        logCaughtError("client.access.vault", vaultError, { component: "auth" });
         warnings.push("ACCESS_VAULT_UPDATE_FAILED");
       }
       setNoStore(res);
@@ -8285,12 +8312,25 @@ app.post(
 );
 
 app.use((error, req, res, _next) => {
-  console.error(error);
+  const oneCPresented = presentUnhandledOneCError(error);
+  logSafe("error", {
+    event: "http.unhandled",
+    code: oneCPresented?.body.code || error?.code,
+    status: error?.status,
+    httpStatus: oneCPresented?.httpStatus,
+    correlationId: oneCPresented?.body.correlationId,
+    component: "server",
+  });
+
+  if (oneCPresented) {
+    return res.status(oneCPresented.httpStatus).json(oneCPresented.body);
+  }
 
   if (Number.isInteger(error?.status) && error.status >= 400 && error.status < 600) {
     return res.status(error.status).json({
       error: error.message,
       ...(error.code ? { code: error.code } : {}),
+      ...(error.correlationId ? { correlationId: error.correlationId } : {}),
     });
   }
 
@@ -8346,13 +8386,21 @@ try {
     );
   }
 } catch (error) {
-  console.error("Не удалось создать автоматическую резервную копию", error);
+  logSafe("error", {
+    event: "backup.daily.failed",
+    code: error?.code,
+    component: "backups",
+  });
 }
 
 try {
   assertOneCContourAuthConfig();
 } catch (error) {
-  console.error(error.message || error);
+  logSafe("error", {
+    event: "onec.contour.config",
+    code: error?.code,
+    component: "oneCContourAuth",
+  });
   process.exit(1);
 }
 
@@ -8362,7 +8410,10 @@ app.listen(port, host, () => {
   console.log("Clover Server V18.1 (4.0.4 legacy-ack-bridge) запущен");
   console.log(`API: http://localhost:${port}/api/health`);
   if (process.env.MANAGER_EMAIL) {
-    console.log(`Менеджер: ${process.env.MANAGER_EMAIL}`);
+    logSafe("info", {
+      event: "server.listen.manager-configured",
+      component: "server",
+    });
   }
   console.log("Пароли и ключи в журнал не выводятся.");
   console.log("");
