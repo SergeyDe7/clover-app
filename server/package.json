@@ -13,7 +13,7 @@
     "test:onec": "node scripts/run-package-scripts.mjs test:onec",
     "apply:onec-links": "node scripts/apply-onec-links.mjs",
     "test:v18": "node scripts/verify-v18.mjs",
-    "test:all": "npm run check && npm run test:onec && npm run test:v18 && npm run test:runtime && npm run test:manager-notifications && npm run test:manager-tabs && npm run test:order-trash && npm run test:security-stage3-package1 && npm run test:security-stage3-package2",
+    "test:all": "npm run check && npm run test:onec && npm run test:v18 && npm run test:runtime && npm run test:manager-notifications && npm run test:manager-tabs && npm run test:order-trash && npm run test:security-stage3-package1 && npm run test:security-stage3-package2 && npm run test:security-stage3-package3",
     "test:runtime": "node scripts/verify-runtime-integrations.mjs",
     "test:manager-notifications": "node scripts/verify-manager-notifications.mjs",
     "test:manager-tabs": "node scripts/verify-manager-tabs-smoke.mjs",
@@ -21,7 +21,8 @@
     "test:push-badge": "node scripts/verify-push-badge.mjs",
     "test:i18n-stage-8-azure": "node scripts/verify-i18n-stage-8-azure-product-batch.mjs",
     "test:security-stage3-package1": "node --test scripts/verify-security-stage3-package1.mjs",
-    "test:security-stage3-package2": "node --test scripts/verify-security-stage3-package2.mjs"
+    "test:security-stage3-package2": "node --test scripts/verify-security-stage3-package2.mjs",
+    "test:security-stage3-package3": "node --test scripts/verify-security-stage3-package3.mjs"
   },
   "dependencies": {
     "@simplewebauthn/server": "13.0.0",

@@ -106,6 +106,11 @@ const CHECK_FILES = [
   "scripts/verify-ui-build-tag.mjs",
   "scripts/verify-security-stage3-package1.mjs",
   "scripts/verify-security-stage3-package2.mjs",
+  "scripts/verify-security-stage3-package3.mjs",
+  "src/previewArtifact.js",
+  "src/auditRetention.js",
+  "src/safeFsPath.js",
+  "scripts/run-audit-retention.mjs",
 ];
 
 const TEST_ONEC = [
