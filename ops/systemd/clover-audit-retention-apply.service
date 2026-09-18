@@ -1,0 +1,18 @@
+[Unit]
+Description=Clover audit retention apply (oneshot, literal --apply only)
+After=network.target
+# Source-controlled only. Enable/start requires a separate production approval.
+# --apply lives only in this unit. Timer is not enabled by this package.
+
+[Service]
+Type=oneshot
+User=clover
+Group=clover
+UMask=0077
+WorkingDirectory=/opt/clover/clover-app/server
+Environment=DB_PATH=/opt/clover/clover-app/server/data/clover.sqlite
+Environment=CLOVER_AUDIT_RETENTION_ALLOW_PRODUCTION=1
+ExecStart=/opt/clover/clover-app/scripts/linux/run-audit-retention.sh --max-age-days 365 --apply
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true

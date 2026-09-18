@@ -14,6 +14,8 @@
 
 Linux safety: `daily-backup.sh` ставит `umask 077`, держит non-blocking `flock` на `server/backups/.daily-backup.lock` на весь job (TGZ + scheduled ZIP + retention) и при занятом lock делает controlled skip (`SKIP:…`, exit 0). Новые каталоги backup — mode `700`, новые архивы и lock — mode `600`. Live `server/uploads` permissions не меняются. Без `flock` скрипт не запускается. Cron schedule не меняется.
 
+Audit retention timer и DAC umask drop-in лежат в репозитории (`ops/systemd/`, план: [SECURITY_STAGE3_PACKAGE3_CLOSEOUT.md](./SECURITY_STAGE3_PACKAGE3_CLOSEOUT.md)). Они **не** установлены и **не** включены. Install/enable/start, production dry-run и chmod — только после отдельного разрешения.
+
 Если после деплоя процессы запущены вручную, а systemd-юниты `inactive` из‑за занятых портов — остановить ручные PID и `sudo systemctl restart clover-api clover-ui`.
 
 Живые заказы: [MANAGER_WORKING_1C.md](./MANAGER_WORKING_1C.md). Приёмка VLAVKA: [ACCEPTANCE_ORDERS_VLAVKA.md](./ACCEPTANCE_ORDERS_VLAVKA.md).

@@ -34,12 +34,28 @@ import {
   AUDIT_EMAIL_REDACTED,
   AUDIT_RETENTION_DEFAULT_MAX_AGE_DAYS,
   AUDIT_RETENTION_MAX_AGE_SOURCE_DEFAULT,
+  PRODUCTION_REPOSITORY_ROOT,
   assertRetentionDbPathAllowed,
   auditRetentionCutoffIso,
   isExplicitApply,
   parseAuditRetentionArgs,
+  productionLiveDbPath,
   runAuditRetention,
 } from "../src/auditRetention.js";
+import {
+  RUNTIME_DIR_MODE,
+  RUNTIME_FILE_MODE,
+  RUNTIME_PERMISSIONS_CODE_DENIED,
+  RUNTIME_PERMISSION_TARGETS,
+  RUNTIME_PERMISSION_UNTOUCHED,
+  applyRuntimePermissionPlan,
+  assertRuntimeRootAllowed,
+  isExplicitApply as isExplicitPermissionsApply,
+  parseRuntimePermissionsArgs,
+  planRuntimePermissionFixes,
+  postcheckRuntimePermissions,
+  rollbackRuntimePermissionPlan,
+} from "../src/runtimeFilePermissions.js";
 import {
   BACKUP_DOWNLOAD_CACHE_CONTROL,
   buildBackupDownloadAuditDetails,
@@ -59,6 +75,8 @@ const repositoryRoot = path.resolve(scriptDirectory, "../..");
 const PRODUCTION_DATA = path.resolve("/opt/clover/clover-app/server/data");
 const WORKTREE_DATA = path.resolve(repositoryRoot, "server/data");
 const RETENTION_CLI = path.join(scriptDirectory, "run-audit-retention.mjs");
+const PERMISSIONS_CLI = path.join(scriptDirectory, "run-runtime-permissions.mjs");
+const RETENTION_WRAPPER = path.join(repositoryRoot, "scripts/linux/run-audit-retention.sh");
 const HEALTH_SCRIPT = path.join(
   repositoryRoot,
   "releases/dc-prep-ac44dcf/scripts/health-check.sh"
@@ -192,6 +210,64 @@ function previewNames(directory) {
 
 function localServerImports(serverSource) {
   return [...serverSource.matchAll(/from\s+"(\.\/[^"]+\.js)"/gu)].map((match) => match[1]);
+}
+
+function spawnPermissionsCli({ root, args = [], extraEnv = {} }) {
+  const env = { ...process.env, ...extraEnv };
+  delete env.CLOVER_RUNTIME_PERMISSIONS_ALLOW_PRODUCTION;
+  if (Object.prototype.hasOwnProperty.call(extraEnv, "CLOVER_RUNTIME_PERMISSIONS_ALLOW_PRODUCTION")) {
+    env.CLOVER_RUNTIME_PERMISSIONS_ALLOW_PRODUCTION =
+      extraEnv.CLOVER_RUNTIME_PERMISSIONS_ALLOW_PRODUCTION;
+  }
+  const argv = [...args];
+  if (root !== undefined) argv.push("--root", root);
+  return spawnSync(process.execPath, [PERMISSIONS_CLI, ...argv], {
+    cwd: path.join(repositoryRoot, "server"),
+    env,
+    encoding: "utf8",
+  });
+}
+
+function makePermissionsFixture(label) {
+  const root = makeTempRoot(label);
+  const dataDir = path.join(root, "server", "data");
+  const previewDir = path.join(dataDir, "one-c-preview");
+  const backupsDir = path.join(root, "server", "backups");
+  const uploadsDir = path.join(root, "server", "uploads");
+  mkdirSync(previewDir, { recursive: true });
+  mkdirSync(backupsDir, { recursive: true });
+  mkdirSync(uploadsDir, { recursive: true });
+  const dbPath = path.join(dataDir, "clover.sqlite");
+  const clients = path.join(previewDir, "clients-preview.json");
+  const products = path.join(previewDir, "products-preview.json");
+  const upload = path.join(uploadsDir, "keep.txt");
+  writeFileSync(dbPath, "sqlite-fixture", "utf8");
+  writeFileSync(clients, "{}", "utf8");
+  writeFileSync(products, "{}", "utf8");
+  writeFileSync(upload, "uploads-must-not-change", "utf8");
+  return { root, dbPath, clients, products, upload, dataDir, previewDir, backupsDir };
+}
+
+function unitActiveText(source) {
+  return String(source)
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+      return trimmed && !trimmed.startsWith("#");
+    })
+    .join("\n");
+}
+
+function unitKeyValues(source) {
+  const values = {};
+  for (const line of String(source).split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("[")) continue;
+    const index = trimmed.indexOf("=");
+    if (index <= 0) continue;
+    values[trimmed.slice(0, index)] = trimmed.slice(index + 1);
+  }
+  return values;
 }
 
 function spawnRetentionCli({ dbPath, args = [], extraEnv = {} }) {
@@ -453,6 +529,102 @@ test("SEC3-008: retention CLI denies production-looking DB path before open", ()
   assert.ok(denyIndex >= 0);
   assert.match(cliSource, /DatabaseSync\(canonicalPath/u);
   assert.ok(denyIndex < cliSource.indexOf("new DatabaseSync"));
+});
+
+test("SEC3-008: production allow permits only exact canonical live DB", () => {
+  const productionRoot = path.resolve(PRODUCTION_REPOSITORY_ROOT);
+  const liveDb = productionLiveDbPath();
+  const otherDb = path.join(PRODUCTION_DATA, "other.sqlite");
+  const liveFs = injectedFs(liveDb, { kind: "file" });
+  const worktreeDb = path.join(WORKTREE_DATA, "clover.sqlite");
+  const aliasFile = path.join(path.resolve("/tmp"), "clover-sec3p3-alias.sqlite");
+
+  assert.throws(
+    () => assertRetentionDbPathAllowed(liveDb, {
+      repositoryRoot: productionRoot,
+      allowProduction: false,
+      fs: liveFs,
+    }),
+    (error) => error?.code === "AUDIT_RETENTION_DB_PATH_DENIED"
+      && /Refusing production DB_PATH/u.test(error.message)
+  );
+
+  const opened = assertRetentionDbPathAllowed(liveDb, {
+    repositoryRoot: productionRoot,
+    allowProduction: true,
+    fs: liveFs,
+  });
+  assert.equal(opened, path.resolve(liveDb));
+
+  assert.throws(
+    () => assertRetentionDbPathAllowed(worktreeDb, {
+      repositoryRoot,
+      allowProduction: true,
+      fs: injectedFs(worktreeDb, { kind: "file" }),
+    }),
+    (error) => error?.code === "AUDIT_RETENTION_DB_PATH_DENIED"
+      && /Refusing worktree DB_PATH/u.test(error.message)
+  );
+
+  assert.throws(
+    () => assertRetentionDbPathAllowed(otherDb, {
+      repositoryRoot: productionRoot,
+      allowProduction: true,
+      fs: injectedFs(otherDb, { kind: "file" }),
+    }),
+    (error) => error?.code === "AUDIT_RETENTION_DB_PATH_DENIED"
+  );
+
+  assert.throws(
+    () => assertRetentionDbPathAllowed(aliasFile, {
+      repositoryRoot: productionRoot,
+      allowProduction: true,
+      fs: injectedFs(aliasFile, { kind: "symlink", realpath: liveDb }),
+    }),
+    (error) => error?.code === "AUDIT_RETENTION_DB_PATH_DENIED"
+  );
+
+  const parent = path.join(productionRoot, "server");
+  assert.throws(
+    () => assertRetentionDbPathAllowed(liveDb, {
+      repositoryRoot: productionRoot,
+      allowProduction: true,
+      fs: injectedFs(liveDb, {
+        kind: "file",
+        override: {
+          [parent]: { kind: "symlink", realpath: productionRoot },
+        },
+      }),
+    }),
+    (error) => error?.code === "AUDIT_RETENTION_DB_PATH_DENIED"
+  );
+});
+
+test("SEC3-008: retention CLI local worktree stays denied even with production allow", () => {
+  const liveDb = "/opt/clover/clover-app/server/data/clover.sqlite";
+  const denied = spawnRetentionCli({ dbPath: liveDb });
+  assert.equal(denied.status, 2);
+  assert.match(String(denied.stderr), /Refusing production DB_PATH/u);
+  assertNoMarker(denied.stdout, "cli production deny stdout");
+  assertNoMarker(denied.stderr, "cli production deny stderr");
+
+  const localAllowDoesNotBypass = spawnRetentionCli({
+    dbPath: liveDb,
+    extraEnv: { CLOVER_AUDIT_RETENTION_ALLOW_PRODUCTION: "1" },
+  });
+  assert.equal(localAllowDoesNotBypass.status, 2);
+  assert.match(
+    String(localAllowDoesNotBypass.stderr),
+    /Refusing production DB_PATH|Refusing worktree DB_PATH|Refusing unproven production repository root/u
+  );
+
+  const worktreeAllow = spawnRetentionCli({
+    dbPath: path.join(WORKTREE_DATA, "clover.sqlite"),
+    extraEnv: { CLOVER_AUDIT_RETENTION_ALLOW_PRODUCTION: "1" },
+  });
+  assert.equal(worktreeAllow.status, 2);
+  assert.match(String(worktreeAllow.stderr), /Refusing worktree DB_PATH/u);
+  assertNoMarker(worktreeAllow.stdout, "cli worktree allow stdout");
 });
 
 test("SEC3-008: retention path deny stops file and parent symlinks before open", () => {
@@ -1046,4 +1218,266 @@ test("SEC3-011: health script leaves a hostile symlink untouched", () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("SEC3-008: retention CLI apply stdout stays aggregated without PII", () => {
+  const root = makeTempRoot("cli-pii");
+  const dbPath = path.join(root, "audit.sqlite");
+  const database = openAuditDb(dbPath);
+  try {
+    insertAudit(database, {
+      id: "old-1",
+      userId: "user-old",
+      userEmail: MARKER_EMAIL,
+      userRole: "admin",
+      action: "backup.create",
+      createdAt: "2024-01-01T00:00:00.000Z",
+    });
+  } finally {
+    database.close();
+  }
+  try {
+    const applied = spawnRetentionCli({ dbPath, args: ["--apply"] });
+    assert.equal(applied.status, 0, applied.stderr || applied.stdout);
+    assertNoMarker(applied.stdout, "cli apply stdout");
+    assertNoMarker(applied.stderr, "cli apply stderr");
+    const payload = JSON.parse(String(applied.stdout).trim());
+    assert.equal(payload.apply, true);
+    assert.equal(Object.prototype.hasOwnProperty.call(payload, "user_email"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(payload, "rows"), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("SEC3-012: permissions helper dry-run does not mutate exact paths", () => {
+  const fixture = makePermissionsFixture("perm-dry");
+  try {
+    const beforeDb = fileDigest(fixture.dbPath);
+    const beforeUpload = fileDigest(fixture.upload);
+    const beforeClients = fileDigest(fixture.clients);
+    const chmodCalls = [];
+    const plan = planRuntimePermissionFixes(fixture.root);
+    const dry = applyRuntimePermissionPlan(plan, {
+      apply: false,
+      chmodFn: (...args) => {
+        chmodCalls.push(args);
+        throw new Error("chmod must not run in dry-run");
+      },
+    });
+    assert.equal(dry.dryRun, true);
+    assert.equal(dry.apply, false);
+    assert.equal(dry.applied, 0);
+    assert.equal(chmodCalls.length, 0);
+    assert.equal(fileDigest(fixture.dbPath), beforeDb);
+    assert.equal(fileDigest(fixture.upload), beforeUpload);
+    assert.equal(fileDigest(fixture.clients), beforeClients);
+    for (const row of [...plan.changes, ...plan.unchanged, ...plan.skipped]) {
+      assert.equal(RUNTIME_PERMISSION_UNTOUCHED.includes(row.relative), false);
+    }
+    const cli = spawnPermissionsCli({ root: fixture.root });
+    assert.equal(cli.status, 0, cli.stderr || cli.stdout);
+    const payload = JSON.parse(String(cli.stdout).trim());
+    assert.equal(payload.dryRun, true);
+    assert.equal(payload.apply, false);
+    assert.equal(fileDigest(fixture.dbPath), beforeDb);
+    assert.equal(readFileSync(fixture.upload, "utf8"), "uploads-must-not-change");
+    assertNoMarker(cli.stdout, "permissions dry-run stdout");
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("SEC3-012: permissions helper skips symlinks and keeps exact-path safety", () => {
+  const fixture = makePermissionsFixture("perm-symlink");
+  const chmodCalls = [];
+  try {
+    const canary = path.join(fixture.root, "canary.txt");
+    writeFileSync(canary, "perm-canary", "utf8");
+    const linkedClients = path.join(fixture.previewDir, "clients-preview.json");
+    rmSync(linkedClients, { force: true });
+    const linked = trySymlink(canary, linkedClients);
+    const plan = planRuntimePermissionFixes(fixture.root);
+    assert.equal(
+      plan.changes.some((row) => row.relative === "server/uploads"),
+      false
+    );
+    if (linked) {
+      assert.ok(plan.skipped.some((row) => row.relative.endsWith("clients-preview.json") && row.reason === "symlink"));
+    }
+    const applied = applyRuntimePermissionPlan(plan, {
+      apply: true,
+      chmodFn: (target) => {
+        chmodCalls.push(target);
+        assert.equal(lstatSync(target).isSymbolicLink(), false);
+      },
+    });
+    assert.equal(applied.apply, true);
+    assert.equal(readFileSync(canary, "utf8"), "perm-canary");
+    if (linked) {
+      assert.equal(lstatSync(linkedClients).isSymbolicLink(), true);
+      assert.equal(chmodCalls.includes(linkedClients), false);
+    }
+
+    assert.throws(
+      () => assertRuntimeRootAllowed(PRODUCTION_REPOSITORY_ROOT, { repositoryRoot }),
+      (error) => error?.code === "RUNTIME_PERMISSIONS_ROOT_DENIED"
+    );
+    assert.throws(
+      () => assertRuntimeRootAllowed(repositoryRoot, {
+        repositoryRoot,
+        allowProduction: true,
+      }),
+      (error) => error?.code === "RUNTIME_PERMISSIONS_ROOT_DENIED"
+    );
+    const productionDenied = spawnPermissionsCli({
+      root: PRODUCTION_REPOSITORY_ROOT,
+    });
+    assert.equal(productionDenied.status, 2);
+    assert.match(String(productionDenied.stderr), /Refusing production runtime root/u);
+    const worktree = spawnPermissionsCli({ root: repositoryRoot });
+    assert.equal(worktree.status, 2);
+    assert.match(String(worktree.stderr), /Refusing worktree runtime root/u);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("SEC3-012: permissions apply is literal and rollback restores planned modes", () => {
+  const fixture = makePermissionsFixture("perm-apply");
+  const chmodLog = [];
+  try {
+    assert.equal(parseRuntimePermissionsArgs(["--apply=true"]).apply, false);
+    assert.equal(isExplicitPermissionsApply({ apply: "true" }), false);
+    assert.equal(isExplicitPermissionsApply(parseRuntimePermissionsArgs(["--apply"])), true);
+    const plan = planRuntimePermissionFixes(fixture.root);
+    const denied = applyRuntimePermissionPlan(plan, {
+      apply: "true",
+      chmodFn: (...args) => chmodLog.push(args),
+    });
+    assert.equal(denied.dryRun, true);
+    assert.equal(chmodLog.length, 0);
+    const applied = applyRuntimePermissionPlan(plan, {
+      apply: true,
+      chmodFn: (target, mode) => chmodLog.push({ target, mode }),
+    });
+    assert.equal(applied.apply, true);
+    assert.ok(applied.applied >= 1);
+    for (const row of chmodLog) {
+      assert.equal(path.resolve(row.target).startsWith(path.resolve(fixture.root)), true);
+      assert.equal(
+        row.target.includes(`${path.sep}uploads${path.sep}`) || row.target.endsWith(`${path.sep}uploads`),
+        false
+      );
+    }
+    const restored = rollbackRuntimePermissionPlan(applied, {
+      chmodFn: (target, mode) => chmodLog.push({ target, mode, rollback: true }),
+    });
+    assert.equal(restored.rollback, true);
+    assert.equal(restored.restored, applied.applied);
+    const cliDenied = spawnPermissionsCli({ root: fixture.root, args: ["--apply=true"] });
+    assert.equal(cliDenied.status, 0, cliDenied.stderr || cliDenied.stdout);
+    assert.equal(JSON.parse(String(cliDenied.stdout).trim()).apply, false);
+    const post = postcheckRuntimePermissions(fixture.root);
+    assert.equal(Array.isArray(post.mismatches), true);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("SEC3-012: rollback refuses paths outside the validated root", () => {
+  const fixture = makePermissionsFixture("perm-rollback-escape");
+  const outside = makeTempRoot("perm-outside");
+  const victim = path.join(outside, "victim.txt");
+  writeFileSync(victim, "keep-outside", "utf8");
+  const chmodCalls = [];
+  try {
+    const hostile = {
+      root: fixture.root,
+      appliedChanges: [{
+        relative: "server/data/clover.sqlite",
+        path: victim,
+        from: 0o644,
+        to: 0o600,
+      }],
+    };
+    assert.throws(
+      () => rollbackRuntimePermissionPlan(hostile, {
+        chmodFn: (...args) => chmodCalls.push(args),
+      }),
+      (error) => error?.code === RUNTIME_PERMISSIONS_CODE_DENIED
+        && /path escape/u.test(error.message)
+    );
+    assert.equal(chmodCalls.length, 0);
+    assert.equal(readFileSync(victim, "utf8"), "keep-outside");
+
+    const planFile = path.join(fixture.root, "hostile-plan.json");
+    writeFileSync(planFile, `${JSON.stringify(hostile)}\n`, "utf8");
+    const cli = spawnPermissionsCli({
+      args: ["--rollback", "--plan", planFile],
+    });
+    assert.equal(cli.status, 2, cli.stderr || cli.stdout);
+    assert.match(String(cli.stderr), /path escape|unknown permission target/u);
+    assert.equal(readFileSync(victim, "utf8"), "keep-outside");
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("SEC3-013: systemd units have no secrets, clover user, timer contract, no overlap", () => {
+  const api = readRepoSource("releases/dc-prep-ac44dcf/systemd/clover-api.service");
+  const dropIn = readRepoSource("ops/systemd/clover-api.service.d/10-umask.conf");
+  const dry = readRepoSource("ops/systemd/clover-audit-retention-dry-run.service");
+  const apply = readRepoSource("ops/systemd/clover-audit-retention-apply.service");
+  const timer = readRepoSource("ops/systemd/clover-audit-retention.timer");
+  const wrapper = readRepoSource("scripts/linux/run-audit-retention.sh");
+  const adopt = readRepoSource("scripts/linux/adopt-systemd.sh");
+  assert.doesNotMatch(unitActiveText(api), /PASSWORD=|SECRET=|TOKEN=|API_KEY=|JWT_/iu);
+  assert.doesNotMatch(unitActiveText(dropIn), /PASSWORD=|SECRET=|TOKEN=|API_KEY=|JWT_/iu);
+  assert.doesNotMatch(unitActiveText(dry), /PASSWORD=|SECRET=|TOKEN=|API_KEY=|JWT_/iu);
+  assert.doesNotMatch(unitActiveText(apply), /PASSWORD=|SECRET=|TOKEN=|API_KEY=|JWT_/iu);
+  assert.doesNotMatch(unitActiveText(timer), /PASSWORD=|SECRET=|TOKEN=|API_KEY=|JWT_/iu);
+  assert.doesNotMatch(unitActiveText(wrapper), /PASSWORD=|SECRET=|TOKEN=|API_KEY=|JWT_/iu);
+  assert.doesNotMatch(api, /BEGIN [A-Z ]*PRIVATE/u);
+  assert.doesNotMatch(dropIn, /BEGIN [A-Z ]*PRIVATE/u);
+  assert.doesNotMatch(dry, /BEGIN [A-Z ]*PRIVATE/u);
+  assert.doesNotMatch(apply, /BEGIN [A-Z ]*PRIVATE/u);
+  assert.match(dropIn, /^UMask=0077$/mu);
+  const dryKeys = unitKeyValues(dry);
+  const applyKeys = unitKeyValues(apply);
+  const timerKeys = unitKeyValues(timer);
+  const apiKeys = unitKeyValues(api);
+  assert.equal(apiKeys.User, "clover");
+  assert.equal(apiKeys.Group, "clover");
+  assert.equal(dryKeys.User, "clover");
+  assert.equal(dryKeys.Group, "clover");
+  assert.equal(applyKeys.User, "clover");
+  assert.equal(applyKeys.Group, "clover");
+  assert.notEqual(dryKeys.User, "root");
+  assert.notEqual(applyKeys.User, "root");
+  assert.equal(dryKeys.Type, "oneshot");
+  assert.equal(applyKeys.Type, "oneshot");
+  assert.equal(dryKeys.UMask, "0077");
+  assert.equal(applyKeys.UMask, "0077");
+  assert.match(apply, /DB_PATH=\/opt\/clover\/clover-app\/server\/data\/clover\.sqlite/u);
+  assert.match(applyKeys.ExecStart, /--max-age-days 365/u);
+  assert.match(applyKeys.ExecStart, / --apply/u);
+  assert.doesNotMatch(dryKeys.ExecStart, /--apply/u);
+  assert.doesNotMatch(timer, /--apply/u);
+  assert.equal(timerKeys.Persistent, "true");
+  assert.equal(timerKeys.Unit, "clover-audit-retention-apply.service");
+  assert.match(timer, /^OnCalendar=/mu);
+  assert.match(wrapper, /^umask 077$/mu);
+  assert.match(wrapper, /\bflock -n 9\b/u);
+  assert.match(wrapper, /run-audit-retention\.mjs" "\$@"/u);
+  assert.doesNotMatch(wrapper, / --apply/u);
+  assert.doesNotMatch(adopt, /clover-audit-retention/u);
+  assert.doesNotMatch(
+    readRepoSource("server/scripts/run-runtime-permissions.mjs"),
+    /from\s+"\.\.\/src\/db\.js"/u
+  );
+  assert.equal(RUNTIME_PERMISSION_TARGETS.some((row) => row.relative === "server/data/clover.sqlite"), true);
+  assert.equal(RUNTIME_DIR_MODE, 0o700);
+  assert.equal(RUNTIME_FILE_MODE, 0o600);
 });

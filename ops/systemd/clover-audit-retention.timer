@@ -1,0 +1,13 @@
+[Unit]
+Description=Clover audit retention timer (disabled until explicit enable)
+# Owner decision: monthly after daily backup (03:15). Change OnCalendar only with approval.
+
+[Timer]
+OnCalendar=*-*-01 03:40:00
+Persistent=true
+AccuracySec=30min
+RandomizedDelaySec=20min
+Unit=clover-audit-retention-apply.service
+
+[Install]
+WantedBy=timers.target
