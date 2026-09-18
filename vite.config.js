@@ -1,12 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-import process from "node:process";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import {
   renderPublicRouteHtml,
   resolvePublicRouteRequest,
 } from "./src/shared/sitemap/publicRouteHtml.js";
+import { isPublicLocaleRoutesEnabledFromEnv } from "./src/shared/i18n/localeRoutesBuildFlag.js";
 
 const proxy = {
   "/api": {
@@ -31,9 +31,7 @@ const UI_BUILD_PLACEHOLDER = "%CLOVER_UI_BUILD%";
 const PUBLIC_LOCALE_ROUTES_PLACEHOLDER = "%CLOVER_PUBLIC_LOCALE_ROUTES%";
 
 function publicLocaleRoutesBuildValue() {
-  return String(process.env.CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED || "").trim() === "1"
-    ? "enabled"
-    : "disabled";
+  return isPublicLocaleRoutesEnabledFromEnv() ? "enabled" : "disabled";
 }
 
 /** Каждый production build получает уникальный тег по hash entry-бандла — иначе localStorage не сбрасывает кэш. */

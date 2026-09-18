@@ -39,6 +39,7 @@ server/data/
 server/uploads/
 server/backups/
 server/.env
+tools/seo-browser-smoke-portable/work/
 _stage2/
 INSTALL_STAGE2_FIXED.bat
 INSTALL_UPDATE_STAGE2.bat

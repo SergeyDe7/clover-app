@@ -4,6 +4,8 @@
  *
  * Reads SQLite app_state read-only (same products/settings as public catalog).
  * Does NOT call production HTTP. Does NOT mutate DB.
+ * Must not import server/src/db.js or localizationStore.js: those run
+ * initializeLocalizationCatalog() / catalog-sync on API startup.
  *
  * Env:
  *   DB_PATH — sqlite file (default: <repo>/server/data/clover.sqlite)
@@ -17,6 +19,7 @@ import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
+import { isPublicLocaleRoutesEnabledFromEnv } from "../../src/shared/i18n/localeRoutesBuildFlag.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -129,6 +132,9 @@ async function main() {
     path.join(projectRoot, "server/data/clover.sqlite");
   const outPath =
     process.env.SITEMAP_OUT || path.join(projectRoot, "dist/sitemap.xml");
+  const manifestOutPath =
+    process.env.PUBLIC_ROUTE_MANIFEST_OUT ||
+    path.join(path.dirname(outPath), "public-route-manifest.json");
 
   if (!existsSync(dbPath)) {
     console.error(
@@ -140,8 +146,7 @@ async function main() {
   const state = loadSitemapState(dbPath);
   const publicProducts = state.publicProducts;
   const sets = collectSitemapIndexSets(publicProducts);
-  const infrastructureEnabled =
-    String(process.env.CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED || "").trim() === "1";
+  const infrastructureEnabled = isPublicLocaleRoutesEnabledFromEnv();
   let manifest = {
     version: 1,
     infrastructureEnabled: false,
@@ -177,11 +182,12 @@ async function main() {
     xml = renderSitemapXml(locs);
   }
 
+  const manifestPath = manifestOutPath;
   mkdirSync(path.dirname(outPath), { recursive: true });
+  mkdirSync(path.dirname(manifestPath), { recursive: true });
   const tmpPath = `${outPath}.${process.pid}.tmp`;
   writeFileSync(tmpPath, xml);
   renameSync(tmpPath, outPath);
-  const manifestPath = path.join(path.dirname(outPath), "public-route-manifest.json");
   const manifestTmpPath = `${manifestPath}.${process.pid}.tmp`;
   writeFileSync(manifestTmpPath, `${JSON.stringify(manifest)}\n`);
   renameSync(manifestTmpPath, manifestPath);

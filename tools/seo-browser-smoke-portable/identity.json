@@ -1,0 +1,40 @@
+{
+  "package": "clover-seo-browser-smoke-portable",
+  "purpose": "Settled-DOM locale-route SEO smoke on a workstation Chrome/Edge profile, never on the production Linux host.",
+  "notProductionDb": true,
+  "noCookies": true,
+  "noSecrets": true,
+  "doNotUseLinuxChromeHeadlessShell": true,
+  "includesPrebuiltCandidateDist": false,
+  "windowsCompatibilityVerified": true,
+  "browserSmoke": "PASS",
+  "candidateUiBuild": "ui-20260918-BJ_YbAhT",
+  "archiveSha256": "eeb8223d79a0705c30107f15a9f7acbb406274f753fff71c992bb7fe995b0c13",
+  "branch": "agent/fix-seo-locale-routes-on-main",
+  "baselineMain": "df38cd12ffaa06ba57ccd14966da5fb0358b37ae",
+  "productionUiAtHandoff": "ui-20260918-BTQzg2Z6",
+  "rollbackTargetIfInstalledLater": "df38cd12ffaa06ba57ccd14966da5fb0358b37ae",
+  "doNotRollbackTo": "5de14f926a8aeae8ddef44cbd102743ce29aaa58",
+  "windows": {
+    "node": "22+",
+    "npmCiRequiredForCandidate": true,
+    "browser": "installed Chrome or Edge via CLOVER_BROWSER_CHROME or default Program Files paths",
+    "simpleCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\tools\\seo-browser-smoke-portable\\Run-SeoBrowserSmoke.ps1 -Phase simple",
+    "candidateCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\tools\\seo-browser-smoke-portable\\Run-SeoBrowserSmoke.ps1 -Phase candidate",
+    "report": "tools\\seo-browser-smoke-portable\\work\\seo-browser-smoke-report.json"
+  },
+  "requiredFiles": [
+    "tools/seo-browser-smoke-portable/Run-SeoBrowserSmoke.ps1",
+    "tools/seo-browser-smoke-portable/run.mjs",
+    "tools/seo-browser-smoke-portable/cdp-chrome.mjs",
+    "tools/seo-browser-smoke-portable/seed-fixture-db.mjs",
+    "tools/seo-browser-smoke-portable/fixtures/simple.html",
+    "tools/seo-browser-smoke-portable/fixtures/storefront.json",
+    "src/shared/sitemap/publicRouteHtml.js",
+    "server/scripts/generate-sitemap.mjs",
+    "server/scripts/assert-locale-route-release.mjs",
+    "vite.config.js",
+    "package.json",
+    "package-lock.json"
+  ]
+}
