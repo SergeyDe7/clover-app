@@ -7,6 +7,7 @@ import {
   resolvePublicRouteRequest,
 } from "./src/shared/sitemap/publicRouteHtml.js";
 import { isPublicLocaleRoutesEnabledFromEnv } from "./src/shared/i18n/localeRoutesBuildFlag.js";
+import { staticAssetRelativePath } from "./src/shared/staticAssetGuard.js";
 
 const proxy = {
   "/api": {
@@ -188,20 +189,15 @@ function cloverPreviewCacheHeaders() {
 /**
  * SPA fallback must NOT swallow missing static files as index.html —
  * phone then gets HTML as CSS/image → broken UI / false-positive 200 pages.
- * Applies to hashed /assets/* and bundled /storefront/* hero media.
+ * Applies to hashed /assets/*, self-hosted /fonts/*, and /storefront/* media.
  */
 function noAssetSpaFallback() {
   return {
     name: "clover-no-asset-spa-fallback",
     configurePreviewServer(server) {
       server.middlewares.use((req, res, next) => {
-        const url = String(req.url || "").split("?")[0];
-        let relative = "";
-        if (url.startsWith("/assets/")) {
-          relative = url.replace(/^\/assets\//, "assets/");
-        } else if (url.startsWith("/storefront/")) {
-          relative = url.replace(/^\/storefront\//, "storefront/");
-        } else {
+        const relative = staticAssetRelativePath(req.url || "/");
+        if (!relative) {
           next();
           return;
         }
@@ -210,6 +206,7 @@ function noAssetSpaFallback() {
         if (filePath !== outDir && !filePath.startsWith(`${outDir}${path.sep}`)) {
           res.statusCode = 404;
           res.setHeader("Content-Type", "text/plain; charset=utf-8");
+          res.setHeader("Cache-Control", "no-store");
           res.end("Not found");
           return;
         }
@@ -219,6 +216,7 @@ function noAssetSpaFallback() {
         }
         res.statusCode = 404;
         res.setHeader("Content-Type", "text/plain; charset=utf-8");
+        res.setHeader("Cache-Control", "no-store");
         res.end("Not found");
       });
     },

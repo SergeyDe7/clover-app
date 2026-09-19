@@ -26,7 +26,8 @@ server {
     access_log /var/log/nginx/clover-order.access.log;
     error_log /var/log/nginx/clover-order.error.log;
 
-    # Hashed Vite assets — год, immutable
+    # Hashed Vite assets: proxy to the live UI origin. Do not alias private dist.
+    # Preserve URI + Host. Hide upstream Cache-Control. No yearly immutable on errors.
     location /assets/ {
         proxy_pass http://192.168.155.15:5273;
         proxy_http_version 1.1;
@@ -37,11 +38,10 @@ server {
         proxy_hide_header Cache-Control;
         proxy_hide_header Pragma;
         proxy_hide_header Expires;
-        expires 1y;
-        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
-    # Self-hosted fonts
+    # Self-hosted fonts: same UI proxy as /assets/.
     location /fonts/ {
         proxy_pass http://192.168.155.15:5273;
         proxy_http_version 1.1;
@@ -52,8 +52,7 @@ server {
         proxy_hide_header Cache-Control;
         proxy_hide_header Pragma;
         proxy_hide_header Expires;
-        expires 1y;
-        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
     location ~* ^/(favicon\.png|favicon-32\.png|apple-touch-icon\.png|icon-.*\.png|icons\.svg)$ {

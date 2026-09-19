@@ -97,10 +97,65 @@ assert.equal(
   false,
   "default CLOVER_DEPLOY_HEALTH_ATTEMPTS must not remain 30"
 );
+assert.match(scriptSrc, /uiAssetProbe\.mjs/, "deploy must copy/run the asset probe");
+assert.match(scriptSrc, /READY_CONSECUTIVE:-\s*2\b/, "two consecutive ready passes required");
+assert.match(scriptSrc, /check_http_assets/, "HTML/API 200 is not enough without asset HTTP");
+assert.equal(
+  /nginx\s+-s\s+reload|systemctl\s+reload\s+nginx/i.test(scriptSrc),
+  false,
+  "must not force nginx reload when config did not change"
+);
+assert.equal(
+  /chmod\s+.*\bdist\b/.test(scriptSrc),
+  false,
+  "must not weaken or rewrite live dist permissions"
+);
+assert.equal(
+  /wait_for_nginx_worker|while\s+.*nginx.*worker/i.test(scriptSrc),
+  false,
+  "must not wait for previous nginx workers to drain"
+);
+assert.equal(
+  /\s-k\b|--insecure/.test(scriptSrc),
+  false,
+  "deploy must not disable TLS verification"
+);
+const launcherSrc = readFileSync(path.join(workRoot, "scripts/linux/run-target-deploy.sh"), "utf8");
+assert.match(launcherSrc, /FIRST_DEPLOY_LAUNCHER/, "first-deploy launcher must extract the target script");
+assert.match(launcherSrc, /CLOVER_DEPLOY_ROOT/, "launcher ROOT comes from env, not this file");
+assert.equal(/git reset/i.test(launcherSrc), false, "launcher must not reset live source");
+assert.equal(/BASH_SOURCE/.test(launcherSrc), false, "launcher must not infer ROOT from its path");
+assert.match(launcherSrc, /extract dir must not be inside live ROOT/);
+const probeSrc = readFileSync(path.join(workRoot, "server/scripts/uiAssetProbe.mjs"), "utf8");
+assert.match(probeSrc, /TLS verification must stay enabled/);
+assert.equal(
+  /extraArgs\.push\(\s*["'](?:-k|--insecure)["']/.test(probeSrc),
+  false,
+  "asset probe must not pass -k/--insecure to curl"
+);
 console.log("STATIC_CONTRACT:PASS");
 
+const GIT_USR_BIN = "C:\\Program Files\\Git\\usr\\bin";
+
+function resolveBash() {
+  if (process.env.CLOVER_DEPLOY_TEST_BASH) return process.env.CLOVER_DEPLOY_TEST_BASH;
+  const candidates = [
+    path.join(GIT_USR_BIN, "bash.exe"),
+    "C:\\Program Files\\Git\\bin\\bash.exe",
+    "bash",
+  ];
+  for (const cmd of candidates) {
+    const result = spawnSync(cmd, ["-c", "echo ok"], { encoding: "utf8" });
+    if (result.status === 0) return cmd;
+  }
+  return "";
+}
+
+const BASH_BIN = resolveBash();
+assert.ok(BASH_BIN, "bash is required for deploy sandbox (Git Bash on Windows)");
+
 function sh(cmd, opts = {}) {
-  return spawnSync("bash", ["-lc", cmd], {
+  return spawnSync(BASH_BIN, ["-lc", cmd], {
     encoding: "utf8",
     ...opts,
   });
@@ -109,6 +164,30 @@ function sh(cmd, opts = {}) {
 function writeExec(file, body) {
   writeFileSync(file, body);
   chmodSync(file, 0o755);
+}
+
+function writeCompleteUiDist(dir, { tag, jsPath, localeStamp = "disabled" }) {
+  mkdirSync(path.join(dir, "assets"), { recursive: true });
+  mkdirSync(path.join(dir, "fonts"), { recursive: true });
+  const js = jsPath || "/assets/index-NEW.js";
+  const stem = js.replace(/\.js$/, "");
+  const css = `${stem}.css`;
+  const chunk = js.includes("OLD") ? "/assets/vendor-OLD.js" : "/assets/vendor-NEW.js";
+  const fontCss = "/fonts/manrope.css";
+  const fontFile = "/fonts/manrope-latin-700-normal.woff2";
+  writeFileSync(
+    path.join(dir, "index.html"),
+    `<meta name="clover-ui-build" content="${tag}"><meta name="clover-public-locale-routes" content="${localeStamp}"><link rel="modulepreload" href="${chunk}"><link rel="stylesheet" href="${css}"><link rel="preload" href="${fontFile}" as="font"><link rel="stylesheet" href="${fontCss}"><script src="${js}"></script>`
+  );
+  writeFileSync(path.join(dir, js.slice(1)), "export default 1;\n");
+  writeFileSync(path.join(dir, chunk.slice(1)), "export const vendor = 1;\n");
+  writeFileSync(
+    path.join(dir, css.slice(1)),
+    `body{color:#111}@font-face{src:url("${fontFile}")}`
+  );
+  writeFileSync(path.join(dir, fontCss.slice(1)), `@font-face{src:url("${fontFile}")}`);
+  writeFileSync(path.join(dir, fontFile.slice(1)), "w2");
+  writeFileSync(path.join(dir, "sitemap.xml"), "<urlset></urlset>");
 }
 
 function initSandbox(label) {
@@ -129,11 +208,10 @@ function initSandbox(label) {
   mkdirSync(path.join(live, "node_modules"), { recursive: true });
   mkdirSync(path.join(live, "server/node_modules"), { recursive: true });
   writeFileSync(path.join(live, "server/data/clover.sqlite"), "");
-  writeFileSync(
-    path.join(live, "dist/index.html"),
-    `<meta name="clover-ui-build" content="ui-OLD"><script src="/assets/index-OLD.js"></script>`
-  );
-  writeFileSync(path.join(live, "dist/sitemap.xml"), "<urlset></urlset>");
+  writeCompleteUiDist(path.join(live, "dist"), {
+    tag: "ui-OLD",
+    jsPath: "/assets/index-OLD.js",
+  });
   writeFileSync(path.join(live, "package.json"), JSON.stringify({ scripts: { build: "node ./fake-build.js" } }));
   writeFileSync(path.join(live, "server/src/server.js"), "console.log('api-old')\n");
   mkdirSync(path.join(live, "server"), { recursive: true });
@@ -141,6 +219,14 @@ function initSandbox(label) {
   writeFileSync(
     path.join(live, "server/.env"),
     "CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED=0\n"
+  );
+  mkdirSync(path.join(live, "scripts/linux"), { recursive: true });
+  mkdirSync(path.join(live, "server/scripts"), { recursive: true });
+  writeFileSync(
+    path.join(live, "scripts/linux/restart-api-ui.sh"),
+    execFileSync("git", ["-C", workRoot, "show", "b3f31a3fc68303655c9ddda5c81488c3c834ce04:scripts/linux/restart-api-ui.sh"], {
+      encoding: "utf8",
+    })
   );
 
   // Fake git repo with two commits.
@@ -160,13 +246,34 @@ function initSandbox(label) {
 const fs = require('fs');
 const path = require('path');
 const out = path.join(process.cwd(), 'dist');
-fs.mkdirSync(out, { recursive: true });
+fs.rmSync(out, { recursive: true, force: true });
+fs.mkdirSync(path.join(out, 'assets'), { recursive: true });
+fs.mkdirSync(path.join(out, 'fonts'), { recursive: true });
 const tag = process.env.FAKE_BUILD_TAG || 'ui-NEW';
 const js = process.env.FAKE_BUILD_JS || '/assets/index-NEW.js';
+const omit = new Set(String(process.env.FAKE_BUILD_OMIT || '').split(',').filter(Boolean));
 const forcedLocale = process.env.FAKE_LOCALE_ARTIFACTS || '';
 const localeEnabled = forcedLocale === 'enabled' || (forcedLocale !== 'disabled' && process.env.CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED === '1');
 const localeStamp = localeEnabled ? 'enabled' : 'disabled';
-fs.writeFileSync(path.join(out, 'index.html'), '<meta name="clover-ui-build" content="' + tag + '"><meta name="clover-public-locale-routes" content="' + localeStamp + '"><script src="' + js + '"></script>');
+const stem = js.replace(/\\.js$/, '');
+const css = process.env.FAKE_BUILD_CSS || (stem + '.css');
+const chunk = process.env.FAKE_BUILD_CHUNK || '/assets/vendor-NEW.js';
+const fontCss = '/fonts/manrope.css';
+const fontFile = '/fonts/manrope-latin-700-normal.woff2';
+let html = '<meta name="clover-ui-build" content="' + tag + '"><meta name="clover-public-locale-routes" content="' + localeStamp + '">';
+html += '<link rel="modulepreload" href="' + chunk + '">';
+html += '<link rel="stylesheet" href="' + css + '">';
+html += '<link rel="preload" href="' + fontFile + '" as="font">';
+html += '<link rel="stylesheet" href="' + fontCss + '">';
+html += '<script src="' + js + '"></script>';
+fs.writeFileSync(path.join(out, 'index.html'), html);
+if (!omit.has('js')) fs.writeFileSync(path.join(out, js.replace(/^\\//, '')), 'export default 1;\\n');
+if (!omit.has('chunk')) fs.writeFileSync(path.join(out, chunk.replace(/^\\//, '')), 'export const vendor = 1;\\n');
+if (!omit.has('css')) fs.writeFileSync(path.join(out, css.replace(/^\\//, '')), 'body{color:#111}@font-face{src:url("' + fontFile + '")}');
+if (!omit.has('font')) {
+  fs.writeFileSync(path.join(out, fontCss.replace(/^\\//, '')), '@font-face{src:url("' + fontFile + '")}');
+  fs.writeFileSync(path.join(out, fontFile.replace(/^\\//, '')), 'w2');
+}
 if (localeEnabled) {
   fs.writeFileSync(path.join(out, 'public-route-manifest.json'), JSON.stringify({
     version: 1,
@@ -190,17 +297,25 @@ if (process.env.FAKE_BUILD_FAIL === '1') {
 }
 `
   );
+  cpSync(SCRIPT, path.join(live, "scripts/linux/restart-api-ui.sh"));
+  cpSync(
+    path.join(workRoot, "server/scripts/uiAssetProbe.mjs"),
+    path.join(live, "server/scripts/uiAssetProbe.mjs")
+  );
+  cpSync(
+    path.join(workRoot, "scripts/linux/run-target-deploy.sh"),
+    path.join(live, "scripts/linux/run-target-deploy.sh")
+  );
   execFileSync("git", ["add", "-A"], { cwd: live });
   execFileSync("git", ["commit", "-m", "new"], { cwd: live });
   const newSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: live, encoding: "utf8" }).trim();
   execFileSync("git", ["reset", "--hard", oldSha], { cwd: live });
 
   // Restore live dist as OLD after reset (git may not track dist).
-  writeFileSync(
-    path.join(live, "dist/index.html"),
-    `<meta name="clover-ui-build" content="ui-OLD"><script src="/assets/index-OLD.js"></script>`
-  );
-  writeFileSync(path.join(live, "dist/sitemap.xml"), "<urlset></urlset>");
+  writeCompleteUiDist(path.join(live, "dist"), {
+    tag: "ui-OLD",
+    jsPath: "/assets/index-OLD.js",
+  });
 
   writeFileSync(path.join(state, "health"), "ok\n");
   writeFileSync(path.join(state, "tag"), "match\n");
@@ -236,40 +351,156 @@ exit 0
 `
   );
   writeExec(
+    path.join(bin, "flock"),
+    `#!/usr/bin/env bash
+set -euo pipefail
+nonblock=0
+while [[ \$# -gt 0 ]]; do
+  case "\$1" in
+    -n) nonblock=1; shift ;;
+    -x|-s|-u|-o) shift ;;
+    *) shift ;;
+  esac
+done
+lock="\${CLOVER_DEPLOY_LOCK:-}"
+[[ -n "\$lock" ]] || exit 1
+held="\${lock}.held"
+if ! mkdir "\$held" 2>/dev/null; then
+  if [[ "\$nonblock" -eq 1 ]]; then exit 1; fi
+  exit 1
+fi
+exit 0
+`
+  );
+  writeExec(
     path.join(bin, "curl"),
     `#!/usr/bin/env bash
 set -euo pipefail
 STATE="${state}"
-URL="\${@: -1}"
+OUT=""
+DUMP=""
+WRITE_FMT=""
+URL=""
+args=("\$@")
+i=0
+while [[ \$i -lt \${#args[@]} ]]; do
+  a="\${args[\$i]}"
+  case "\$a" in
+    -o|--output) i=\$((i+1)); OUT="\${args[\$i]}" ;;
+    -D|--dump-header) i=\$((i+1)); DUMP="\${args[\$i]}" ;;
+    -w|--write-out) i=\$((i+1)); WRITE_FMT="\${args[\$i]}" ;;
+    -H|--header|--resolve|--max-time|-m|--cacert|--capath) i=\$((i+1)) ;;
+    -s|-S|-f|-sS|-fsS|-sSf|--http1.1) ;;
+    -k|--insecure)
+      echo "curl: TLS verification must stay enabled" >&2
+      exit 2
+      ;;
+    http*|https*) URL="\$a" ;;
+    *) URL="\$a" ;;
+  esac
+  i=\$((i+1))
+done
+[[ -n "\$URL" ]] || { echo "curl: no URL" >&2; exit 2; }
+
+path_of() {
+  local u="\$1" rest p
+  rest="\${u#http://}"
+  rest="\${rest#https://}"
+  if [[ "\$rest" == */* ]]; then
+    p="/\${rest#*/}"
+  else
+    p="/"
+  fi
+  printf '%s' "\${p%%\\?*}"
+}
+REQ_PATH="\$(path_of "\$URL")"
+
+mime_of() {
+  case "\$1" in
+    *.js) printf 'text/javascript' ;;
+    *.css) printf 'text/css' ;;
+    *.woff2) printf 'font/woff2' ;;
+    *.woff) printf 'font/woff' ;;
+    *) printf 'text/plain' ;;
+  esac
+}
+
+write_resp() {
+  local code="\$1" ctype="\$2" body="\$3"
+  if [[ -n "\$DUMP" && "\$DUMP" != "-" ]]; then
+    printf 'HTTP/1.1 %s OK\\r\\nContent-Type: %s\\r\\n\\r\\n' "\$code" "\$ctype" > "\$DUMP"
+  fi
+  if [[ -n "\$OUT" && "\$OUT" != "-" ]]; then
+    printf '%s' "\$body" > "\$OUT"
+  else
+    printf '%s' "\$body"
+  fi
+  if [[ -n "\$WRITE_FMT" ]]; then
+    printf '%s' "\${WRITE_FMT//%{http_code\}/\$code}"
+  fi
+}
+
+if [[ "\$URL" == *"/api/health"* ]]; then
+  if grep -q fail-api "\$STATE/health" 2>/dev/null; then exit 1; fi
+  write_resp 200 "application/json" '{"ok":true}'
+  exit 0
+fi
+
+if grep -q fail-ui "\$STATE/health" 2>/dev/null; then exit 1; fi
+
+if grep -q timeout-assets "\$STATE/health" 2>/dev/null && [[ "\$REQ_PATH" == /assets/* || "\$REQ_PATH" == /fonts/* ]]; then
+  echo "curl: timeout" >&2
+  exit 28
+fi
+
+if grep -q mismatch "\$STATE/tag" 2>/dev/null && [[ "\$REQ_PATH" == "/" || "\$REQ_PATH" == "/index.html" ]]; then
+  write_resp 200 "text/html" '<meta name="clover-ui-build" content="ui-WRONG"><script src="/assets/index-WRONG.js"></script>'
+  exit 0
+fi
+
+if [[ "\$REQ_PATH" == /assets/* || "\$REQ_PATH" == /fonts/* ]]; then
+  if grep -q fail-js-403 "\$STATE/health" 2>/dev/null && [[ "\$REQ_PATH" == *.js ]]; then
+    write_resp 403 "text/plain" "forbidden"
+    exit 0
+  fi
+  if [[ "\$URL" == *":18080"* ]] && grep -q fail-nginx-js-403 "\$STATE/health" 2>/dev/null && [[ "\$REQ_PATH" == *.js ]]; then
+    write_resp 403 "text/plain" "nginx-forbidden"
+    exit 0
+  fi
+  if [[ "\$URL" != *":18080"* ]] && grep -q fail-origin-js-403 "\$STATE/health" 2>/dev/null && [[ "\$REQ_PATH" == *.js ]]; then
+    write_resp 403 "text/plain" "origin-forbidden"
+    exit 0
+  fi
+  if [[ -f "\$STATE/js-fail-remaining" && "\$REQ_PATH" == *.js ]]; then
+    left="\$(cat "\$STATE/js-fail-remaining" 2>/dev/null || echo 0)"
+    if [[ "\${left:-0}" -gt 0 ]]; then
+      echo \$((left-1)) > "\$STATE/js-fail-remaining"
+      write_resp 403 "text/plain" "transient"
+      exit 0
+    fi
+  fi
+  if grep -q asset-html "\$STATE/health" 2>/dev/null; then
+    write_resp 200 "text/html" '<!doctype html><html><body>shell</body></html>'
+    exit 0
+  fi
+  FILE="\${CURL_LIVE_DIST}\${REQ_PATH}"
+  if [[ -f "\$FILE" ]]; then
+    write_resp 200 "\$(mime_of "\$REQ_PATH")" "\$(cat "\$FILE")"
+    exit 0
+  fi
+  write_resp 404 "text/plain" "missing"
+  exit 0
+fi
+
 LIVE_HTML=""
 if [[ -n "\${CURL_LIVE_DIST:-}" && -f "\${CURL_LIVE_DIST}/index.html" ]]; then
   LIVE_HTML="\$(cat "\${CURL_LIVE_DIST}/index.html")"
 fi
-# Force mismatched tag for post-cutover validation tests.
-if grep -q mismatch "\$STATE/tag" 2>/dev/null && [[ "\$URL" != *"/api/health"* ]]; then
-  echo '<meta name="clover-ui-build" content="ui-WRONG"><script src="/assets/index-WRONG.js"></script>'
-  exit 0
-fi
-# After rollback, live dist is OLD — treat as healthy again.
-if [[ "\$LIVE_HTML" == *"ui-OLD"* ]]; then
-  if [[ "\$URL" == *"/api/health"* ]]; then
-    echo '{"ok":true}'
-    exit 0
-  fi
-  echo "\$LIVE_HTML"
-  exit 0
-fi
-if [[ "\$URL" == *"/api/health"* ]]; then
-  if grep -q fail-api "\$STATE/health" 2>/dev/null; then exit 1; fi
-  echo '{"ok":true}'
-  exit 0
-fi
-if grep -q fail-ui "\$STATE/health" 2>/dev/null; then exit 1; fi
 if [[ -n "\$LIVE_HTML" ]]; then
-  echo "\$LIVE_HTML"
+  write_resp 200 "text/html" "\$LIVE_HTML"
   exit 0
 fi
-echo '<meta name="clover-ui-build" content="ui-NEW"><script src="/assets/index-NEW.js"></script>'
+write_resp 200 "text/html" '<meta name="clover-ui-build" content="ui-NEW"><script src="/assets/index-NEW.js"></script>'
 `
   );
   writeExec(
@@ -290,9 +521,11 @@ exit 2
 `
   );
 
+  const pathSep = process.platform === "win32" ? ";" : ":";
+  const pathPrefix = existsSync(GIT_USR_BIN) ? `${bin}${pathSep}${GIT_USR_BIN}` : bin;
   const env = {
     ...process.env,
-    PATH: `${bin}:${process.env.PATH}`,
+    PATH: `${pathPrefix}${pathSep}${process.env.PATH}`,
     CLOVER_DEPLOY_ROOT: live,
     CLOVER_DEPLOY_STAGING: staging,
     CLOVER_DEPLOY_LKG: lkg,
@@ -304,18 +537,49 @@ exit 2
     CLOVER_DEPLOY_CURL: path.join(bin, "curl"),
     CLOVER_DEPLOY_HEALTH_API: "http://127.0.0.1:4100/api/health",
     CLOVER_DEPLOY_HEALTH_UI: "http://127.0.0.1:5273/",
-    CLOVER_DEPLOY_HEALTH_ATTEMPTS: "3",
+    CLOVER_DEPLOY_ORIGIN_BASE: "http://127.0.0.1:5273",
+    CLOVER_DEPLOY_NGINX_UI: "http://127.0.0.1:18080",
+    CLOVER_DEPLOY_NGINX_RESOLVE: "",
+    CLOVER_DEPLOY_CANONICAL_HOST: "clover-spb.ru",
+    CLOVER_DEPLOY_HEALTH_ATTEMPTS: "8",
     CLOVER_DEPLOY_DB_PATH: path.join(live, "server/data/clover.sqlite"),
     CLOVER_DEPLOY_API_UNIT: "clover-api.service",
     CLOVER_DEPLOY_UI_UNIT: "clover-ui.service",
+    CLOVER_DEPLOY_FSDEV_LIVE: "1001",
+    CLOVER_DEPLOY_FSDEV_STAGING: "1001",
+    CLOVER_DEPLOY_FSDEV_LKG: "1001",
     CURL_LIVE_DIST: path.join(live, "dist"),
+    CLOVER_PROBE_BASH: BASH_BIN,
   };
 
   return { root, live, staging, lkg, bin, state, oldSha, newSha, env };
 }
 
 function runDeploy(box, targetSha, extraEnv = {}) {
-  return spawnSync("bash", [SCRIPT, targetSha], {
+  return spawnSync(BASH_BIN, [SCRIPT, targetSha], {
+    encoding: "utf8",
+    env: { ...box.env, ...extraEnv },
+  });
+}
+
+function runFirstDeploy(box, targetSha, extraEnv = {}) {
+  const bootstrapDir = path.join(box.staging, `bootstrap-launcher-${targetSha}`);
+  mkdirSync(bootstrapDir, { recursive: true });
+  const launcherPath = path.join(bootstrapDir, "run-target-deploy.sh");
+  writeFileSync(
+    launcherPath,
+    execFileSync("git", ["-C", box.live, "show", `${targetSha}:scripts/linux/run-target-deploy.sh`], {
+      encoding: "utf8",
+    })
+  );
+  return spawnSync(BASH_BIN, [launcherPath, targetSha], {
+    encoding: "utf8",
+    env: { ...box.env, ...extraEnv },
+  });
+}
+
+function runLiveScript(box, scriptPath, targetSha, extraEnv = {}) {
+  return spawnSync(BASH_BIN, [scriptPath, targetSha], {
     encoding: "utf8",
     env: { ...box.env, ...extraEnv },
   });
@@ -429,10 +693,6 @@ exit 2
   const box = initSandbox("f2-nonff");
   // Live HEAD = newer; target = older ancestor (exists but not a forward descendant).
   execFileSync("git", ["-C", box.live, "reset", "--hard", box.newSha]);
-  writeFileSync(
-    path.join(box.live, "dist/index.html"),
-    `<meta name="clover-ui-build" content="ui-OLD"><script src="/assets/index-OLD.js"></script>`
-  );
   const before = liveSha(box);
   assert.equal(before, box.newSha);
   const beforeTag = liveTag(box);
@@ -457,13 +717,25 @@ exit 2
 {
   const box = initSandbox("lock2");
   const lock = box.env.CLOVER_DEPLOY_LOCK;
+  const flockBin = path.join(box.bin, "flock").replace(/\\/g, "/");
+  const lockPosix = String(lock).replace(/\\/g, "/");
   const { spawn } = await import("node:child_process");
-  const child = spawn("bash", ["-c", `exec 9>"${lock}"; flock -n 9 || exit 9; sleep 20`], {
-    detached: true,
-    stdio: "ignore",
-  });
+  const child = spawn(
+    BASH_BIN,
+    ["-c", `exec 9>"${lockPosix}"; "${flockBin}" -n 9 || exit 9; sleep 5`],
+    {
+      detached: true,
+      stdio: "ignore",
+      env: box.env,
+    }
+  );
   child.unref();
-  await new Promise((r) => setTimeout(r, 200));
+  const held = `${lock}.held`;
+  const started = Date.now();
+  while (!existsSync(held) && Date.now() - started < 2000) {
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  assert.equal(existsSync(held), true, "concurrent holder must take the lock");
   const res = runDeploy(box, box.newSha);
   assert.notEqual(res.status, 0);
   assert.match(res.stderr, /another deployment|lock/i);
@@ -647,6 +919,156 @@ exit 2
   assert.equal(`${res.stderr}\n${res.stdout}`.includes("do-not-enable"), false);
   assert.doesNotMatch(res.stdout, /Deploy OK/);
   console.log("Q_REQUIRED_LOCALE_FLAG_KEY_ABSENT:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- R. HTML/API 200 + JS 403 → deploy gate FAIL + rollback ---
+{
+  const box = initSandbox("js403");
+  writeFileSync(path.join(box.state, "health"), "fail-js-403\n");
+  const res = runDeploy(box, box.newSha);
+  assert.notEqual(res.status, 0, "JS 403 must fail deploy");
+  assert.equal(liveSha(box), box.oldSha, "JS 403 rolls back source");
+  assert.equal(liveTag(box), "ui-OLD", "JS 403 rolls back dist");
+  assert.match(`${res.stderr}\n${res.stdout}`, /assets did not become ready|HTTP 403|forbidden/i);
+  assert.doesNotMatch(res.stdout, /Deploy OK/);
+  console.log("R_HTML_OK_JS_403_FAIL:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- S. asset 200 text/html → FAIL ---
+{
+  const box = initSandbox("assethtml");
+  writeFileSync(path.join(box.state, "health"), "asset-html\n");
+  const res = runDeploy(box, box.newSha);
+  assert.notEqual(res.status, 0, "HTML-bodied asset must fail deploy");
+  assert.equal(liveSha(box), box.oldSha);
+  assert.equal(liveTag(box), "ui-OLD");
+  assert.match(`${res.stderr}\n${res.stdout}`, /HTML|assets did not become ready/i);
+  console.log("S_ASSET_HTML_FAIL:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- T. missing CSS / chunk / font → FAIL before cutover ---
+{
+  for (const omit of ["css", "chunk", "font"]) {
+    const box = initSandbox(`omit-${omit}`);
+    const before = liveSha(box);
+    const beforeTag = liveTag(box);
+    const res = runDeploy(box, box.newSha, { FAKE_BUILD_OMIT: omit });
+    assert.notEqual(res.status, 0, `missing ${omit} must fail`);
+    assert.equal(liveSha(box), before, `source unchanged when ${omit} missing`);
+    assert.equal(liveTag(box), beforeTag, `dist unchanged when ${omit} missing`);
+    assert.equal(readFileSync(path.join(box.state, "restart_count"), "utf8").trim(), "0");
+    rmSync(box.root, { recursive: true, force: true });
+  }
+  console.log("T_MISSING_CSS_CHUNK_FONT_FAIL:PASS");
+}
+
+// --- U. first JS 403, then stable 200 → PASS ---
+{
+  const box = initSandbox("transient403");
+  writeFileSync(path.join(box.state, "js-fail-remaining"), "1\n");
+  const res = runDeploy(box, box.newSha, { CLOVER_DEPLOY_HEALTH_ATTEMPTS: "8" });
+  assert.equal(res.status, 0, `transient 403 should pass: ${res.stderr}\n${res.stdout}`);
+  assert.equal(liveSha(box), box.newSha);
+  assert.match(res.stdout, /Deploy OK/);
+  console.log("U_TRANSIENT_FIRST_403_PASS:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- V. permanent timeout → bounded FAIL + rollback ---
+{
+  const box = initSandbox("timeout");
+  writeFileSync(path.join(box.state, "health"), "timeout-assets\n");
+  const res = runDeploy(box, box.newSha, { CLOVER_DEPLOY_HEALTH_ATTEMPTS: "2" });
+  assert.notEqual(res.status, 0, "asset timeout must fail");
+  assert.equal(liveSha(box), box.oldSha, "timeout rolls back source");
+  assert.equal(liveTag(box), "ui-OLD", "timeout rolls back dist");
+  console.log("V_PERMANENT_TIMEOUT_ROLLBACK:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- W. origin 200 + nginx 403 → FAIL ---
+{
+  const box = initSandbox("origin-ok-nginx-403");
+  writeFileSync(path.join(box.state, "health"), "fail-nginx-js-403\n");
+  const res = runDeploy(box, box.newSha);
+  assert.notEqual(res.status, 0, "nginx 403 must fail even if origin is 200");
+  assert.match(`${res.stderr}\n${res.stdout}`, /nginx .*403|nginx-forbidden/i);
+  assert.doesNotMatch(res.stdout, /Deploy OK/);
+  console.log("W_ORIGIN_200_NGINX_403_FAIL:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- X. origin 403 + nginx 200 → FAIL ---
+{
+  const box = initSandbox("origin-403-nginx-ok");
+  writeFileSync(path.join(box.state, "health"), "fail-origin-js-403\n");
+  const res = runDeploy(box, box.newSha);
+  assert.notEqual(res.status, 0, "origin 403 must fail even if nginx is 200");
+  assert.match(`${res.stderr}\n${res.stdout}`, /origin .*403|origin-forbidden/i);
+  assert.doesNotMatch(res.stdout, /Deploy OK/);
+  console.log("X_ORIGIN_403_NGINX_200_FAIL:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+// --- Y. first deploy: extract launcher from target SHA before live reset ---
+{
+  const box = initSandbox("first-deploy-old-misses-gate");
+  const liveOld = path.join(box.live, "scripts/linux/restart-api-ui.sh");
+  writeFileSync(path.join(box.state, "health"), "fail-js-403\n");
+  const oldRun = runLiveScript(box, liveOld, box.newSha);
+  assert.equal(oldRun.status, 0, `old live script must miss JS 403: ${oldRun.stderr}\n${oldRun.stdout}`);
+  assert.match(oldRun.stdout, /Deploy OK/);
+  console.log("Y1_OLD_LIVE_SCRIPT_MISSES_ASSET_GATE:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("first-deploy-launcher-gate");
+  assert.equal(
+    readFileSync(path.join(box.live, "scripts/linux/restart-api-ui.sh"), "utf8").includes("check_http_assets"),
+    false,
+    "live tree still has the historical script"
+  );
+  writeFileSync(path.join(box.state, "health"), "fail-js-403\n");
+  const launched = runFirstDeploy(box, box.newSha);
+  assert.match(launched.stdout + launched.stderr, /FIRST_DEPLOY_LAUNCHER: invoked=/);
+  assert.match(launched.stdout + launched.stderr, /FIRST_DEPLOY_LAUNCHER: root=/);
+  assert.notEqual(launched.status, 0, `launcher must use new asset gate: ${launched.stderr}\n${launched.stdout}`);
+  assert.match(`${launched.stderr}\n${launched.stdout}`, /HTTP 403|assets did not become ready/i);
+  assert.doesNotMatch(launched.stdout, /Deploy OK/);
+  assert.equal(liveSha(box), box.oldSha, "first-deploy rollback keeps previous SHA");
+  assert.equal(liveTag(box), "ui-OLD");
+  const delivered = path.join(box.staging, `delivered-deploy-${box.newSha}`, "restart-api-ui.sh");
+  assert.equal(existsSync(delivered), true, "target script extracted beside live ROOT");
+  assert.notEqual(path.resolve(path.dirname(delivered)), path.resolve(box.live));
+  assert.match(readFileSync(delivered, "utf8"), /check_http_assets/);
+  console.log("Y2_FIRST_DEPLOY_LAUNCHER_USES_NEW_GATE:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("first-deploy-launcher-success");
+  const launched = runFirstDeploy(box, box.newSha);
+  assert.equal(launched.status, 0, `first-deploy success failed: ${launched.stderr}\n${launched.stdout}`);
+  assert.match(launched.stdout, /FIRST_DEPLOY_LAUNCHER/);
+  assert.match(launched.stdout, /Deploy OK/);
+  assert.equal(liveSha(box), box.newSha);
+  console.log("Y3_FIRST_DEPLOY_LAUNCHER_BOTH_200_PASS:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("first-deploy-extract-inside-root");
+  const launched = runFirstDeploy(box, box.newSha, {
+    CLOVER_DEPLOY_STAGING: path.join(box.live, "inside-live-staging"),
+  });
+  assert.notEqual(launched.status, 0, "extract inside ROOT must fail");
+  assert.match(`${launched.stderr}\n${launched.stdout}`, /extract dir must not be inside live ROOT/);
+  assert.equal(liveSha(box), box.oldSha, "refused extract must not switch live source");
+  console.log("Y4_EXTRACT_NOT_INSIDE_ROOT:PASS");
   rmSync(box.root, { recursive: true, force: true });
 }
 

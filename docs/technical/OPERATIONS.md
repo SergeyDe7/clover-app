@@ -16,6 +16,8 @@ Linux safety: `daily-backup.sh` ставит `umask 077`, держит non-block
 
 Audit retention timer и DAC umask drop-in лежат в репозитории (`ops/systemd/`, план: [SECURITY_STAGE3_PACKAGE3_CLOSEOUT.md](./SECURITY_STAGE3_PACKAGE3_CLOSEOUT.md)). Они **не** установлены и **не** включены. Install/enable/start, production dry-run и chmod — только после отдельного разрешения.
 
+После каждого deploy/rollback на DC обязателен внешний browser smoke (`/`, `/lk`, `/contacts`, `/cart`; JS/CSS/fonts 200, MIME не HTML). Внутренний health/asset probe hairpin/внешнюю недоступность за успех браузера не считает. Инцидент UI 403 и схема Recovery V3: [INCIDENT-2026-09-18-UI-403-RECOVERY-V3.md](./INCIDENT-2026-09-18-UI-403-RECOVERY-V3.md). Первый выкат пакета с новым asset gate — через `git show <sha>:scripts/linux/run-target-deploy.sh` в staging и запуск извлечённого файла; live `restart-api-ui.sh` до этого SHA gate не содержит. `/assets/` и `/fonts/` в nginx только proxy на UI origin, не `alias` на private `dist`. `UMask=0077` API не ослаблять.
+
 Если после деплоя процессы запущены вручную, а systemd-юниты `inactive` из‑за занятых портов — остановить ручные PID и `sudo systemctl restart clover-api clover-ui`.
 
 Живые заказы: [MANAGER_WORKING_1C.md](./MANAGER_WORKING_1C.md). Приёмка VLAVKA: [ACCEPTANCE_ORDERS_VLAVKA.md](./ACCEPTANCE_ORDERS_VLAVKA.md).

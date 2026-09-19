@@ -9,8 +9,15 @@
 #   CLOVER_DEPLOY_ROOT, CLOVER_DEPLOY_STAGING, CLOVER_DEPLOY_LKG, CLOVER_DEPLOY_LOCK
 #   CLOVER_DEPLOY_GIT, CLOVER_DEPLOY_NPM, CLOVER_DEPLOY_SYSTEMCTL, CLOVER_DEPLOY_SUDO_SYSTEMCTL
 #   CLOVER_DEPLOY_CURL, CLOVER_DEPLOY_HEALTH_API, CLOVER_DEPLOY_HEALTH_UI
+#   CLOVER_DEPLOY_ORIGIN_BASE, CLOVER_DEPLOY_NGINX_UI, CLOVER_DEPLOY_NGINX_RESOLVE
+#   CLOVER_DEPLOY_CANONICAL_HOST, CLOVER_DEPLOY_TLS_CA, CLOVER_DEPLOY_PROBE_JS
 #   CLOVER_DEPLOY_DB_PATH, CLOVER_DEPLOY_NODE_MODULES, CLOVER_DEPLOY_SERVER_NODE_MODULES
 #   CLOVER_DEPLOY_DRY_RUN=1  — resolve/validate only; never mutate live source/dist/services
+#
+# First deploy of this SHA while live still has the previous script:
+#   bash scripts/linux/run-target-deploy.sh <sha>
+# That extracts THIS file + uiAssetProbe.mjs from the target commit into staging
+# and execs them. ROOT stays CLOVER_DEPLOY_ROOT (never this file's directory).
 #
 set -euo pipefail
 
@@ -25,9 +32,15 @@ SUDO_SYSTEMCTL="${CLOVER_DEPLOY_SUDO_SYSTEMCTL:-sudo -n /bin/systemctl}"
 CURL_BIN="${CLOVER_DEPLOY_CURL:-curl}"
 HEALTH_API="${CLOVER_DEPLOY_HEALTH_API:-http://127.0.0.1:4100/api/health}"
 HEALTH_UI="${CLOVER_DEPLOY_HEALTH_UI:-http://127.0.0.1:5273/}"
+ORIGIN_BASE="${CLOVER_DEPLOY_ORIGIN_BASE:-http://127.0.0.1:5273}"
+NGINX_UI="${CLOVER_DEPLOY_NGINX_UI:-https://clover-spb.ru}"
+NGINX_RESOLVE="${CLOVER_DEPLOY_NGINX_RESOLVE:-127.0.0.1}"
+CANONICAL_HOST="${CLOVER_DEPLOY_CANONICAL_HOST:-clover-spb.ru}"
+READY_CONSECUTIVE="${CLOVER_DEPLOY_READY_CONSECUTIVE:-2}"
 DRY_RUN="${CLOVER_DEPLOY_DRY_RUN:-0}"
 API_UNIT="${CLOVER_DEPLOY_API_UNIT:-clover-api.service}"
 UI_UNIT="${CLOVER_DEPLOY_UI_UNIT:-clover-ui.service}"
+PROBE_JS=""
 
 TARGET_SHA="${1:-${CLOVER_DEPLOY_TARGET_SHA:-}}"
 if [[ -z "${TARGET_SHA}" ]]; then
@@ -80,17 +93,97 @@ require_loaded_unit() {
   fi
 }
 
+install_runtime_probe() {
+  local script_dir invoked_root src
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  invoked_root="$(cd "${script_dir}/../.." && pwd)"
+  for src in \
+    "${CLOVER_DEPLOY_PROBE_JS:-}" \
+    "${script_dir}/uiAssetProbe.mjs" \
+    "${invoked_root}/server/scripts/uiAssetProbe.mjs" \
+    "${ROOT}/server/scripts/uiAssetProbe.mjs"
+  do
+    if [[ -n "${src}" && -f "${src}" ]]; then
+      mkdir -p "${STAGING_ROOT}"
+      PROBE_JS="${STAGING_ROOT}/uiAssetProbe.runtime.mjs"
+      cp "${src}" "${PROBE_JS}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+nginx_resolve_spec() {
+  if [[ -z "${NGINX_UI}" ]]; then
+    return 0
+  fi
+  if [[ "${NGINX_UI}" == https://* && -n "${NGINX_RESOLVE}" ]]; then
+    printf '%s\n' "${CANONICAL_HOST}:443:${NGINX_RESOLVE}"
+  fi
+}
+
+check_dist_assets() {
+  local dist_dir="$1"
+  [[ -n "${PROBE_JS}" ]] || return 1
+  [[ -f "${dist_dir}/index.html" ]] || return 1
+  node "${PROBE_JS}" check-dist --html-file "${dist_dir}/index.html" --dist "${dist_dir}"
+}
+
+check_http_assets() {
+  local html="$1"
+  local html_file rc resolve_spec
+  [[ -n "${PROBE_JS}" ]] || return 1
+  if [[ -z "${NGINX_UI}" ]]; then
+    echo "ERROR: CLOVER_DEPLOY_NGINX_UI is required; origin-only is not a deploy PASS" >&2
+    return 1
+  fi
+  html_file="$(mktemp)"
+  printf '%s' "${html}" > "${html_file}"
+  resolve_spec="$(nginx_resolve_spec || true)"
+  local -a probe_args=(
+    check-http
+    --html-file "${html_file}"
+    --dist "${LIVE_DIST}"
+    --origin "${ORIGIN_BASE}"
+    --nginx "${NGINX_UI}"
+    --nginx-resolve "${resolve_spec}"
+    --curl "${CURL_BIN}"
+  )
+  if [[ -n "${CLOVER_DEPLOY_TLS_CA:-}" ]]; then
+    probe_args+=(--cacert "${CLOVER_DEPLOY_TLS_CA}")
+  fi
+  set +e
+  node "${PROBE_JS}" "${probe_args[@]}"
+  rc=$?
+  set -e
+  rm -f "${html_file}"
+  return "${rc}"
+}
+
+# Bounded readiness: one shared deadline, transient first failures allowed,
+# two consecutive full passes (API + UI HTML + origin assets + nginx assets).
+# No worker-drain loop. Reverse-proxy reload is not part of this script.
 wait_for_health() {
   local i
   local attempts="${CLOVER_DEPLOY_HEALTH_ATTEMPTS:-60}"
+  local consecutive=0
+  local html
   for i in $(seq 1 "${attempts}"); do
+    html=""
     if "${CURL_BIN}" -fsS "${HEALTH_API}" >/dev/null 2>&1 \
-      && "${CURL_BIN}" -fsS -o /dev/null "${HEALTH_UI}" 2>&1; then
-      return 0
+      && html="$("${CURL_BIN}" -fsS "${HEALTH_UI}" 2>/dev/null)" \
+      && [[ -n "${html}" ]] \
+      && check_http_assets "${html}"; then
+      consecutive=$((consecutive + 1))
+      if [[ "${consecutive}" -ge "${READY_CONSECUTIVE}" ]]; then
+        return 0
+      fi
+    else
+      consecutive=0
     fi
     sleep 1
   done
-  echo "ERROR: API/UI did not become ready in ${attempts}s" >&2
+  echo "ERROR: API/UI/assets did not become ready in ${attempts}s (${READY_CONSECUTIVE} consecutive passes required). Not a browser smoke PASS." >&2
   return 1
 }
 
@@ -216,6 +309,7 @@ require_loaded_unit "${API_UNIT}"
 require_loaded_unit "${UI_UNIT}"
 
 mkdir -p "${STAGING_ROOT}" "${LKG_ROOT}"
+install_runtime_probe || die "uiAssetProbe.mjs missing; refusing deploy without asset gate"
 # Rename/move cutover requires same filesystem for live dist, staging, and LKG.
 fs_device() {
   local path="$1"
@@ -376,6 +470,7 @@ cd "${BUILD_PREV_PWD}"
 [[ -f "${STAGED_DIST}/index.html" ]] || die "staged index.html missing"
 [[ -f "${STAGED_DIST}/sitemap.xml" ]] || die "staged sitemap.xml missing"
 read_dist_meta "${STAGED_DIST}" || die "staged dist missing build tag/bundle"
+check_dist_assets "${STAGED_DIST}" || die "staged dist is missing referenced JS/CSS/fonts or chunks"
 echo "Staged UI build tag: ${BUILD_TAG}"
 echo "Staged UI bundle: ${MAIN_JS}"
 
