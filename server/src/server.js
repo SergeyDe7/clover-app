@@ -532,7 +532,149 @@ app.use("/api/public", (req, res, next) => {
   res.setHeader("X-Robots-Tag", "noindex");
   next();
 });
-app.use(express.json({ limit: "24mb" }));
+const JSON_BODY_LIMITS = Object.freeze({
+  AUTH: "32kb",
+  PUBLIC_ORDER: "128kb",
+  DEFAULT: "256kb",
+  BULK: "24mb",
+});
+const JSON_BODY_RULES = Object.freeze([
+  {
+    limit: JSON_BODY_LIMITS.AUTH,
+    methods: new Set(["POST"]),
+    paths: new Set([
+      "/api/auth/register",
+      "/api/auth/verify-email",
+      "/api/auth/resend-verification",
+      "/api/auth/forgot-password",
+      "/api/auth/reset-password",
+      "/api/auth/login",
+      "/api/auth/change-password",
+      "/api/auth/logout-other-sessions",
+      "/api/passkeys/registration/options",
+      "/api/passkeys/registration/verify",
+      "/api/passkeys/authentication/options",
+      "/api/passkeys/authentication/verify",
+    ]),
+  },
+  {
+    limit: JSON_BODY_LIMITS.PUBLIC_ORDER,
+    methods: new Set(["POST"]),
+    paths: new Set(["/api/public/orders"]),
+  },
+  {
+    limit: JSON_BODY_LIMITS.BULK,
+    methods: new Set(["PUT"]),
+    paths: new Set([
+      "/api/state/products",
+      "/api/state/orders",
+      "/api/state/settings",
+      "/api/state/client-links",
+      "/api/admin/storefront",
+    ]),
+  },
+  {
+    limit: JSON_BODY_LIMITS.BULK,
+    methods: new Set(["POST"]),
+    paths: new Set([
+      "/api/migrate/client",
+      "/api/migrate/manager",
+      "/api/one-c/purchase-prices",
+      "/api/one-c/sale-prices",
+      "/api/one-c/products-preview",
+      "/api/one-c/clients-preview",
+      "/api/admin/one-c/products/match-import",
+    ]),
+    patterns: [/^\/api\/one-c\/reconciliation\/[^/]+\/result$/],
+  },
+]);
+
+function normalizeJsonBodyPath(rawPath) {
+  const source = String(rawPath || "").split("?")[0];
+  if (source.length > 1 && source.endsWith("/") && source[source.length - 2] !== "/") {
+    return source.slice(0, -1) || "/";
+  }
+  return source || "/";
+}
+
+function resolveJsonBodyLimit(method, rawPath) {
+  const normalizedMethod = String(method || "GET").toUpperCase();
+  const normalizedPath = normalizeJsonBodyPath(rawPath);
+  for (const rule of JSON_BODY_RULES) {
+    if (!rule.methods.has(normalizedMethod)) continue;
+    if (rule.paths?.has(normalizedPath)) return rule.limit;
+    if (rule.patterns?.some((pattern) => pattern.test(normalizedPath))) return rule.limit;
+  }
+  return JSON_BODY_LIMITS.DEFAULT;
+}
+
+function sendPayloadTooLarge(res) {
+  setNoStore(res);
+  return res.status(413).json({
+    error: "Тело запроса слишком большое.",
+    code: "PAYLOAD_TOO_LARGE",
+  });
+}
+
+function sendMalformedJson(res) {
+  return res.status(400).json({
+    error: "Некорректный JSON.",
+  });
+}
+
+function sendUnsupportedMedia(res) {
+  setNoStore(res);
+  return res.status(415).json({
+    error: "Тип или кодировка содержимого не поддерживаются.",
+    code: "UNSUPPORTED_MEDIA_TYPE",
+  });
+}
+
+function isPayloadTooLargeError(error) {
+  return error?.status === 413 || error?.type === "entity.too.large" || error?.code === "PAYLOAD_TOO_LARGE";
+}
+
+function isMalformedJsonError(error) {
+  return (
+    error?.type === "entity.parse.failed" ||
+    (error instanceof SyntaxError && Number(error.status) === 400)
+  );
+}
+
+function isUnsupportedMediaError(error) {
+  return (
+    error?.status === 415 ||
+    error?.type === "charset.unsupported" ||
+    error?.type === "encoding.unsupported"
+  );
+}
+
+function wrapJsonParser(parser) {
+  return (req, res, next) => {
+    parser(req, res, (error) => {
+      if (!error) return next();
+      if (isPayloadTooLargeError(error)) return sendPayloadTooLarge(res);
+      if (isMalformedJsonError(error)) return sendMalformedJson(res);
+      if (isUnsupportedMediaError(error)) return sendUnsupportedMedia(res);
+      return next(error);
+    });
+  };
+}
+
+const jsonBodyParsers = {
+  [JSON_BODY_LIMITS.AUTH]: wrapJsonParser(express.json({ limit: JSON_BODY_LIMITS.AUTH })),
+  [JSON_BODY_LIMITS.PUBLIC_ORDER]: wrapJsonParser(express.json({ limit: JSON_BODY_LIMITS.PUBLIC_ORDER })),
+  [JSON_BODY_LIMITS.DEFAULT]: wrapJsonParser(express.json({ limit: JSON_BODY_LIMITS.DEFAULT })),
+  [JSON_BODY_LIMITS.BULK]: wrapJsonParser(express.json({ limit: JSON_BODY_LIMITS.BULK })),
+};
+
+function jsonBodyByRoute(req, res, next) {
+  if (req._body) return next();
+  const limit = resolveJsonBodyLimit(req.method, req.originalUrl || req.url);
+  return jsonBodyParsers[limit](req, res, next);
+}
+
+app.use(jsonBodyByRoute);
 app.use(credentialNoStoreMiddleware);
 app.use("/uploads/reconciliation", (req, res) => res.status(404).end());
 app.use("/uploads", express.static(uploadsDirectory, { maxAge: "1h" }));
@@ -8313,6 +8455,18 @@ app.use((error, req, res, _next) => {
 
   if (oneCPresented) {
     return res.status(oneCPresented.httpStatus).json(oneCPresented.body);
+  }
+
+  if (isPayloadTooLargeError(error)) {
+    return sendPayloadTooLarge(res);
+  }
+
+  if (isMalformedJsonError(error)) {
+    return sendMalformedJson(res);
+  }
+
+  if (isUnsupportedMediaError(error)) {
+    return sendUnsupportedMedia(res);
   }
 
   if (Number.isInteger(error?.status) && error.status >= 400 && error.status < 600) {
