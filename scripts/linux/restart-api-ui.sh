@@ -4,6 +4,14 @@
 #
 # Usage:
 #   scripts/linux/restart-api-ui.sh <exact-target-commit-sha>
+#   scripts/linux/restart-api-ui.sh prepare <exact-target-commit-sha>
+#   scripts/linux/restart-api-ui.sh promote <prepared-artifact-dir> <exact-target-commit-sha>
+#
+# prepare: isolated build + namespace/locale/asset checks, write dist+manifest
+#   under trusted staging, then exit. No live reset, dist replacement, or restart.
+# promote: install that prepared tree. Does not run npm build and does not make
+#   a new releaseId. An arbitrary manifest is not install permission.
+# There is no hidden build-skip switch.
 #
 # Injectable overrides (for sandbox tests / dry validation):
 #   CLOVER_DEPLOY_ROOT, CLOVER_DEPLOY_STAGING, CLOVER_DEPLOY_LKG, CLOVER_DEPLOY_LOCK
@@ -15,8 +23,9 @@
 #   CLOVER_DEPLOY_DRY_RUN=1  — resolve/validate only; never mutate live source/dist/services
 #
 # First deploy of this SHA while live still has the previous script:
-#   bash scripts/linux/run-target-deploy.sh <sha>
-# That extracts THIS file + uiAssetProbe.mjs from the target commit into staging
+#   bash scripts/linux/run-target-deploy.sh prepare|promote|<sha>
+# promote via launcher: run-target-deploy.sh promote <dir> <sha>
+# That extracts THIS file + probes from the target commit into staging
 # and execs them. ROOT stays CLOVER_DEPLOY_ROOT (never this file's directory).
 #
 set -euo pipefail
@@ -41,16 +50,39 @@ DRY_RUN="${CLOVER_DEPLOY_DRY_RUN:-0}"
 API_UNIT="${CLOVER_DEPLOY_API_UNIT:-clover-api.service}"
 UI_UNIT="${CLOVER_DEPLOY_UI_UNIT:-clover-ui.service}"
 PROBE_JS=""
+PREPARED_JS=""
+PREPARED_KEEP=""
+PREPARED_PATH=""
+DEPLOY_MODE="deploy"
+BASELINE_SHA=""
 
-TARGET_SHA="${1:-${CLOVER_DEPLOY_TARGET_SHA:-}}"
+if [[ "${1:-}" == "prepare" ]]; then
+  DEPLOY_MODE="prepare"
+  TARGET_SHA="${2:-${CLOVER_DEPLOY_TARGET_SHA:-}}"
+elif [[ "${1:-}" == "promote" ]]; then
+  DEPLOY_MODE="promote"
+  PREPARED_PATH="${2:-${CLOVER_DEPLOY_PREPARED_PATH:-}}"
+  TARGET_SHA="${3:-${CLOVER_DEPLOY_TARGET_SHA:-}}"
+else
+  TARGET_SHA="${1:-${CLOVER_DEPLOY_TARGET_SHA:-}}"
+fi
+
+if [[ "${DEPLOY_MODE}" == "promote" ]]; then
+  if [[ -z "${PREPARED_PATH}" ]]; then
+    echo "ERROR: promote requires a prepared artifact path: $0 promote <dir> <sha>" >&2
+    exit 2
+  fi
+fi
 if [[ -z "${TARGET_SHA}" ]]; then
-  echo "ERROR: target commit SHA required: $0 <sha>" >&2
+  echo "ERROR: target commit SHA required: $0 <sha>|prepare <sha>|promote <dir> <sha>" >&2
   exit 2
 fi
 if [[ ! "${TARGET_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]; then
   echo "ERROR: target SHA must be a full 40-char commit hash" >&2
   exit 2
 fi
+TARGET_SHA="$(printf '%s' "${TARGET_SHA}" | tr 'A-F' 'a-f')"
+PINNED_SHA="${TARGET_SHA}"
 
 LIVE_DIST="${ROOT}/dist"
 STAGED_DIST=""
@@ -68,7 +100,9 @@ cleanup_temp() {
     "${GIT_BIN}" -C "${ROOT}" worktree remove --force "${BUILD_WT}" >/dev/null 2>&1 || rm -rf "${BUILD_WT}" || true
   fi
   if [[ -n "${STAGED_DIST}" && -d "${STAGED_DIST}" && "${CUTOVER_STARTED}" -eq 0 ]]; then
-    rm -rf "${STAGED_DIST}" || true
+    if [[ -z "${PREPARED_KEEP}" || "${STAGED_DIST}" != "${PREPARED_KEEP}" ]]; then
+      rm -rf "${STAGED_DIST}" || true
+    fi
   fi
 }
 
@@ -110,6 +144,10 @@ install_runtime_probe() {
       if [[ -f "$(dirname "${src}")/releaseNamespace.js" ]]; then
         cp "$(dirname "${src}")/releaseNamespace.js" "${STAGING_ROOT}/releaseNamespace.js"
       fi
+      if [[ -f "$(dirname "${src}")/preparedDist.mjs" ]]; then
+        cp "$(dirname "${src}")/preparedDist.mjs" "${STAGING_ROOT}/preparedDist.mjs"
+        PREPARED_JS="${STAGING_ROOT}/preparedDist.mjs"
+      fi
       return 0
     fi
   done
@@ -136,6 +174,97 @@ check_dist_assets() {
     || return 1
   node "${PROBE_JS}" check-namespace --html-file "${dist_dir}/index.html" --dist "${dist_dir}" \
     --expected-locale-stamp "${expected}"
+}
+
+require_prepared_js() {
+  if [[ -n "${PREPARED_JS}" && -f "${PREPARED_JS}" ]]; then
+    return 0
+  fi
+  local src
+  for src in \
+    "${STAGING_ROOT}/preparedDist.mjs" \
+    "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/preparedDist.mjs"
+  do
+    if [[ -f "${src}" ]]; then
+      PREPARED_JS="${src}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+release_id_from_tag() {
+  local tag="$1"
+  if [[ "${tag}" =~ ^ui-(.+)$ ]]; then
+    printf '%s\n' "${BASH_REMATCH[1]}"
+  fi
+}
+
+persist_prepared_artifact() {
+  local dest tmp manifest_file release_id
+  require_prepared_js || die "preparedDist.mjs missing; refusing prepare without inventory"
+  release_id="$(release_id_from_tag "${BUILD_TAG}")"
+  [[ -n "${release_id}" ]] || die "prepared build tag is not a release namespace"
+  dest="${STAGING_ROOT}/prepared-${TARGET_SHA}"
+  tmp="${STAGING_ROOT}/prepared-${TARGET_SHA}.tmp.$$"
+  rm -rf "${tmp}"
+  mkdir -p "${tmp}/dist"
+  cp -a "${STAGED_DIST}/." "${tmp}/dist/"
+  manifest_file="${tmp}/manifest.json"
+  node "${PREPARED_JS}" write \
+    --dist "${tmp}/dist" \
+    --out "${manifest_file}" \
+    --target-sha "${TARGET_SHA}" \
+    --release-id "${release_id}" \
+    --expected-locale "${EXPECT_LOCALE}" \
+    --build-tag "${BUILD_TAG}" \
+    || die "failed to write prepared manifest"
+  node "${PREPARED_JS}" verify \
+    --prepared "${tmp}" \
+    --staging "${STAGING_ROOT}" \
+    --expected-target-sha "${TARGET_SHA}" \
+    --expected-locale "${EXPECT_LOCALE}" \
+    --expected-release-id "${release_id}" \
+    || die "prepared artifact failed inventory verify"
+  rm -rf "${dest}"
+  mv "${tmp}" "${dest}"
+  PREPARED_KEEP="${dest}"
+  echo "PREPARED_OK: ${dest}"
+  echo "PREPARED_MANIFEST: ${dest}/manifest.json"
+  echo "PREPARED_RELEASE_ID: ${release_id}"
+  echo "PREPARED_TARGET_SHA: ${TARGET_SHA}"
+  echo "PREPARED_LOCALE: ${EXPECT_LOCALE}"
+}
+
+load_promote_tree() {
+  local trusted release_id inspected
+  require_prepared_js || die "preparedDist.mjs missing; refusing promote without inventory"
+  [[ "${TARGET_SHA}" == "${PINNED_SHA}" ]] || die "pinned target SHA drifted before promote"
+  node "${PREPARED_JS}" verify \
+    --prepared "${PREPARED_PATH}" \
+    --staging "${STAGING_ROOT}" \
+    --expected-target-sha "${PINNED_SHA}" \
+    || die "prepared artifact rejected (untrusted path, symlink, traversal, or inventory)"
+  inspected="$(node "${PREPARED_JS}" inspect-sha --manifest "${PREPARED_PATH}/manifest.json")"
+  [[ "${inspected}" == "${PINNED_SHA}" ]] || die "prepared manifest targetSha does not match pinned ${PINNED_SHA}"
+  TARGET_SHA="${PINNED_SHA}"
+  trusted="${STAGING_ROOT}/promote-${PINNED_SHA}-$$"
+  rm -rf "${trusted}"
+  mkdir -p "${trusted}"
+  node "${PREPARED_JS}" copy \
+    --from "${PREPARED_PATH}/dist" \
+    --to "${trusted}" \
+    --manifest "${PREPARED_PATH}/manifest.json" \
+    || die "failed to copy prepared files into trusted staging"
+  STAGED_DIST="${trusted}"
+  read_dist_meta "${STAGED_DIST}" || die "prepared dist missing build tag/bundle"
+  release_id="$(release_id_from_tag "${BUILD_TAG}")"
+  node "${PREPARED_JS}" verify \
+    --prepared "${PREPARED_PATH}" \
+    --staging "${STAGING_ROOT}" \
+    --expected-target-sha "${TARGET_SHA}" \
+    --expected-release-id "${release_id}" \
+    || die "prepared releaseId/tag drifted after copy"
 }
 
 check_http_assets() {
@@ -305,13 +434,17 @@ if [[ -n "$("${GIT_BIN}" -C "${ROOT}" status --porcelain=v1 --untracked-files=no
 fi
 
 PREV_SHA="$("${GIT_BIN}" -C "${ROOT}" rev-parse HEAD)"
-if ! "${GIT_BIN}" -C "${ROOT}" cat-file -e "${TARGET_SHA}^{commit}"; then
-  die "target SHA not present in ROOT repo: ${TARGET_SHA}"
-fi
-# Accept only current SHA or a descendant (fast-forward). Refuse older ancestors / diverged commits.
-# Rollback uses recorded PREV_SHA internally and is not subject to this gate.
-if ! "${GIT_BIN}" -C "${ROOT}" merge-base --is-ancestor "${PREV_SHA}" "${TARGET_SHA}"; then
-  die "target is not a fast-forward descendant of current production SHA (${PREV_SHA})"
+BASELINE_SHA="${PREV_SHA}"
+assert_target_fast_forward() {
+  if ! "${GIT_BIN}" -C "${ROOT}" cat-file -e "${TARGET_SHA}^{commit}"; then
+    die "target SHA not present in ROOT repo: ${TARGET_SHA}"
+  fi
+  if ! "${GIT_BIN}" -C "${ROOT}" merge-base --is-ancestor "${PREV_SHA}" "${TARGET_SHA}"; then
+    die "target is not a fast-forward descendant of current production SHA (${PREV_SHA})"
+  fi
+}
+if [[ "${DEPLOY_MODE}" != "promote" ]]; then
+  assert_target_fast_forward
 fi
 
 require_loaded_unit "${API_UNIT}"
@@ -338,23 +471,30 @@ if [[ "${LIVE_DEV}" != "${STAGING_DEV}" || "${LIVE_DEV}" != "${LKG_DEV}" ]]; the
   die "cross-filesystem deploy staging is unsafe (live=${LIVE_DEV} staging=${STAGING_DEV} lkg=${LKG_DEV})"
 fi
 
-STAGED_DIST="${STAGING_ROOT}/dist-${TARGET_SHA}-$$"
-BUILD_WT="${STAGING_ROOT}/src-${TARGET_SHA}-$$"
-rm -rf "${STAGED_DIST}" "${BUILD_WT}"
-mkdir -p "${STAGED_DIST}"
+if [[ "${DEPLOY_MODE}" == "promote" ]]; then
+  echo "Promote: using prepared artifact ${PREPARED_PATH} (no npm build)"
+  load_promote_tree
+  assert_target_fast_forward
+else
+  STAGED_DIST="${STAGING_ROOT}/dist-${TARGET_SHA}-$$"
+  BUILD_WT="${STAGING_ROOT}/src-${TARGET_SHA}-$$"
+  rm -rf "${STAGED_DIST}" "${BUILD_WT}"
+  mkdir -p "${STAGED_DIST}"
+fi
 
 echo "Recording previous release: ${PREV_SHA}"
-if [[ -d "${LIVE_DIST}" ]]; then
+if [[ "${DEPLOY_MODE}" != "prepare" && -d "${LIVE_DIST}" ]]; then
   rm -rf "${LKG_ROOT}/dist"
   cp -a "${LIVE_DIST}" "${LKG_ROOT}/dist"
-  if [[ -f "${LIVE_DIST}/index.html" ]]; then
-    PREV_TAG="$(extract_tag "$(cat "${LIVE_DIST}/index.html")")"
-    PREV_JS="$(extract_js "$(cat "${LIVE_DIST}/index.html")")"
-  fi
+fi
+if [[ -f "${LIVE_DIST}/index.html" ]]; then
+  PREV_TAG="$(extract_tag "$(cat "${LIVE_DIST}/index.html")")"
+  PREV_JS="$(extract_js "$(cat "${LIVE_DIST}/index.html")")"
 fi
 echo "Previous live tag: ${PREV_TAG:-unknown}"
 echo "Previous live bundle: ${PREV_JS:-unknown}"
 
+if [[ "${DEPLOY_MODE}" != "promote" ]]; then
 echo "Creating isolated build worktree for ${TARGET_SHA}..."
 "${GIT_BIN}" -C "${ROOT}" worktree add --detach "${BUILD_WT}" "${TARGET_SHA}"
 
@@ -377,6 +517,7 @@ fi
 if [[ -f "${ROOT}/.env.production" ]]; then
   ln -sfn "${ROOT}/.env.production" "${BUILD_WT}/.env.production"
 fi
+fi
 
 DB_PATH_BUILD="${CLOVER_DEPLOY_DB_PATH:-${ROOT}/server/data/clover.sqlite}"
 if [[ ! -f "${DB_PATH_BUILD}" ]]; then
@@ -387,7 +528,10 @@ fi
 # boolean into the off-live build — never source the rest of dotenv, never
 # treat DB languages as a substitute for the explicit flag.
 LOCALE_ENV_FILE="${ROOT}/server/.env"
-ASSERT_JS="${BUILD_WT}/server/scripts/assert-locale-route-release.mjs"
+ASSERT_JS=""
+if [[ -n "${BUILD_WT}" ]]; then
+  ASSERT_JS="${BUILD_WT}/server/scripts/assert-locale-route-release.mjs"
+fi
 if [[ ! -f "${ASSERT_JS}" ]]; then
   ASSERT_JS="${ROOT}/server/scripts/assert-locale-route-release.mjs"
 fi
@@ -449,6 +593,7 @@ else
   die "locale-route expect must be enabled or disabled, got: ${EXPECT_LOCALE}"
 fi
 
+if [[ "${DEPLOY_MODE}" != "promote" ]]; then
 echo "Building release off live path into staged dist..."
 # IMPORTANT: build must NOT write into live ROOT/dist.
 # Do not use `npm run build -- --outDir …`: extra args attach to generate-sitemap, not Vite.
@@ -475,6 +620,7 @@ rm -rf "${STAGED_DIST}"
 mkdir -p "${STAGED_DIST}"
 cp -a "${BUILD_WT}/dist/." "${STAGED_DIST}/"
 cd "${BUILD_PREV_PWD}"
+fi
 
 [[ -f "${STAGED_DIST}/index.html" ]] || die "staged index.html missing"
 [[ -f "${STAGED_DIST}/sitemap.xml" ]] || die "staged sitemap.xml missing"
@@ -503,6 +649,41 @@ if [[ "${EXPECT_LOCALE}" == "enabled" ]]; then
       die "sitemap has unprefixed homepage; refusing cutover"
     fi
   fi
+fi
+
+if [[ "${DEPLOY_MODE}" == "promote" ]]; then
+  require_prepared_js || die "preparedDist.mjs missing during promote verify"
+  node "${PREPARED_JS}" verify \
+    --prepared "${PREPARED_PATH}" \
+    --staging "${STAGING_ROOT}" \
+    --expected-target-sha "${TARGET_SHA}" \
+    --expected-locale "${EXPECT_LOCALE}" \
+    || die "prepared manifest SHA/locale does not match current deploy config"
+  node "${PREPARED_JS}" verify-files \
+    --dist "${STAGED_DIST}" \
+    --manifest "${PREPARED_PATH}/manifest.json" \
+    --expected-target-sha "${TARGET_SHA}" \
+    --expected-locale "${EXPECT_LOCALE}" \
+    --expected-release-id "$(release_id_from_tag "${BUILD_TAG}")" \
+    || die "trusted staging tree drifted after copy; refusing cutover"
+fi
+
+if [[ "${DEPLOY_MODE}" == "prepare" ]]; then
+  persist_prepared_artifact
+  cleanup_temp
+  trap - EXIT
+  echo "PREPARE OK."
+  echo "Prepared SHA: ${TARGET_SHA}"
+  echo "UI build tag: ${BUILD_TAG}"
+  echo "UI bundle: ${MAIN_JS}"
+  exit 0
+fi
+
+if [[ "$("${GIT_BIN}" -C "${ROOT}" rev-parse HEAD)" != "${BASELINE_SHA}" ]]; then
+  die "live SHA drifted before cutover; refusing promote/deploy"
+fi
+if [[ -n "$("${GIT_BIN}" -C "${ROOT}" status --porcelain=v1 --untracked-files=no)" ]]; then
+  die "live tracked source drifted before cutover; refusing promote/deploy"
 fi
 
 # Pre-cutover validation complete. Live dist still untouched until here.

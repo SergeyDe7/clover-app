@@ -106,6 +106,11 @@ assert.match(
   /--expected-locale-stamp/,
   "namespace check must receive locale stamp from deploy config, not from HTML"
 );
+assert.match(scriptSrc, /prepare/, "deploy script must support prepare");
+assert.match(scriptSrc, /promote/, "deploy script must support promote");
+assert.equal(/SKIP_BUILD=/.test(scriptSrc), false, "must not add a hidden SKIP_BUILD switch");
+assert.match(scriptSrc, /preparedDist\.mjs/, "prepare/promote must inventory via preparedDist.mjs");
+assert.match(scriptSrc, /verify-files/, "promote must re-hash the trusted staging tree before cutover");
 assert.equal(
   /nginx\s+-s\s+reload|systemctl\s+reload\s+nginx/i.test(scriptSrc),
   false,
@@ -132,12 +137,52 @@ assert.match(launcherSrc, /CLOVER_DEPLOY_ROOT/, "launcher ROOT comes from env, n
 assert.equal(/git reset/i.test(launcherSrc), false, "launcher must not reset live source");
 assert.equal(/BASH_SOURCE/.test(launcherSrc), false, "launcher must not infer ROOT from its path");
 assert.match(launcherSrc, /extract dir must not be inside live ROOT/);
+assert.match(launcherSrc, /prepare/, "launcher must support prepare");
+assert.match(launcherSrc, /promote/, "launcher must support promote");
+assert.match(launcherSrc, /preparedDist\.mjs/, "launcher must extract preparedDist.mjs from target SHA");
+assert.equal(/SKIP_BUILD=/.test(launcherSrc), false, "launcher must not add SKIP_BUILD");
+assert.equal(
+  /grep\s+-oE/.test(launcherSrc),
+  false,
+  "launcher must not extract targetSha with grep"
+);
+assert.equal(
+  /JSON\.parse/.test(launcherSrc),
+  false,
+  "launcher must not parse manifest to choose the bootstrap SHA"
+);
+assert.match(
+  launcherSrc,
+  /promote <dir> <sha>|explicit expected target SHA/,
+  "launcher promote must take an explicit expected SHA"
+);
+assert.match(launcherSrc, /PINNED_SHA/, "launcher must pin one SHA for extract and cutover");
+assert.match(
+  launcherSrc,
+  /inspect-sha/,
+  "launcher must verify manifest with the helper extracted from the pinned SHA"
+);
+assert.equal(
+  /TARGET_SHA="\$\(node/.test(scriptSrc),
+  false,
+  "deploy script must not replace the pinned SHA by re-reading inspect-sha"
+);
+assert.match(
+  scriptSrc,
+  /promote <dir> <sha>|promote <prepared-artifact-dir> <exact-target-commit-sha>/,
+  "promote must accept an explicit expected SHA"
+);
 const probeSrc = readFileSync(path.join(workRoot, "server/scripts/uiAssetProbe.mjs"), "utf8");
 assert.match(probeSrc, /TLS verification must stay enabled/);
 assert.equal(
   /extraArgs\.push\(\s*["'](?:-k|--insecure)["']/.test(probeSrc),
   false,
   "asset probe must not pass -k/--insecure to curl"
+);
+assert.equal(
+  /command === "check-http"[\s\S]*inspectReleaseNamespace/.test(probeSrc),
+  false,
+  "HTTP/MIME rollback gate must not require a new release namespace"
 );
 console.log("STATIC_CONTRACT:PASS");
 
@@ -327,6 +372,10 @@ if (process.env.FAKE_BUILD_FAIL === '1') {
     path.join(workRoot, "scripts/linux/run-target-deploy.sh"),
     path.join(live, "scripts/linux/run-target-deploy.sh")
   );
+  cpSync(
+    path.join(workRoot, "server/scripts/preparedDist.mjs"),
+    path.join(live, "server/scripts/preparedDist.mjs")
+  );
   execFileSync("git", ["add", "-A"], { cwd: live });
   execFileSync("git", ["commit", "-m", "new"], { cwd: live });
   const newSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: live, encoding: "utf8" }).trim();
@@ -342,6 +391,9 @@ if (process.env.FAKE_BUILD_FAIL === '1') {
   writeFileSync(path.join(state, "tag"), "match\n");
   writeFileSync(path.join(state, "units"), "loaded\n");
   writeFileSync(path.join(state, "restart_count"), "0\n");
+  writeFileSync(path.join(state, "build_count"), "0\n");
+  writeFileSync(path.join(state, "api.pid"), "41001\n");
+  writeFileSync(path.join(state, "ui.pid"), "52731\n");
 
   writeExec(
     path.join(bin, "systemctl"),
@@ -367,6 +419,8 @@ STATE="${state}"
 # emulate: sudo -n /bin/systemctl restart api ui
 n=\$(cat "\$STATE/restart_count")
 echo \$((n+1)) > "\$STATE/restart_count"
+echo \$((41001+n+1)) > "\$STATE/api.pid"
+echo \$((52731+n+1)) > "\$STATE/ui.pid"
 if grep -q fail-restart "\$STATE/units" 2>/dev/null; then echo restart-failed >&2; exit 1; fi
 exit 0
 `
@@ -530,6 +584,8 @@ write_resp 200 "text/html" '<meta name="clover-ui-build" content="ui-NEW"><scrip
 set -euo pipefail
 # Only support "run build"
 if [[ "\${1:-}" == "run" && "\${2:-}" == "build" ]]; then
+  n=\$(cat "${state}/build_count")
+  echo \$((n+1)) > "${state}/build_count"
   if [[ "\${FAKE_BUILD_FAIL:-0}" == "1" ]]; then
     echo "fake npm build fail" >&2
     exit 1
@@ -576,11 +632,19 @@ exit 2
   return { root, live, staging, lkg, bin, state, oldSha, newSha, env };
 }
 
+function releaseSandboxLock(box, result) {
+  const text = `${result?.stderr || ""}\n${result?.stdout || ""}`;
+  if (/another deployment holds/.test(text)) return;
+  rmSync(`${box.env.CLOVER_DEPLOY_LOCK}.held`, { recursive: true, force: true });
+}
+
 function runDeploy(box, targetSha, extraEnv = {}) {
-  return spawnSync(BASH_BIN, [SCRIPT, targetSha], {
+  const result = spawnSync(BASH_BIN, [SCRIPT, targetSha], {
     encoding: "utf8",
     env: { ...box.env, ...extraEnv },
   });
+  releaseSandboxLock(box, result);
+  return result;
 }
 
 function runFirstDeploy(box, targetSha, extraEnv = {}) {
@@ -593,17 +657,21 @@ function runFirstDeploy(box, targetSha, extraEnv = {}) {
       encoding: "utf8",
     })
   );
-  return spawnSync(BASH_BIN, [launcherPath, targetSha], {
+  const result = spawnSync(BASH_BIN, [launcherPath, targetSha], {
     encoding: "utf8",
     env: { ...box.env, ...extraEnv },
   });
+  releaseSandboxLock(box, result);
+  return result;
 }
 
 function runLiveScript(box, scriptPath, targetSha, extraEnv = {}) {
-  return spawnSync(BASH_BIN, [scriptPath, targetSha], {
+  const result = spawnSync(BASH_BIN, [scriptPath, targetSha], {
     encoding: "utf8",
     env: { ...box.env, ...extraEnv },
   });
+  releaseSandboxLock(box, result);
+  return result;
 }
 
 function liveSha(box) {
@@ -614,6 +682,142 @@ function liveTag(box) {
   const html = readFileSync(path.join(box.live, "dist/index.html"), "utf8");
   const m = html.match(/content="([^"]+)"/);
   return m ? m[1] : "";
+}
+
+function runPrepare(box, targetSha, extraEnv = {}) {
+  const result = spawnSync(BASH_BIN, [SCRIPT, "prepare", targetSha], {
+    encoding: "utf8",
+    env: { ...box.env, ...extraEnv },
+  });
+  releaseSandboxLock(box, result);
+  return result;
+}
+
+function runPromote(box, preparedPath, extraEnv = {}) {
+  const targetSha = extraEnv.CLOVER_DEPLOY_TARGET_SHA || box.newSha;
+  const result = spawnSync(BASH_BIN, [SCRIPT, "promote", preparedPath, targetSha], {
+    encoding: "utf8",
+    env: { ...box.env, ...extraEnv },
+  });
+  releaseSandboxLock(box, result);
+  return result;
+}
+
+function writeLauncher(box, targetSha) {
+  const bootstrapDir = path.join(box.staging, `bootstrap-launcher-${targetSha}`);
+  mkdirSync(bootstrapDir, { recursive: true });
+  const launcherPath = path.join(bootstrapDir, "run-target-deploy.sh");
+  writeFileSync(
+    launcherPath,
+    execFileSync("git", ["-C", box.live, "show", `${targetSha}:scripts/linux/run-target-deploy.sh`], {
+      encoding: "utf8",
+    })
+  );
+  return launcherPath;
+}
+
+function runFirstPrepare(box, targetSha, extraEnv = {}) {
+  const launcherPath = writeLauncher(box, targetSha);
+  const result = spawnSync(BASH_BIN, [launcherPath, "prepare", targetSha], {
+    encoding: "utf8",
+    env: { ...box.env, ...extraEnv },
+  });
+  releaseSandboxLock(box, result);
+  return result;
+}
+
+function runFirstPromote(box, preparedPath, targetSha, extraEnv = {}) {
+  const launcherPath = writeLauncher(box, targetSha);
+  const result = spawnSync(BASH_BIN, [launcherPath, "promote", preparedPath, targetSha], {
+    encoding: "utf8",
+    env: { ...box.env, ...extraEnv },
+  });
+  releaseSandboxLock(box, result);
+  return result;
+}
+
+function writeDuplicateTargetShaManifest(manifestPath, firstSha, secondSha) {
+  const original = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const rest = { ...original };
+  delete rest.targetSha;
+  const body = JSON.stringify(rest, null, 2).replace(/^\{\n/, "").replace(/\n\}\s*$/, "");
+  writeFileSync(
+    manifestPath,
+    `{\n  "targetSha": "${firstSha}",\n  "targetSha": "${secondSha}",\n${body}\n}\n`
+  );
+}
+
+function preparedDirFor(box, sha) {
+  return path.join(box.staging, `prepared-${sha}`);
+}
+
+function buildCount(box) {
+  return readFileSync(path.join(box.state, "build_count"), "utf8").trim();
+}
+
+function livePids(box) {
+  return {
+    api: readFileSync(path.join(box.state, "api.pid"), "utf8").trim(),
+    ui: readFileSync(path.join(box.state, "ui.pid"), "utf8").trim(),
+  };
+}
+
+function writeRecoveryR403uDist(dir) {
+  mkdirSync(path.join(dir, "assets"), { recursive: true });
+  mkdirSync(path.join(dir, "fonts"), { recursive: true });
+  writeFileSync(
+    path.join(dir, "index.html"),
+    `<meta name="clover-ui-build" content="ui-20260918r403u"><meta name="clover-public-locale-routes" content="disabled"><link rel="stylesheet" href="/assets/index-B2GFFiD2.css"><link rel="stylesheet" href="/fonts/manrope.css"><script src="/assets/index-B2GFFiD2.js"></script>`
+  );
+  writeFileSync(path.join(dir, "assets/index-B2GFFiD2.js"), "export default 1;\n");
+  writeFileSync(path.join(dir, "assets/index-B2GFFiD2.css"), "body{color:#111}");
+  writeFileSync(
+    path.join(dir, "fonts/manrope.css"),
+    '@font-face{src:url("/fonts/manrope-latin-700-normal.woff2")}'
+  );
+  writeFileSync(path.join(dir, "fonts/manrope-latin-700-normal.woff2"), "w2");
+  writeFileSync(path.join(dir, "sw.js"), 'const CACHE_NAME = "clover-shell-ui-20260918r403u";\n');
+  writeFileSync(path.join(dir, "sitemap.xml"), "<urlset></urlset>");
+}
+
+function probeHttp(box, html) {
+  return spawnSync(
+    process.execPath,
+    [
+      path.join(workRoot, "server/scripts/uiAssetProbe.mjs"),
+      "check-http",
+      "--html",
+      html,
+      "--dist",
+      path.join(box.live, "dist"),
+      "--origin",
+      box.env.CLOVER_DEPLOY_ORIGIN_BASE,
+      "--nginx",
+      box.env.CLOVER_DEPLOY_NGINX_UI,
+      "--curl",
+      box.env.CLOVER_DEPLOY_CURL,
+    ],
+    { encoding: "utf8", env: box.env }
+  );
+}
+
+function probeNamespace(box, html, expectedLocale = "disabled") {
+  const htmlFile = path.join(box.root, "ns-check.html");
+  writeFileSync(htmlFile, html);
+  return spawnSync(
+    process.execPath,
+    [
+      path.join(workRoot, "server/scripts/uiAssetProbe.mjs"),
+      "check-namespace",
+      "--html-file",
+      htmlFile,
+      "--dist",
+      path.join(box.live, "dist"),
+      "--expected-locale-stamp",
+      expectedLocale,
+    ],
+    { encoding: "utf8", env: box.env }
+  );
 }
 
 // --- A. BUILD FAILURE ---
@@ -1109,6 +1313,301 @@ exit 2
   assert.equal(liveTag(box), beforeTag, "flat build must not replace live dist");
   assert.equal(readFileSync(path.join(box.state, "restart_count"), "utf8").trim(), "0");
   console.log("Y5_NEW_SCRIPT_FLAT_BUILD_FAILS_BEFORE_CUTOVER:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("prepare-leaves-live");
+  const before = liveSha(box);
+  const beforeTag = liveTag(box);
+  const beforePids = livePids(box);
+  const prepared = runFirstPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, `prepare failed: ${prepared.stderr}\n${prepared.stdout}`);
+  assert.match(prepared.stdout, /PREPARED_OK:/);
+  assert.match(prepared.stdout, /PREPARE OK/);
+  assert.equal(liveSha(box), before, "prepare must not reset live SHA");
+  assert.equal(liveTag(box), beforeTag, "prepare must not replace live dist");
+  assert.equal(livePids(box).api, beforePids.api);
+  assert.equal(livePids(box).ui, beforePids.ui);
+  assert.equal(readFileSync(path.join(box.state, "restart_count"), "utf8").trim(), "0");
+  const dest = preparedDirFor(box, box.newSha);
+  assert.equal(existsSync(path.join(dest, "manifest.json")), true, "prepared artifact must remain");
+  assert.equal(existsSync(path.join(dest, "dist/index.html")), true);
+  const manifest = JSON.parse(readFileSync(path.join(dest, "manifest.json"), "utf8"));
+  assert.equal(manifest.targetSha, box.newSha);
+  assert.equal(manifest.expectedLocaleStamp, "disabled");
+  assert.ok(manifest.releaseId);
+  assert.ok(Array.isArray(manifest.files) && manifest.files.length > 0);
+  console.log("Z1_PREPARE_LEAVES_LIVE_AND_KEEPS_ARTIFACT:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("promote-no-rebuild");
+  const prepared = runPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, `prepare failed: ${prepared.stderr}\n${prepared.stdout}`);
+  const dest = preparedDirFor(box, box.newSha);
+  const manifest = JSON.parse(readFileSync(path.join(dest, "manifest.json"), "utf8"));
+  const buildsAfterPrepare = buildCount(box);
+  assert.notEqual(buildsAfterPrepare, "0");
+  const promoted = runPromote(box, dest);
+  assert.equal(promoted.status, 0, `promote failed: ${promoted.stderr}\n${promoted.stdout}`);
+  assert.equal(buildCount(box), buildsAfterPrepare, "promote must not call npm build");
+  assert.equal(liveSha(box), box.newSha);
+  assert.equal(liveTag(box), manifest.buildTag);
+  assert.match(readFileSync(path.join(box.live, "dist/index.html"), "utf8"), new RegExp(manifest.releaseId));
+  console.log("Z2_PROMOTE_SAME_RELEASE_NO_REBUILD:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("promote-changed-file");
+  const prepared = runPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const dest = preparedDirFor(box, box.newSha);
+  const before = liveSha(box);
+  const beforeTag = liveTag(box);
+  writeFileSync(path.join(dest, "dist/index.html"), `${readFileSync(path.join(dest, "dist/index.html"), "utf8")}\n`);
+  const promoted = runPromote(box, dest);
+  assert.notEqual(promoted.status, 0, "changed file must fail before cutover");
+  assert.match(`${promoted.stderr}\n${promoted.stdout}`, /changed prepared file|prepared dist mismatch/i);
+  assert.doesNotMatch(`${promoted.stdout}\n${promoted.stderr}`, /Cutover: switching source/);
+  assert.equal(liveSha(box), before);
+  assert.equal(liveTag(box), beforeTag);
+  console.log("Z3_CHANGED_FILE_FAILS_BEFORE_CUTOVER:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("promote-extra-file");
+  const prepared = runPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const dest = preparedDirFor(box, box.newSha);
+  const before = liveSha(box);
+  writeFileSync(path.join(dest, "dist/extra.txt"), "nope\n");
+  const promoted = runPromote(box, dest);
+  assert.notEqual(promoted.status, 0, "extra file must fail before cutover");
+  assert.match(`${promoted.stderr}\n${promoted.stdout}`, /extra prepared file/i);
+  assert.equal(liveSha(box), before);
+  console.log("Z4_EXTRA_FILE_FAILS_BEFORE_CUTOVER:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("promote-missing-file");
+  const prepared = runPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const dest = preparedDirFor(box, box.newSha);
+  const before = liveSha(box);
+  rmSync(path.join(dest, "dist/sitemap.xml"));
+  const promoted = runPromote(box, dest);
+  assert.notEqual(promoted.status, 0, "missing file must fail before cutover");
+  assert.match(`${promoted.stderr}\n${promoted.stdout}`, /missing prepared file/i);
+  assert.equal(liveSha(box), before);
+  console.log("Z5_MISSING_FILE_FAILS_BEFORE_CUTOVER:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("promote-wrong-sha-locale");
+  const prepared = runPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const dest = preparedDirFor(box, box.newSha);
+  const before = liveSha(box);
+  const manifestPath = path.join(dest, "manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  writeFileSync(
+    manifestPath,
+    `${JSON.stringify({ ...manifest, targetSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }, null, 2)}\n`
+  );
+  const wrongSha = runPromote(box, dest);
+  assert.notEqual(wrongSha.status, 0, "wrong SHA must fail before cutover");
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  writeFileSync(
+    manifestPath,
+    `${JSON.stringify({ ...manifest, expectedLocaleStamp: "enabled" }, null, 2)}\n`
+  );
+  const wrongLocale = runPromote(box, dest);
+  assert.notEqual(wrongLocale.status, 0, "wrong locale must fail before cutover");
+  assert.equal(liveSha(box), before);
+  console.log("Z6_WRONG_SHA_OR_LOCALE_FAILS_BEFORE_CUTOVER:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("promote-traversal-symlink");
+  const prepared = runPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const dest = preparedDirFor(box, box.newSha);
+  const before = liveSha(box);
+  const manifestPath = path.join(dest, "manifest.json");
+  const original = JSON.parse(readFileSync(manifestPath, "utf8"));
+  writeFileSync(
+    manifestPath,
+    `${JSON.stringify(
+      {
+        ...original,
+        files: [...original.files, { path: "../escape.js", sha256: "0".repeat(64), size: 1 }],
+      },
+      null,
+      2
+    )}\n`
+  );
+  const traversal = runPromote(box, dest);
+  assert.notEqual(traversal.status, 0, "path traversal must fail before cutover");
+  writeFileSync(manifestPath, `${JSON.stringify(original, null, 2)}\n`);
+  const linkPath = path.join(dest, "dist", "link.js");
+  symlinkSync(path.join(dest, "dist/index.html"), linkPath);
+  writeFileSync(
+    manifestPath,
+    `${JSON.stringify(
+      {
+        ...original,
+        files: [...original.files, { path: "link.js", sha256: "1".repeat(64), size: 1 }],
+      },
+      null,
+      2
+    )}\n`
+  );
+  const symlinkRes = runPromote(box, dest);
+  assert.notEqual(symlinkRes.status, 0, "symlink must fail before cutover");
+  assert.equal(liveSha(box), before);
+  console.log("Z7_TRAVERSAL_SYMLINK_FAILS_BEFORE_CUTOVER:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("promote-baseline-drift");
+  const prepared = runPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const dest = preparedDirFor(box, box.newSha);
+  const beforeTag = liveTag(box);
+  writeFileSync(path.join(box.live, "server/src/server.js"), "console.log('drift')\n");
+  const promoted = runPromote(box, dest);
+  assert.notEqual(promoted.status, 0, "dirty live baseline must fail");
+  assert.match(`${promoted.stderr}\n${promoted.stdout}`, /local modifications|drifted/i);
+  assert.equal(liveTag(box), beforeTag);
+  assert.doesNotMatch(`${promoted.stdout}\n${promoted.stderr}`, /Cutover: switching source/);
+  console.log("Z8_BASELINE_DRIFT_FAILS:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("promote-rollback-r403u");
+  writeRecoveryR403uDist(path.join(box.live, "dist"));
+  execFileSync("git", ["-C", box.live, "add", "-u", "--", "dist"]);
+  const tracked = execFileSync("git", ["-C", box.live, "diff", "--name-only", "--cached"], {
+    encoding: "utf8",
+  })
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (tracked.length) {
+    execFileSync("git", ["-C", box.live, "restore", "--staged", "--worktree", "--source=HEAD", "--", ...tracked]);
+  }
+  writeRecoveryR403uDist(path.join(box.live, "dist"));
+  const modified = execFileSync("git", ["-C", box.live, "ls-files", "-m", "--", "dist"], {
+    encoding: "utf8",
+  })
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (modified.length) {
+    execFileSync("git", ["-C", box.live, "update-index", "--skip-worktree", "--", ...modified]);
+  }
+  const prepared = runPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, `prepare failed: ${prepared.stderr}\n${prepared.stdout}`);
+  writeFileSync(path.join(box.state, "health"), "fail-js-403\n");
+  const dest = preparedDirFor(box, box.newSha);
+  const promoted = runPromote(box, dest);
+  assert.notEqual(promoted.status, 0, "post-cutover health failure must roll back");
+  assert.equal(liveSha(box), box.oldSha, "rollback must restore previous SHA");
+  const liveHtml = readFileSync(path.join(box.live, "dist/index.html"), "utf8");
+  assert.match(liveHtml, /ui-20260918r403u/);
+  assert.match(liveHtml, /index-B2GFFiD2\.js/);
+  writeFileSync(path.join(box.state, "health"), "ok\n");
+  const http = probeHttp(box, liveHtml);
+  assert.equal(http.status, 0, `r403u HTTP/MIME gate must PASS: ${http.stderr}\n${http.stdout}`);
+  const ns = probeNamespace(box, liveHtml);
+  assert.notEqual(ns.status, 0, "legacy r403u must not satisfy the new namespace gate");
+  console.log("Z9_POST_CUTOVER_ROLLBACK_R403U_HTTP:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("launcher-duplicate-targetsha");
+  const prepared = runFirstPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, `prepare failed: ${prepared.stderr}\n${prepared.stdout}`);
+  const dest = preparedDirFor(box, box.newSha);
+  const before = liveSha(box);
+  const beforeTag = liveTag(box);
+  const buildsAfterPrepare = buildCount(box);
+  writeDuplicateTargetShaManifest(path.join(dest, "manifest.json"), box.oldSha, box.newSha);
+  const promoted = runFirstPromote(box, dest, box.newSha);
+  assert.notEqual(promoted.status, 0, "duplicate targetSha must fail before cutover");
+  assert.match(
+    `${promoted.stderr}\n${promoted.stdout}`,
+    /duplicate targetSha|ambiguous prepared manifest/i
+  );
+  assert.doesNotMatch(`${promoted.stdout}\n${promoted.stderr}`, /Cutover: switching source/);
+  assert.equal(liveSha(box), before);
+  assert.equal(liveTag(box), beforeTag);
+  assert.equal(readFileSync(path.join(box.state, "restart_count"), "utf8").trim(), "0");
+  assert.equal(buildCount(box), buildsAfterPrepare, "refused launcher promote must not rebuild");
+  console.log("Z10_LAUNCHER_DUPLICATE_TARGETSHA_FAILS:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("launcher-sha-mismatch");
+  const prepared = runFirstPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, `prepare failed: ${prepared.stderr}\n${prepared.stdout}`);
+  const dest = preparedDirFor(box, box.newSha);
+  const before = liveSha(box);
+  const beforeTag = liveTag(box);
+  const manifestPath = path.join(dest, "manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  writeFileSync(
+    manifestPath,
+    `${JSON.stringify({ ...manifest, targetSha: box.oldSha }, null, 2)}\n`
+  );
+  const promoted = runFirstPromote(box, dest, box.newSha);
+  assert.notEqual(promoted.status, 0, "explicit SHA mismatch must fail before cutover");
+  assert.match(
+    `${promoted.stderr}\n${promoted.stdout}`,
+    /does not match pinned|does not match expected/i
+  );
+  assert.doesNotMatch(`${promoted.stdout}\n${promoted.stderr}`, /Cutover: switching source/);
+  assert.equal(liveSha(box), before);
+  assert.equal(liveTag(box), beforeTag);
+  assert.equal(readFileSync(path.join(box.state, "restart_count"), "utf8").trim(), "0");
+  console.log("Z11_LAUNCHER_EXPLICIT_SHA_MISMATCH_FAILS:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("launcher-promote-same-dist");
+  const prepared = runFirstPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, `prepare failed: ${prepared.stderr}\n${prepared.stdout}`);
+  const dest = preparedDirFor(box, box.newSha);
+  const manifest = JSON.parse(readFileSync(path.join(dest, "manifest.json"), "utf8"));
+  const buildsAfterPrepare = buildCount(box);
+  assert.notEqual(buildsAfterPrepare, "0");
+  const promoted = runFirstPromote(box, dest, box.newSha);
+  assert.equal(promoted.status, 0, `launcher promote failed: ${promoted.stderr}\n${promoted.stdout}`);
+  assert.match(promoted.stdout, new RegExp(`FIRST_DEPLOY_LAUNCHER: pinned_sha=${box.newSha}`));
+  assert.equal(buildCount(box), buildsAfterPrepare, "launcher promote must not call npm build");
+  assert.equal(liveSha(box), box.newSha);
+  assert.equal(liveTag(box), manifest.buildTag);
+  assert.match(readFileSync(path.join(box.live, "dist/index.html"), "utf8"), new RegExp(manifest.releaseId));
+  const delivered = path.join(box.staging, `delivered-deploy-${box.newSha}`);
+  assert.equal(existsSync(path.join(delivered, "restart-api-ui.sh")), true);
+  assert.equal(existsSync(path.join(delivered, "preparedDist.mjs")), true);
+  assert.equal(existsSync(path.join(delivered, "uiAssetProbe.mjs")), true);
+  assert.equal(existsSync(path.join(delivered, "releaseNamespace.js")), true);
+  assert.match(readFileSync(path.join(delivered, "restart-api-ui.sh"), "utf8"), /PINNED_SHA/);
+  assert.match(readFileSync(path.join(delivered, "preparedDist.mjs"), "utf8"), /assertUniqueTargetShaKey/);
+  console.log("Z12_LAUNCHER_PROMOTE_SAME_DIST_ONE_SHA:PASS");
   rmSync(box.root, { recursive: true, force: true });
 }
 
