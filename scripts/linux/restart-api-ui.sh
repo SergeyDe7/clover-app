@@ -107,6 +107,9 @@ install_runtime_probe() {
       mkdir -p "${STAGING_ROOT}"
       PROBE_JS="${STAGING_ROOT}/uiAssetProbe.runtime.mjs"
       cp "${src}" "${PROBE_JS}"
+      if [[ -f "$(dirname "${src}")/releaseNamespace.js" ]]; then
+        cp "$(dirname "${src}")/releaseNamespace.js" "${STAGING_ROOT}/releaseNamespace.js"
+      fi
       return 0
     fi
   done
@@ -126,7 +129,9 @@ check_dist_assets() {
   local dist_dir="$1"
   [[ -n "${PROBE_JS}" ]] || return 1
   [[ -f "${dist_dir}/index.html" ]] || return 1
-  node "${PROBE_JS}" check-dist --html-file "${dist_dir}/index.html" --dist "${dist_dir}"
+  node "${PROBE_JS}" check-dist --html-file "${dist_dir}/index.html" --dist "${dist_dir}" \
+    || return 1
+  node "${PROBE_JS}" check-namespace --html-file "${dist_dir}/index.html" --dist "${dist_dir}"
 }
 
 check_http_assets() {
@@ -194,7 +199,7 @@ extract_tag() {
 
 extract_js() {
   local html="$1"
-  grep -o 'src="/assets/index-[^"]*\.js"' <<<"${html}" | head -1 || true
+  grep -oE 'src="/assets/([^"]+/)?index-[^"]+\.js"' <<<"${html}" | head -1 || true
 }
 
 read_dist_meta() {

@@ -88,7 +88,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Hashed build assets: cache-first (filename changes every build).
+  // Namespaced hashed assets: cache-first (release directory changes every build).
   if (isHashedAsset(path)) {
     event.respondWith(
       (async () => {

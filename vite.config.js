@@ -8,6 +8,14 @@ import {
 } from "./src/shared/sitemap/publicRouteHtml.js";
 import { isPublicLocaleRoutesEnabledFromEnv } from "./src/shared/i18n/localeRoutesBuildFlag.js";
 import { staticAssetRelativePath } from "./src/shared/staticAssetGuard.js";
+import {
+  buildTagFromReleaseId,
+  createReleaseId,
+  rewriteFontPublicUrls,
+} from "./server/scripts/releaseNamespace.js";
+
+const RELEASE_ID = createReleaseId();
+const RELEASE_BUILD_TAG = buildTagFromReleaseId(RELEASE_ID);
 
 const proxy = {
   "/api": {
@@ -35,7 +43,24 @@ function publicLocaleRoutesBuildValue() {
   return isPublicLocaleRoutesEnabledFromEnv() ? "enabled" : "disabled";
 }
 
-/** Каждый production build получает уникальный тег по hash entry-бандла — иначе localStorage не сбрасывает кэш. */
+function namespaceCopiedFonts(distDir, releaseId) {
+  const fontsRoot = path.join(distDir, "fonts");
+  if (!fs.existsSync(fontsRoot)) return;
+  const dest = path.join(fontsRoot, releaseId);
+  fs.mkdirSync(dest, { recursive: true });
+  for (const name of fs.readdirSync(fontsRoot)) {
+    if (name === releaseId) continue;
+    const from = path.join(fontsRoot, name);
+    if (!fs.statSync(from).isFile()) continue;
+    const raw = fs.readFileSync(from);
+    const body = name.endsWith(".css")
+      ? rewriteFontPublicUrls(raw.toString("utf8"), releaseId)
+      : raw;
+    fs.writeFileSync(path.join(dest, name), body);
+  }
+}
+
+/** Каждый production build получает уникальный release namespace — иначе браузер может повторно запросить закэшированный 403. */
 function cloverUiBuildTag() {
   return {
     name: "clover-ui-build-tag",
@@ -50,26 +75,23 @@ function cloverUiBuildTag() {
       }
       return html;
     },
-    writeBundle(options, bundle) {
-      const entry = Object.values(bundle).find(
-        (item) => item.type === "chunk" && item.isEntry
-      );
-      const hashMatch = String(entry?.fileName || "").match(/index-([A-Za-z0-9_-]+)\.js$/);
-      const hash = hashMatch?.[1] || String(Date.now());
-      const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      const buildTag = `ui-${date}-${hash}`;
+    writeBundle(options) {
+      const buildTag = RELEASE_BUILD_TAG;
+      namespaceCopiedFonts(options.dir, RELEASE_ID);
       const indexPath = path.join(options.dir, "index.html");
       if (fs.existsSync(indexPath)) {
-        const html = fs
-          .readFileSync(indexPath, "utf8")
-          .replaceAll(UI_BUILD_PLACEHOLDER, buildTag)
-          .replaceAll(
-            PUBLIC_LOCALE_ROUTES_PLACEHOLDER,
-            publicLocaleRoutesBuildValue()
-          );
+        const html = rewriteFontPublicUrls(
+          fs
+            .readFileSync(indexPath, "utf8")
+            .replaceAll(UI_BUILD_PLACEHOLDER, buildTag)
+            .replaceAll(
+              PUBLIC_LOCALE_ROUTES_PLACEHOLDER,
+              publicLocaleRoutesBuildValue()
+            ),
+          RELEASE_ID
+        );
         fs.writeFileSync(indexPath, html);
       }
-      // Stamp SW so installed PWAs detect a new worker every deploy (byte change → install/activate).
       const swPath = path.join(options.dir, "sw.js");
       if (fs.existsSync(swPath)) {
         const sw = fs
@@ -77,7 +99,7 @@ function cloverUiBuildTag() {
           .replaceAll(UI_BUILD_PLACEHOLDER, buildTag);
         fs.writeFileSync(swPath, sw);
       }
-      console.log(`[clover-ui-build] ${buildTag}`);
+      console.log(`[clover-ui-build] ${buildTag} namespace=${RELEASE_ID}`);
     },
   };
 }
@@ -245,6 +267,9 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+        entryFileNames: `assets/${RELEASE_ID}/[name]-[hash].js`,
+        chunkFileNames: `assets/${RELEASE_ID}/[name]-[hash].js`,
+        assetFileNames: `assets/${RELEASE_ID}/[name]-[hash][extname]`,
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
           if (id.includes("react-dom") || id.includes("/react/") || id.includes("\\react\\")) {

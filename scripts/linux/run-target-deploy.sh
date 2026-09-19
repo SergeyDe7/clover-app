@@ -53,6 +53,11 @@ if ! "${GIT_BIN}" -C "${ROOT}" show "${TARGET_SHA}:server/scripts/uiAssetProbe.m
   echo "ERROR: target commit has no server/scripts/uiAssetProbe.mjs" >&2
   exit 1
 fi
+if ! "${GIT_BIN}" -C "${ROOT}" show "${TARGET_SHA}:server/scripts/releaseNamespace.js" \
+  > "${EXTRACT}/releaseNamespace.js"; then
+  echo "ERROR: target commit has no server/scripts/releaseNamespace.js" >&2
+  exit 1
+fi
 chmod +x "${EXTRACT}/restart-api-ui.sh" || true
 
 export CLOVER_DEPLOY_ROOT="${ROOT}"
