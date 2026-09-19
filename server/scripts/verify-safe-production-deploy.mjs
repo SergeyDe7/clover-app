@@ -100,6 +100,12 @@ assert.equal(
 assert.match(scriptSrc, /uiAssetProbe\.mjs/, "deploy must copy/run the asset probe");
 assert.match(scriptSrc, /READY_CONSECUTIVE:-\s*2\b/, "two consecutive ready passes required");
 assert.match(scriptSrc, /check_http_assets/, "HTML/API 200 is not enough without asset HTTP");
+assert.match(scriptSrc, /check-namespace/, "staged dist must prove release namespace consistency");
+assert.match(
+  scriptSrc,
+  /--expected-locale-stamp/,
+  "namespace check must receive locale stamp from deploy config, not from HTML"
+);
 assert.equal(
   /nginx\s+-s\s+reload|systemctl\s+reload\s+nginx/i.test(scriptSrc),
   false,
@@ -167,14 +173,16 @@ function writeExec(file, body) {
 }
 
 function writeCompleteUiDist(dir, { tag, jsPath, localeStamp = "disabled" }) {
-  mkdirSync(path.join(dir, "assets"), { recursive: true });
-  mkdirSync(path.join(dir, "fonts"), { recursive: true });
-  const js = jsPath || "/assets/index-NEW.js";
-  const stem = js.replace(/\.js$/, "");
-  const css = `${stem}.css`;
-  const chunk = js.includes("OLD") ? "/assets/vendor-OLD.js" : "/assets/vendor-NEW.js";
-  const fontCss = "/fonts/manrope.css";
-  const fontFile = "/fonts/manrope-latin-700-normal.woff2";
+  const releaseId = String(tag || "ui-NEW").replace(/^ui-/, "");
+  const jsName = path.posix.basename(jsPath || "/assets/index-NEW.js");
+  const chunkName = jsName.includes("OLD") ? "vendor-OLD.js" : "vendor-NEW.js";
+  const js = `/assets/${releaseId}/${jsName}`;
+  const css = js.replace(/\.js$/, ".css");
+  const chunk = `/assets/${releaseId}/${chunkName}`;
+  const fontCss = `/fonts/${releaseId}/manrope.css`;
+  const fontFile = `/fonts/${releaseId}/manrope-latin-700-normal.woff2`;
+  mkdirSync(path.join(dir, "assets", releaseId), { recursive: true });
+  mkdirSync(path.join(dir, "fonts", releaseId), { recursive: true });
   writeFileSync(
     path.join(dir, "index.html"),
     `<meta name="clover-ui-build" content="${tag}"><meta name="clover-public-locale-routes" content="${localeStamp}"><link rel="modulepreload" href="${chunk}"><link rel="stylesheet" href="${css}"><link rel="preload" href="${fontFile}" as="font"><link rel="stylesheet" href="${fontCss}"><script src="${js}"></script>`
@@ -187,6 +195,10 @@ function writeCompleteUiDist(dir, { tag, jsPath, localeStamp = "disabled" }) {
   );
   writeFileSync(path.join(dir, fontCss.slice(1)), `@font-face{src:url("${fontFile}")}`);
   writeFileSync(path.join(dir, fontFile.slice(1)), "w2");
+  writeFileSync(
+    path.join(dir, "sw.js"),
+    `const CACHE_NAME = "clover-shell-${tag}";\n`
+  );
   writeFileSync(path.join(dir, "sitemap.xml"), "<urlset></urlset>");
 }
 
@@ -250,16 +262,19 @@ fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(path.join(out, 'assets'), { recursive: true });
 fs.mkdirSync(path.join(out, 'fonts'), { recursive: true });
 const tag = process.env.FAKE_BUILD_TAG || 'ui-NEW';
-const js = process.env.FAKE_BUILD_JS || '/assets/index-NEW.js';
+const releaseId = String(tag).replace(/^ui-/, '');
+const jsName = require('path').posix.basename(process.env.FAKE_BUILD_JS || '/assets/index-NEW.js');
+const chunkName = require('path').posix.basename(process.env.FAKE_BUILD_CHUNK || '/assets/vendor-NEW.js');
+const flat = process.env.FAKE_BUILD_FLAT === '1';
+const js = flat ? '/assets/' + jsName : '/assets/' + releaseId + '/' + jsName;
+const css = process.env.FAKE_BUILD_CSS || js.replace(/\\.js$/, '.css');
+const chunk = flat ? '/assets/' + chunkName : '/assets/' + releaseId + '/' + chunkName;
 const omit = new Set(String(process.env.FAKE_BUILD_OMIT || '').split(',').filter(Boolean));
 const forcedLocale = process.env.FAKE_LOCALE_ARTIFACTS || '';
 const localeEnabled = forcedLocale === 'enabled' || (forcedLocale !== 'disabled' && process.env.CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED === '1');
 const localeStamp = localeEnabled ? 'enabled' : 'disabled';
-const stem = js.replace(/\\.js$/, '');
-const css = process.env.FAKE_BUILD_CSS || (stem + '.css');
-const chunk = process.env.FAKE_BUILD_CHUNK || '/assets/vendor-NEW.js';
-const fontCss = '/fonts/manrope.css';
-const fontFile = '/fonts/manrope-latin-700-normal.woff2';
+const fontCss = flat ? '/fonts/manrope.css' : '/fonts/' + releaseId + '/manrope.css';
+const fontFile = flat ? '/fonts/manrope-latin-700-normal.woff2' : '/fonts/' + releaseId + '/manrope-latin-700-normal.woff2';
 let html = '<meta name="clover-ui-build" content="' + tag + '"><meta name="clover-public-locale-routes" content="' + localeStamp + '">';
 html += '<link rel="modulepreload" href="' + chunk + '">';
 html += '<link rel="stylesheet" href="' + css + '">';
@@ -267,10 +282,12 @@ html += '<link rel="preload" href="' + fontFile + '" as="font">';
 html += '<link rel="stylesheet" href="' + fontCss + '">';
 html += '<script src="' + js + '"></script>';
 fs.writeFileSync(path.join(out, 'index.html'), html);
-if (!omit.has('js')) fs.writeFileSync(path.join(out, js.replace(/^\\//, '')), 'export default 1;\\n');
-if (!omit.has('chunk')) fs.writeFileSync(path.join(out, chunk.replace(/^\\//, '')), 'export const vendor = 1;\\n');
-if (!omit.has('css')) fs.writeFileSync(path.join(out, css.replace(/^\\//, '')), 'body{color:#111}@font-face{src:url("' + fontFile + '")}');
+fs.writeFileSync(path.join(out, 'sw.js'), 'const CACHE_NAME = "clover-shell-' + tag + '";\\n');
+if (!omit.has('js')) { fs.mkdirSync(path.dirname(path.join(out, js.replace(/^\\//, ''))), { recursive: true }); fs.writeFileSync(path.join(out, js.replace(/^\\//, '')), 'export default 1;\\n'); }
+if (!omit.has('chunk')) { fs.mkdirSync(path.dirname(path.join(out, chunk.replace(/^\\//, ''))), { recursive: true }); fs.writeFileSync(path.join(out, chunk.replace(/^\\//, '')), 'export const vendor = 1;\\n'); }
+if (!omit.has('css')) { fs.mkdirSync(path.dirname(path.join(out, css.replace(/^\\//, ''))), { recursive: true }); fs.writeFileSync(path.join(out, css.replace(/^\\//, '')), 'body{color:#111}@font-face{src:url("' + fontFile + '")}'); }
 if (!omit.has('font')) {
+  fs.mkdirSync(path.dirname(path.join(out, fontCss.replace(/^\\//, ''))), { recursive: true });
   fs.writeFileSync(path.join(out, fontCss.replace(/^\\//, '')), '@font-face{src:url("' + fontFile + '")}');
   fs.writeFileSync(path.join(out, fontFile.replace(/^\\//, '')), 'w2');
 }
@@ -301,6 +318,10 @@ if (process.env.FAKE_BUILD_FAIL === '1') {
   cpSync(
     path.join(workRoot, "server/scripts/uiAssetProbe.mjs"),
     path.join(live, "server/scripts/uiAssetProbe.mjs")
+  );
+  cpSync(
+    path.join(workRoot, "server/scripts/releaseNamespace.js"),
+    path.join(live, "server/scripts/releaseNamespace.js")
   );
   cpSync(
     path.join(workRoot, "scripts/linux/run-target-deploy.sh"),
@@ -848,7 +869,7 @@ exit 2
   assert.notEqual(res.status, 0, "disabled locale artifacts must fail deploy");
   assert.match(
     `${res.stderr}\n${res.stdout}`,
-    /locale-route|refusing cutover|artifacts rejected/i
+    /locale-route|refusing cutover|artifacts rejected|does not match expected enabled|release namespace mismatch/i
   );
   assert.equal(liveSha(box), before, "source unchanged when locale guard rejects");
   assert.equal(liveTag(box), beforeTag, "dist unchanged when locale guard rejects");
@@ -1018,7 +1039,7 @@ exit 2
   const box = initSandbox("first-deploy-old-misses-gate");
   const liveOld = path.join(box.live, "scripts/linux/restart-api-ui.sh");
   writeFileSync(path.join(box.state, "health"), "fail-js-403\n");
-  const oldRun = runLiveScript(box, liveOld, box.newSha);
+  const oldRun = runLiveScript(box, liveOld, box.newSha, { FAKE_BUILD_FLAT: "1" });
   assert.equal(oldRun.status, 0, `old live script must miss JS 403: ${oldRun.stderr}\n${oldRun.stdout}`);
   assert.match(oldRun.stdout, /Deploy OK/);
   console.log("Y1_OLD_LIVE_SCRIPT_MISSES_ASSET_GATE:PASS");
@@ -1069,6 +1090,25 @@ exit 2
   assert.match(`${launched.stderr}\n${launched.stdout}`, /extract dir must not be inside live ROOT/);
   assert.equal(liveSha(box), box.oldSha, "refused extract must not switch live source");
   console.log("Y4_EXTRACT_NOT_INSIDE_ROOT:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("new-script-flat-build");
+  const before = liveSha(box);
+  const beforeTag = liveTag(box);
+  const res = runDeploy(box, box.newSha, { FAKE_BUILD_FLAT: "1" });
+  assert.notEqual(res.status, 0, "NEW script + flat build must fail before cutover");
+  assert.match(
+    `${res.stderr}\n${res.stdout}`,
+    /release namespace|outside release namespace|check-namespace|missing referenced/i
+  );
+  assert.doesNotMatch(`${res.stdout}\n${res.stderr}`, /Cutover: switching source/);
+  assert.doesNotMatch(res.stdout, /Deploy OK/);
+  assert.equal(liveSha(box), before, "flat build must not switch live source");
+  assert.equal(liveTag(box), beforeTag, "flat build must not replace live dist");
+  assert.equal(readFileSync(path.join(box.state, "restart_count"), "utf8").trim(), "0");
+  console.log("Y5_NEW_SCRIPT_FLAT_BUILD_FAILS_BEFORE_CUTOVER:PASS");
   rmSync(box.root, { recursive: true, force: true });
 }
 

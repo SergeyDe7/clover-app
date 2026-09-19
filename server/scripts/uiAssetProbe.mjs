@@ -7,6 +7,10 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  extractJsReferencedPaths,
+  namespaceFailures,
+} from "./releaseNamespace.js";
 
 export const ASSET_PATH_RE =
   /(?:src|href)\s*=\s*["'](\/(?:assets|fonts)\/[^"'?#]+)(?:[?#][^"']*)?["']/gi;
@@ -37,23 +41,72 @@ export function extractCssFontPaths(css) {
 
 export function collectBuildAssets({ html, distDir, readFile = readFileSync } = {}) {
   const paths = extractReferencedPaths(html);
-  const extra = [];
-  if (distDir) {
-    for (const assetPath of paths) {
-      if (!assetPath.endsWith(".css")) continue;
-      const filePath = distFilePath(distDir, assetPath);
-      if (!existsSync(filePath)) continue;
-      extra.push(...extractCssFontPaths(readFile(filePath, "utf8")));
-    }
-  }
   const seen = new Set(paths);
-  for (const item of extra) {
-    if (!seen.has(item)) {
-      seen.add(item);
-      paths.push(item);
+  const add = (assetPath) => {
+    if (!assetPath || seen.has(assetPath)) return false;
+    seen.add(assetPath);
+    paths.push(assetPath);
+    return true;
+  };
+  if (distDir) {
+    let growing = true;
+    while (growing) {
+      growing = false;
+      for (const assetPath of [...paths]) {
+        if (assetPath.includes("..")) continue;
+        let filePath;
+        try {
+          filePath = assertSafeDistFile(distDir, assetPath);
+        } catch {
+          continue;
+        }
+        if (!existsSync(filePath) || !statSync(filePath).isFile()) continue;
+        if (assetPath.endsWith(".css")) {
+          for (const item of extractCssFontPaths(readFile(filePath, "utf8"))) {
+            if (add(item)) growing = true;
+          }
+        }
+        if (assetPath.endsWith(".js")) {
+          for (const item of extractJsReferencedPaths(readFile(filePath, "utf8"), {
+            fromAssetPath: assetPath,
+          })) {
+            if (add(item)) growing = true;
+          }
+        }
+      }
     }
   }
   return paths;
+}
+
+export function inspectReleaseNamespace({
+  html,
+  distDir,
+  swSource = "",
+  expectedLocaleStamp,
+  env = process.env,
+  readFile = readFileSync,
+} = {}) {
+  const assets = collectBuildAssets({ html, distDir, readFile });
+  const jsRefs = [];
+  if (distDir) {
+    for (const assetPath of assets) {
+      if (!assetPath.endsWith(".js")) continue;
+      const filePath = distFilePath(distDir, assetPath);
+      if (!existsSync(filePath)) continue;
+      jsRefs.push(
+        ...extractJsReferencedPaths(readFile(filePath, "utf8"), { fromAssetPath: assetPath })
+      );
+    }
+  }
+  return namespaceFailures({
+    html,
+    assets,
+    jsRefs,
+    swSource,
+    expectedLocaleStamp,
+    env,
+  });
 }
 
 export function distFilePath(distDir, assetPath) {
@@ -304,7 +357,38 @@ function main(argv = process.argv.slice(2)) {
       console.error("HTML/CSS graph has no stylesheet");
       return 1;
     }
-    console.log(`check-dist: ${assets.length} assets present`);
+    const swPath = path.join(distDir, "sw.js");
+    const swSource = existsSync(swPath) ? readFileSync(swPath, "utf8") : "";
+    const ns = inspectReleaseNamespace({
+      html,
+      distDir,
+      swSource,
+      expectedLocaleStamp: argValue(argv, "--expected-locale-stamp"),
+    });
+    if (!ns.ok) {
+      console.error(`release namespace mismatch:\n${ns.failures.join("\n")}`);
+      return 1;
+    }
+    console.log(`check-dist: ${assets.length} assets present namespace=${ns.releaseId}`);
+    return 0;
+  }
+  if (command === "check-namespace") {
+    const htmlFile = argValue(argv, "--html-file");
+    const distDir = argValue(argv, "--dist");
+    const html = readFileSync(htmlFile, "utf8");
+    const swPath = distDir && path.join(distDir, "sw.js");
+    const swSource = swPath && existsSync(swPath) ? readFileSync(swPath, "utf8") : "";
+    const ns = inspectReleaseNamespace({
+      html,
+      distDir,
+      swSource,
+      expectedLocaleStamp: argValue(argv, "--expected-locale-stamp"),
+    });
+    if (!ns.ok) {
+      console.error(`release namespace mismatch:\n${ns.failures.join("\n")}`);
+      return 1;
+    }
+    console.log(`check-namespace: ${ns.tag} ${ns.releaseId}`);
     return 0;
   }
   if (command === "check-http") {
@@ -356,7 +440,7 @@ function main(argv = process.argv.slice(2)) {
     console.log("check-http: nginx PASS");
     return 0;
   }
-  console.error("usage: uiAssetProbe.mjs extract|check-dist|check-http");
+  console.error("usage: uiAssetProbe.mjs extract|check-dist|check-namespace|check-http");
   return 2;
 }
 

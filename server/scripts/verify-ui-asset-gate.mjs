@@ -22,9 +22,15 @@ import { fileURLToPath } from "node:url";
 import {
   classifyAssetResponse,
   collectBuildAssets,
+  inspectReleaseNamespace,
   missingDistAssets,
   waitForConsecutiveReady,
 } from "./uiAssetProbe.mjs";
+import {
+  assertValidReleaseId,
+  createReleaseId,
+  rewriteFontPublicUrls,
+} from "./releaseNamespace.js";
 import { staticAssetRelativePath } from "../../src/shared/staticAssetGuard.js";
 import { locationHasYearlyImmutableOnErrors } from "./verify-nginx-static-cache.mjs";
 
@@ -45,6 +51,101 @@ const html = `<link rel="modulepreload" href="/assets/vendor-AAA.js">
   assert.ok(assets.includes("/fonts/manrope.css"));
   assert.ok(assets.includes("/fonts/manrope-latin-700-normal.woff2"));
   console.log("EXTRACT_HTML_ASSETS:PASS");
+}
+
+{
+  assert.throws(() => assertValidReleaseId("r403u20260918"), /recovery suffix/);
+  const first = createReleaseId({ env: { CLOVER_UI_RELEASE_ID: "alpha111" } });
+  const second = createReleaseId({ env: { CLOVER_UI_RELEASE_ID: "beta2222" } });
+  assert.equal(first, "alpha111");
+  assert.notEqual(first, second);
+  assert.match(
+    rewriteFontPublicUrls('src:url("/fonts/manrope.css")', "alpha111"),
+    /\/fonts\/alpha111\/manrope\.css/
+  );
+  const goodHtml = `<meta name="clover-ui-build" content="ui-alpha111"><meta name="clover-public-locale-routes" content="disabled"><script src="/assets/alpha111/index-x.js"></script><link href="/assets/alpha111/index-x.css" rel="stylesheet"><link href="/fonts/alpha111/manrope.css" rel="stylesheet">`;
+  const dist = mkdtempSync(path.join(tmpdir(), "clover-ns-ok-"));
+  mkdirSync(path.join(dist, "assets/alpha111"), { recursive: true });
+  mkdirSync(path.join(dist, "fonts/alpha111"), { recursive: true });
+  writeFileSync(path.join(dist, "assets/alpha111/index-x.js"), 'import "./vendor-x.js";\n');
+  writeFileSync(path.join(dist, "assets/alpha111/vendor-x.js"), "export const v=1;\n");
+  writeFileSync(path.join(dist, "assets/alpha111/index-x.css"), "body{color:#111}");
+  writeFileSync(
+    path.join(dist, "fonts/alpha111/manrope.css"),
+    '@font-face{src:url("/fonts/alpha111/manrope.woff2")}'
+  );
+  writeFileSync(path.join(dist, "fonts/alpha111/manrope.woff2"), "w2");
+  writeFileSync(path.join(dist, "sw.js"), 'const CACHE_NAME = "clover-shell-ui-alpha111";\n');
+  const ok = inspectReleaseNamespace({
+    html: goodHtml,
+    distDir: dist,
+    swSource: readFileSync(path.join(dist, "sw.js"), "utf8"),
+    expectedLocaleStamp: "disabled",
+  });
+  assert.equal(ok.ok, true, ok.failures.join("\n"));
+  const poisoned = inspectReleaseNamespace({
+    html: `<meta name="clover-ui-build" content="ui-alpha111"><script src="/assets/index-B2GFFiD2.js"></script><link href="/assets/index-x.css" rel="stylesheet">`,
+    distDir: dist,
+    expectedLocaleStamp: "disabled",
+  });
+  assert.equal(poisoned.ok, false);
+  assert.match(poisoned.failures.join("\n"), /outside release namespace/);
+
+  const sw = readFileSync(path.join(dist, "sw.js"), "utf8");
+  const placeholder = inspectReleaseNamespace({
+    html: goodHtml.replace(
+      'content="disabled"',
+      'content="%CLOVER_PUBLIC_LOCALE_ROUTES%"'
+    ),
+    distDir: dist,
+    swSource: sw,
+    expectedLocaleStamp: "disabled",
+  });
+  assert.equal(placeholder.ok, false);
+  assert.match(placeholder.failures.join("\n"), /build placeholder/);
+
+  const expectEnabledActualDisabled = inspectReleaseNamespace({
+    html: goodHtml,
+    distDir: dist,
+    swSource: sw,
+    expectedLocaleStamp: "enabled",
+  });
+  assert.equal(expectEnabledActualDisabled.ok, false);
+  assert.match(
+    expectEnabledActualDisabled.failures.join("\n"),
+    /does not match expected enabled/
+  );
+
+  const enabledHtml = goodHtml.replace('content="disabled"', 'content="enabled"');
+  const expectDisabledActualEnabled = inspectReleaseNamespace({
+    html: enabledHtml,
+    distDir: dist,
+    swSource: sw,
+    expectedLocaleStamp: "disabled",
+  });
+  assert.equal(expectDisabledActualEnabled.ok, false);
+  assert.match(
+    expectDisabledActualEnabled.failures.join("\n"),
+    /does not match expected disabled/
+  );
+
+  const okEnabled = inspectReleaseNamespace({
+    html: enabledHtml,
+    distDir: dist,
+    swSource: sw,
+    expectedLocaleStamp: "enabled",
+  });
+  assert.equal(okEnabled.ok, true, okEnabled.failures.join("\n"));
+  const okDisabled = inspectReleaseNamespace({
+    html: goodHtml,
+    distDir: dist,
+    swSource: sw,
+    expectedLocaleStamp: "disabled",
+  });
+  assert.equal(okDisabled.ok, true, okDisabled.failures.join("\n"));
+  rmSync(dist, { recursive: true, force: true });
+  console.log("RELEASE_NAMESPACE_GRAPH:PASS");
+  console.log("LOCALE_STAMP_INDEPENDENT_EXPECT:PASS");
 }
 
 {
