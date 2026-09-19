@@ -501,6 +501,7 @@ assert.doesNotMatch(localTest.scripts[0].src, /mc\.yandex/);
 const footer = src("src/screens/storefront/components/StoreFooter.jsx");
 assert.match(footer, /openAnalyticsSettings/);
 assert.match(footer, /storefront\.analytics\.settings/);
+assert.match(footer, /readMetrikaEnvFlag/);
 const banner = src("src/analytics/AnalyticsConsentBanner.jsx");
 assert.match(banner, /data-analytics-action="allow"/);
 assert.match(banner, /storefront\.analytics\.allow/);
@@ -521,6 +522,8 @@ for (const key of [
   "storefront.analytics.revokeNote",
   "storefront.analytics.privacyLink",
   "storefront.analytics.close",
+  "storefront.checkout.orderLegalNote",
+  "storefront.checkout.orderLegalLink",
 ]) {
   assert.match(catalog, new RegExp(`"key": "${key}"`));
   assert.match(seed, new RegExp(`"${key}": \\{`));

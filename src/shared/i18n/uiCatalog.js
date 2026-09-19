@@ -11849,6 +11849,20 @@ const RAW_CATALOG = [
     "critical": true
   },
   {
+    "key": "storefront.checkout.orderLegalLink",
+    "sourceRu": "Согласие на обработку персональных данных",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
+    "key": "storefront.checkout.orderLegalNote",
+    "sourceRu": "Отправляя заказ, вы просите принять и исполнить его. Это не согласие на рекламу и не согласие на аналитику. Подробности —",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": true
+  },
+  {
     "key": "storefront.checkout.paidDeliverySpb",
     "sourceRu": "Доставка по СПб — {fee} (заказ менее {freeFrom})",
     "namespace": "ui",

@@ -5,6 +5,7 @@ import {
   ANALYTICS_CONSENT_GRANTED,
   ANALYTICS_CONSENT_UNSET,
   ANALYTICS_SETTINGS_OPEN_EVENT,
+  readMetrikaEnvFlag,
 } from "./metrikaConfig.js";
 import {
   readAnalyticsConsentRecord,
@@ -95,8 +96,10 @@ export function YandexMetrikaRoot({ active }) {
 
   if (!active) return null;
 
-  const showPrompt = record.status === ANALYTICS_CONSENT_UNSET && !settingsOpen;
-  const showSettings = settingsOpen;
+  const consentUiEnabled = readMetrikaEnvFlag(import.meta.env);
+  const showPrompt =
+    consentUiEnabled && record.status === ANALYTICS_CONSENT_UNSET && !settingsOpen;
+  const showSettings = consentUiEnabled && settingsOpen;
 
   return (
     <>

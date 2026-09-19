@@ -1263,6 +1263,14 @@ html.sf-catalog-lock .sf-main,
 .sf-checkout-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 760px; }
 .sf-field-wide { grid-column: 1 / -1; }
 .sf-checkout-summary, .sf-checkout-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.sf-checkout-legal {
+  flex: 1 1 100%;
+  line-height: 1.45;
+}
+.sf-checkout-legal-link {
+  color: #4f9a52;
+  font-weight: 600;
+}
 .sf-error { color: var(--clover-danger, #a54f4f); font-weight: 600; }
 @keyframes sf-hero-in { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: scale(1); } }
 @keyframes sf-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }

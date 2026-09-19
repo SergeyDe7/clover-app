@@ -820,20 +820,6 @@
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
-    "literal": "Отозвать согласие или уточнить порядок обработки персональных данных можно, обратившись к Оператору по контактам, указанным на сайте.",
-    "count": 1,
-    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
-  },
-  {
-    "path": "src/screens/storefront/pages/infoPageContent.js",
-    "literal": "Пользователь имеет право в любое время запросить уточнение своих данных, их блокирование или удаление, направив соответствующее обращение в адрес Оператора. Использование сайта означает согласие пользователя с условиями настоящей Политики.",
-    "count": 1,
-    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
-  },
-  {
-    "path": "src/screens/storefront/pages/infoPageContent.js",
     "literal": "Самовывоз",
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
@@ -918,13 +904,6 @@
   },
   {
     "path": "src/screens/storefront/pages/infoPages.js",
-    "literal": "Политика обработки и защиты персональных данных пользователей сайта компании КЛЕВЕР.",
-    "count": 1,
-    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
-  },
-  {
-    "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Политика обработки персональных данных",
     "count": 2,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
@@ -934,13 +913,6 @@
     "path": "src/screens/storefront/pages/infoPages.js",
     "literal": "Согласие на обработку персональных данных",
     "count": 2,
-    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
-    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
-  },
-  {
-    "path": "src/screens/storefront/pages/infoPages.js",
-    "literal": "Текст согласия на обработку персональных данных пользователей сайта компании КЛЕВЕР.",
-    "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
     "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   },
@@ -2091,5 +2063,264 @@
     "count": 1,
     "classification": "SAFE_RU_FALLBACK",
     "reason": "codedError SAFE RU fallback. Authority is error.code; UI projects by code via errorDisplayMessage and never branches on this message."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Цели и категории данных",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Для приёма и исполнения заказа, ответа на обращение и исполнения обязанностей, установленных законом, Оператор обрабатывает данные, которые посетитель сам указывает в формах витрины или при регистрации в личном кабинете.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Имя или ФИО контактного лица, название организации.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Телефон, адрес электронной почты, адрес доставки или самовывоза, комментарий к заказу.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Состав заказа, служебные сведения о статусе обращения.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Технические данные, необходимые, чтобы сайт работал: язык интерфейса, содержимое корзины, выбранное согласие на аналитику.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Реклама и аналитика не являются условием заказа. Отдельное согласие на рекламную рассылку в этой редакции не запрашивается и не требуется, чтобы оформить заказ.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Основания обработки",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Заключение и исполнение договора — когда посетитель оформляет заказ или просит связаться по поводу заказа.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Исполнение обязанностей, возложенных на Оператора законодательством.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Отдельное добровольное согласие — только для необязательной аналитики Яндекс Метрики, и только если счётчик включён на сайте.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Как долго хранятся данные",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Служебный журнал действий: пока нужен, чтобы обеспечивать работу сайта и разбирать обращения. Отдельный числовой срок законом для этого журнала не установлен.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Копии рабочей базы на том же сервере в России подчиняются тем же целям, что и соответствующие рабочие записи. Периодическая замена технических архивов не задаёт срок хранения заказа. Отдельное внешнее хранилище копий не подтверждено.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Записи в браузере (корзина, язык, выбор аналитики): на вашем устройстве, пока вы не очистите данные сайта или не измените выбор.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Данные, уже переданные в Яндекс Метрику: выключение счётчика или отзыв согласия прекращают новые отправки в этом браузере и не удаляют ранее отправленные данные. Дальнейшее хранение у ООО «ЯНДЕКС» — по документам сервиса.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Заказы Оператор также ведёт в информационной системе «1С:Управление нашей фирмой». Это программа, которую использует Оператор, а не отдельное юридическое лицо и не самостоятельный получатель данных.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Кто может получать данные",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Работники Оператора, которым сведения нужны, чтобы принять и исполнить заказ.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "ООО «Филанко Санкт-Петербург» (ИНН 7838492138, КПП 783801001) — услуги VPS для сайта и рабочей базы.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Сервис электронной почты — если Оператор направляет служебные уведомления о заказе.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Сервис Telegram — если Оператор включил уведомления менеджеру о заказе.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "ООО «ЯНДЕКС» — сервис «Яндекс Метрика» после отдельного согласия и при включённом счётчике; карты на странице «Контакты», если карта показана.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Сайт и рабочая база размещены на сервере в Российской Федерации. Услуги VPS оказывает ООО «Филанко Санкт-Петербург», ИНН 7838492138, КПП 783801001. Сведения о провайдере и стране подтверждены реквизитами поставщика и владельцем сайта.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Файлы cookie и localStorage",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Сайт использует локальное хранилище браузера, чтобы корзина, язык и выбор согласия на аналитику сохранялись на этом устройстве. Эти записи нужны для работы витрины и сами по себе не включают счётчик аналитики.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Необязательная аналитика — Яндекс Метрика",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Счётчик загружается только после «Разрешить аналитику». Пока счётчик выключен, запрос согласия не показывается. Отказ или отсутствие ответа не блокируют каталог, вход и заказ.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "События витрины: просмотр страницы; order_submitted — только после подтверждённого успеха публичного заказа; contact_phone_click и contact_message_click — нажатие публичного телефона или письма на странице контактов.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Вебвизор выключен. Записи сеанса с экрана не ведутся.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "В аналитические события не включаются ФИО, контакты покупателя, адреса, комментарии, пароли и содержимое форм.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Личный кабинет и чувствительные страницы (вход, восстановление доступа, административные и операционные разделы) из аналитики исключены. Заказы, оформленные в личном кабинете, в Метрику не отправляются.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Права и обращения",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Этот документ относится к данным, которые вы указываете при оформлении заказа на витрине. Он объясняет обработку этих данных, чтобы принять и исполнить заказ. Он не является согласием на рекламу и не является согласием на аналитику.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPageContent.js",
+    "literal": "Оператор: ООО «Клевер», ИНН 7813285010, ОГРН 1177847262669. Юридический адрес: 197110, Санкт-Петербург, ул. Красного Курсанта, дом 25, лит. Ж, пом. 3Н. Сайт: https://clover-spb.ru. Обращения по персональным данным: 9112368277@mail.ru.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPages.js",
+    "literal": "Политика ООО «Клевер»: реквизиты оператора, обработка данных заказа, хранение, cookies и необязательная аналитика.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/pages/infoPages.js",
+    "literal": "Согласие на обработку данных, указанных при заказе. Реклама и аналитика в него не входят.",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
   }
 ]

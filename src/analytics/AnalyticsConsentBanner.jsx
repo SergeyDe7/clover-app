@@ -37,7 +37,9 @@ export function AnalyticsConsentBanner({
           {title}
         </h2>
         <p className="sf-analytics-consent-text">{text}</p>
-        <p className="sf-analytics-consent-note">{t("storefront.analytics.revokeNote")}</p>
+        {settings ? (
+          <p className="sf-analytics-consent-note">{t("storefront.analytics.revokeNote")}</p>
+        ) : null}
         <a
           className="sf-analytics-consent-privacy"
           href={storefrontHref({ name: "info", slug: "privacy-policy" })}

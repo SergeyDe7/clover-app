@@ -13,6 +13,7 @@ import {
 } from "../cartStorage.js";
 import { storefrontApi } from "../publicApi.js";
 import { formatMoney, navigateStorefront } from "../components/StoreHeader.jsx";
+import { storefrontHref } from "../mode.js";
 import { trackOrderSubmitted } from "../../../analytics/metrikaBrowser.js";
 
 const EMPTY = {
@@ -188,6 +189,20 @@ export function CheckoutPage() {
           <p className="sf-muted">{
             t("storefront.theOrderGoesToTheManager")
           }</p>
+          <p className="sf-muted sf-checkout-legal">
+            {t("storefront.checkout.orderLegalNote")}{" "}
+            <a
+              className="sf-checkout-legal-link"
+              href={storefrontHref({ name: "info", slug: "personal-data-consent" })}
+              onClick={(event) => {
+                event.preventDefault();
+                navigateStorefront({ name: "info", slug: "personal-data-consent" });
+              }}
+            >
+              {t("storefront.checkout.orderLegalLink")}
+            </a>
+            .
+          </p>
         </div>
         {error ? <p className="sf-error sf-field-wide">{error}</p> : null}
         <div className="sf-checkout-actions sf-field-wide">

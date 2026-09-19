@@ -105,6 +105,7 @@ const CHECK_FILES = [
   "scripts/verify-seo-locale-html-preview.mjs",
   "scripts/verify-yandex-metrika-safe-init.mjs",
   "scripts/verify-yandex-metrika-url-sanitizer.mjs",
+  "scripts/verify-legal-metrika-policy.mjs",
   "scripts/verify-ui-build-tag.mjs",
   "scripts/verify-nginx-static-cache.mjs",
   "scripts/uiAssetProbe.mjs",

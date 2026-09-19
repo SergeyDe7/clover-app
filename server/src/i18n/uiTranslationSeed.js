@@ -13545,6 +13545,22 @@ export const SEEDS = {
     "zh-CN": "运费 {fee}。距免运费还差 {needMore}。",
     "ar": "التوصيل {fee}. يتبقى {needMore} للتوصيل المجاني."
   },
+  "storefront.checkout.orderLegalLink": {
+    "en": "Consent to personal data processing",
+    "uz": "Shaxsiy ma’lumotlarni qayta ishlashga rozilik",
+    "ky": "Жеке маалыматтарды иштетүүгө макулдук",
+    "tg": "Розигӣ ба коркарди маълумоти шахсӣ",
+    "zh-CN": "个人数据处理同意书",
+    "ar": "الموافقة على معالجة البيانات الشخصية"
+  },
+  "storefront.checkout.orderLegalNote": {
+    "en": "By sending the order you ask us to accept and fulfil it. This is not consent to advertising and not consent to analytics. Details:",
+    "uz": "Buyurtma yuborib, uni qabul qilish va bajarishni so‘raysiz. Bu reklamaga rozilik emas va analitikaga rozilik emas. Tafsilotlar —",
+    "ky": "Заказ жөнөтүп, аны кабыл алууну жана аткарууну суранасыз. Бул жарнамага макулдук эмес жана аналитикага макулдук эмес. Толук маалымат —",
+    "tg": "Бо фиристодани фармоиш қабул ва иҷрои онро мехоҳед. Ин розигӣ ба реклама ва розигӣ ба таҳлил нест. Тафсил —",
+    "zh-CN": "提交订单即请求受理并履行。这不是广告同意，也不是分析同意。详情：",
+    "ar": "بإرسال الطلب تطلب قبوله وتنفيذه. هذه ليست موافقة على الإعلان وليست موافقة على التحليلات. التفاصيل —"
+  },
   "storefront.checkout.paidDeliverySpb": {
     "en": "St. Petersburg delivery — {fee} (order below {freeFrom})",
     "uz": "Sankt-Peterburg yetkazib berish — {fee} (buyurtma {freeFrom} dan kam)",
