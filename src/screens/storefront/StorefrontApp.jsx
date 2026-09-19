@@ -10,6 +10,7 @@ import {
   storefrontRouteDocumentMeta,
 } from "./seo.js";
 import { isIndexablePublicSearch } from "../../shared/i18n/publicLocaleRouting.js";
+import { trackStorefrontPageview } from "../../analytics/metrikaBrowser.js";
 import "./storefront.css";
 
 const CatalogPage = lazy(() =>
@@ -113,15 +114,16 @@ export default function StorefrontApp({ localization }) {
   }, [contentLocale]);
 
   useEffect(() => {
-    if (route.name === "product") return;
-    if (!site && contentLocale !== "ru") return;
-    applyStorefrontDocumentMeta(
-      storefrontRouteDocumentMeta(route, site, {
-        locale: contentLocale,
-        enabledLanguages,
-        indexable: isIndexablePublicSearch(window.location.search),
-      })
-    );
+    if (route.name !== "product" && (site || contentLocale === "ru")) {
+      applyStorefrontDocumentMeta(
+        storefrontRouteDocumentMeta(route, site, {
+          locale: contentLocale,
+          enabledLanguages,
+          indexable: isIndexablePublicSearch(window.location.search),
+        })
+      );
+    }
+    trackStorefrontPageview();
   }, [enabledLanguages, route, contentLocale, site]);
 
   let page;

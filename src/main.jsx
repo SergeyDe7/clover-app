@@ -7,6 +7,7 @@ import {
   LocalizationProvider,
   useLocalization,
 } from "./shared/i18n/LocalizationProvider.jsx";
+import { YandexMetrikaRoot } from "./analytics/YandexMetrikaRoot.jsx";
 import { shouldRenderStorefront } from "./screens/storefront/mode.js";
 
 // Витрина и ЛК — разные чанки: на витрине не тянем админку/клиентский кабинет.
@@ -28,6 +29,7 @@ function RootShell() {
       <Suspense fallback={null}>
         {storefront ? <StorefrontApp localization={localization} /> : <App />}
       </Suspense>
+      <YandexMetrikaRoot active={storefront} />
     </>
   );
 }

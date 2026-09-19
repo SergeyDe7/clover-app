@@ -509,6 +509,83 @@ const RAW_CATALOG = [
     "critical": false
   },
   {
+    "key": "storefront.analytics.bannerTitle",
+    "sourceRu": "Необязательная аналитика",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": false
+  },
+  {
+    "key": "storefront.analytics.bannerText",
+    "sourceRu": "Мы используем Яндекс Метрику, чтобы понимать, какие страницы открывают посетители и какие действия совершают на витрине. Это необязательно: каталог, вход и заказ работают без согласия. Отсутствие ответа не считается согласием.",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": false
+  },
+  {
+    "key": "storefront.analytics.allow",
+    "sourceRu": "Разрешить аналитику",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": false
+  },
+  {
+    "key": "storefront.analytics.deny",
+    "sourceRu": "Отклонить",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": false
+  },
+  {
+    "key": "storefront.analytics.settings",
+    "sourceRu": "Настройки аналитики",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": false
+  },
+  {
+    "key": "storefront.analytics.settingsTitle",
+    "sourceRu": "Настройки аналитики",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": false
+  },
+  {
+    "key": "storefront.analytics.settingsText",
+    "sourceRu": "Можно изменить или отозвать согласие на необязательную аналитику Яндекс Метрики. Отзыв останавливает дальнейший сбор на этом устройстве.",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": false
+  },
+  {
+    "key": "storefront.analytics.revoke",
+    "sourceRu": "Отозвать согласие",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": false
+  },
+  {
+    "key": "storefront.analytics.revokeNote",
+    "sourceRu": "Отзыв не удаляет данные, которые уже могли быть отправлены.",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": false
+  },
+  {
+    "key": "storefront.analytics.privacyLink",
+    "sourceRu": "Политика обработки персональных данных",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": false
+  },
+  {
+    "key": "storefront.analytics.close",
+    "sourceRu": "Закрыть",
+    "namespace": "ui",
+    "surface": "storefront",
+    "critical": false
+  },
+  {
     "key": "storefront.back",
     "sourceRu": "Назад",
     "namespace": "ui",
