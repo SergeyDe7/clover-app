@@ -108,6 +108,7 @@ const CHECK_FILES = [
   "scripts/uiAssetProbe.mjs",
   "scripts/verify-ui-asset-gate.mjs",
   "scripts/releaseNamespace.js",
+  "scripts/preparedDist.mjs",
   "scripts/verify-release-namespace.mjs",
   "scripts/verify-safe-production-deploy.mjs",
   "scripts/verify-security-stage3-package1.mjs",

@@ -40,7 +40,7 @@ HTML/API 200 и внутренний asset probe **не** заменяют вн�
 
 Live source до cutover остаётся на предыдущем SHA. Новый gate живёт только в доставляемом commit. Запускать **не** live `scripts/linux/restart-api-ui.sh`: у него нет `check_http_assets`.
 
-Зависимости launcher (`run-target-deploy.sh`): `bash`, `git`, `mkdir`, `chmod`. `ROOT` берётся только из `CLOVER_DEPLOY_ROOT` (не из пути файла). Извлечение — в `CLOVER_DEPLOY_STAGING/delivered-deploy-<sha>`, не внутри live ROOT. Дальше extracted `restart-api-ui.sh` требует `node`, `npm`, `curl`, `flock`, systemd.
+Зависимости launcher (`run-target-deploy.sh`): `bash`, `git`, `mkdir`, `chmod`. Режим `promote` принимает явный `<sha>` (не читает SHA из manifest через grep/`JSON.parse`), извлекает helpers из этого SHA, затем сверяет manifest доверенным `inspect-sha`. `ROOT` берётся только из `CLOVER_DEPLOY_ROOT` (не из пути файла). Извлечение — в `CLOVER_DEPLOY_STAGING/delivered-deploy-<sha>`, не внутри live ROOT. Дальше extracted `restart-api-ui.sh` требует `node`, `npm`, `curl`, `flock`, systemd.
 
 Точные команды (SHA уже в object DB live repo; `git fetch`, без `reset`, без переключения live source):
 
@@ -56,7 +56,21 @@ CLOVER_DEPLOY_ROOT="${ROOT}" CLOVER_DEPLOY_STAGING="${STAGING}" \
   bash "${EXTRACT}/run-target-deploy.sh" "${SHA}"
 ```
 
-Launcher сам извлечёт `restart-api-ui.sh` и `uiAssetProbe.mjs` из того же SHA и exec их. Cutover и rollback идут уже новым скриптом: оба вызывают `wait_for_health` → `check_http_assets` (origin и nginx раздельно). TLS verification не отключается; при необходимости только `CLOVER_DEPLOY_TLS_CA` (тестовый/служебный CA), не production credentials.
+Launcher сам извлечёт `restart-api-ui.sh`, `uiAssetProbe.mjs`, `releaseNamespace.js` и `preparedDist.mjs` из того же SHA и exec их. Cutover и rollback идут уже новым скриптом: оба вызывают `wait_for_health` → `check_http_assets` (origin и nginx раздельно). TLS verification не отключается; при необходимости только `CLOVER_DEPLOY_TLS_CA` (тестовый/служебный CA), не production credentials.
+
+Проверить готовый dist и поставить его без пересборки (нет скрытого build-skip):
+
+```bash
+CLOVER_DEPLOY_ROOT="${ROOT}" CLOVER_DEPLOY_STAGING="${STAGING}" \
+  bash "${EXTRACT}/run-target-deploy.sh" prepare "${SHA}"
+# печатает PREPARED_OK / PREPARED_MANIFEST / PREPARED_RELEASE_ID
+# live SHA/dist/services не меняются. Передать ЛЕВОМУ окну путь PREPARED_MANIFEST.
+
+CLOVER_DEPLOY_ROOT="${ROOT}" CLOVER_DEPLOY_STAGING="${STAGING}" \
+  bash "${EXTRACT}/run-target-deploy.sh" promote "${STAGING}/prepared-${SHA}" "${SHA}"
+```
+
+`promote` не вызывает `npm build` и не создаёт новый releaseId. Произвольный manifest не является разрешением на установку: путь обязан быть в trusted staging, дерево сверяется с SHA-256.
 
 Недостаточно фразы «проверки заработают со следующего деплоя»: первый выкат этого SHA должен идти через команды выше.
 
