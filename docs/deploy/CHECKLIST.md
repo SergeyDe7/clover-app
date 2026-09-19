@@ -43,6 +43,17 @@
 4. Повторный заказ (регресс).
 5. Зафиксировать номера документов в журнале.
 
+## E2. Browser smoke после каждого Linux deploy/rollback
+
+Внутренний `curl` health и asset probe недостаточны. С телефона и с компьютера (не через hairpin сервера) открыть:
+
+1. `https://clover-spb.ru/`
+2. `https://clover-spb.ru/lk`
+3. `https://clover-spb.ru/contacts`
+4. `https://clover-spb.ru/cart`
+
+JS/CSS/fonts в Network должны быть 200 с правильным MIME, не `text/html`. Первый выкат SHA с новым asset gate — через извлечённый `run-target-deploy.sh`, не live `restart-api-ui.sh`. Подробности: [INCIDENT-2026-09-18-UI-403-RECOVERY-V3.md](../technical/INCIDENT-2026-09-18-UI-403-RECOVERY-V3.md).
+
 ## F. Ещё НЕ делать без «да»
 
 - Домен / SSL / публикация в интернет — см. черновик [STAGE2_DOMAIN_HTTPS_PUSH.md](./STAGE2_DOMAIN_HTTPS_PUSH.md).

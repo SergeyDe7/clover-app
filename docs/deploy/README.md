@@ -13,6 +13,7 @@
 | [PUSH_ENABLE.md](./PUSH_ENABLE.md) | VAPID и подписка устройств |
 | [DOMAIN_RECOMMENDATION.md](./DOMAIN_RECOMMENDATION.md) | Выбор домена |
 | [ROLLBACK.md](./ROLLBACK.md) | Откат |
+| [INCIDENT-2026-09-18-UI-403-RECOVERY-V3.md](../technical/INCIDENT-2026-09-18-UI-403-RECOVERY-V3.md) | UI 403 / Recovery V3: nginx proxy и обязательный browser smoke |
 
 Скрипты:
 
