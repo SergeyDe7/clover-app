@@ -127,11 +127,15 @@ nginx_resolve_spec() {
 
 check_dist_assets() {
   local dist_dir="$1"
+  local expected="${2:-${EXPECT_LOCALE:-}}"
   [[ -n "${PROBE_JS}" ]] || return 1
   [[ -f "${dist_dir}/index.html" ]] || return 1
+  [[ -n "${expected}" ]] || return 1
   node "${PROBE_JS}" check-dist --html-file "${dist_dir}/index.html" --dist "${dist_dir}" \
+    --expected-locale-stamp "${expected}" \
     || return 1
-  node "${PROBE_JS}" check-namespace --html-file "${dist_dir}/index.html" --dist "${dist_dir}"
+  node "${PROBE_JS}" check-namespace --html-file "${dist_dir}/index.html" --dist "${dist_dir}" \
+    --expected-locale-stamp "${expected}"
 }
 
 check_http_assets() {

@@ -101,6 +101,11 @@ assert.match(scriptSrc, /uiAssetProbe\.mjs/, "deploy must copy/run the asset pro
 assert.match(scriptSrc, /READY_CONSECUTIVE:-\s*2\b/, "two consecutive ready passes required");
 assert.match(scriptSrc, /check_http_assets/, "HTML/API 200 is not enough without asset HTTP");
 assert.match(scriptSrc, /check-namespace/, "staged dist must prove release namespace consistency");
+assert.match(
+  scriptSrc,
+  /--expected-locale-stamp/,
+  "namespace check must receive locale stamp from deploy config, not from HTML"
+);
 assert.equal(
   /nginx\s+-s\s+reload|systemctl\s+reload\s+nginx/i.test(scriptSrc),
   false,
@@ -864,7 +869,7 @@ exit 2
   assert.notEqual(res.status, 0, "disabled locale artifacts must fail deploy");
   assert.match(
     `${res.stderr}\n${res.stdout}`,
-    /locale-route|refusing cutover|artifacts rejected/i
+    /locale-route|refusing cutover|artifacts rejected|does not match expected enabled|release namespace mismatch/i
   );
   assert.equal(liveSha(box), before, "source unchanged when locale guard rejects");
   assert.equal(liveTag(box), beforeTag, "dist unchanged when locale guard rejects");
@@ -1085,6 +1090,25 @@ exit 2
   assert.match(`${launched.stderr}\n${launched.stdout}`, /extract dir must not be inside live ROOT/);
   assert.equal(liveSha(box), box.oldSha, "refused extract must not switch live source");
   console.log("Y4_EXTRACT_NOT_INSIDE_ROOT:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("new-script-flat-build");
+  const before = liveSha(box);
+  const beforeTag = liveTag(box);
+  const res = runDeploy(box, box.newSha, { FAKE_BUILD_FLAT: "1" });
+  assert.notEqual(res.status, 0, "NEW script + flat build must fail before cutover");
+  assert.match(
+    `${res.stderr}\n${res.stdout}`,
+    /release namespace|outside release namespace|check-namespace|missing referenced/i
+  );
+  assert.doesNotMatch(`${res.stdout}\n${res.stderr}`, /Cutover: switching source/);
+  assert.doesNotMatch(res.stdout, /Deploy OK/);
+  assert.equal(liveSha(box), before, "flat build must not switch live source");
+  assert.equal(liveTag(box), beforeTag, "flat build must not replace live dist");
+  assert.equal(readFileSync(path.join(box.state, "restart_count"), "utf8").trim(), "0");
+  console.log("Y5_NEW_SCRIPT_FLAT_BUILD_FAILS_BEFORE_CUTOVER:PASS");
   rmSync(box.root, { recursive: true, force: true });
 }
 

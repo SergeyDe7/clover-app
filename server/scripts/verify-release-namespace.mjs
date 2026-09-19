@@ -76,7 +76,12 @@ function buildIsolated(releaseId, outDir) {
   assert.equal(result.status, 0, `vite build ${releaseId} failed:\n${result.stderr}\n${result.stdout}`);
   const html = readFileSync(path.join(outDir, "index.html"), "utf8");
   const sw = readFileSync(path.join(outDir, "sw.js"), "utf8");
-  const ns = inspectReleaseNamespace({ html, distDir: outDir, swSource: sw });
+  const ns = inspectReleaseNamespace({
+    html,
+    distDir: outDir,
+    swSource: sw,
+    expectedLocaleStamp: "disabled",
+  });
   assert.equal(ns.ok, true, ns.failures.join("\n"));
   assert.equal(ns.releaseId, releaseId);
   assert.equal(extractBuildTag(html), `ui-${releaseId}`);
@@ -96,6 +101,8 @@ const beta = buildIsolated("beta2222", betaDir);
     assert.equal(alphaSet.has(assetPath), false, `URL reused across releases: ${assetPath}`);
   }
   assert.doesNotMatch(beta.html, /index-B2GFFiD2|r403u/);
+  // C2 Low (documented, not fixed): Vite still leaves public /fonts/* in dist
+  // beside fonts/<releaseId>/. New HTML does not reference those leftovers.
   console.log("ISOLATED_BUILDS_DISJOINT_URLS:PASS");
 }
 

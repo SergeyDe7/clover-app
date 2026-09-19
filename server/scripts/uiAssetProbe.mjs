@@ -83,6 +83,8 @@ export function inspectReleaseNamespace({
   html,
   distDir,
   swSource = "",
+  expectedLocaleStamp,
+  env = process.env,
   readFile = readFileSync,
 } = {}) {
   const assets = collectBuildAssets({ html, distDir, readFile });
@@ -97,15 +99,13 @@ export function inspectReleaseNamespace({
       );
     }
   }
-  const localeMatch = String(html || "").match(
-    /name=["']clover-public-locale-routes["'][^>]*content=["']([^"']+)["']/i
-  );
   return namespaceFailures({
     html,
     assets,
     jsRefs,
     swSource,
-    localeStamp: localeMatch?.[1] || "",
+    expectedLocaleStamp,
+    env,
   });
 }
 
@@ -359,7 +359,12 @@ function main(argv = process.argv.slice(2)) {
     }
     const swPath = path.join(distDir, "sw.js");
     const swSource = existsSync(swPath) ? readFileSync(swPath, "utf8") : "";
-    const ns = inspectReleaseNamespace({ html, distDir, swSource });
+    const ns = inspectReleaseNamespace({
+      html,
+      distDir,
+      swSource,
+      expectedLocaleStamp: argValue(argv, "--expected-locale-stamp"),
+    });
     if (!ns.ok) {
       console.error(`release namespace mismatch:\n${ns.failures.join("\n")}`);
       return 1;
@@ -373,7 +378,12 @@ function main(argv = process.argv.slice(2)) {
     const html = readFileSync(htmlFile, "utf8");
     const swPath = distDir && path.join(distDir, "sw.js");
     const swSource = swPath && existsSync(swPath) ? readFileSync(swPath, "utf8") : "";
-    const ns = inspectReleaseNamespace({ html, distDir, swSource });
+    const ns = inspectReleaseNamespace({
+      html,
+      distDir,
+      swSource,
+      expectedLocaleStamp: argValue(argv, "--expected-locale-stamp"),
+    });
     if (!ns.ok) {
       console.error(`release namespace mismatch:\n${ns.failures.join("\n")}`);
       return 1;

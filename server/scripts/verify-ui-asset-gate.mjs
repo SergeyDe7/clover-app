@@ -80,16 +80,72 @@ const html = `<link rel="modulepreload" href="/assets/vendor-AAA.js">
     html: goodHtml,
     distDir: dist,
     swSource: readFileSync(path.join(dist, "sw.js"), "utf8"),
+    expectedLocaleStamp: "disabled",
   });
   assert.equal(ok.ok, true, ok.failures.join("\n"));
   const poisoned = inspectReleaseNamespace({
     html: `<meta name="clover-ui-build" content="ui-alpha111"><script src="/assets/index-B2GFFiD2.js"></script><link href="/assets/index-x.css" rel="stylesheet">`,
     distDir: dist,
+    expectedLocaleStamp: "disabled",
   });
   assert.equal(poisoned.ok, false);
   assert.match(poisoned.failures.join("\n"), /outside release namespace/);
+
+  const sw = readFileSync(path.join(dist, "sw.js"), "utf8");
+  const placeholder = inspectReleaseNamespace({
+    html: goodHtml.replace(
+      'content="disabled"',
+      'content="%CLOVER_PUBLIC_LOCALE_ROUTES%"'
+    ),
+    distDir: dist,
+    swSource: sw,
+    expectedLocaleStamp: "disabled",
+  });
+  assert.equal(placeholder.ok, false);
+  assert.match(placeholder.failures.join("\n"), /build placeholder/);
+
+  const expectEnabledActualDisabled = inspectReleaseNamespace({
+    html: goodHtml,
+    distDir: dist,
+    swSource: sw,
+    expectedLocaleStamp: "enabled",
+  });
+  assert.equal(expectEnabledActualDisabled.ok, false);
+  assert.match(
+    expectEnabledActualDisabled.failures.join("\n"),
+    /does not match expected enabled/
+  );
+
+  const enabledHtml = goodHtml.replace('content="disabled"', 'content="enabled"');
+  const expectDisabledActualEnabled = inspectReleaseNamespace({
+    html: enabledHtml,
+    distDir: dist,
+    swSource: sw,
+    expectedLocaleStamp: "disabled",
+  });
+  assert.equal(expectDisabledActualEnabled.ok, false);
+  assert.match(
+    expectDisabledActualEnabled.failures.join("\n"),
+    /does not match expected disabled/
+  );
+
+  const okEnabled = inspectReleaseNamespace({
+    html: enabledHtml,
+    distDir: dist,
+    swSource: sw,
+    expectedLocaleStamp: "enabled",
+  });
+  assert.equal(okEnabled.ok, true, okEnabled.failures.join("\n"));
+  const okDisabled = inspectReleaseNamespace({
+    html: goodHtml,
+    distDir: dist,
+    swSource: sw,
+    expectedLocaleStamp: "disabled",
+  });
+  assert.equal(okDisabled.ok, true, okDisabled.failures.join("\n"));
   rmSync(dist, { recursive: true, force: true });
   console.log("RELEASE_NAMESPACE_GRAPH:PASS");
+  console.log("LOCALE_STAMP_INDEPENDENT_EXPECT:PASS");
 }
 
 {

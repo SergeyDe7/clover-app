@@ -4,6 +4,8 @@ export const RELEASE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{2,31}$/;
 export const FORBIDDEN_RELEASE_MARK = /r403u/i;
 export const BUILD_TAG_RE = /^ui-([A-Za-z0-9][A-Za-z0-9_-]{2,31})$/;
 export const NAMESPACED_ASSET_RE = /^\/(assets|fonts)\/([^/]+)\/[^/]+/;
+export const PUBLIC_LOCALE_ROUTES_PLACEHOLDER = "%CLOVER_PUBLIC_LOCALE_ROUTES%";
+export const PUBLIC_LOCALE_STAMPS = Object.freeze(["enabled", "disabled"]);
 
 const JS_ABS_ASSET_RE =
   /["'`](\/(?:assets|fonts)\/[^"'`?#]+)(?:[?#][^"'`]*)?["'`]/g;
@@ -50,6 +52,34 @@ export function extractBuildTag(html) {
     /<meta\s+[^>]*name=["']clover-ui-build["'][^>]*content=["']([^"']+)["'][^>]*>/i
   );
   return match ? match[1].trim() : "";
+}
+
+/** Independent of HTML: same contract as isPublicLocaleRoutesEnabledFromEnv (`1` → enabled). */
+export function expectedLocaleStampFromEnv(env = process.env) {
+  return String(env?.CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED || "").trim() === "1"
+    ? "enabled"
+    : "disabled";
+}
+
+export function resolveExpectedLocaleStamp(expectedLocaleStamp, env = process.env) {
+  const explicit = String(expectedLocaleStamp || "").trim();
+  if (PUBLIC_LOCALE_STAMPS.includes(explicit)) return explicit;
+  return expectedLocaleStampFromEnv(env);
+}
+
+export function extractLocaleStamp(html) {
+  const source = String(html || "");
+  const named = source.match(
+    /<meta\s+[^>]*name=["']clover-public-locale-routes["'][^>]*>/i
+  );
+  if (named) {
+    const content = named[0].match(/content=["']([^"']*)["']/i);
+    if (content) return content[1].trim();
+  }
+  const reversed = source.match(
+    /<meta\s+[^>]*content=["']([^"']*)["'][^>]*name=["']clover-public-locale-routes["'][^>]*>/i
+  );
+  return reversed ? reversed[1].trim() : "";
 }
 
 export function pathReleaseId(assetPath) {
@@ -113,7 +143,8 @@ export function namespaceFailures({
   assets,
   jsRefs = [],
   swSource = "",
-  localeStamp = "",
+  expectedLocaleStamp,
+  env = process.env,
 }) {
   const failures = [];
   const tag = extractBuildTag(html);
@@ -155,8 +186,20 @@ export function namespaceFailures({
       failures.push("sw.js must not contain the temporary recovery suffix");
     }
   }
-  if (localeStamp && !new RegExp(`content="${localeStamp}"`).test(String(html))) {
-    failures.push(`locale HTML stamp ${localeStamp} missing from index.html`);
+  const htmlSource = String(html || "");
+  if (htmlSource.includes(PUBLIC_LOCALE_ROUTES_PLACEHOLDER)) {
+    failures.push("locale HTML stamp is still the build placeholder");
+  }
+  const expected = resolveExpectedLocaleStamp(expectedLocaleStamp, env);
+  const actual = extractLocaleStamp(htmlSource);
+  if (actual === PUBLIC_LOCALE_ROUTES_PLACEHOLDER) {
+    if (!failures.some((item) => item.includes("build placeholder"))) {
+      failures.push("locale HTML stamp is still the build placeholder");
+    }
+  } else if (actual !== expected) {
+    failures.push(
+      `locale HTML stamp ${actual || "(missing)"} does not match expected ${expected}`
+    );
   }
   return { ok: failures.length === 0, releaseId, tag, failures };
 }
