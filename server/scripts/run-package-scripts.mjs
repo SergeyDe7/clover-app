@@ -103,6 +103,8 @@ const CHECK_FILES = [
   "scripts/verify-seo-portable-launcher.mjs",
   "scripts/verify-seo-build-readonly.mjs",
   "scripts/verify-seo-locale-html-preview.mjs",
+  "scripts/verify-yandex-metrika-safe-init.mjs",
+  "scripts/verify-yandex-metrika-url-sanitizer.mjs",
   "scripts/verify-ui-build-tag.mjs",
   "scripts/verify-nginx-static-cache.mjs",
   "scripts/uiAssetProbe.mjs",

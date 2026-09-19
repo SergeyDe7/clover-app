@@ -13,6 +13,7 @@ import {
 } from "../cartStorage.js";
 import { storefrontApi } from "../publicApi.js";
 import { formatMoney, navigateStorefront } from "../components/StoreHeader.jsx";
+import { trackOrderSubmitted } from "../../../analytics/metrikaBrowser.js";
 
 const EMPTY = {
   contactName: "",
@@ -85,8 +86,10 @@ export function CheckoutPage() {
           qty: item.qty,
         })),
       });
+      const order = result.order || result;
       clearCart();
-      setDone(result.order || result);
+      setDone(order);
+      trackOrderSubmitted(order?.number || order?.id || "ok");
     } catch (err) {
       setError(errorDisplayMessage(err, t, "storefront.error.checkoutFailed"));
     } finally {
