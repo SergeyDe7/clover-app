@@ -233,6 +233,12 @@ import {
   executeResendVerification,
 } from "./authIssuance.js";
 import {
+  consumePublicRateLimit,
+  enforcePublicRateLimit,
+  resetPublicRateLimit,
+  resolveAnonymousRateLimitClient,
+} from "./publicRateLimit.js";
+import {
   autoLinkCloverClients,
   buildOneCClientCandidates,
   buildOneCClientsSummary,
@@ -271,6 +277,7 @@ import {
 } from "./storefrontCounterparty.js";
 import {
   createStorefrontOrder,
+  storefrontOrderSchema,
   getPublicCatalog,
   getPublicProductByCode,
   getPublicSite,
@@ -678,8 +685,6 @@ app.use(jsonBodyByRoute);
 app.use(credentialNoStoreMiddleware);
 app.use("/uploads/reconciliation", (req, res) => res.status(404).end());
 app.use("/uploads", express.static(uploadsDirectory, { maxAge: "1h" }));
-
-const loginAttempts = new Map();
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -1144,43 +1149,18 @@ function rejectUnlessStaffFeature(req, res, featureId) {
   return true;
 }
 
-const LOGIN_LIMIT_WINDOW_MS = 10 * 60 * 1000;
-const LOGIN_LIMIT_MAX = 20;
-
-function checkLoginLimit(email) {
-  const key = normalizeEmail(email);
-  const current = loginAttempts.get(key);
-  const now = Date.now();
-
-  if (!current || now - current.startedAt > LOGIN_LIMIT_WINDOW_MS) {
-    loginAttempts.set(key, {
-      count: 1,
-      startedAt: now,
-    });
-    return true;
-  }
-
-  current.count += 1;
-
-  return current.count <= LOGIN_LIMIT_MAX;
-}
-
-function loginLimitRetryAfterSeconds(email) {
-  const current = loginAttempts.get(normalizeEmail(email));
-  if (!current?.startedAt) return 0;
-  const remainingMs = LOGIN_LIMIT_WINDOW_MS - (Date.now() - current.startedAt);
-  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return 0;
-  return Math.ceil(remainingMs / 1000);
-}
-
 function clearLoginLimit(email) {
   const key = normalizeEmail(email);
   if (!key) return;
-  loginAttempts.delete(key);
+  resetPublicRateLimit({
+    scope: "login",
+    subject: key,
+    secret: jwtSecret,
+  });
 }
 
-function sendAuthRateLimited(res, email) {
-  const retryAfter = loginLimitRetryAfterSeconds(email);
+function sendAuthRateLimited(res, decision) {
+  const retryAfter = Number(decision?.retryAfterSeconds) || 0;
   setNoStore(res);
   if (retryAfter > 0) {
     res.setHeader("Retry-After", String(retryAfter));
@@ -1189,6 +1169,26 @@ function sendAuthRateLimited(res, email) {
     error: "Слишком много попыток. Попробуйте позже.",
     code: "AUTH_RATE_LIMITED",
   });
+}
+
+function rejectPublicRateLimit(res, scope, subject) {
+  return enforcePublicRateLimit(res, {
+    scope,
+    subject,
+    secret: jwtSecret,
+  });
+}
+
+function rejectDiscoverablePasskeyOptionsLimit(req, res) {
+  const client = resolveAnonymousRateLimitClient({
+    cookieHeader: req.headers.cookie,
+    secret: jwtSecret,
+    secure: req.secure === true || req.protocol === "https",
+  });
+  if (client.cookie) {
+    res.setHeader("Set-Cookie", client.cookie);
+  }
+  return rejectPublicRateLimit(res, "passkeyAuthOptions", `anon:${client.id}`);
 }
 
 
@@ -2301,7 +2301,9 @@ app.get("/api/public/catalog/:code", (req, res) => {
 /** Гостевой заказ с витрины — только сайтовые цены. */
 app.post("/api/public/orders", async (req, res) => {
   try {
-    const order = createStorefrontOrder(req.body, {
+    const parsedGuestOrder = storefrontOrderSchema.parse(req.body);
+    if (rejectPublicRateLimit(res, "guestOrder", parsedGuestOrder.phone)) return;
+    const order = createStorefrontOrder(parsedGuestOrder, {
       notify: (created) => {
         queueManagerNotification({
           type: "order_new",
@@ -2352,6 +2354,7 @@ function liveAuthIssuanceDeps() {
 app.post("/api/auth/register", async (req, res, next) => {
   try {
     const input = registerSchema.parse(req.body);
+    if (rejectPublicRateLimit(res, "register", input.email)) return;
     const result = await executeClientRegistration(
       {
         email: normalizeEmail(input.email),
@@ -2373,6 +2376,7 @@ app.post("/api/auth/register", async (req, res, next) => {
 app.post("/api/auth/verify-email", (req, res, next) => {
   try {
     const input = tokenSchema.parse(req.body);
+    if (rejectPublicRateLimit(res, "verifyEmail", input.token)) return;
     const token = consumeAuthToken({ type: "verify_email", tokenHash: tokenHash(input.token) });
     if (!token) {
       return res.status(400).json({ error: "Ссылка подтверждения недействительна или уже использована." });
@@ -2400,6 +2404,7 @@ app.post("/api/auth/verify-email", (req, res, next) => {
 app.post("/api/auth/resend-verification", async (req, res, next) => {
   try {
     const input = forgotPasswordSchema.parse(req.body);
+    if (rejectPublicRateLimit(res, "resendVerification", input.email)) return;
     const result = await executeResendVerification(
       { email: normalizeEmail(input.email), req },
       liveAuthIssuanceDeps()
@@ -2414,6 +2419,7 @@ app.post("/api/auth/resend-verification", async (req, res, next) => {
 app.post("/api/auth/forgot-password", async (req, res, next) => {
   try {
     const input = forgotPasswordSchema.parse(req.body);
+    if (rejectPublicRateLimit(res, "forgotPassword", input.email)) return;
     const result = await executeForgotPassword(
       { email: normalizeEmail(input.email), req },
       liveAuthIssuanceDeps()
@@ -2428,6 +2434,7 @@ app.post("/api/auth/forgot-password", async (req, res, next) => {
 app.post("/api/auth/reset-password", async (req, res, next) => {
   try {
     const input = resetPasswordSchema.parse(req.body);
+    if (rejectPublicRateLimit(res, "resetPassword", input.token)) return;
     const token = consumeAuthToken({ type: "reset_password", tokenHash: tokenHash(input.token) });
     if (!token) {
       return res.status(400).json({ error: "Ссылка восстановления недействительна или уже использована." });
@@ -2470,8 +2477,13 @@ app.post("/api/auth/login", async (req, res, next) => {
     const input = loginSchema.parse(req.body);
     const email = normalizeEmail(input.email);
 
-    if (!checkLoginLimit(email)) {
-      return sendAuthRateLimited(res, email);
+    const loginLimit = consumePublicRateLimit({
+      scope: "login",
+      subject: email,
+      secret: jwtSecret,
+    });
+    if (!loginLimit.allowed) {
+      return sendAuthRateLimited(res, loginLimit);
     }
 
     const user = findUserByEmail(email);
@@ -2996,6 +3008,11 @@ app.post("/api/passkeys/authentication/options", async (req, res, next) => {
   try {
     const input = passkeyAuthenticationOptionsSchema.parse(req.body || {});
     const email = input.email ? normalizeEmail(input.email) : "";
+    if (email) {
+      if (rejectPublicRateLimit(res, "passkeyAuthOptions", email)) return;
+    } else if (rejectDiscoverablePasskeyOptionsLimit(req, res)) {
+      return;
+    }
 
     // С почтой — узкий список ключей аккаунта. Без почты — discoverable (Face ID выбирает ключ сам).
     if (email) {
@@ -3031,6 +3048,7 @@ app.post("/api/passkeys/authentication/verify", async (req, res, next) => {
   try {
     const input = passkeyAuthenticationVerifySchema.parse(req.body || {});
     const email = input.email ? normalizeEmail(input.email) : "";
+    if (rejectPublicRateLimit(res, "passkeyAuthVerify", email || input.ceremonyId)) return;
     const ceremony = consumeWebAuthnChallenge(input.ceremonyId, "authentication");
     const credential = getPasskey(input.response?.id || "");
     if (!ceremony || !credential) {
