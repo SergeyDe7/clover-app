@@ -47,6 +47,8 @@ const CHECK_FILES = [
   "src/safeLog.js",
   "src/authUrlPolicy.js",
   "src/authIssuance.js",
+  "src/publicRateLimit.js",
+  "scripts/verify-security-stage4-package-b.mjs",
   "src/outboundResponse.js",
   "src/remoteImagePolicy.js",
   "src/pushSubscriptionOwnership.js",
