@@ -91,6 +91,7 @@ extract_file "scripts/linux/restart-api-ui.sh" "${EXTRACT}/restart-api-ui.sh"
 extract_file "server/scripts/uiAssetProbe.mjs" "${EXTRACT}/uiAssetProbe.mjs"
 extract_file "server/scripts/releaseNamespace.js" "${EXTRACT}/releaseNamespace.js"
 extract_file "server/scripts/preparedDist.mjs" "${EXTRACT}/preparedDist.mjs"
+extract_file "server/scripts/assert-metrika-release.mjs" "${EXTRACT}/assert-metrika-release.mjs"
 chmod +x "${EXTRACT}/restart-api-ui.sh" || true
 if [[ "${LAUNCH_MODE}" == "promote" ]]; then
   EXTRACTED_SHA="$(node "${EXTRACT}/preparedDist.mjs" inspect-sha --manifest "${PREPARED_PATH}/manifest.json")"
@@ -104,6 +105,7 @@ fi
 export CLOVER_DEPLOY_ROOT="${ROOT}"
 export CLOVER_DEPLOY_STAGING="${STAGING_ROOT}"
 export CLOVER_DEPLOY_PROBE_JS="${EXTRACT}/uiAssetProbe.mjs"
+export CLOVER_DEPLOY_METRIKA_JS="${EXTRACT}/assert-metrika-release.mjs"
 export CLOVER_DEPLOY_TARGET_SHA="${PINNED_SHA}"
 echo "FIRST_DEPLOY_LAUNCHER: invoked=${EXTRACT}/restart-api-ui.sh"
 echo "FIRST_DEPLOY_LAUNCHER: mode=${LAUNCH_MODE}"

@@ -94,6 +94,13 @@ export function inventoryDist(distDir) {
   });
 }
 
+function normalizeMetrikaStamp(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "";
+  if (raw === "on" || raw === "off") return raw;
+  throw new Error("manifest expectedMetrikaEnabled must be on or off");
+}
+
 export function writePreparedManifest({
   distDir,
   outFile,
@@ -101,6 +108,7 @@ export function writePreparedManifest({
   releaseId,
   expectedLocaleStamp,
   buildTag,
+  expectedMetrikaEnabled = "",
 }) {
   if (!/^[0-9a-fA-F]{40}$/.test(String(targetSha || ""))) {
     throw new Error("manifest targetSha must be a full 40-char commit hash");
@@ -118,6 +126,8 @@ export function writePreparedManifest({
     expectedLocaleStamp: locale,
     files,
   };
+  const metrika = normalizeMetrikaStamp(expectedMetrikaEnabled);
+  if (metrika) manifest.expectedMetrikaEnabled = metrika;
   mkdirSync(path.dirname(outFile), { recursive: true });
   writeFileSync(outFile, `${JSON.stringify(manifest, null, 2)}\n`);
   return manifest;
@@ -273,6 +283,7 @@ export function verifyPreparedDist({
   expectedTargetSha = "",
   expectedLocaleStamp = "",
   expectedReleaseId = "",
+  expectedMetrikaEnabled = "",
 }) {
   const failures = [];
   if (expectedTargetSha && String(manifest.targetSha).toLowerCase() !== String(expectedTargetSha).toLowerCase()) {
@@ -287,6 +298,15 @@ export function verifyPreparedDist({
     failures.push(
       `manifest locale ${manifest.expectedLocaleStamp} does not match expected ${expectedLocaleStamp}`
     );
+  }
+  if (expectedMetrikaEnabled) {
+    const wanted = normalizeMetrikaStamp(expectedMetrikaEnabled);
+    const got = String(manifest.expectedMetrikaEnabled || "").trim();
+    if (got !== wanted) {
+      failures.push(
+        `manifest metrika ${got || "(missing)"} does not match expected ${wanted}`
+      );
+    }
   }
   if (expectedReleaseId && String(manifest.releaseId) !== String(expectedReleaseId)) {
     failures.push(
@@ -391,6 +411,7 @@ function main(argv = process.argv.slice(2)) {
       releaseId: argValue(argv, "--release-id"),
       expectedLocaleStamp: argValue(argv, "--expected-locale"),
       buildTag: argValue(argv, "--build-tag"),
+      expectedMetrikaEnabled: argValue(argv, "--expected-metrika"),
     });
     console.log(`prepared-manifest: ${manifest.files.length} files release=${manifest.releaseId}`);
     return 0;
@@ -398,6 +419,16 @@ function main(argv = process.argv.slice(2)) {
   if (command === "inspect-sha") {
     const manifest = readPreparedManifest(argValue(argv, "--manifest"));
     process.stdout.write(`${String(manifest.targetSha).toLowerCase()}\n`);
+    return 0;
+  }
+  if (command === "inspect-metrika") {
+    const manifest = readPreparedManifest(argValue(argv, "--manifest"));
+    const value = String(manifest.expectedMetrikaEnabled || "").trim();
+    if (value !== "on" && value !== "off") {
+      console.error("prepared manifest expectedMetrikaEnabled is missing");
+      return 1;
+    }
+    process.stdout.write(`${value}\n`);
     return 0;
   }
   if (command === "verify") {
@@ -417,6 +448,7 @@ function main(argv = process.argv.slice(2)) {
       expectedTargetSha: argValue(argv, "--expected-target-sha"),
       expectedLocaleStamp: argValue(argv, "--expected-locale"),
       expectedReleaseId: argValue(argv, "--expected-release-id"),
+      expectedMetrikaEnabled: argValue(argv, "--expected-metrika"),
     });
     if (!result.ok) {
       console.error(`prepared dist mismatch:\n${result.failures.join("\n")}`);
@@ -435,6 +467,7 @@ function main(argv = process.argv.slice(2)) {
       expectedTargetSha: argValue(argv, "--expected-target-sha"),
       expectedLocaleStamp: argValue(argv, "--expected-locale"),
       expectedReleaseId: argValue(argv, "--expected-release-id"),
+      expectedMetrikaEnabled: argValue(argv, "--expected-metrika"),
     });
     if (!result.ok) {
       console.error(`prepared dist mismatch:\n${result.failures.join("\n")}`);
@@ -467,7 +500,7 @@ function main(argv = process.argv.slice(2)) {
     console.log(`prepared-copy: ${manifest.files.length} files`);
     return 0;
   }
-  console.error("usage: preparedDist.mjs write|verify|inspect-sha|verify-files|copy");
+  console.error("usage: preparedDist.mjs write|verify|inspect-sha|inspect-metrika|verify-files|copy");
   return 2;
 }
 
