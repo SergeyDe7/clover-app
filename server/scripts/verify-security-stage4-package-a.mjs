@@ -345,6 +345,8 @@ function childEnv(port) {
     ONEC_ALLOW_LOCAL_WITHOUT_KEY: "false",
     ALLOW_LAN_ORIGINS: "false",
     APP_PUBLIC_URL: `http://127.0.0.1:${port}`,
+    CLOVER_SERVER_BACKUP_DIR: path.join(temp, "backups"),
+    CLOVER_UPLOADS_DIR: path.join(temp, "uploads"),
     MANAGER_EMAIL: "",
     MANAGER_PASSWORD: "",
   };
@@ -439,6 +441,26 @@ try {
   assertSafe413(overLogin, "login.oversize");
   note("login.oversize.before-bcrypt", overLoginMs < 400, `ms=${overLoginMs}`);
 
+  const caseLoginSmall = await rawRequest(port, {
+    path: "/API/auth/login",
+    body: { email: meta.adminEmail, password },
+  });
+  note(
+    "login.case-api.small",
+    caseLoginSmall.status === 200 && Boolean(caseLoginSmall.json?.token),
+    `status=${caseLoginSmall.status}`
+  );
+  const caseApiOver = await rawRequest(port, {
+    path: "/API/auth/login",
+    body: { email: meta.adminEmail, password, filler: "x".repeat(AUTH_OVERSIZE) },
+  });
+  assertSafe413(caseApiOver, "login.case-api.oversize");
+  const caseLoginOver = await rawRequest(port, {
+    path: "/api/auth/Login",
+    body: { email: meta.adminEmail, password, filler: "x".repeat(AUTH_OVERSIZE) },
+  });
+  assertSafe413(caseLoginOver, "login.case-login.oversize");
+
   for (const route of ["/api/auth/register", "/api/auth/forgot-password"]) {
     const res = await rawRequest(port, {
       path: route,
@@ -498,6 +520,11 @@ try {
     body: { ...guest, filler: "x".repeat(150 * 1024) },
   });
   assertSafe413(guestOver, "public-order.oversize");
+  const guestCaseOver = await rawRequest(port, {
+    path: "/api/public/Orders",
+    body: { ...guest, filler: "x".repeat(150 * 1024) },
+  });
+  assertSafe413(guestCaseOver, "public-order.case.oversize");
 
   const adminSmall = await rawRequest(port, {
     path: "/api/admin/notifications/read-all",
