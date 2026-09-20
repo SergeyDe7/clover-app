@@ -45,7 +45,7 @@ createRoot(document.getElementById("root")).render(
 const CLOVER_UI_BUILD =
   document.querySelector('meta[name="clover-ui-build"]')?.getAttribute("content")?.trim() ||
   "ui-dev";
-const BOOT_SPLASH_MS = 450;
+const BOOT_SPLASH_MS = 1000;
 const APP_THEME_COLOR = "#f4f8f2";
 const STOREFRONT_THEME_COLOR = "#f3f2ee";
 const VIEWPORT_BASE = "width=device-width, initial-scale=1.0, viewport-fit=cover";
@@ -118,12 +118,12 @@ if (document.readyState === "complete") {
   window.addEventListener("load", () => scheduleBootSplashHide(bootStartedAt), { once: true });
 }
 
-// Как только React нарисовал вход — убираем splash (иначе 2 логотипа на медленной сети)
+// После первого React render убираем splash, но сохраняем минимальное время показа логотипа.
 const rootEl = document.getElementById("root");
 if (rootEl) {
   const splashObserver = new MutationObserver(() => {
     if (rootEl.childElementCount > 0) {
-      hideBootSplash();
+      scheduleBootSplashHide(bootStartedAt);
       splashObserver.disconnect();
     }
   });
