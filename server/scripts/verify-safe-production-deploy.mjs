@@ -111,6 +111,16 @@ assert.match(scriptSrc, /promote/, "deploy script must support promote");
 assert.equal(/SKIP_BUILD=/.test(scriptSrc), false, "must not add a hidden SKIP_BUILD switch");
 assert.match(scriptSrc, /preparedDist\.mjs/, "prepare/promote must inventory via preparedDist.mjs");
 assert.match(scriptSrc, /verify-files/, "promote must re-hash the trusted staging tree before cutover");
+assert.match(scriptSrc, /assert-metrika-release\.mjs/, "prepare/promote must gate Metrika bake");
+assert.match(scriptSrc, /production-ui-build\.flags/, "prepare must read the explicit Metrika target file");
+assert.match(scriptSrc, /--expected-metrika/, "manifest must record expected Metrika bake");
+assert.match(scriptSrc, /unset VITE_YANDEX_METRIKA_TEST_MODE/, "production bake must drop TEST_MODE");
+assert.equal(/set\s+-a/.test(scriptSrc), false, "must not export a full dotenv into the frontend build");
+assert.equal(
+  /(^|[;&]|\n)\s*source\s+["']?(\$\{?ROOT\}?\/)?server\/\.env/m.test(scriptSrc),
+  false,
+  "must not source server/.env into the frontend build"
+);
 assert.equal(
   /nginx\s+-s\s+reload|systemctl\s+reload\s+nginx/i.test(scriptSrc),
   false,
@@ -132,6 +142,7 @@ assert.equal(
   "deploy must not disable TLS verification"
 );
 const launcherSrc = readFileSync(path.join(workRoot, "scripts/linux/run-target-deploy.sh"), "utf8");
+assert.match(launcherSrc, /assert-metrika-release\.mjs/, "launcher must extract the Metrika bake helper");
 assert.match(launcherSrc, /FIRST_DEPLOY_LAUNCHER/, "first-deploy launcher must extract the target script");
 assert.match(launcherSrc, /CLOVER_DEPLOY_ROOT/, "launcher ROOT comes from env, not this file");
 assert.equal(/git reset/i.test(launcherSrc), false, "launcher must not reset live source");
@@ -375,6 +386,14 @@ if (process.env.FAKE_BUILD_FAIL === '1') {
   cpSync(
     path.join(workRoot, "server/scripts/preparedDist.mjs"),
     path.join(live, "server/scripts/preparedDist.mjs")
+  );
+  cpSync(
+    path.join(workRoot, "server/scripts/assert-metrika-release.mjs"),
+    path.join(live, "server/scripts/assert-metrika-release.mjs")
+  );
+  writeFileSync(
+    path.join(live, "scripts/linux/production-ui-build.flags"),
+    "# sandbox / TEST default OFF\nVITE_YANDEX_METRIKA_ENABLED=0\n"
   );
   execFileSync("git", ["add", "-A"], { cwd: live });
   execFileSync("git", ["commit", "-m", "new"], { cwd: live });

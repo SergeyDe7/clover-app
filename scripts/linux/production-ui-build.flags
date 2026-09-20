@@ -1,0 +1,5 @@
+# Explicit production UI bake flags for prepare/promote.
+# Deploy reads ONLY the allowlisted key below. This file is not sourced
+# as dotenv and is not loaded by Vite TEST/preview builds.
+# server/.env is never read here.
+VITE_YANDEX_METRIKA_ENABLED=1

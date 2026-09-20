@@ -353,6 +353,10 @@ assert.match(html, /clover-public-locale-routes/);
 
 const productionEnv = src(".env.production");
 assert.doesNotMatch(productionEnv, /VITE_YANDEX_METRIKA_ENABLED=1/);
+assert.doesNotMatch(productionEnv, /VITE_YANDEX_METRIKA_TEST_MODE=1/);
+const productionFlags = src("scripts/linux/production-ui-build.flags");
+assert.match(productionFlags, /^VITE_YANDEX_METRIKA_ENABLED=1$/m);
+assert.doesNotMatch(productionFlags, /VITE_YANDEX_METRIKA_TEST_MODE/);
 
 const config = src("src/analytics/metrikaConfig.js");
 assert.match(config, /webvisor: false/);

@@ -51,6 +51,8 @@ API_UNIT="${CLOVER_DEPLOY_API_UNIT:-clover-api.service}"
 UI_UNIT="${CLOVER_DEPLOY_UI_UNIT:-clover-ui.service}"
 PROBE_JS=""
 PREPARED_JS=""
+METRIKA_ASSERT_JS=""
+EXPECT_METRIKA=""
 PREPARED_KEEP=""
 PREPARED_PATH=""
 DEPLOY_MODE="deploy"
@@ -148,6 +150,10 @@ install_runtime_probe() {
         cp "$(dirname "${src}")/preparedDist.mjs" "${STAGING_ROOT}/preparedDist.mjs"
         PREPARED_JS="${STAGING_ROOT}/preparedDist.mjs"
       fi
+      if [[ -f "$(dirname "${src}")/assert-metrika-release.mjs" ]]; then
+        cp "$(dirname "${src}")/assert-metrika-release.mjs" "${STAGING_ROOT}/assert-metrika-release.mjs"
+        METRIKA_ASSERT_JS="${STAGING_ROOT}/assert-metrika-release.mjs"
+      fi
       return 0
     fi
   done
@@ -174,6 +180,32 @@ check_dist_assets() {
     || return 1
   node "${PROBE_JS}" check-namespace --html-file "${dist_dir}/index.html" --dist "${dist_dir}" \
     --expected-locale-stamp "${expected}"
+}
+
+require_metrika_js() {
+  if [[ -n "${METRIKA_ASSERT_JS}" && -f "${METRIKA_ASSERT_JS}" ]]; then
+    return 0
+  fi
+  local src
+  for src in \
+    "${CLOVER_DEPLOY_METRIKA_JS:-}" \
+    "${STAGING_ROOT}/assert-metrika-release.mjs" \
+    "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/assert-metrika-release.mjs"
+  do
+    if [[ -n "${src}" && -f "${src}" ]]; then
+      METRIKA_ASSERT_JS="${src}"
+      return 0
+    fi
+  done
+  if [[ -n "${BUILD_WT}" && -f "${BUILD_WT}/server/scripts/assert-metrika-release.mjs" ]]; then
+    METRIKA_ASSERT_JS="${BUILD_WT}/server/scripts/assert-metrika-release.mjs"
+    return 0
+  fi
+  if [[ -f "${ROOT}/server/scripts/assert-metrika-release.mjs" ]]; then
+    METRIKA_ASSERT_JS="${ROOT}/server/scripts/assert-metrika-release.mjs"
+    return 0
+  fi
+  return 1
 }
 
 require_prepared_js() {
@@ -217,6 +249,7 @@ persist_prepared_artifact() {
     --target-sha "${TARGET_SHA}" \
     --release-id "${release_id}" \
     --expected-locale "${EXPECT_LOCALE}" \
+    --expected-metrika "${EXPECT_METRIKA}" \
     --build-tag "${BUILD_TAG}" \
     || die "failed to write prepared manifest"
   node "${PREPARED_JS}" verify \
@@ -224,6 +257,7 @@ persist_prepared_artifact() {
     --staging "${STAGING_ROOT}" \
     --expected-target-sha "${TARGET_SHA}" \
     --expected-locale "${EXPECT_LOCALE}" \
+    --expected-metrika "${EXPECT_METRIKA}" \
     --expected-release-id "${release_id}" \
     || die "prepared artifact failed inventory verify"
   rm -rf "${dest}"
@@ -234,6 +268,7 @@ persist_prepared_artifact() {
   echo "PREPARED_RELEASE_ID: ${release_id}"
   echo "PREPARED_TARGET_SHA: ${TARGET_SHA}"
   echo "PREPARED_LOCALE: ${EXPECT_LOCALE}"
+  echo "PREPARED_METRIKA: ${EXPECT_METRIKA}"
 }
 
 load_promote_tree() {
@@ -593,6 +628,37 @@ else
   die "locale-route expect must be enabled or disabled, got: ${EXPECT_LOCALE}"
 fi
 
+# One allowlisted Vite flag for the off-live bake. Never source server/.env
+# or the rest of .env.production. TEST_MODE must not ride in from the shell.
+require_metrika_js || die "assert-metrika-release.mjs missing; refusing deploy without Metrika gate"
+unset VITE_YANDEX_METRIKA_TEST_MODE || true
+unset VITE_YANDEX_METRIKA_TAG_SRC || true
+if [[ "${DEPLOY_MODE}" == "promote" ]]; then
+  require_prepared_js || die "preparedDist.mjs missing before Metrika expect"
+  EXPECT_METRIKA="$(node "${PREPARED_JS}" inspect-metrika --manifest "${PREPARED_PATH}/manifest.json")" \
+    || die "prepared manifest is missing expectedMetrikaEnabled"
+else
+  FLAGS_FILE=""
+  if [[ -n "${BUILD_WT}" && -f "${BUILD_WT}/scripts/linux/production-ui-build.flags" ]]; then
+    FLAGS_FILE="${BUILD_WT}/scripts/linux/production-ui-build.flags"
+  fi
+  [[ -n "${FLAGS_FILE}" ]] || die "production-ui-build.flags missing on target SHA; refusing prepare without explicit Metrika target"
+  EXPECT_METRIKA="$(node "${METRIKA_ASSERT_JS}" --print-expect --flags-file "${FLAGS_FILE}")" \
+    || die "production-ui-build.flags rejected"
+  METRIKA_EXPORT="$(node "${METRIKA_ASSERT_JS}" --print-export --flags-file "${FLAGS_FILE}")" \
+    || die "failed to read Metrika export value"
+  if [[ -n "${METRIKA_EXPORT}" ]]; then
+    export VITE_YANDEX_METRIKA_ENABLED="${METRIKA_EXPORT}"
+  else
+    unset VITE_YANDEX_METRIKA_ENABLED || true
+  fi
+fi
+EXPECT_METRIKA="$(printf '%s' "${EXPECT_METRIKA}" | tr -d '[:space:]')"
+if [[ "${EXPECT_METRIKA}" != "on" && "${EXPECT_METRIKA}" != "off" ]]; then
+  die "metrika expect must be on or off, got: ${EXPECT_METRIKA}"
+fi
+echo "Metrika bake: isolated build target ${EXPECT_METRIKA}"
+
 if [[ "${DEPLOY_MODE}" != "promote" ]]; then
 echo "Building release off live path into staged dist..."
 # IMPORTANT: build must NOT write into live ROOT/dist.
@@ -629,6 +695,10 @@ check_dist_assets "${STAGED_DIST}" || die "staged dist is missing referenced JS/
 echo "Staged UI build tag: ${BUILD_TAG}"
 echo "Staged UI bundle: ${MAIN_JS}"
 
+require_metrika_js || die "assert-metrika-release.mjs missing before artifact Metrika check"
+node "${METRIKA_ASSERT_JS}" --dist "${STAGED_DIST}" --expect "${EXPECT_METRIKA}" \
+  || die "baked Metrika flag does not match expected ${EXPECT_METRIKA}; live source/dist/services unchanged"
+
 if [[ "${EXPECT_LOCALE}" == "enabled" ]]; then
   if [[ -f "${ASSERT_JS}" ]]; then
     node "${ASSERT_JS}" --dist "${STAGED_DIST}" --db "${DB_PATH_BUILD}" --expect enabled \
@@ -658,12 +728,14 @@ if [[ "${DEPLOY_MODE}" == "promote" ]]; then
     --staging "${STAGING_ROOT}" \
     --expected-target-sha "${TARGET_SHA}" \
     --expected-locale "${EXPECT_LOCALE}" \
-    || die "prepared manifest SHA/locale does not match current deploy config"
+    --expected-metrika "${EXPECT_METRIKA}" \
+    || die "prepared manifest SHA/locale/metrika does not match current deploy config"
   node "${PREPARED_JS}" verify-files \
     --dist "${STAGED_DIST}" \
     --manifest "${PREPARED_PATH}/manifest.json" \
     --expected-target-sha "${TARGET_SHA}" \
     --expected-locale "${EXPECT_LOCALE}" \
+    --expected-metrika "${EXPECT_METRIKA}" \
     --expected-release-id "$(release_id_from_tag "${BUILD_TAG}")" \
     || die "trusted staging tree drifted after copy; refusing cutover"
 fi
