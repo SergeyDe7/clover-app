@@ -590,7 +590,7 @@ const JSON_BODY_RULES = Object.freeze([
 ]);
 
 function normalizeJsonBodyPath(rawPath) {
-  const source = String(rawPath || "").split("?")[0];
+  const source = String(rawPath || "").split("?")[0].toLowerCase();
   if (source.length > 1 && source.endsWith("/") && source[source.length - 2] !== "/") {
     return source.slice(0, -1) || "/";
   }
