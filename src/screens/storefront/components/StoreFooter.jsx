@@ -4,6 +4,8 @@ import {
   STOREFRONT_INFO_PAGES,
   resolveStorefrontInfoPage,
 } from "../../../shared/storefrontInfoPages.js";
+import { openAnalyticsSettings } from "../../../analytics/metrikaConsent.js";
+import { readMetrikaEnvFlag } from "../../../analytics/metrikaConfig.js";
 
 export function StoreFooter({ current, infoPages }) {
   const { t } = useLocalization();
@@ -40,6 +42,16 @@ export function StoreFooter({ current, infoPages }) {
             `info:${page.slug}`
           );
         })}
+        {readMetrikaEnvFlag(import.meta.env) ? (
+          <button
+            type="button"
+            className="sf-footer-link sf-footer-analytics"
+            data-analytics-settings="1"
+            onClick={() => openAnalyticsSettings(window)}
+          >
+            {t("storefront.analytics.settings")}
+          </button>
+        ) : null}
       </nav>
     </footer>
   );

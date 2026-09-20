@@ -13,6 +13,10 @@ import {
   yandexStaticMapSrc,
 } from "../../../shared/yandexMaps.js";
 import { storefrontApi } from "../publicApi.js";
+import {
+  trackContactMessageClick,
+  trackContactPhoneClick,
+} from "../../../analytics/metrikaBrowser.js";
 
 const MAP_Z_MIN = 4;
 const MAP_Z_MAX = 21;
@@ -189,16 +193,16 @@ export function ContactsPage() {
               <h2 id="sf-contacts-reach-title">{t("storefront.contact")}</h2>
               {phoneLinks.phone ? (
                 <Fact label={t("auth.register.phone")}>
-                  <a href={phoneLinks.phone}>{phoneValue}</a>
-                  <a className="sf-btn sf-btn-primary sf-btn-sm" href={phoneLinks.phone}>{
+                  <a href={phoneLinks.phone} onClick={trackContactPhoneClick}>{phoneValue}</a>
+                  <a className="sf-btn sf-btn-primary sf-btn-sm" href={phoneLinks.phone} onClick={trackContactPhoneClick}>{
                     t("storefront.call")
                   }</a>
                 </Fact>
               ) : null}
               {mailHref ? (
                 <Fact label={t("shared.field.emailShort")}>
-                  <a href={mailHref}>{site.contactEmail}</a>
-                  <a className="sf-btn sf-btn-ghost sf-btn-sm" href={mailHref}>{
+                  <a href={mailHref} onClick={trackContactMessageClick}>{site.contactEmail}</a>
+                  <a className="sf-btn sf-btn-ghost sf-btn-sm" href={mailHref} onClick={trackContactMessageClick}>{
                     t("storefront.write")
                   }</a>
                 </Fact>

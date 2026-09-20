@@ -157,12 +157,12 @@ const SEEDS = {
     ar: "سياسة الخصوصية",
   },
   [seedKey("privacy-policy", "description")]: {
-    en: "Policy on processing and protecting personal data of users of the KLEVER company website.",
-    uz: "KLEVER kompaniyasi sayti foydalanuvchilarining shaxsiy ma’lumotlarini qayta ishlash va himoya qilish siyosati.",
-    ky: "КЛЕВЕР компаниясынын сайтынын колдонуучуларынын жеке маалыматтарын иштетүү жана коргоо саясаты.",
-    tg: "Сиёсати коркард ва ҳифзи маълумоти шахсии истифодабарандагони сомонаи ширкати КЛЕВЕР.",
-    "zh-CN": "КЛЕВЕР公司网站用户个人数据处理与保护政策。",
-    ar: "سياسة معالجة وحماية البيانات الشخصية لمستخدمي موقع شركة كليفّر.",
+    en: "LLC “Klever” policy: operator details, order data, retention, cookies and optional analytics.",
+    uz: "«Klever» MChJ siyosati: rekvizitlar, buyurtma ma’lumotlari, saqlash, cookie va ixtiyoriy analitika.",
+    ky: "«Клевер» ЖЧК саясаты: реквизиттер, заказ маалыматы, сактоо, cookie жана милдеттүү эмес аналитика.",
+    tg: "Сиёсати ҶДММ «Клевер»: реквизитҳо, маълумоти фармоиш, нигоҳдорӣ, cookie ва таҳлили ихтиёрӣ.",
+    "zh-CN": "ООО «Клевер»政策：经营者信息、订单数据、保存、cookie 与可选分析。",
+    ar: "سياسة شركة «كليفّر»: بيانات المشغّل والطلب والحفظ وملفات الارتباط والتحليلات الاختيارية.",
   },
 
   [seedKey("personal-data-consent", "heading")]: {
@@ -182,12 +182,12 @@ const SEEDS = {
     ar: "الموافقة على معالجة البيانات الشخصية",
   },
   [seedKey("personal-data-consent", "description")]: {
-    en: "Consent to processing of personal data of users of the KLEVER company website.",
-    uz: "KLEVER kompaniyasi sayti foydalanuvchilarining shaxsiy ma’lumotlarini qayta ishlashga rozilik matni.",
-    ky: "КЛЕВЕР компаниясынын сайтынын колдонуучуларынын жеке маалыматтарын иштетүүгө макулдук тексти.",
-    tg: "Матни розигӣ ба коркарди маълумоти шахсии истифодабарандагони сомонаи ширкати КЛЕВЕР.",
-    "zh-CN": "КЛЕВЕР公司网站用户个人数据处理同意文本。",
-    ar: "نص الموافقة على معالجة البيانات الشخصية لمستخدمي موقع شركة كليفّر.",
+    en: "Consent for data entered at checkout. Advertising and analytics are not included.",
+    uz: "Buyurtmada kiritilgan ma’lumotlarga rozilik. Reklama va analitika kirmaydi.",
+    ky: "Заказда киргизилген маалыматка макулдук. Жарнама жана аналитика кирбейт.",
+    tg: "Розигӣ ба маълумоти ҳангоми фармоиш воридшуда. Реклама ва таҳлил дохил нестанд.",
+    "zh-CN": "对下单所填数据的同意。不含广告与分析。",
+    ar: "موافقة على البيانات المدخلة عند الطلب. الإعلان والتحليلات غير مشمولين.",
   },
 };
 

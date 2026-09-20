@@ -585,6 +585,94 @@ export const SEEDS = {
     "zh-CN": "© Clover",
     "ar": "© Clover"
   },
+  "storefront.analytics.bannerTitle": {
+    "en": "Optional analytics",
+    "uz": "Ixtiyoriy analitika",
+    "ky": "Милдеттүү эмес аналитика",
+    "tg": "Таҳлили ихтиёрӣ",
+    "zh-CN": "可选分析",
+    "ar": "تحليلات اختيارية"
+  },
+  "storefront.analytics.bannerText": {
+    "en": "We use Yandex Metrica to understand which pages visitors open and which actions they take on the storefront. This is optional: catalog, sign-in and checkout work without consent. No answer is not consent.",
+    "uz": "Mehmonlar qaysi sahifalarni ochishi va vitrinada qanday amallar qilishini tushunish uchun Yandex Metrica ishlatamiz. Bu ixtiyoriy: katalog, kirish va buyurtma roziliksiz ishlaydi. Javob yo‘qligi rozilik emas.",
+    "ky": "Коноктор кайсы барактарды ачканын жана витринада кандай аракет кылганын түшүнүү үчүн Яндекс Метриканы колдонобуз. Бул милдеттүү эмес: каталог, кирүү жана заказ макулдуксуз иштейт. Жооп жок болсо, бул макулдук эмес.",
+    "tg": "Барои фаҳмидани он ки меҳмонон кадом саҳифаҳоро мекушоянд ва дар витрина чӣ амал мекунанд, Яндекс Метрикаро истифода мебарем. Ин ихтиёрӣ аст: каталог, вуруд ва фармоиш бе розигӣ кор мекунанд. Ҷавоб надодан розигӣ нест.",
+    "zh-CN": "我们使用 Yandex Metrica 了解访客打开了哪些页面、在橱窗上做了哪些操作。这是可选项：目录、登录和下单无需同意即可使用。未作答不视为同意。",
+    "ar": "نستخدم ياندكس متريكا لفهم الصفحات التي يفتحها الزوار والإجراءات التي يقومون بها في الواجهة. هذا اختياري: الكتالوج وتسجيل الدخول والطلب يعملون دون موافقة. عدم الإجابة لا يعني الموافقة."
+  },
+  "storefront.analytics.allow": {
+    "en": "Allow analytics",
+    "uz": "Analitikaga ruxsat",
+    "ky": "Аналитикага уруксат",
+    "tg": "Иҷозати таҳлил",
+    "zh-CN": "允许分析",
+    "ar": "السماح بالتحليلات"
+  },
+  "storefront.analytics.deny": {
+    "en": "Decline",
+    "uz": "Rad etish",
+    "ky": "Четке кагуу",
+    "tg": "Рад кардан",
+    "zh-CN": "拒绝",
+    "ar": "رفض"
+  },
+  "storefront.analytics.settings": {
+    "en": "Analytics settings",
+    "uz": "Analitika sozlamalari",
+    "ky": "Аналитика жөндөөлөрү",
+    "tg": "Танзимоти таҳлил",
+    "zh-CN": "分析设置",
+    "ar": "إعدادات التحليلات"
+  },
+  "storefront.analytics.settingsTitle": {
+    "en": "Analytics settings",
+    "uz": "Analitika sozlamalari",
+    "ky": "Аналитика жөндөөлөрү",
+    "tg": "Танзимоти таҳлил",
+    "zh-CN": "分析设置",
+    "ar": "إعدادات التحليلات"
+  },
+  "storefront.analytics.settingsText": {
+    "en": "You can change or withdraw consent for optional Yandex Metrica analytics. Withdrawal stops further collection on this device.",
+    "uz": "Yandex Metrica ixtiyoriy analitikasi uchun rozilikni o‘zgartirish yoki qaytarib olish mumkin. Qaytarib olish shu qurilmada keyingi yig‘ishni to‘xtatadi.",
+    "ky": "Яндекс Метриканын милдеттүү эмес аналитикасына макулдукту өзгөртүү же кайтарып алуу мүмкүн. Кайтарып алуу бул түзмөктө кийинки чогултууну токтотот.",
+    "tg": "Розигиро барои таҳлили ихтиёрии Яндекс Метрика метавон тағйир дод ё бозпас гирифт. Бозпас гирифтан ҷамъоварии минбаъдаро дар ин дастгоҳ қатъ мекунад.",
+    "zh-CN": "您可以更改或撤回对可选 Yandex Metrica 分析的同意。撤回后，本设备将停止继续收集。",
+    "ar": "يمكنك تغيير موافقة التحليلات الاختيارية لياندكس متريكا أو سحبها. السحب يوقف الجمع اللاحق على هذا الجهاز."
+  },
+  "storefront.analytics.revoke": {
+    "en": "Withdraw consent",
+    "uz": "Rozilikni qaytarib olish",
+    "ky": "Макулдукту кайтарып алуу",
+    "tg": "Бозпас гирифтани розигӣ",
+    "zh-CN": "撤回同意",
+    "ar": "سحب الموافقة"
+  },
+  "storefront.analytics.revokeNote": {
+    "en": "Withdrawal does not delete data that may already have been sent.",
+    "uz": "Qaytarib olish allaqachon yuborilgan bo‘lishi mumkin bo‘lgan ma’lumotlarni o‘chirmaydi.",
+    "ky": "Кайтарып алуу мурда жөнөтүлүп калышы мүмкүн болгон маалыматтарды өчүрбөйт.",
+    "tg": "Бозпас гирифтан маълумотеро, ки шояд аллакай фиристода шудааст, нест намекунад.",
+    "zh-CN": "撤回不会删除可能已经发送的数据。",
+    "ar": "السحب لا يحذف البيانات التي ربما أُرسلت بالفعل."
+  },
+  "storefront.analytics.privacyLink": {
+    "en": "Personal data processing policy",
+    "uz": "Shaxsiy ma’lumotlarni qayta ishlash siyosati",
+    "ky": "Жеке маалыматтарды иштетүү саясаты",
+    "tg": "Сиёсати коркарди маълумоти шахсӣ",
+    "zh-CN": "个人数据处理政策",
+    "ar": "سياسة معالجة البيانات الشخصية"
+  },
+  "storefront.analytics.close": {
+    "en": "Close",
+    "uz": "Yopish",
+    "ky": "Жабуу",
+    "tg": "Пӯшидан",
+    "zh-CN": "关闭",
+    "ar": "إغلاق"
+  },
   "storefront.back": {
     "en": "Back",
     "uz": "Orqaga",
@@ -13456,6 +13544,22 @@ export const SEEDS = {
     "tg": "Расонидан {fee}. То ройгон боз {needMore}.",
     "zh-CN": "运费 {fee}。距免运费还差 {needMore}。",
     "ar": "التوصيل {fee}. يتبقى {needMore} للتوصيل المجاني."
+  },
+  "storefront.checkout.orderLegalLink": {
+    "en": "Consent to personal data processing",
+    "uz": "Shaxsiy ma’lumotlarni qayta ishlashga rozilik",
+    "ky": "Жеке маалыматтарды иштетүүгө макулдук",
+    "tg": "Розигӣ ба коркарди маълумоти шахсӣ",
+    "zh-CN": "个人数据处理同意书",
+    "ar": "الموافقة على معالجة البيانات الشخصية"
+  },
+  "storefront.checkout.orderLegalNote": {
+    "en": "By sending the order you ask us to accept and fulfil it. This is not consent to advertising and not consent to analytics. Details:",
+    "uz": "Buyurtma yuborib, uni qabul qilish va bajarishni so‘raysiz. Bu reklamaga rozilik emas va analitikaga rozilik emas. Tafsilotlar —",
+    "ky": "Заказ жөнөтүп, аны кабыл алууну жана аткарууну суранасыз. Бул жарнамага макулдук эмес жана аналитикага макулдук эмес. Толук маалымат —",
+    "tg": "Бо фиристодани фармоиш қабул ва иҷрои онро мехоҳед. Ин розигӣ ба реклама ва розигӣ ба таҳлил нест. Тафсил —",
+    "zh-CN": "提交订单即请求受理并履行。这不是广告同意，也不是分析同意。详情：",
+    "ar": "بإرسال الطلب تطلب قبوله وتنفيذه. هذه ليست موافقة على الإعلان وليست موافقة على التحليلات. التفاصيل —"
   },
   "storefront.checkout.paidDeliverySpb": {
     "en": "St. Petersburg delivery — {fee} (order below {freeFrom})",
