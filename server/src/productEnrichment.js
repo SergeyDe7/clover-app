@@ -8,6 +8,7 @@ import { mkdirSync, promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { downloadRemoteImage } from "./remoteImagePolicy.js";
+import { readEnrichQueueMax } from "./resourceBounds.js";
 
 const PRODUCT_PHOTO_SIZE = 800;
 const USER_AGENT = (() => {
@@ -1373,6 +1374,23 @@ const enrichQueue = [];
 let enrichActive = 0;
 const ENRICH_CONCURRENCY = 2;
 
+export function getEnrichQueueDepth() {
+  return enrichQueue.length + enrichActive;
+}
+
+export function enrichCapacityRemaining(env = process.env) {
+  return Math.max(0, readEnrichQueueMax(env) - getEnrichQueueDepth());
+}
+
+export function getEnrichQueueDepthForTests() {
+  return getEnrichQueueDepth();
+}
+
+export function resetEnrichQueueForTests() {
+  enrichQueue.length = 0;
+  enrichActive = 0;
+}
+
 function pumpEnrichQueue() {
   while (enrichActive < ENRICH_CONCURRENCY && enrichQueue.length) {
     const job = enrichQueue.shift();
@@ -1399,9 +1417,12 @@ export function scheduleProductWebEnrichment({
   forceRefreshPhoto = false,
   forceRefreshCopy = false,
 }) {
-  if (!enabled()) return;
+  if (!enabled()) return { queued: false, reason: "disabled" };
   const id = String(productId || "").trim();
-  if (!id) return;
+  if (!id) return { queued: false, reason: "missing-id" };
+  if (enrichQueue.length + enrichActive >= readEnrichQueueMax()) {
+    return { queued: false, reason: "capacity" };
+  }
 
   enrichQueue.push(async () => {
     const products = getProducts();
@@ -1499,4 +1520,5 @@ export function scheduleProductWebEnrichment({
     onDone?.(updated);
   });
   pumpEnrichQueue();
+  return { queued: true, reason: "queued" };
 }

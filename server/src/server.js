@@ -220,6 +220,7 @@ import {
   productNeedsWebEnrichment,
   scheduleProductWebEnrichment,
   enrichProductCardFromWeb,
+  enrichCapacityRemaining,
 } from "./productEnrichment.js";
 import {
   publicCabinetUrl,
@@ -238,6 +239,12 @@ import {
   resetPublicRateLimit,
   resolveAnonymousRateLimitClient,
 } from "./publicRateLimit.js";
+import { applyHttpServerBounds, readHttpServerBounds } from "./httpServerBounds.js";
+import {
+  createConcurrencyGate,
+  rejectOversizedPublicCatalogQuery,
+  sendResourceOverloaded,
+} from "./resourceBounds.js";
 import {
   autoLinkCloverClients,
   buildOneCClientCandidates,
@@ -2257,9 +2264,12 @@ app.get("/api/public/manager-contact", (req, res) => {
   });
 });
 
+const storefrontPdfGate = createConcurrencyGate({ max: 2, perKey: 1 });
+
 /** Публичный каталог витрины clover-spb.ru (цены сайта, без матрицы ЛК). */
 app.get("/api/public/catalog", (req, res) => {
   try {
+    if (rejectOversizedPublicCatalogQuery(req, res)) return;
     const catalog = getPublicCatalog({
         category: String(req.query.category || ""),
         subcategory: String(req.query.subcategory || ""),
@@ -5371,6 +5381,8 @@ app.get(
   authRequired,
   roleRequired("admin"),
   async (req, res, next) => {
+    const slot = storefrontPdfGate.tryEnter(req.user?.id);
+    if (!slot.ok) return sendResourceOverloaded(res);
     try {
       const markupRaw = req.query?.markupPercent;
       const markupPercent =
@@ -5406,6 +5418,8 @@ app.get(
       res.send(pdf);
     } catch (error) {
       next(error);
+    } finally {
+      slot.leave();
     }
   }
 );
@@ -6494,8 +6508,7 @@ app.post(
         product;
       let enrichmentQueued = false;
       if (!skipEnrichment && productNeedsWebEnrichment(enrichTarget)) {
-        enrichmentQueued = true;
-        scheduleProductWebEnrichment({
+        const scheduled = scheduleProductWebEnrichment({
           productId: enrichTarget.id,
           uploadsDirectory,
           getProducts: () => getGlobalState("products", DEFAULT_PRODUCTS),
@@ -6504,12 +6517,15 @@ app.post(
             setGlobalState("catalogPricesVersion", new Date().toISOString());
           },
         });
-        nextProducts = nextProducts.map((entry) =>
-          String(entry.id) === String(enrichTarget.id)
-            ? { ...entry, enrichmentStatus: "pending" }
-            : entry
-        );
-        commitCanonicalProducts( nextProducts);
+        enrichmentQueued = scheduled?.queued === true;
+        if (enrichmentQueued) {
+          nextProducts = nextProducts.map((entry) =>
+            String(entry.id) === String(enrichTarget.id)
+              ? { ...entry, enrichmentStatus: "pending" }
+              : entry
+          );
+          commitCanonicalProducts( nextProducts);
+        }
       }
 
       // В ответ — с ценами 1С (закупка / виды цен), иначе матрица менеджера пустая.
@@ -6709,6 +6725,9 @@ app.post(
       (product) => product?.active !== false && product?.showOnStorefront === true
     );
 
+    if (targets.length > enrichCapacityRemaining()) {
+      return sendResourceOverloaded(res);
+    }
     for (const product of targets) {
       scheduleProductWebEnrichment({
         productId: product.id,
@@ -8565,7 +8584,7 @@ try {
   process.exit(1);
 }
 
-app.listen(port, host, () => {
+const httpServer = app.listen(port, host, () => {
   startOneCClaimRequeueTimer();
   console.log("");
   console.log("Clover Server V18.1 (4.0.4 legacy-ack-bridge) запущен");
@@ -8579,3 +8598,4 @@ app.listen(port, host, () => {
   console.log("Пароли и ключи в журнал не выводятся.");
   console.log("");
 });
+applyHttpServerBounds(httpServer, readHttpServerBounds());
