@@ -517,14 +517,14 @@ const RAW_CATALOG = [
   },
   {
     "key": "storefront.analytics.bannerText",
-    "sourceRu": "Мы используем Яндекс Метрику, чтобы понимать, какие страницы открывают посетители и какие действия совершают на витрине. Это необязательно: каталог, вход и заказ работают без согласия. Отсутствие ответа не считается согласием.",
+    "sourceRu": "Используем cookie для статистики — с вашего разрешения.",
     "namespace": "ui",
     "surface": "storefront",
     "critical": false
   },
   {
     "key": "storefront.analytics.allow",
-    "sourceRu": "Разрешить аналитику",
+    "sourceRu": "Разрешить",
     "namespace": "ui",
     "surface": "storefront",
     "critical": false
@@ -573,7 +573,7 @@ const RAW_CATALOG = [
   },
   {
     "key": "storefront.analytics.privacyLink",
-    "sourceRu": "Политика обработки персональных данных",
+    "sourceRu": "Подробнее",
     "namespace": "ui",
     "surface": "storefront",
     "critical": false

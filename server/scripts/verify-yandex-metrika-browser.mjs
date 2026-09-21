@@ -111,7 +111,8 @@ function visitAssets(dir) {
 }
 visitAssets(path.join(outDir, "assets"));
 const bundle = chunks.join("\n");
-assert.match(bundle, /Разрешить аналитику/);
+assert.match(bundle, /Используем cookie для статистики — с вашего разрешения\./);
+assert.match(bundle, /Подробнее/);
 assert.match(bundle, /data-analytics-consent/);
 assert.match(bundle, /__clover_metrika_mock\.js/);
 assert.match(bundle, /order_submitted/);
@@ -174,11 +175,34 @@ if (chrome) {
     { encoding: "utf8", timeout: 25000, env: { ...process.env, HOME: temp } }
   );
   if (dump.status === 0 && dump.stdout.includes("data-analytics-consent")) {
-    assert.match(dump.stdout, /Разрешить аналитику/);
+    assert.match(dump.stdout, /Используем cookie для статистики — с вашего разрешения\./);
+    assert.match(dump.stdout, /Подробнее/);
+    assert.match(dump.stdout, /Разрешить/);
     assert.match(dump.stdout, /Отклонить/);
+    assert.doesNotMatch(dump.stdout, /Необязательная аналитика/);
+    assert.doesNotMatch(dump.stdout, /Разрешить аналитику/);
     assert.doesNotMatch(dump.stdout, /mc\.yandex\.ru\/metrika\/tag\.js/);
     settledDom = "PASS";
     chromeDetail = "dump-dom-prompt";
+    const mobile = spawnSync(
+      chrome,
+      [
+        "--headless=new",
+        "--disable-gpu",
+        "--no-sandbox",
+        "--window-size=390,844",
+        "--dump-dom",
+        `http://127.0.0.1:${port}/`,
+      ],
+      { encoding: "utf8", timeout: 25000, env: { ...process.env, HOME: temp } }
+    );
+    if (mobile.status === 0 && mobile.stdout.includes("is-prompt")) {
+      assert.match(mobile.stdout, /data-analytics-consent="prompt"/);
+      assert.match(mobile.stdout, /Используем cookie для статистики — с вашего разрешения\./);
+      chromeDetail = "dump-dom-prompt+mobile-390";
+    } else {
+      chromeDetail = "dump-dom-prompt;mobile-NOT_VERIFIED";
+    }
   } else {
     settledDom = "NOT VERIFIED";
     chromeDetail = `dump-failed:${dump.status}:${(dump.stderr || "").slice(0, 160)}`;

@@ -510,11 +510,35 @@ const banner = src("src/analytics/AnalyticsConsentBanner.jsx");
 assert.match(banner, /data-analytics-action="allow"/);
 assert.match(banner, /storefront\.analytics\.allow/);
 assert.match(banner, /storefront\.analytics\.deny/);
+assert.match(banner, /is-prompt/);
+assert.match(banner, /storefront\.analytics\.bannerText/);
+assert.match(banner, /privacy-policy/);
+assert.doesNotMatch(banner, /bannerTitle/);
+const bannerCss = src("src/screens/storefront/storefront.css");
+const consentStart = bannerCss.indexOf(".sf-analytics-consent,");
+assert.ok(consentStart >= 0, "consent box-sizing group missing");
+const consentCss = bannerCss.slice(consentStart, bannerCss.indexOf(".sf-section-foot"));
+assert.match(consentCss, /\.sf-analytics-consent\.is-prompt/);
+assert.match(consentCss, /box-sizing:\s*border-box/);
+assert.match(consentCss, /min-height:\s*44px/);
+assert.match(consentCss, /height:\s*auto/);
+assert.match(consentCss, /max-width:\s*100%/);
+assert.match(consentCss, /flex:\s*1 1 auto/);
+assert.match(consentCss, /flex:\s*0 0 auto/);
+assert.match(consentCss, /safe-area-inset-bottom/);
+assert.match(consentCss, /@media \(max-width: 640px\)/);
+assert.match(consentCss, /min\(720px, 100%\)/);
+assert.doesNotMatch(consentCss, /flex:\s*1 1 16rem/);
+assert.doesNotMatch(consentCss, /flex:\s*1 1 12\.5rem/);
+assert.doesNotMatch(consentCss, /overflow\s*:\s*hidden/);
 assert.doesNotMatch(checkout, /storefront\.analytics/);
 assert.match(src("src/analytics/metrikaConfig.js"), /build-time flag/);
 assert.match(src("docs/technical/yandex-metrika-safe-init.md"), /PUT \/api\/state\/orders/);
 
 const catalog = src("src/shared/i18n/uiCatalog.js");
+assert.match(catalog, /Используем cookie для статистики — с вашего разрешения\./);
+assert.match(catalog, /"sourceRu": "Разрешить"/);
+assert.match(catalog, /"sourceRu": "Подробнее"/);
 const seed = src("server/src/i18n/uiTranslationSeed.js");
 for (const key of [
   "storefront.analytics.bannerTitle",

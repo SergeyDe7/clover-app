@@ -286,6 +286,7 @@ class CdpSession {
   constructor(ws) {
     this.ws = ws;
     this.id = 0;
+    this.sessionId = "";
     this.pending = new Map();
     this.network = [];
     this.requestIds = new Map();
@@ -321,28 +322,34 @@ class CdpSession {
     });
   }
 
-  send(method, params = {}) {
+  send(method, params = {}, sessionId = this.sessionId) {
     const id = ++this.id;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
-      this.ws.send(JSON.stringify({ id, method, params }));
+      const payload = { id, method, params };
+      if (sessionId) payload.sessionId = sessionId;
+      this.ws.send(JSON.stringify(payload));
     });
   }
 
-  async evaluate(expression) {
-    const result = await this.send("Runtime.evaluate", {
-      expression,
-      awaitPromise: true,
-      returnByValue: true,
-    });
+  async evaluate(expression, sessionId = this.sessionId) {
+    const result = await this.send(
+      "Runtime.evaluate",
+      {
+        expression,
+        awaitPromise: true,
+        returnByValue: true,
+      },
+      sessionId
+    );
     if (result.exceptionDetails) {
       throw new Error(result.exceptionDetails.text || "evaluate failed");
     }
     return result.result?.value;
   }
 
-  async screenshot(file) {
-    const shot = await this.send("Page.captureScreenshot", { format: "png" });
+  async screenshot(file, sessionId = this.sessionId) {
+    const shot = await this.send("Page.captureScreenshot", { format: "png" }, sessionId);
     writeFileSync(file, Buffer.from(shot.data, "base64"));
     return file;
   }
@@ -408,6 +415,93 @@ async function launchChrome(browserPath, userDataDir) {
   return { child, cdp, port };
 }
 
+async function connectBrowserCdp(port) {
+  const res = await fetch(`http://127.0.0.1:${port}/json/version`);
+  if (!res.ok) throw new Error("chrome version endpoint failed");
+  const version = await res.json();
+  const ws = new WebSocket(version.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => {
+    ws.addEventListener("open", resolve);
+    ws.addEventListener("error", reject);
+  });
+  return new CdpSession(ws);
+}
+
+function bindSession(browserCdp, sessionId) {
+  return {
+    sessionId,
+    send: (method, params = {}) => browserCdp.send(method, params, sessionId),
+    evaluate: (expression) => browserCdp.evaluate(expression, sessionId),
+    screenshot: (file) => browserCdp.screenshot(file, sessionId),
+  };
+}
+
+async function openIsolatedLayoutPage(browserCdp, origin, { pathName, width, height }) {
+  const { browserContextId } = await browserCdp.send("Target.createBrowserContext", {});
+  const { targetId } = await browserCdp.send("Target.createTarget", {
+    url: "about:blank",
+    browserContextId,
+  });
+  const attached = await browserCdp.send("Target.attachToTarget", {
+    targetId,
+    flatten: true,
+  });
+  const page = bindSession(browserCdp, attached.sessionId);
+  await page.send("Page.enable");
+  await page.send("Runtime.enable");
+  await page.send("Network.enable");
+  await page.send("Network.setBlockedURLs", { urls: METRIKA_BLOCK_URLS });
+  await page.send("Emulation.setDeviceMetricsOverride", {
+    width,
+    height,
+    deviceScaleFactor: 1,
+    mobile: width < 500,
+  });
+  await page.send("Page.navigate", { url: `${origin}${pathName}` });
+  return {
+    page,
+    async close() {
+      try {
+        await browserCdp.send("Target.closeTarget", { targetId });
+      } catch {
+        /* already gone */
+      }
+      try {
+        await browserCdp.send("Target.disposeBrowserContext", { browserContextId });
+      } catch {
+        /* already gone */
+      }
+    },
+  };
+}
+
+async function stabilizeBanner(page, { lang, expectedText, expectedAllow }) {
+  await waitFor(page, `document.readyState === "complete"`, 15000);
+  await waitFor(page, `Boolean(document.getElementById("root"))`, 15000);
+  await page.evaluate(PAGE_HELPERS);
+  await waitFor(
+    page,
+    `document.documentElement.lang === ${JSON.stringify(lang)} && Boolean(document.querySelector('[data-analytics-consent="prompt"]')) && window.__cloverSmoke.state().allow === true`,
+    15000
+  );
+  await page.evaluate(`document.fonts ? document.fonts.ready.then(() => true) : true`);
+  await page.evaluate(
+    `new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))`
+  );
+  await new Promise((r) => setTimeout(r, 280));
+  const layout = await page.evaluate("window.__cloverSmoke.layout()");
+  const pathOk =
+    lang === "ar"
+      ? String(layout.path || "").startsWith("/ar")
+      : !/^\/(en|ar|uz|ky|tg|zh)(\/|$)/.test(String(layout.path || ""));
+  const langOk = layout.lang === lang;
+  const textOk = String(layout.bannerText || "").includes(expectedText);
+  const allowOk = layout.buttons.some(
+    (b) => b.action === "allow" && b.text === expectedAllow
+  );
+  return { layout, pathOk, langOk, textOk, allowOk };
+}
+
 async function waitFor(cdp, expression, timeoutMs = 8000) {
   const deadline = Date.now() + timeoutMs;
   let last;
@@ -468,19 +562,89 @@ const PAGE_HELPERS = String.raw`
     },
     layout() {
       const card = document.querySelector(".sf-analytics-consent-card");
+      const host = document.querySelector(".sf-analytics-consent");
       const btns = [...document.querySelectorAll(".sf-analytics-consent-btn")];
       const header = document.querySelector(".sf-header");
-      return {
-        ...window.__cloverSmoke.state(),
-        card: card ? card.getBoundingClientRect().toJSON() : null,
-        buttons: btns.map((b) => ({
+      const vv = window.visualViewport;
+      const viewport = {
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+        clientWidth: document.documentElement.clientWidth,
+        clientHeight: document.documentElement.clientHeight,
+        visualWidth: vv ? vv.width : window.innerWidth,
+        visualHeight: vv ? vv.height : window.innerHeight,
+      };
+      const vw = viewport.visualWidth || viewport.clientWidth;
+      const vh = viewport.visualHeight || viewport.clientHeight;
+      const styleOf = (el) => {
+        if (!el) return null;
+        const cs = getComputedStyle(el);
+        return {
+          boxSizing: cs.boxSizing,
+          display: cs.display,
+          flex: cs.flex,
+          flexBasis: cs.flexBasis,
+          flexGrow: cs.flexGrow,
+          flexDirection: cs.flexDirection,
+          width: cs.width,
+          height: cs.height,
+          maxWidth: cs.maxWidth,
+          minHeight: cs.minHeight,
+          padding: cs.padding,
+          overflow: cs.overflow,
+          alignSelf: cs.alignSelf,
+        };
+      };
+      const boxOf = (el) => {
+        if (!el) return null;
+        const rect = el.getBoundingClientRect();
+        return {
+          x: rect.x,
+          y: rect.y,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height,
+        };
+      };
+      const fits = (box) => {
+        if (!box) return false;
+        return (
+          box.left >= -1 &&
+          box.top >= -1 &&
+          box.right <= vw + 1 &&
+          box.bottom <= vh + 1
+        );
+      };
+      const cardBox = boxOf(card);
+      const buttonRows = btns.map((b) => {
+        const box = boxOf(b);
+        return {
           text: b.textContent.trim(),
           action: b.getAttribute("data-analytics-action"),
-          box: b.getBoundingClientRect().toJSON(),
-          height: b.getBoundingClientRect().height,
-          width: b.getBoundingClientRect().width,
-        })),
+          box,
+          height: box?.height || 0,
+          width: box?.width || 0,
+          fitsViewport: fits(box),
+          style: styleOf(b),
+        };
+      });
+      return {
+        ...window.__cloverSmoke.state(),
+        bannerText: document.querySelector(".sf-analytics-consent-text")?.textContent.trim() || "",
+        viewport,
+        card: cardBox,
+        host: boxOf(host),
+        cardFitsViewport: fits(cardBox),
+        buttons: buttonRows,
         headerBottom: header ? header.getBoundingClientRect().bottom : 0,
+        styles: {
+          host: styleOf(host),
+          card: styleOf(card),
+          actions: styleOf(document.querySelector(".sf-analytics-consent-actions")),
+        },
       };
     },
     click(sel) {
@@ -614,7 +778,7 @@ async function runSensitiveUrlScenario(cdp, origin) {
   });
 }
 
-async function runInteractive(cdp, origin) {
+async function runInteractive(cdp, origin, { port } = {}) {
   const rows = [];
   const shots = [];
   const only = smokeOnly();
@@ -751,8 +915,18 @@ async function runInteractive(cdp, origin) {
       if (afterReload.banner === "prompt" || afterReload.mockLoaded || afterReload.inits) {
         return fail("revoke_reload_regrant_unknown_version", "reload-reopened-or-loaded", { afterReload });
       }
-      await cdp.evaluate(`window.__cloverSmoke.click("[data-analytics-settings]")`);
-      await new Promise((r) => setTimeout(r, 400));
+      await waitFor(
+        cdp,
+        `Boolean(document.querySelector("[data-analytics-settings]"))`,
+        8000
+      );
+      await cdp.evaluate(
+        `new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))`
+      );
+      const reopened = await cdp.evaluate(`window.__cloverSmoke.click("[data-analytics-settings]")`);
+      if (!reopened) {
+        return fail("revoke_reload_regrant_unknown_version", "settings-missing-after-reload");
+      }
       await waitFor(cdp, `window.__cloverSmoke.state().allow === true`, 8000);
       await cdp.evaluate(`window.__cloverSmoke.click("[data-analytics-action='allow']")`);
       await waitFor(cdp, `window.__cloverSmoke.state().inits === 1`, 8000);
@@ -870,46 +1044,111 @@ async function runInteractive(cdp, origin) {
     })
   );
 
-  for (const [lang, width] of [
-    ["ru", 390],
-    ["ru", 1280],
-    ["ar", 390],
-    ["ar", 1280],
-  ]) {
+  const layoutCases = [
+    ["ru", 390, "/", "Используем cookie для статистики", "Разрешить"],
+    ["ru", 1280, "/", "Используем cookie для статистики", "Разрешить"],
+    ["ar", 390, "/ar/", "ملفات تعريف الارتباط", "السماح"],
+    ["ar", 1280, "/ar/", "ملفات تعريف الارتباط", "السماح"],
+  ];
+  let browserCdp;
+  try {
+    browserCdp = port ? await connectBrowserCdp(port) : null;
+  } catch (error) {
+    rows.push(fail("banner_layout_ru_390", "isolated-context", { error: String(error) }));
+    return { rows, shots };
+  }
+  for (const [lang, width, pathName, expectedText, expectedAllow] of layoutCases) {
     const id = `banner_layout_${lang}_${width}`;
+    const height = width === 390 ? 844 : 900;
     rows.push(
       await (async () => {
-        await cdp.send("Emulation.setDeviceMetricsOverride", {
-          width,
-          height: width === 390 ? 844 : 900,
-          deviceScaleFactor: 1,
-          mobile: width < 500,
-        });
-        await cdp.evaluate(`window.__cloverSmoke.setConsent(null)`);
-        const pathName = lang === "ar" ? "/ar/" : "/";
-        await cdp.send("Page.navigate", { url: `${origin}${pathName}` });
-        await waitFor(cdp, `document.readyState === "complete"`);
-        await cdp.evaluate(PAGE_HELPERS);
-        await waitFor(cdp, `window.__cloverSmoke.state().allow === true`, 10000);
-        const layout = await cdp.evaluate("window.__cloverSmoke.layout()");
-        const shot = path.join(evidenceDir, `consent-prompt-${lang}-${width}.png`);
-        await cdp.screenshot(shot);
-        shots.push(shot);
-        const equal =
-          layout.buttons.length === 2 &&
-          Math.abs((layout.buttons[0].width || 0) - (layout.buttons[1].width || 0)) <= 2 &&
-          layout.buttons.every((b) => (b.height || 0) >= 44);
-        const rtlOk = lang !== "ar" || layout.dir === "rtl";
-        const overlap =
-          layout.card && layout.headerBottom
-            ? layout.card.y < layout.headerBottom - 8
-            : false;
-        if (!equal || layout.overflowX || !rtlOk || overlap || !layout.allow || !layout.deny) {
-          return fail(id, "layout", { layout, shot, rtlOk, equal, overlap });
+        if (!browserCdp) {
+          return fail(id, "isolated-context", { reason: "browser-cdp-missing" });
         }
-        return pass(id, { layout, shot, rtlOk });
+        let isolated;
+        try {
+          isolated = await openIsolatedLayoutPage(browserCdp, origin, {
+            pathName,
+            width,
+            height,
+          });
+          const settled = await stabilizeBanner(isolated.page, {
+            lang,
+            expectedText,
+            expectedAllow,
+          });
+          const shot = path.join(evidenceDir, `consent-prompt-${lang}-${width}.png`);
+          await isolated.page.screenshot(shot);
+          shots.push(shot);
+          const { layout, pathOk, langOk, textOk, allowOk } = settled;
+          const buttons = layout.buttons || [];
+          const equal =
+            buttons.length === 2 &&
+            Math.abs((buttons[0].width || 0) - (buttons[1].width || 0)) <= 2;
+          const heightOk = buttons.every((b) => (b.height || 0) >= 44 && (b.height || 0) <= 80);
+          const compactOk = width !== 390 || ((layout.card?.height || 0) > 0 && (layout.card?.height || 0) <= 240);
+          const inside =
+            layout.cardFitsViewport === true && buttons.every((b) => b.fitsViewport);
+          const rtlOk = lang !== "ar" || layout.dir === "rtl";
+          const overlap =
+            layout.card && layout.headerBottom
+              ? layout.card.y < layout.headerBottom - 8
+              : false;
+          if (
+            !pathOk ||
+            !langOk ||
+            !textOk ||
+            !allowOk ||
+            !equal ||
+            !heightOk ||
+            !compactOk ||
+            !inside ||
+            !rtlOk ||
+            overlap ||
+            !layout.allow ||
+            !layout.deny
+          ) {
+            return fail(id, "layout", {
+              layout,
+              shot,
+              pathOk,
+              langOk,
+              textOk,
+              allowOk,
+              equal,
+              heightOk,
+              compactOk,
+              inside,
+              rtlOk,
+              overlap,
+            });
+          }
+          return pass(id, {
+            layout,
+            shot,
+            pathOk,
+            langOk,
+            textOk,
+            allowOk,
+            heightOk,
+            compactOk,
+            inside,
+            rtlOk,
+          });
+        } catch (error) {
+          return fail(id, "layout-exception", { error: String(error) });
+        } finally {
+          if (isolated) await isolated.close();
+        }
       })()
     );
+  }
+  if (browserCdp?.ws) {
+    try {
+      browserCdp.ws.close();
+    } catch {
+      /* ignore */
+    }
   }
 
   rows.push(await runSensitiveUrlScenario(cdp, origin));
@@ -1014,7 +1253,7 @@ async function main() {
 
     const testServer = await startPreviewServer(testDist, { copyMock: true });
     chrome = await launchChrome(browser, profile);
-    const interactive = await runInteractive(chrome.cdp, testServer.origin);
+    const interactive = await runInteractive(chrome.cdp, testServer.origin, { port: chrome.port });
     scenarios.push(...interactive.rows);
     if (wantScenario("network_guard")) {
       if (realMetrikaHits(chrome.cdp, await pageBeacons(chrome.cdp)).length) {
