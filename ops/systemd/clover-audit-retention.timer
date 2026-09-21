@@ -1,13 +1,13 @@
 [Unit]
-Description=Clover audit retention timer (disabled until explicit enable)
-# Owner decision: monthly after daily backup (03:15). Change OnCalendar only with approval.
+Description=Clover audit retention dry-run timer
+# Stage 5: scheduled retention must stay read-only. Apply remains manual-only.
 
 [Timer]
 OnCalendar=*-*-01 03:40:00
 Persistent=true
 AccuracySec=30min
 RandomizedDelaySec=20min
-Unit=clover-audit-retention-apply.service
+Unit=clover-audit-retention-dry-run.service
 
 [Install]
 WantedBy=timers.target
