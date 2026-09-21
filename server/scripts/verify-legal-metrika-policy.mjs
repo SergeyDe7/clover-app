@@ -104,9 +104,9 @@ for (const locale of ["en", "uz", "ky", "tg", "zh-CN", "ar"]) {
 }
 
 const catalog = read("src/shared/i18n/uiCatalog.js");
-assert.match(catalog, /Мы используем Яндекс Метрику, чтобы понимать, какие страницы открывают посетители/);
-assert.match(catalog, /каталог, вход и заказ работают без согласия/);
-assert.match(catalog, /Отсутствие ответа не считается согласием/);
+assert.match(catalog, /Используем cookie для статистики — с вашего разрешения\./);
+assert.match(catalog, /"sourceRu": "Разрешить"/);
+assert.match(catalog, /"sourceRu": "Подробнее"/);
 assert.match(catalog, /storefront\.checkout\.orderLegalNote/);
 assert.match(catalog, /storefront\.checkout\.orderLegalLink/);
 

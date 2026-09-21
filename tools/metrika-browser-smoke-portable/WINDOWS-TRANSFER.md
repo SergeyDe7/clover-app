@@ -12,7 +12,7 @@
 С Linux-источника:
 
 ```powershell
-ssh clover "node /opt/clover/worktrees/yandex-metrika-safe-init/tools/metrika-browser-smoke-portable/pack-candidate.mjs"
+ssh clover "node /opt/clover/worktrees/metrika-consent-banner-compact/tools/metrika-browser-smoke-portable/pack-candidate.mjs"
 ```
 
 Скрипт пишет архив в `/tmp/clover-metrika-candidate-*` и
@@ -21,16 +21,19 @@ ssh clover "node /opt/clover/worktrees/yandex-metrika-safe-init/tools/metrika-br
 
 ```powershell
 New-Item -ItemType Directory -Force C:\clover-metrika-smoke | Out-Null
-scp clover:/tmp/clover-metrika-candidate-*/yandex-metrika-safe-init-candidate.tar.gz C:\clover-metrika-smoke\
+scp clover:/tmp/clover-metrika-candidate-*/metrika-consent-banner-compact-candidate.tar.gz C:\clover-metrika-smoke\
+scp clover:/tmp/clover-metrika-candidate-*/ARCHIVE.sha256 C:\clover-metrika-smoke\
 scp clover:/tmp/clover-metrika-candidate-*/SHA256SUMS C:\clover-metrika-smoke\
 scp clover:/tmp/clover-metrika-candidate-*/IDENTITY.json C:\clover-metrika-smoke\
+scp clover:/tmp/clover-metrika-candidate-*/WINDOWS-RUN.md C:\clover-metrika-smoke\
 ```
 
 Не копировать `.env`, рабочие БД, секреты, `node_modules`.
 
 Распаковать в отдельную папку и сверить checksums с `SHA256SUMS`.
-`IDENTITY.json` должен показывать ветку `agent/yandex-metrika-safe-init`,
-грязное дерево и SHA файлов аналитики — не чистый `origin/main`.
+`IDENTITY.json` должен показывать ветку `agent/metrika-consent-banner-compact`,
+HEAD `73341869c1f3b6733c82d3b43044ae753c4abf32`, грязное дерево и SHA файлов
+баннера — не чистый `origin/main` без незакоммиченных правок.
 
 ## Зависимости
 
@@ -42,8 +45,8 @@ scp clover:/tmp/clover-metrika-candidate-*/IDENTITY.json C:\clover-metrika-smoke
 ## Запуск
 
 ```powershell
-cd C:\clover-metrika-smoke\yandex-metrika-safe-init   # или путь после tar
-powershell -File .\tools\metrika-browser-smoke-portable\Run-MetrikaBrowserSmoke.ps1
+cd C:\clover-metrika-smoke\candidate
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\metrika-browser-smoke-portable\Run-MetrikaBrowserSmoke.ps1
 ```
 
 Launcher:

@@ -17,36 +17,55 @@ export function AnalyticsConsentBanner({
 }) {
   const { t } = useLocalization();
   const settings = mode === "settings";
-  const title = settings
-    ? t("storefront.analytics.settingsTitle")
-    : t("storefront.analytics.bannerTitle");
-  const text = settings
-    ? t("storefront.analytics.settingsText")
-    : t("storefront.analytics.bannerText");
+  const denyAction =
+    settings && currentStatus === ANALYTICS_CONSENT_GRANTED ? "revoke" : "deny";
+  const denyLabel =
+    denyAction === "revoke"
+      ? t("storefront.analytics.revoke")
+      : t("storefront.analytics.deny");
 
   return (
     <div
-      className={`sf-analytics-consent${settings ? " is-settings" : ""}`}
+      className={`sf-analytics-consent${settings ? " is-settings" : " is-prompt"}`}
       role="dialog"
       aria-modal="false"
-      aria-labelledby="sf-analytics-consent-title"
+      aria-label={
+        settings
+          ? t("storefront.analytics.settingsTitle")
+          : t("storefront.analytics.bannerText")
+      }
       data-analytics-consent={settings ? "settings" : "prompt"}
     >
       <div className="sf-analytics-consent-card">
-        <h2 id="sf-analytics-consent-title" className="sf-analytics-consent-title">
-          {title}
-        </h2>
-        <p className="sf-analytics-consent-text">{text}</p>
         {settings ? (
-          <p className="sf-analytics-consent-note">{t("storefront.analytics.revokeNote")}</p>
+          <>
+            <h2 id="sf-analytics-consent-title" className="sf-analytics-consent-title">
+              {t("storefront.analytics.settingsTitle")}
+            </h2>
+            <p className="sf-analytics-consent-text">{t("storefront.analytics.settingsText")}</p>
+            <p className="sf-analytics-consent-note">{t("storefront.analytics.revokeNote")}</p>
+          </>
+        ) : (
+          <p className="sf-analytics-consent-text">
+            {t("storefront.analytics.bannerText")}{" "}
+            <a
+              className="sf-analytics-consent-privacy"
+              href={storefrontHref({ name: "info", slug: "privacy-policy" })}
+              onClick={goPrivacy}
+            >
+              {t("storefront.analytics.privacyLink")}
+            </a>
+          </p>
+        )}
+        {settings ? (
+          <a
+            className="sf-analytics-consent-privacy"
+            href={storefrontHref({ name: "info", slug: "privacy-policy" })}
+            onClick={goPrivacy}
+          >
+            {t("storefront.analytics.privacyLink")}
+          </a>
         ) : null}
-        <a
-          className="sf-analytics-consent-privacy"
-          href={storefrontHref({ name: "info", slug: "privacy-policy" })}
-          onClick={goPrivacy}
-        >
-          {t("storefront.analytics.privacyLink")}
-        </a>
         <div className="sf-analytics-consent-actions">
           <button
             type="button"
@@ -59,12 +78,10 @@ export function AnalyticsConsentBanner({
           <button
             type="button"
             className="sf-btn sf-btn-ghost sf-analytics-consent-btn"
-            data-analytics-action={settings && currentStatus === ANALYTICS_CONSENT_GRANTED ? "revoke" : "deny"}
+            data-analytics-action={denyAction}
             onClick={onDeny}
           >
-            {settings && currentStatus === ANALYTICS_CONSENT_GRANTED
-              ? t("storefront.analytics.revoke")
-              : t("storefront.analytics.deny")}
+            {denyLabel}
           </button>
         </div>
         {settings ? (

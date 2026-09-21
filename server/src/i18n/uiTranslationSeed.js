@@ -594,20 +594,20 @@ export const SEEDS = {
     "ar": "تحليلات اختيارية"
   },
   "storefront.analytics.bannerText": {
-    "en": "We use Yandex Metrica to understand which pages visitors open and which actions they take on the storefront. This is optional: catalog, sign-in and checkout work without consent. No answer is not consent.",
-    "uz": "Mehmonlar qaysi sahifalarni ochishi va vitrinada qanday amallar qilishini tushunish uchun Yandex Metrica ishlatamiz. Bu ixtiyoriy: katalog, kirish va buyurtma roziliksiz ishlaydi. Javob yo‘qligi rozilik emas.",
-    "ky": "Коноктор кайсы барактарды ачканын жана витринада кандай аракет кылганын түшүнүү үчүн Яндекс Метриканы колдонобуз. Бул милдеттүү эмес: каталог, кирүү жана заказ макулдуксуз иштейт. Жооп жок болсо, бул макулдук эмес.",
-    "tg": "Барои фаҳмидани он ки меҳмонон кадом саҳифаҳоро мекушоянд ва дар витрина чӣ амал мекунанд, Яндекс Метрикаро истифода мебарем. Ин ихтиёрӣ аст: каталог, вуруд ва фармоиш бе розигӣ кор мекунанд. Ҷавоб надодан розигӣ нест.",
-    "zh-CN": "我们使用 Yandex Metrica 了解访客打开了哪些页面、在橱窗上做了哪些操作。这是可选项：目录、登录和下单无需同意即可使用。未作答不视为同意。",
-    "ar": "نستخدم ياندكس متريكا لفهم الصفحات التي يفتحها الزوار والإجراءات التي يقومون بها في الواجهة. هذا اختياري: الكتالوج وتسجيل الدخول والطلب يعملون دون موافقة. عدم الإجابة لا يعني الموافقة."
+    "en": "We use cookies for statistics — with your permission.",
+    "uz": "Statistika uchun cookie ishlatamiz — sizning ruxsatingiz bilan.",
+    "ky": "Статистика үчүн cookie колдонобуз — сиздин уруксатыңыз менен.",
+    "tg": "Барои омор cookie истифода мебарем — бо иҷозати шумо.",
+    "zh-CN": "经您允许，我们使用 cookie 做统计。",
+    "ar": "نستخدم ملفات تعريف الارتباط للإحصاء — بإذنكم."
   },
   "storefront.analytics.allow": {
-    "en": "Allow analytics",
-    "uz": "Analitikaga ruxsat",
-    "ky": "Аналитикага уруксат",
-    "tg": "Иҷозати таҳлил",
-    "zh-CN": "允许分析",
-    "ar": "السماح بالتحليلات"
+    "en": "Allow",
+    "uz": "Ruxsat",
+    "ky": "Уруксат",
+    "tg": "Иҷозат",
+    "zh-CN": "允许",
+    "ar": "السماح"
   },
   "storefront.analytics.deny": {
     "en": "Decline",
@@ -658,12 +658,12 @@ export const SEEDS = {
     "ar": "السحب لا يحذف البيانات التي ربما أُرسلت بالفعل."
   },
   "storefront.analytics.privacyLink": {
-    "en": "Personal data processing policy",
-    "uz": "Shaxsiy ma’lumotlarni qayta ishlash siyosati",
-    "ky": "Жеке маалыматтарды иштетүү саясаты",
-    "tg": "Сиёсати коркарди маълумоти шахсӣ",
-    "zh-CN": "个人数据处理政策",
-    "ar": "سياسة معالجة البيانات الشخصية"
+    "en": "More",
+    "uz": "Batafsil",
+    "ky": "Кененирээк",
+    "tg": "Муфассал",
+    "zh-CN": "详情",
+    "ar": "المزيد"
   },
   "storefront.analytics.close": {
     "en": "Close",
