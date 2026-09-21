@@ -21,6 +21,7 @@ import {
   sourceFiles,
   verifyArtifact,
 } from "./securityStage5Artifact.mjs";
+import { runSecurityStage5OperatorTests } from "./verify-security-stage5-operator.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDir, "../..");
@@ -124,6 +125,13 @@ for (const required of [
   assert.ok(rollback.includes(required), `rollback contract missing ${required}`);
 }
 assert.doesNotMatch(rollback, /rm\s+-rf|pkill|kill\s+-9/);
+assert.ok(sourceFiles.includes("ops/security-stage5/scripts/promote-package-a.sh"));
+assert.match(rollback, /ops\/security-stage5\/scripts\/promote-package-a\.sh/);
+assert.match(rollback, /10-umask\.conf` is \*\*not\*\* a\s+destination/);
+assert.match(rollback, /Never restore\s+`10-umask\.conf`/);
+assert.doesNotMatch(rollback, /restore_exact[^\n]*10-umask/);
+assert.match(rollback, /The first\s+change is `systemctl stop clover-audit-retention\.timer`/);
+assert.match(rollback, /exits `40` when rollback completes and\s+`41`/);
 for (const dir of destinationDirs) {
   const escaped = dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   assert.doesNotMatch(
@@ -487,7 +495,8 @@ try {
   assert.equal(manifest.packages.B.status, "PREPARED");
   assert.equal(manifest.packages.C.status, "PREPARED");
   assert.equal(manifest.packages.D.status, "BLOCKED");
-  assert.ok(manifest.files.length >= 9);
+  assert.ok(manifest.files.length >= 10);
+  assert.ok(manifest.files.some((entry) => entry.path === "ops/security-stage5/scripts/promote-package-a.sh"));
   verifyArtifact({ artifact, expectedSha: fixtureSha, sourceRoot: fixtureRoot });
 
   const tampered = path.join(
@@ -514,5 +523,7 @@ try {
 } finally {
   rmSync(temp, { recursive: true, force: true });
 }
+
+runSecurityStage5OperatorTests();
 
 console.log("SECURITY_STAGE5_PREPARE:PASS");

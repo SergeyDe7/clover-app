@@ -63,6 +63,13 @@ Exact destinations, pre-state backups, install order, rollback commands, and
 post-rollback checks are defined in `PROMOTE_ROLLBACK.md`. That contract is
 included in the hashed PREPARE artifact.
 
+The only source-controlled Package A operator is
+`ops/security-stage5/scripts/promote-package-a.sh`. It is hashed into the
+PREPARE artifact. The rejected production file
+`/opt/clover/deployments/staging/package-a-promote-retry.sh` SHA-256
+`ba0a3c3e57d2bd01c94046dab81aded4e10c2df1566038b02a19be6c498a4f50` must never
+be executed.
+
 ## Package D — perimeter (BLOCKED)
 
 No firewall or API-bind artifact is included. Package D remains blocked until

@@ -19,6 +19,7 @@ export const auditBaselineSha = "1fdd7e6ac715f55e407d71a225e5a6037eb9d2e8";
 export const sourceFiles = Object.freeze([
   "ops/security-stage5/README.md",
   "ops/security-stage5/PROMOTE_ROLLBACK.md",
+  "ops/security-stage5/scripts/promote-package-a.sh",
   "ops/security-stage5/package-a/systemd/clover-api.service.d/20-hardening.conf",
   "ops/security-stage5/package-a/systemd/clover-ui.service.d/20-hardening.conf",
   "ops/systemd/clover-audit-retention.timer",

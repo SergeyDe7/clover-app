@@ -132,11 +132,26 @@ rollback_created_dir() {
 
 ## Package A — systemd and retention dry-run
 
+Use only the source-controlled operator
+`ops/security-stage5/scripts/promote-package-a.sh` from the accepted artifact.
+It requires a real TTY, one interactive `sudo -v`, then one root shell. Do not
+run `/opt/clover/deployments/staging/package-a-promote-retry.sh`.
+
+The operator extracts the verifier with
+`git -C /opt/clover/clover-app show "$EXPECTED_SHA:server/scripts/securityStage5Artifact.mjs"`
+into the new recovery directory. A pre-placed `.verifier-*.mjs` is forbidden.
+
 Exact destinations:
 
 - `/etc/systemd/system/clover-api.service.d/20-hardening.conf`
 - `/etc/systemd/system/clover-ui.service.d/20-hardening.conf`
 - `/etc/systemd/system/clover-audit-retention.timer`
+
+`/etc/systemd/system/clover-api.service.d/10-umask.conf` is **not** a
+destination. Record owner/group/mode/size and SHA-256 as evidence only. Never
+install, chmod, chown, delete, or restore it. After promote and after rollback
+the evidence SHA must be unchanged. Restoring a file the operator did not
+change is forbidden.
 
 Backup calls:
 
@@ -156,10 +171,21 @@ systemctl show clover-audit-retention.timer \
 curl -fsS --connect-timeout 2 --max-time 5 http://127.0.0.1:4100/api/health
 ```
 
-After exact-file backups, ensure destination directories without changing
-existing metadata, then install:
+Capture API `releaseId`/`version` and the live UI tag/html SHA from pre-state.
+After API→health then UI→health, those identities must be unchanged. Package A
+must not change the UI build.
+
+Timer backup and hashes must be complete before the first change. The first
+change is `systemctl stop clover-audit-retention.timer`. Apply and dry-run
+units must stay inactive. Install the three destinations only after that stop.
+The installed timer `Unit=` must be `clover-audit-retention-dry-run.service`.
+Never start `clover-audit-retention-apply.service`.
+
+After exact-file backups, stop the timer, ensure destination directories
+without changing existing metadata, then install:
 
 ```bash
+sudo systemctl stop clover-audit-retention.timer
 ensure_destination_dir /etc/systemd/system/clover-api.service.d a-dir-clover-api.service.d 0755
 ensure_destination_dir /etc/systemd/system/clover-ui.service.d a-dir-clover-ui.service.d 0755
 sudo install -m 0644 \
@@ -168,9 +194,12 @@ sudo install -m 0644 \
 sudo install -m 0644 \
   "$ARTIFACT/ops/security-stage5/package-a/systemd/clover-ui.service.d/20-hardening.conf" \
   /etc/systemd/system/clover-ui.service.d/20-hardening.conf
-sudo systemctl stop clover-audit-retention.timer
 sudo install -m 0644 \
   "$ARTIFACT/ops/systemd/clover-audit-retention.timer" \
+  /etc/systemd/system/clover-audit-retention.timer
+sudo systemd-analyze verify \
+  /etc/systemd/system/clover-api.service \
+  /etc/systemd/system/clover-ui.service \
   /etc/systemd/system/clover-audit-retention.timer
 sudo systemctl daemon-reload
 sudo systemctl restart clover-api.service
@@ -180,6 +209,15 @@ curl -fsS -o /dev/null --connect-timeout 2 --max-time 5 http://127.0.0.1:5273/
 sudo systemctl start clover-audit-retention.timer
 systemctl show clover-audit-retention.timer -p ActiveState -p NextElapseUSecRealtime
 ```
+
+nginx is read-only: record PID and HTTPS health. Do not restart or reload
+nginx. Packages B–D, orphan listeners, checkout, application, database,
+uploads, backups, and 1C stay untouched.
+
+Promote failure after the first change exits `40` when rollback completes and
+`41` when rollback is incomplete. Unexpected errors before the first change
+keep the original exit code and must not roll back. `INT`/`TERM` after
+`CHANGED=1` must roll back.
 
 Rollback restores or removes the three exact destinations according to their
 backups/`.absent` markers, then removes only directories this package created,
@@ -199,6 +237,12 @@ sudo systemctl restart clover-ui.service
 curl -fsS -o /dev/null --connect-timeout 2 --max-time 5 http://127.0.0.1:5273/
 sudo systemctl start clover-audit-retention.timer
 ```
+
+Rollback restores the exact pre-state timer, including `Unit=`. If that
+pre-state targeted `clover-audit-retention-apply.service`, record residual:
+apply was not started by the operator; the restored timer is the previous
+host state, not the promoted dry-run target. Never restore
+`10-umask.conf`.
 
 Stopping orphan listeners and changing isolated SQLite modes are not included
 in this install. They require a separate runtime plan with exact PID start time,
