@@ -1466,7 +1466,7 @@ test("SEC3-013: systemd units have no secrets, clover user, timer contract, no o
   assert.doesNotMatch(dryKeys.ExecStart, /--apply/u);
   assert.doesNotMatch(timer, /--apply/u);
   assert.equal(timerKeys.Persistent, "true");
-  assert.equal(timerKeys.Unit, "clover-audit-retention-apply.service");
+  assert.equal(timerKeys.Unit, "clover-audit-retention-dry-run.service");
   assert.match(timer, /^OnCalendar=/mu);
   assert.match(wrapper, /^umask 077$/mu);
   assert.match(wrapper, /\bflock -n 9\b/u);
@@ -1502,7 +1502,7 @@ function spawnWrapperResolve(wrapperPath, extraEnv = {}) {
   });
 }
 
-test("SEC3-013: closeout documents hard-link, TOCTOU, trusted plan, and Persistent catch-up", () => {
+test("SEC3-013: closeout documents hard-link, TOCTOU, trusted plan, and dry-run catch-up", () => {
   const closeout = readRepoSource("docs/technical/SECURITY_STAGE3_PACKAGE3_CLOSEOUT.md");
   assert.match(closeout, /Hard-link residual/u);
   assert.match(closeout, /`lstat` sees a regular file/u);
@@ -1514,11 +1514,11 @@ test("SEC3-013: closeout documents hard-link, TOCTOU, trusted plan, and Persiste
   assert.match(closeout, /do \*\*not\*\* give a remote bypass/u);
   assert.match(closeout, /exact allowlist/u);
   assert.match(closeout, /canonical proven root/u);
-  assert.match(closeout, /Timer catch-up warning/u);
+  assert.match(closeout, /Timer catch-up note/u);
   assert.match(closeout, /Persistent=true/u);
-  assert.match(closeout, /immediately start \*\*apply\*\*/u);
-  assert.match(closeout, /Do \*\*not\*\* treat `systemctl enable --now clover-audit-retention\.timer` as a simple install step/u);
-  assert.match(closeout, /Before the first timer start: backup, a successful production dry-run, and a separate owner approval for apply/u);
+  assert.match(closeout, /Stage 5 timer target is the dry-run service/u);
+  assert.match(closeout, /manual start of/u);
+  assert.match(closeout, /separate production database/u);
 });
 
 test("SEC3-013: wrapper pins repository root and ignores malicious CLOVER_ROOT", () => {

@@ -2,6 +2,9 @@
 
 Source-controlled closeout for the production path-gate, DAC helper, and retention timer. This document is the install/rollback plan. It does **not** install, enable, start, chmod, or apply anything on production.
 
+Stage 5 supersedes the timer target: scheduled executions are now dry-run only.
+The apply service remains available for a separately approved manual run.
+
 ## Production path contract
 
 Retention CLI (`server/scripts/run-audit-retention.mjs`) opens SQLite only after `assertRetentionDbPathAllowed`. `DatabaseSync` receives that canonical path. Dry-run is `readOnly`. Apply requires the literal flag `--apply`. The CLI does not import `db.js` / schema-ensure.
@@ -102,7 +105,7 @@ Units (not installed by this package):
 
 - `ops/systemd/clover-audit-retention-dry-run.service` — no `--apply`
 - `ops/systemd/clover-audit-retention-apply.service` — literal `--apply` only here
-- `ops/systemd/clover-audit-retention.timer` — `Persistent=true`, `Unit=clover-audit-retention-apply.service`
+- `ops/systemd/clover-audit-retention.timer` — `Persistent=true`, `Unit=clover-audit-retention-dry-run.service`
 - `scripts/linux/run-audit-retention.sh` — `umask 077`, non-blocking `flock`, no secrets. At commit: `git add --chmod=+x` so the blob is `100755` (ExecStart calls the script directly). Wrapper root is the real path of the script (`.../scripts/linux/run-audit-retention.sh` → repository root). `CLOVER_ROOT` is accepted only when it canonicalizes to that same root; otherwise it is rejected. `DB_PATH` is always `<validated-root>/server/data/clover.sqlite`. A symlink invocation does not take root from the symlink directory.
 
 Contract:
@@ -121,7 +124,7 @@ Before any future enable or the first timer start:
 
 1. Backup.
 2. Successful production dry-run of the path-gate (this closeout supplies the gate; the dry-run itself still needs a separate production approval).
-3. A separate owner approval that **apply** is intended, including catch-up apply from a missed slot.
+3. Verify that the installed timer targets `clover-audit-retention-dry-run.service`.
 
 Copy units (does not enable):
 
@@ -138,9 +141,12 @@ Manual dry-run after copy (separate approval):
 sudo systemctl start clover-audit-retention-dry-run.service
 ```
 
-Timer catch-up warning: `Persistent=true` means that starting the timer after a missed `*-*-01 03:40:00` slot can immediately start **apply** (`clover-audit-retention-apply.service`). This is not a dry-run. Do **not** treat `systemctl enable --now clover-audit-retention.timer` as a simple install step. Copy + `daemon-reload` does not enable the timer. Before the first timer start: backup, a successful production dry-run, and a separate owner approval for apply (including an immediate catch-up apply).
+Timer catch-up note: `Persistent=true` can immediately start a missed slot, but
+the Stage 5 timer target is the dry-run service. Any manual start of
+`clover-audit-retention-apply.service` remains a separate production database
+action requiring explicit approval and a fresh backup.
 
-Enable/start timer (forbidden in this package; requires a later explicit approval):
+Enable/start the dry-run timer (forbidden in this package; requires a later explicit approval):
 
 ```bash
 sudo systemctl enable --now clover-audit-retention.timer

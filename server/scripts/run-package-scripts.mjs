@@ -52,6 +52,8 @@ const CHECK_FILES = [
   "src/httpServerBounds.js",
   "src/resourceBounds.js",
   "scripts/verify-security-stage4-package-c.mjs",
+  "scripts/securityStage5Artifact.mjs",
+  "scripts/verify-security-stage5-prepare.mjs",
   "src/outboundResponse.js",
   "src/remoteImagePolicy.js",
   "src/pushSubscriptionOwnership.js",
