@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Source-controlled Package A operator. Not permission to run on production.
-# Launch only as:
-#   git -C /opt/clover/clover-app show \
-#     "<EXTERNAL_TARGET>:ops/security-stage5/scripts/promote-package-a.sh" \
-#     | sudo /bin/bash -s -- \
-#       --target <EXTERNAL_TARGET> \
-#       --expected-manifest <EXTERNAL_MANIFEST_SHA256> \
-#       --artifact <ABS_ARTIFACT>
+# Launch only via the two-phase TTY command in PROMOTE_ROLLBACK.md:
+#   sudo /bin/bash -c '<fixed bootstrap>' -- \
+#     --target <EXTERNAL_TARGET> \
+#     --expected-manifest <EXTERNAL_MANIFEST_SHA256> \
+#     --artifact <ABS_ARTIFACT>
+# The bootstrap writes this file into a new root-owned recovery directory,
+# compares git hash-object --no-filters to $TARGET:path, then executes
+# /bin/bash <root-owned-operator>. Never pipe git show into bash -s.
 # Rejected remote SHA ba0a3c3e57d2bd01c94046dab81aded4e10c2df1566038b02a19be6c498a4f50
-# must never be executed. This file must not be opened as root via $0.
+# must never be executed.
 #
 # Exit codes:
 #   0  PASS
@@ -33,6 +34,14 @@ readonly EXIT_ROLLBACK_INCOMPLETE=41
 readonly DEFAULT_ROOT=/opt/clover/clover-app
 readonly DEFAULT_LIVE=1fdd7e6ac715f55e407d71a225e5a6037eb9d2e8
 readonly DEFAULT_LOCK=/opt/clover/deployments/deploy.lock
+readonly OPERATOR_REL=ops/security-stage5/scripts/promote-package-a.sh
+if [ -x /usr/bin/git ]; then
+  readonly TRUSTED_GIT=/usr/bin/git
+elif [ -x /mingw64/bin/git ]; then
+  readonly TRUSTED_GIT=/mingw64/bin/git
+else
+  readonly TRUSTED_GIT=/usr/bin/git
+fi
 
 TARGET=""
 EXPECTED_MANIFEST=""
@@ -86,14 +95,15 @@ require_tty() {
   fi
 }
 
-require_bash_s_launch() {
-  case "$0" in
-    bash|-bash|/bin/bash|/usr/bin/bash) ;;
-    *)
-      printf '%s\n' "FAIL: operator must be launched via git show | sudo /bin/bash -s" >&2
-      exit "$EXIT_PRE"
-      ;;
-  esac
+trusted_git() {
+  if [ ! -x "$TRUSTED_GIT" ]; then
+    printf '%s\n' "FAIL: /usr/bin/git missing" >&2
+    return 1
+  fi
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_OBJECT_DIRECTORY \
+    -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_INDEX_FILE \
+    -u GIT_NAMESPACE -u GIT_COMMON_DIR -u GIT_REPLACE_REF_BASE \
+    "$TRUSTED_GIT" --no-replace-objects -C "$ROOT" "$@"
 }
 
 require_sha256() {
@@ -125,9 +135,70 @@ sha_file() {
 
 git_blob_sha() {
   local spec="$1" hash
-  hash=$(git -C "$ROOT" show "$spec" | sha256sum | awk '{print $1}')
+  hash=$(trusted_git show "$spec" | sha256sum | awk '{print $1}')
   require_sha256 "$spec" "$hash"
+  [ -n "$hash" ] || return 1
   printf '%s\n' "$hash"
+}
+
+git_blob_id() {
+  local spec="$1" oid
+  oid=$(trusted_git rev-parse --verify "$spec")
+  if [ -z "$oid" ] || ! printf '%s' "$oid" | grep -Eq '^[0-9a-f]{40}$'; then
+    printf '%s\n' "FAIL: empty or invalid git object id for $spec" >&2
+    return 1
+  fi
+  printf '%s\n' "$oid"
+}
+
+file_blob_id() {
+  local path="$1" oid
+  oid=$(trusted_git hash-object --no-filters -- "$path")
+  if [ -z "$oid" ] || ! printf '%s' "$oid" | grep -Eq '^[0-9a-f]{40}$'; then
+    printf '%s\n' "FAIL: empty or invalid hash-object for $path" >&2
+    return 1
+  fi
+  printf '%s\n' "$oid"
+}
+
+require_trusted_self() {
+  local self="${BASH_SOURCE[0]:-}"
+  if [ -z "$self" ]; then
+    fail_before "BASH_SOURCE missing; stdin/source launch is forbidden"
+  fi
+  case "$self" in
+    /*) ;;
+    *) fail_before "operator path must be absolute" ;;
+  esac
+  if [ "$self" != "$0" ]; then
+    fail_before "operator must be executed as a file, not sourced or piped"
+  fi
+  case "$0" in
+    bash|-bash|/bin/bash|/usr/bin/bash) fail_before "bash -s/stdin launch is forbidden" ;;
+  esac
+  if test -L "$self" || ! test -f "$self"; then
+    fail_before "operator is not a regular non-symlink file"
+  fi
+  local owner mode nlink
+  owner=$(stat -c '%U:%G' "$self")
+  mode=$(stat -c '%a' "$self")
+  nlink=$(stat -c '%h' "$self")
+  [ "$owner" = "root:root" ] || fail_before "operator owner $owner"
+  [ "$mode" = "500" ] || [ "$mode" = "0500" ] || fail_before "operator mode $mode"
+  [ "$nlink" = "1" ] || fail_before "operator nlink $nlink"
+  case "$self" in
+    "$RECOVERY"/*) ;;
+    *) fail_before "operator is outside recovery" ;;
+  esac
+  case "$self" in
+    */artifact/*|*/ops/security-stage5/scripts/promote-package-a.sh)
+      fail_before "worktree/artifact operator path is forbidden"
+      ;;
+  esac
+  local expected_oid copy_oid
+  expected_oid=$(git_blob_id "${TARGET}:${OPERATOR_REL}")
+  copy_oid=$(file_blob_id "$self")
+  [ "$copy_oid" = "$expected_oid" ] || fail_before "operator blob id mismatch"
 }
 
 log() {
@@ -514,6 +585,10 @@ copy_payload_snapshot() {
   [ "$copy_hash" = "$man_hash" ] || fail_before "snapshot $rel != manifest"
   blob_hash=$(git_blob_sha "${TARGET}:${rel}")
   [ "$copy_hash" = "$blob_hash" ] || fail_before "snapshot $rel != git blob"
+  local expected_oid copy_oid
+  expected_oid=$(git_blob_id "${TARGET}:${rel}")
+  copy_oid=$(file_blob_id "$dest")
+  [ "$copy_oid" = "$expected_oid" ] || fail_before "snapshot $rel blob id mismatch"
 }
 
 manifest_file_hash() {
@@ -526,8 +601,7 @@ print(hits[0])' "$ARTIFACT/manifest.json" "$rel"
 }
 
 operator_main() {
-  unset CLOVER_OPERATOR_AS_ROOT SUDO_ASKPASS ASKPASS VERIFIER || true
-  require_bash_s_launch
+  unset CLOVER_OPERATOR_AS_ROOT SUDO_ASKPASS ASKPASS VERIFIER GIT_DIR GIT_WORK_TREE || true
   require_root
   require_tty
   parse_args "$@"
@@ -538,9 +612,17 @@ operator_main() {
     /*) ;;
     *) fail_before "ARTIFACT must be an absolute path" ;;
   esac
+  [ -n "$RECOVERY_ARG" ] || fail_before "recovery directory is required"
+  case "$RECOVERY_ARG" in
+    /*) ;;
+    *) fail_before "recovery must be an absolute path" ;;
+  esac
+  RECOVERY="$RECOVERY_ARG"
+  [ -d "$RECOVERY" ] || fail_before "recovery is not a directory"
   [ -d "$ARTIFACT" ] || fail_before "ARTIFACT is not a directory"
   [ -d "$ROOT/.git" ] || fail_before "repo missing $ROOT"
-  git -C "$ROOT" cat-file -e "${TARGET}^{commit}" || fail_before "target commit missing"
+  trusted_git cat-file -e "${TARGET}^{commit}" || fail_before "target commit missing"
+  require_trusted_self
 
   DST_API="${DEST_ROOT}/etc/systemd/system/clover-api.service.d/20-hardening.conf"
   DST_UI="${DEST_ROOT}/etc/systemd/system/clover-ui.service.d/20-hardening.conf"
@@ -566,12 +648,6 @@ operator_main() {
   fi
   LOCK_HELD=1
 
-  local rand
-  rand=$(python3 -c "import secrets; print(secrets.token_hex(8))")
-  RECOVERY=${RECOVERY_ARG:-/opt/clover/recovery/security-stage5-package-a-${TARGET}-full-${rand}}
-  install -d -m 0700 -- "$RECOVERY"
-  chown root:root -- "$RECOVERY"
-  chmod 0700 -- "$RECOVERY"
   SNAPSHOT="$RECOVERY/payload"
   install -d -m 0700 -- "$SNAPSHOT"
   chmod 0700 -- "$SNAPSHOT"
@@ -583,7 +659,7 @@ operator_main() {
 
   local verifier copy_hash blob_hash
   verifier="$RECOVERY/securityStage5Artifact-${TARGET}.mjs"
-  git -C "$ROOT" show "${TARGET}:server/scripts/securityStage5Artifact.mjs" > "$verifier"
+  trusted_git show "${TARGET}:server/scripts/securityStage5Artifact.mjs" > "$verifier"
   chmod 0500 -- "$verifier"
   copy_hash=$(sha_file "$verifier")
   blob_hash=$(git_blob_sha "${TARGET}:server/scripts/securityStage5Artifact.mjs")
@@ -597,7 +673,8 @@ operator_main() {
   man_sha=$(sha256sum -- "$ARTIFACT/manifest.json" | awk '{print toupper($1)}')
   [ "$man_sha" = "$EXPECTED_MANIFEST" ] || fail_before "manifest sha $man_sha"
   local head
-  head=$(git -C "$ROOT" rev-parse HEAD)
+  head=$(trusted_git rev-parse HEAD)
+  [ -n "$head" ] || fail_before "empty HEAD"
   [ "$head" = "$LIVE" ] || fail_before "checkout $head"
 
   local rel_api rel_ui rel_timer man_api man_ui man_timer
@@ -742,7 +819,7 @@ operator_main() {
   [ "$new_tgt" = clover-audit-retention-dry-run.service ]
   [ "$apply_st" = inactive ]
   [ "$(sha_file "$UMASK_FILE")" = "$UMASK_SHA" ]
-  [ "$(git -C "$ROOT" rev-parse HEAD)" = "$LIVE" ]
+  [ "$(trusted_git rev-parse HEAD)" = "$LIVE" ]
 
   ROLLBACK_STATE=NOT_NEEDED
   log "PACKAGE A PROMOTE PASS"
@@ -758,4 +835,8 @@ operator_main() {
   exit "$EXIT_PASS"
 }
 
+if [ "${BASH_SOURCE[0]:-}" != "$0" ]; then
+  printf '%s\n' "FAIL: operator must not be sourced or piped on stdin" >&2
+  exit "$EXIT_PRE"
+fi
 operator_main "$@"

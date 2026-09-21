@@ -121,6 +121,21 @@ function quote(value) {
   return `"${String(value).replace(/"/g, '\\"')}"`;
 }
 
+function extractBootstrap(text) {
+  const marker = "sudo /bin/bash -c '";
+  const start = text.indexOf(marker);
+  assert.ok(start >= 0, "runbook must contain sudo /bin/bash -c launcher");
+  const bodyStart = start + marker.length;
+  const bodyEnd = text.indexOf("\n' --", bodyStart);
+  assert.ok(bodyEnd > bodyStart, "runbook bootstrap body must end before argument list");
+  const body = text.slice(bodyStart, bodyEnd);
+  assert.match(body, /--no-replace-objects/);
+  assert.match(body, /\/usr\/bin\/git/);
+  assert.match(body, /hash-object --no-filters/);
+  assert.doesNotMatch(body, /\beval\b/);
+  return body;
+}
+
 function operatorArgs(cfg) {
   return [
     "--target",
@@ -185,20 +200,13 @@ function runTtyOperator(cfg, extraEnv, args) {
   const posixRc = toPosix(rcPath);
   const posixDone = toPosix(donePath);
   const posixLog = toPosix(logPath);
-  const blob = `git -C ${quote(cfg.repo)} show ${quote(`${cfg.target}:${operatorRel}`)}`;
   writeExec(
     innerPath,
     `#!/usr/bin/env bash
 ${envExports(extraEnv)}
 source ${quote(cfg.mocks)}
 export PATH=${quote(cfg.path)}
-if ! ${blob} > ${quote(posixBlob)}; then
-  echo "FAIL: git show of operator blob" >&2
-  echo 20 > ${quote(posixRc)}
-  echo DONE > ${quote(posixDone)}
-  exit 20
-fi
-bash -s -- ${args} < ${quote(posixBlob)}
+bash -c "$(cat ${quote(cfg.bootstrapFile)})" -- ${args}
 echo $? > ${quote(posixRc)}
 echo DONE > ${quote(posixDone)}
 `
@@ -254,7 +262,11 @@ function runOperator(cfg, extraEnv = {}, options = {}) {
     return runPipedOperator(cfg, extraEnv, `bash -- ${quote(options.fileLaunch)} ${args}`);
   }
   if (!options.tty) {
-    return runPipedOperator(cfg, extraEnv, `${blob} | bash -s -- ${args}`);
+    return runPipedOperator(
+      cfg,
+      extraEnv,
+      `bash -c "$(cat ${quote(cfg.bootstrapFile)})" -- ${args}`
+    );
   }
   return runTtyOperator(cfg, extraEnv, args);
 }
@@ -264,8 +276,10 @@ export function runSecurityStage5OperatorTests() {
   assert.match(operator, /^set -Eeuo pipefail$/m);
   assert.match(operator, /ROLLBACK_RUNNING=0/);
   assert.match(operator, /disable_recursive_traps/);
-  assert.match(operator, /require_bash_s_launch/);
-  assert.match(operator, /git show \| sudo \/bin\/bash -s/);
+  assert.match(operator, /require_trusted_self/);
+  assert.match(operator, /--no-replace-objects/);
+  assert.match(operator, /hash-object --no-filters/);
+  assert.doesNotMatch(operator, /git show \| sudo \/bin\/bash -s|require_bash_s_launch/);
   assert.match(operator, /readonly EXIT_PROMOTE_FAIL=40/);
   assert.match(operator, /readonly EXIT_ROLLBACK_INCOMPLETE=41/);
   assert.match(operator, /SNAPSHOT_LOCKED/);
@@ -286,7 +300,10 @@ export function runSecurityStage5OperatorTests() {
   assert.doesNotMatch(operator, /rm\s+-rf|pkill|kill\s+-9|\*\.conf/);
   assert.doesNotMatch(operator, /systemd-analyze[\s\S]{0,200}\|\|\s*true/);
   assert.doesNotMatch(operator, /\beval\b/);
-  assert.match(rollback, /sudo \/bin\/bash -s --/);
+  assert.match(rollback, /sudo \/bin\/bash -c '/);
+  assert.match(rollback, /--no-replace-objects/);
+  assert.match(rollback, /hash-object --no-filters/);
+  assert.doesNotMatch(rollback, /git show[\s\S]{0,80}\| sudo \/bin\/bash -s/);
   assert.match(rollback, /10-umask\.conf` is \*\*not\*\* a\s+destination/);
   assert.doesNotMatch(rollback, /restore_exact[^\n]*10-umask/);
 
@@ -518,6 +535,13 @@ if [ -f "${toPosix(stateDir)}/tamper.verifier" ]; then
     esac
   done
 fi
+if [ -f "${toPosix(stateDir)}/tamper.operator" ]; then
+  for arg in "$@"; do
+    case "$arg" in
+      *promote-package-a.sh) printf '\\n# tampered-root-copy\\n' >> "$arg" ;;
+    esac
+  done
+fi
 exit 0
 `
     );
@@ -525,8 +549,19 @@ exit 0
       path.join(mockBin, "stat"),
       `#!/usr/bin/env bash
 if [ "$1" = "-c" ]; then
-  if [ "$2" = "%a" ]; then echo 700; exit 0; fi
-  echo "umask owner=root:root mode=644 size=20 path=$3"
+  target="\${3:-}"
+  case "$2" in
+    %a)
+      case "$target" in
+        *promote-package-a.sh*) echo 500 ;;
+        *) echo 700 ;;
+      esac
+      ;;
+    %U:%G) echo root:root ;;
+    %h) echo 1 ;;
+    %F) echo regular file ;;
+    *) echo "umask owner=root:root mode=644 size=20 path=$target" ;;
+  esac
   exit 0
 fi
 exec /usr/bin/stat "$@"
@@ -537,6 +572,33 @@ exec /usr/bin/stat "$@"
       `#!/usr/bin/env bash
 printf '%s\\n' "chown $*" >> "${toPosix(stateDir)}/commands.log"
 exit 0
+`
+    );
+    const realGit = runBash("command -v git").trim();
+    writeExec(
+      path.join(mockBin, "trusted-git"),
+      `#!/usr/bin/env bash
+STATE="${toPosix(stateDir)}"
+REAL_GIT="${realGit}"
+if [ -f "$STATE/git.fail" ]; then
+  for arg in "$@"; do
+    if [ "$arg" = show ]; then echo GIT_SHOW_FAIL >&2; exit 1; fi
+  done
+fi
+if [ -f "$STATE/git.empty" ]; then
+  for arg in "$@"; do
+    if [ "$arg" = show ]; then exit 0; fi
+  done
+fi
+if [ -f "$STATE/git.trunc" ]; then
+  for arg in "$@"; do
+    if [ "$arg" = show ]; then
+      "$REAL_GIT" "$@" | dd bs=1500 count=1 2>/dev/null
+      exit 0
+    fi
+  done
+fi
+exec "$REAL_GIT" "$@"
 `
     );
     writeExec(
@@ -683,6 +745,8 @@ fi
       lock: toPosix(path.join(work, "deploy.lock")),
       destRoot: posixDest,
       recovery: toPosix(path.join(work, "recovery")),
+      mockGit: toPosix(path.join(mockBin, "trusted-git")),
+      bootstrapFile: toPosix(path.join(work, "bootstrap.sh")),
       mocks: toPosix(mocksSh),
       path: [
         toPosix(mockBin),
@@ -700,6 +764,10 @@ fi
         "/cmd",
       ].join(":"),
     };
+    writeExec(
+      path.join(work, "bootstrap.sh"),
+      extractBootstrap(rollback).replaceAll("/usr/bin/git", cfg.mockGit)
+    );
 
     const resetHost = () => {
       writeFileSync(path.join(stateDir, "timer.unit"), "clover-audit-retention-apply.service\n");
@@ -714,13 +782,76 @@ fi
       );
     };
 
+    resetHost();
     const fileLaunch = runOperator(cfg, {}, { fileLaunch: toPosix(operatorPath) });
     assert.notEqual(fileLaunch.status, 0);
-    assert.match(`${fileLaunch.stdout}${fileLaunch.stderr}`, /git show \| sudo \/bin\/bash -s/);
+    assert.match(
+      `${fileLaunch.stdout}${fileLaunch.stderr}`,
+      /TTY GATE: FAIL|must not be sourced|outside recovery|worktree|absolute|recovery is not|BASH_SOURCE/
+    );
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl |flock -n/);
+
+    const worktreeTty = runPipedOperator(
+      cfg,
+      {},
+      `source ${quote(cfg.mocks)}; if [ -e /dev/tty ]; then exec 1>/dev/tty 2>/dev/tty; fi; bash -- ${quote(toPosix(operatorPath))} ${operatorArgs({ ...cfg, recovery: toPosix(path.join(work, "recovery-filetty")) })}`
+    );
+    assert.notEqual(worktreeTty.status, 0);
+
+    const sourced = runPipedOperator(cfg, {}, `source ${quote(toPosix(operatorPath))}`);
+    assert.notEqual(sourced.status, 0);
+    assert.match(`${sourced.stdout}${sourced.stderr}`, /must not be sourced|piped on stdin/);
+
+    const stdinLaunch = runPipedOperator(
+      cfg,
+      {},
+      `git -C ${quote(posixRepo)} show ${quote(`${fixtureSha}:${operatorRel}`)} | bash -s -- ${operatorArgs(cfg)}`
+    );
+    assert.notEqual(stdinLaunch.status, 0);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl stop/);
+
+    const artifactLaunch = runOperator(
+      cfg,
+      {},
+      { fileLaunch: toPosix(path.join(artifact, ...operatorRel.split("/"))) }
+    );
+    assert.notEqual(artifactLaunch.status, 0);
 
     const noTty = runOperator({ ...cfg, recovery: toPosix(path.join(work, "recovery-notty")) }, {}, { tty: false });
-    assert.equal(noTty.status, 2);
-    assert.match(`${noTty.stdout}${noTty.stderr}`, /TTY GATE: FAIL/);
+    assert.notEqual(noTty.status, 0);
+    assert.match(`${noTty.stdout}${noTty.stderr}`, /TTY GATE: FAIL|TTY \/dev\/tty required/);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "git.empty"), "1");
+    const emptyGit = runOperator({ ...cfg, recovery: toPosix(path.join(work, "recovery-empty-git")) }, {}, { tty: true });
+    rmSync(path.join(stateDir, "git.empty"));
+    assert.notEqual(emptyGit.status, 0);
+    assert.match(`${emptyGit.stdout}${emptyGit.stderr}`, /empty operator blob|BOOTSTRAP: FAIL/);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl /);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "git.trunc"), "1");
+    const truncGit = runOperator({ ...cfg, recovery: toPosix(path.join(work, "recovery-trunc")) }, {}, { tty: true });
+    rmSync(path.join(stateDir, "git.trunc"));
+    assert.notEqual(truncGit.status, 0);
+    assert.match(`${truncGit.stdout}${truncGit.stderr}`, /object id mismatch|BOOTSTRAP: FAIL/);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl /);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "git.fail"), "1");
+    const failGit = runOperator({ ...cfg, recovery: toPosix(path.join(work, "recovery-gitfail")) }, {}, { tty: true });
+    rmSync(path.join(stateDir, "git.fail"));
+    assert.notEqual(failGit.status, 0);
+    assert.match(`${failGit.stdout}${failGit.stderr}`, /git show operator|BOOTSTRAP: FAIL/);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl /);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "tamper.operator"), "1");
+    const tamperCopy = runOperator({ ...cfg, recovery: toPosix(path.join(work, "recovery-tamper-op")) }, {}, { tty: true });
+    rmSync(path.join(stateDir, "tamper.operator"));
+    assert.notEqual(tamperCopy.status, 0);
+    assert.match(`${tamperCopy.stdout}${tamperCopy.stderr}`, /object id mismatch after lock|BOOTSTRAP: FAIL/);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl /);
 
     const envBypass = runTtyOperator(
       { ...cfg, recovery: toPosix(path.join(work, "recovery-env")) },
@@ -844,6 +975,35 @@ fi
     );
     rmSync(path.join(stateDir, "send.term"));
     assert.equal(liveTerm.status, 40, `live TERM after change must exit 40, got ${liveTerm.status}`);
+
+    resetHost();
+    const honestOid = execFileSync("git", ["--no-replace-objects", "rev-parse", `${fixtureSha}:${operatorRel}`], {
+      cwd: fixtureRoot,
+      encoding: "utf8",
+    }).trim();
+    const evilPath = path.join(fixtureRoot, "evil-operator.sh");
+    writeFileSync(evilPath, "# evil replace\n");
+    const evilOid = execFileSync("git", ["hash-object", "-w", evilPath], {
+      cwd: fixtureRoot,
+      encoding: "utf8",
+    }).trim();
+    execFileSync("git", ["replace", honestOid, evilOid], { cwd: fixtureRoot });
+    const swapped = execFileSync("git", ["show", `${fixtureSha}:${operatorRel}`], {
+      cwd: fixtureRoot,
+      encoding: "utf8",
+    });
+    assert.match(swapped, /evil replace/);
+    const replacePinned = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-replace")) },
+      {},
+      { tty: true }
+    );
+    assert.equal(
+      replacePinned.status,
+      0,
+      `replace ref must not change trusted bootstrap\n${replacePinned.stdout}\n${replacePinned.stderr}`
+    );
+    execFileSync("git", ["replace", "-d", honestOid], { cwd: fixtureRoot });
 
     resetHost();
     const passed = runOperator(cfg, {}, { tty: true });

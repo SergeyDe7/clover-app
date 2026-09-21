@@ -65,9 +65,12 @@ included in the hashed PREPARE artifact.
 
 The only source-controlled Package A operator is
 `ops/security-stage5/scripts/promote-package-a.sh`. It is hashed into the
-PREPARE artifact. Production launches it only as
-`git show <TARGET>:ops/security-stage5/scripts/promote-package-a.sh | sudo /bin/bash -s --`
-with literal `--target`, `--expected-manifest`, and `--artifact` arguments.
+PREPARE artifact. Production launches it only as the completed TTY command
+`sudo /bin/bash -c '<fixed bootstrap>' --` with literal `--target`,
+`--expected-manifest`, and `--artifact` arguments. The bootstrap writes a
+root-owned operator copy, compares `git hash-object --no-filters` to the
+exact `$TARGET` blob, then runs `/bin/bash <root-owned-operator>`. Do not
+pipe `git show` into `bash -s`.
 The rejected production file
 `/opt/clover/deployments/staging/package-a-promote-retry.sh` SHA-256
 `ba0a3c3e57d2bd01c94046dab81aded4e10c2df1566038b02a19be6c498a4f50` must never

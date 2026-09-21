@@ -132,17 +132,22 @@ assert.match(rollback, /Never restore\s+`10-umask\.conf`/);
 assert.doesNotMatch(rollback, /restore_exact[^\n]*10-umask/);
 assert.match(rollback, /The first\s+change is `systemctl stop clover-audit-retention\.timer`/);
 assert.match(rollback, /exits `40` when rollback completes and\s+`41`/);
-assert.match(rollback, /sudo \/bin\/bash -s --/);
+assert.match(rollback, /sudo \/bin\/bash -c '/);
+assert.match(rollback, /--no-replace-objects/);
+assert.match(rollback, /hash-object --no-filters/);
 assert.match(rollback, /--expected-manifest/);
 assert.match(rollback, /--target /);
+assert.doesNotMatch(rollback, /git show[\s\S]{0,80}\| sudo \/bin\/bash -s/);
 assert.doesNotMatch(
   read("ops/security-stage5/scripts/promote-package-a.sh"),
-  /CLOVER_OPERATOR_AS_ROOT=|exec sudo -n env/
+  /CLOVER_OPERATOR_AS_ROOT=|exec sudo -n env|git show \| sudo \/bin\/bash -s|require_bash_s_launch/
 );
 assert.match(
   read("ops/security-stage5/scripts/promote-package-a.sh"),
   /unset CLOVER_OPERATOR_AS_ROOT/
 );
+assert.match(read("ops/security-stage5/scripts/promote-package-a.sh"), /--no-replace-objects/);
+assert.match(read("ops/security-stage5/scripts/promote-package-a.sh"), /require_trusted_self/);
 for (const dir of destinationDirs) {
   const escaped = dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   assert.doesNotMatch(
@@ -533,6 +538,55 @@ try {
   );
 } finally {
   rmSync(temp, { recursive: true, force: true });
+}
+
+{
+  const replaceDir = mkdtempSync(path.join(tmpdir(), "clover-stage5-replace-"));
+  try {
+    execFileSync("git", ["init", "--quiet"], { cwd: replaceDir });
+    execFileSync("git", ["config", "user.email", "replace@example.invalid"], { cwd: replaceDir });
+    execFileSync("git", ["config", "user.name", "Replace Test"], { cwd: replaceDir });
+    for (const relative of sourceFiles) {
+      const destination = path.join(replaceDir, ...relative.split("/"));
+      mkdirSync(path.dirname(destination), { recursive: true });
+      copyFileSync(path.join(root, ...relative.split("/")), destination);
+    }
+    execFileSync("git", ["add", "--", ...sourceFiles], { cwd: replaceDir });
+    execFileSync("git", ["commit", "--quiet", "-m", "replace fixture"], { cwd: replaceDir });
+    const sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: replaceDir, encoding: "utf8" }).trim();
+    const operatorRelPath = "ops/security-stage5/scripts/promote-package-a.sh";
+    const honestOid = execFileSync(
+      "git",
+      ["--no-replace-objects", "rev-parse", `${sha}:${operatorRelPath}`],
+      { cwd: replaceDir, encoding: "utf8" }
+    ).trim();
+    const evilFile = path.join(replaceDir, "evil.sh");
+    writeFileSync(evilFile, "# evil replace\n");
+    const evilOid = execFileSync("git", ["hash-object", "-w", evilFile], {
+      cwd: replaceDir,
+      encoding: "utf8",
+    }).trim();
+    execFileSync("git", ["replace", honestOid, evilOid], { cwd: replaceDir });
+    const replaced = execFileSync("git", ["show", `${sha}:${operatorRelPath}`], {
+      cwd: replaceDir,
+      encoding: "utf8",
+    });
+    assert.match(replaced, /evil replace/, "control: replace ref swaps bytes without --no-replace-objects");
+    const pinned = execFileSync("git", ["--no-replace-objects", "show", `${sha}:${operatorRelPath}`], {
+      cwd: replaceDir,
+      encoding: "utf8",
+    });
+    assert.doesNotMatch(pinned, /evil replace/);
+    const artifactOut = path.join(tmpdir(), `clover-stage5-replace-art-${process.pid}`);
+    rmSync(artifactOut, { recursive: true, force: true });
+    const manifest = prepareArtifact({ sourceRoot: replaceDir, output: artifactOut, targetSha: sha });
+    const operatorRecord = manifest.files.find((entry) => entry.path === operatorRelPath);
+    assert.equal(operatorRecord.sha256, createHash("sha256").update(pinned).digest("hex"));
+    verifyArtifact({ artifact: artifactOut, expectedSha: sha, sourceRoot: replaceDir });
+  } finally {
+    rmSync(replaceDir, { recursive: true, force: true });
+    rmSync(path.join(tmpdir(), `clover-stage5-replace-art-${process.pid}`), { recursive: true, force: true });
+  }
 }
 
 runSecurityStage5OperatorTests();

@@ -158,34 +158,153 @@ rollback_created_dir() {
 
 ## Package A — systemd and retention dry-run
 
-The only allowed Package A production launcher is this exact TTY command.
-Substitute the ticket's literal 40-character target SHA, uppercase manifest
-SHA-256, and absolute artifact path. Do not run a writable worktree or
-artifact copy as `$0`. Do not run
+The only allowed Package A production launcher is this exact completed TTY
+command. Substitute the ticket's literal 40-character target SHA, uppercase
+manifest SHA-256, and absolute artifact path. Do not pipe `git show` into
+`bash -s`. Do not run a writable worktree or artifact copy. Do not run
 `/opt/clover/deployments/staging/package-a-promote-retry.sh`.
 
 ```bash
-git -C /opt/clover/clover-app show \
-  "$EXPECTED_SHA:ops/security-stage5/scripts/promote-package-a.sh" \
-  | sudo /bin/bash -s -- \
-    --target "$EXPECTED_SHA" \
-    --expected-manifest "$EXPECTED_MANIFEST" \
-    --artifact "$ARTIFACT"
+sudo /bin/bash -c '
+set -Eeuo pipefail
+umask 0077
+OPERATOR_REL=ops/security-stage5/scripts/promote-package-a.sh
+DEFAULT_ROOT=/opt/clover/clover-app
+TARGET=""
+EXPECTED_MANIFEST=""
+ARTIFACT=""
+ROOT=/opt/clover/clover-app
+LIVE=1fdd7e6ac715f55e407d71a225e5a6037eb9d2e8
+LOCK=/opt/clover/deployments/deploy.lock
+DEST_ROOT=""
+RECOVERY=""
+fail() {
+  printf "%s\n" "BOOTSTRAP: FAIL: $*" >&2
+  if [ -n "${RECOVERY:-}" ] && [ -d "${RECOVERY:-}" ]; then
+    chmod 0700 -- "$RECOVERY" || true
+    printf "%s\n" "BOOTSTRAP: REJECTED_RECOVERY=$RECOVERY" >&2
+  fi
+  exit 20
+}
+set_once() {
+  name="$1"
+  value="$2"
+  case "$name" in
+    TARGET) [ -z "$TARGET" ] || fail "duplicate --target" ;;
+    EXPECTED_MANIFEST) [ -z "$EXPECTED_MANIFEST" ] || fail "duplicate --expected-manifest" ;;
+    ARTIFACT) [ -z "$ARTIFACT" ] || fail "duplicate --artifact" ;;
+    ROOT) [ "$ROOT" = "$DEFAULT_ROOT" ] || fail "duplicate --repo" ;;
+    LIVE) [ "$LIVE" = 1fdd7e6ac715f55e407d71a225e5a6037eb9d2e8 ] || fail "duplicate --live" ;;
+    LOCK) [ "$LOCK" = /opt/clover/deployments/deploy.lock ] || fail "duplicate --lock" ;;
+    DEST_ROOT) [ -z "$DEST_ROOT" ] || fail "duplicate --dest-root" ;;
+    RECOVERY) [ -z "$RECOVERY" ] || fail "duplicate --recovery" ;;
+  esac
+  case "$name" in
+    TARGET) TARGET="$value" ;;
+    EXPECTED_MANIFEST) EXPECTED_MANIFEST="$value" ;;
+    ARTIFACT) ARTIFACT="$value" ;;
+    ROOT) ROOT="$value" ;;
+    LIVE) LIVE="$value" ;;
+    LOCK) LOCK="$value" ;;
+    DEST_ROOT) DEST_ROOT="$value" ;;
+    RECOVERY) RECOVERY="$value" ;;
+  esac
+}
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --target) [ $# -ge 2 ] || fail "missing --target"; set_once TARGET "$2"; shift 2 ;;
+    --expected-manifest) [ $# -ge 2 ] || fail "missing --expected-manifest"; set_once EXPECTED_MANIFEST "$2"; shift 2 ;;
+    --artifact) [ $# -ge 2 ] || fail "missing --artifact"; set_once ARTIFACT "$2"; shift 2 ;;
+    --repo) [ $# -ge 2 ] || fail "missing --repo"; set_once ROOT "$2"; shift 2 ;;
+    --live) [ $# -ge 2 ] || fail "missing --live"; set_once LIVE "$2"; shift 2 ;;
+    --lock) [ $# -ge 2 ] || fail "missing --lock"; set_once LOCK "$2"; shift 2 ;;
+    --dest-root) [ $# -ge 2 ] || fail "missing --dest-root"; set_once DEST_ROOT "$2"; shift 2 ;;
+    --recovery) [ $# -ge 2 ] || fail "missing --recovery"; set_once RECOVERY "$2"; shift 2 ;;
+    *) fail "unknown argument $1" ;;
+  esac
+done
+[ "$(id -u)" -eq 0 ] || fail "UID 0 required"
+[ -e /dev/tty ] && [ -r /dev/tty ] && [ -w /dev/tty ] || fail "TTY /dev/tty required"
+printf "%s" "$TARGET" | grep -Eq "^[0-9a-f]{40}$" || fail "TARGET must be a 40-character lowercase SHA"
+printf "%s" "$EXPECTED_MANIFEST" | grep -Eq "^[0-9A-F]{64}$" || fail "EXPECTED_MANIFEST"
+case "$ARTIFACT" in /*) ;; *) fail "ARTIFACT must be an absolute path" ;; esac
+[ -d "$ARTIFACT" ] || fail "ARTIFACT is not a directory"
+if [ -x /usr/bin/git ]; then
+  GITBIN=/usr/bin/git
+elif [ -x /mingw64/bin/git ]; then
+  GITBIN=/mingw64/bin/git
+else
+  fail "/usr/bin/git missing"
+fi
+trusted_git() {
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_OBJECT_DIRECTORY \
+    -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_INDEX_FILE \
+    -u GIT_NAMESPACE -u GIT_COMMON_DIR -u GIT_REPLACE_REF_BASE \
+    "$GITBIN" --no-replace-objects -C "$ROOT" "$@"
+}
+trusted_git cat-file -e "${TARGET}^{commit}" || fail "target commit missing"
+OID=$(trusted_git rev-parse --verify "${TARGET}:${OPERATOR_REL}")
+printf "%s" "$OID" | grep -Eq "^[0-9a-f]{40}$" || fail "operator blob id"
+if [ -z "$RECOVERY" ]; then
+  RAND=$(python3 -c "import secrets; print(secrets.token_hex(8))")
+  RECOVERY=/opt/clover/recovery/security-stage5-package-a-${TARGET}-full-${RAND}
+fi
+case "$RECOVERY" in /*) ;; *) fail "recovery must be an absolute path" ;; esac
+[ ! -e "$RECOVERY" ] || fail "recovery already exists"
+install -d -m 0700 -- "$RECOVERY"
+chown root:root -- "$RECOVERY"
+chmod 0700 -- "$RECOVERY"
+OPFILE=${RECOVERY}/promote-package-a.sh
+trusted_git show "${TARGET}:${OPERATOR_REL}" > "$OPFILE" || fail "git show operator"
+[ -s "$OPFILE" ] || fail "empty operator blob"
+! test -L "$OPFILE" || fail "operator symlink"
+test -f "$OPFILE" || fail "operator not regular"
+COPY_OID=$(trusted_git hash-object --no-filters -- "$OPFILE")
+[ "$COPY_OID" = "$OID" ] || fail "operator object id mismatch"
+chmod 0500 -- "$OPFILE"
+! test -L "$OPFILE" || fail "operator symlink after chmod"
+test -f "$OPFILE" || fail "operator not regular after chmod"
+[ "$(stat -c %U:%G "$OPFILE")" = root:root ] || fail "owner"
+MODE=$(stat -c %a "$OPFILE")
+[ "$MODE" = 500 ] || [ "$MODE" = 0500 ] || fail "mode"
+[ "$(stat -c %h "$OPFILE")" = 1 ] || fail "nlink"
+COPY_OID=$(trusted_git hash-object --no-filters -- "$OPFILE")
+[ "$COPY_OID" = "$OID" ] || fail "operator object id mismatch after lock"
+printf "%s\n" "BOOTSTRAP: PASS"
+set -- --target "$TARGET" --expected-manifest "$EXPECTED_MANIFEST" --artifact "$ARTIFACT" --recovery "$RECOVERY"
+[ "$ROOT" = "$DEFAULT_ROOT" ] || set -- "$@" --repo "$ROOT"
+[ "$LIVE" = 1fdd7e6ac715f55e407d71a225e5a6037eb9d2e8 ] || set -- "$@" --live "$LIVE"
+[ "$LOCK" = /opt/clover/deployments/deploy.lock ] || set -- "$@" --lock "$LOCK"
+[ -z "$DEST_ROOT" ] || set -- "$@" --dest-root "$DEST_ROOT"
+exec /bin/bash "$OPFILE" "$@"
+' -- \
+  --target <EXTERNAL_TARGET> \
+  --expected-manifest <EXTERNAL_MANIFEST_SHA256> \
+  --artifact <ABS_ARTIFACT>
 ```
 
-`sudo` receives script bytes from `git show` of that exact commit. The
-operator requires UID 0 and a real TTY on stdout/stderr plus `/dev/tty`.
-It does not call `sudo`, does not read `$0`, and does not trust environment
+The entire bootstrap string is complete before `bash -c` starts. There is no
+pipe into a root shell and no heredoc from a writable file. Target SHA,
+manifest SHA-256, and artifact path are literal arguments. Git runs as
+`/usr/bin/git --no-replace-objects` with GIT_DIR/GIT_WORK_TREE/alternates
+unset. The operator is executed only after the root-owned copy matches the
+exact `$TARGET` blob object ID. Bootstrap failure leaves the recovery
+directory closed `0700` and does not change live state.
+
+The operator requires UID 0, a real TTY on stdout/stderr plus `/dev/tty`,
+and `BASH_SOURCE[0]` as an absolute regular root-owned file inside that
+recovery directory. It refuses stdin, `bash -s`, `source`, worktree, and
+artifact paths. It does not call `sudo` and does not trust environment
 variables for target, manifest hash, or artifact path. Unknown or duplicate
 arguments fail. A pre-placed `.verifier-*.mjs` is forbidden.
 
 The operator extracts the verifier with
-`git -C /opt/clover/clover-app show "$EXPECTED_SHA:server/scripts/securityStage5Artifact.mjs"`
-into the new recovery directory, compares that root copy to a second Git
-blob extraction, then verifies the artifact with the external target SHA.
-The three Package A sources are snapshotted into root-owned recovery files
-and compared to the manifest and `git show $TARGET:path` before install.
-Install reads only that snapshot.
+`/usr/bin/git --no-replace-objects show "$EXPECTED_SHA:server/scripts/securityStage5Artifact.mjs"`
+into the recovery directory after the deploy lock, compares that root copy to
+the exact Git blob object, then verifies the artifact with the external
+target SHA. The three Package A sources are snapshotted into root-owned
+recovery files and compared to the manifest and exact Git blobs before
+install. Install reads only that snapshot.
 
 Exact destinations:
 
