@@ -84,10 +84,20 @@ assert.match(doc, /working 1C source IP and route are proven/);
 assert.doesNotMatch(doc, /enable --now clover-audit-retention\.timer/);
 
 const rollback = read("ops/security-stage5/PROMOTE_ROLLBACK.md");
+const destinationDirs = [
+  "/etc/systemd/system/clover-api.service.d",
+  "/etc/systemd/system/clover-ui.service.d",
+  "/etc/ssh/sshd_config.d",
+  "/etc/nginx/snippets",
+];
 for (const required of [
   "cp --preserve=all",
   "sha256sum",
   ".absent",
+  ".dir-created",
+  "ensure_destination_dir",
+  "rollback_created_dir",
+  "rmdir --",
   "sshd -T -C",
   "sshd -t",
   "nginx -t",
@@ -99,10 +109,190 @@ for (const required of [
   "--source-root /opt/clover/clover-app",
   "/etc/ssh/sshd_config.d/50-clover-security.conf",
   "/etc/nginx/sites-enabled/clover-spb.ru",
+  ...destinationDirs,
 ]) {
   assert.ok(rollback.includes(required), `rollback contract missing ${required}`);
 }
 assert.doesNotMatch(rollback, /rm\s+-rf|pkill|kill\s+-9/);
+for (const dir of destinationDirs) {
+  const escaped = dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  assert.doesNotMatch(
+    rollback,
+    new RegExp(`install -d -m 0[0-7]{3} ${escaped}`),
+    `direct install -d is forbidden for ${dir}`
+  );
+  assert.match(
+    rollback,
+    new RegExp(`ensure_destination_dir ${escaped} `),
+    `missing ensure_destination_dir for ${dir}`
+  );
+  assert.match(
+    rollback,
+    new RegExp(`rollback_created_dir ${escaped} `),
+    `missing rollback_created_dir for ${dir}`
+  );
+}
+
+function extractBashFunction(source, name) {
+  const start = source.indexOf(`${name}() {`);
+  assert.ok(start >= 0, `missing bash function ${name}`);
+  let depth = 0;
+  let end = -1;
+  for (let index = start; index < source.length; index += 1) {
+    if (source[index] === "{") depth += 1;
+    if (source[index] === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        end = index + 1;
+        break;
+      }
+    }
+  }
+  assert.ok(end > start, `unclosed bash function ${name}`);
+  return source.slice(start, end);
+}
+
+function findBash() {
+  const candidates = [
+    "bash",
+    "C:\\Program Files\\Git\\bin\\bash.exe",
+    "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+  ];
+  for (const candidate of candidates) {
+    try {
+      execFileSync(candidate, ["-c", "echo ok"], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      return candidate;
+    } catch {
+      // try the next candidate
+    }
+  }
+  throw new Error("bash is required to exercise destination-dir helpers");
+}
+
+function runHelperScript(body) {
+  const bash = findBash();
+  const scriptDir = mkdtempSync(path.join(tmpdir(), "clover-stage5-dir-helper-"));
+  const scriptPath = path.join(scriptDir, "run.sh");
+  writeFileSync(
+    scriptPath,
+    `#!/usr/bin/env bash
+set -eu
+sudo() { "$@"; }
+${extractBashFunction(rollback, "ensure_destination_dir")}
+${extractBashFunction(rollback, "rollback_created_dir")}
+install() {
+  printf '%s\\n' "install $*" >> "$RECOVERY/commands.log"
+  command install "$@"
+}
+rmdir() {
+  printf '%s\\n' "rmdir $*" >> "$RECOVERY/commands.log"
+  command rmdir "$@"
+}
+rm() {
+  printf '%s\\n' "rm $*" >> "$RECOVERY/commands.log"
+  command rm "$@"
+}
+${body}
+`
+  );
+  try {
+    return execFileSync(bash, [scriptPath], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (error) {
+    throw new Error(`${error.stderr || ""}${error.stdout || ""}${error.message}`);
+  } finally {
+    rmSync(scriptDir, { recursive: true, force: true });
+  }
+}
+
+const helperTemp = mkdtempSync(path.join(tmpdir(), "clover-stage5-dir-contract-"));
+try {
+  const posix = (value) => value.split(path.sep).join("/");
+  const existingRoot = posix(path.join(helperTemp, "existing"));
+  const createdRoot = posix(path.join(helperTemp, "created"));
+  const fileRoot = posix(path.join(helperTemp, "as-file"));
+  const nonemptyRoot = posix(path.join(helperTemp, "nonempty"));
+  const recovery = posix(path.join(helperTemp, "recovery"));
+  mkdirSync(existingRoot, { recursive: true });
+  mkdirSync(createdRoot, { recursive: true });
+  mkdirSync(fileRoot, { recursive: true });
+  mkdirSync(nonemptyRoot, { recursive: true });
+  mkdirSync(recovery, { recursive: true });
+
+  const existingDir = `${existingRoot}/clover-api.service.d`;
+  mkdirSync(existingDir);
+  writeFileSync(path.join(existingDir, "pre-state.conf"), "keep\n");
+  runHelperScript(`
+RECOVERY="${recovery}"
+ensure_destination_dir "${existingDir}" dir-clover-api.service.d 0755
+rollback_created_dir "${existingDir}" dir-clover-api.service.d
+test -f "${existingDir}/pre-state.conf"
+test -d "${existingDir}"
+test ! -e "${recovery}/dir-clover-api.service.d.dir-created"
+if grep -q '^install ' "${recovery}/commands.log" 2>/dev/null; then
+  echo "existing directory must not call install -d" >&2
+  exit 1
+fi
+if grep -q '^rmdir ' "${recovery}/commands.log" 2>/dev/null; then
+  echo "pre-existing directory must not be rmdir'd" >&2
+  exit 1
+fi
+`);
+
+  const newDir = `${createdRoot}/sshd_config.d`;
+  runHelperScript(`
+RECOVERY="${recovery}"
+ensure_destination_dir "${newDir}" dir-sshd_config.d 0755
+test -d "${newDir}"
+test -f "${recovery}/dir-sshd_config.d.dir-created"
+grep -q '^install -d -m 0755 -- ${newDir}$' "${recovery}/commands.log"
+rollback_created_dir "${newDir}" dir-sshd_config.d
+test ! -e "${newDir}"
+grep -q '^rmdir -- ${newDir}$' "${recovery}/commands.log"
+if grep -Eq '^rm[[:space:]]+-rf' "${recovery}/commands.log"; then
+  echo "rollback must not use rm -rf" >&2
+  exit 1
+fi
+`);
+
+  const notDir = `${fileRoot}/snippets`;
+  writeFileSync(notDir, "not-a-directory\n");
+  assert.throws(
+    () =>
+      runHelperScript(`
+RECOVERY="${recovery}"
+ensure_destination_dir "${notDir}" dir-nginx-snippets 0755
+`),
+    /exists and is not a directory/
+  );
+
+  const leftoverDir = `${nonemptyRoot}/clover-ui.service.d`;
+  assert.throws(
+    () =>
+      runHelperScript(`
+RECOVERY="${recovery}"
+ensure_destination_dir "${leftoverDir}" dir-clover-ui.service.d 0755
+printf 'foreign\\n' > "${leftoverDir}/foreign.conf"
+rollback_created_dir "${leftoverDir}" dir-clover-ui.service.d
+`),
+    /not empty or not a directory/
+  );
+  assert.equal(
+    readFileSync(path.join(nonemptyRoot, "clover-ui.service.d", "foreign.conf"), "utf8"),
+    "foreign\n"
+  );
+  assert.doesNotMatch(
+    readFileSync(path.join(helperTemp, "recovery", "commands.log"), "utf8"),
+    /^rm\s+-rf/m
+  );
+} finally {
+  rmSync(helperTemp, { recursive: true, force: true });
+}
 
 const artifactSource = read("server/scripts/securityStage5Artifact.mjs");
 assert.match(artifactSource, /gitBytes/);

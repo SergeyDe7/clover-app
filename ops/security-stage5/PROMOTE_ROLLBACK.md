@@ -19,10 +19,27 @@ sudo node "$RECOVERY/securityStage5Artifact-$EXPECTED_SHA.mjs" verify \
   --source-root /opt/clover/clover-app
 ```
 
-For every destination, save the previous file with `cp --preserve=all`. If the
-destination does not exist, create a same-name `.absent` marker in `RECOVERY`.
-Rollback restores the saved file, or removes only that exact destination when
-its `.absent` marker exists. Never use a wildcard.
+For every destination file, save the previous file with `cp --preserve=all`. If
+the destination does not exist, create a same-name `.absent` marker in
+`RECOVERY`. Rollback restores the saved file, or removes only that exact
+destination when its `.absent` marker exists. Never use a wildcard.
+
+Destination directories for Packages A–C are:
+
+- `/etc/systemd/system/clover-api.service.d`
+- `/etc/systemd/system/clover-ui.service.d`
+- `/etc/ssh/sshd_config.d`
+- `/etc/nginx/snippets`
+
+Do not run `install -d -m 0755` on those paths. GNU `install -d -m MODE`
+changes the mode of an existing directory. Production already has
+`/etc/systemd/system/clover-api.service.d` as `root:root` mode `0700`. Existing
+directory owner, group, and mode must stay unchanged. If a path exists and is
+not a directory, fail before installing files. Create a missing directory with
+mode `0755` only, record `$RECOVERY/<key>.dir-created`, and on rollback `rmdir`
+that exact directory after file restore. If `rmdir` fails because the directory
+is not empty, stop; do not delete leftover entries. Never chmod, chown, use a
+wildcard, or recursively remove these directories.
 
 Use these helpers with an explicit destination and unique recovery key. They
 record a SHA-256 for every existing pre-state file and distinguish an absent
@@ -48,6 +65,40 @@ restore_exact() {
   else
     (cd "$RECOVERY" && sudo sha256sum -c "$key.sha256")
     sudo cp --preserve=all -- "$RECOVERY/$key" "$destination"
+  fi
+}
+
+ensure_destination_dir() {
+  destination="$1"
+  key="$2"
+  mode="$3"
+  if [ "$mode" != "0755" ]; then
+    echo "FAIL: directory create mode must be 0755, got $mode" >&2
+    exit 1
+  fi
+  if sudo test -L "$destination"; then
+    echo "FAIL: $destination exists and is a symlink" >&2
+    exit 1
+  fi
+  if sudo test -e "$destination"; then
+    if sudo test -d "$destination"; then
+      return 0
+    fi
+    echo "FAIL: $destination exists and is not a directory" >&2
+    exit 1
+  fi
+  sudo install -d -m "$mode" -- "$destination"
+  sudo touch -- "$RECOVERY/$key.dir-created"
+}
+
+rollback_created_dir() {
+  destination="$1"
+  key="$2"
+  if sudo test -e "$RECOVERY/$key.dir-created"; then
+    if ! sudo rmdir -- "$destination"; then
+      echo "FAIL: $destination is not empty or not a directory; leftover entries were not deleted" >&2
+      exit 1
+    fi
   fi
 }
 ```
@@ -78,11 +129,12 @@ systemctl show clover-audit-retention.timer \
 curl -fsS --connect-timeout 2 --max-time 5 http://127.0.0.1:4100/api/health
 ```
 
-After exact-file backups, install:
+After exact-file backups, ensure destination directories without changing
+existing metadata, then install:
 
 ```bash
-sudo install -d -m 0755 /etc/systemd/system/clover-api.service.d
-sudo install -d -m 0755 /etc/systemd/system/clover-ui.service.d
+ensure_destination_dir /etc/systemd/system/clover-api.service.d dir-clover-api.service.d 0755
+ensure_destination_dir /etc/systemd/system/clover-ui.service.d dir-clover-ui.service.d 0755
 sudo install -m 0644 \
   "$ARTIFACT/ops/security-stage5/package-a/systemd/clover-api.service.d/20-hardening.conf" \
   /etc/systemd/system/clover-api.service.d/20-hardening.conf
@@ -103,13 +155,16 @@ systemctl show clover-audit-retention.timer -p ActiveState -p NextElapseUSecReal
 ```
 
 Rollback restores or removes the three exact destinations according to their
-backups/`.absent` markers, then runs:
+backups/`.absent` markers, then removes only directories this package created,
+then runs:
 
 ```bash
 sudo systemctl stop clover-audit-retention.timer
 restore_exact /etc/systemd/system/clover-api.service.d/20-hardening.conf api-20-hardening.conf
 restore_exact /etc/systemd/system/clover-ui.service.d/20-hardening.conf ui-20-hardening.conf
 restore_exact /etc/systemd/system/clover-audit-retention.timer audit-retention.timer
+rollback_created_dir /etc/systemd/system/clover-api.service.d dir-clover-api.service.d
+rollback_created_dir /etc/systemd/system/clover-ui.service.d dir-clover-ui.service.d
 sudo systemctl daemon-reload
 sudo systemctl restart clover-api.service
 curl -fsS --connect-timeout 2 --max-time 5 http://127.0.0.1:4100/api/health
@@ -148,7 +203,7 @@ sudo /usr/sbin/sshd -T -C user=clover,host=clover,addr="$OPERATOR_SOURCE_IP" \
 Install and validate without closing either recovery session:
 
 ```bash
-sudo install -d -m 0755 /etc/ssh/sshd_config.d
+ensure_destination_dir /etc/ssh/sshd_config.d dir-sshd_config.d 0755
 sudo install -m 0644 \
   "$ARTIFACT/ops/security-stage5/package-b/sshd/50-clover-security.conf" \
   /etc/ssh/sshd_config.d/50-clover-security.conf
@@ -164,10 +219,12 @@ values are root/password/keyboard-interactive disabled and
 
 On any failure, restore the exact previous file or remove only
 `/etc/ssh/sshd_config.d/50-clover-security.conf` when its `.absent` marker was
-recorded:
+recorded, then `rmdir` `/etc/ssh/sshd_config.d` only when this package created
+it:
 
 ```bash
 restore_exact /etc/ssh/sshd_config.d/50-clover-security.conf ssh-50-clover-security.conf
+rollback_created_dir /etc/ssh/sshd_config.d dir-sshd_config.d
 ```
 
 From an already-open recovery session run `sshd -t`, reload
@@ -195,8 +252,8 @@ Back up or mark absent for all three destinations. Capture UI PID/NRestarts,
 Install and validate in this order:
 
 ```bash
-sudo install -d -m 0755 /etc/systemd/system/clover-ui.service.d
-sudo install -d -m 0755 /etc/nginx/snippets
+ensure_destination_dir /etc/systemd/system/clover-ui.service.d dir-clover-ui.service.d 0755
+ensure_destination_dir /etc/nginx/snippets dir-nginx-snippets 0755
 sudo install -m 0644 \
   "$ARTIFACT/ops/security-stage5/package-c/systemd/clover-ui.service.d/30-loopback.conf" \
   /etc/systemd/system/clover-ui.service.d/30-loopback.conf
@@ -229,6 +286,8 @@ Exact rollback starts with:
 restore_exact /etc/systemd/system/clover-ui.service.d/30-loopback.conf ui-30-loopback.conf
 restore_exact /etc/nginx/snippets/clover-security-headers.conf nginx-security-headers.conf
 restore_exact /etc/nginx/sites-enabled/clover-spb.ru nginx-clover-spb.ru.conf
+rollback_created_dir /etc/systemd/system/clover-ui.service.d dir-clover-ui.service.d
+rollback_created_dir /etc/nginx/snippets dir-nginx-snippets
 sudo /usr/sbin/nginx -t
 sudo systemctl daemon-reload
 sudo systemctl restart clover-ui.service
