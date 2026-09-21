@@ -1,11 +1,18 @@
 #!/usr/bin/env bash
 # Source-controlled Package A operator. Not permission to run on production.
+# Launch only as:
+#   git -C /opt/clover/clover-app show \
+#     "<EXTERNAL_TARGET>:ops/security-stage5/scripts/promote-package-a.sh" \
+#     | sudo /bin/bash -s -- \
+#       --target <EXTERNAL_TARGET> \
+#       --expected-manifest <EXTERNAL_MANIFEST_SHA256> \
+#       --artifact <ABS_ARTIFACT>
 # Rejected remote SHA ba0a3c3e57d2bd01c94046dab81aded4e10c2df1566038b02a19be6c498a4f50
-# must never be executed. This file is the only approved operator source.
+# must never be executed. This file must not be opened as root via $0.
 #
 # Exit codes:
 #   0  PASS
-#   2  TTY/sudo gate
+#   2  TTY/root gate
 #  10  lock busy
 #  20  explicit pre-change failure
 #  40  promote failed after change; rollback completed
@@ -23,39 +30,70 @@ readonly EXIT_PRE=20
 readonly EXIT_PROMOTE_FAIL=40
 readonly EXIT_ROLLBACK_INCOMPLETE=41
 
-ROOT=${ROOT:-/opt/clover/clover-app}
-LIVE=${LIVE:-1fdd7e6ac715f55e407d71a225e5a6037eb9d2e8}
-ARTIFACT=${ARTIFACT:-}
-TARGET=${TARGET:-}
-EXPECTED_MANIFEST=${EXPECTED_MANIFEST:-}
-LOCK=${LOCK:-/opt/clover/deployments/deploy.lock}
-DEST_ROOT=${DEST_ROOT:-}
-UMASK_FILE=${UMASK_FILE:-}
+readonly DEFAULT_ROOT=/opt/clover/clover-app
+readonly DEFAULT_LIVE=1fdd7e6ac715f55e407d71a225e5a6037eb9d2e8
+readonly DEFAULT_LOCK=/opt/clover/deployments/deploy.lock
 
-ART_API=""
-ART_UI=""
-ART_TIMER=""
+TARGET=""
+EXPECTED_MANIFEST=""
+ARTIFACT=""
+ROOT="$DEFAULT_ROOT"
+LIVE="$DEFAULT_LIVE"
+LOCK="$DEFAULT_LOCK"
+DEST_ROOT=""
+RECOVERY_ARG=""
+
+CHANGED=0
+ROLLBACK_RUNNING=0
+IN_CLEANUP=0
+LOCK_HELD=0
+ORIG_EXIT=0
+RECOVERY=""
+SNAPSHOT=""
+PROMOTE_LOG=""
+ROLLBACK_STATE=NOT_NEEDED
+PRE_TIMER_UNIT=""
+PRE_API_RELEASE=""
+PRE_UI_TAG=""
+PRE_UI_SHA=""
+PRE_NGX_PID=""
+UMASK_SHA=""
+UMASK_FILE=""
+SNAP_API=""
+SNAP_UI=""
+SNAP_TIMER=""
 DST_API=""
 DST_UI=""
 DST_TIMER=""
 DIR_API=""
 DIR_UI=""
 
-CHANGED=0
-IN_ROLLBACK=0
-IN_CLEANUP=0
-LOCK_HELD=0
-ORIG_EXIT=0
-RECOVERY=""
-PROMOTE_LOG=""
-ROLLBACK_STATE=NOT_NEEDED
-SUDO_KEEP=""
-
-require_tty() {
-  if [ ! -t 0 ] || [ ! -t 1 ]; then
-    printf '%s\n' "SUDO GATE: FAIL (no TTY)" >&2
+require_root() {
+  if [ "$(id -u)" -ne 0 ]; then
+    printf '%s\n' "ROOT GATE: FAIL" >&2
     exit "$EXIT_SUDO"
   fi
+}
+
+require_tty() {
+  if [ ! -t 1 ] || [ ! -t 2 ]; then
+    printf '%s\n' "TTY GATE: FAIL (stdout/stderr)" >&2
+    exit "$EXIT_SUDO"
+  fi
+  if [ ! -e /dev/tty ] || [ ! -r /dev/tty ] || [ ! -w /dev/tty ]; then
+    printf '%s\n' "TTY GATE: FAIL (/dev/tty)" >&2
+    exit "$EXIT_SUDO"
+  fi
+}
+
+require_bash_s_launch() {
+  case "$0" in
+    bash|-bash|/bin/bash|/usr/bin/bash) ;;
+    *)
+      printf '%s\n' "FAIL: operator must be launched via git show | sudo /bin/bash -s" >&2
+      exit "$EXIT_PRE"
+      ;;
+  esac
 }
 
 require_sha256() {
@@ -66,10 +104,29 @@ require_sha256() {
   fi
 }
 
+require_sha256_upper() {
+  local label="$1" value="$2"
+  if [ -z "$value" ] || ! printf '%s' "$value" | grep -Eq '^[0-9A-F]{64}$'; then
+    printf '%s\n' "FAIL: empty or invalid uppercase SHA-256 for $label" >&2
+    return 1
+  fi
+}
+
 sha_file() {
   local path="$1" hash
+  if ! test -f "$path" || test -L "$path"; then
+    printf '%s\n' "FAIL: not a regular file $path" >&2
+    return 1
+  fi
   hash=$(sha256sum -- "$path" | awk '{print $1}')
   require_sha256 "$path" "$hash"
+  printf '%s\n' "$hash"
+}
+
+git_blob_sha() {
+  local spec="$1" hash
+  hash=$(git -C "$ROOT" show "$spec" | sha256sum | awk '{print $1}')
+  require_sha256 "$spec" "$hash"
   printf '%s\n' "$hash"
 }
 
@@ -85,22 +142,48 @@ log() {
 backup_exact() {
   destination="$1"
   key="$2"
-  if sudo test -e "$destination"; then
-    sudo cp --preserve=all -- "$destination" "$RECOVERY/$key"
-    sudo sha256sum "$RECOVERY/$key" | sudo tee "$RECOVERY/$key.sha256" >/dev/null
+  if test -e "$destination"; then
+    if ! cp --preserve=all -- "$destination" "$RECOVERY/$key"; then
+      echo "FAIL: could not backup $destination" >&2
+      exit 1
+    fi
+    if ! sha256sum "$RECOVERY/$key" | tee "$RECOVERY/$key.sha256" >/dev/null; then
+      echo "FAIL: could not hash backup $key" >&2
+      exit 1
+    fi
+    if ! test -s "$RECOVERY/$key.sha256"; then
+      echo "FAIL: empty backup hash $key" >&2
+      exit 1
+    fi
   else
-    sudo touch "$RECOVERY/$key.absent"
+    if ! touch "$RECOVERY/$key.absent"; then
+      echo "FAIL: could not write absent marker $key" >&2
+      exit 1
+    fi
+    if ! test -e "$RECOVERY/$key.absent"; then
+      echo "FAIL: absent marker missing after create $key" >&2
+      exit 1
+    fi
   fi
 }
 
 restore_exact() {
   destination="$1"
   key="$2"
-  if sudo test -e "$RECOVERY/$key.absent"; then
-    sudo rm -f -- "$destination"
+  if test -e "$RECOVERY/$key.absent"; then
+    if ! rm -f -- "$destination"; then
+      echo "FAIL: could not remove absent destination $destination" >&2
+      exit 1
+    fi
   else
-    (cd "$RECOVERY" && sudo sha256sum -c "$key.sha256")
-    sudo cp --preserve=all -- "$RECOVERY/$key" "$destination"
+    if ! (cd "$RECOVERY" && sha256sum -c "$key.sha256"); then
+      echo "FAIL: backup hash check failed for $key" >&2
+      exit 1
+    fi
+    if ! cp --preserve=all -- "$RECOVERY/$key" "$destination"; then
+      echo "FAIL: could not restore $destination" >&2
+      exit 1
+    fi
   fi
 }
 
@@ -113,33 +196,33 @@ ensure_destination_dir() {
     echo "FAIL: directory create mode must be 0755, got $mode" >&2
     exit 1
   fi
-  if sudo test -e "$marker"; then
+  if test -e "$marker"; then
     echo "FAIL: recovery marker already exists for $key" >&2
     exit 1
   fi
-  if sudo test -L "$destination"; then
+  if test -L "$destination"; then
     echo "FAIL: $destination exists and is a symlink" >&2
     exit 1
   fi
-  if sudo test -e "$destination"; then
-    if sudo test -d "$destination"; then
+  if test -e "$destination"; then
+    if test -d "$destination"; then
       return 0
     fi
     echo "FAIL: $destination exists and is not a directory" >&2
     exit 1
   fi
-  if ! sudo install -d -m "$mode" -- "$destination"; then
+  if ! install -d -m "$mode" -- "$destination"; then
     echo "FAIL: could not create directory $destination" >&2
     exit 1
   fi
-  if ! sudo touch -- "$marker"; then
+  if ! touch -- "$marker"; then
     echo "FAIL: could not write directory marker $marker" >&2
-    sudo rmdir -- "$destination"
+    rmdir -- "$destination"
     exit 1
   fi
-  if ! sudo test -e "$marker"; then
+  if ! test -e "$marker"; then
     echo "FAIL: directory marker missing after create $marker" >&2
-    sudo rmdir -- "$destination"
+    rmdir -- "$destination"
     exit 1
   fi
 }
@@ -148,14 +231,14 @@ rollback_created_dir() {
   destination="$1"
   key="$2"
   marker="$RECOVERY/$key.dir-created"
-  if ! sudo test -e "$marker"; then
+  if ! test -e "$marker"; then
     return 0
   fi
-  if ! sudo rmdir -- "$destination"; then
+  if ! rmdir -- "$destination"; then
     echo "FAIL: $destination is not empty or not a directory; leftover entries were not deleted; marker kept" >&2
     exit 1
   fi
-  if ! sudo rm -f -- "$marker"; then
+  if ! rm -f -- "$marker"; then
     echo "FAIL: could not remove directory marker $marker after rmdir" >&2
     exit 1
   fi
@@ -208,43 +291,6 @@ ngx_health() {
   python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding="utf-8")); sys.exit(0 if d.get("ok") is True else 1)' "$out"
 }
 
-do_rollback() {
-  IN_ROLLBACK=1
-  ROLLBACK_STATE=INCOMPLETE
-  log "===== AUTOMATIC ROLLBACK ====="
-  sudo systemctl stop clover-audit-retention.timer || true
-  restore_exact "$DST_API" api-20-hardening.conf
-  restore_exact "$DST_UI" ui-20-hardening.conf
-  restore_exact "$DST_TIMER" audit-retention.timer
-  rollback_created_dir "$DIR_API" a-dir-clover-api.service.d
-  rollback_created_dir "$DIR_UI" a-dir-clover-ui.service.d
-  # 10-umask.conf is evidence-only and is never restored.
-  sudo systemctl daemon-reload
-  sudo systemctl restart clover-api.service
-  wait_active clover-api.service
-  api_health
-  sudo systemctl restart clover-ui.service
-  wait_active clover-ui.service
-  ui_fetch "$RECOVERY/ui-root.rollback.html"
-  sudo systemctl start clover-audit-retention.timer
-  local tgt as now_umask
-  tgt=$(systemctl show clover-audit-retention.timer -p Unit --value)
-  as=$(systemctl show clover-audit-retention.timer -p ActiveState --value)
-  [ "$tgt" = "$PRE_TIMER_UNIT" ]
-  [ "$as" = active ]
-  if [ "$PRE_TIMER_UNIT" = clover-audit-retention-apply.service ]; then
-    log "RESIDUAL: restored pre-state timer still targets apply.service; apply service was not started"
-  fi
-  now_umask=$(sha_file "$UMASK_FILE")
-  [ "$now_umask" = "$UMASK_SHA" ]
-  local apply_st
-  apply_st=$(systemctl show clover-audit-retention-apply.service -p ActiveState --value)
-  [ "$apply_st" = inactive ]
-  ROLLBACK_STATE=COMPLETED
-  log "ROLLBACK COMPLETED orig_exit=$ORIG_EXIT"
-  return 0
-}
-
 release_lock() {
   if [ "$LOCK_HELD" = 1 ]; then
     flock -u 9 || true
@@ -267,25 +313,83 @@ fail_before() {
   exit "$EXIT_PRE"
 }
 
+disable_recursive_traps() {
+  trap - ERR
+  trap 'exit '"$EXIT_ROLLBACK_INCOMPLETE" INT
+  trap 'exit '"$EXIT_ROLLBACK_INCOMPLETE" TERM
+}
+
+do_rollback() {
+  ROLLBACK_RUNNING=1
+  ROLLBACK_STATE=INCOMPLETE
+  disable_recursive_traps
+  log "===== AUTOMATIC ROLLBACK ====="
+  local rb=0
+  systemctl stop clover-audit-retention.timer || true
+  (restore_exact "$DST_API" api-20-hardening.conf) || rb=1
+  (restore_exact "$DST_UI" ui-20-hardening.conf) || rb=1
+  (restore_exact "$DST_TIMER" audit-retention.timer) || rb=1
+  (rollback_created_dir "$DIR_API" a-dir-clover-api.service.d) || rb=1
+  (rollback_created_dir "$DIR_UI" a-dir-clover-ui.service.d) || rb=1
+  # 10-umask.conf is evidence-only and is never restored.
+  systemctl daemon-reload || rb=1
+  systemctl restart clover-api.service || rb=1
+  wait_active clover-api.service || rb=1
+  api_health || rb=1
+  systemctl restart clover-ui.service || rb=1
+  wait_active clover-ui.service || rb=1
+  ui_fetch "$RECOVERY/ui-root.rollback.html" || rb=1
+  systemctl start clover-audit-retention.timer || rb=1
+  local tgt as now_umask apply_st
+  tgt=$(systemctl show clover-audit-retention.timer -p Unit --value) || rb=1
+  as=$(systemctl show clover-audit-retention.timer -p ActiveState --value) || rb=1
+  if [ "$tgt" != "$PRE_TIMER_UNIT" ] || [ "$as" != active ]; then
+    rb=1
+  fi
+  if [ "$PRE_TIMER_UNIT" = clover-audit-retention-apply.service ]; then
+    log "RESIDUAL: restored pre-state timer still targets apply.service; apply service was not started"
+  fi
+  now_umask=$(sha_file "$UMASK_FILE") || rb=1
+  if [ "$now_umask" != "$UMASK_SHA" ]; then
+    rb=1
+  fi
+  apply_st=$(systemctl show clover-audit-retention-apply.service -p ActiveState --value) || rb=1
+  if [ "$apply_st" != inactive ]; then
+    rb=1
+  fi
+  if [ "$rb" -ne 0 ]; then
+    log "ROLLBACK INCOMPLETE orig_exit=$ORIG_EXIT"
+    return 1
+  fi
+  ROLLBACK_STATE=COMPLETED
+  log "ROLLBACK COMPLETED orig_exit=$ORIG_EXIT"
+  return 0
+}
+
+finish_fail_after_change() {
+  disable_recursive_traps
+  if do_rollback; then
+    release_lock
+    echo "PACKAGE A PROMOTE: FAIL"
+    echo "ROLLBACK: COMPLETED"
+    echo "ORIG_EXIT=$ORIG_EXIT"
+    exit "$EXIT_PROMOTE_FAIL"
+  fi
+  release_lock
+  echo "PACKAGE A PROMOTE: FAIL"
+  echo "ROLLBACK: INCOMPLETE"
+  echo "ORIG_EXIT=$ORIG_EXIT"
+  exit "$EXIT_ROLLBACK_INCOMPLETE"
+}
+
 operator_on_err() {
   local code=$?
   ORIG_EXIT=$code
-  if [ "$IN_ROLLBACK" = 1 ] || [ "$IN_CLEANUP" = 1 ]; then
+  if [ "$ROLLBACK_RUNNING" = 1 ] || [ "$IN_CLEANUP" = 1 ]; then
     exit "$EXIT_ROLLBACK_INCOMPLETE"
   fi
   if [ "$CHANGED" = 1 ]; then
-    if do_rollback; then
-      release_lock
-      echo "PACKAGE A PROMOTE: FAIL"
-      echo "ROLLBACK: COMPLETED"
-      echo "ORIG_EXIT=$ORIG_EXIT"
-      exit "$EXIT_PROMOTE_FAIL"
-    fi
-    release_lock
-    echo "PACKAGE A PROMOTE: FAIL"
-    echo "ROLLBACK: INCOMPLETE"
-    echo "ORIG_EXIT=$ORIG_EXIT"
-    exit "$EXIT_ROLLBACK_INCOMPLETE"
+    finish_fail_after_change
   fi
   release_lock
   echo "PACKAGE A PROMOTE: FAIL"
@@ -302,22 +406,11 @@ operator_on_signal() {
     *) ORIG_EXIT=1 ;;
   esac
   log "SIGNAL $sig"
-  if [ "$IN_ROLLBACK" = 1 ]; then
+  if [ "$ROLLBACK_RUNNING" = 1 ] || [ "$IN_CLEANUP" = 1 ]; then
     exit "$EXIT_ROLLBACK_INCOMPLETE"
   fi
   if [ "$CHANGED" = 1 ]; then
-    if do_rollback; then
-      release_lock
-      echo "PACKAGE A PROMOTE: FAIL"
-      echo "ROLLBACK: COMPLETED"
-      echo "ORIG_EXIT=$ORIG_EXIT"
-      exit "$EXIT_PROMOTE_FAIL"
-    fi
-    release_lock
-    echo "PACKAGE A PROMOTE: FAIL"
-    echo "ROLLBACK: INCOMPLETE"
-    echo "ORIG_EXIT=$ORIG_EXIT"
-    exit "$EXIT_ROLLBACK_INCOMPLETE"
+    finish_fail_after_change
   fi
   release_lock
   echo "PACKAGE A PROMOTE: FAIL"
@@ -326,49 +419,135 @@ operator_on_signal() {
   exit "$ORIG_EXIT"
 }
 
-enter_root_shell() {
-  if [ "${CLOVER_OPERATOR_AS_ROOT:-}" = 1 ]; then
-    return 0
+set_once() {
+  local name="$1" value="$2"
+  case "$name" in
+    TARGET) [ -z "$TARGET" ] || fail_before "duplicate argument --target" ;;
+    EXPECTED_MANIFEST) [ -z "$EXPECTED_MANIFEST" ] || fail_before "duplicate argument --expected-manifest" ;;
+    ARTIFACT) [ -z "$ARTIFACT" ] || fail_before "duplicate argument --artifact" ;;
+    ROOT) [ "$ROOT" = "$DEFAULT_ROOT" ] || fail_before "duplicate argument --repo" ;;
+    LIVE) [ "$LIVE" = "$DEFAULT_LIVE" ] || fail_before "duplicate argument --live" ;;
+    LOCK) [ "$LOCK" = "$DEFAULT_LOCK" ] || fail_before "duplicate argument --lock" ;;
+    DEST_ROOT) [ -z "$DEST_ROOT" ] || fail_before "duplicate argument --dest-root" ;;
+    RECOVERY_ARG) [ -z "$RECOVERY_ARG" ] || fail_before "duplicate argument --recovery" ;;
+  esac
+  case "$name" in
+    TARGET) TARGET="$value" ;;
+    EXPECTED_MANIFEST) EXPECTED_MANIFEST="$value" ;;
+    ARTIFACT) ARTIFACT="$value" ;;
+    ROOT) ROOT="$value" ;;
+    LIVE) LIVE="$value" ;;
+    LOCK) LOCK="$value" ;;
+    DEST_ROOT) DEST_ROOT="$value" ;;
+    RECOVERY_ARG) RECOVERY_ARG="$value" ;;
+  esac
+}
+
+parse_args() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --target)
+        [ $# -ge 2 ] || fail_before "missing value for --target"
+        set_once TARGET "$2"
+        shift 2
+        ;;
+      --expected-manifest)
+        [ $# -ge 2 ] || fail_before "missing value for --expected-manifest"
+        set_once EXPECTED_MANIFEST "$2"
+        shift 2
+        ;;
+      --artifact)
+        [ $# -ge 2 ] || fail_before "missing value for --artifact"
+        set_once ARTIFACT "$2"
+        shift 2
+        ;;
+      --repo)
+        [ $# -ge 2 ] || fail_before "missing value for --repo"
+        set_once ROOT "$2"
+        shift 2
+        ;;
+      --live)
+        [ $# -ge 2 ] || fail_before "missing value for --live"
+        set_once LIVE "$2"
+        shift 2
+        ;;
+      --lock)
+        [ $# -ge 2 ] || fail_before "missing value for --lock"
+        set_once LOCK "$2"
+        shift 2
+        ;;
+      --dest-root)
+        [ $# -ge 2 ] || fail_before "missing value for --dest-root"
+        set_once DEST_ROOT "$2"
+        shift 2
+        ;;
+      --recovery)
+        [ $# -ge 2 ] || fail_before "missing value for --recovery"
+        set_once RECOVERY_ARG "$2"
+        shift 2
+        ;;
+      *)
+        fail_before "unknown argument $1"
+        ;;
+    esac
+  done
+}
+
+require_regular_file() {
+  local path="$1"
+  if test -L "$path" || ! test -f "$path"; then
+    fail_before "not a regular file $path"
   fi
-  if [ "$(id -u)" -eq 0 ]; then
-    return 0
+}
+
+copy_payload_snapshot() {
+  local rel="$1" dest="$2" man_hash="$3"
+  local src="$ARTIFACT/$rel" copy_hash blob_hash
+  require_regular_file "$src"
+  if ! cp -- "$src" "$dest"; then
+    fail_before "could not snapshot $rel"
   fi
-  require_tty
-  log "===== SUDO -v (type password in this terminal; it will not be echoed) ====="
-  if ! sudo -v; then
-    echo "SUDO GATE: FAIL"
-    exit "$EXIT_SUDO"
+  if ! chmod 0400 -- "$dest"; then
+    fail_before "could not lock snapshot $rel"
   fi
-  if ! sudo -n true; then
-    echo "SUDO GATE: FAIL"
-    exit "$EXIT_SUDO"
-  fi
-  exec sudo -n env CLOVER_OPERATOR_AS_ROOT=1 ROOT="$ROOT" ARTIFACT="$ARTIFACT" \
-    TARGET="$TARGET" EXPECTED_MANIFEST="$EXPECTED_MANIFEST" LIVE="$LIVE" LOCK="$LOCK" \
-    UMASK_FILE="$UMASK_FILE" DEST_ROOT="$DEST_ROOT" RECOVERY_OVERRIDE="${RECOVERY_OVERRIDE:-}" \
-    /bin/bash -- "$0" "$@"
+  copy_hash=$(sha_file "$dest")
+  [ "$copy_hash" = "$man_hash" ] || fail_before "snapshot $rel != manifest"
+  blob_hash=$(git_blob_sha "${TARGET}:${rel}")
+  [ "$copy_hash" = "$blob_hash" ] || fail_before "snapshot $rel != git blob"
+}
+
+manifest_file_hash() {
+  local rel="$1"
+  python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding="utf-8"));
+p=sys.argv[2]
+hits=[x["sha256"] for x in d.get("files",[]) if x.get("path")==p]
+sys.exit(1 if len(hits)!=1 else 0)
+print(hits[0])' "$ARTIFACT/manifest.json" "$rel"
 }
 
 operator_main() {
-  : "${ARTIFACT:?ARTIFACT must be the accepted PREPARE directory}"
-  : "${TARGET:?TARGET must be the 40-character artifact commit}"
-  : "${EXPECTED_MANIFEST:?EXPECTED_MANIFEST must be the uppercase SHA-256 of manifest.json}"
-  ART_API="$ARTIFACT/ops/security-stage5/package-a/systemd/clover-api.service.d/20-hardening.conf"
-  ART_UI="$ARTIFACT/ops/security-stage5/package-a/systemd/clover-ui.service.d/20-hardening.conf"
-  ART_TIMER="$ARTIFACT/ops/systemd/clover-audit-retention.timer"
+  unset CLOVER_OPERATOR_AS_ROOT SUDO_ASKPASS ASKPASS VERIFIER || true
+  require_bash_s_launch
+  require_root
+  require_tty
+  parse_args "$@"
+
+  printf '%s' "$TARGET" | grep -Eq '^[0-9a-f]{40}$' || fail_before "TARGET must be a 40-character lowercase SHA"
+  require_sha256_upper "EXPECTED_MANIFEST" "$EXPECTED_MANIFEST"
+  case "$ARTIFACT" in
+    /*) ;;
+    *) fail_before "ARTIFACT must be an absolute path" ;;
+  esac
+  [ -d "$ARTIFACT" ] || fail_before "ARTIFACT is not a directory"
+  [ -d "$ROOT/.git" ] || fail_before "repo missing $ROOT"
+  git -C "$ROOT" cat-file -e "${TARGET}^{commit}" || fail_before "target commit missing"
+
   DST_API="${DEST_ROOT}/etc/systemd/system/clover-api.service.d/20-hardening.conf"
   DST_UI="${DEST_ROOT}/etc/systemd/system/clover-ui.service.d/20-hardening.conf"
   DST_TIMER="${DEST_ROOT}/etc/systemd/system/clover-audit-retention.timer"
   DIR_API="${DEST_ROOT}/etc/systemd/system/clover-api.service.d"
   DIR_UI="${DEST_ROOT}/etc/systemd/system/clover-ui.service.d"
-  if [ -z "$UMASK_FILE" ]; then
-    UMASK_FILE="${DEST_ROOT}/etc/systemd/system/clover-api.service.d/10-umask.conf"
-  fi
-
-  enter_root_shell "$@"
-  if [ "$(id -u)" -eq 0 ] || [ "${CLOVER_OPERATOR_AS_ROOT:-}" = 1 ]; then
-    sudo() { "$@"; }
-  fi
+  UMASK_FILE="${DEST_ROOT}/etc/systemd/system/clover-api.service.d/10-umask.conf"
 
   trap operator_on_err ERR
   trap 'operator_on_signal INT' INT
@@ -389,22 +568,26 @@ operator_main() {
 
   local rand
   rand=$(python3 -c "import secrets; print(secrets.token_hex(8))")
-  RECOVERY=${RECOVERY_OVERRIDE:-/opt/clover/recovery/security-stage5-package-a-${TARGET}-full-${rand}}
-  sudo install -d -m 0700 -- "$RECOVERY"
-  sudo chown root:root -- "$RECOVERY"
-  sudo chmod 0700 -- "$RECOVERY"
+  RECOVERY=${RECOVERY_ARG:-/opt/clover/recovery/security-stage5-package-a-${TARGET}-full-${rand}}
+  install -d -m 0700 -- "$RECOVERY"
+  chown root:root -- "$RECOVERY"
+  chmod 0700 -- "$RECOVERY"
+  SNAPSHOT="$RECOVERY/payload"
+  install -d -m 0700 -- "$SNAPSHOT"
+  chmod 0700 -- "$SNAPSHOT"
   PROMOTE_LOG="$RECOVERY/promote-package-a.log"
   : > "$PROMOTE_LOG"
-  sudo chmod 0600 -- "$PROMOTE_LOG"
+  chmod 0600 -- "$PROMOTE_LOG"
   log "LOCK_HELD"
   log "RECOVERY=$RECOVERY"
 
-  local verifier
+  local verifier copy_hash blob_hash
   verifier="$RECOVERY/securityStage5Artifact-${TARGET}.mjs"
-  git -C "$ROOT" cat-file -e "${TARGET}^{commit}"
   git -C "$ROOT" show "${TARGET}:server/scripts/securityStage5Artifact.mjs" > "$verifier"
-  sudo chmod 0500 -- "$verifier"
-  require_sha256 "extracted verifier" "$(sha_file "$verifier")"
+  chmod 0500 -- "$verifier"
+  copy_hash=$(sha_file "$verifier")
+  blob_hash=$(git_blob_sha "${TARGET}:server/scripts/securityStage5Artifact.mjs")
+  [ "$copy_hash" = "$blob_hash" ] || fail_before "verifier != git blob"
   case "$verifier" in
     *.verifier*|*/.verifier-*) fail_before "pre-placed verifier path" ;;
   esac
@@ -416,6 +599,24 @@ operator_main() {
   local head
   head=$(git -C "$ROOT" rev-parse HEAD)
   [ "$head" = "$LIVE" ] || fail_before "checkout $head"
+
+  local rel_api rel_ui rel_timer man_api man_ui man_timer
+  rel_api="ops/security-stage5/package-a/systemd/clover-api.service.d/20-hardening.conf"
+  rel_ui="ops/security-stage5/package-a/systemd/clover-ui.service.d/20-hardening.conf"
+  rel_timer="ops/systemd/clover-audit-retention.timer"
+  SNAP_API="$SNAPSHOT/api-20-hardening.conf"
+  SNAP_UI="$SNAPSHOT/ui-20-hardening.conf"
+  SNAP_TIMER="$SNAPSHOT/audit-retention.timer"
+  man_api=$(manifest_file_hash "$rel_api")
+  man_ui=$(manifest_file_hash "$rel_ui")
+  man_timer=$(manifest_file_hash "$rel_timer")
+  require_sha256 "$rel_api" "$man_api"
+  require_sha256 "$rel_ui" "$man_ui"
+  require_sha256 "$rel_timer" "$man_timer"
+  copy_payload_snapshot "$rel_api" "$SNAP_API" "$man_api"
+  copy_payload_snapshot "$rel_ui" "$SNAP_UI" "$man_ui"
+  copy_payload_snapshot "$rel_timer" "$SNAP_TIMER" "$man_timer"
+  log "SNAPSHOT_LOCKED"
 
   systemctl list-jobs --no-pager | grep -q 'No jobs running' || fail_before "jobs"
   local u as
@@ -448,24 +649,41 @@ operator_main() {
   [ "$apply_st" = inactive ] && [ "$dry_st" = inactive ] || fail_before "apply/dry $apply_st/$dry_st"
   log "PRE_TIMER_UNIT=$PRE_TIMER_UNIT"
 
+  local api_dir_mode
+  api_dir_mode=$(stat -c '%a' "$DIR_API")
+  printf '%s\n' "$api_dir_mode" > "$RECOVERY/api-dir.mode"
+  [ "$api_dir_mode" = 700 ] || [ "$api_dir_mode" = 0700 ] || fail_before "api dir mode $api_dir_mode"
+
   backup_exact "$DST_API" api-20-hardening.conf
   backup_exact "$DST_UI" ui-20-hardening.conf
   backup_exact "$DST_TIMER" audit-retention.timer
-  sudo test -f "$RECOVERY/audit-retention.timer" || sudo test -f "$RECOVERY/audit-retention.timer.absent" || fail_before "timer backup missing"
-  if sudo test -f "$RECOVERY/audit-retention.timer.sha256"; then
-    (cd "$RECOVERY" && sudo sha256sum -c audit-retention.timer.sha256)
+  if test -f "$RECOVERY/api-20-hardening.conf.sha256"; then
+    (cd "$RECOVERY" && sha256sum -c api-20-hardening.conf.sha256)
+  else
+    test -f "$RECOVERY/api-20-hardening.conf.absent"
+  fi
+  if test -f "$RECOVERY/ui-20-hardening.conf.sha256"; then
+    (cd "$RECOVERY" && sha256sum -c ui-20-hardening.conf.sha256)
+  else
+    test -f "$RECOVERY/ui-20-hardening.conf.absent"
+  fi
+  if test -f "$RECOVERY/audit-retention.timer.sha256"; then
+    (cd "$RECOVERY" && sha256sum -c audit-retention.timer.sha256)
+  else
+    test -f "$RECOVERY/audit-retention.timer.absent"
   fi
 
-  sudo test -e "$UMASK_FILE" || fail_before "10-umask.conf missing"
-  sudo stat -c 'umask owner=%U:%G mode=%a size=%s path=%n' "$UMASK_FILE" | sudo tee "$RECOVERY/10-umask.conf.stat" >/dev/null
+  test -e "$UMASK_FILE" || fail_before "10-umask.conf missing"
+  stat -c 'umask owner=%U:%G mode=%a size=%s path=%n' "$UMASK_FILE" > "$RECOVERY/10-umask.conf.stat"
   UMASK_SHA=$(sha_file "$UMASK_FILE")
-  printf '%s  %s\n' "$UMASK_SHA" "$UMASK_FILE" | sudo tee "$RECOVERY/10-umask.conf.evidence.sha256" >/dev/null
+  printf '%s  %s\n' "$UMASK_SHA" "$UMASK_FILE" > "$RECOVERY/10-umask.conf.evidence.sha256"
+  require_sha256 "10-umask.conf" "$UMASK_SHA"
   log "UMASK_EVIDENCE=$UMASK_SHA"
   log "10-umask.conf is not a destination and will not be installed or restored"
 
   log "===== STOP TIMER (first change) ====="
   CHANGED=1
-  sudo systemctl stop clover-audit-retention.timer
+  systemctl stop clover-audit-retention.timer
   tas=$(systemctl show clover-audit-retention.timer -p ActiveState --value)
   apply_st=$(systemctl show clover-audit-retention-apply.service -p ActiveState --value)
   dry_st=$(systemctl show clover-audit-retention-dry-run.service -p ActiveState --value)
@@ -473,45 +691,36 @@ operator_main() {
 
   ensure_destination_dir "$DIR_API" a-dir-clover-api.service.d 0755
   ensure_destination_dir "$DIR_UI" a-dir-clover-ui.service.d 0755
-  local api_dir_mode
-  api_dir_mode=$(sudo stat -c '%a' "$DIR_API")
+  api_dir_mode=$(stat -c '%a' "$DIR_API")
   [ "$api_dir_mode" = 700 ] || [ "$api_dir_mode" = 0700 ]
 
-  sudo install -m 0644 -- "$ART_API" "$DST_API"
-  sudo install -m 0644 -- "$ART_UI" "$DST_UI"
-  sudo install -m 0644 -- "$ART_TIMER" "$DST_TIMER"
+  install -m 0644 -- "$SNAP_API" "$DST_API"
+  install -m 0644 -- "$SNAP_UI" "$DST_UI"
+  install -m 0644 -- "$SNAP_TIMER" "$DST_TIMER"
   [ "$(sha_file "$UMASK_FILE")" = "$UMASK_SHA" ]
+  [ "$(sha_file "$DST_API")" = "$(sha_file "$SNAP_API")" ]
+  [ "$(sha_file "$DST_UI")" = "$(sha_file "$SNAP_UI")" ]
+  [ "$(sha_file "$DST_TIMER")" = "$(sha_file "$SNAP_TIMER")" ]
 
-  local inst_api inst_ui inst_timer art_api art_ui art_timer
-  inst_api=$(sha_file "$DST_API")
-  inst_ui=$(sha_file "$DST_UI")
-  inst_timer=$(sha_file "$DST_TIMER")
-  art_api=$(sha_file "$ART_API")
-  art_ui=$(sha_file "$ART_UI")
-  art_timer=$(sha_file "$ART_TIMER")
-  [ "$inst_api" = "$art_api" ]
-  [ "$inst_ui" = "$art_ui" ]
-  [ "$inst_timer" = "$art_timer" ]
-
-  sudo systemd-analyze verify \
+  systemd-analyze verify \
     /etc/systemd/system/clover-api.service \
     /etc/systemd/system/clover-ui.service \
     /etc/systemd/system/clover-audit-retention.timer \
     "$DST_API" "$DST_UI" "$DST_TIMER"
 
-  sudo systemctl daemon-reload
+  systemctl daemon-reload
   local new_tgt
   new_tgt=$(systemctl show clover-audit-retention.timer -p Unit --value)
   [ "$new_tgt" = clover-audit-retention-dry-run.service ]
   apply_st=$(systemctl show clover-audit-retention-apply.service -p ActiveState --value)
   [ "$apply_st" = inactive ]
 
-  sudo systemctl restart clover-api.service
+  systemctl restart clover-api.service
   wait_active clover-api.service
   api_health
   [ "$(capture_api_release)" = "$PRE_API_RELEASE" ]
 
-  sudo systemctl restart clover-ui.service
+  systemctl restart clover-ui.service
   wait_active clover-ui.service
   ui_fetch "$RECOVERY/ui-root.post.html"
   local post_tag post_sha
@@ -524,7 +733,7 @@ operator_main() {
   ngx_health
   [ "$(systemctl show nginx.service -p MainPID --value)" = "$PRE_NGX_PID" ]
 
-  sudo systemctl start clover-audit-retention.timer
+  systemctl start clover-audit-retention.timer
   tas=$(systemctl show clover-audit-retention.timer -p ActiveState --value)
   tss=$(systemctl show clover-audit-retention.timer -p SubState --value)
   new_tgt=$(systemctl show clover-audit-retention.timer -p Unit --value)
@@ -538,7 +747,7 @@ operator_main() {
   ROLLBACK_STATE=NOT_NEEDED
   log "PACKAGE A PROMOTE PASS"
   release_lock
-  echo "SUDO GATE: PASS"
+  echo "TTY GATE: PASS"
   echo "PACKAGE A PROMOTE: PASS"
   echo "ROLLBACK: NOT NEEDED"
   echo "PACKAGE B/C/D: NOT TOUCHED"
@@ -549,6 +758,4 @@ operator_main() {
   exit "$EXIT_PASS"
 }
 
-if [ "${CLOVER_OPERATOR_SOURCE_ONLY:-}" != 1 ]; then
-  operator_main "$@"
-fi
+operator_main "$@"

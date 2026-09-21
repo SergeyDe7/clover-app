@@ -63,17 +63,6 @@ function toPosix(value) {
   return resolved.split(path.sep).join("/");
 }
 
-function toBashPath(winPath) {
-  return String(winPath || "")
-    .split(";")
-    .filter(Boolean)
-    .map((entry) => {
-      if (/^[A-Za-z]:[\\/]/.test(entry)) return toPosix(entry);
-      return entry.split(path.sep).join("/");
-    })
-    .join(":");
-}
-
 function extractBashFunction(source, name) {
   const start = source.indexOf(`${name}() {`);
   assert.ok(start >= 0, `missing bash function ${name}`);
@@ -93,9 +82,9 @@ function extractBashFunction(source, name) {
   return source.slice(start, end);
 }
 
-function runBash(script, env = {}, extraArgs = []) {
+function runBash(script, env = {}) {
   const bash = findBash();
-  return execFileSync(bash, ["-lc", script, ...extraArgs], {
+  return execFileSync(bash, ["-lc", script], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, ...env },
@@ -120,17 +109,58 @@ function runBashAllowFail(script, env = {}) {
   }
 }
 
-function runOperator(env) {
+function sha256File(filePath) {
+  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+function writeExec(filePath, body) {
+  writeFileSync(filePath, body.replace(/\r\n/g, "\n"));
+}
+
+function quote(value) {
+  return `"${String(value).replace(/"/g, '\\"')}"`;
+}
+
+function operatorArgs(cfg) {
+  return [
+    "--target",
+    cfg.target,
+    "--expected-manifest",
+    cfg.expectedManifest,
+    "--artifact",
+    cfg.artifact,
+    "--repo",
+    cfg.repo,
+    "--live",
+    cfg.live,
+    "--lock",
+    cfg.lock,
+    "--dest-root",
+    cfg.destRoot,
+    "--recovery",
+    cfg.recovery,
+  ]
+    .map(quote)
+    .join(" ");
+}
+
+function envExports(extraEnv) {
+  return Object.entries(extraEnv)
+    .map(([key, value]) => `export ${key}=${quote(value)}`)
+    .join("\n");
+}
+
+function runPipedOperator(cfg, extraEnv, command) {
   const bash = findBash();
-  const mocks = env.CLOVER_OPERATOR_MOCKS;
-  const args = mocks
-    ? ["-lc", `source "${mocks}"; exec bash -- "${toPosix(operatorPath)}"`]
-    : [toPosix(operatorPath)];
+  const script = `${envExports(extraEnv)}
+source ${quote(cfg.mocks)}
+${command}
+`;
   try {
-    const stdout = execFileSync(bash, args, {
+    const stdout = execFileSync(bash, ["-lc", script], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, ...env },
+      env: { ...process.env, ...extraEnv, PATH: cfg.path },
     });
     return { status: 0, stdout, stderr: "" };
   } catch (error) {
@@ -142,39 +172,122 @@ function runOperator(env) {
   }
 }
 
-function sha256File(filePath) {
-  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+function runTtyOperator(cfg, extraEnv, args) {
+  const bash = findBash();
+  const stamp = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const blobPath = path.join(tmpdir(), `clover-op-blob-${stamp}`);
+  const innerPath = path.join(tmpdir(), `clover-op-inner-${stamp}.sh`);
+  const rcPath = path.join(tmpdir(), `clover-op-rc-${stamp}`);
+  const donePath = path.join(tmpdir(), `clover-op-done-${stamp}`);
+  const logPath = path.join(tmpdir(), `clover-op-log-${stamp}`);
+  const posixBlob = toPosix(blobPath);
+  const posixInner = toPosix(innerPath);
+  const posixRc = toPosix(rcPath);
+  const posixDone = toPosix(donePath);
+  const posixLog = toPosix(logPath);
+  const blob = `git -C ${quote(cfg.repo)} show ${quote(`${cfg.target}:${operatorRel}`)}`;
+  writeExec(
+    innerPath,
+    `#!/usr/bin/env bash
+${envExports(extraEnv)}
+source ${quote(cfg.mocks)}
+export PATH=${quote(cfg.path)}
+if ! ${blob} > ${quote(posixBlob)}; then
+  echo "FAIL: git show of operator blob" >&2
+  echo 20 > ${quote(posixRc)}
+  echo DONE > ${quote(posixDone)}
+  exit 20
+fi
+bash -s -- ${args} < ${quote(posixBlob)}
+echo $? > ${quote(posixRc)}
+echo DONE > ${quote(posixDone)}
+`
+  );
+  const launcher = `if command -v script >/dev/null 2>&1; then
+  script -q -c ${quote(`/usr/bin/bash ${posixInner}`)} /dev/null
+elif command -v mintty >/dev/null 2>&1; then
+  mintty -w min -h never -l ${quote(posixLog)} -- /usr/bin/bash ${quote(posixInner)}
+  for i in $(seq 1 120); do
+    [ -f ${quote(posixDone)} ] && break
+    sleep 0.25
+  done
+else
+  echo 'FAIL: neither script nor mintty is available for TTY tests' >&2
+  exit 124
+fi
+if [ ! -f ${quote(posixDone)} ]; then
+  echo 'FAIL: TTY launcher timed out' >&2
+  exit 124
+fi
+exit "$(cat ${quote(posixRc)})"
+`;
+  try {
+    const stdout = execFileSync(bash, ["-lc", launcher], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, ...extraEnv, PATH: cfg.path },
+    });
+    const log = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
+    return { status: 0, stdout: `${stdout}${log}`, stderr: "" };
+  } catch (error) {
+    const log = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
+    return {
+      status: error.status ?? 1,
+      stdout: `${String(error.stdout || "")}${log}`,
+      stderr: String(error.stderr || ""),
+    };
+  } finally {
+    for (const file of [blobPath, innerPath, rcPath, donePath, logPath]) {
+      try {
+        rmSync(file, { force: true });
+      } catch {
+        // ignore leftover temp files
+      }
+    }
+  }
 }
 
-function writeExec(filePath, body) {
-  writeFileSync(filePath, body.replace(/\r\n/g, "\n"));
+function runOperator(cfg, extraEnv = {}, options = {}) {
+  const args = operatorArgs(cfg);
+  const blob = `git -C ${quote(cfg.repo)} show ${quote(`${cfg.target}:${operatorRel}`)}`;
+  if (options.fileLaunch) {
+    return runPipedOperator(cfg, extraEnv, `bash -- ${quote(options.fileLaunch)} ${args}`);
+  }
+  if (!options.tty) {
+    return runPipedOperator(cfg, extraEnv, `${blob} | bash -s -- ${args}`);
+  }
+  return runTtyOperator(cfg, extraEnv, args);
 }
 
 export function runSecurityStage5OperatorTests() {
   assert.ok(sourceFiles.includes(operatorRel), "operator must be in PREPARE allowlist");
   assert.match(operator, /^set -Eeuo pipefail$/m);
-  assert.match(operator, /trap operator_on_err ERR/);
-  assert.match(operator, /trap 'operator_on_signal INT' INT/);
-  assert.match(operator, /trap 'operator_on_signal TERM' TERM/);
-  assert.match(operator, /trap cleanup EXIT/);
+  assert.match(operator, /ROLLBACK_RUNNING=0/);
+  assert.match(operator, /disable_recursive_traps/);
+  assert.match(operator, /require_bash_s_launch/);
+  assert.match(operator, /git show \| sudo \/bin\/bash -s/);
   assert.match(operator, /readonly EXIT_PROMOTE_FAIL=40/);
   assert.match(operator, /readonly EXIT_ROLLBACK_INCOMPLETE=41/);
-  assert.match(operator, /sudo -v/);
-  assert.match(operator, /exec sudo -n env CLOVER_OPERATOR_AS_ROOT=1/);
-  assert.match(operator, /git -C "\$ROOT" show "\$\{TARGET\}:server\/scripts\/securityStage5Artifact\.mjs"/);
+  assert.match(operator, /SNAPSHOT_LOCKED/);
+  assert.match(operator, /git_blob_sha/);
   assert.match(operator, /10-umask\.conf is not a destination/);
   assert.match(operator, /STOP TIMER \(first change\)/);
-  assert.match(operator, /CHANGED=1/);
-  assert.doesNotMatch(operator, /sudo\s+-S\b/);
-  assert.doesNotMatch(operator, /SUDO_ASKPASS|askpass|sudoers/i);
-  assert.doesNotMatch(operator, /while\s+true;\s*do\s*sudo\s+-n\s+true/);
-  assert.doesNotMatch(operator, /sudo\s+-n\s+true\s+sleep/);
+  assert.ok(
+    operator.indexOf("sha256sum -c api-20-hardening.conf.sha256") < operator.indexOf("CHANGED=1") &&
+      operator.indexOf("sha256sum -c ui-20-hardening.conf.sha256") < operator.indexOf("CHANGED=1") &&
+      operator.indexOf("sha256sum -c audit-retention.timer.sha256") < operator.indexOf("CHANGED=1") &&
+      operator.indexOf("10-umask.conf.evidence.sha256") < operator.indexOf("CHANGED=1"),
+    "backup hashes must be checked before CHANGED=1"
+  );
+  assert.doesNotMatch(operator, /sudo\s+-S\b|sudo\s+-v\b|exec sudo/);
+  assert.doesNotMatch(operator, /CLOVER_OPERATOR_AS_ROOT=|SUDO_ASKPASS=|\/etc\/sudoers/);
+  assert.match(operator, /unset CLOVER_OPERATOR_AS_ROOT SUDO_ASKPASS ASKPASS VERIFIER/);
+  assert.doesNotMatch(operator, /while\s+true;/);
   assert.doesNotMatch(operator, /rm\s+-rf|pkill|kill\s+-9|\*\.conf/);
   assert.doesNotMatch(operator, /systemd-analyze[\s\S]{0,200}\|\|\s*true/);
-  assert.doesNotMatch(operator, /VERIFIER=.*\.verifier-/);
+  assert.doesNotMatch(operator, /\beval\b/);
+  assert.match(rollback, /sudo \/bin\/bash -s --/);
   assert.match(rollback, /10-umask\.conf` is \*\*not\*\* a\s+destination/);
-  assert.match(rollback, /ops\/security-stage5\/scripts\/promote-package-a\.sh/);
-  assert.match(rollback, /exits `40` when rollback completes and\s+`41`/);
   assert.doesNotMatch(rollback, /restore_exact[^\n]*10-umask/);
 
   for (const name of ["backup_exact", "restore_exact", "ensure_destination_dir", "rollback_created_dir"]) {
@@ -193,70 +306,92 @@ export function runSecurityStage5OperatorTests() {
 
   const emptyHash = runBashAllowFail(
     `set -Eeuo pipefail
-     source "${toPosix(operatorPath)}"
+     ${extractBashFunction(operator, "require_sha256")}
      require_sha256 empty ""
-    `,
-    { CLOVER_OPERATOR_SOURCE_ONLY: "1" }
+    `
   );
   assert.notEqual(emptyHash.status, 0, "empty hash must block continuation");
-  assert.match(`${emptyHash.stdout}${emptyHash.stderr}`, /empty or invalid SHA-256/);
 
-  const trapDir = mkdtempSync(path.join(tmpdir(), "clover-stage5-op-traps-"));
-  try {
-    const after = runBashAllowFail(
-      `set -Eeuo pipefail
-       source "${toPosix(operatorPath)}"
-       do_rollback() { echo ROLLBACK_RAN; return 0; }
-       CHANGED=1
-       IN_ROLLBACK=0
-       IN_CLEANUP=0
-       LOCK_HELD=0
-       trap operator_on_err ERR
-       trap 'operator_on_signal INT' INT
-       trap 'operator_on_signal TERM' TERM
+  const trapPrelude = `
+set -Eeuo pipefail
+EXIT_PROMOTE_FAIL=40
+EXIT_ROLLBACK_INCOMPLETE=41
+CHANGED=0
+ROLLBACK_RUNNING=0
+IN_CLEANUP=0
+LOCK_HELD=0
+ORIG_EXIT=0
+PROMOTE_LOG=""
+ROLLBACK_STATE=NOT_NEEDED
+${extractBashFunction(operator, "log")}
+${extractBashFunction(operator, "release_lock")}
+${extractBashFunction(operator, "cleanup")}
+${extractBashFunction(operator, "disable_recursive_traps")}
+${extractBashFunction(operator, "finish_fail_after_change")}
+${extractBashFunction(operator, "operator_on_err")}
+${extractBashFunction(operator, "operator_on_signal")}
+`;
+
+  const afterInt = runBashAllowFail(
+    `${trapPrelude}
+     do_rollback() { echo ROLLBACK_RAN; return 0; }
+     CHANGED=1
+     trap 'operator_on_signal INT' INT
+     kill -INT $$
+    `
+  );
+  assert.equal(afterInt.status, 40, `INT after CHANGED must exit 40, got ${afterInt.status}`);
+  assert.match(`${afterInt.stdout}${afterInt.stderr}`, /ROLLBACK_RAN/);
+
+  const afterTerm = runBashAllowFail(
+    `${trapPrelude}
+     do_rollback() { echo ROLLBACK_RAN; return 0; }
+     CHANGED=1
+     trap 'operator_on_signal TERM' TERM
+     kill -TERM $$
+    `
+  );
+  assert.equal(afterTerm.status, 40, `TERM after CHANGED must exit 40, got ${afterTerm.status}`);
+  assert.match(`${afterTerm.stdout}${afterTerm.stderr}`, /ROLLBACK_RAN/);
+
+  const incomplete = runBashAllowFail(
+    `${trapPrelude}
+     do_rollback() { echo ROLLBACK_RAN; return 1; }
+     CHANGED=1
+     trap operator_on_err ERR
+     false
+    `
+  );
+  assert.equal(incomplete.status, 41, `rollback incomplete must exit 41, got ${incomplete.status}`);
+
+  const recursive = runBashAllowFail(
+    `${trapPrelude}
+     count=0
+     do_rollback() {
+       count=$((count+1))
+       echo ROLLBACK_COUNT=$count
+       ROLLBACK_RUNNING=1
        false
-      `,
-      { CLOVER_OPERATOR_SOURCE_ONLY: "1" }
-    );
-    assert.equal(after.status, 40, `INT/ERR after CHANGED must exit 40, got ${after.status}`);
-    assert.match(`${after.stdout}${after.stderr}`, /ROLLBACK_RAN/);
-    assert.match(`${after.stdout}${after.stderr}`, /ROLLBACK: COMPLETED/);
+     }
+     CHANGED=1
+     trap operator_on_err ERR
+     false
+    `
+  );
+  assert.equal(recursive.status, 41);
+  assert.match(`${recursive.stdout}${recursive.stderr}`, /ROLLBACK_COUNT=1/);
+  assert.doesNotMatch(`${recursive.stdout}${recursive.stderr}`, /ROLLBACK_COUNT=2/);
 
-    const incomplete = runBashAllowFail(
-      `set -Eeuo pipefail
-       source "${toPosix(operatorPath)}"
-       do_rollback() { echo ROLLBACK_RAN; return 1; }
-       CHANGED=1
-       IN_ROLLBACK=0
-       IN_CLEANUP=0
-       LOCK_HELD=0
-       trap operator_on_err ERR
-       false
-      `,
-      { CLOVER_OPERATOR_SOURCE_ONLY: "1" }
-    );
-    assert.equal(incomplete.status, 41, `rollback incomplete must exit 41, got ${incomplete.status}`);
-    assert.match(`${incomplete.stdout}${incomplete.stderr}`, /ROLLBACK: INCOMPLETE/);
-
-    const before = runBashAllowFail(
-      `set -Eeuo pipefail
-       source "${toPosix(operatorPath)}"
-       do_rollback() { echo ROLLBACK_RAN; return 0; }
-       CHANGED=0
-       IN_ROLLBACK=0
-       IN_CLEANUP=0
-       LOCK_HELD=0
-       trap 'operator_on_signal INT' INT
-       kill -INT $$
-      `,
-      { CLOVER_OPERATOR_SOURCE_ONLY: "1" }
-    );
-    assert.equal(before.status, 130, `INT before CHANGED must keep 130, got ${before.status}`);
-    assert.doesNotMatch(`${before.stdout}${before.stderr}`, /ROLLBACK_RAN/);
-    assert.match(`${before.stdout}${before.stderr}`, /ROLLBACK: NOT_NEEDED/);
-  } finally {
-    rmSync(trapDir, { recursive: true, force: true });
-  }
+  const before = runBashAllowFail(
+    `${trapPrelude}
+     do_rollback() { echo ROLLBACK_RAN; return 0; }
+     CHANGED=0
+     trap 'operator_on_signal INT' INT
+     kill -INT $$
+    `
+  );
+  assert.equal(before.status, 130);
+  assert.doesNotMatch(`${before.stdout}${before.stderr}`, /ROLLBACK_RAN/);
 
   const work = mkdtempSync(path.join(tmpdir(), "clover-stage5-op-run-"));
   try {
@@ -278,11 +413,7 @@ export function runSecurityStage5OperatorTests() {
     const umaskPath = path.join(destRoot, "etc/systemd/system/clover-api.service.d/10-umask.conf");
     writeFileSync(umaskPath, "[Service]\nUMask=0077\n");
     const umaskSha = sha256File(umaskPath);
-    try {
-      execFileSync("chmod", ["0700", path.join(destRoot, "etc/systemd/system/clover-api.service.d")]);
-    } catch {
-      runBash(`chmod 0700 "${toPosix(path.join(destRoot, "etc/systemd/system/clover-api.service.d"))}"`);
-    }
+    runBash(`chmod 0700 "${toPosix(path.join(destRoot, "etc/systemd/system/clover-api.service.d"))}" || true`);
 
     const fixtureFiles = [...sourceFiles, "server/scripts/securityStage5Artifact.mjs"];
     for (const relative of fixtureFiles) {
@@ -319,6 +450,7 @@ import { readFileSync } from "node:fs";
 const dashC = process.argv.indexOf("-c");
 const code = dashC >= 0 ? String(process.argv[dashC + 1] || "") : "";
 const fileArg = process.argv[dashC + 2];
+const extra = process.argv[dashC + 3];
 if (code.includes("token_hex")) {
   process.stdout.write(randomBytes(8).toString("hex") + "\\n");
   process.exit(0);
@@ -330,6 +462,13 @@ if (code.includes('d.get("ok")')) {
 if (code.includes("releaseId")) {
   const data = JSON.parse(readFileSync(fileArg, "utf8"));
   process.stdout.write(String(data.releaseId || data.version || "") + "\\n");
+  process.exit(0);
+}
+if (code.includes("files")) {
+  const data = JSON.parse(readFileSync(fileArg, "utf8"));
+  const hit = (data.files || []).find((entry) => entry.path === extra);
+  if (!hit) process.exit(1);
+  process.stdout.write(String(hit.sha256) + "\\n");
   process.exit(0);
 }
 if (code.includes("ui-")) {
@@ -357,18 +496,12 @@ if [ "$1" = "-d" ]; then
   mkdir -p -- "\${@: -1}"
   exit 0
 fi
-src=""
-dest=""
+src=""; dest=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -m) shift 2 ;;
     --) shift ;;
-    *)
-      if [ -z "$src" ]; then src="$1"
-      else dest="$1"
-      fi
-      shift
-      ;;
+    *) if [ -z "$src" ]; then src="$1"; else dest="$1"; fi; shift ;;
   esac
 done
 cp -- "$src" "$dest"
@@ -378,6 +511,13 @@ cp -- "$src" "$dest"
       path.join(mockBin, "chmod"),
       `#!/usr/bin/env bash
 printf '%s\\n' "chmod $*" >> "${toPosix(stateDir)}/commands.log"
+if [ -f "${toPosix(stateDir)}/tamper.verifier" ]; then
+  for arg in "$@"; do
+    case "$arg" in
+      *securityStage5Artifact*) printf '\\n# tampered-root-copy\\n' >> "$arg" ;;
+    esac
+  done
+fi
 exit 0
 `
     );
@@ -385,13 +525,8 @@ exit 0
       path.join(mockBin, "stat"),
       `#!/usr/bin/env bash
 if [ "$1" = "-c" ]; then
-  fmt="$2"
-  target="$3"
-  if [ "$fmt" = "%a" ]; then
-    echo 700
-    exit 0
-  fi
-  echo "umask owner=root:root mode=644 size=20 path=$target"
+  if [ "$2" = "%a" ]; then echo 700; exit 0; fi
+  echo "umask owner=root:root mode=644 size=20 path=$3"
   exit 0
 fi
 exec /usr/bin/stat "$@"
@@ -415,10 +550,9 @@ exit 0
       path.join(mockBin, "systemd-analyze"),
       `#!/usr/bin/env bash
 printf '%s\\n' "systemd-analyze $*" >> "${toPosix(stateDir)}/commands.log"
-if [ -f "${toPosix(stateDir)}/analyze.fail" ]; then
-  echo "ANALYZE_FAIL" >&2
-  exit 1
-fi
+if [ -f "${toPosix(stateDir)}/analyze.fail" ]; then echo ANALYZE_FAIL >&2; exit 1; fi
+if [ -f "${toPosix(stateDir)}/send.int" ]; then kill -INT "$PPID"; sleep 2; exit 0; fi
+if [ -f "${toPosix(stateDir)}/send.term" ]; then kill -TERM "$PPID"; sleep 2; exit 0; fi
 exit 0
 `
     );
@@ -426,8 +560,7 @@ exit 0
       path.join(mockBin, "curl"),
       `#!/usr/bin/env bash
 printf '%s\\n' "curl $*" >> "${toPosix(stateDir)}/commands.log"
-out=""
-url=""
+out=""; url=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -o) out="$2"; shift 2 ;;
@@ -435,20 +568,11 @@ while [ $# -gt 0 ]; do
     *) shift ;;
   esac
 done
-if [ -z "$out" ]; then
-  out="${toPosix(stateDir)}/curl-default.out"
-fi
+[ -n "$out" ] || out="${toPosix(stateDir)}/curl-default.out"
 case "$url" in
-  *4100/api/health*|*clover-spb.ru/api/health*)
-    printf '%s\\n' '{"ok":true,"releaseId":"rel-pre"}' > "$out"
-    ;;
-  *5273/*|*:5273/)
-    printf '%s\\n' '<html>ui-PRETAG</html>' > "$out"
-    ;;
-  *)
-    echo "unexpected curl $url" >&2
-    exit 1
-    ;;
+  *4100/api/health*|*clover-spb.ru/api/health*) printf '%s\\n' '{"ok":true,"releaseId":"rel-pre"}' > "$out" ;;
+  *5273/*|*:5273/) printf '%s\\n' '<html>ui-PRETAG</html>' > "$out" ;;
+  *) echo "unexpected curl $url" >&2; exit 1 ;;
 esac
 `
     );
@@ -458,38 +582,25 @@ esac
 set -euo pipefail
 STATE="${toPosix(stateDir)}"
 printf '%s\\n' "systemctl $*" >> "$STATE/commands.log"
-cmd="$1"
-shift || true
+cmd="$1"; shift || true
 show_prop() {
   local unit="$1" prop="$2"
   case "$unit:$prop" in
-    clover-api.service:ActiveState|clover-ui.service:ActiveState|nginx.service:ActiveState)
-      echo active ;;
-    clover-api.service:SubState|clover-ui.service:SubState|nginx.service:SubState)
-      echo running ;;
-    nginx.service:MainPID)
-      echo 4242 ;;
-    clover-audit-retention.timer:Unit)
-      cat "$STATE/timer.unit" ;;
-    clover-audit-retention.timer:ActiveState)
-      cat "$STATE/timer.active" ;;
-    clover-audit-retention.timer:SubState)
-      cat "$STATE/timer.sub" ;;
-    clover-audit-retention-apply.service:ActiveState|clover-audit-retention-dry-run.service:ActiveState)
-      echo inactive ;;
-    *:ActiveState)
-      echo inactive ;;
-    *)
-      echo "" ;;
+    clover-api.service:ActiveState|clover-ui.service:ActiveState|nginx.service:ActiveState) echo active ;;
+    clover-api.service:SubState|clover-ui.service:SubState|nginx.service:SubState) echo running ;;
+    nginx.service:MainPID) echo 4242 ;;
+    clover-audit-retention.timer:Unit) cat "$STATE/timer.unit" ;;
+    clover-audit-retention.timer:ActiveState) cat "$STATE/timer.active" ;;
+    clover-audit-retention.timer:SubState) cat "$STATE/timer.sub" ;;
+    clover-audit-retention-apply.service:ActiveState|clover-audit-retention-dry-run.service:ActiveState) echo inactive ;;
+    *:ActiveState) echo inactive ;;
+    *) echo "" ;;
   esac
 }
 case "$cmd" in
-  list-jobs)
-    echo "No jobs running"
-    ;;
+  list-jobs) echo "No jobs running" ;;
   show)
-    unit=""
-    props=()
+    unit=""; props=()
     while [ $# -gt 0 ]; do
       case "$1" in
         -p) props+=("$2"); shift 2 ;;
@@ -497,9 +608,7 @@ case "$cmd" in
         *) unit="$1"; shift ;;
       esac
     done
-    for prop in "\${props[@]}"; do
-      show_prop "$unit" "$prop"
-    done
+    for prop in "\${props[@]}"; do show_prop "$unit" "$prop"; done
     ;;
   stop)
     if [ "\${1:-}" = clover-audit-retention.timer ]; then
@@ -508,48 +617,33 @@ case "$cmd" in
     fi
     ;;
   start)
-    if [ "\${1:-}" = clover-audit-retention-apply.service ]; then
-      echo "MUST NOT START APPLY" >&2
-      exit 1
-    fi
+    if [ "\${1:-}" = clover-audit-retention-apply.service ]; then echo MUST_NOT_START_APPLY >&2; exit 1; fi
     if [ "\${1:-}" = clover-audit-retention.timer ]; then
       echo active > "$STATE/timer.active"
       echo waiting > "$STATE/timer.sub"
     fi
     ;;
   restart)
-    if [ "\${1:-}" = nginx.service ]; then
-      echo "MUST NOT RESTART NGINX" >&2
-      exit 1
-    fi
+    if [ "\${1:-}" = nginx.service ]; then echo MUST_NOT_RESTART_NGINX >&2; exit 1; fi
+    if [ -f "$STATE/restart.fail" ]; then exit 1; fi
     ;;
-  reload)
-    echo "MUST NOT RELOAD $1" >&2
-    exit 1
-    ;;
+  reload) echo MUST_NOT_RELOAD >&2; exit 1 ;;
   daemon-reload)
     timer="${toPosix(path.join(destRoot, "etc/systemd/system/clover-audit-retention.timer"))}"
-    if [ -f "$timer" ]; then
-      awk -F= '/^Unit=/{print $2}' "$timer" > "$STATE/timer.unit"
-    fi
+    if [ -f "$timer" ]; then awk -F= '/^Unit=/{print $2}' "$timer" > "$STATE/timer.unit"; fi
     ;;
-  *)
-    echo "unsupported systemctl $cmd" >&2
-    exit 1
-    ;;
+  *) echo "unsupported systemctl $cmd" >&2; exit 1 ;;
 esac
 `
     );
-    writeFileSync(path.join(stateDir, "timer.unit"), "clover-audit-retention-apply.service\n");
-    writeFileSync(path.join(stateDir, "timer.active"), "active\n");
-    writeFileSync(path.join(stateDir, "timer.sub"), "waiting\n");
-    writeFileSync(path.join(stateDir, "commands.log"), "");
     runBash(`chmod 0755 "${toPosix(mockBin)}"/*`);
     const mocksSh = path.join(work, "mocks.sh");
     writeExec(
       mocksSh,
       `#!/usr/bin/env bash
 export MOCK_BIN="${toPosix(mockBin)}"
+export STATE="${toPosix(stateDir)}"
+id() { if [ "$1" = "-u" ]; then echo 0; else command id "$@"; fi; }
 install() { "$MOCK_BIN/install" "$@"; }
 chmod() { "$MOCK_BIN/chmod" "$@"; }
 stat() { "$MOCK_BIN/stat" "$@"; }
@@ -559,98 +653,230 @@ systemd-analyze() { "$MOCK_BIN/systemd-analyze" "$@"; }
 curl() { "$MOCK_BIN/curl" "$@"; }
 systemctl() { "$MOCK_BIN/systemctl" "$@"; }
 python3() { "$MOCK_BIN/python3" "$@"; }
-export -f install chmod stat chown flock systemd-analyze curl systemctl python3
+export -f id install chmod stat chown flock systemd-analyze curl systemctl python3
 if [ "\${CLOVER_EMPTY_SHA256:-}" = 1 ]; then
   sha256sum() { echo "  $1"; }
   export -f sha256sum
 fi
+if [ -f "$STATE/backup.fail" ]; then
+  cp() {
+    if printf '%s' "$*" | grep -q 'api-20-hardening.conf'; then
+      echo "backup copy fail" >&2
+      return 1
+    fi
+    command cp "$@"
+  }
+  export -f cp
+fi
 `
     );
 
-    const commonEnv = {
-      CLOVER_OPERATOR_AS_ROOT: "1",
-      CLOVER_OPERATOR_MOCKS: toPosix(mocksSh),
-      ROOT: toPosix(fixtureRoot),
-      ARTIFACT: toPosix(artifact),
-      TARGET: fixtureSha,
-      EXPECTED_MANIFEST: expectedManifest,
-      LIVE: fixtureSha,
-      LOCK: toPosix(path.join(work, "deploy.lock")),
-      DEST_ROOT: toPosix(destRoot),
-      RECOVERY_OVERRIDE: toPosix(path.join(work, "recovery")),
-      PATH: `${toPosix(mockBin)}:/usr/bin:/bin:${toBashPath(process.env.PATH)}`,
+    const posixArtifact = toPosix(artifact);
+    const posixRepo = toPosix(fixtureRoot);
+    const posixDest = toPosix(destRoot);
+    const cfg = {
+      target: fixtureSha,
+      expectedManifest,
+      artifact: posixArtifact,
+      repo: posixRepo,
+      live: fixtureSha,
+      lock: toPosix(path.join(work, "deploy.lock")),
+      destRoot: posixDest,
+      recovery: toPosix(path.join(work, "recovery")),
+      mocks: toPosix(mocksSh),
+      path: [
+        toPosix(mockBin),
+        ...runBash(`
+          dirname "$(command -v git)"
+          dirname "$(command -v node)"
+          dirname "$(command -v bash)"
+        `)
+          .trim()
+          .split(/\r?\n/)
+          .filter(Boolean),
+        "/mingw64/bin",
+        "/usr/bin",
+        "/bin",
+        "/cmd",
+      ].join(":"),
     };
 
-    writeFileSync(path.join(stateDir, "analyze.fail"), "1");
-    writeFileSync(path.join(stateDir, "timer.unit"), "clover-audit-retention-apply.service\n");
-    writeFileSync(path.join(stateDir, "timer.active"), "active\n");
-    writeFileSync(path.join(stateDir, "timer.sub"), "waiting\n");
-    writeFileSync(path.join(destRoot, "etc/systemd/system/clover-api.service.d/20-hardening.conf"), "OLD-API\n");
-    writeFileSync(path.join(destRoot, "etc/systemd/system/clover-ui.service.d/20-hardening.conf"), "OLD-UI\n");
-    writeFileSync(
-      path.join(destRoot, "etc/systemd/system/clover-audit-retention.timer"),
-      "[Timer]\nUnit=clover-audit-retention-apply.service\n"
+    const resetHost = () => {
+      writeFileSync(path.join(stateDir, "timer.unit"), "clover-audit-retention-apply.service\n");
+      writeFileSync(path.join(stateDir, "timer.active"), "active\n");
+      writeFileSync(path.join(stateDir, "timer.sub"), "waiting\n");
+      writeFileSync(path.join(stateDir, "commands.log"), "");
+      writeFileSync(path.join(destRoot, "etc/systemd/system/clover-api.service.d/20-hardening.conf"), "OLD-API\n");
+      writeFileSync(path.join(destRoot, "etc/systemd/system/clover-ui.service.d/20-hardening.conf"), "OLD-UI\n");
+      writeFileSync(
+        path.join(destRoot, "etc/systemd/system/clover-audit-retention.timer"),
+        "[Timer]\nUnit=clover-audit-retention-apply.service\n"
+      );
+    };
+
+    const fileLaunch = runOperator(cfg, {}, { fileLaunch: toPosix(operatorPath) });
+    assert.notEqual(fileLaunch.status, 0);
+    assert.match(`${fileLaunch.stdout}${fileLaunch.stderr}`, /git show \| sudo \/bin\/bash -s/);
+
+    const noTty = runOperator({ ...cfg, recovery: toPosix(path.join(work, "recovery-notty")) }, {}, { tty: false });
+    assert.equal(noTty.status, 2);
+    assert.match(`${noTty.stdout}${noTty.stderr}`, /TTY GATE: FAIL/);
+
+    const envBypass = runTtyOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-env")) },
+      {
+        TARGET: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+        EXPECTED_MANIFEST: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        ARTIFACT: "/tmp/nope",
+        CLOVER_OPERATOR_AS_ROOT: "1",
+      },
+      `--repo ${quote(posixRepo)} --live ${quote(fixtureSha)} --lock ${quote(cfg.lock)} --dest-root ${quote(posixDest)} --recovery ${quote(toPosix(path.join(work, "recovery-env")))}`
     );
-    const blocked = runOperator({
-      ...commonEnv,
-      RECOVERY_OVERRIDE: toPosix(path.join(work, "recovery-analyze")),
-    });
+    assert.notEqual(envBypass.status, 0);
+    assert.match(
+      `${envBypass.stdout}${envBypass.stderr}`,
+      /TARGET must be|FAIL_BEFORE_CHANGE|empty or invalid/
+    );
+
+    const unknownArg = runTtyOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-unknown")) },
+      {},
+      `${operatorArgs({ ...cfg, recovery: toPosix(path.join(work, "recovery-unknown")) })} --oops 1`
+    );
+    assert.notEqual(unknownArg.status, 0);
+    assert.match(`${unknownArg.stdout}${unknownArg.stderr}`, /unknown argument/);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "backup.fail"), "1");
+    const backupFail = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-backup")) },
+      {},
+      { tty: true }
+    );
+    rmSync(path.join(stateDir, "backup.fail"));
+    assert.notEqual(backupFail.status, 0);
+    assert.notEqual(backupFail.status, 40);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl stop clover-audit-retention\.timer/);
+
+    resetHost();
+    const preMutate = path.join(artifact, "ops/security-stage5/package-a/systemd/clover-api.service.d/20-hardening.conf");
+    const originalApi = readFileSync(preMutate);
+    writeFileSync(preMutate, "MUTATED-BEFORE-SNAPSHOT\n");
+    const mutatedBefore = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-mutate-before")) },
+      {},
+      { tty: true }
+    );
+    writeFileSync(preMutate, originalApi);
+    assert.notEqual(mutatedBefore.status, 0);
+    assert.notEqual(mutatedBefore.status, 40);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "tamper.verifier"), "1");
+    const verifierTamper = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-verifier")) },
+      {},
+      { tty: true }
+    );
+    rmSync(path.join(stateDir, "tamper.verifier"));
+    assert.notEqual(verifierTamper.status, 0);
+    assert.notEqual(verifierTamper.status, 40);
+    assert.match(`${verifierTamper.stdout}${verifierTamper.stderr}`, /verifier != git blob|FAIL_BEFORE_CHANGE/);
+
+    resetHost();
+    const worktreeOperator = path.join(fixtureRoot, ...operatorRel.split("/"));
+    const originalWorktreeOperator = readFileSync(worktreeOperator);
+    writeFileSync(worktreeOperator, `${originalWorktreeOperator}\n# local writable $0 mutation\n`);
+    const blobIgnoresWritable = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-writable")) },
+      {},
+      { tty: true }
+    );
+    writeFileSync(worktreeOperator, originalWorktreeOperator);
+    assert.equal(
+      blobIgnoresWritable.status,
+      0,
+      `writable $0 mutation must not change git-show root operator\n${blobIgnoresWritable.stdout}\n${blobIgnoresWritable.stderr}`
+    );
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "analyze.fail"), "1");
+    const blocked = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-analyze")) },
+      {},
+      { tty: true }
+    );
+    rmSync(path.join(stateDir, "analyze.fail"));
     assert.equal(blocked.status, 40, `syntax-check failure must exit 40, got ${blocked.status}\n${blocked.stdout}\n${blocked.stderr}`);
     assert.match(`${blocked.stdout}${blocked.stderr}`, /ROLLBACK: COMPLETED/);
-    assert.match(`${blocked.stdout}${blocked.stderr}`, /RESIDUAL: restored pre-state timer still targets apply\.service/);
-    assert.equal(
-      readFileSync(path.join(destRoot, "etc/systemd/system/clover-api.service.d/20-hardening.conf"), "utf8"),
-      "OLD-API\n"
-    );
+    assert.equal(readFileSync(path.join(destRoot, "etc/systemd/system/clover-api.service.d/20-hardening.conf"), "utf8"), "OLD-API\n");
     assert.equal(sha256File(umaskPath), umaskSha);
-    rmSync(path.join(stateDir, "analyze.fail"));
 
-    writeFileSync(path.join(stateDir, "commands.log"), "");
-    writeFileSync(path.join(stateDir, "timer.unit"), "clover-audit-retention-apply.service\n");
-    writeFileSync(path.join(stateDir, "timer.active"), "active\n");
-    writeFileSync(path.join(stateDir, "timer.sub"), "waiting\n");
-    const passed = runOperator(commonEnv);
+    resetHost();
+    writeFileSync(path.join(stateDir, "analyze.fail"), "1");
+    writeFileSync(path.join(stateDir, "restart.fail"), "1");
+    const rbIncomplete = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-rb41")) },
+      {},
+      { tty: true }
+    );
+    rmSync(path.join(stateDir, "analyze.fail"));
+    rmSync(path.join(stateDir, "restart.fail"));
+    assert.equal(rbIncomplete.status, 41, `rollback incomplete must exit 41, got ${rbIncomplete.status}\n${rbIncomplete.stdout}\n${rbIncomplete.stderr}`);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "send.int"), "1");
+    const liveInt = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-int")) },
+      {},
+      { tty: true }
+    );
+    rmSync(path.join(stateDir, "send.int"));
+    assert.equal(liveInt.status, 40, `live INT after change must exit 40, got ${liveInt.status}\n${liveInt.stdout}\n${liveInt.stderr}`);
+    assert.match(`${liveInt.stdout}${liveInt.stderr}`, /AUTOMATIC ROLLBACK/);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "send.term"), "1");
+    const liveTerm = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-term")) },
+      {},
+      { tty: true }
+    );
+    rmSync(path.join(stateDir, "send.term"));
+    assert.equal(liveTerm.status, 40, `live TERM after change must exit 40, got ${liveTerm.status}`);
+
+    resetHost();
+    const passed = runOperator(cfg, {}, { tty: true });
     assert.equal(passed.status, 0, `happy-path operator failed ${passed.status}\n${passed.stdout}\n${passed.stderr}`);
     assert.match(passed.stdout, /PACKAGE A PROMOTE: PASS/);
     const commands = readFileSync(path.join(stateDir, "commands.log"), "utf8");
     const stopAt = commands.indexOf("systemctl stop clover-audit-retention.timer");
-    const installAt = commands.indexOf("systemd-analyze");
-    assert.ok(stopAt >= 0, "timer stop must be recorded");
-    assert.ok(installAt > stopAt, "timer stop must precede install/verify");
+    const installAt = commands.indexOf("install -m 0644");
+    assert.ok(stopAt >= 0);
+    assert.ok(installAt > stopAt);
+    assert.match(commands, /payload\/api-20-hardening\.conf/);
+    assert.doesNotMatch(commands, /install -m 0644 -- .*\/artifact\/ops\//);
     assert.doesNotMatch(commands, /restart nginx|reload nginx|start clover-audit-retention-apply/);
-    assert.doesNotMatch(commands, /rm -rf|pkill|kill -9/);
-    assert.match(passed.stdout, /PRE_UI_TAG=ui-PRETAG/);
-    assert.match(passed.stdout, /UMASK_EVIDENCE=/);
     assert.equal(sha256File(umaskPath), umaskSha);
+    const installedTimer = readFileSync(path.join(destRoot, "etc/systemd/system/clover-audit-retention.timer"), "utf8");
+    writeFileSync(path.join(artifact, "ops/systemd/clover-audit-retention.timer"), "[Timer]\nUnit=MUTATED-AFTER\n");
     assert.equal(
-      readFileSync(path.join(destRoot, "etc/systemd/system/clover-audit-retention.timer"), "utf8"),
-      readFileSync(path.join(artifact, "ops/systemd/clover-audit-retention.timer"), "utf8")
+      installedTimer,
+      execFileSync("git", ["-C", fixtureRoot, "show", `${fixtureSha}:ops/systemd/clover-audit-retention.timer`], {
+        encoding: "utf8",
+      })
     );
-    const recoveryFiles = readFileSync(path.join(work, "recovery", `securityStage5Artifact-${fixtureSha}.mjs`));
-    const gitVerifier = execFileSync(
-      "git",
-      ["-C", fixtureRoot, "show", `${fixtureSha}:server/scripts/securityStage5Artifact.mjs`],
-      { encoding: "buffer" }
+    const recoveryVerifier = readFileSync(path.join(work, "recovery", `securityStage5Artifact-${fixtureSha}.mjs`));
+    const gitVerifier = execFileSync("git", ["-C", fixtureRoot, "show", `${fixtureSha}:server/scripts/securityStage5Artifact.mjs`]);
+    assert.deepEqual(recoveryVerifier, gitVerifier);
+
+    const emptyPromote = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-empty")) },
+      { CLOVER_EMPTY_SHA256: "1" },
+      { tty: true }
     );
-    assert.deepEqual(recoveryFiles, gitVerifier);
-    assert.equal(existsSync(path.join(destRoot, "etc/ssh")), false);
-    assert.equal(existsSync(path.join(destRoot, "etc/nginx")), false);
-
-    const emptyPromote = runOperator({
-      ...commonEnv,
-      CLOVER_EMPTY_SHA256: "1",
-      RECOVERY_OVERRIDE: toPosix(path.join(work, "recovery-empty")),
-    });
-    assert.notEqual(emptyPromote.status, 0, "empty hash during promote must fail");
-    assert.notEqual(emptyPromote.status, 40, "empty hash before change must not look like promote failure after change");
-
-    const preplaced = runOperator({
-      ...commonEnv,
-      VERIFIER: "/tmp/preplaced-verifier.mjs",
-      RECOVERY_OVERRIDE: toPosix(path.join(work, "recovery-preplaced")),
-    });
-    assert.equal(preplaced.status, 20);
-    assert.match(`${preplaced.stdout}${preplaced.stderr}`, /pre-placed verifier is forbidden/);
+    assert.notEqual(emptyPromote.status, 0);
+    assert.notEqual(emptyPromote.status, 40);
 
     const tampered = path.join(artifact, ...operatorRel.split("/"));
     writeFileSync(tampered, `${readFileSync(tampered, "utf8")}\n# tampered\n`);

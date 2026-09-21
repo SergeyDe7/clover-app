@@ -132,6 +132,17 @@ assert.match(rollback, /Never restore\s+`10-umask\.conf`/);
 assert.doesNotMatch(rollback, /restore_exact[^\n]*10-umask/);
 assert.match(rollback, /The first\s+change is `systemctl stop clover-audit-retention\.timer`/);
 assert.match(rollback, /exits `40` when rollback completes and\s+`41`/);
+assert.match(rollback, /sudo \/bin\/bash -s --/);
+assert.match(rollback, /--expected-manifest/);
+assert.match(rollback, /--target /);
+assert.doesNotMatch(
+  read("ops/security-stage5/scripts/promote-package-a.sh"),
+  /CLOVER_OPERATOR_AS_ROOT=|exec sudo -n env/
+);
+assert.match(
+  read("ops/security-stage5/scripts/promote-package-a.sh"),
+  /unset CLOVER_OPERATOR_AS_ROOT/
+);
 for (const dir of destinationDirs) {
   const escaped = dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   assert.doesNotMatch(

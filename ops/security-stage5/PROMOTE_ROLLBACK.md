@@ -53,22 +53,48 @@ and distinguish an absent file from an empty file:
 backup_exact() {
   destination="$1"
   key="$2"
-  if sudo test -e "$destination"; then
-    sudo cp --preserve=all -- "$destination" "$RECOVERY/$key"
-    sudo sha256sum "$RECOVERY/$key" | sudo tee "$RECOVERY/$key.sha256" >/dev/null
+  if test -e "$destination"; then
+    if ! cp --preserve=all -- "$destination" "$RECOVERY/$key"; then
+      echo "FAIL: could not backup $destination" >&2
+      exit 1
+    fi
+    if ! sha256sum "$RECOVERY/$key" | tee "$RECOVERY/$key.sha256" >/dev/null; then
+      echo "FAIL: could not hash backup $key" >&2
+      exit 1
+    fi
+    if ! test -s "$RECOVERY/$key.sha256"; then
+      echo "FAIL: empty backup hash $key" >&2
+      exit 1
+    fi
   else
-    sudo touch "$RECOVERY/$key.absent"
+    if ! touch "$RECOVERY/$key.absent"; then
+      echo "FAIL: could not write absent marker $key" >&2
+      exit 1
+    fi
+    if ! test -e "$RECOVERY/$key.absent"; then
+      echo "FAIL: absent marker missing after create $key" >&2
+      exit 1
+    fi
   fi
 }
 
 restore_exact() {
   destination="$1"
   key="$2"
-  if sudo test -e "$RECOVERY/$key.absent"; then
-    sudo rm -f -- "$destination"
+  if test -e "$RECOVERY/$key.absent"; then
+    if ! rm -f -- "$destination"; then
+      echo "FAIL: could not remove absent destination $destination" >&2
+      exit 1
+    fi
   else
-    (cd "$RECOVERY" && sudo sha256sum -c "$key.sha256")
-    sudo cp --preserve=all -- "$RECOVERY/$key" "$destination"
+    if ! (cd "$RECOVERY" && sha256sum -c "$key.sha256"); then
+      echo "FAIL: backup hash check failed for $key" >&2
+      exit 1
+    fi
+    if ! cp --preserve=all -- "$RECOVERY/$key" "$destination"; then
+      echo "FAIL: could not restore $destination" >&2
+      exit 1
+    fi
   fi
 }
 
@@ -81,33 +107,33 @@ ensure_destination_dir() {
     echo "FAIL: directory create mode must be 0755, got $mode" >&2
     exit 1
   fi
-  if sudo test -e "$marker"; then
+  if test -e "$marker"; then
     echo "FAIL: recovery marker already exists for $key" >&2
     exit 1
   fi
-  if sudo test -L "$destination"; then
+  if test -L "$destination"; then
     echo "FAIL: $destination exists and is a symlink" >&2
     exit 1
   fi
-  if sudo test -e "$destination"; then
-    if sudo test -d "$destination"; then
+  if test -e "$destination"; then
+    if test -d "$destination"; then
       return 0
     fi
     echo "FAIL: $destination exists and is not a directory" >&2
     exit 1
   fi
-  if ! sudo install -d -m "$mode" -- "$destination"; then
+  if ! install -d -m "$mode" -- "$destination"; then
     echo "FAIL: could not create directory $destination" >&2
     exit 1
   fi
-  if ! sudo touch -- "$marker"; then
+  if ! touch -- "$marker"; then
     echo "FAIL: could not write directory marker $marker" >&2
-    sudo rmdir -- "$destination"
+    rmdir -- "$destination"
     exit 1
   fi
-  if ! sudo test -e "$marker"; then
+  if ! test -e "$marker"; then
     echo "FAIL: directory marker missing after create $marker" >&2
-    sudo rmdir -- "$destination"
+    rmdir -- "$destination"
     exit 1
   fi
 }
@@ -116,14 +142,14 @@ rollback_created_dir() {
   destination="$1"
   key="$2"
   marker="$RECOVERY/$key.dir-created"
-  if ! sudo test -e "$marker"; then
+  if ! test -e "$marker"; then
     return 0
   fi
-  if ! sudo rmdir -- "$destination"; then
+  if ! rmdir -- "$destination"; then
     echo "FAIL: $destination is not empty or not a directory; leftover entries were not deleted; marker kept" >&2
     exit 1
   fi
-  if ! sudo rm -f -- "$marker"; then
+  if ! rm -f -- "$marker"; then
     echo "FAIL: could not remove directory marker $marker after rmdir" >&2
     exit 1
   fi
@@ -132,14 +158,34 @@ rollback_created_dir() {
 
 ## Package A — systemd and retention dry-run
 
-Use only the source-controlled operator
-`ops/security-stage5/scripts/promote-package-a.sh` from the accepted artifact.
-It requires a real TTY, one interactive `sudo -v`, then one root shell. Do not
-run `/opt/clover/deployments/staging/package-a-promote-retry.sh`.
+The only allowed Package A production launcher is this exact TTY command.
+Substitute the ticket's literal 40-character target SHA, uppercase manifest
+SHA-256, and absolute artifact path. Do not run a writable worktree or
+artifact copy as `$0`. Do not run
+`/opt/clover/deployments/staging/package-a-promote-retry.sh`.
+
+```bash
+git -C /opt/clover/clover-app show \
+  "$EXPECTED_SHA:ops/security-stage5/scripts/promote-package-a.sh" \
+  | sudo /bin/bash -s -- \
+    --target "$EXPECTED_SHA" \
+    --expected-manifest "$EXPECTED_MANIFEST" \
+    --artifact "$ARTIFACT"
+```
+
+`sudo` receives script bytes from `git show` of that exact commit. The
+operator requires UID 0 and a real TTY on stdout/stderr plus `/dev/tty`.
+It does not call `sudo`, does not read `$0`, and does not trust environment
+variables for target, manifest hash, or artifact path. Unknown or duplicate
+arguments fail. A pre-placed `.verifier-*.mjs` is forbidden.
 
 The operator extracts the verifier with
 `git -C /opt/clover/clover-app show "$EXPECTED_SHA:server/scripts/securityStage5Artifact.mjs"`
-into the new recovery directory. A pre-placed `.verifier-*.mjs` is forbidden.
+into the new recovery directory, compares that root copy to a second Git
+blob extraction, then verifies the artifact with the external target SHA.
+The three Package A sources are snapshotted into root-owned recovery files
+and compared to the manifest and `git show $TARGET:path` before install.
+Install reads only that snapshot.
 
 Exact destinations:
 
@@ -188,14 +234,14 @@ without changing existing metadata, then install:
 sudo systemctl stop clover-audit-retention.timer
 ensure_destination_dir /etc/systemd/system/clover-api.service.d a-dir-clover-api.service.d 0755
 ensure_destination_dir /etc/systemd/system/clover-ui.service.d a-dir-clover-ui.service.d 0755
-sudo install -m 0644 \
-  "$ARTIFACT/ops/security-stage5/package-a/systemd/clover-api.service.d/20-hardening.conf" \
+install -m 0644 -- \
+  "$RECOVERY/payload/api-20-hardening.conf" \
   /etc/systemd/system/clover-api.service.d/20-hardening.conf
-sudo install -m 0644 \
-  "$ARTIFACT/ops/security-stage5/package-a/systemd/clover-ui.service.d/20-hardening.conf" \
+install -m 0644 -- \
+  "$RECOVERY/payload/ui-20-hardening.conf" \
   /etc/systemd/system/clover-ui.service.d/20-hardening.conf
-sudo install -m 0644 \
-  "$ARTIFACT/ops/systemd/clover-audit-retention.timer" \
+install -m 0644 -- \
+  "$RECOVERY/payload/audit-retention.timer" \
   /etc/systemd/system/clover-audit-retention.timer
 sudo systemd-analyze verify \
   /etc/systemd/system/clover-api.service \
