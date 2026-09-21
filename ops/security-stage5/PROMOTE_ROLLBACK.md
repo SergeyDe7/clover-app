@@ -5,18 +5,112 @@ package at a time. Never run A, B, and C in parallel. `ARTIFACT`, `RECOVERY`,
 and `EXPECTED_SHA` must be explicit absolute values recorded in the change
 ticket. The recovery directory must be outside the live repository.
 
-Before every package:
+Before Packages B/C (shared artifact verify), use this two-phase root
+verifier contract. Ticket literals: 40-character `TARGET`, absolute
+`ARTIFACT`, absolute `RECOVERY` outside the live repo, and
+`--source-root /opt/clover/clover-app`. Do not pipe `git show` into
+`sudo tee` or any root shell. Do not run Node until the root-owned
+verifier copy matches the exact `$TARGET` blob object ID. Package A uses
+its own accepted launcher below; that launcher also extracts the verifier
+with the same Git trust rules after its operator root-copy check.
 
 ```bash
-sudo install -d -m 0700 "$RECOVERY"
-git -C /opt/clover/clover-app cat-file -e "$EXPECTED_SHA^{commit}"
-git -C /opt/clover/clover-app show \
-  "$EXPECTED_SHA:server/scripts/securityStage5Artifact.mjs" \
-  | sudo tee "$RECOVERY/securityStage5Artifact-$EXPECTED_SHA.mjs" >/dev/null
-sudo chmod 0500 "$RECOVERY/securityStage5Artifact-$EXPECTED_SHA.mjs"
-sudo node "$RECOVERY/securityStage5Artifact-$EXPECTED_SHA.mjs" verify \
-  --artifact "$ARTIFACT" --expected-sha "$EXPECTED_SHA" \
-  --source-root /opt/clover/clover-app
+sudo /bin/bash -c '
+set -Eeuo pipefail
+umask 0077
+VERIFIER_REL=server/scripts/securityStage5Artifact.mjs
+TARGET=""
+ARTIFACT=""
+SOURCE_ROOT=/opt/clover/clover-app
+RECOVERY=""
+fail() {
+  printf "%s\n" "VERIFIER_BOOTSTRAP: FAIL: $*" >&2
+  exit 20
+}
+set_once() {
+  name="$1"
+  value="$2"
+  case "$name" in
+    TARGET) [ -z "$TARGET" ] || fail "duplicate --target" ;;
+    ARTIFACT) [ -z "$ARTIFACT" ] || fail "duplicate --artifact" ;;
+    SOURCE_ROOT) [ "$SOURCE_ROOT" = /opt/clover/clover-app ] || fail "duplicate --source-root" ;;
+    RECOVERY) [ -z "$RECOVERY" ] || fail "duplicate --recovery" ;;
+  esac
+  case "$name" in
+    TARGET) TARGET="$value" ;;
+    ARTIFACT) ARTIFACT="$value" ;;
+    SOURCE_ROOT) SOURCE_ROOT="$value" ;;
+    RECOVERY) RECOVERY="$value" ;;
+  esac
+}
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --target) [ $# -ge 2 ] || fail "missing --target"; set_once TARGET "$2"; shift 2 ;;
+    --artifact) [ $# -ge 2 ] || fail "missing --artifact"; set_once ARTIFACT "$2"; shift 2 ;;
+    --source-root) [ $# -ge 2 ] || fail "missing --source-root"; set_once SOURCE_ROOT "$2"; shift 2 ;;
+    --recovery) [ $# -ge 2 ] || fail "missing --recovery"; set_once RECOVERY "$2"; shift 2 ;;
+    *) fail "unknown argument $1" ;;
+  esac
+done
+[ "$(id -u)" -eq 0 ] || fail "UID 0 required"
+[ -e /dev/tty ] && [ -r /dev/tty ] && [ -w /dev/tty ] || fail "TTY /dev/tty required"
+printf "%s" "$TARGET" | grep -Eq "^[0-9a-f]{40}$" || fail "TARGET must be a 40-character lowercase SHA"
+case "$ARTIFACT" in /*) ;; *) fail "ARTIFACT must be an absolute path" ;; esac
+case "$SOURCE_ROOT" in /*) ;; *) fail "SOURCE_ROOT must be an absolute path" ;; esac
+case "$RECOVERY" in /*) ;; *) fail "RECOVERY must be an absolute path" ;; esac
+[ -d "$ARTIFACT" ] || fail "ARTIFACT is not a directory"
+[ -d "$SOURCE_ROOT/.git" ] || fail "SOURCE_ROOT missing .git"
+[ ! -e "$RECOVERY" ] || fail "RECOVERY already exists"
+if [ -x /usr/bin/git ]; then
+  GITBIN=/usr/bin/git
+elif [ -x /mingw64/bin/git ]; then
+  GITBIN=/mingw64/bin/git
+else
+  fail "/usr/bin/git missing"
+fi
+trusted_git() {
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_OBJECT_DIRECTORY \
+    -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_INDEX_FILE \
+    -u GIT_NAMESPACE -u GIT_COMMON_DIR -u GIT_REPLACE_REF_BASE \
+    "$GITBIN" --no-replace-objects -C "$SOURCE_ROOT" "$@"
+}
+trusted_git cat-file -e "${TARGET}^{commit}" || fail "target commit missing"
+OID=$(trusted_git rev-parse --verify "${TARGET}:${VERIFIER_REL}")
+printf "%s" "$OID" | grep -Eq "^[0-9a-f]{40}$" || fail "verifier blob id"
+install -d -m 0700 -- "$RECOVERY"
+chown root:root -- "$RECOVERY"
+chmod 0700 -- "$RECOVERY"
+[ "$(stat -c %U:%G "$RECOVERY")" = root:root ] || fail "recovery owner"
+MODE=$(stat -c %a "$RECOVERY")
+[ "$MODE" = 700 ] || [ "$MODE" = 0700 ] || fail "recovery mode"
+! test -L "$RECOVERY" || fail "recovery symlink"
+[ "$(stat -c %F "$RECOVERY")" = directory ] || fail "recovery not a directory"
+VFILE=${RECOVERY}/securityStage5Artifact-${TARGET}.mjs
+trusted_git show "${TARGET}:${VERIFIER_REL}" > "$VFILE" || fail "git show verifier"
+[ -s "$VFILE" ] || fail "empty verifier blob"
+! test -L "$VFILE" || fail "verifier symlink"
+test -f "$VFILE" || fail "verifier not regular"
+COPY_OID=$(trusted_git hash-object --no-filters -- "$VFILE")
+[ "$COPY_OID" = "$OID" ] || fail "verifier object id mismatch"
+chmod 0500 -- "$VFILE"
+chown root:root -- "$VFILE"
+! test -L "$VFILE" || fail "verifier symlink after chmod"
+test -f "$VFILE" || fail "verifier not regular after chmod"
+[ "$(stat -c %U:%G "$VFILE")" = root:root ] || fail "verifier owner"
+VMODE=$(stat -c %a "$VFILE")
+[ "$VMODE" = 500 ] || [ "$VMODE" = 0500 ] || fail "verifier mode"
+[ "$(stat -c %h "$VFILE")" = 1 ] || fail "verifier nlink"
+COPY_OID=$(trusted_git hash-object --no-filters -- "$VFILE")
+[ "$COPY_OID" = "$OID" ] || fail "verifier object id mismatch after lock"
+printf "%s\n" "VERIFIER_BOOTSTRAP: PASS"
+exec node "$VFILE" verify \
+  --artifact "$ARTIFACT" --expected-sha "$TARGET" \
+  --source-root "$SOURCE_ROOT"
+' -- \
+  --target <EXTERNAL_TARGET> \
+  --artifact <ABS_ARTIFACT> \
+  --source-root /opt/clover/clover-app \
+  --recovery <ABS_RECOVERY>
 ```
 
 For every destination file, save the previous file with `cp --preserve=all`. If
@@ -53,22 +147,48 @@ and distinguish an absent file from an empty file:
 backup_exact() {
   destination="$1"
   key="$2"
-  if sudo test -e "$destination"; then
-    sudo cp --preserve=all -- "$destination" "$RECOVERY/$key"
-    sudo sha256sum "$RECOVERY/$key" | sudo tee "$RECOVERY/$key.sha256" >/dev/null
+  if test -e "$destination"; then
+    if ! cp --preserve=all -- "$destination" "$RECOVERY/$key"; then
+      echo "FAIL: could not backup $destination" >&2
+      exit 1
+    fi
+    if ! sha256sum "$RECOVERY/$key" | tee "$RECOVERY/$key.sha256" >/dev/null; then
+      echo "FAIL: could not hash backup $key" >&2
+      exit 1
+    fi
+    if ! test -s "$RECOVERY/$key.sha256"; then
+      echo "FAIL: empty backup hash $key" >&2
+      exit 1
+    fi
   else
-    sudo touch "$RECOVERY/$key.absent"
+    if ! touch "$RECOVERY/$key.absent"; then
+      echo "FAIL: could not write absent marker $key" >&2
+      exit 1
+    fi
+    if ! test -e "$RECOVERY/$key.absent"; then
+      echo "FAIL: absent marker missing after create $key" >&2
+      exit 1
+    fi
   fi
 }
 
 restore_exact() {
   destination="$1"
   key="$2"
-  if sudo test -e "$RECOVERY/$key.absent"; then
-    sudo rm -f -- "$destination"
+  if test -e "$RECOVERY/$key.absent"; then
+    if ! rm -f -- "$destination"; then
+      echo "FAIL: could not remove absent destination $destination" >&2
+      exit 1
+    fi
   else
-    (cd "$RECOVERY" && sudo sha256sum -c "$key.sha256")
-    sudo cp --preserve=all -- "$RECOVERY/$key" "$destination"
+    if ! (cd "$RECOVERY" && sha256sum -c "$key.sha256"); then
+      echo "FAIL: backup hash check failed for $key" >&2
+      exit 1
+    fi
+    if ! cp --preserve=all -- "$RECOVERY/$key" "$destination"; then
+      echo "FAIL: could not restore $destination" >&2
+      exit 1
+    fi
   fi
 }
 
@@ -81,33 +201,33 @@ ensure_destination_dir() {
     echo "FAIL: directory create mode must be 0755, got $mode" >&2
     exit 1
   fi
-  if sudo test -e "$marker"; then
+  if test -e "$marker"; then
     echo "FAIL: recovery marker already exists for $key" >&2
     exit 1
   fi
-  if sudo test -L "$destination"; then
+  if test -L "$destination"; then
     echo "FAIL: $destination exists and is a symlink" >&2
     exit 1
   fi
-  if sudo test -e "$destination"; then
-    if sudo test -d "$destination"; then
+  if test -e "$destination"; then
+    if test -d "$destination"; then
       return 0
     fi
     echo "FAIL: $destination exists and is not a directory" >&2
     exit 1
   fi
-  if ! sudo install -d -m "$mode" -- "$destination"; then
+  if ! install -d -m "$mode" -- "$destination"; then
     echo "FAIL: could not create directory $destination" >&2
     exit 1
   fi
-  if ! sudo touch -- "$marker"; then
+  if ! touch -- "$marker"; then
     echo "FAIL: could not write directory marker $marker" >&2
-    sudo rmdir -- "$destination"
+    rmdir -- "$destination"
     exit 1
   fi
-  if ! sudo test -e "$marker"; then
+  if ! test -e "$marker"; then
     echo "FAIL: directory marker missing after create $marker" >&2
-    sudo rmdir -- "$destination"
+    rmdir -- "$destination"
     exit 1
   fi
 }
@@ -116,14 +236,14 @@ rollback_created_dir() {
   destination="$1"
   key="$2"
   marker="$RECOVERY/$key.dir-created"
-  if ! sudo test -e "$marker"; then
+  if ! test -e "$marker"; then
     return 0
   fi
-  if ! sudo rmdir -- "$destination"; then
+  if ! rmdir -- "$destination"; then
     echo "FAIL: $destination is not empty or not a directory; leftover entries were not deleted; marker kept" >&2
     exit 1
   fi
-  if ! sudo rm -f -- "$marker"; then
+  if ! rm -f -- "$marker"; then
     echo "FAIL: could not remove directory marker $marker after rmdir" >&2
     exit 1
   fi
@@ -132,11 +252,166 @@ rollback_created_dir() {
 
 ## Package A — systemd and retention dry-run
 
+The only allowed Package A production launcher is this exact completed TTY
+command. Substitute the ticket's literal 40-character target SHA, uppercase
+manifest SHA-256, and absolute artifact path. Do not pipe `git show` into
+`bash -s`. Do not run a writable worktree or artifact copy. Do not run
+`/opt/clover/deployments/staging/package-a-promote-retry.sh`.
+
+```bash
+sudo /bin/bash -c '
+set -Eeuo pipefail
+umask 0077
+OPERATOR_REL=ops/security-stage5/scripts/promote-package-a.sh
+DEFAULT_ROOT=/opt/clover/clover-app
+TARGET=""
+EXPECTED_MANIFEST=""
+ARTIFACT=""
+ROOT=/opt/clover/clover-app
+LIVE=1fdd7e6ac715f55e407d71a225e5a6037eb9d2e8
+LOCK=/opt/clover/deployments/deploy.lock
+DEST_ROOT=""
+RECOVERY=""
+fail() {
+  printf "%s\n" "BOOTSTRAP: FAIL: $*" >&2
+  if [ -n "${RECOVERY:-}" ] && [ -d "${RECOVERY:-}" ]; then
+    chmod 0700 -- "$RECOVERY" || true
+    printf "%s\n" "BOOTSTRAP: REJECTED_RECOVERY=$RECOVERY" >&2
+  fi
+  exit 20
+}
+set_once() {
+  name="$1"
+  value="$2"
+  case "$name" in
+    TARGET) [ -z "$TARGET" ] || fail "duplicate --target" ;;
+    EXPECTED_MANIFEST) [ -z "$EXPECTED_MANIFEST" ] || fail "duplicate --expected-manifest" ;;
+    ARTIFACT) [ -z "$ARTIFACT" ] || fail "duplicate --artifact" ;;
+    ROOT) [ "$ROOT" = "$DEFAULT_ROOT" ] || fail "duplicate --repo" ;;
+    LIVE) [ "$LIVE" = 1fdd7e6ac715f55e407d71a225e5a6037eb9d2e8 ] || fail "duplicate --live" ;;
+    LOCK) [ "$LOCK" = /opt/clover/deployments/deploy.lock ] || fail "duplicate --lock" ;;
+    DEST_ROOT) [ -z "$DEST_ROOT" ] || fail "duplicate --dest-root" ;;
+    RECOVERY) [ -z "$RECOVERY" ] || fail "duplicate --recovery" ;;
+  esac
+  case "$name" in
+    TARGET) TARGET="$value" ;;
+    EXPECTED_MANIFEST) EXPECTED_MANIFEST="$value" ;;
+    ARTIFACT) ARTIFACT="$value" ;;
+    ROOT) ROOT="$value" ;;
+    LIVE) LIVE="$value" ;;
+    LOCK) LOCK="$value" ;;
+    DEST_ROOT) DEST_ROOT="$value" ;;
+    RECOVERY) RECOVERY="$value" ;;
+  esac
+}
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --target) [ $# -ge 2 ] || fail "missing --target"; set_once TARGET "$2"; shift 2 ;;
+    --expected-manifest) [ $# -ge 2 ] || fail "missing --expected-manifest"; set_once EXPECTED_MANIFEST "$2"; shift 2 ;;
+    --artifact) [ $# -ge 2 ] || fail "missing --artifact"; set_once ARTIFACT "$2"; shift 2 ;;
+    --repo) [ $# -ge 2 ] || fail "missing --repo"; set_once ROOT "$2"; shift 2 ;;
+    --live) [ $# -ge 2 ] || fail "missing --live"; set_once LIVE "$2"; shift 2 ;;
+    --lock) [ $# -ge 2 ] || fail "missing --lock"; set_once LOCK "$2"; shift 2 ;;
+    --dest-root) [ $# -ge 2 ] || fail "missing --dest-root"; set_once DEST_ROOT "$2"; shift 2 ;;
+    --recovery) [ $# -ge 2 ] || fail "missing --recovery"; set_once RECOVERY "$2"; shift 2 ;;
+    *) fail "unknown argument $1" ;;
+  esac
+done
+[ "$(id -u)" -eq 0 ] || fail "UID 0 required"
+[ -e /dev/tty ] && [ -r /dev/tty ] && [ -w /dev/tty ] || fail "TTY /dev/tty required"
+printf "%s" "$TARGET" | grep -Eq "^[0-9a-f]{40}$" || fail "TARGET must be a 40-character lowercase SHA"
+printf "%s" "$EXPECTED_MANIFEST" | grep -Eq "^[0-9A-F]{64}$" || fail "EXPECTED_MANIFEST"
+case "$ARTIFACT" in /*) ;; *) fail "ARTIFACT must be an absolute path" ;; esac
+[ -d "$ARTIFACT" ] || fail "ARTIFACT is not a directory"
+if [ -x /usr/bin/git ]; then
+  GITBIN=/usr/bin/git
+elif [ -x /mingw64/bin/git ]; then
+  GITBIN=/mingw64/bin/git
+else
+  fail "/usr/bin/git missing"
+fi
+trusted_git() {
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_OBJECT_DIRECTORY \
+    -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_INDEX_FILE \
+    -u GIT_NAMESPACE -u GIT_COMMON_DIR -u GIT_REPLACE_REF_BASE \
+    "$GITBIN" --no-replace-objects -C "$ROOT" "$@"
+}
+trusted_git cat-file -e "${TARGET}^{commit}" || fail "target commit missing"
+OID=$(trusted_git rev-parse --verify "${TARGET}:${OPERATOR_REL}")
+printf "%s" "$OID" | grep -Eq "^[0-9a-f]{40}$" || fail "operator blob id"
+if [ -z "$RECOVERY" ]; then
+  RAND=$(python3 -c "import secrets; print(secrets.token_hex(8))")
+  RECOVERY=/opt/clover/recovery/security-stage5-package-a-${TARGET}-full-${RAND}
+fi
+case "$RECOVERY" in /*) ;; *) fail "recovery must be an absolute path" ;; esac
+[ ! -e "$RECOVERY" ] || fail "recovery already exists"
+install -d -m 0700 -- "$RECOVERY"
+chown root:root -- "$RECOVERY"
+chmod 0700 -- "$RECOVERY"
+OPFILE=${RECOVERY}/promote-package-a.sh
+trusted_git show "${TARGET}:${OPERATOR_REL}" > "$OPFILE" || fail "git show operator"
+[ -s "$OPFILE" ] || fail "empty operator blob"
+! test -L "$OPFILE" || fail "operator symlink"
+test -f "$OPFILE" || fail "operator not regular"
+COPY_OID=$(trusted_git hash-object --no-filters -- "$OPFILE")
+[ "$COPY_OID" = "$OID" ] || fail "operator object id mismatch"
+chmod 0500 -- "$OPFILE"
+! test -L "$OPFILE" || fail "operator symlink after chmod"
+test -f "$OPFILE" || fail "operator not regular after chmod"
+[ "$(stat -c %U:%G "$OPFILE")" = root:root ] || fail "owner"
+MODE=$(stat -c %a "$OPFILE")
+[ "$MODE" = 500 ] || [ "$MODE" = 0500 ] || fail "mode"
+[ "$(stat -c %h "$OPFILE")" = 1 ] || fail "nlink"
+COPY_OID=$(trusted_git hash-object --no-filters -- "$OPFILE")
+[ "$COPY_OID" = "$OID" ] || fail "operator object id mismatch after lock"
+printf "%s\n" "BOOTSTRAP: PASS"
+set -- --target "$TARGET" --expected-manifest "$EXPECTED_MANIFEST" --artifact "$ARTIFACT" --recovery "$RECOVERY"
+[ "$ROOT" = "$DEFAULT_ROOT" ] || set -- "$@" --repo "$ROOT"
+[ "$LIVE" = 1fdd7e6ac715f55e407d71a225e5a6037eb9d2e8 ] || set -- "$@" --live "$LIVE"
+[ "$LOCK" = /opt/clover/deployments/deploy.lock ] || set -- "$@" --lock "$LOCK"
+[ -z "$DEST_ROOT" ] || set -- "$@" --dest-root "$DEST_ROOT"
+exec /bin/bash "$OPFILE" "$@"
+' -- \
+  --target <EXTERNAL_TARGET> \
+  --expected-manifest <EXTERNAL_MANIFEST_SHA256> \
+  --artifact <ABS_ARTIFACT>
+```
+
+The entire bootstrap string is complete before `bash -c` starts. There is no
+pipe into a root shell and no heredoc from a writable file. Target SHA,
+manifest SHA-256, and artifact path are literal arguments. Git runs as
+`/usr/bin/git --no-replace-objects` with GIT_DIR/GIT_WORK_TREE/alternates
+unset. The operator is executed only after the root-owned copy matches the
+exact `$TARGET` blob object ID. Bootstrap failure leaves the recovery
+directory closed `0700` and does not change live state.
+
+The operator requires UID 0, a real TTY on stdout/stderr plus `/dev/tty`,
+and `BASH_SOURCE[0]` as an absolute regular root-owned file inside that
+recovery directory. It refuses stdin, `bash -s`, `source`, worktree, and
+artifact paths. It does not call `sudo` and does not trust environment
+variables for target, manifest hash, or artifact path. Unknown or duplicate
+arguments fail. A pre-placed `.verifier-*.mjs` is forbidden.
+
+The operator extracts the verifier with
+`/usr/bin/git --no-replace-objects show "$TARGET:server/scripts/securityStage5Artifact.mjs"`
+into the recovery directory after the deploy lock, compares
+`hash-object --no-filters` of that root copy to the exact `$TARGET` blob
+object ID, re-checks owner/mode/nlink, then runs Node only after that
+match. The three Package A sources are snapshotted into root-owned
+recovery files and compared to the manifest and exact Git blobs before
+install. Install reads only that snapshot.
+
 Exact destinations:
 
 - `/etc/systemd/system/clover-api.service.d/20-hardening.conf`
 - `/etc/systemd/system/clover-ui.service.d/20-hardening.conf`
 - `/etc/systemd/system/clover-audit-retention.timer`
+
+`/etc/systemd/system/clover-api.service.d/10-umask.conf` is **not** a
+destination. Record owner/group/mode/size and SHA-256 as evidence only. Never
+install, chmod, chown, delete, or restore it. After promote and after rollback
+the evidence SHA must be unchanged. Restoring a file the operator did not
+change is forbidden.
 
 Backup calls:
 
@@ -156,21 +431,35 @@ systemctl show clover-audit-retention.timer \
 curl -fsS --connect-timeout 2 --max-time 5 http://127.0.0.1:4100/api/health
 ```
 
-After exact-file backups, ensure destination directories without changing
-existing metadata, then install:
+Capture API `releaseId`/`version` and the live UI tag/html SHA from pre-state.
+After API→health then UI→health, those identities must be unchanged. Package A
+must not change the UI build.
+
+Timer backup and hashes must be complete before the first change. The first
+change is `systemctl stop clover-audit-retention.timer`. Apply and dry-run
+units must stay inactive. Install the three destinations only after that stop.
+The installed timer `Unit=` must be `clover-audit-retention-dry-run.service`.
+Never start `clover-audit-retention-apply.service`.
+
+After exact-file backups, stop the timer, ensure destination directories
+without changing existing metadata, then install:
 
 ```bash
+sudo systemctl stop clover-audit-retention.timer
 ensure_destination_dir /etc/systemd/system/clover-api.service.d a-dir-clover-api.service.d 0755
 ensure_destination_dir /etc/systemd/system/clover-ui.service.d a-dir-clover-ui.service.d 0755
-sudo install -m 0644 \
-  "$ARTIFACT/ops/security-stage5/package-a/systemd/clover-api.service.d/20-hardening.conf" \
+install -m 0644 -- \
+  "$RECOVERY/payload/api-20-hardening.conf" \
   /etc/systemd/system/clover-api.service.d/20-hardening.conf
-sudo install -m 0644 \
-  "$ARTIFACT/ops/security-stage5/package-a/systemd/clover-ui.service.d/20-hardening.conf" \
+install -m 0644 -- \
+  "$RECOVERY/payload/ui-20-hardening.conf" \
   /etc/systemd/system/clover-ui.service.d/20-hardening.conf
-sudo systemctl stop clover-audit-retention.timer
-sudo install -m 0644 \
-  "$ARTIFACT/ops/systemd/clover-audit-retention.timer" \
+install -m 0644 -- \
+  "$RECOVERY/payload/audit-retention.timer" \
+  /etc/systemd/system/clover-audit-retention.timer
+sudo systemd-analyze verify \
+  /etc/systemd/system/clover-api.service \
+  /etc/systemd/system/clover-ui.service \
   /etc/systemd/system/clover-audit-retention.timer
 sudo systemctl daemon-reload
 sudo systemctl restart clover-api.service
@@ -180,6 +469,15 @@ curl -fsS -o /dev/null --connect-timeout 2 --max-time 5 http://127.0.0.1:5273/
 sudo systemctl start clover-audit-retention.timer
 systemctl show clover-audit-retention.timer -p ActiveState -p NextElapseUSecRealtime
 ```
+
+nginx is read-only: record PID and HTTPS health. Do not restart or reload
+nginx. Packages B–D, orphan listeners, checkout, application, database,
+uploads, backups, and 1C stay untouched.
+
+Promote failure after the first change exits `40` when rollback completes and
+`41` when rollback is incomplete. Unexpected errors before the first change
+keep the original exit code and must not roll back. `INT`/`TERM` after
+`CHANGED=1` must roll back.
 
 Rollback restores or removes the three exact destinations according to their
 backups/`.absent` markers, then removes only directories this package created,
@@ -199,6 +497,12 @@ sudo systemctl restart clover-ui.service
 curl -fsS -o /dev/null --connect-timeout 2 --max-time 5 http://127.0.0.1:5273/
 sudo systemctl start clover-audit-retention.timer
 ```
+
+Rollback restores the exact pre-state timer, including `Unit=`. If that
+pre-state targeted `clover-audit-retention-apply.service`, record residual:
+apply was not started by the operator; the restored timer is the previous
+host state, not the promoted dry-run target. Never restore
+`10-umask.conf`.
 
 Stopping orphan listeners and changing isolated SQLite modes are not included
 in this install. They require a separate runtime plan with exact PID start time,

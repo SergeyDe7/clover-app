@@ -19,6 +19,7 @@ export const auditBaselineSha = "1fdd7e6ac715f55e407d71a225e5a6037eb9d2e8";
 export const sourceFiles = Object.freeze([
   "ops/security-stage5/README.md",
   "ops/security-stage5/PROMOTE_ROLLBACK.md",
+  "ops/security-stage5/scripts/promote-package-a.sh",
   "ops/security-stage5/package-a/systemd/clover-api.service.d/20-hardening.conf",
   "ops/security-stage5/package-a/systemd/clover-ui.service.d/20-hardening.conf",
   "ops/systemd/clover-audit-retention.timer",
@@ -63,20 +64,51 @@ function listFiles(root, relative = "") {
   return out.sort();
 }
 
+const UNTRUSTED_GIT_ENV = [
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_INDEX_FILE",
+  "GIT_NAMESPACE",
+  "GIT_COMMON_DIR",
+  "GIT_REPLACE_REF_BASE",
+];
+
+function cleanGitEnv() {
+  const env = { ...process.env };
+  for (const key of UNTRUSTED_GIT_ENV) {
+    delete env[key];
+  }
+  return env;
+}
+
 function git(root, args) {
-  const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+  const result = spawnSync("git", ["--no-replace-objects", "-C", root, ...args], {
+    encoding: "utf8",
+    env: cleanGitEnv(),
+  });
   if (result.error) throw result.error;
   if (result.status !== 0) fail(`git ${args.join(" ")} failed: ${result.stderr || result.stdout}`);
-  return String(result.stdout || "").trim();
+  const output = String(result.stdout || "").trim();
+  if (args[0] !== "status" && args[0] !== "cat-file" && !output && args[0] !== "replace") {
+    fail(`git ${args.join(" ")} returned empty output`);
+  }
+  return output;
 }
 
 function gitBytes(root, args) {
-  const result = spawnSync("git", ["-C", root, ...args], { maxBuffer: 32 * 1024 * 1024 });
+  const result = spawnSync("git", ["--no-replace-objects", "-C", root, ...args], {
+    maxBuffer: 32 * 1024 * 1024,
+    env: cleanGitEnv(),
+  });
   if (result.error) throw result.error;
   if (result.status !== 0) {
     fail(`git ${args.join(" ")} failed: ${String(result.stderr || result.stdout || "")}`);
   }
-  return Buffer.from(result.stdout || []);
+  const bytes = Buffer.from(result.stdout || []);
+  if (bytes.length === 0) fail(`git ${args.join(" ")} returned empty output`);
+  return bytes;
 }
 
 function assertCleanPinnedCheckout(root, targetSha) {

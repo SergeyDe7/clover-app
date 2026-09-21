@@ -10,6 +10,7 @@ import {
   rmSync,
   statSync,
   writeFileSync,
+  chmodSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -21,6 +22,7 @@ import {
   sourceFiles,
   verifyArtifact,
 } from "./securityStage5Artifact.mjs";
+import { extractVerifierPreamble, runSecurityStage5OperatorTests } from "./verify-security-stage5-operator.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDir, "../..");
@@ -106,7 +108,7 @@ for (const required of [
   "systemctl restart clover-api.service",
   "systemctl restart clover-ui.service",
   "systemctl reload nginx.service",
-  "git -C /opt/clover/clover-app show",
+  "VERIFIER_REL=server/scripts/securityStage5Artifact.mjs",
   "--source-root /opt/clover/clover-app",
   "/etc/ssh/sshd_config.d/50-clover-security.conf",
   "/etc/nginx/sites-enabled/clover-spb.ru",
@@ -124,6 +126,34 @@ for (const required of [
   assert.ok(rollback.includes(required), `rollback contract missing ${required}`);
 }
 assert.doesNotMatch(rollback, /rm\s+-rf|pkill|kill\s+-9/);
+assert.ok(sourceFiles.includes("ops/security-stage5/scripts/promote-package-a.sh"));
+assert.match(rollback, /ops\/security-stage5\/scripts\/promote-package-a\.sh/);
+assert.match(rollback, /10-umask\.conf` is \*\*not\*\* a\s+destination/);
+assert.match(rollback, /Never restore\s+`10-umask\.conf`/);
+assert.doesNotMatch(rollback, /restore_exact[^\n]*10-umask/);
+assert.match(rollback, /The first\s+change is `systemctl stop clover-audit-retention\.timer`/);
+assert.match(rollback, /exits `40` when rollback completes and\s+`41`/);
+assert.match(rollback, /sudo \/bin\/bash -c '/);
+assert.match(rollback, /--no-replace-objects/);
+assert.match(rollback, /hash-object --no-filters/);
+assert.match(rollback, /--expected-manifest/);
+assert.match(rollback, /--target /);
+assert.match(rollback, /VERIFIER_BOOTSTRAP: PASS/);
+assert.match(rollback, /require_trusted_recovery|recovery mode/);
+assert.doesNotMatch(rollback, /git show[\s\S]{0,80}\| sudo \/bin\/bash -s/);
+assert.doesNotMatch(rollback, /\| sudo tee/);
+assert.doesNotMatch(
+  read("ops/security-stage5/scripts/promote-package-a.sh"),
+  /CLOVER_OPERATOR_AS_ROOT=|exec sudo -n env|git show \| sudo \/bin\/bash -s|require_bash_s_launch/
+);
+assert.match(
+  read("ops/security-stage5/scripts/promote-package-a.sh"),
+  /unset CLOVER_OPERATOR_AS_ROOT/
+);
+assert.match(read("ops/security-stage5/scripts/promote-package-a.sh"), /--no-replace-objects/);
+assert.match(read("ops/security-stage5/scripts/promote-package-a.sh"), /require_trusted_self/);
+assert.match(read("ops/security-stage5/scripts/promote-package-a.sh"), /require_trusted_recovery/);
+assert.match(read("ops/security-stage5/scripts/promote-package-a.sh"), /verifier object id mismatch/);
 for (const dir of destinationDirs) {
   const escaped = dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   assert.doesNotMatch(
@@ -487,7 +517,8 @@ try {
   assert.equal(manifest.packages.B.status, "PREPARED");
   assert.equal(manifest.packages.C.status, "PREPARED");
   assert.equal(manifest.packages.D.status, "BLOCKED");
-  assert.ok(manifest.files.length >= 9);
+  assert.ok(manifest.files.length >= 10);
+  assert.ok(manifest.files.some((entry) => entry.path === "ops/security-stage5/scripts/promote-package-a.sh"));
   verifyArtifact({ artifact, expectedSha: fixtureSha, sourceRoot: fixtureRoot });
 
   const tampered = path.join(
@@ -513,6 +544,279 @@ try {
   );
 } finally {
   rmSync(temp, { recursive: true, force: true });
+}
+
+{
+  const replaceDir = mkdtempSync(path.join(tmpdir(), "clover-stage5-replace-"));
+  try {
+    execFileSync("git", ["init", "--quiet"], { cwd: replaceDir });
+    execFileSync("git", ["config", "user.email", "replace@example.invalid"], { cwd: replaceDir });
+    execFileSync("git", ["config", "user.name", "Replace Test"], { cwd: replaceDir });
+    for (const relative of sourceFiles) {
+      const destination = path.join(replaceDir, ...relative.split("/"));
+      mkdirSync(path.dirname(destination), { recursive: true });
+      copyFileSync(path.join(root, ...relative.split("/")), destination);
+    }
+    execFileSync("git", ["add", "--", ...sourceFiles], { cwd: replaceDir });
+    execFileSync("git", ["commit", "--quiet", "-m", "replace fixture"], { cwd: replaceDir });
+    const sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: replaceDir, encoding: "utf8" }).trim();
+    const operatorRelPath = "ops/security-stage5/scripts/promote-package-a.sh";
+    const honestOid = execFileSync(
+      "git",
+      ["--no-replace-objects", "rev-parse", `${sha}:${operatorRelPath}`],
+      { cwd: replaceDir, encoding: "utf8" }
+    ).trim();
+    const evilFile = path.join(replaceDir, "evil.sh");
+    writeFileSync(evilFile, "# evil replace\n");
+    const evilOid = execFileSync("git", ["hash-object", "-w", evilFile], {
+      cwd: replaceDir,
+      encoding: "utf8",
+    }).trim();
+    execFileSync("git", ["replace", honestOid, evilOid], { cwd: replaceDir });
+    const replaced = execFileSync("git", ["show", `${sha}:${operatorRelPath}`], {
+      cwd: replaceDir,
+      encoding: "utf8",
+    });
+    assert.match(replaced, /evil replace/, "control: replace ref swaps bytes without --no-replace-objects");
+    const pinned = execFileSync("git", ["--no-replace-objects", "show", `${sha}:${operatorRelPath}`], {
+      cwd: replaceDir,
+      encoding: "utf8",
+    });
+    assert.doesNotMatch(pinned, /evil replace/);
+    const artifactOut = path.join(tmpdir(), `clover-stage5-replace-art-${process.pid}`);
+    rmSync(artifactOut, { recursive: true, force: true });
+    const manifest = prepareArtifact({ sourceRoot: replaceDir, output: artifactOut, targetSha: sha });
+    const operatorRecord = manifest.files.find((entry) => entry.path === operatorRelPath);
+    assert.equal(operatorRecord.sha256, createHash("sha256").update(pinned).digest("hex"));
+    verifyArtifact({ artifact: artifactOut, expectedSha: sha, sourceRoot: replaceDir });
+  } finally {
+    rmSync(replaceDir, { recursive: true, force: true });
+    rmSync(path.join(tmpdir(), `clover-stage5-replace-art-${process.pid}`), { recursive: true, force: true });
+  }
+}
+
+runSecurityStage5OperatorTests();
+
+{
+  const verifierBody = extractVerifierPreamble(rollback);
+  const work = mkdtempSync(path.join(tmpdir(), "clover-stage5-verpre-"));
+  const toPosix = (value) => {
+    const resolved = path.resolve(value);
+    if (/^[A-Za-z]:[\\/]/.test(resolved)) {
+      return `/${resolved[0].toLowerCase()}/${resolved.slice(3).split(path.sep).join("/")}`;
+    }
+    return resolved.split(path.sep).join("/");
+  };
+  const findBash = () => {
+    try {
+      return execFileSync("bash", ["-lc", "command -v bash"], { encoding: "utf8" }).trim();
+    } catch {
+      return "C:/Program Files/Git/bin/bash.exe";
+    }
+  };
+  const bash = findBash();
+  try {
+    const sourceRoot = path.join(work, "source");
+    const artifact = path.join(work, "artifact");
+    const mockBin = path.join(work, "mock-bin");
+    const stateDir = path.join(work, "state");
+    mkdirSync(mockBin);
+    mkdirSync(stateDir);
+    for (const relative of [...sourceFiles, "server/scripts/securityStage5Artifact.mjs"]) {
+      const destination = path.join(sourceRoot, ...relative.split("/"));
+      mkdirSync(path.dirname(destination), { recursive: true });
+      copyFileSync(path.join(root, ...relative.split("/")), destination);
+    }
+    execFileSync("git", ["init", "--quiet"], { cwd: sourceRoot });
+    execFileSync("git", ["config", "user.email", "verpre@example.invalid"], { cwd: sourceRoot });
+    execFileSync("git", ["config", "user.name", "Verifier Preamble"], { cwd: sourceRoot });
+    execFileSync("git", ["add", "--", ...sourceFiles, "server/scripts/securityStage5Artifact.mjs"], {
+      cwd: sourceRoot,
+    });
+    execFileSync("git", ["commit", "--quiet", "-m", "verifier preamble fixture"], { cwd: sourceRoot });
+    const sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: sourceRoot, encoding: "utf8" }).trim();
+    prepareArtifact({ sourceRoot, output: artifact, targetSha: sha });
+    // prepareArtifact only packs sourceFiles; verifier still lives in the git tree for root-copy.
+
+    const realGit = execFileSync(bash, ["-lc", "command -v git"], { encoding: "utf8" }).trim();
+    const writeExec = (filePath, body) => {
+      writeFileSync(filePath, body.replace(/\r\n/g, "\n"));
+      chmodSync(filePath, 0o755);
+    };
+    writeExec(
+      path.join(mockBin, "trusted-git"),
+      `#!/usr/bin/env bash
+STATE="${toPosix(stateDir)}"
+REAL_GIT="${realGit}"
+if [ -f "$STATE/git.empty" ]; then
+  for arg in "$@"; do
+    if [ "$arg" = show ]; then exit 0; fi
+  done
+fi
+if [ -f "$STATE/git.trunc" ]; then
+  for arg in "$@"; do
+    if [ "$arg" = show ]; then
+      "$REAL_GIT" "$@" | dd bs=200 count=1 2>/dev/null
+      exit 0
+    fi
+  done
+fi
+if [ -f "$STATE/tamper.after" ]; then
+  for arg in "$@"; do
+    if [ "$arg" = "hash-object" ]; then
+      echo deadbeefdeadbeefdeadbeefdeadbeefdeadbeef
+      exit 0
+    fi
+  done
+fi
+exec "$REAL_GIT" "$@"
+`
+    );
+    writeExec(
+      path.join(mockBin, "node"),
+      `#!/usr/bin/env bash
+printf '%s\\n' "node $*" >> "${toPosix(stateDir)}/commands.log"
+exit 0
+`
+    );
+    writeExec(
+      path.join(mockBin, "stat"),
+      `#!/usr/bin/env bash
+if [ "$1" = "-c" ]; then
+  target="\${3:-}"
+  case "$2" in
+    %a)
+      case "$target" in *securityStage5Artifact*) echo 500 ;; *) echo 700 ;; esac
+      ;;
+    %U:%G) echo root:root ;;
+    %h) echo 1 ;;
+    %F)
+      case "$target" in *securityStage5Artifact*) echo "regular file" ;; *) echo directory ;; esac
+      ;;
+    *) echo ok ;;
+  esac
+  exit 0
+fi
+exec /usr/bin/stat "$@"
+`
+    );
+    writeExec(
+      path.join(mockBin, "install"),
+      `#!/usr/bin/env bash
+if [ "$1" = "-d" ]; then mkdir -p -- "\${@: -1}"; exit 0; fi
+exit 0
+`
+    );
+    writeExec(
+      path.join(mockBin, "chown"),
+      `#!/usr/bin/env bash
+exit 0
+`
+    );
+    writeExec(
+      path.join(mockBin, "chmod"),
+      `#!/usr/bin/env bash
+if [ -f "${toPosix(stateDir)}/tamper.copy" ]; then
+  for arg in "$@"; do
+    case "$arg" in
+      *securityStage5Artifact*) printf '\\n# tampered\\n' >> "$arg" ;;
+    esac
+  done
+fi
+exit 0
+`
+    );
+
+    const runPreamble = (recoveryName, extraState = null) => {
+      if (extraState) writeFileSync(path.join(stateDir, extraState), "1");
+      writeFileSync(path.join(stateDir, "commands.log"), "");
+      const recovery = path.join(work, recoveryName);
+      const script = path.join(work, `${recoveryName}.sh`);
+      writeFileSync(
+        script,
+        `${verifierBody.replaceAll("/usr/bin/git", toPosix(path.join(mockBin, "trusted-git")))}\n`
+      );
+      const result = (() => {
+        try {
+          return {
+            status: 0,
+            stdout: execFileSync(
+              bash,
+              [
+                "-lc",
+                `export PATH="${toPosix(mockBin)}:$PATH"
+id() { if [ "$1" = "-u" ]; then echo 0; else echo "uid=0(root)"; fi; }
+export -f id
+bash -c "$(cat ${toPosix(script)})" -- --target ${sha} --artifact ${toPosix(artifact)} --source-root ${toPosix(sourceRoot)} --recovery ${toPosix(recovery)}`,
+              ],
+              { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
+            ),
+            stderr: "",
+          };
+        } catch (error) {
+          return {
+            status: error.status ?? 1,
+            stdout: String(error.stdout || ""),
+            stderr: String(error.stderr || ""),
+          };
+        }
+      })();
+      if (extraState) rmSync(path.join(stateDir, extraState), { force: true });
+      return result;
+    };
+
+    const happy = runPreamble("recovery-ok");
+    assert.equal(happy.status, 0, `${happy.stdout}\n${happy.stderr}`);
+    assert.match(`${happy.stdout}${happy.stderr}`, /VERIFIER_BOOTSTRAP: PASS/);
+    assert.match(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /^node /m);
+
+    const empty = runPreamble("recovery-empty", "git.empty");
+    assert.notEqual(empty.status, 0);
+    assert.match(`${empty.stdout}${empty.stderr}`, /empty verifier blob|VERIFIER_BOOTSTRAP: FAIL/);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /^node /m);
+
+    const trunc = runPreamble("recovery-trunc", "git.trunc");
+    assert.notEqual(trunc.status, 0);
+    assert.match(`${trunc.stdout}${trunc.stderr}`, /object id mismatch|VERIFIER_BOOTSTRAP: FAIL/);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /^node /m);
+
+    const tamper = runPreamble("recovery-tamper", "tamper.copy");
+    assert.notEqual(tamper.status, 0);
+    assert.match(`${tamper.stdout}${tamper.stderr}`, /object id mismatch|VERIFIER_BOOTSTRAP: FAIL/);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /^node /m);
+
+    const verifierRel = "server/scripts/securityStage5Artifact.mjs";
+    const honestOid = execFileSync("git", ["--no-replace-objects", "rev-parse", `${sha}:${verifierRel}`], {
+      cwd: sourceRoot,
+      encoding: "utf8",
+    }).trim();
+    const evilPath = path.join(work, "evil-verifier.mjs");
+    writeFileSync(evilPath, "console.log('evil replace verifier')\n");
+    const evilOid = execFileSync("git", ["hash-object", "-w", evilPath], {
+      cwd: sourceRoot,
+      encoding: "utf8",
+    }).trim();
+    execFileSync("git", ["replace", honestOid, evilOid], { cwd: sourceRoot });
+    const swapped = execFileSync("git", ["show", `${sha}:${verifierRel}`], {
+      cwd: sourceRoot,
+      encoding: "utf8",
+    });
+    assert.match(swapped, /evil replace verifier/);
+    const replacePinned = runPreamble("recovery-replace");
+    assert.equal(
+      replacePinned.status,
+      0,
+      `replace ref must not change trusted verifier preamble\n${replacePinned.stdout}\n${replacePinned.stderr}`
+    );
+    assert.match(`${replacePinned.stdout}${replacePinned.stderr}`, /VERIFIER_BOOTSTRAP: PASS/);
+    assert.doesNotMatch(
+      readFileSync(path.join(work, "recovery-replace", `securityStage5Artifact-${sha}.mjs`), "utf8"),
+      /evil replace verifier/
+    );
+    execFileSync("git", ["replace", "-d", honestOid], { cwd: sourceRoot });
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
 }
 
 console.log("SECURITY_STAGE5_PREPARE:PASS");
