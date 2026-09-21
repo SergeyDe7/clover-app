@@ -5,18 +5,112 @@ package at a time. Never run A, B, and C in parallel. `ARTIFACT`, `RECOVERY`,
 and `EXPECTED_SHA` must be explicit absolute values recorded in the change
 ticket. The recovery directory must be outside the live repository.
 
-Before every package:
+Before Packages B/C (shared artifact verify), use this two-phase root
+verifier contract. Ticket literals: 40-character `TARGET`, absolute
+`ARTIFACT`, absolute `RECOVERY` outside the live repo, and
+`--source-root /opt/clover/clover-app`. Do not pipe `git show` into
+`sudo tee` or any root shell. Do not run Node until the root-owned
+verifier copy matches the exact `$TARGET` blob object ID. Package A uses
+its own accepted launcher below; that launcher also extracts the verifier
+with the same Git trust rules after its operator root-copy check.
 
 ```bash
-sudo install -d -m 0700 "$RECOVERY"
-git -C /opt/clover/clover-app cat-file -e "$EXPECTED_SHA^{commit}"
-git -C /opt/clover/clover-app show \
-  "$EXPECTED_SHA:server/scripts/securityStage5Artifact.mjs" \
-  | sudo tee "$RECOVERY/securityStage5Artifact-$EXPECTED_SHA.mjs" >/dev/null
-sudo chmod 0500 "$RECOVERY/securityStage5Artifact-$EXPECTED_SHA.mjs"
-sudo node "$RECOVERY/securityStage5Artifact-$EXPECTED_SHA.mjs" verify \
-  --artifact "$ARTIFACT" --expected-sha "$EXPECTED_SHA" \
-  --source-root /opt/clover/clover-app
+sudo /bin/bash -c '
+set -Eeuo pipefail
+umask 0077
+VERIFIER_REL=server/scripts/securityStage5Artifact.mjs
+TARGET=""
+ARTIFACT=""
+SOURCE_ROOT=/opt/clover/clover-app
+RECOVERY=""
+fail() {
+  printf "%s\n" "VERIFIER_BOOTSTRAP: FAIL: $*" >&2
+  exit 20
+}
+set_once() {
+  name="$1"
+  value="$2"
+  case "$name" in
+    TARGET) [ -z "$TARGET" ] || fail "duplicate --target" ;;
+    ARTIFACT) [ -z "$ARTIFACT" ] || fail "duplicate --artifact" ;;
+    SOURCE_ROOT) [ "$SOURCE_ROOT" = /opt/clover/clover-app ] || fail "duplicate --source-root" ;;
+    RECOVERY) [ -z "$RECOVERY" ] || fail "duplicate --recovery" ;;
+  esac
+  case "$name" in
+    TARGET) TARGET="$value" ;;
+    ARTIFACT) ARTIFACT="$value" ;;
+    SOURCE_ROOT) SOURCE_ROOT="$value" ;;
+    RECOVERY) RECOVERY="$value" ;;
+  esac
+}
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --target) [ $# -ge 2 ] || fail "missing --target"; set_once TARGET "$2"; shift 2 ;;
+    --artifact) [ $# -ge 2 ] || fail "missing --artifact"; set_once ARTIFACT "$2"; shift 2 ;;
+    --source-root) [ $# -ge 2 ] || fail "missing --source-root"; set_once SOURCE_ROOT "$2"; shift 2 ;;
+    --recovery) [ $# -ge 2 ] || fail "missing --recovery"; set_once RECOVERY "$2"; shift 2 ;;
+    *) fail "unknown argument $1" ;;
+  esac
+done
+[ "$(id -u)" -eq 0 ] || fail "UID 0 required"
+[ -e /dev/tty ] && [ -r /dev/tty ] && [ -w /dev/tty ] || fail "TTY /dev/tty required"
+printf "%s" "$TARGET" | grep -Eq "^[0-9a-f]{40}$" || fail "TARGET must be a 40-character lowercase SHA"
+case "$ARTIFACT" in /*) ;; *) fail "ARTIFACT must be an absolute path" ;; esac
+case "$SOURCE_ROOT" in /*) ;; *) fail "SOURCE_ROOT must be an absolute path" ;; esac
+case "$RECOVERY" in /*) ;; *) fail "RECOVERY must be an absolute path" ;; esac
+[ -d "$ARTIFACT" ] || fail "ARTIFACT is not a directory"
+[ -d "$SOURCE_ROOT/.git" ] || fail "SOURCE_ROOT missing .git"
+[ ! -e "$RECOVERY" ] || fail "RECOVERY already exists"
+if [ -x /usr/bin/git ]; then
+  GITBIN=/usr/bin/git
+elif [ -x /mingw64/bin/git ]; then
+  GITBIN=/mingw64/bin/git
+else
+  fail "/usr/bin/git missing"
+fi
+trusted_git() {
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_OBJECT_DIRECTORY \
+    -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_INDEX_FILE \
+    -u GIT_NAMESPACE -u GIT_COMMON_DIR -u GIT_REPLACE_REF_BASE \
+    "$GITBIN" --no-replace-objects -C "$SOURCE_ROOT" "$@"
+}
+trusted_git cat-file -e "${TARGET}^{commit}" || fail "target commit missing"
+OID=$(trusted_git rev-parse --verify "${TARGET}:${VERIFIER_REL}")
+printf "%s" "$OID" | grep -Eq "^[0-9a-f]{40}$" || fail "verifier blob id"
+install -d -m 0700 -- "$RECOVERY"
+chown root:root -- "$RECOVERY"
+chmod 0700 -- "$RECOVERY"
+[ "$(stat -c %U:%G "$RECOVERY")" = root:root ] || fail "recovery owner"
+MODE=$(stat -c %a "$RECOVERY")
+[ "$MODE" = 700 ] || [ "$MODE" = 0700 ] || fail "recovery mode"
+! test -L "$RECOVERY" || fail "recovery symlink"
+[ "$(stat -c %F "$RECOVERY")" = directory ] || fail "recovery not a directory"
+VFILE=${RECOVERY}/securityStage5Artifact-${TARGET}.mjs
+trusted_git show "${TARGET}:${VERIFIER_REL}" > "$VFILE" || fail "git show verifier"
+[ -s "$VFILE" ] || fail "empty verifier blob"
+! test -L "$VFILE" || fail "verifier symlink"
+test -f "$VFILE" || fail "verifier not regular"
+COPY_OID=$(trusted_git hash-object --no-filters -- "$VFILE")
+[ "$COPY_OID" = "$OID" ] || fail "verifier object id mismatch"
+chmod 0500 -- "$VFILE"
+chown root:root -- "$VFILE"
+! test -L "$VFILE" || fail "verifier symlink after chmod"
+test -f "$VFILE" || fail "verifier not regular after chmod"
+[ "$(stat -c %U:%G "$VFILE")" = root:root ] || fail "verifier owner"
+VMODE=$(stat -c %a "$VFILE")
+[ "$VMODE" = 500 ] || [ "$VMODE" = 0500 ] || fail "verifier mode"
+[ "$(stat -c %h "$VFILE")" = 1 ] || fail "verifier nlink"
+COPY_OID=$(trusted_git hash-object --no-filters -- "$VFILE")
+[ "$COPY_OID" = "$OID" ] || fail "verifier object id mismatch after lock"
+printf "%s\n" "VERIFIER_BOOTSTRAP: PASS"
+exec node "$VFILE" verify \
+  --artifact "$ARTIFACT" --expected-sha "$TARGET" \
+  --source-root "$SOURCE_ROOT"
+' -- \
+  --target <EXTERNAL_TARGET> \
+  --artifact <ABS_ARTIFACT> \
+  --source-root /opt/clover/clover-app \
+  --recovery <ABS_RECOVERY>
 ```
 
 For every destination file, save the previous file with `cp --preserve=all`. If
@@ -299,10 +393,11 @@ variables for target, manifest hash, or artifact path. Unknown or duplicate
 arguments fail. A pre-placed `.verifier-*.mjs` is forbidden.
 
 The operator extracts the verifier with
-`/usr/bin/git --no-replace-objects show "$EXPECTED_SHA:server/scripts/securityStage5Artifact.mjs"`
-into the recovery directory after the deploy lock, compares that root copy to
-the exact Git blob object, then verifies the artifact with the external
-target SHA. The three Package A sources are snapshotted into root-owned
+`/usr/bin/git --no-replace-objects show "$TARGET:server/scripts/securityStage5Artifact.mjs"`
+into the recovery directory after the deploy lock, compares
+`hash-object --no-filters` of that root copy to the exact `$TARGET` blob
+object ID, re-checks owner/mode/nlink, then runs Node only after that
+match. The three Package A sources are snapshotted into root-owned
 recovery files and compared to the manifest and exact Git blobs before
 install. Install reads only that snapshot.
 

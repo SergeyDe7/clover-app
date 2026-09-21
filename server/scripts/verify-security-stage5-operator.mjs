@@ -123,18 +123,51 @@ function quote(value) {
 
 function extractBootstrap(text) {
   const marker = "sudo /bin/bash -c '";
-  const start = text.indexOf(marker);
-  assert.ok(start >= 0, "runbook must contain sudo /bin/bash -c launcher");
-  const bodyStart = start + marker.length;
-  const bodyEnd = text.indexOf("\n' --", bodyStart);
-  assert.ok(bodyEnd > bodyStart, "runbook bootstrap body must end before argument list");
-  const body = text.slice(bodyStart, bodyEnd);
-  assert.match(body, /--no-replace-objects/);
-  assert.match(body, /\/usr\/bin\/git/);
-  assert.match(body, /hash-object --no-filters/);
-  assert.doesNotMatch(body, /\beval\b/);
-  return body;
+  let searchFrom = 0;
+  while (searchFrom < text.length) {
+    const start = text.indexOf(marker, searchFrom);
+    assert.ok(start >= 0, "runbook must contain Package A sudo /bin/bash -c launcher");
+    const bodyStart = start + marker.length;
+    const bodyEnd = text.indexOf("\n' --", bodyStart);
+    assert.ok(bodyEnd > bodyStart, "runbook bootstrap body must end before argument list");
+    const body = text.slice(bodyStart, bodyEnd);
+    if (body.includes("OPERATOR_REL=ops/security-stage5/scripts/promote-package-a.sh")) {
+      assert.match(body, /--no-replace-objects/);
+      assert.match(body, /\/usr\/bin\/git/);
+      assert.match(body, /hash-object --no-filters/);
+      assert.doesNotMatch(body, /\beval\b/);
+      return body;
+    }
+    searchFrom = bodyEnd + 1;
+  }
+  assert.fail("Package A bootstrap body not found");
 }
+
+function extractVerifierPreamble(text) {
+  const marker = "sudo /bin/bash -c '";
+  let searchFrom = 0;
+  while (searchFrom < text.length) {
+    const start = text.indexOf(marker, searchFrom);
+    assert.ok(start >= 0, "runbook must contain verifier sudo /bin/bash -c preamble");
+    const bodyStart = start + marker.length;
+    const bodyEnd = text.indexOf("\n' --", bodyStart);
+    assert.ok(bodyEnd > bodyStart, "verifier preamble body must end before argument list");
+    const body = text.slice(bodyStart, bodyEnd);
+    if (body.includes("VERIFIER_REL=server/scripts/securityStage5Artifact.mjs")) {
+      assert.match(body, /--no-replace-objects/);
+      assert.match(body, /hash-object --no-filters/);
+      assert.match(body, /VERIFIER_BOOTSTRAP: PASS/);
+      assert.doesNotMatch(body, /\beval\b/);
+      assert.doesNotMatch(body, /\| sudo tee/);
+      assert.doesNotMatch(body, /git show[^\n]*\|\s*(sudo\s+)?(tee|bash)/);
+      return body;
+    }
+    searchFrom = bodyEnd + 1;
+  }
+  assert.fail("verifier preamble body not found");
+}
+
+export { extractVerifierPreamble };
 
 function operatorArgs(cfg) {
   return [
@@ -277,6 +310,7 @@ export function runSecurityStage5OperatorTests() {
   assert.match(operator, /ROLLBACK_RUNNING=0/);
   assert.match(operator, /disable_recursive_traps/);
   assert.match(operator, /require_trusted_self/);
+  assert.match(operator, /require_trusted_recovery/);
   assert.match(operator, /--no-replace-objects/);
   assert.match(operator, /hash-object --no-filters/);
   assert.doesNotMatch(operator, /git show \| sudo \/bin\/bash -s|require_bash_s_launch/);
@@ -284,6 +318,7 @@ export function runSecurityStage5OperatorTests() {
   assert.match(operator, /readonly EXIT_ROLLBACK_INCOMPLETE=41/);
   assert.match(operator, /SNAPSHOT_LOCKED/);
   assert.match(operator, /git_blob_sha/);
+  assert.match(operator, /verifier object id mismatch/);
   assert.match(operator, /10-umask\.conf is not a destination/);
   assert.match(operator, /STOP TIMER \(first change\)/);
   assert.ok(
@@ -303,10 +338,12 @@ export function runSecurityStage5OperatorTests() {
   assert.match(rollback, /sudo \/bin\/bash -c '/);
   assert.match(rollback, /--no-replace-objects/);
   assert.match(rollback, /hash-object --no-filters/);
+  assert.match(rollback, /VERIFIER_REL=server\/scripts\/securityStage5Artifact\.mjs/);
   assert.doesNotMatch(rollback, /git show[\s\S]{0,80}\| sudo \/bin\/bash -s/);
+  assert.doesNotMatch(rollback, /\| sudo tee/);
   assert.match(rollback, /10-umask\.conf` is \*\*not\*\* a\s+destination/);
   assert.doesNotMatch(rollback, /restore_exact[^\n]*10-umask/);
-
+  extractVerifierPreamble(rollback);
   for (const name of ["backup_exact", "restore_exact", "ensure_destination_dir", "rollback_created_dir"]) {
     assert.equal(
       extractBashFunction(operator, name).replace(/\r\n/g, "\n"),
@@ -439,6 +476,14 @@ ${extractBashFunction(operator, "operator_on_signal")}
       mkdirSync(path.dirname(destination), { recursive: true });
       copyFileSync(source, destination);
     }
+    const mockGitPath = toPosix(path.join(mockBin, "trusted-git"));
+    const fixtureOperator = path.join(fixtureRoot, ...operatorRel.split("/"));
+    const patchedOperator = readFileSync(fixtureOperator, "utf8").replace(
+      /if \[ -x \/usr\/bin\/git \]; then\r?\n  readonly TRUSTED_GIT=\/usr\/bin\/git\r?\nelif \[ -x \/mingw64\/bin\/git \]; then\r?\n  readonly TRUSTED_GIT=\/mingw64\/bin\/git\r?\nelse\r?\n  readonly TRUSTED_GIT=\/usr\/bin\/git\r?\nfi/,
+      `readonly TRUSTED_GIT=${mockGitPath}`
+    );
+    assert.match(patchedOperator, new RegExp(`readonly TRUSTED_GIT=${mockGitPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    writeFileSync(fixtureOperator, patchedOperator);
     execFileSync("git", ["init", "--quiet"], { cwd: fixtureRoot });
     execFileSync("git", ["config", "user.email", "stage5-operator@example.invalid"], { cwd: fixtureRoot });
     execFileSync("git", ["config", "user.name", "Stage 5 Operator"], { cwd: fixtureRoot });
@@ -548,18 +593,60 @@ exit 0
     writeExec(
       path.join(mockBin, "stat"),
       `#!/usr/bin/env bash
+STATE="${toPosix(stateDir)}"
 if [ "$1" = "-c" ]; then
   target="\${3:-}"
   case "$2" in
     %a)
+      if [ -f "$STATE/operator.mode.bad" ]; then
+        case "$target" in *promote-package-a.sh) echo 755; exit 0 ;; esac
+      fi
+      if [ -f "$STATE/recovery.mode0755" ]; then
+        case "$target" in
+          *promote-package-a.sh|*securityStage5Artifact*) echo 500 ;;
+          *) echo 755 ;;
+        esac
+        exit 0
+      fi
       case "$target" in
-        *promote-package-a.sh*) echo 500 ;;
+        *promote-package-a.sh|*securityStage5Artifact*) echo 500 ;;
         *) echo 700 ;;
       esac
       ;;
-    %U:%G) echo root:root ;;
+    %U:%G)
+      if [ -f "$STATE/recovery.owner.bad" ]; then
+        case "$target" in
+          *promote-package-a.sh|*securityStage5Artifact*) echo root:root ;;
+          *) echo clover:clover ;;
+        esac
+        exit 0
+      fi
+      echo root:root
+      ;;
+    %u:%g)
+      if [ -f "$STATE/recovery.owner.bad" ]; then
+        case "$target" in
+          *promote-package-a.sh|*securityStage5Artifact*) echo 0:0 ;;
+          *) echo 1000:1000 ;;
+        esac
+        exit 0
+      fi
+      echo 0:0
+      ;;
     %h) echo 1 ;;
-    %F) echo regular file ;;
+    %F)
+      if [ -f "$STATE/recovery.symlink" ]; then
+        case "$target" in
+          *promote-package-a.sh|*securityStage5Artifact*) echo "regular file" ;;
+          *) echo "symbolic link" ;;
+        esac
+        exit 0
+      fi
+      case "$target" in
+        *promote-package-a.sh|*securityStage5Artifact*) echo "regular file" ;;
+        *) echo directory ;;
+      esac
+      ;;
     *) echo "umask owner=root:root mode=644 size=20 path=$target" ;;
   esac
   exit 0
@@ -585,9 +672,23 @@ if [ -f "$STATE/git.fail" ]; then
     if [ "$arg" = show ]; then echo GIT_SHOW_FAIL >&2; exit 1; fi
   done
 fi
+if [ -f "$STATE/git.fail.verifier" ]; then
+  for arg in "$@"; do
+    if [ "$arg" = show ]; then
+      case "$*" in *securityStage5Artifact*) echo GIT_SHOW_FAIL >&2; exit 1 ;; esac
+    fi
+  done
+fi
 if [ -f "$STATE/git.empty" ]; then
   for arg in "$@"; do
     if [ "$arg" = show ]; then exit 0; fi
+  done
+fi
+if [ -f "$STATE/git.empty.verifier" ]; then
+  for arg in "$@"; do
+    if [ "$arg" = show ]; then
+      case "$*" in *securityStage5Artifact*) exit 0 ;; esac
+    fi
   done
 fi
 if [ -f "$STATE/git.trunc" ]; then
@@ -595,6 +696,18 @@ if [ -f "$STATE/git.trunc" ]; then
     if [ "$arg" = show ]; then
       "$REAL_GIT" "$@" | dd bs=1500 count=1 2>/dev/null
       exit 0
+    fi
+  done
+fi
+if [ -f "$STATE/git.trunc.verifier" ]; then
+  for arg in "$@"; do
+    if [ "$arg" = show ]; then
+      case "$*" in
+        *securityStage5Artifact*)
+          "$REAL_GIT" "$@" | dd bs=400 count=1 2>/dev/null
+          exit 0
+          ;;
+      esac
     fi
   done
 fi
@@ -912,7 +1025,95 @@ fi
     rmSync(path.join(stateDir, "tamper.verifier"));
     assert.notEqual(verifierTamper.status, 0);
     assert.notEqual(verifierTamper.status, 40);
-    assert.match(`${verifierTamper.stdout}${verifierTamper.stderr}`, /verifier != git blob|FAIL_BEFORE_CHANGE/);
+    assert.match(`${verifierTamper.stdout}${verifierTamper.stderr}`, /verifier object id mismatch|FAIL_BEFORE_CHANGE/);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl stop/);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "recovery.mode0755"), "1");
+    const recoveryMode = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-mode0755")) },
+      {},
+      { tty: true }
+    );
+    rmSync(path.join(stateDir, "recovery.mode0755"));
+    assert.notEqual(recoveryMode.status, 0);
+    assert.match(`${recoveryMode.stdout}${recoveryMode.stderr}`, /recovery mode|FAIL_BEFORE_CHANGE/);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl |flock -n/);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "recovery.owner.bad"), "1");
+    const recoveryOwner = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-owner")) },
+      {},
+      { tty: true }
+    );
+    rmSync(path.join(stateDir, "recovery.owner.bad"));
+    assert.notEqual(recoveryOwner.status, 0);
+    assert.match(`${recoveryOwner.stdout}${recoveryOwner.stderr}`, /recovery owner|FAIL_BEFORE_CHANGE/);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl |flock -n/);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "recovery.symlink"), "1");
+    const recoverySymlink = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-symlink")) },
+      {},
+      { tty: true }
+    );
+    rmSync(path.join(stateDir, "recovery.symlink"));
+    assert.notEqual(recoverySymlink.status, 0);
+    assert.match(
+      `${recoverySymlink.stdout}${recoverySymlink.stderr}`,
+      /recovery must not be a symlink|recovery is not a directory|FAIL_BEFORE_CHANGE/
+    );
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl |flock -n/);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "operator.mode.bad"), "1");
+    const operatorMode = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-opmode")) },
+      {},
+      { tty: true }
+    );
+    rmSync(path.join(stateDir, "operator.mode.bad"));
+    assert.notEqual(operatorMode.status, 0);
+    assert.match(`${operatorMode.stdout}${operatorMode.stderr}`, /mode|BOOTSTRAP: FAIL|FAIL_BEFORE_CHANGE/);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl /);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "git.empty.verifier"), "1");
+    const emptyVerifier = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-empty-ver")) },
+      {},
+      { tty: true }
+    );
+    rmSync(path.join(stateDir, "git.empty.verifier"));
+    assert.notEqual(emptyVerifier.status, 0);
+    assert.match(`${emptyVerifier.stdout}${emptyVerifier.stderr}`, /empty verifier blob|object id mismatch|FAIL_BEFORE_CHANGE/);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl stop/);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "git.trunc.verifier"), "1");
+    const truncVerifier = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-trunc-ver")) },
+      {},
+      { tty: true }
+    );
+    rmSync(path.join(stateDir, "git.trunc.verifier"));
+    assert.notEqual(truncVerifier.status, 0);
+    assert.match(`${truncVerifier.stdout}${truncVerifier.stderr}`, /object id mismatch|FAIL_BEFORE_CHANGE/);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl stop/);
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "git.fail.verifier"), "1");
+    const failVerifier = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-fail-ver")) },
+      {},
+      { tty: true }
+    );
+    rmSync(path.join(stateDir, "git.fail.verifier"));
+    assert.notEqual(failVerifier.status, 0);
+    assert.match(`${failVerifier.stdout}${failVerifier.stderr}`, /git show verifier|FAIL_BEFORE_CHANGE/);
+    assert.doesNotMatch(readFileSync(path.join(stateDir, "commands.log"), "utf8"), /systemctl stop/);
 
     resetHost();
     const worktreeOperator = path.join(fixtureRoot, ...operatorRel.split("/"));

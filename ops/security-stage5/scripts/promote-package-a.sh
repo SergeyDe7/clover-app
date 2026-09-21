@@ -161,6 +161,25 @@ file_blob_id() {
   printf '%s\n' "$oid"
 }
 
+require_trusted_recovery() {
+  local expected="$1"
+  case "$expected" in
+    /*) ;;
+    *) fail_before "recovery must be an absolute path" ;;
+  esac
+  [ "$RECOVERY" = "$expected" ] || fail_before "recovery path mismatch"
+  if test -L "$RECOVERY"; then
+    fail_before "recovery must not be a symlink"
+  fi
+  [ -d "$RECOVERY" ] || fail_before "recovery is not a directory"
+  [ "$(stat -c '%F' "$RECOVERY")" = "directory" ] || fail_before "recovery is not a directory"
+  local uidgid mode
+  uidgid=$(stat -c '%u:%g' "$RECOVERY")
+  mode=$(stat -c '%a' "$RECOVERY")
+  [ "$uidgid" = "0:0" ] || fail_before "recovery owner $uidgid"
+  [ "$mode" = "700" ] || [ "$mode" = "0700" ] || fail_before "recovery mode $mode"
+}
+
 require_trusted_self() {
   local self="${BASH_SOURCE[0]:-}"
   if [ -z "$self" ]; then
@@ -618,7 +637,7 @@ operator_main() {
     *) fail_before "recovery must be an absolute path" ;;
   esac
   RECOVERY="$RECOVERY_ARG"
-  [ -d "$RECOVERY" ] || fail_before "recovery is not a directory"
+  require_trusted_recovery "$RECOVERY_ARG"
   [ -d "$ARTIFACT" ] || fail_before "ARTIFACT is not a directory"
   [ -d "$ROOT/.git" ] || fail_before "repo missing $ROOT"
   trusted_git cat-file -e "${TARGET}^{commit}" || fail_before "target commit missing"
@@ -657,13 +676,26 @@ operator_main() {
   log "LOCK_HELD"
   log "RECOVERY=$RECOVERY"
 
-  local verifier copy_hash blob_hash
+  local verifier expected_oid copy_oid vowner vmode vnlink
   verifier="$RECOVERY/securityStage5Artifact-${TARGET}.mjs"
-  trusted_git show "${TARGET}:server/scripts/securityStage5Artifact.mjs" > "$verifier"
+  expected_oid=$(git_blob_id "${TARGET}:server/scripts/securityStage5Artifact.mjs")
+  trusted_git show "${TARGET}:server/scripts/securityStage5Artifact.mjs" > "$verifier" || fail_before "git show verifier"
+  [ -s "$verifier" ] || fail_before "empty verifier blob"
+  ! test -L "$verifier" || fail_before "verifier symlink"
+  test -f "$verifier" || fail_before "verifier not regular"
+  copy_oid=$(file_blob_id "$verifier")
+  [ "$copy_oid" = "$expected_oid" ] || fail_before "verifier object id mismatch"
   chmod 0500 -- "$verifier"
-  copy_hash=$(sha_file "$verifier")
-  blob_hash=$(git_blob_sha "${TARGET}:server/scripts/securityStage5Artifact.mjs")
-  [ "$copy_hash" = "$blob_hash" ] || fail_before "verifier != git blob"
+  ! test -L "$verifier" || fail_before "verifier symlink after chmod"
+  test -f "$verifier" || fail_before "verifier not regular after chmod"
+  vowner=$(stat -c '%U:%G' "$verifier")
+  vmode=$(stat -c '%a' "$verifier")
+  vnlink=$(stat -c '%h' "$verifier")
+  [ "$vowner" = "root:root" ] || fail_before "verifier owner $vowner"
+  [ "$vmode" = "500" ] || [ "$vmode" = "0500" ] || fail_before "verifier mode $vmode"
+  [ "$vnlink" = "1" ] || fail_before "verifier nlink $vnlink"
+  copy_oid=$(file_blob_id "$verifier")
+  [ "$copy_oid" = "$expected_oid" ] || fail_before "verifier object id mismatch after lock"
   case "$verifier" in
     *.verifier*|*/.verifier-*) fail_before "pre-placed verifier path" ;;
   esac
