@@ -96,8 +96,10 @@ const headerIncludes = nginx.match(/include \/etc\/nginx\/snippets\/clover-secur
 assert.ok(headerIncludes.length >= 10, "security headers must be restored in cache locations");
 
 const doc = read("ops/security-stage5/README.md");
-assert.match(doc, /Package D — perimeter \(BLOCKED\)/);
-assert.match(doc, /working 1C source IP and route are proven/);
+assert.match(doc, /Package D — targeted perimeter/);
+assert.match(doc, /192\.168\.155\.155/);
+assert.match(doc, /192\.168\.155\.0\/24/);
+assert.match(doc, /dropping direct TCP `4100`/);
 assert.doesNotMatch(doc, /enable --now clover-audit-retention\.timer/);
 
 const rollback = read("ops/security-stage5/PROMOTE_ROLLBACK.md");
@@ -141,6 +143,8 @@ for (const required of [
 }
 assert.doesNotMatch(rollback, /rm\s+-rf|pkill|kill\s+-9/);
 assert.ok(sourceFiles.includes("ops/security-stage5/scripts/promote-package-a.sh"));
+assert.ok(sourceFiles.includes("ops/security-stage5/scripts/promote-package-d.sh"));
+assert.ok(sourceFiles.includes("ops/security-stage5/package-d/nftables/clover-perimeter.nft"));
 assert.match(rollback, /ops\/security-stage5\/scripts\/promote-package-a\.sh/);
 assert.match(rollback, /10-umask\.conf` is \*\*not\*\* a\s+destination/);
 assert.match(rollback, /Never restore\s+`10-umask\.conf`/);
@@ -530,9 +534,10 @@ try {
   assert.equal(manifest.packages.A.status, "PREPARED");
   assert.equal(manifest.packages.B.status, "PREPARED");
   assert.equal(manifest.packages.C.status, "PREPARED");
-  assert.equal(manifest.packages.D.status, "BLOCKED");
-  assert.ok(manifest.files.length >= 10);
+  assert.equal(manifest.packages.D.status, "PREPARED");
+  assert.ok(manifest.files.length >= 12);
   assert.ok(manifest.files.some((entry) => entry.path === "ops/security-stage5/scripts/promote-package-a.sh"));
+  assert.ok(manifest.files.some((entry) => entry.path === "ops/security-stage5/scripts/promote-package-d.sh"));
   verifyArtifact({ artifact, expectedSha: fixtureSha, sourceRoot: fixtureRoot });
 
   const tampered = path.join(

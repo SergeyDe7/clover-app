@@ -1,0 +1,20 @@
+#!/usr/sbin/nft -f
+
+table inet clover_stage5 {
+	chain input {
+		type filter hook input priority filter; policy accept;
+
+		iifname "lo" accept comment "clover: preserve loopback"
+		ip saddr 192.168.155.0/24 tcp dport 4100 accept comment "clover: working 1C and office LAN"
+		tcp dport 4100 drop comment "clover: block direct API outside office LAN"
+		tcp dport { 4117, 4118, 5293 } drop comment "clover: block abandoned test listeners"
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy accept;
+	}
+
+	chain output {
+		type filter hook output priority filter; policy accept;
+	}
+}

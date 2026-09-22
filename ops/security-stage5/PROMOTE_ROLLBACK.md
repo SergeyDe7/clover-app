@@ -625,3 +625,49 @@ sudo systemctl restart clover-ui.service
 sudo systemctl reload nginx.service
 curl -fsS --connect-timeout 3 --max-time 10 https://clover-spb.ru/api/health
 ```
+
+## Package D — targeted nftables perimeter
+
+Package D has exactly one destination and does not restart API, UI, nginx, or
+SSH: `/etc/nftables.conf`.
+
+The promotion gate requires live checkout `70eb66504bf981b1ea395d55671547292fa95141`,
+an empty effective nftables ruleset, `nftables.service` inactive/disabled, and
+the existing config SHA-256
+`60dac93ffe0ea440fc4a8941a080b6fb8d2c8655d47baf856e97182a0d1ca29a`.
+Any drift aborts before the first change.
+
+Use the same two-phase trust contract as Package A: the completed TTY
+bootstrap writes `ops/security-stage5/scripts/promote-package-d.sh` from the
+exact target Git blob into a new `root:root 0700` recovery directory, verifies
+its object ID with `git --no-replace-objects hash-object --no-filters`, sets the
+operator to `root:root 0500` with `nlink=1`, and only then executes it. Literal
+external arguments are target SHA, uppercase manifest SHA-256, absolute
+artifact/recovery paths, and live SHA.
+
+The root operator re-verifies the manifest and every artifact file against
+Git, snapshots the candidate firewall file into recovery, backs up the exact
+existing config, records API/UI/nginx PIDs, checks health, validates with
+`nft -c`, revalidates the still-empty ruleset immediately before the change,
+installs the snapshot, applies only its dedicated `inet clover_stage5` table,
+and runs `systemctl enable nftables.service`. The service stays inactive until
+boot; the runtime table is already active through `nft -f`.
+
+Expected policy:
+
+- loopback remains unrestricted;
+- office LAN `192.168.155.0/24` may connect directly to API `4100`;
+- all other IPv4 and IPv6 sources are dropped on direct API `4100`;
+- `4117`, `4118`, and `5293` are dropped outside loopback;
+- every other input, including SSH `22` and nginx `80/443`, remains accepted.
+
+On `ERR`, `INT`, or `TERM` after the first change, rollback restores the exact
+backup, deletes only `inet clover_stage5`, disables nftables when that was the
+recorded pre-state, verifies the baseline SHA and empty ruleset, and repeats
+health gates. Exit `40` means rollback passed; exit `41` means rollback was
+incomplete.
+
+After PASS prove: existing and new SSH work; public HTTPS works; public TCP
+`4100/4117/4118/5293` is blocked; office-LAN `192.168.155.15:4100` remains
+reachable; API/UI/nginx PIDs and restart counters are unchanged. Do not call
+working 1C during Package D.
