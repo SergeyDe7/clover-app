@@ -612,10 +612,12 @@ copy_payload_snapshot() {
 
 manifest_file_hash() {
   local rel="$1"
-  python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding="utf-8"));
+  python3 -c 'import json,sys
+d=json.load(open(sys.argv[1],encoding="utf-8"))
 p=sys.argv[2]
 hits=[x["sha256"] for x in d.get("files",[]) if x.get("path")==p]
-sys.exit(1 if len(hits)!=1 else 0)
+if len(hits)!=1:
+  sys.exit(1)
 print(hits[0])' "$ARTIFACT/manifest.json" "$rel"
 }
 

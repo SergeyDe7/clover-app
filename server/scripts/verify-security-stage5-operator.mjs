@@ -366,6 +366,111 @@ export function runSecurityStage5OperatorTests() {
   );
   assert.notEqual(emptyHash.status, 0, "empty hash must block continuation");
 
+  const manifestHashFn = extractBashFunction(operator, "manifest_file_hash");
+  assert.doesNotMatch(
+    manifestHashFn,
+    /sys\.exit\(1 if len\(hits\)!=1 else 0\)\s*\nprint\(hits\[0\]\)/,
+    "manifest_file_hash must not exit before printing the single hit"
+  );
+  assert.match(
+    manifestHashFn,
+    /if len\(hits\)!=1:\s*\n\s*sys\.exit\(1\)\s*\nprint\(hits\[0\]\)/,
+    "manifest_file_hash must print after the exact-one-hit gate"
+  );
+
+  const hashProbeDir = mkdtempSync(path.join(tmpdir(), "stage5-manifest-hash-"));
+  const hashMockBin = mkdtempSync(path.join(tmpdir(), "stage5-manifest-hash-mock-"));
+  try {
+    const probePath = "ops/security-stage5/package-a/systemd/clover-api.service.d/20-hardening.conf";
+    const probeHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const otherHash = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    writeFileSync(
+      path.join(hashProbeDir, "manifest.json"),
+      JSON.stringify({
+        files: [
+          { path: probePath, sha256: probeHash },
+          { path: "ops/other.conf", sha256: otherHash },
+        ],
+      }),
+      "utf8"
+    );
+    const mockPy = path.join(hashMockBin, "python3.mjs");
+    writeFileSync(
+      mockPy,
+      `import { readFileSync } from "node:fs";
+const dashC = process.argv.indexOf("-c");
+const code = String(process.argv[dashC + 1] || "");
+const fileArg = process.argv[dashC + 2];
+const rel = process.argv[dashC + 3];
+if (!code.includes("hits") || !code.includes("sha256")) {
+  console.error("unexpected python3 payload");
+  process.exit(2);
+}
+const data = JSON.parse(readFileSync(fileArg, "utf8"));
+const hits = (data.files || []).filter((entry) => entry.path === rel).map((entry) => entry.sha256);
+if (hits.length !== 1) process.exit(1);
+if (code.includes("sys.exit(1 if len(hits)!=1 else 0)")) {
+  console.error("python payload still exits before print");
+  process.exit(3);
+}
+process.stdout.write(String(hits[0]) + "\\n");
+`
+    );
+    const artifactPosix = toPosix(hashProbeDir);
+    const mockPyPosix = toPosix(mockPy);
+    const single = runBashAllowFail(
+      `set -Eeuo pipefail
+       python3() { node '${mockPyPosix}' "$@"; }
+       export -f python3
+       ARTIFACT='${artifactPosix}'
+       ${manifestHashFn}
+       out=$(manifest_file_hash '${probePath}')
+       printf 'OUT=%s\\n' "$out"
+       [ -n "$out" ] || exit 2
+       [ "$out" = '${probeHash}' ] || exit 3
+      `
+    );
+    assert.equal(single.status, 0, `single match must succeed: ${single.stderr || single.stdout}`);
+    assert.match(single.stdout, new RegExp(`OUT=${probeHash}`));
+
+    const missing = runBashAllowFail(
+      `set -Eeuo pipefail
+       python3() { node '${mockPyPosix}' "$@"; }
+       export -f python3
+       ARTIFACT='${artifactPosix}'
+       ${manifestHashFn}
+       manifest_file_hash 'missing/path.conf'
+      `
+    );
+    assert.notEqual(missing.status, 0, "missing path must fail");
+    assert.equal((missing.stdout || "").trim(), "", "missing path must not print a hash");
+
+    writeFileSync(
+      path.join(hashProbeDir, "manifest.json"),
+      JSON.stringify({
+        files: [
+          { path: probePath, sha256: probeHash },
+          { path: probePath, sha256: otherHash },
+        ],
+      }),
+      "utf8"
+    );
+    const dup = runBashAllowFail(
+      `set -Eeuo pipefail
+       python3() { node '${mockPyPosix}' "$@"; }
+       export -f python3
+       ARTIFACT='${artifactPosix}'
+       ${manifestHashFn}
+       manifest_file_hash '${probePath}'
+      `
+    );
+    assert.notEqual(dup.status, 0, "duplicate path entries must fail");
+    assert.equal((dup.stdout || "").trim(), "", "duplicate path must not print a hash");
+  } finally {
+    rmSync(hashProbeDir, { recursive: true, force: true });
+    rmSync(hashMockBin, { recursive: true, force: true });
+  }
+
   const trapPrelude = `
 set -Eeuo pipefail
 EXIT_PROMOTE_FAIL=40
@@ -528,9 +633,9 @@ if (code.includes("releaseId")) {
 }
 if (code.includes("files")) {
   const data = JSON.parse(readFileSync(fileArg, "utf8"));
-  const hit = (data.files || []).find((entry) => entry.path === extra);
-  if (!hit) process.exit(1);
-  process.stdout.write(String(hit.sha256) + "\\n");
+  const hits = (data.files || []).filter((entry) => entry.path === extra).map((entry) => entry.sha256);
+  if (hits.length !== 1) process.exit(1);
+  process.stdout.write(String(hits[0]) + "\\n");
   process.exit(0);
 }
 if (code.includes("ui-")) {
