@@ -334,6 +334,10 @@ export function runSecurityStage5OperatorTests() {
   assert.doesNotMatch(operator, /while\s+true;/);
   assert.doesNotMatch(operator, /rm\s+-rf|pkill|kill\s+-9|\*\.conf/);
   assert.doesNotMatch(operator, /systemd-analyze[\s\S]{0,200}\|\|\s*true/);
+  assert.match(operator, /HEALTH_FAIL api attempts=\$tries/);
+  assert.match(operator, /HEALTH_FAIL ui attempts=\$tries/);
+  assert.match(operator, /HEALTH_FAIL nginx attempts=\$tries/);
+  assert.equal((operator.match(/tries=15/g) || []).length, 3);
   const analyzeVerify = operator.match(
     /systemd-analyze verify \\\n([\s\S]*?)\n\n  systemctl daemon-reload/
   );
@@ -860,6 +864,10 @@ exit 0
       path.join(mockBin, "curl"),
       `#!/usr/bin/env bash
 printf '%s\\n' "curl $*" >> "${toPosix(stateDir)}/commands.log"
+if [ -f "${toPosix(stateDir)}/curl.fail.once" ]; then
+  rm -f "${toPosix(stateDir)}/curl.fail.once"
+  exit 7
+fi
 out=""; url=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -926,6 +934,7 @@ case "$cmd" in
   restart)
     if [ "\${1:-}" = nginx.service ]; then echo MUST_NOT_RESTART_NGINX >&2; exit 1; fi
     if [ -f "$STATE/restart.fail" ]; then exit 1; fi
+    if [ -f "$STATE/health.race" ]; then touch "$STATE/curl.fail.once"; fi
     ;;
   reload) echo MUST_NOT_RELOAD >&2; exit 1 ;;
   daemon-reload)
@@ -1258,14 +1267,20 @@ fi
 
     resetHost();
     writeFileSync(path.join(stateDir, "analyze.fail"), "1");
+    writeFileSync(path.join(stateDir, "health.race"), "1");
     const blocked = runOperator(
       { ...cfg, recovery: toPosix(path.join(work, "recovery-analyze")) },
       {},
       { tty: true }
     );
     rmSync(path.join(stateDir, "analyze.fail"));
+    rmSync(path.join(stateDir, "health.race"));
     assert.equal(blocked.status, 40, `syntax-check failure must exit 40, got ${blocked.status}\n${blocked.stdout}\n${blocked.stderr}`);
-    assert.match(`${blocked.stdout}${blocked.stderr}`, /ROLLBACK: COMPLETED/);
+    assert.match(
+      `${blocked.stdout}${blocked.stderr}`,
+      /ROLLBACK: COMPLETED/,
+      "rollback health probes must tolerate the same restart race"
+    );
     assert.equal(readFileSync(path.join(destRoot, "etc/systemd/system/clover-api.service.d/20-hardening.conf"), "utf8"), "OLD-API\n");
     assert.equal(sha256File(umaskPath), umaskSha);
 
@@ -1330,6 +1345,29 @@ fi
       `replace ref must not change trusted bootstrap\n${replacePinned.stdout}\n${replacePinned.stderr}`
     );
     execFileSync("git", ["replace", "-d", honestOid], { cwd: fixtureRoot });
+
+    resetHost();
+    writeFileSync(path.join(stateDir, "health.race"), "1");
+    const healthRace = runOperator(
+      { ...cfg, recovery: toPosix(path.join(work, "recovery-health-race")) },
+      {},
+      { tty: true }
+    );
+    rmSync(path.join(stateDir, "health.race"));
+    assert.equal(
+      healthRace.status,
+      0,
+      `one refused connection after each restart must be retried\n${healthRace.stdout}\n${healthRace.stderr}`
+    );
+    const healthRaceCommands = readFileSync(path.join(stateDir, "commands.log"), "utf8");
+    assert.ok(
+      (healthRaceCommands.match(/curl .*4100\/api\/health/g) || []).length >= 3,
+      "API health must retry after a restart race"
+    );
+    assert.ok(
+      (healthRaceCommands.match(/curl .*5273\//g) || []).length >= 3,
+      "UI health must retry after a restart race"
+    );
 
     resetHost();
     const passed = runOperator(cfg, {}, { tty: true });
