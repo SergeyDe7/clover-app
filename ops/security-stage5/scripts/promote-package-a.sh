@@ -349,9 +349,20 @@ wait_active() {
 }
 
 api_health() {
-  local out="$RECOVERY/api-health.json"
-  curl -fsS --connect-timeout 2 --max-time 8 -o "$out" http://127.0.0.1:4100/api/health
-  python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding="utf-8")); sys.exit(0 if d.get("ok") is True else 1)' "$out"
+  local out="$RECOVERY/api-health.json" candidate="${RECOVERY}/api-health.try.json"
+  local tries=15 i
+  for i in $(seq 1 "$tries"); do
+    rm -f -- "$candidate"
+    if curl -fsS --connect-timeout 1 --max-time 2 -o "$candidate" http://127.0.0.1:4100/api/health &&
+      python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding="utf-8")); sys.exit(0 if d.get("ok") is True else 1)' "$candidate"; then
+      mv -f -- "$candidate" "$out"
+      return 0
+    fi
+    sleep 1
+  done
+  rm -f -- "$candidate"
+  log "HEALTH_FAIL api attempts=$tries"
+  return 1
 }
 
 capture_api_release() {
@@ -371,14 +382,36 @@ print(hashlib.sha256(text.encode("utf-8", "replace")).hexdigest())
 }
 
 ui_fetch() {
-  curl -fsS --connect-timeout 2 --max-time 8 -o "$1" http://127.0.0.1:5273/
+  local out="$1" candidate="${1}.try" tries=15 i
+  for i in $(seq 1 "$tries"); do
+    rm -f -- "$candidate"
+    if curl -fsS --connect-timeout 1 --max-time 2 -o "$candidate" http://127.0.0.1:5273/; then
+      mv -f -- "$candidate" "$out"
+      return 0
+    fi
+    sleep 1
+  done
+  rm -f -- "$candidate"
+  log "HEALTH_FAIL ui attempts=$tries"
+  return 1
 }
 
 ngx_health() {
-  local out="$RECOVERY/ngx-health.json"
-  curl -fsS --connect-timeout 3 --max-time 8 -k --resolve clover-spb.ru:443:127.0.0.1 \
-    -o "$out" https://clover-spb.ru/api/health
-  python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding="utf-8")); sys.exit(0 if d.get("ok") is True else 1)' "$out"
+  local out="$RECOVERY/ngx-health.json" candidate="${RECOVERY}/ngx-health.try.json"
+  local tries=15 i
+  for i in $(seq 1 "$tries"); do
+    rm -f -- "$candidate"
+    if curl -fsS --connect-timeout 1 --max-time 2 -k --resolve clover-spb.ru:443:127.0.0.1 \
+      -o "$candidate" https://clover-spb.ru/api/health &&
+      python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding="utf-8")); sys.exit(0 if d.get("ok") is True else 1)' "$candidate"; then
+      mv -f -- "$candidate" "$out"
+      return 0
+    fi
+    sleep 1
+  done
+  rm -f -- "$candidate"
+  log "HEALTH_FAIL nginx attempts=$tries"
+  return 1
 }
 
 release_lock() {
