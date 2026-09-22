@@ -645,6 +645,20 @@ operator to `root:root 0500` with `nlink=1`, and only then executes it. Literal
 external arguments are target SHA, uppercase manifest SHA-256, absolute
 artifact/recovery paths, and live SHA.
 
+Package D recovery must be a child of the dedicated
+`/opt/clover-security-recovery` directory. The bootstrap creates that parent
+directly below root-owned `/opt` and requires it to remain a real
+`root:root 0700` directory. Do not use `/opt/clover/recovery` for Package D;
+that shared path is writable by the deployment account and is not a trusted
+root execution boundary.
+
+The unprivileged launcher holds the shared
+`/opt/clover/deployments/deploy.lock` for the entire sudo child lifetime. The
+root operator never opens that user-writable path. It separately locks
+`/run/lock/clover-security-stage5/package-d.lock`, whose parent and file must
+be real root-owned objects with modes `0700` and `0600` respectively; the
+operator opens that file read/write without truncation.
+
 The root operator re-verifies the manifest and every artifact file against
 Git, snapshots the candidate firewall file into recovery, backs up the exact
 existing config, records API/UI/nginx PIDs, checks health, validates with
@@ -668,6 +682,7 @@ health gates. Exit `40` means rollback passed; exit `41` means rollback was
 incomplete.
 
 After PASS prove: existing and new SSH work; public HTTPS works; public TCP
-`4100/4117/4118/5293` is blocked; office-LAN `192.168.155.15:4100` remains
+`4100/4117/4118/5293` is blocked; the observed working-1C source
+`192.168.155.155:4100` remains
 reachable; API/UI/nginx PIDs and restart counters are unchanged. Do not call
 working 1C during Package D.
