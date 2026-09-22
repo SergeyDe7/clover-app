@@ -27,6 +27,8 @@ export const sourceFiles = Object.freeze([
   "ops/security-stage5/package-c/systemd/clover-ui.service.d/30-loopback.conf",
   "ops/security-stage5/package-c/nginx/clover-security-headers.conf",
   "ops/security-stage5/package-c/nginx/clover-spb.ru.conf",
+  "ops/security-stage5/scripts/promote-package-d.sh",
+  "ops/security-stage5/package-d/nftables/clover-perimeter.nft",
 ]);
 
 function fail(message) {
@@ -175,9 +177,9 @@ export function prepareArtifact({
         promotionGate: "pre-state-backup-nginx-test-and-external-smoke",
       },
       D: {
-        status: "BLOCKED",
-        scope: "firewall-api-bind",
-        blocker: "working-1C-source-IP-not-verified",
+        status: "PREPARED",
+        scope: "nftables-targeted-perimeter",
+        promotionGate: "working-1C-direct-source-192.168.155.155-observed-and-external-smoke",
       },
     },
     files,
@@ -211,8 +213,7 @@ export function verifyArtifact({
     fail("manifest target SHA does not match expected SHA");
   }
   if (manifest.auditBaselineSha !== auditBaselineSha) fail("unexpected audit baseline SHA");
-  if (manifest.packages?.D?.status !== "BLOCKED") fail("Package D must remain blocked");
-  for (const name of ["A", "B", "C"]) {
+  for (const name of ["A", "B", "C", "D"]) {
     if (manifest.packages?.[name]?.status !== "PREPARED") {
       fail(`Package ${name} must be PREPARED, not promotion-ready`);
     }

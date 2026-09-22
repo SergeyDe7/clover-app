@@ -55,6 +55,7 @@ const CHECK_FILES = [
   "scripts/securityStage5Artifact.mjs",
   "scripts/verify-security-stage5-prepare.mjs",
   "scripts/verify-security-stage5-operator.mjs",
+  "scripts/verify-security-stage5-package-d.mjs",
   "src/outboundResponse.js",
   "src/remoteImagePolicy.js",
   "src/pushSubscriptionOwnership.js",

@@ -339,7 +339,7 @@ export function runSecurityStage5OperatorTests() {
   assert.match(operator, /HEALTH_FAIL nginx attempts=\$tries/);
   assert.equal((operator.match(/tries=15/g) || []).length, 3);
   const analyzeVerify = operator.match(
-    /systemd-analyze verify \\\n([\s\S]*?)\n\n  systemctl daemon-reload/
+    /systemd-analyze verify \\\r?\n([\s\S]*?)\r?\n\r?\n  systemctl daemon-reload/
   );
   assert.ok(analyzeVerify, "systemd-analyze verify block must exist before daemon-reload");
   assert.match(analyzeVerify[1], /\/etc\/systemd\/system\/clover-api\.service/);

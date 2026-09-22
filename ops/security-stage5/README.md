@@ -76,11 +76,32 @@ The rejected production file
 `ba0a3c3e57d2bd01c94046dab81aded4e10c2df1566038b02a19be6c498a4f50` must never
 be executed.
 
-## Package D — perimeter (BLOCKED)
+## Package D — targeted perimeter
 
-No firewall or API-bind artifact is included. Package D remains blocked until
-the working 1C source IP and route are proven without changing polling,
-claim/ACK, credentials, retries, idempotency, or TEST/VLAVKA isolation.
+The refreshed read-only audit found an empty live nftables ruleset and no
+`/api/one-c` requests in the nginx access log. The working 1C route therefore
+must not be forced through nginx and the API must not be rebound to loopback.
+
+During a user-authorized empty-queue pull, passive socket observation recorded
+three direct connections to API `:4100` from `192.168.155.155`. No payload,
+credential, order, ACK, or 1C response body was captured. This proves the
+working route and places its observed source inside `192.168.155.0/24`.
+
+Package D keeps direct API access from the server loopback and the office LAN
+`192.168.155.0/24`, while dropping direct TCP `4100` from every other IPv4 or
+IPv6 source. TCP `4117`, `4118`, and `5293` are dropped outside loopback even
+if an abandoned test process reappears. SSH and public HTTP/HTTPS remain
+unchanged because the input-chain policy stays `accept` and no rule targets
+ports `22`, `80`, or `443`.
+
+Promotion is allowed only while the live ruleset is still empty, the existing
+`/etc/nftables.conf` matches its audited SHA/owner/mode, the nftables service is
+inactive and disabled, API/UI/nginx PIDs remain stable, and all local health
+gates pass. The source-controlled operator validates the candidate with
+`nft -c`, installs an exact Git/artifact snapshot, enables the existing
+`nftables.service`, and automatically restores the exact pre-state on failure.
+It does not call 1C or change credentials, polling, claim/ACK, retries,
+idempotency, TEST/VLAVKA isolation, the database, uploads, or application code.
 
 ## Exact PREPARE artifact
 
@@ -111,4 +132,8 @@ artifact. PREPARE is not permission to promote.
 - unexpected listener or changed 1C route;
 - artifact SHA or file hash mismatch.
 
-Package D has no rollback because it has no executable artifact yet.
+Package D rollback restores the exact previous `/etc/nftables.conf`, deletes
+only the package-owned `inet clover_stage5` table, returns `nftables.service`
+to disabled, and repeats API/UI/HTTPS health gates. External postchecks must prove
+public `22/80/443`, blocked public `4100/4117/4118/5293`, and allowed office-LAN
+`4100` before Stage 5 can close.
