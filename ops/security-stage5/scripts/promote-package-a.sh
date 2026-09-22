@@ -816,8 +816,7 @@ operator_main() {
   systemd-analyze verify \
     /etc/systemd/system/clover-api.service \
     /etc/systemd/system/clover-ui.service \
-    /etc/systemd/system/clover-audit-retention.timer \
-    "$DST_API" "$DST_UI" "$DST_TIMER"
+    /etc/systemd/system/clover-audit-retention.timer
 
   systemctl daemon-reload
   local new_tgt

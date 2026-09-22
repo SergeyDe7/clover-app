@@ -334,6 +334,18 @@ export function runSecurityStage5OperatorTests() {
   assert.doesNotMatch(operator, /while\s+true;/);
   assert.doesNotMatch(operator, /rm\s+-rf|pkill|kill\s+-9|\*\.conf/);
   assert.doesNotMatch(operator, /systemd-analyze[\s\S]{0,200}\|\|\s*true/);
+  const analyzeVerify = operator.match(
+    /systemd-analyze verify \\\n([\s\S]*?)\n\n  systemctl daemon-reload/
+  );
+  assert.ok(analyzeVerify, "systemd-analyze verify block must exist before daemon-reload");
+  assert.match(analyzeVerify[1], /\/etc\/systemd\/system\/clover-api\.service/);
+  assert.match(analyzeVerify[1], /\/etc\/systemd\/system\/clover-ui\.service/);
+  assert.match(analyzeVerify[1], /\/etc\/systemd\/system\/clover-audit-retention\.timer/);
+  assert.doesNotMatch(
+    analyzeVerify[1],
+    /\$DST_API|\$DST_UI|\$DST_TIMER|\.service\.d\/[^\s]+\.conf/,
+    "drop-in snippets must not be passed to systemd-analyze as standalone units"
+  );
   assert.doesNotMatch(operator, /\beval\b/);
   assert.match(rollback, /sudo \/bin\/bash -c '/);
   assert.match(rollback, /--no-replace-objects/);
@@ -830,6 +842,14 @@ exit 0
       path.join(mockBin, "systemd-analyze"),
       `#!/usr/bin/env bash
 printf '%s\\n' "systemd-analyze $*" >> "${toPosix(stateDir)}/commands.log"
+for arg in "$@"; do
+  case "$arg" in
+    *.service.d/*.conf)
+      echo "standalone drop-in rejected: $arg" >&2
+      exit 64
+      ;;
+  esac
+done
 if [ -f "${toPosix(stateDir)}/analyze.fail" ]; then echo ANALYZE_FAIL >&2; exit 1; fi
 if [ -f "${toPosix(stateDir)}/send.int" ]; then kill -INT "$PPID"; sleep 2; exit 0; fi
 if [ -f "${toPosix(stateDir)}/send.term" ]; then kill -TERM "$PPID"; sleep 2; exit 0; fi
