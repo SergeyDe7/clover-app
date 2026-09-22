@@ -49,11 +49,25 @@ for (const unit of ["clover-api", "clover-ui"]) {
     "RestrictNamespaces=true",
     "CapabilityBoundingSet=",
     "AmbientCapabilities=",
-    "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6",
   ]) {
     assert.ok(hardening.includes(required), `${unit} missing ${required}`);
   }
 }
+
+const apiHardening = read(
+  "ops/security-stage5/package-a/systemd/clover-api.service.d/20-hardening.conf"
+);
+const uiHardening = read(
+  "ops/security-stage5/package-a/systemd/clover-ui.service.d/20-hardening.conf"
+);
+const addressFamilyDirectives = (hardening) =>
+  hardening.match(/^RestrictAddressFamilies=.*$/gm) || [];
+assert.deepEqual(addressFamilyDirectives(apiHardening), [
+  "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6",
+]);
+assert.deepEqual(addressFamilyDirectives(uiHardening), [
+  "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK",
+]);
 
 const ssh = read("ops/security-stage5/package-b/sshd/50-clover-security.conf");
 assert.match(ssh, /^PermitRootLogin no$/m);
