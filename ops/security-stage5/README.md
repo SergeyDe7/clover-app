@@ -94,6 +94,11 @@ if an abandoned test process reappears. SSH and public HTTP/HTTPS remain
 unchanged because the input-chain policy stays `accept` and no rule targets
 ports `22`, `80`, or `443`.
 
+Its root-owned operator and rollback evidence live only below the dedicated
+`/opt/clover-security-recovery` (`root:root 0700`) trust root. The shared
+`/opt/clover/recovery` directory is not used for Package D because it is
+writable by the deployment account.
+
 Promotion is allowed only while the live ruleset is still empty, the existing
 `/etc/nftables.conf` matches its audited SHA/owner/mode, the nftables service is
 inactive and disabled, API/UI/nginx PIDs remain stable, and all local health

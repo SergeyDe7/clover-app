@@ -6,7 +6,9 @@ readonly OPERATOR_REL="ops/security-stage5/scripts/promote-package-d.sh"
 readonly PAYLOAD_REL="ops/security-stage5/package-d/nftables/clover-perimeter.nft"
 readonly VERIFIER_REL="server/scripts/securityStage5Artifact.mjs"
 readonly DEFAULT_ROOT="/opt/clover/clover-app"
-readonly DEFAULT_LOCK="/opt/clover/deployments/deploy.lock"
+readonly LOCK_ROOT="/run/lock/clover-security-stage5"
+readonly DEFAULT_LOCK="$LOCK_ROOT/package-d.lock"
+readonly RECOVERY_ROOT="/opt/clover-security-recovery"
 readonly DESTINATION="/etc/nftables.conf"
 readonly PRECONFIG_SHA256="60dac93ffe0ea440fc4a8941a080b6fb8d2c8655d47baf856e97182a0d1ca29a"
 
@@ -72,10 +74,24 @@ require_root_file() {
 }
 
 require_trusted_recovery() {
-  case "$RECOVERY" in /opt/clover/recovery/security-stage5-package-d-*) ;; *) fail "unexpected recovery path" ;; esac
+  [ -d "$RECOVERY_ROOT" ] && [ ! -L "$RECOVERY_ROOT" ] || fail "unsafe recovery root"
+  [ "$(stat -c %u:%g -- "$RECOVERY_ROOT")" = "0:0" ] || fail "recovery root owner"
+  [ "$(stat -c %a -- "$RECOVERY_ROOT")" = "700" ] || fail "recovery root mode"
+  case "$RECOVERY" in "$RECOVERY_ROOT"/security-stage5-package-d-*) ;; *) fail "unexpected recovery path" ;; esac
   [ -d "$RECOVERY" ] && [ ! -L "$RECOVERY" ] || fail "unsafe recovery directory"
   [ "$(stat -c %u:%g -- "$RECOVERY")" = "0:0" ] || fail "recovery owner"
   [ "$(stat -c %a -- "$RECOVERY")" = "700" ] || fail "recovery mode"
+}
+
+require_trusted_lock() {
+  [ "$LOCK" = "$DEFAULT_LOCK" ] || fail "unexpected lock path"
+  [ -d "$LOCK_ROOT" ] && [ ! -L "$LOCK_ROOT" ] || fail "unsafe lock root"
+  [ "$(stat -c %u:%g -- "$LOCK_ROOT")" = "0:0" ] || fail "lock root owner"
+  [ "$(stat -c %a -- "$LOCK_ROOT")" = "700" ] || fail "lock root mode"
+  [ -f "$LOCK" ] && [ ! -L "$LOCK" ] || fail "unsafe lock file"
+  [ "$(stat -c %u:%g -- "$LOCK")" = "0:0" ] || fail "lock owner"
+  [ "$(stat -c %a -- "$LOCK")" = "600" ] || fail "lock mode"
+  [ "$(stat -c %h -- "$LOCK")" = "1" ] || fail "lock nlink"
 }
 
 require_trusted_self() {
@@ -206,8 +222,9 @@ case "$LOCK" in /*) ;; *) fail "lock must be absolute"; exit 2 ;; esac
 [ -d "$ARTIFACT" ] && [ ! -L "$ARTIFACT" ] || { fail "unsafe artifact"; exit 2; }
 require_trusted_recovery
 require_trusted_self
+require_trusted_lock
 
-exec 9>"$LOCK"
+exec 9<>"$LOCK"
 flock -n 9 || { fail "deploy lock busy"; exit 3; }
 printf '%s\n' LOCK_HELD
 

@@ -47,6 +47,17 @@ for (const token of [
   assert.ok(operator.includes(token), `missing operator gate: ${token}`);
 }
 
+assert.match(operator, /readonly RECOVERY_ROOT="\/opt\/clover-security-recovery"/);
+assert.match(operator, /recovery root owner/);
+assert.match(operator, /recovery root mode/);
+assert.doesNotMatch(operator, /\/opt\/clover\/recovery\/security-stage5-package-d-/);
+assert.match(operator, /readonly LOCK_ROOT="\/run\/lock\/clover-security-stage5"/);
+assert.match(operator, /readonly DEFAULT_LOCK="\$LOCK_ROOT\/package-d\.lock"/);
+assert.match(operator, /require_trusted_lock/);
+assert.match(operator, /exec 9<>"\$LOCK"/);
+assert.doesNotMatch(operator, /exec 9>"\$LOCK"/);
+assert.doesNotMatch(operator, /DEFAULT_LOCK="\/opt\/clover\/deployments\/deploy\.lock"/);
+
 const changeIndex = operator.indexOf("CHANGED=1");
 assert.ok(changeIndex > operator.indexOf("nft -c -f"));
 assert.ok(changeIndex > operator.indexOf("nftables.conf.sha256"));
@@ -94,5 +105,9 @@ for (const port of [4117, 4118, 5293]) {
 for (const port of [22, 80, 443]) {
   assert.equal(inputDecision({ family: 4, source: "203.0.113.5", port }), "accept");
 }
+
+const runbook = read("ops/security-stage5/PROMOTE_ROLLBACK.md");
+assert.match(runbook, /192\.168\.155\.155:4100/);
+assert.doesNotMatch(runbook, /192\.168\.155\.15:4100/);
 
 console.log("SECURITY_STAGE5_PACKAGE_D:PASS");
