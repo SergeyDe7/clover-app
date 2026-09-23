@@ -22,6 +22,11 @@ const CODE_HEADERS = [
   "code",
 ];
 
+export const MATRIX_EXCEL_MAX_FILE_BYTES = 5 * 1024 * 1024;
+export const MATRIX_EXCEL_MAX_ROWS = 10_000;
+export const MATRIX_EXCEL_MAX_COLUMNS = 128;
+export const MATRIX_EXCEL_MAX_CELLS = 250_000;
+
 function normalizeHeader(value) {
   return String(value ?? "")
     .trim()
@@ -52,7 +57,20 @@ export async function parseMatrixExcelFile(file) {
     throw new Error("Файл не выбран.");
   }
 
+  if (Number(file.size) > MATRIX_EXCEL_MAX_FILE_BYTES) {
+    throw codedError(
+      "EXCEL_FILE_TOO_LARGE",
+      "Файл слишком большой. Максимальный размер — 5 МБ."
+    );
+  }
+
   const buffer = await file.arrayBuffer();
+  if (buffer.byteLength > MATRIX_EXCEL_MAX_FILE_BYTES) {
+    throw codedError(
+      "EXCEL_FILE_TOO_LARGE",
+      "Файл слишком большой. Максимальный размер — 5 МБ."
+    );
+  }
   const workbook = XLSX.read(buffer, { type: "array" });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) {
@@ -60,6 +78,27 @@ export async function parseMatrixExcelFile(file) {
   }
 
   const sheet = workbook.Sheets[sheetName];
+  const sheetRef = String(sheet?.["!ref"] || "").trim();
+  if (sheetRef) {
+    let range;
+    try {
+      range = XLSX.utils.decode_range(sheetRef);
+    } catch {
+      throw codedError("EXCEL_RANGE_INVALID", "В файле указан некорректный диапазон листа.");
+    }
+    const rangeRows = range.e.r - range.s.r + 1;
+    const rangeColumns = range.e.c - range.s.c + 1;
+    if (
+      rangeRows > MATRIX_EXCEL_MAX_ROWS + 1 ||
+      rangeColumns > MATRIX_EXCEL_MAX_COLUMNS ||
+      rangeRows * rangeColumns > MATRIX_EXCEL_MAX_CELLS
+    ) {
+      throw codedError(
+        "EXCEL_RANGE_TOO_LARGE",
+        "Диапазон листа слишком большой для безопасного импорта."
+      );
+    }
+  }
   const matrix = XLSX.utils.sheet_to_json(sheet, {
     header: 1,
     defval: "",
@@ -84,6 +123,13 @@ export async function parseMatrixExcelFile(file) {
   } else {
     nameIdx = 0;
     codeIdx = rows[0].length > 1 ? 1 : -1;
+  }
+
+  if (dataRows.length > MATRIX_EXCEL_MAX_ROWS) {
+    throw codedError(
+      "EXCEL_TOO_MANY_ROWS",
+      "В файле слишком много строк. Максимум — 10 000 позиций."
+    );
   }
 
   const parsed = [];

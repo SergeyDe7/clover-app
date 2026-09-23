@@ -24,6 +24,53 @@ export function publicMailStatus() {
   };
 }
 
+const MAILBOX_PATTERN = /^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i;
+
+function hasMailControlCharacters(value) {
+  return [...String(value)].some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 0x1f || code === 0x7f;
+  });
+}
+
+export function normalizeMailRecipients(value) {
+  const recipients = String(value || "")
+    .split(",")
+    .map((recipient) => recipient.trim())
+    .filter(Boolean);
+
+  if (!recipients.length || recipients.length > 20) {
+    throw new Error("MAIL_RECIPIENTS_INVALID");
+  }
+  for (const recipient of recipients) {
+    if (recipient.length > 200 || !MAILBOX_PATTERN.test(recipient)) {
+      throw new Error("MAIL_RECIPIENT_INVALID");
+    }
+  }
+  return recipients.join(", ");
+}
+
+export function normalizeMailAttachments(value = []) {
+  if (!Array.isArray(value) || value.length > 5) {
+    throw new Error("MAIL_ATTACHMENTS_INVALID");
+  }
+  return value.map((attachment) => {
+    const filename = String(attachment?.filename || "").trim();
+    const contentType = String(attachment?.contentType || "application/octet-stream").trim();
+    if (
+      !filename ||
+      filename.length > 200 ||
+      hasMailControlCharacters(filename) ||
+      !Buffer.isBuffer(attachment?.content) ||
+      attachment.content.length > 20 * 1024 * 1024 ||
+      !/^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/iu.test(contentType)
+    ) {
+      throw new Error("MAIL_ATTACHMENT_INVALID");
+    }
+    return { filename, content: attachment.content, contentType };
+  });
+}
+
 export async function sendCloverMail({ to, subject, text, html, attachments = [] }) {
   const config = smtpConfig();
   if (!config.configured) {
@@ -46,11 +93,13 @@ export async function sendCloverMail({ to, subject, text, html, attachments = []
 
   const info = await transporter.sendMail({
     from: config.from,
-    to,
+    to: normalizeMailRecipients(to),
     subject,
     text,
     html,
-    attachments,
+    attachments: normalizeMailAttachments(attachments),
+    disableFileAccess: true,
+    disableUrlAccess: true,
   });
 
   return {
@@ -61,10 +110,12 @@ export async function sendCloverMail({ to, subject, text, html, attachments = []
 
 export function verificationEmail({ companyName, verifyUrl }) {
   const safeCompany = String(companyName || "клиент");
+  const safeCompanyHtml = escapeMailHtml(safeCompany);
+  const safeVerifyUrl = escapeMailHtml(verifyUrl);
   return {
     subject: "Подтверждение регистрации в Clover",
     text: `Здравствуйте! Подтвердите регистрацию компании «${safeCompany}» в Clover: ${verifyUrl}\n\nСсылка действует 24 часа.`,
-    html: `<p>Здравствуйте!</p><p>Подтвердите регистрацию компании <strong>«${safeCompany}»</strong> в Clover.</p><p><a href="${verifyUrl}">Подтвердить электронную почту</a></p><p>Ссылка действует 24 часа.</p>`,
+    html: `<p>Здравствуйте!</p><p>Подтвердите регистрацию компании <strong>«${safeCompanyHtml}»</strong> в Clover.</p><p><a href="${safeVerifyUrl}">Подтвердить электронную почту</a></p><p>Ссылка действует 24 часа.</p>`,
   };
 }
 
@@ -81,10 +132,14 @@ export function reconciliationReadyEmail({ companyName = "", period = "" } = {})
   const periodText = String(period || "").trim();
   const greeting = company ? ` для компании «${company}»` : "";
   const suffix = periodText ? ` (${periodText})` : "";
+  const htmlGreeting = company
+    ? ` для компании «${escapeMailHtml(company)}»`
+    : "";
+  const htmlSuffix = periodText ? ` (${escapeMailHtml(periodText)})` : "";
   return {
     subject: `Акт сверки Clover${suffix}`,
     text: `Акт сверки${greeting}${suffix} готов. PDF-файл прикреплён к письму и доступен в личном кабинете Clover.`,
-    html: `<p>Акт сверки${greeting}${suffix} готов.</p><p>PDF-файл прикреплён к письму и также доступен в личном кабинете Clover.</p>`,
+    html: `<p>Акт сверки${htmlGreeting}${htmlSuffix} готов.</p><p>PDF-файл прикреплён к письму и также доступен в личном кабинете Clover.</p>`,
   };
 }
 
