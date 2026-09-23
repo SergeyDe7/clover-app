@@ -701,7 +701,9 @@ try {
     const head = parseHead(await response.text());
     assert.deepEqual(head.robots, ["noindex,follow"], noindexPath);
     assert.equal(head.alternates.length, 0, noindexPath);
-    assert.deepEqual(head.canonical, [`https://clover-spb.ru${noindexPath}`]);
+    // The bare install guide is the Russian alias after install-page localization.
+    const canonicalPath = noindexPath === "/install-app" ? "/ru/install-app" : noindexPath;
+    assert.deepEqual(head.canonical, [`https://clover-spb.ru${canonicalPath}`], noindexPath);
   }
   const facet = await request(
     "/en/catalog/%D0%9E%D0%B4%D0%BD%D0%BE%D1%80%D0%B0%D0%B7%D0%BE%D0%B2%D0%B0%D1%8F%20%D0%BF%D0%BE%D1%81%D1%83%D0%B4%D0%B0/%D0%A1%D1%82%D0%B0%D0%BA%D0%B0%D0%BD%D1%8B/facet"
@@ -727,7 +729,7 @@ try {
   assert.equal(redirect.headers.get("location"), "/en/catalog?utm_source=test");
 
   const assetName = readFileSync(path.join(outDir, "index.html"), "utf8").match(
-    /src="(\/assets\/index-[^"]+\.js)"/
+    /src="(\/assets\/(?:[^/"<>]+\/)*index-[^/"<>]+\.js)"/
   )?.[1];
   assert.ok(assetName);
   assert.equal((await request(assetName)).status, 200);
@@ -750,7 +752,7 @@ assert.match(sw, /Never cache API \/ uploads/);
 assert.match(sw, /fetch\(request, \{ cache: "no-store" \}\)/);
 const navigationCacheBlock =
   sw.match(
-    /if \(isNavigationRequest\(request, path\)\) \{([\s\S]*?)\/\/ Hashed build assets/
+    /if \(isNavigationRequest\(request, path\)\) \{([\s\S]*?)if \(isHashedAsset\(path\)\)/
   )?.[1] || "";
 assert.ok(navigationCacheBlock);
 assert.doesNotMatch(navigationCacheBlock, /cache\.put\(/);
