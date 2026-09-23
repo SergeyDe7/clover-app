@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
@@ -8064,7 +8065,7 @@ app.post(
             ...message,
             attachments: [{
               filename: request.fileName || "Акт-сверки.pdf",
-              path: req.file.path,
+              content: await readFile(req.file.path),
               contentType: "application/pdf",
             }],
           });
