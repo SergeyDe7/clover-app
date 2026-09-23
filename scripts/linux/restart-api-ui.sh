@@ -20,6 +20,8 @@
 #   CLOVER_DEPLOY_ORIGIN_BASE, CLOVER_DEPLOY_NGINX_UI, CLOVER_DEPLOY_NGINX_RESOLVE
 #   CLOVER_DEPLOY_CANONICAL_HOST, CLOVER_DEPLOY_TLS_CA, CLOVER_DEPLOY_PROBE_JS
 #   CLOVER_DEPLOY_DB_PATH, CLOVER_DEPLOY_NODE_MODULES, CLOVER_DEPLOY_SERVER_NODE_MODULES
+#   CLOVER_DEPLOY_SEO_GATE_JS from target-pinned launcher; the one-release SEO
+#     HTTP gate is mandatory when upgrading the exact pre-SEO baseline below
 #   CLOVER_DEPLOY_DRY_RUN=1  — resolve/validate only; never mutate live source/dist/services
 #
 # First deploy of this SHA while live still has the previous script:
@@ -50,6 +52,10 @@ DRY_RUN="${CLOVER_DEPLOY_DRY_RUN:-0}"
 API_UNIT="${CLOVER_DEPLOY_API_UNIT:-clover-api.service}"
 UI_UNIT="${CLOVER_DEPLOY_UI_UNIT:-clover-ui.service}"
 PROBE_JS=""
+SEO_GATE_JS="${CLOVER_DEPLOY_SEO_GATE_JS:-${ROOT}/server/scripts/seoPostCutoverProbe.mjs}"
+SEO_BASELINE_SHA="21259c768b3dbf2de17da9a0b676f571380c6a1b"
+SEO_FEATURE_SHA="a952974bd5126d4000ed6d0fda1d696bfca49b36"
+SEO_GATE_ACTIVE=0
 PREPARED_JS=""
 METRIKA_ASSERT_JS=""
 EXPECT_METRIKA=""
@@ -428,6 +434,10 @@ rollback_release() {
 
   if [[ "${rollback_ok}" -eq 1 ]]; then
     if wait_for_health; then
+      if [[ "${SEO_GATE_ACTIVE}" == "1" ]] && ! check_seo_routes "rolled-back"; then
+        echo "CRITICAL: rollback SEO routes did not return to baseline" >&2
+        critical "rollback browser-route checks failed after cutover (${why})"
+      fi
       echo "Rollback restored previous release (${PREV_SHA})." >&2
       cleanup_temp
       exit 1
@@ -435,6 +445,24 @@ rollback_release() {
     echo "CRITICAL: rollback health checks failed" >&2
   fi
   critical "rollback failed after cutover (${why})"
+}
+
+check_seo_routes() {
+  local mode="$1" resolve_spec
+  [[ "${SEO_GATE_ACTIVE}" == "1" ]] || return 0
+  [[ -f "${SEO_GATE_JS}" ]] || return 1
+  resolve_spec="$(nginx_resolve_spec || true)"
+  local -a args=(
+    --mode "${mode}"
+    --origin "${ORIGIN_BASE}"
+    --nginx "${NGINX_UI}"
+    --nginx-resolve "${resolve_spec}"
+    --curl "${CURL_BIN}"
+  )
+  if [[ -n "${CLOVER_DEPLOY_TLS_CA:-}" ]]; then
+    args+=(--cacert "${CLOVER_DEPLOY_TLS_CA}")
+  fi
+  node "${SEO_GATE_JS}" "${args[@]}"
 }
 
 [[ -d "${ROOT}/.git" || -f "${ROOT}/.git" ]] || die "ROOT is not a git checkout: ${ROOT}"
@@ -470,12 +498,28 @@ fi
 
 PREV_SHA="$("${GIT_BIN}" -C "${ROOT}" rev-parse HEAD)"
 BASELINE_SHA="${PREV_SHA}"
+"${GIT_BIN}" -C "${ROOT}" cat-file -e "${SEO_BASELINE_SHA}^{commit}" 2>/dev/null \
+  || die "SEO baseline object ${SEO_BASELINE_SHA} missing; refusing cutover"
+"${GIT_BIN}" -C "${ROOT}" cat-file -e "${SEO_FEATURE_SHA}^{commit}" 2>/dev/null \
+  || die "SEO feature object ${SEO_FEATURE_SHA} missing; refusing cutover"
+if [[ "${PREV_SHA}" == "${SEO_BASELINE_SHA}" ]]; then
+  SEO_GATE_ACTIVE=1
+elif "${GIT_BIN}" -C "${ROOT}" merge-base --is-ancestor "${SEO_FEATURE_SHA}" "${PREV_SHA}"; then
+  # This baseline already contains PR #159 redirects; its rollback keeps them.
+  SEO_GATE_ACTIVE=0
+else
+  die "SEO rollout requires baseline ${SEO_BASELINE_SHA} or a later SEO-enabled release; observed ${PREV_SHA}"
+fi
 assert_target_fast_forward() {
   if ! "${GIT_BIN}" -C "${ROOT}" cat-file -e "${TARGET_SHA}^{commit}"; then
     die "target SHA not present in ROOT repo: ${TARGET_SHA}"
   fi
   if ! "${GIT_BIN}" -C "${ROOT}" merge-base --is-ancestor "${PREV_SHA}" "${TARGET_SHA}"; then
     die "target is not a fast-forward descendant of current production SHA (${PREV_SHA})"
+  fi
+  if [[ "${SEO_GATE_ACTIVE}" == "1" ]] &&
+    ! "${GIT_BIN}" -C "${ROOT}" merge-base --is-ancestor "${SEO_FEATURE_SHA}" "${TARGET_SHA}"; then
+    die "target does not contain SEO feature commit ${SEO_FEATURE_SHA}; refusing cutover"
   fi
 }
 if [[ "${DEPLOY_MODE}" != "promote" ]]; then
@@ -515,6 +559,9 @@ else
   BUILD_WT="${STAGING_ROOT}/src-${TARGET_SHA}-$$"
   rm -rf "${STAGED_DIST}" "${BUILD_WT}"
   mkdir -p "${STAGED_DIST}"
+fi
+if [[ "${SEO_GATE_ACTIVE}" == "1" && ! -f "${SEO_GATE_JS}" ]]; then
+  die "SEO post-cutover probe missing; refusing cutover"
 fi
 
 echo "Recording previous release: ${PREV_SHA}"
@@ -802,6 +849,22 @@ if [[ -z "${LIVE_TAG}" || "${LIVE_TAG}" != "${BUILD_TAG}" ]]; then
 fi
 if [[ -z "${LIVE_JS}" || "${LIVE_JS}" != "${MAIN_JS}" ]]; then
   rollback_release "live bundle mismatch (expected ${MAIN_JS}, got ${LIVE_JS:-empty})"
+fi
+
+# This probe is inside the existing deploy lock and rollback transaction.
+check_seo_routes "promoted" || rollback_release "post-cutover SEO route check failed"
+
+if [[ "${SEO_GATE_ACTIVE}" == "1" && "${DEPLOY_MODE}" == "promote" ]]; then
+  # A one-time receipt binds any later post-success recovery to this exact
+  # baseline, target, and prepared artifact; future releases cannot reuse it.
+  SEO_RECEIPT="${STAGING_ROOT}/seo-cutover-${TARGET_SHA}.receipt"
+  SEO_RECEIPT_TMP="${SEO_RECEIPT}.tmp.$$"
+  SEO_MANIFEST_SHA="$(sha256sum <"${PREPARED_PATH}/manifest.json" | awk '{print $1}')" \
+    || rollback_release "could not hash prepared SEO manifest"
+  printf '%s\n' "seo-cutover-v1" "${SEO_BASELINE_SHA}" "${TARGET_SHA}" "${SEO_MANIFEST_SHA}" >"${SEO_RECEIPT_TMP}" \
+    || rollback_release "could not write SEO recovery receipt"
+  chmod 600 "${SEO_RECEIPT_TMP}" || rollback_release "could not protect SEO recovery receipt"
+  mv -f "${SEO_RECEIPT_TMP}" "${SEO_RECEIPT}" || rollback_release "could not pin SEO recovery receipt"
 fi
 
 # Bounded LKG: keep only one previous dist snapshot.
