@@ -13,7 +13,7 @@
     "test:onec": "node scripts/run-package-scripts.mjs test:onec",
     "apply:onec-links": "node scripts/apply-onec-links.mjs",
     "test:v18": "node scripts/verify-v18.mjs",
-    "test:all": "npm run check && npm run test:onec && npm run test:v18 && npm run test:runtime && npm run test:manager-notifications && npm run test:manager-tabs && npm run test:order-trash && npm run test:security-stage3-package1 && npm run test:security-stage3-package2 && npm run test:security-stage3-package3 && npm run test:security-stage4-package-a && npm run test:security-stage4-package-b && npm run test:security-stage4-package-c && npm run test:security-stage5-prepare && npm run test:security-stage5-package-d && npm run test:iphone-boot-splash",
+    "test:all": "npm run check && npm run test:onec && npm run test:v18 && npm run test:runtime && npm run test:manager-notifications && npm run test:manager-tabs && npm run test:order-trash && npm run test:security-stage3-package1 && npm run test:security-stage3-package2 && npm run test:security-stage3-package3 && npm run test:security-stage4-package-a && npm run test:security-stage4-package-b && npm run test:security-stage4-package-c && npm run test:security-stage5-prepare && npm run test:security-stage5-package-d && npm run test:security-stage6 && npm run test:iphone-boot-splash",
     "test:runtime": "node scripts/verify-runtime-integrations.mjs",
     "test:manager-notifications": "node scripts/verify-manager-notifications.mjs",
     "test:manager-tabs": "node scripts/verify-manager-tabs-smoke.mjs",
@@ -28,6 +28,8 @@
     "test:security-stage4-package-c": "node scripts/verify-security-stage4-package-c.mjs",
     "test:security-stage5-prepare": "node scripts/verify-security-stage5-prepare.mjs",
     "test:security-stage5-package-d": "node scripts/verify-security-stage5-package-d.mjs",
+    "test:security-stage6": "node scripts/verify-security-stage6.mjs",
+    "prepare:security-stage6": "node scripts/securityStage6Artifact.mjs prepare",
     "test:iphone-boot-splash": "node scripts/verify-iphone-boot-splash.mjs"
   },
   "dependencies": {
