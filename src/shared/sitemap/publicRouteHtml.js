@@ -10,6 +10,12 @@ import {
   stripPublicLocalePrefix,
 } from "../i18n/publicLocaleRouting.js";
 
+// Only obsolete, confirmed 404 slugs. Valid unprefixed routes still render 200.
+const legacyCategoryTargets = new Map([
+  ["/catalog/odnorazovaya-posuda/dlya-sushi-i-lapshi", publicPathForLocale("/catalog/Одноразовая посуда/Для суши и лапши", "ru")],
+  ["/catalog/himiya-chistyashchie-sredstva/dlya-okon", publicPathForLocale("/catalog/Химия, чистящие средства/Для окон", "ru")],
+]);
+
 function escapeHtml(value) {
   return String(value || "")
     .replaceAll("&", "&amp;")
@@ -147,6 +153,14 @@ export function resolvePublicRouteRequest(manifest, rawUrl) {
 
   const record = lookupPublicRouteRecord(manifest, url.pathname, parsed);
   if (!record) {
+    const legacyTarget = legacyCategoryTargets.get(url.pathname);
+    if (
+      legacyTarget &&
+      (manifest.enabledLanguages || []).includes("ru") &&
+      manifest.routes?.[legacyTarget]
+    ) {
+      return { action: "redirect", status: 301, location: `${legacyTarget}${url.search}` };
+    }
     const noindex = describeNoindexPublicRoute(parsed.pathname, parsed.locale);
     if (noindex?.ok) {
       const locale = parsed.locale || DEFAULT_LOCALE;
