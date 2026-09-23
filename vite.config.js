@@ -295,6 +295,8 @@ export default defineConfig({
     strictPort: true,
     proxy,
     allowedHosts,
-    cors: true,
+    // Production preview is loopback-only behind nginx (Stage 5 Package C).
+    // Public UI files do not need a wildcard cross-origin read grant.
+    cors: false,
   },
 });
