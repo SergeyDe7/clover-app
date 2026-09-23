@@ -175,16 +175,28 @@ self.addEventListener("pushsubscriptionchange", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = new URL(event.notification.data?.url || "/lk/", self.location.origin).href;
+  let target = new URL("/lk/", self.location.origin);
+  try {
+    const requested = new URL(event.notification.data?.url || "/lk/", self.location.origin);
+    if (requested.origin === self.location.origin) target = requested;
+  } catch {
+    // Invalid or cross-origin notification targets fall back to the cabinet.
+  }
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windows) => {
       for (const client of windows) {
         if ("focus" in client) {
-          client.navigate(target);
+          if ("navigate" in client) {
+            try {
+              await client.navigate(target.href);
+            } catch {
+              // Keep the existing Clover window usable when navigation is rejected.
+            }
+          }
           return client.focus();
         }
       }
-      return clients.openWindow ? clients.openWindow(target) : undefined;
+      return clients.openWindow ? clients.openWindow(target.href) : undefined;
     })
   );
 });

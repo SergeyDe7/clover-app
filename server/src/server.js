@@ -516,16 +516,27 @@ function allowedCorsOrigin(origin) {
       const got = new URL(origin);
       const cfgHost = cfg.hostname.replace(/^www\./i, "").toLowerCase();
       const gotHost = got.hostname.replace(/^www\./i, "").toLowerCase();
-      if (cfgHost && cfgHost === gotHost && cfg.protocol === got.protocol) return true;
+      if (
+        cfgHost &&
+        cfgHost === gotHost &&
+        cfg.protocol === got.protocol &&
+        cfg.port === got.port
+      ) return true;
     } catch {
       /* ignore */
     }
   }
   try {
     const url = new URL(origin);
+    const configuredLanPolicy = String(process.env.ALLOW_LAN_ORIGINS || "")
+      .trim()
+      .toLowerCase();
+    const allowLanOrigins = configuredLanPolicy === "true";
     if (url.port !== "5273") return false;
-    if (["localhost", "127.0.0.1", "::1"].includes(url.hostname)) return true;
-    return String(process.env.ALLOW_LAN_ORIGINS || "true") === "true" &&
+    if (["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
+      return allowLanOrigins;
+    }
+    return allowLanOrigins &&
       (/^192\.168\./.test(url.hostname) || /^10\./.test(url.hostname) || /^172\.(1[6-9]|2\d|3[01])\./.test(url.hostname));
   } catch {
     return false;
@@ -536,10 +547,20 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(cors({
   origin(origin, callback) {
     const allowed = allowedCorsOrigin(origin);
-    callback(allowed ? null : new Error("CORS origin is not allowed."), allowed);
+    callback(null, allowed);
   },
   credentials: false,
 }));
+
+function privateApiNoStoreMiddleware(req, res, next) {
+  const pathname = String(req.path || "");
+  if (/^\/api(?:\/|$)/i.test(pathname) && !/^\/api\/public(?:\/|$)/i.test(pathname)) {
+    setNoStore(res);
+  }
+  next();
+}
+
+app.use(privateApiNoStoreMiddleware);
 // SEO-002: allow crawlers to fetch /api/public/* for storefront JS rendering,
 // but keep JSON out of the index.
 app.use("/api/public", (req, res, next) => {
