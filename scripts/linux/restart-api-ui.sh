@@ -854,6 +854,19 @@ fi
 # This probe is inside the existing deploy lock and rollback transaction.
 check_seo_routes "promoted" || rollback_release "post-cutover SEO route check failed"
 
+if [[ "${SEO_GATE_ACTIVE}" == "1" && "${DEPLOY_MODE}" == "promote" ]]; then
+  # A one-time receipt binds any later post-success recovery to this exact
+  # baseline, target, and prepared artifact; future releases cannot reuse it.
+  SEO_RECEIPT="${STAGING_ROOT}/seo-cutover-${TARGET_SHA}.receipt"
+  SEO_RECEIPT_TMP="${SEO_RECEIPT}.tmp.$$"
+  SEO_MANIFEST_SHA="$(sha256sum <"${PREPARED_PATH}/manifest.json" | awk '{print $1}')" \
+    || rollback_release "could not hash prepared SEO manifest"
+  printf '%s\n' "seo-cutover-v1" "${SEO_BASELINE_SHA}" "${TARGET_SHA}" "${SEO_MANIFEST_SHA}" >"${SEO_RECEIPT_TMP}" \
+    || rollback_release "could not write SEO recovery receipt"
+  chmod 600 "${SEO_RECEIPT_TMP}" || rollback_release "could not protect SEO recovery receipt"
+  mv -f "${SEO_RECEIPT_TMP}" "${SEO_RECEIPT}" || rollback_release "could not pin SEO recovery receipt"
+fi
+
 # Bounded LKG: keep only one previous dist snapshot.
 # LKG_ROOT/dist already holds pre-cutover snapshot; leave it until next deploy overwrites.
 

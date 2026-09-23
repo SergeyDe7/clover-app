@@ -7,6 +7,7 @@
  * no-live-build, no-unsafe-process-kill.
  */
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   chmodSync,
   cpSync,
@@ -27,9 +28,11 @@ import { parseCurlHeaders } from "./seoPostCutoverProbe.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const workRoot = path.resolve(__dirname, "../..");
 const SCRIPT = path.join(workRoot, "scripts/linux/restart-api-ui.sh");
+const RECOVERY_SCRIPT = path.join(workRoot, "scripts/linux/recover-seo-post-success.sh");
 const PRODUCTION_ROOT = "/opt/clover/clover-app";
 
 assert.ok(existsSync(SCRIPT), "restart-api-ui.sh missing");
+assert.ok(existsSync(RECOVERY_SCRIPT), "recover-seo-post-success.sh missing");
 assert.notEqual(path.resolve(SCRIPT).startsWith(PRODUCTION_ROOT), true);
 assert.deepEqual(
   parseCurlHeaders("HTTP/1.1 100 Continue\r\n\r\nHTTP/2 301\r\nLocation: /ru/catalog/example\r\n\r\n"),
@@ -206,6 +209,7 @@ assert.equal(
 );
 console.log("STATIC_CONTRACT:PASS");
 const SEO_ONLY = process.argv.includes("--seo-only");
+const RECOVERY_ONLY = process.argv.includes("--recovery-only");
 
 const GIT_USR_BIN = "C:\\Program Files\\Git\\usr\\bin";
 
@@ -236,6 +240,11 @@ function sh(cmd, opts = {}) {
 function bashPath(value) {
   if (process.platform !== "win32") return value;
   return String(value).replace(/^([A-Za-z]):[\\/]/u, (_match, drive) => `/${drive.toLowerCase()}/`).replaceAll("\\", "/");
+}
+
+function nativePath(value) {
+  if (process.platform !== "win32") return value;
+  return String(value).replace(/^\/([a-zA-Z])\//u, (_match, drive) => `${drive.toUpperCase()}:/`);
 }
 
 function writeExec(file, body) {
@@ -298,7 +307,7 @@ function initSandbox(label) {
   writeFileSync(path.join(live, "package.json"), JSON.stringify({ scripts: { build: "node ./fake-build.js" } }));
   writeFileSync(path.join(live, "server/src/server.js"), "console.log('api-old')\n");
   mkdirSync(path.join(live, "server"), { recursive: true });
-  writeFileSync(path.join(live, ".gitignore"), "server/.env\n");
+  writeFileSync(path.join(live, ".gitignore"), "server/.env\nserver/data/clover.sqlite\n");
   writeFileSync(
     path.join(live, "server/.env"),
     "CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED=0\n"
@@ -322,7 +331,7 @@ function initSandbox(label) {
 
   // Match production: the UI dist is runtime output, not source tracked by
   // the new release. The old fixture commit remains available for rollback.
-  writeFileSync(path.join(live, ".gitignore"), "server/.env\ndist/\n");
+  writeFileSync(path.join(live, ".gitignore"), "server/.env\nserver/data/clover.sqlite\ndist/\n");
   execFileSync("git", ["rm", "--cached", "-r", "dist"], { cwd: live });
 
   writeFileSync(path.join(live, "server/src/server.js"), "console.log('api-new')\n");
@@ -924,7 +933,7 @@ function probeNamespace(box, html, expectedLocale = "disabled") {
 }
 
 // --- A. BUILD FAILURE ---
-if (!SEO_ONLY) {
+if (!SEO_ONLY && !RECOVERY_ONLY) {
 {
   const box = initSandbox("buildfail");
   const before = liveSha(box);
@@ -1511,6 +1520,7 @@ exit 2
   rmSync(box.root, { recursive: true, force: true });
 }
 
+if (!RECOVERY_ONLY) {
 {
   const box = initSandbox("seo-post-gate-pass");
   const prepared = runFirstPrepare(box, box.newSha);
@@ -1586,8 +1596,121 @@ for (const [label, injected, expected] of [
   console.log("Z2D_FUTURE_ROLLBACK_TO_SEO_BASELINE:PASS");
   rmSync(box.root, { recursive: true, force: true });
 }
+}
 
-if (!SEO_ONLY) {
+// --- Z2E. Explicit recovery after Deploy OK preserves the failed UI tree. ---
+{
+  const box = initSandbox("seo-post-success-recovery");
+  const backup = path.join(box.lkg, "seo-before-feature");
+  cpSync(path.join(box.live, "dist"), backup, { recursive: true });
+  const oldPrepared = path.join(box.staging, `prepared-${box.oldSha}`);
+  mkdirSync(oldPrepared, { recursive: true });
+  const oldManifest = path.join(oldPrepared, "manifest.json");
+  const prepHelper = path.join(box.staging, "runtime", "preparedDist.mjs");
+  const oldWrite = spawnSync(process.execPath, [prepHelper, "write", "--dist", path.join(box.live, "dist"),
+    "--out", oldManifest, "--target-sha", box.oldSha, "--release-id", "OLD",
+    "--expected-locale", "disabled", "--expected-metrika", "off", "--build-tag", "ui-OLD"],
+  { encoding: "utf8" });
+  assert.equal(oldWrite.status, 0, oldWrite.stderr);
+  const oldManifestSha = createHash("sha256").update(readFileSync(oldManifest)).digest("hex");
+  const prepared = runFirstPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const promoted = runFirstPromote(box, preparedDirFor(box, box.newSha), box.newSha);
+  assert.equal(promoted.status, 0, promoted.stderr);
+  const newManifestSha = createHash("sha256")
+    .update(readFileSync(path.join(preparedDirFor(box, box.newSha), "manifest.json"))).digest("hex");
+  const scriptPath = path.join(box.staging, "runtime", "recover-seo-post-success.sh");
+  let recoverySource = readFileSync(RECOVERY_SCRIPT, "utf8");
+  const replacements = [
+    ['BASE_SHA="21259c768b3dbf2de17da9a0b676f571380c6a1b"', `BASE_SHA="${box.oldSha}"`],
+    ['FEATURE_SHA="a952974bd5126d4000ed6d0fda1d696bfca49b36"', `FEATURE_SHA="${box.oldSha}"`],
+    ['BACKUP="/opt/clover/deployments/lkg/seo-before-a3a158c7914d82ae3d2b8abea55788126adf0124"', `BACKUP="${bashPath(backup)}"`],
+    ['OLD_MANIFEST="/opt/clover/deployments/staging/prepared-21259c768b3dbf2de17da9a0b676f571380c6a1b/manifest.json"', `OLD_MANIFEST="${bashPath(oldManifest)}"`],
+    ['OLD_MANIFEST_SHA="f0db034cff474006b832af812d68042298265e5820fff0a9a8245e200b0afdb2"', `OLD_MANIFEST_SHA="${oldManifestSha}"`],
+    ['--expected-release-id "20260923HjDT6xzD"', '--expected-release-id "OLD"'],
+    ['"ui-20260923HjDT6xzD"', '"ui-OLD"'],
+  ];
+  for (const [oldText, newText] of replacements) {
+    assert.ok(recoverySource.includes(oldText), `recovery fixture replacement missing: ${oldText}`);
+    recoverySource = recoverySource.replace(oldText, newText);
+  }
+  writeFileSync(scriptPath, recoverySource);
+  const runRecovery = (mode, checksum = newManifestSha, extraEnv = {}) => {
+    const result = spawnSync(BASH_BIN, [scriptPath, "--target", box.newSha,
+      "--manifest-sha256", checksum, mode], {
+      encoding: "utf8",
+      env: { ...box.env, CLOVER_SEO_RECOVERY_FIXTURE: "1", ...extraEnv },
+    });
+    releaseSandboxLock(box, result);
+    return result;
+  };
+  assert.ok(existsSync(path.join(box.staging, `seo-cutover-${box.newSha}.receipt`)));
+  const wrongLock = runRecovery("--check", newManifestSha, {
+    CLOVER_DEPLOY_LOCK: bashPath(path.join(box.root, "wrong.lock")),
+  });
+  assert.notEqual(wrongLock.status, 0, "wrong deploy lock must fail before recovery");
+  assert.match(wrongLock.stderr, /fixture staging\/lock mismatch/u);
+  const wrongHost = runRecovery("--check", newManifestSha, {
+    CLOVER_DEPLOY_CANONICAL_HOST: "other.example",
+  });
+  assert.notEqual(wrongHost.status, 0, "wrong canonical host must fail before recovery");
+  assert.match(wrongHost.stderr, /canonical host override refused/u);
+  const wrongChecksum = runRecovery("--check", "0".repeat(64));
+  assert.notEqual(wrongChecksum.status, 0, "wrong target manifest must be refused");
+  const receiptPath = path.join(box.staging, `seo-cutover-${box.newSha}.receipt`);
+  const receiptSource = readFileSync(receiptPath, "utf8");
+  writeFileSync(receiptPath, receiptSource.replace(newManifestSha, "0".repeat(64)));
+  const wrongReceipt = runRecovery("--check");
+  assert.notEqual(wrongReceipt.status, 0, "wrong receipt must fail before recovery");
+  assert.match(wrongReceipt.stderr, /receipt identity mismatch/u);
+  writeFileSync(receiptPath, receiptSource);
+  const liveIndex = path.join(box.live, "dist/index.html");
+  const liveIndexSource = readFileSync(liveIndex, "utf8");
+  writeFileSync(liveIndex, `${liveIndexSource}\n<!-- damaged target -->\n`);
+  const damagedTarget = runRecovery("--check");
+  assert.equal(damagedTarget.status, 0, `damaged target dist must not block baseline recovery: ${damagedTarget.stderr}\n${damagedTarget.stdout}`);
+  assert.match(damagedTarget.stderr, /damaged live target dist will be quarantined/u);
+  writeFileSync(liveIndex, liveIndexSource);
+  assert.equal(liveSha(box), box.newSha);
+  const checked = runRecovery("--check");
+  assert.equal(checked.status, 0, `recovery preflight failed: ${checked.stderr}\n${checked.stdout}`);
+  assert.equal(liveSha(box), box.newSha, "--check must not switch source");
+  const beforeTag = liveTag(box);
+  const gitLocator = process.platform === "win32" ? "where.exe" : "which";
+  const gitExe = bashPath(execFileSync(gitLocator, ["git"], { encoding: "utf8" }).trim().split(/\r?\n/u)[0]);
+  const failResetGit = path.join(box.bin, "git-fail-reset");
+  writeExec(failResetGit, `#!/usr/bin/env bash\nif [[ "$*" == *"reset --hard ${box.oldSha}"* ]]; then exit 42; fi\nexec "${gitExe}" "$@"\n`);
+  const resetFailure = runRecovery("--apply", newManifestSha, {
+    CLOVER_DEPLOY_GIT: bashPath(failResetGit),
+  });
+  assert.equal(resetFailure.status, 3, `reset failure must be CRITICAL: ${resetFailure.stderr}`);
+  assert.match(resetFailure.stderr, /failed UI restored to live path/u);
+  assert.equal(liveSha(box), box.newSha, "failed reset must leave source at target");
+  assert.equal(liveTag(box), beforeTag, "failed reset must return UI to live path");
+  writeFileSync(path.join(box.state, "tag"), "mismatch\n");
+  const staleHtml = runRecovery("--apply");
+  assert.equal(staleHtml.status, 3, `stale live HTML must be CRITICAL: ${staleHtml.stderr}`);
+  assert.match(staleHtml.stderr, /origin serves wrong UI tag\/bundle/u);
+  const staleFailedPath = nativePath(staleHtml.stderr.match(/failed-ui=([^\s]+)/u)?.[1]);
+  assert.ok(staleFailedPath && existsSync(path.join(staleFailedPath, "index.html")));
+  assert.equal(liveSha(box), box.oldSha);
+  execFileSync("git", ["-C", box.live, "reset", "--hard", box.newSha]);
+  rmSync(path.join(box.live, "dist"), { recursive: true, force: true });
+  cpSync(staleFailedPath, path.join(box.live, "dist"), { recursive: true });
+  writeFileSync(path.join(box.state, "tag"), "match\n");
+  const recovered = runRecovery("--apply");
+  assert.equal(recovered.status, 0, `post-success recovery failed: ${recovered.stderr}\n${recovered.stdout}`);
+  assert.match(recovered.stdout, /SEO_POST_SUCCESS_RECOVERY_OK/u);
+  assert.equal(liveSha(box), box.oldSha);
+  assert.equal(liveTag(box), "ui-OLD");
+  const failedPath = nativePath(recovered.stdout.match(/failed-ui=([^\s]+)/u)?.[1]);
+  assert.ok(failedPath && existsSync(path.join(failedPath, "index.html")));
+  assert.match(readFileSync(path.join(failedPath, "index.html"), "utf8"), new RegExp(beforeTag));
+  console.log("Z2E_POST_SUCCESS_RECOVERY_PRESERVES_FAILED_UI:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+if (!SEO_ONLY && !RECOVERY_ONLY) {
 {
   const box = initSandbox("promote-changed-file");
   const prepared = runPrepare(box, box.newSha);
@@ -1851,4 +1974,4 @@ if (!SEO_ONLY) {
 }
 
 }
-console.log(SEO_ONLY ? "SEO_POST_CUTOVER_DEPLOY_VERIFY_PASS" : "SAFE_PRODUCTION_DEPLOY_VERIFY_PASS");
+console.log(RECOVERY_ONLY ? "SEO_POST_SUCCESS_RECOVERY_VERIFY_PASS" : SEO_ONLY ? "SEO_POST_CUTOVER_DEPLOY_VERIFY_PASS" : "SAFE_PRODUCTION_DEPLOY_VERIFY_PASS");
