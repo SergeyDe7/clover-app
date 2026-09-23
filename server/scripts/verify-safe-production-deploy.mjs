@@ -22,6 +22,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync, execFileSync } from "node:child_process";
+import { parseCurlHeaders } from "./seoPostCutoverProbe.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const workRoot = path.resolve(__dirname, "../..");
@@ -30,6 +31,11 @@ const PRODUCTION_ROOT = "/opt/clover/clover-app";
 
 assert.ok(existsSync(SCRIPT), "restart-api-ui.sh missing");
 assert.notEqual(path.resolve(SCRIPT).startsWith(PRODUCTION_ROOT), true);
+assert.deepEqual(
+  parseCurlHeaders("HTTP/1.1 100 Continue\r\n\r\nHTTP/2 301\r\nLocation: /ru/catalog/example\r\n\r\n"),
+  { status: 301, headers: new Map([["location", "/ru/catalog/example"]]) },
+  "SEO probe must inspect the final HTTP response and exact Location"
+);
 
 const scriptSrc = readFileSync(SCRIPT, "utf8");
 assert.equal(/\bpkill\b/i.test(scriptSrc), false, "no pkill");
@@ -151,6 +157,9 @@ assert.match(launcherSrc, /extract dir must not be inside live ROOT/);
 assert.match(launcherSrc, /prepare/, "launcher must support prepare");
 assert.match(launcherSrc, /promote/, "launcher must support promote");
 assert.match(launcherSrc, /preparedDist\.mjs/, "launcher must extract preparedDist.mjs from target SHA");
+assert.match(launcherSrc, /extract_file "server\/scripts\/seoPostCutoverProbe\.mjs"/, "launcher must extract the target-pinned SEO gate");
+assert.match(scriptSrc, /check_seo_routes "promoted" \|\| rollback_release/, "SEO gate must run before Deploy OK with rollback armed");
+assert.doesNotMatch(scriptSrc, /SEO_POST_GATE/, "SEO gate must not have an opt-out flag");
 assert.equal(/SKIP_BUILD=/.test(launcherSrc), false, "launcher must not add SKIP_BUILD");
 assert.equal(
   /grep\s+-oE/.test(launcherSrc),
@@ -196,6 +205,7 @@ assert.equal(
   "HTTP/MIME rollback gate must not require a new release namespace"
 );
 console.log("STATIC_CONTRACT:PASS");
+const SEO_ONLY = process.argv.includes("--seo-only");
 
 const GIT_USR_BIN = "C:\\Program Files\\Git\\usr\\bin";
 
@@ -221,6 +231,11 @@ function sh(cmd, opts = {}) {
     encoding: "utf8",
     ...opts,
   });
+}
+
+function bashPath(value) {
+  if (process.platform !== "win32") return value;
+  return String(value).replace(/^([A-Za-z]):[\\/]/u, (_match, drive) => `/${drive.toLowerCase()}/`).replaceAll("\\", "/");
 }
 
 function writeExec(file, body) {
@@ -305,6 +320,11 @@ function initSandbox(label) {
   execFileSync("git", ["commit", "-m", "old"], { cwd: live });
   const oldSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: live, encoding: "utf8" }).trim();
 
+  // Match production: the UI dist is runtime output, not source tracked by
+  // the new release. The old fixture commit remains available for rollback.
+  writeFileSync(path.join(live, ".gitignore"), "server/.env\ndist/\n");
+  execFileSync("git", ["rm", "--cached", "-r", "dist"], { cwd: live });
+
   writeFileSync(path.join(live, "server/src/server.js"), "console.log('api-new')\n");
   writeFileSync(path.join(live, "marker-new.txt"), "new\n");
   // Keep package.json build script.
@@ -371,6 +391,28 @@ if (process.env.FAKE_BUILD_FAIL === '1') {
 `
   );
   cpSync(SCRIPT, path.join(live, "scripts/linux/restart-api-ui.sh"));
+  // The one-release gate is keyed to the real pre-SEO production SHA. In this
+  // isolated Git fixture, pin it to the fixture's own old commit instead.
+  const fixtureDeployPath = path.join(live, "scripts/linux/restart-api-ui.sh");
+  assert.match(readFileSync(fixtureDeployPath, "utf8"), /SEO_BASELINE_SHA="21259c768b3dbf2de17da9a0b676f571380c6a1b"/u);
+  assert.match(readFileSync(fixtureDeployPath, "utf8"), /SEO_FEATURE_SHA="a952974bd5126d4000ed6d0fda1d696bfca49b36"/u);
+  writeFileSync(
+    fixtureDeployPath,
+    readFileSync(fixtureDeployPath, "utf8").replace(
+      /SEO_BASELINE_SHA="21259c768b3dbf2de17da9a0b676f571380c6a1b"/u,
+      `SEO_BASELINE_SHA="${oldSha}"`
+    ).replace(
+      /SEO_FEATURE_SHA="a952974bd5126d4000ed6d0fda1d696bfca49b36"/u,
+      `SEO_FEATURE_SHA="${oldSha}"`
+    )
+  );
+  const runtimeDir = path.join(staging, "runtime");
+  mkdirSync(runtimeDir, { recursive: true });
+  const runtimeScript = path.join(runtimeDir, "restart-api-ui.runtime.sh");
+  cpSync(fixtureDeployPath, runtimeScript);
+  for (const helper of ["uiAssetProbe.mjs", "releaseNamespace.js", "preparedDist.mjs", "assert-metrika-release.mjs", "seoPostCutoverProbe.mjs"]) {
+    cpSync(path.join(workRoot, "server/scripts", helper), path.join(runtimeDir, helper));
+  }
   cpSync(
     path.join(workRoot, "server/scripts/uiAssetProbe.mjs"),
     path.join(live, "server/scripts/uiAssetProbe.mjs")
@@ -391,6 +433,10 @@ if (process.env.FAKE_BUILD_FAIL === '1') {
     path.join(workRoot, "server/scripts/assert-metrika-release.mjs"),
     path.join(live, "server/scripts/assert-metrika-release.mjs")
   );
+  cpSync(
+    path.join(workRoot, "server/scripts/seoPostCutoverProbe.mjs"),
+    path.join(live, "server/scripts/seoPostCutoverProbe.mjs")
+  );
   writeFileSync(
     path.join(live, "scripts/linux/production-ui-build.flags"),
     "# sandbox / TEST default OFF\nVITE_YANDEX_METRIKA_ENABLED=0\n"
@@ -400,11 +446,8 @@ if (process.env.FAKE_BUILD_FAIL === '1') {
   const newSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: live, encoding: "utf8" }).trim();
   execFileSync("git", ["reset", "--hard", oldSha], { cwd: live });
 
-  // Restore live dist as OLD after reset (git may not track dist).
-  writeCompleteUiDist(path.join(live, "dist"), {
-    tag: "ui-OLD",
-    jsPath: "/assets/index-OLD.js",
-  });
+  // reset --hard restores the old fixture's tracked UI; the new release
+  // removes dist from Git, matching production's runtime-only dist.
 
   writeFileSync(path.join(state, "health"), "ok\n");
   writeFileSync(path.join(state, "tag"), "match\n");
@@ -475,6 +518,7 @@ OUT=""
 DUMP=""
 WRITE_FMT=""
 URL=""
+METHOD="GET"
 args=("\$@")
 i=0
 while [[ \$i -lt \${#args[@]} ]]; do
@@ -483,8 +527,9 @@ while [[ \$i -lt \${#args[@]} ]]; do
     -o|--output) i=\$((i+1)); OUT="\${args[\$i]}" ;;
     -D|--dump-header) i=\$((i+1)); DUMP="\${args[\$i]}" ;;
     -w|--write-out) i=\$((i+1)); WRITE_FMT="\${args[\$i]}" ;;
-    -H|--header|--resolve|--max-time|-m|--cacert|--capath) i=\$((i+1)) ;;
-    -s|-S|-f|-sS|-fsS|-sSf|--http1.1) ;;
+    -H|--header|--resolve|--max-time|-m|--cacert|--capath|--connect-timeout|--noproxy) i=\$((i+1)) ;;
+    --head) METHOD="HEAD" ;;
+    -s|-S|-f|-sS|-fsS|-sSf|--http1.1|--silent|--show-error|--path-as-is|--globoff) ;;
     -k|--insecure)
       echo "curl: TLS verification must stay enabled" >&2
       exit 2
@@ -520,9 +565,11 @@ mime_of() {
 }
 
 write_resp() {
-  local code="\$1" ctype="\$2" body="\$3"
+  local code="\$1" ctype="\$2" body="\$3" location="\${4:-}"
   if [[ -n "\$DUMP" && "\$DUMP" != "-" ]]; then
-    printf 'HTTP/1.1 %s OK\\r\\nContent-Type: %s\\r\\n\\r\\n' "\$code" "\$ctype" > "\$DUMP"
+    printf 'HTTP/1.1 %s OK\\r\\nContent-Type: %s\\r\\n' "\$code" "\$ctype" > "\$DUMP"
+    if [[ -n "\$location" ]]; then printf 'Location: %s\\r\\n' "\$location" >> "\$DUMP"; fi
+    printf '\\r\\n' >> "\$DUMP"
   fi
   if [[ -n "\$OUT" && "\$OUT" != "-" ]]; then
     printf '%s' "\$body" > "\$OUT"
@@ -541,6 +588,42 @@ if [[ "\$URL" == *"/api/health"* ]]; then
 fi
 
 if grep -q fail-ui "\$STATE/health" 2>/dev/null; then exit 1; fi
+if [[ -f "\${CURL_LIVE_DIST%/dist}/marker-third.txt" && "\$REQ_PATH" == "/" ]] && grep -q fail-third-ui "\$STATE/health" 2>/dev/null; then exit 1; fi
+
+if [[ "\$REQ_PATH" == "/catalog/odnorazovaya-posuda/dlya-sushi-i-lapshi" || "\$REQ_PATH" == "/catalog/himiya-chistyashchie-sredstva/dlya-okon" ]]; then
+  if [[ ! -f "\${CURL_LIVE_DIST%/dist}/marker-new.txt" ]] || grep -q fail-seo-redirect "\$STATE/health" 2>/dev/null || { [[ "\$URL" == *":18080"* ]] && grep -q fail-nginx-seo-redirect "\$STATE/health" 2>/dev/null; }; then
+    write_resp 404 "text/html" "not found"
+    exit 0
+  fi
+  if [[ "\$METHOD" == "HEAD" ]] && grep -q fail-seo-head "\$STATE/health" 2>/dev/null; then
+    write_resp 200 "text/html" "not redirecting on HEAD"
+    exit 0
+  fi
+  if [[ "\$REQ_PATH" == "/catalog/odnorazovaya-posuda/dlya-sushi-i-lapshi" ]]; then
+    dest="/ru/catalog/%D0%9E%D0%B4%D0%BD%D0%BE%D1%80%D0%B0%D0%B7%D0%BE%D0%B2%D0%B0%D1%8F%20%D0%BF%D0%BE%D1%81%D1%83%D0%B4%D0%B0/%D0%94%D0%BB%D1%8F%20%D1%81%D1%83%D1%88%D0%B8%20%D0%B8%20%D0%BB%D0%B0%D0%BF%D1%88%D0%B8"
+  else
+    dest="/ru/catalog/%D0%A5%D0%B8%D0%BC%D0%B8%D1%8F%2C%20%D1%87%D0%B8%D1%81%D1%82%D1%8F%D1%89%D0%B8%D0%B5%20%D1%81%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B2%D0%B0/%D0%94%D0%BB%D1%8F%20%D0%BE%D0%BA%D0%BE%D0%BD"
+  fi
+  if [[ "\$URL" == *"?"* ]] && ! grep -q fail-seo-query "\$STATE/health" 2>/dev/null; then dest="\$dest?\${URL#*\\?}"; fi
+  write_resp 301 "text/html" "" "\$dest"
+  exit 0
+fi
+if [[ "\$REQ_PATH" == /ru/catalog/* ]]; then
+  if [[ -f "\${CURL_LIVE_DIST%/dist}/marker-new.txt" ]] && grep -q fail-seo-destination "\$STATE/health" 2>/dev/null; then
+    write_resp 404 "text/html" "missing destination"
+    exit 0
+  fi
+  write_resp 200 "text/html" "<html>category</html>"
+  exit 0
+fi
+if [[ "\$REQ_PATH" == "/product/%D0%9D%D0%A4-00002829" ]]; then
+  if [[ -f "\${CURL_LIVE_DIST%/dist}/marker-new.txt" ]] && grep -q fail-seo-product-canonical "\$STATE/health" 2>/dev/null; then
+    write_resp 200 "text/html" '<html><link rel="canonical" href="https://clover-spb.ru/en/product/wrong" /></html>'
+    exit 0
+  fi
+  write_resp 200 "text/html" '<html><link rel="canonical" href="https://clover-spb.ru/ru/product/%D0%9D%D0%A4-00002829" /></html>'
+  exit 0
+fi
 
 if grep -q timeout-assets "\$STATE/health" 2>/dev/null && [[ "\$REQ_PATH" == /assets/* || "\$REQ_PATH" == /fonts/* ]]; then
   echo "curl: timeout" >&2
@@ -622,15 +705,16 @@ exit 2
   const env = {
     ...process.env,
     PATH: `${pathPrefix}${pathSep}${process.env.PATH}`,
-    CLOVER_DEPLOY_ROOT: live,
-    CLOVER_DEPLOY_STAGING: staging,
-    CLOVER_DEPLOY_LKG: lkg,
-    CLOVER_DEPLOY_LOCK: path.join(root, "deploy.lock"),
+    CLOVER_DEPLOY_ROOT: bashPath(live),
+    CLOVER_DEPLOY_STAGING: bashPath(staging),
+    CLOVER_DEPLOY_LKG: bashPath(lkg),
+    CLOVER_DEPLOY_LOCK: bashPath(path.join(root, "deploy.lock")),
     CLOVER_DEPLOY_GIT: "git",
-    CLOVER_DEPLOY_NPM: path.join(bin, "npm"),
-    CLOVER_DEPLOY_SYSTEMCTL: path.join(bin, "systemctl"),
-    CLOVER_DEPLOY_SUDO_SYSTEMCTL: path.join(bin, "sudo-systemctl"),
-    CLOVER_DEPLOY_CURL: path.join(bin, "curl"),
+    CLOVER_DEPLOY_NPM: bashPath(path.join(bin, "npm")),
+    CLOVER_DEPLOY_SYSTEMCTL: bashPath(path.join(bin, "systemctl")),
+    CLOVER_DEPLOY_SUDO_SYSTEMCTL: bashPath(path.join(bin, "sudo-systemctl")),
+    CLOVER_DEPLOY_CURL: bashPath(path.join(bin, "curl")),
+    CLOVER_DEPLOY_SEO_GATE_JS: bashPath(path.join(runtimeDir, "seoPostCutoverProbe.mjs")),
     CLOVER_DEPLOY_HEALTH_API: "http://127.0.0.1:4100/api/health",
     CLOVER_DEPLOY_HEALTH_UI: "http://127.0.0.1:5273/",
     CLOVER_DEPLOY_ORIGIN_BASE: "http://127.0.0.1:5273",
@@ -638,27 +722,27 @@ exit 2
     CLOVER_DEPLOY_NGINX_RESOLVE: "",
     CLOVER_DEPLOY_CANONICAL_HOST: "clover-spb.ru",
     CLOVER_DEPLOY_HEALTH_ATTEMPTS: "8",
-    CLOVER_DEPLOY_DB_PATH: path.join(live, "server/data/clover.sqlite"),
+    CLOVER_DEPLOY_DB_PATH: bashPath(path.join(live, "server/data/clover.sqlite")),
     CLOVER_DEPLOY_API_UNIT: "clover-api.service",
     CLOVER_DEPLOY_UI_UNIT: "clover-ui.service",
     CLOVER_DEPLOY_FSDEV_LIVE: "1001",
     CLOVER_DEPLOY_FSDEV_STAGING: "1001",
     CLOVER_DEPLOY_FSDEV_LKG: "1001",
-    CURL_LIVE_DIST: path.join(live, "dist"),
+    CURL_LIVE_DIST: bashPath(path.join(live, "dist")),
     CLOVER_PROBE_BASH: BASH_BIN,
   };
 
-  return { root, live, staging, lkg, bin, state, oldSha, newSha, env };
+  return { root, live, staging, lkg, bin, state, oldSha, newSha, env, runtimeScript };
 }
 
 function releaseSandboxLock(box, result) {
   const text = `${result?.stderr || ""}\n${result?.stdout || ""}`;
   if (/another deployment holds/.test(text)) return;
-  rmSync(`${box.env.CLOVER_DEPLOY_LOCK}.held`, { recursive: true, force: true });
+  rmSync(path.join(box.root, "deploy.lock.held"), { recursive: true, force: true });
 }
 
 function runDeploy(box, targetSha, extraEnv = {}) {
-  const result = spawnSync(BASH_BIN, [SCRIPT, targetSha], {
+  const result = spawnSync(BASH_BIN, [box.runtimeScript, targetSha], {
     encoding: "utf8",
     env: { ...box.env, ...extraEnv },
   });
@@ -704,7 +788,7 @@ function liveTag(box) {
 }
 
 function runPrepare(box, targetSha, extraEnv = {}) {
-  const result = spawnSync(BASH_BIN, [SCRIPT, "prepare", targetSha], {
+  const result = spawnSync(BASH_BIN, [box.runtimeScript, "prepare", targetSha], {
     encoding: "utf8",
     env: { ...box.env, ...extraEnv },
   });
@@ -714,7 +798,7 @@ function runPrepare(box, targetSha, extraEnv = {}) {
 
 function runPromote(box, preparedPath, extraEnv = {}) {
   const targetSha = extraEnv.CLOVER_DEPLOY_TARGET_SHA || box.newSha;
-  const result = spawnSync(BASH_BIN, [SCRIPT, "promote", preparedPath, targetSha], {
+  const result = spawnSync(BASH_BIN, [box.runtimeScript, "promote", preparedPath, targetSha], {
     encoding: "utf8",
     env: { ...box.env, ...extraEnv },
   });
@@ -840,6 +924,7 @@ function probeNamespace(box, html, expectedLocale = "disabled") {
 }
 
 // --- A. BUILD FAILURE ---
+if (!SEO_ONLY) {
 {
   const box = initSandbox("buildfail");
   const before = liveSha(box);
@@ -937,6 +1022,10 @@ exit 2
   const box = initSandbox("f2-nonff");
   // Live HEAD = newer; target = older ancestor (exists but not a forward descendant).
   execFileSync("git", ["-C", box.live, "reset", "--hard", box.newSha]);
+  writeCompleteUiDist(path.join(box.live, "dist"), {
+    tag: "ui-NEW",
+    jsPath: "/assets/index-NEW.js",
+  });
   const before = liveSha(box);
   assert.equal(before, box.newSha);
   const beforeTag = liveTag(box);
@@ -957,10 +1046,31 @@ exit 2
   rmSync(box.root, { recursive: true, force: true });
 }
 
+// --- F3. MISSING PINNED SEO BASELINE OBJECT ---
+{
+  const box = initSandbox("missing-seo-baseline-object");
+  const testScript = path.join(box.staging, "runtime", "missing-baseline.sh");
+  writeFileSync(
+    testScript,
+    readFileSync(box.runtimeScript, "utf8").replace(
+      `SEO_BASELINE_SHA="${box.oldSha}"`,
+      `SEO_BASELINE_SHA="${"f".repeat(40)}"`
+    )
+  );
+  const result = runLiveScript(box, testScript, box.newSha);
+  assert.notEqual(result.status, 0, "missing SEO baseline object must fail closed");
+  assert.match(result.stderr, /SEO baseline object .* missing; refusing cutover/u);
+  assert.doesNotMatch(result.stdout, /Cutover: switching source/u);
+  assert.equal(liveSha(box), box.oldSha);
+  assert.equal(liveTag(box), "ui-OLD");
+  console.log("F3_MISSING_SEO_BASELINE_OBJECT_FAILS_BEFORE_CUTOVER:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
 // --- G. CONCURRENT DEPLOY ---
 {
   const box = initSandbox("lock2");
-  const lock = box.env.CLOVER_DEPLOY_LOCK;
+  const lock = path.join(box.root, "deploy.lock");
   const flockBin = path.join(box.bin, "flock").replace(/\\/g, "/");
   const lockPosix = String(lock).replace(/\\/g, "/");
   const { spawn } = await import("node:child_process");
@@ -1307,7 +1417,7 @@ exit 2
 {
   const box = initSandbox("first-deploy-extract-inside-root");
   const launched = runFirstDeploy(box, box.newSha, {
-    CLOVER_DEPLOY_STAGING: path.join(box.live, "inside-live-staging"),
+    CLOVER_DEPLOY_STAGING: bashPath(path.join(box.live, "inside-live-staging")),
   });
   assert.notEqual(launched.status, 0, "extract inside ROOT must fail");
   assert.match(`${launched.stderr}\n${launched.stdout}`, /extract dir must not be inside live ROOT/);
@@ -1378,7 +1488,106 @@ exit 2
   console.log("Z2_PROMOTE_SAME_RELEASE_NO_REBUILD:PASS");
   rmSync(box.root, { recursive: true, force: true });
 }
+}
 
+// --- F4. TARGET WITHOUT THE SEO FEATURE MERGE ---
+{
+  const box = initSandbox("target-without-seo-feature");
+  const testScript = path.join(box.staging, "runtime", "missing-feature-in-target.sh");
+  writeFileSync(
+    testScript,
+    readFileSync(box.runtimeScript, "utf8").replace(
+      `SEO_FEATURE_SHA="${box.oldSha}"`,
+      `SEO_FEATURE_SHA="${box.newSha}"`
+    )
+  );
+  const result = runLiveScript(box, testScript, box.oldSha);
+  assert.notEqual(result.status, 0, "target without the SEO feature must fail before cutover");
+  assert.match(result.stderr, /target does not contain SEO feature commit .* refusing cutover/u);
+  assert.doesNotMatch(result.stdout, /Cutover: switching source/u);
+  assert.equal(liveSha(box), box.oldSha);
+  assert.equal(liveTag(box), "ui-OLD");
+  console.log("F4_TARGET_WITHOUT_SEO_FEATURE_FAILS_BEFORE_CUTOVER:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("seo-post-gate-pass");
+  const prepared = runFirstPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const promoted = runFirstPromote(box, preparedDirFor(box, box.newSha), box.newSha);
+  assert.equal(promoted.status, 0, `SEO-gated promote failed: ${promoted.stderr}\n${promoted.stdout}`);
+  assert.match(promoted.stdout, /SEO_POST_CUTOVER_PROMOTED:PASS/);
+  assert.equal(liveSha(box), box.newSha);
+  assert.equal(liveTag(box).startsWith("ui-NEW"), true);
+  console.log("Z2A_SEO_GATE_PASS_BEFORE_DEPLOY_OK:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("seo-post-gate-rollback");
+  const prepared = runFirstPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, prepared.stderr);
+  writeFileSync(path.join(box.state, "health"), "fail-seo-redirect\n");
+  const promoted = runFirstPromote(box, preparedDirFor(box, box.newSha), box.newSha);
+  assert.notEqual(promoted.status, 0, "bad live SEO route must fail promote");
+  assert.match(`${promoted.stderr}\n${promoted.stdout}`, /post-cutover SEO route check failed/);
+  assert.match(promoted.stdout, /SEO_POST_CUTOVER_ROLLED-BACK:PASS/);
+  assert.doesNotMatch(promoted.stdout, /Deploy OK\./);
+  assert.equal(liveSha(box), box.oldSha, "SEO gate must restore old source");
+  assert.equal(liveTag(box), "ui-OLD", "SEO gate must restore old UI");
+  console.log("Z2B_SEO_GATE_FAILURE_ROLLS_BACK_SOURCE_AND_UI:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+for (const [label, injected, expected] of [
+  ["nginx", "fail-nginx-seo-redirect", /nginx GET .*status 404/u],
+  ["head", "fail-seo-head", /HEAD .*status 200/u],
+  ["query", "fail-seo-query", /GET query .*Location/u],
+  ["destination", "fail-seo-destination", /destination .*status 404/u],
+  ["canonical", "fail-seo-product-canonical", /product: RU canonical missing/u],
+]) {
+  const box = initSandbox(`seo-post-${label}`);
+  const prepared = runFirstPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, prepared.stderr);
+  writeFileSync(path.join(box.state, "health"), `${injected}\n`);
+  const promoted = runFirstPromote(box, preparedDirFor(box, box.newSha), box.newSha);
+  const output = `${promoted.stderr}\n${promoted.stdout}`;
+  assert.notEqual(promoted.status, 0, `${label} failure must fail promote`);
+  assert.match(output, expected, `${label} failure must be observed at its own HTTP gate`);
+  assert.match(output, /SEO_POST_CUTOVER_ROLLED-BACK:PASS/);
+  assert.doesNotMatch(output, /Deploy OK\./);
+  assert.equal(liveSha(box), box.oldSha, `${label}: source must roll back`);
+  assert.equal(liveTag(box), "ui-OLD", `${label}: UI must roll back`);
+  console.log(`Z2C_SEO_${label.toUpperCase()}_FAILURE_ROLLS_BACK:PASS`);
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+{
+  const box = initSandbox("seo-future-rollback");
+  const prepared = runFirstPrepare(box, box.newSha);
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const first = runFirstPromote(box, preparedDirFor(box, box.newSha), box.newSha);
+  assert.equal(first.status, 0, `initial SEO release failed: ${first.stderr}\n${first.stdout}`);
+  const seoTag = liveTag(box);
+  writeFileSync(path.join(box.live, "marker-third.txt"), "future\n");
+  execFileSync("git", ["-C", box.live, "add", "marker-third.txt"]);
+  execFileSync("git", ["-C", box.live, "commit", "-m", "future release"]);
+  const futureSha = execFileSync("git", ["-C", box.live, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  execFileSync("git", ["-C", box.live, "reset", "--hard", box.newSha]);
+  writeFileSync(path.join(box.state, "health"), "fail-third-ui\n");
+  const result = runLiveScript(box, path.join(box.live, "scripts/linux/restart-api-ui.sh"), futureSha);
+  const output = `${result.stderr}\n${result.stdout}`;
+  assert.notEqual(result.status, 0, "future UI failure must fail deploy");
+  assert.match(output, /Rollback restored previous release/u);
+  assert.doesNotMatch(output, /rollback SEO routes did not return to baseline|SEO_POST_CUTOVER_ROLLED-BACK/u);
+  assert.equal(liveSha(box), box.newSha, "future rollback must retain the SEO release source");
+  assert.equal(liveTag(box), seoTag, "future rollback must retain the SEO release UI");
+  console.log("Z2D_FUTURE_ROLLBACK_TO_SEO_BASELINE:PASS");
+  rmSync(box.root, { recursive: true, force: true });
+}
+
+if (!SEO_ONLY) {
 {
   const box = initSandbox("promote-changed-file");
   const prepared = runPrepare(box, box.newSha);
@@ -1476,22 +1685,33 @@ exit 2
   assert.notEqual(traversal.status, 0, "path traversal must fail before cutover");
   writeFileSync(manifestPath, `${JSON.stringify(original, null, 2)}\n`);
   const linkPath = path.join(dest, "dist", "link.js");
-  symlinkSync(path.join(dest, "dist/index.html"), linkPath);
-  writeFileSync(
-    manifestPath,
-    `${JSON.stringify(
-      {
-        ...original,
-        files: [...original.files, { path: "link.js", sha256: "1".repeat(64), size: 1 }],
-      },
-      null,
-      2
-    )}\n`
-  );
-  const symlinkRes = runPromote(box, dest);
-  assert.notEqual(symlinkRes.status, 0, "symlink must fail before cutover");
+  let symlinkAvailable = true;
+  try {
+    symlinkSync(path.join(dest, "dist/index.html"), linkPath);
+  } catch (error) {
+    if (process.platform !== "win32" || error?.code !== "EPERM") throw error;
+    symlinkAvailable = false;
+  }
+  if (symlinkAvailable) {
+    writeFileSync(
+      manifestPath,
+      `${JSON.stringify(
+        {
+          ...original,
+          files: [...original.files, { path: "link.js", sha256: "1".repeat(64), size: 1 }],
+        },
+        null,
+        2
+      )}\n`
+    );
+    const symlinkRes = runPromote(box, dest);
+    assert.notEqual(symlinkRes.status, 0, "symlink must fail before cutover");
+  } else {
+    console.log("Z7_SYMLINK_WINDOWS_EPERM:NOT_VERIFIED");
+  }
   assert.equal(liveSha(box), before);
-  console.log("Z7_TRAVERSAL_SYMLINK_FAILS_BEFORE_CUTOVER:PASS");
+  console.log("Z7_TRAVERSAL_FAILS_BEFORE_CUTOVER:PASS");
+  if (symlinkAvailable) console.log("Z7_SYMLINK_FAILS_BEFORE_CUTOVER:PASS");
   rmSync(box.root, { recursive: true, force: true });
 }
 
@@ -1630,4 +1850,5 @@ exit 2
   rmSync(box.root, { recursive: true, force: true });
 }
 
-console.log("SAFE_PRODUCTION_DEPLOY_VERIFY_PASS");
+}
+console.log(SEO_ONLY ? "SEO_POST_CUTOVER_DEPLOY_VERIFY_PASS" : "SAFE_PRODUCTION_DEPLOY_VERIFY_PASS");
