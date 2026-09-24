@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
 import "../../../../src/styles/clover-theme.css";
