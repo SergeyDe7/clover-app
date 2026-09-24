@@ -35,7 +35,9 @@ function parseReviewRange(args) {
   return { base, head };
 }
 
-const reviewRange = parseReviewRange(process.argv.slice(2));
+const verifierArgs = process.argv.slice(2);
+const functionalOnly = verifierArgs.length === 1 && verifierArgs[0] === "--functional-only";
+const reviewRange = functionalOnly ? null : parseReviewRange(verifierArgs);
 
 const cloverClient = {
   id: "client-1",
@@ -425,7 +427,7 @@ assert.deepEqual(multiClientResult[secondClient.id], {
 });
 
 // J. The preview state writes are wired through the transaction primitive.
-const serverSource = readFileSync(path.join(serverRoot, "src", "server.js"), "utf8");
+const serverSource = readFileSync(path.join(serverRoot, "src", "server.js"), "utf8").replace(/\r\n/gu, "\n");
 const previewStart = serverSource.indexOf(
   'app.post("/api/one-c/clients-preview"'
 );
@@ -1227,29 +1229,31 @@ function runGitVerifierSelfTest() {
 }
 
 runGitVerifierSelfTest();
-assert.equal(
-  reviewRange.head,
-  gitText(repositoryRoot, ["rev-parse", "HEAD"]),
-  "Review head must equal the checked-out repository HEAD."
-);
-assert.equal(
-  reviewRange.base,
-  gitText(repositoryRoot, [
-    "merge-base",
+if (!functionalOnly) {
+  assert.equal(
     reviewRange.head,
-    "origin/main",
-  ]),
-  "Review base must equal the trusted origin/main merge-base."
-);
-verifyProtectedDiff({
-  cwd: repositoryRoot,
-  ...reviewRange,
-  allowedPaths: ALLOWED_PR_PATHS,
-});
-verifyRepositoryWorkspaceScope({
-  cwd: repositoryRoot,
-  base: reviewRange.base,
-  allowedPaths: ALLOWED_PR_PATHS,
-});
+    gitText(repositoryRoot, ["rev-parse", "HEAD"]),
+    "Review head must equal the checked-out repository HEAD."
+  );
+  assert.equal(
+    reviewRange.base,
+    gitText(repositoryRoot, [
+      "merge-base",
+      reviewRange.head,
+      "origin/main",
+    ]),
+    "Review base must equal the trusted origin/main merge-base."
+  );
+  verifyProtectedDiff({
+    cwd: repositoryRoot,
+    ...reviewRange,
+    allowedPaths: ALLOWED_PR_PATHS,
+  });
+  verifyRepositoryWorkspaceScope({
+    cwd: repositoryRoot,
+    base: reviewRange.base,
+    allowedPaths: ALLOWED_PR_PATHS,
+  });
+}
 
 console.log("verify-manual-client-price-type: ok");

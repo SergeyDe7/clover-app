@@ -24,8 +24,12 @@ const checks = [
     "В карточке товара есть удаление из каталога Clover, витрины и матриц",
   ],
   [
-    "Список без фото: исходный шрифт телефона, название целиком",
+    ".clover-app .product-card-list h2 {\n    grid-column: 1 !important;\n    grid-row: 1 !important;\n    font-size: 12px !important;",
     "В списке без фото на телефоне исходный шрифт и название целиком",
+  ],
+  [
+    "word-break: keep-all !important;\n    overflow-wrap: normal !important;",
+    "Название в списке без фото переносится по словам, а не по одной букве",
   ],
   [
     'className="purchase-price-card"',
@@ -40,7 +44,7 @@ const checks = [
     "Товарная матрица клиента свёрнута после обновления страницы",
   ],
   [
-    "<summary>1С и цены</summary>",
+    '<summary>{t("manager.clients.oneCAndPrices")}</summary>',
     "Настройки 1С и цен открываются внутри окна матрицы",
   ],
   [
@@ -48,7 +52,7 @@ const checks = [
     "Карточки с 1 и 2 единицами измерения одной высоты",
   ],
   [
-    "Телефон ЛК, вид «Фото»: компактные карточки, бейджи над фото",
+    "Телефон ЛК «Фото»: визуальный паритет с витриной",
     "В ЛК клиента на телефоне вид «Фото» — компактные карточки, бейджи над рамкой фото",
   ],
   [
@@ -92,8 +96,8 @@ const checks = [
     "Карточка клиента компактная, без лишней пустоты",
   ],
   [
-    "grid-template-columns: 38px minmax(0, 1fr) 38px !important",
-    "На телефоне в ЛК кнопки количества крупнее",
+    "grid-template-columns: 30px minmax(0, 1fr) 30px !important;\n    border-radius: 10px !important;\n    box-sizing: border-box !important;",
+    "На телефоне кнопки количества в списке имеют ширину 30px",
   ],
   [
     'Number.isFinite(Number(value))',
@@ -112,7 +116,7 @@ const checks = [
     "Менеджер видит прикреплённую фотографию",
   ],
   [
-    'UNIT_CONFIG[unit].shortLabel',
+    'unitDisplayShort(unit, t) || UNIT_CONFIG[unit]?.shortLabel',
     "В карточке клиента цена подписана только единицей продажи",
   ],
   [
@@ -132,11 +136,11 @@ const checks = [
     "Кнопки отметки и удаления из матрицы стоят одной строкой",
   ],
   [
-    'label: "Данные клиента"',
+    'label: t("manager.clientDetails")',
     "В карточке клиента остаётся пункт «Данные клиента»",
   ],
   [
-    'label: "Матрица"',
+    'label: t("client.matrix.short"),\n                          onSelect: () => {\n                            restoredOpenClient.current = true;\n                            setOpenClientId(client.id);\n                            setMatrixWindowClientId(String(client.id));',
     "Пункт меню клиента открывает окно матрицы, а не прокрутку страницы",
   ],
   [
@@ -144,7 +148,7 @@ const checks = [
     "Из окна матрицы можно скачать Excel всей матрицы клиента",
   ],
   [
-    'label: "Заблокировать доступ"',
+    'label: t("manager.blockAccess")',
     "В меню клиента блокировка называется «Заблокировать доступ»",
   ],
   [
@@ -164,7 +168,7 @@ const checks = [
     "В каталоге можно удалить отмеченные галочками товары",
   ],
   [
-    "                            Выбрать все",
+    '                            t("shared.action.selectAll")',
     "В матрице клиента кнопка выбора называется «Выбрать все»",
   ],
   [
@@ -180,8 +184,8 @@ const checks = [
     "Поиск витрины учитывает подгруппу и фасет, как до смены на prefix search",
   ],
   [
-    '["orders", "Заказы"],\n  ["products", "Товары"],\n  ["storefront", "Витрина"],\n  ["clients", "Клиенты"],\n  ["acts", "Акты сверок"],\n  ["exchange", "1С"],\n  ["more", "Ещё"]',
-    "Главное меню: Заказы, Товары, Витрина, Клиенты, Акты сверок, 1С, Ещё",
+    '["orders", "manager.nav.orders"],\n  ["products", "manager.nav.products"],\n  ["storefront", "manager.nav.storefront"],\n  ["clients", "manager.nav.clients"],\n  ["acts", "manager.nav.acts"],\n  ["exchange", "manager.nav.exchange"],\n  ["price-list", "manager.nav.priceList"],\n  ["languages", "manager.nav.languages"],\n  ["more", "manager.nav.more"]',
+    "Главное меню менеджера содержит локализованные вкладки заказов, товаров, витрины, клиентов, актов, 1С, прайса и языков",
   ],
   [
     "restoreWindowScroll",
@@ -192,7 +196,7 @@ const checks = [
     "На витрине категория химии называется «Химия, чистящие средства»",
   ],
   [
-    "background: #f3f2ee;",
+    "html.sf-root,\nbody.sf-body {\n  background: #f5f7f4 !important;",
     "Фон витрины нейтральный, без зелёной заливки страницы",
   ],
   [
@@ -200,7 +204,7 @@ const checks = [
     "Подгруппа с мопами пишется со строчной буквы",
   ],
   [
-    '["matrix", "Моя матрица"],\n  ["catalog", "Добавить товары из каталога"],',
+    '["matrix", "client.nav.matrix"],\n  ["catalog", "client.nav.catalog"],',
     "В ЛК клиента есть «Моя матрица» и «Добавить товары из каталога»",
   ],
   [
@@ -208,7 +212,7 @@ const checks = [
     "В ЛК админа номер, телефон, адрес и состав заказа спрятаны за «Подробнее»",
   ],
   [
-    "settings.managerCanDeleteOrders ? (",
+    "!inTrash && canShowDelete ? (",
     "В карточке заказа кнопка «Удалить» стоит рядом со статусами, не внутри «Подробнее»",
   ],
   [
@@ -229,10 +233,9 @@ const checks = [
   ],
 ];
 
-for (const [fragment, description] of checks) {
-  if (!source.includes(fragment)) {
-    throw new Error(`Проверка не пройдена: ${description}`);
-  }
+const missingChecks = checks.filter(([fragment]) => !source.includes(fragment));
+if (missingChecks.length) {
+  throw new Error(`Проверка не пройдена: ${missingChecks.map(([, description]) => description).join("; ")}`);
 }
 
 {
@@ -276,7 +279,7 @@ if (source.includes('"Настройки клиента"') || source.includes("�
 {
   const pickerAt = source.indexOf("<OneCClientPicker");
   const lastPickerAt = source.lastIndexOf("<OneCClientPicker");
-  const matrixAt = source.indexOf("<summary>1С и цены");
+  const matrixAt = source.indexOf('<summary>{t("manager.clients.oneCAndPrices")}</summary>');
   if (pickerAt < 0) {
     throw new Error("Пропала кнопка выбора контрагента 1С.");
   }

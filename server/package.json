@@ -11,6 +11,7 @@
     "start": "node src/server.js",
     "check": "node scripts/run-package-scripts.mjs check",
     "test:onec": "node scripts/run-package-scripts.mjs test:onec",
+    "test:manual-client-price-review": "node scripts/run-package-scripts.mjs test:manual-client-price-review",
     "apply:onec-links": "node scripts/apply-onec-links.mjs",
     "test:v18": "node scripts/verify-v18.mjs",
     "test:all": "npm run check && npm run test:onec && npm run test:v18 && npm run test:runtime && npm run test:manager-notifications && npm run test:manager-tabs && npm run test:order-trash && npm run test:security-stage3-package1 && npm run test:security-stage3-package2 && npm run test:security-stage3-package3 && npm run test:security-stage4-package-a && npm run test:security-stage4-package-b && npm run test:security-stage4-package-c && npm run test:security-stage5-prepare && npm run test:security-stage5-package-d && npm run test:security-stage6 && npm run test:security-stage7 && npm run test:iphone-boot-splash",

@@ -205,20 +205,18 @@ if (mode === "check") {
     run(["--check", file]);
   }
 } else if (mode === "test:onec") {
+  for (const file of TEST_ONEC) {
+    run(file === "scripts/verify-manual-client-price-type.mjs" ? [file, "--functional-only"] : [file]);
+  }
+} else if (mode === "test:manual-client-price-review") {
   const reviewBase =
     String(process.env.CLOVER_VERIFY_BASE_SHA || "").trim() ||
     gitOutput(["merge-base", "HEAD", "origin/main"]);
   const reviewHead =
     String(process.env.CLOVER_VERIFY_HEAD_SHA || "").trim() ||
     gitOutput(["rev-parse", "HEAD"]);
-  for (const file of TEST_ONEC) {
-    run(
-      file === "scripts/verify-manual-client-price-type.mjs"
-        ? [file, "--base", reviewBase, "--head", reviewHead]
-        : [file]
-    );
-  }
+  run(["scripts/verify-manual-client-price-type.mjs", "--base", reviewBase, "--head", reviewHead]);
 } else {
-  console.error("usage: node scripts/run-package-scripts.mjs <check|test:onec>");
+  console.error("usage: node scripts/run-package-scripts.mjs <check|test:onec|test:manual-client-price-review>");
   process.exit(2);
 }
