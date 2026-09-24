@@ -69,6 +69,10 @@ import {
   toClientPreviewItems,
   writePreviewArtifact,
 } from "../src/previewArtifact.js";
+import {
+  assertNoSymlinkPathComponents,
+  nativeRealpath,
+} from "../src/safeFsPath.js";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDirectory, "../..");
@@ -358,6 +362,57 @@ function injectedFs(filePath, { kind = "file", realpath = "", override = {} } = 
   realpathSyncFn.native = realpathSyncFn;
   return { lstatSync: lstatSyncFn, realpathSync: realpathSyncFn };
 }
+
+test(
+  "SEC3-008: Windows permission fallback accepts ordinary paths and still rejects links",
+  { skip: process.platform !== "win32" },
+  () => {
+    const root = path.parse(repositoryRoot).root;
+    const candidate = path.join(root, "ordinary", "nested");
+    for (const code of ["EPERM", "EACCES"]) {
+      const ordinaryFs = injectedFs(candidate, { kind: "dir" });
+      ordinaryFs.realpathSync.native = () => {
+        const error = new Error("native realpath denied");
+        error.code = code;
+        throw error;
+      };
+
+      assert.equal(nativeRealpath(candidate, ordinaryFs), path.resolve(candidate));
+      assert.equal(
+        assertNoSymlinkPathComponents(candidate, { fs: ordinaryFs }),
+        path.resolve(candidate)
+      );
+    }
+
+    const linkedParent = path.dirname(candidate);
+    const linkedFs = injectedFs(candidate, {
+      kind: "dir",
+      override: {
+        [linkedParent]: { kind: "symlink", realpath: linkedParent },
+      },
+    });
+    linkedFs.realpathSync.native = () => {
+      const error = new Error("native realpath denied");
+      error.code = "EPERM";
+      throw error;
+    };
+    assert.throws(
+      () => assertNoSymlinkPathComponents(candidate, { fs: linkedFs }),
+      (error) => error?.code === "SAFE_PATH_SYMLINK"
+    );
+
+    const unexpectedFs = injectedFs(candidate, { kind: "dir" });
+    unexpectedFs.realpathSync.native = () => {
+      const error = new Error("native realpath failed unexpectedly");
+      error.code = "EIO";
+      throw error;
+    };
+    assert.throws(
+      () => nativeRealpath(candidate, unexpectedFs),
+      (error) => error?.code === "EIO"
+    );
+  }
+);
 
 test("SEC3-008: dry-run retention does not mutate rows", () => {
   const root = makeTempRoot("audit-dry");

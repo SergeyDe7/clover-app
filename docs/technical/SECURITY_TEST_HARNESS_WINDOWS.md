@@ -1,7 +1,9 @@
 # Windows test-harness repair (local preparation)
 
-This package changes test scripts only. It does not change API/UI runtime code,
-database schema, 1C exchange, production services, or the Stage 5 upload package.
+The original package changed test scripts only. The 2026-09-24 follow-up also
+changes the shared filesystem path canonicalization helper described below. It
+does not change API/UI routes, database schema, 1C exchange, production
+services, or the Stage 5 upload package.
 It starts from local `origin/main` `2dde2e0ea64572336c5926bf01e701d5b384e7fa`.
 The initial remote probe failed; before Git delivery, `git ls-remote origin
 refs/heads/main` confirmed the same SHA on GitHub.
@@ -73,5 +75,34 @@ Targeted ESLint on all changed `.mjs` scripts passed. Repository-wide
 
 Push and PR are a separate owner-approved delivery step. Merge, PROMOTE,
 server change, real login/reset/order/mail, and working 1C actions are not in
-scope. Rollback is to close the unmerged PR, or revert the test-only commit if
-it is merged later.
+scope. Rollback is to close the unmerged PR, or revert the corresponding commit
+if it is merged later.
+
+## Windows realpath follow-up — 2026-09-24
+
+Baseline on `origin/main` `24cbe50efc7ce375d113487641878c48295ae80e`:
+
+- `test:security-stage3-package3` reproduced 8 failures and 22 passes.
+- `lstatSync` identified `C:\Users\Lonovo` as an ordinary directory.
+- `realpathSync.native` returned `EPERM` for that directory in the Windows
+  workspace, while `realpathSync` returned the unchanged canonical path.
+- The path guard therefore mislabeled ordinary temporary fixture paths as
+  symlink paths before the tested retention, preview, and permission logic ran.
+
+The helper now falls back to `realpathSync` only on Windows and only when the
+native call fails with `EPERM` or `EACCES`. Other native errors still propagate.
+Every path component is still checked with `lstatSync`, canonical equality is
+still required, and injected plus real symlink/junction scenarios remain
+rejected.
+
+Verification after the change:
+
+- `test:security-stage3-package3`: PASS, 31/31, including the new Windows
+  `EPERM`/`EACCES`, real-link rejection, and unexpected-error checks.
+- `test:all`: PASS after clean root and server installs from their lock files;
+  the 1C checks use synthetic fixtures and do not call working 1C.
+- Targeted ESLint for `safeFsPath.js` and the Package 3 verifier: PASS.
+- Root and server install audits: 0 vulnerabilities.
+
+Rollback is a revert of the follow-up commit. No deployment, production DB,
+server process, environment, or 1C change is part of this follow-up.
