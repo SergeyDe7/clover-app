@@ -28,6 +28,7 @@
 # The SHA object must already be in ROOT's git (fetch first). This script
 # does not reset ROOT, does not talk to production 1С, and does not chmod dist.
 set -euo pipefail
+umask 077
 
 ROOT="${CLOVER_DEPLOY_ROOT:-/opt/clover/clover-app}"
 STAGING_ROOT="${CLOVER_DEPLOY_STAGING:-/opt/clover/deployments/staging}"

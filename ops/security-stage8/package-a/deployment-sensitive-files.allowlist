@@ -1,0 +1,19 @@
+# Security Stage 8 package A: exact production-relative paths only.
+# File contents are never read by the remediation tool.
+db-backups/clover-before-a845f30884714aadc24b61444936b8b393ae9d84.sqlite
+db-backups/clover-before-a845f30884714aadc24b61444936b8b393ae9d84.sqlite-shm
+db-backups/clover-before-a845f30884714aadc24b61444936b8b393ae9d84.sqlite-wal
+isolated-metrika-flag-20260920T2223Z/old-release-root/.env.production
+isolated-metrika-flag-20260920T2223Z/old-release-root/server/.env
+isolated-metrika-flag-20260920T2223Z/root/.env.production
+isolated-metrika-flag-20260920T2223Z/root/server/.env
+lkg/clover-before-c8a56d61f2343ae112bde939143fc05c1bf2bf43.sqlite
+pr129-pre-20260916T2010Z/clover.sqlite
+staging/backup-metrika-flag-20260920T223751Z/clover.sqlite
+staging/prepare-db-99e45c4a0b5105b763ea0529781c4b05179b9f5a/clover.sqlite
+staging/prepare-db-99e45c4a0b5105b763ea0529781c4b05179b9f5a/clover.sqlite-shm
+staging/prepare-db-99e45c4a0b5105b763ea0529781c4b05179b9f5a/clover.sqlite-wal
+staging/security-stage7-deps-21259c768b3dbf2de17da9a0b676f571380c6a1b/.env.production
+staging/ui-403-recovery-20260918T233508Z/db-ro/clover.sqlite
+staging/ui-403-recovery-20260918T233508Z/db-ro/clover.sqlite-shm
+staging/ui-403-recovery-20260918T233508Z/db-ro/clover.sqlite-wal
