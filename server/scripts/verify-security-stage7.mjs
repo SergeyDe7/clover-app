@@ -24,7 +24,7 @@ const serverPackage = JSON.parse(
 assert.equal(serverPackage.dependencies["@simplewebauthn/server"], "13.3.3");
 assert.equal(serverPackage.dependencies["adm-zip"], "0.6.1");
 assert.equal(serverPackage.dependencies.multer, "2.4.0");
-assert.equal(serverPackage.dependencies.nodemailer, "7.0.13");
+assert.equal(serverPackage.dependencies.nodemailer, "10.0.10");
 assert.equal(serverPackage.dependencies.sharp, "^0.35.4");
 assert.equal(serverPackage.overrides.qs, "6.16.0");
 assert.equal(rootPackage.overrides.nanoid, "3.3.18");
