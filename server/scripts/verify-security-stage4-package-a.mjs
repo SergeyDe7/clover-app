@@ -155,8 +155,24 @@ function jsonRaw(port, {
   return httpRaw({ port, method, pathname, headers, chunks: [payload] });
 }
 
-function httpRaw({ port, method, pathname, headers, chunks }) {
+function httpRaw({ port, method, pathname, headers, chunks, allowConnectionReset = false }) {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const fail = (error, status = 0, parts = []) => {
+      if (settled) return;
+      if (allowConnectionReset && error?.code === "ECONNRESET") {
+        const text = Buffer.concat(parts).toString("utf8");
+        finish({ status, text, json: jsonSafe(text), connectionReset: true });
+        return;
+      }
+      settled = true;
+      reject(error);
+    };
     const req = http.request(
       {
         host: "127.0.0.1",
@@ -170,15 +186,17 @@ function httpRaw({ port, method, pathname, headers, chunks }) {
         res.on("data", (chunk) => parts.push(chunk));
         res.on("end", () => {
           const text = Buffer.concat(parts).toString("utf8");
-          resolve({
+          finish({
             status: res.statusCode,
             text,
             json: jsonSafe(text),
           });
         });
+        res.on("aborted", () => fail(Object.assign(new Error("response aborted"), { code: "ECONNRESET" }), res.statusCode, parts));
+        res.on("error", (error) => fail(error, res.statusCode, parts));
       }
     );
-    req.on("error", reject);
+    req.on("error", (error) => fail(error));
     for (const chunk of chunks) req.write(chunk);
     req.end();
   });
@@ -911,6 +929,7 @@ try {
     pathname: "/api/auth/login",
     headers: { "Content-Type": "application/json" },
     chunks: [Buffer.from(JSON.stringify({ filler: "x".repeat(AUTH_OVERSIZE) }))],
+    allowConnectionReset: true,
   });
   note(
     "login.get-no-wide-bucket",

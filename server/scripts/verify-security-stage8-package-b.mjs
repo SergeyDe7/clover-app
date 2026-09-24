@@ -10,6 +10,7 @@ const workflow = read(".github/workflows/security-stage8.yml");
 const ruleset = JSON.parse(read("ops/security-stage8/package-b/main-ruleset.json"));
 const docs = read("docs/technical/SECURITY_STAGE8_PACKAGE_B.md");
 const serverPackage = JSON.parse(read("server/package.json"));
+const stage4PackageA = read("server/scripts/verify-security-stage4-package-a.mjs");
 
 assert.match(workflow, /^name: S8-B CI$/mu);
 assert.match(workflow, /^  pull_request:$/mu);
@@ -31,6 +32,15 @@ assert.match(workflow, /npm exec -- vite build/u);
 assert.match(workflow, /npm run test:all/u);
 assert.match(workflow, /S8A_FIXTURE_PYTHON: \/usr\/bin\/python3/u);
 assert.doesNotMatch(workflow, /npm run build/u);
+assert.match(stage4PackageA, /function httpRaw\(\{ port, method, pathname, headers, chunks, allowConnectionReset = false \}\)/u);
+assert.equal([...stage4PackageA.matchAll(/allowConnectionReset: true/gu)].length, 1);
+assert.match(stage4PackageA, /allowConnectionReset && error\?\.code === "ECONNRESET"/u);
+assert.match(stage4PackageA, /res\.on\("error", \(error\) => fail\(error, res\.statusCode, parts\)\)/u);
+const resetProbe = stage4PackageA.match(/const getLogin = await httpRaw\(\{([\s\S]*?)\n  \}\);/u)?.[1] || "";
+assert.match(resetProbe, /method: "GET"/u);
+assert.match(resetProbe, /pathname: "\/api\/auth\/login"/u);
+assert.match(resetProbe, /chunks: \[Buffer\.from\(JSON\.stringify\(\{ filler: "x"\.repeat\(AUTH_OVERSIZE\) \}\)\)\]/u);
+assert.match(resetProbe, /allowConnectionReset: true/u);
 
 assert.equal(ruleset.name, "S8-B main protection");
 assert.equal(ruleset.target, "branch");
