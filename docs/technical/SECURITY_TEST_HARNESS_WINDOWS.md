@@ -32,13 +32,15 @@ refs/heads/main` confirmed the same SHA on GitHub.
 
 `test:onec` runs functional and synthetic regression checks, including the
 client-price verifier's fixture and self-tests. It does not call working 1C.
-The strict historical client-price PR allowlist remains available as
-`npm run test:manual-client-price-review`, with an exact base/head; it is not a
-general gate for arbitrary later PRs. The command must be invoked explicitly
-only on the checkout and review range of that historical client-price PR. A
-failure on this test-harness branch is expected because its changed files are
-outside that historical allowlist; it is not an applicable release gate here.
-It must not be silently treated as having run when only `test:all` runs.
+The strict historical client-price PR #132 allowlist is pinned to its immutable
+range `fcf0fc38262453cc28d53478af1ae96d6c860b87..1bc7b81ceb5893f7e8f9a19f251a5b40cb4857c1`.
+`npm run test:manual-client-price-review` validates that exact range from any
+descendant checkout, without depending on the moving `origin/main` merge-base.
+It remains a historical audit rather than a general allowlist for later PRs,
+and `test:all` now runs it explicitly so a broken historical gate cannot be
+reported as covered by functional-only checks. The checkout must contain full
+Git history (`fetch-depth: 0` in CI); the gate fails closed with an actionable
+error if either pinned commit is unavailable.
 
 The storefront CSS root background is `#f5f7f4`, while `src/main.jsx` still
 sets `STOREFRONT_THEME_COLOR` to `#f3f2ee` after splash. This mismatch is an
@@ -61,10 +63,11 @@ Targeted ESLint on all changed `.mjs` scripts passed. Repository-wide
   trusted-bootstrap scenarios and Stage 3 path/symlink tests. On Windows this
   requires running outside the workspace sandbox because `realpathSync.native`
   on the user's home path otherwise returns `EPERM`.
-- `npm run test:manual-client-price-review` on this uncommitted branch:
-  expected FAIL (`Review base and head must not be identical`); the strict
-  historical gate remains active and needs its own applicable commit range.
-- Independent code review: APPROVE after the finished full `test:all` run.
+- `npm run test:manual-client-price-review`: PASS on the pinned PR #132 range.
+- Independent review of the local five-file readiness correction: APPROVE WITH
+  CONDITIONS after the finished full `test:all` run. Delivery remains blocked
+  until the correction is committed, pushed, and rechecked on the exact remote
+  PR head SHA.
 
 ## Release boundary
 
