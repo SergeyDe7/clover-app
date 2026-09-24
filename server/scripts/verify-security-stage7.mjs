@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import AdmZip from "adm-zip";
 import * as XLSX from "xlsx";
@@ -27,8 +28,18 @@ assert.equal(serverPackage.dependencies.multer, "2.4.0");
 assert.equal(serverPackage.dependencies.nodemailer, "7.0.13");
 assert.equal(serverPackage.dependencies.sharp, "^0.35.4");
 assert.equal(serverPackage.overrides.qs, "6.16.0");
+assert.equal(rootPackage.dependencies.xlsx, "file:vendor/xlsx-0.20.3.tgz");
 assert.equal(rootPackage.overrides.nanoid, "3.3.18");
 assert.equal(rootPackage.overrides.postcss, "8.5.28");
+assert.equal(XLSX.version, "0.20.3");
+
+const sheetJsTarball = await readFile(
+  new URL("../../vendor/xlsx-0.20.3.tgz", import.meta.url)
+);
+assert.equal(
+  createHash("sha256").update(sheetJsTarball).digest("hex"),
+  "8dc73fc3b00203e72d176e85b50938627c7b086e607c682e8d3c22c02bb99fe8"
+);
 
 const maliciousCompany = '<img src=x onerror="alert(1)"> & Clover';
 const maliciousUrl = 'https://example.invalid/?next=" onclick="alert(1)';
