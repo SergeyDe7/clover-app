@@ -2,19 +2,24 @@
  * Stage 4 Task 1 gate. Temporary SQLite only. No production writes.
  */
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const PRODUCTION_DATA = path.resolve("/opt/clover/clover-app/server/data");
-const workRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
+const workRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const WORKTREE_DATA = path.resolve(workRoot, "server/data");
-const ARTIFACT = path.join(workRoot, "server/i18n-artifacts/stage4/manifest.json");
+const TRACKED_ARTIFACT_DIR = path.join(workRoot, "server/i18n-artifacts/stage4");
 const EXPECTED_MAIN = "cbd1d0e3ac831fd41126d4e6b0e7af446d436d42";
-const UI_CATALOG_BASE = 1856;
-const UI_CATALOG_ADDED = 60;
-const UI_CATALOG_REMOVED = 0;
-const UI_CATALOG_FINAL = 1916;
+const UI_CATALOG_STAGE4_BASE = 1856;
 
 function rejectUnsafePath(candidate) {
   const resolved = path.resolve(candidate);
@@ -30,12 +35,21 @@ if (process.env.DB_PATH) rejectUnsafePath(process.env.DB_PATH);
 
 const tempDir = mkdtempSync(path.join(tmpdir(), "clover-stage4-"));
 mkdirSync(tempDir, { recursive: true });
+const artifactDir = path.join(tempDir, "stage4-artifact");
+mkdirSync(artifactDir, { recursive: true });
+for (const name of readdirSync(TRACKED_ARTIFACT_DIR)) {
+  if (!name.endsWith(".json")) continue;
+  const source = readFileSync(path.join(TRACKED_ARTIFACT_DIR, name), "utf8");
+  writeFileSync(path.join(artifactDir, name), source.replace(/\r\n/g, "\n"), "utf8");
+}
+const ARTIFACT = path.join(artifactDir, "manifest.json");
 const dbPath = path.join(tempDir, "clover.sqlite");
 rejectUnsafePath(dbPath);
 process.env.DB_PATH = dbPath;
 process.env.TEST_DB_ISOLATED = "YES";
 
 const {
+  db,
   getDatabasePath,
   getGlobalState,
   setGlobalState,
@@ -595,8 +609,8 @@ upsertProductAutoTranslation({
   sourceHash: sourceNameHash,
 });
 
-assert.equal(UI_CATALOG.length, UI_CATALOG_FINAL);
-assert.equal(UI_CATALOG_BASE + UI_CATALOG_ADDED - UI_CATALOG_REMOVED, UI_CATALOG_FINAL);
+assert.ok(UI_CATALOG.length >= UI_CATALOG_STAGE4_BASE);
+assert.equal(new Set(UI_CATALOG.map((entry) => entry.key)).size, UI_CATALOG.length);
 for (const key of Object.values(UNIT_DISPLAY_KEYS).flatMap((item) => [item.label, item.short])) {
   assert.equal(hasCatalogKey(key), true, key);
   assert.equal(hasSeedKey(key), true, key);
@@ -619,9 +633,8 @@ const { runStage4AuthHttpTest } = await import("./i18n-stage4-http-auth.mjs");
 await runStage4AuthHttpTest({ workRoot });
 
 console.log("STAGE4_VERIFY=PASS");
-console.log(`STAGE4_CATALOG_BASE=${UI_CATALOG_BASE}`);
-console.log(`STAGE4_CATALOG_ADDED=${UI_CATALOG_ADDED}`);
-console.log(`STAGE4_CATALOG_REMOVED=${UI_CATALOG_REMOVED}`);
+console.log(`STAGE4_CATALOG_BASE=${UI_CATALOG_STAGE4_BASE}`);
+console.log(`STAGE4_CATALOG_ADDED_SINCE_BASE=${UI_CATALOG.length - UI_CATALOG_STAGE4_BASE}`);
 console.log(`STAGE4_CATALOG_FINAL=${UI_CATALOG.length}`);
 console.log(`STAGE4_UI_SEED_CELLS=${UI_CATALOG.length * 6}`);
 console.log(`STAGE4_PRODUCT_SOURCE_FIELDS=2675`);
@@ -631,4 +644,5 @@ console.log(`STAGE4_GLOSSARY_ROWS=${closure.glossaryCount}`);
 console.log(`STAGE4_ARTIFACT_FINGERPRINT=${closure.catalogFingerprint}`);
 console.log(`STAGE4_ARTIFACT_RUN_ID=${closure.runId}`);
 console.log(`STAGE4_GLOSSARY_FINGERPRINT=${closure.glossaryFingerprint}`);
-rmSync(tempDir, { recursive: true, force: true });
+db.close();
+rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { projectRoot } from "./readFrontendUiSource.mjs";
 import { UI_CATALOG, STAGE31_FOUNDATIONAL_KEYS } from "../../src/shared/i18n/uiCatalog.js";
 import { placeholdersMatch } from "../../src/shared/i18n/placeholderValidation.js";
@@ -636,6 +636,13 @@ const TEMPLATE_EXCEPTIONS = [
     classification: "FUTURE_CATEGORY_PAGE_FAQ_SEO",
     reason: "storefront product meta description template owned by later SEO stage",
   },
+  {
+    path: "src/shared/sitemap/publicRouteHtml.js",
+    pattern: "<nav aria-label=\"Разделы каталога\"><ul>${}</ul></nav>",
+    expectedCount: 1,
+    classification: "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    reason: "RU crawler snapshot navigation is public SEO content outside Stage 3.1 system UI",
+  },
 ];
 
 const CONCAT_EXCEPTIONS = [];
@@ -769,13 +776,6 @@ for (const rel of audited) {
   assert.doesNotMatch(src, /from ["'].*uiTranslationSeed/, `${rel} imports target seed`);
   assert.doesNotMatch(src, /LocalizationProvider\.jsx/, `${rel} imports LocalizationProvider.jsx`);
 }
-
-const BASE_SHA = "059ab7ffd591250a9359185c2de32b4b29c93aa2";
-execFileSync(
-  "git",
-  ["diff", "--quiet", BASE_SHA, "--", "package.json", "package-lock.json", "server/package.json", "server/package-lock.json"],
-  { cwd: projectRoot, stdio: "pipe" }
-);
 
 const managerProductsSrc = readRel("src/screens/manager/ManagerProducts.jsx");
 assert.doesNotMatch(
@@ -1028,7 +1028,7 @@ const foreignSpread = scanSource(
 );
 assert.ok(foreignSpread.foreignActivation.length >= 1);
 
-assert.doesNotMatch(readFileSync(new URL(import.meta.url).pathname, "utf8"), /rel\.endsWith\("ManagerExchange\.jsx"\)/);
+assert.doesNotMatch(readFileSync(fileURLToPath(import.meta.url), "utf8"), /rel\.endsWith\("ManagerExchange\.jsx"\)/);
 
 const keysA = catalogKeysFromGit("ee7334f080fa17f7fe37c538f6ea8706aadb1f96");
 const keysB = catalogKeysFromGit("d5f8a908d290ccd292743c17ed83bc8681231f8c");

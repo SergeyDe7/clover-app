@@ -1,5 +1,4 @@
-import { pathToFileURL } from "node:url";
-import path from "node:path";
+import { launchTestChromium } from "./playwrightRuntime.mjs";
 
 export const JSONLD_HTML_EMBED_MARKER = "clover-jsonld-breakout-marker";
 
@@ -25,16 +24,6 @@ export const JSONLD_HTML_EMBED_CASES = Object.freeze([
     description: "Ordinary organization description",
   }),
 ]);
-
-const playwrightRoot =
-  process.env.PLAYWRIGHT_MODULE_ROOT ||
-  "/opt/clover/.npm/_npx/e41f203b7505f1fb/node_modules/playwright";
-const chromiumPath =
-  process.env.PLAYWRIGHT_CHROMIUM_PATH ||
-  "/opt/clover/.cache/ms-playwright/chromium-1148/chrome-linux/chrome";
-const chromeLibs =
-  process.env.PLAYWRIGHT_CHROME_LIBS ||
-  "/opt/clover/.tmp/chrome-libs/usr/lib/x86_64-linux-gnu";
 
 /**
  * HTML5 script data end-tag: after `<script>`, consume until `</script`
@@ -113,20 +102,9 @@ let sharedBrowser = null;
 
 async function getBrowser() {
   if (sharedBrowser) return sharedBrowser;
-  const { chromium } = await import(
-    pathToFileURL(path.join(playwrightRoot, "index.mjs")).href
-  );
-  sharedBrowser = await chromium.launch({
-    executablePath: chromiumPath,
+  sharedBrowser = await launchTestChromium({
     headless: true,
     args: ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
-    env: {
-      ...process.env,
-      LD_LIBRARY_PATH: [chromeLibs, process.env.LD_LIBRARY_PATH || ""]
-        .filter(Boolean)
-        .join(":"),
-      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1",
-    },
   });
   return sharedBrowser;
 }

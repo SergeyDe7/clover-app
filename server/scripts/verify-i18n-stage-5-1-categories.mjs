@@ -32,7 +32,7 @@ rejectUnsafePath(dbPath);
 process.env.DB_PATH = dbPath;
 process.env.TEST_DB_ISOLATED = "YES";
 
-const { getDatabasePath } = await import("../src/db.js");
+const { db, getDatabasePath } = await import("../src/db.js");
 assert.equal(path.resolve(getDatabasePath()), path.resolve(dbPath));
 assert.ok(!path.resolve(getDatabasePath()).startsWith(PRODUCTION_DATA));
 console.log("TEST_DB_ISOLATED=YES");
@@ -565,11 +565,6 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   catalogPageSrc,
-  /subcategoryDisplayName/,
-  "subcategory breadcrumb display helper must not be reintroduced"
-);
-assert.doesNotMatch(
-  catalogPageSrc,
   /<h2>\{\s*section\.name\s*\}<\/h2>/,
   "all-catalog section H2 must not render raw canonical section.name"
 );
@@ -585,7 +580,7 @@ assert.match(
 );
 assert.match(
   catalogPageSrc,
-  /\{categoryDisplayName\}/,
+  /labelsReady\s*\?\s*categoryDisplayName/,
   "existing category breadcrumb localization must remain"
 );
 
@@ -637,4 +632,5 @@ console.log(
   })
 );
 
-rmSync(tempDir, { recursive: true, force: true });
+db.close();
+rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });

@@ -51,7 +51,7 @@ const outDir = path.join(temp, "dist");
 assert.equal(path.resolve(dbPath).startsWith(productionData), false);
 
 function cleanup() {
-  rmSync(temp, { recursive: true, force: true });
+  rmSync(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 }
 process.on("exit", cleanup);
 process.on("SIGINT", () => {

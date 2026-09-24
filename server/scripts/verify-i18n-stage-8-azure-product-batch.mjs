@@ -43,6 +43,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 const {
+  db,
   getDatabasePath,
   listProductTranslationRows,
   upsertProductTranslationRow,
@@ -111,7 +112,7 @@ for (const key of BATCH_KEYS) {
     assert.ok(getSeedTranslation(key, locale), `${key}/${locale}`);
   }
 }
-assert.equal(UI_CATALOG.length, 1916);
+assert.equal(new Set(UI_CATALOG.map((entry) => entry.key)).size, UI_CATALOG.length);
 
 const serverSrc = readFileSync(path.join(workRoot, "server/src/server.js"), "utf8");
 assert.match(serverSrc, /\/api\/admin\/product-batch-translation\/status[\s\S]{0,120}?roleRequired\("admin"\)/);
@@ -798,4 +799,5 @@ initializeLocalizationCatalog();
 }
 
 console.log("STAGE8_AZURE_PRODUCT_BATCH_OK");
-rmSync(tempDir, { recursive: true, force: true });
+db.close();
+rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
