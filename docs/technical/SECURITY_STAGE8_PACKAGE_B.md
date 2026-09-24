@@ -26,8 +26,9 @@ are `frontend` and `server`.
 The frontend job installs the locked dependency tree with lifecycle scripts
 disabled, lints the repository, and runs the Vite build directly. It does not
 run the production sitemap generator because that step can access deployment
-data. The server job installs the locked server dependency tree with lifecycle
-scripts disabled and runs the complete server verification suite. Its Linux
+data. The server job installs both locked root and server dependency trees with
+lifecycle scripts disabled because existing server security verifiers import
+the root-vendored `xlsx` package, then runs the complete server verification suite. Its Linux
 fixture explicitly selects `/usr/bin/python3` through the fixture-only
 `S8A_FIXTURE_PYTHON` override; the production interpreter pin remains unchanged.
 The server checkout fetches full Git history because an existing protected-diff
