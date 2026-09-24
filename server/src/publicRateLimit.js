@@ -26,6 +26,7 @@ export const PUBLIC_RATE_LIMIT_POLICIES = Object.freeze({
   passkeyAuthOptions: Object.freeze({ max: 10, windowMs: 10 * 60 * 1000 }),
   passkeyAuthVerify: Object.freeze({ max: 10, windowMs: 10 * 60 * 1000 }),
   guestOrder: Object.freeze({ max: 6, windowMs: 10 * 60 * 1000 }),
+  catalogRead: Object.freeze({ max: 30, windowMs: 60 * 1000 }),
 });
 
 const DEFAULT_MAX_ENTRIES = 10_000;
