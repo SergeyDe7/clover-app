@@ -10,6 +10,21 @@ const exchangePath = path.resolve(scriptDir, "../src/exchange.js");
 const source = readFrontendUiSource(projectRoot);
 const exchangeSource = await readFile(exchangePath, "utf8");
 
+function enclosingBlockHeader(blockSource, index) {
+  let depth = 0;
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    if (blockSource[cursor] === "}") depth += 1;
+    if (blockSource[cursor] !== "{") continue;
+    if (depth > 0) {
+      depth -= 1;
+      continue;
+    }
+    const headerStart = blockSource.lastIndexOf("}", cursor - 1) + 1;
+    return blockSource.slice(headerStart, cursor).trim();
+  }
+  return "";
+}
+
 const checks = [
   [
     'const UNIT_ORDER = ["piece", "pair", "meter", "roll", "pack", "bundle", "box"]',
@@ -52,10 +67,6 @@ const checks = [
     "Карточки с 1 и 2 единицами измерения одной высоты",
   ],
   [
-    "Телефон ЛК «Фото»: визуальный паритет с витриной",
-    "В ЛК клиента на телефоне вид «Фото» — компактные карточки, бейджи над рамкой фото",
-  ],
-  [
     'setSelectedIds(new Set(filteredProducts.map((item) => String(item.id))))',
     "В настройках витрины «Выбрать все» отмечает все позиции фильтра",
   ],
@@ -94,10 +105,6 @@ const checks = [
   [
     ".clover-app .client-card {\n  padding: 12px 14px !important;",
     "Карточка клиента компактная, без лишней пустоты",
-  ],
-  [
-    "grid-template-columns: 30px minmax(0, 1fr) 30px !important;\n    border-radius: 10px !important;\n    box-sizing: border-box !important;",
-    "На телефоне кнопки количества в списке имеют ширину 30px",
   ],
   [
     'Number.isFinite(Number(value))',
@@ -385,6 +392,52 @@ if (!cartChunk.includes("document.documentElement") || !dateChunk.includes("docu
 
 const themePath = path.resolve(projectRoot, "src/styles/clover-theme.css");
 const theme = await readFile(themePath, "utf8");
+const mobilePhotoSelectors = [
+  ".clover-app .page-content-client .embedded-catalog .product-grid:not(.product-grid-list) {",
+  ".clover-app .page-content-client .embedded-catalog .product-grid:not(.product-grid-list) .product-card {",
+  ".clover-app .page-content-client .embedded-catalog .product-grid:not(.product-grid-list) .product-image-wrap {",
+  ".clover-app .page-content-client .embedded-catalog .product-grid:not(.product-grid-list) .product-card-top {",
+  ".clover-app .embedded-catalog .product-card-list .quantity-control {",
+];
+for (const selector of mobilePhotoSelectors) {
+  const selectorAt = theme.lastIndexOf(selector);
+  assert.notEqual(selectorAt, -1, `Не найден итоговый mobile-селектор: ${selector}`);
+  assert.match(
+    enclosingBlockHeader(theme, selectorAt),
+    /@media\s*\(max-width:\s*820px\)\s*$/u,
+    `Селектор должен находиться внутри итогового mobile-блока 820px: ${selector}`
+  );
+}
+assert.match(
+  orderEditor,
+  /<div className="product-card-top">[\s\S]{0,1600}?\{!isList && \(\s*<div className="product-image-wrap">/u,
+  "Карточка ЛК должна рендерить верхний слой бейджей перед фото."
+);
+assert.match(
+  theme,
+  /\.clover-app \.page-content-client \.embedded-catalog \.product-grid:not\(\.product-grid-list\)\s*\{[^}]*grid-template-columns:\s*1fr 1fr !important;[^}]*grid-auto-rows:\s*auto !important;[^}]*gap:\s*8px !important;[^}]*align-items:\s*stretch !important;[^}]*\}/u,
+  "Мобильный фото-каталог ЛК должен оставаться компактной сеткой из двух колонок."
+);
+assert.match(
+  theme,
+  /\.clover-app \.page-content-client \.embedded-catalog \.product-grid:not\(\.product-grid-list\) \.product-card\s*\{[^}]*position:\s*relative !important;[^}]*height:\s*100% !important;[^}]*overflow:\s*hidden !important;[^}]*padding:\s*0 !important;[^}]*\}/u,
+  "Мобильная фото-карточка ЛК должна оставаться контейнером для overlay-бейджей."
+);
+assert.match(
+  theme,
+  /\.clover-app \.page-content-client \.embedded-catalog \.product-grid:not\(\.product-grid-list\) \.product-image-wrap\s*\{[^}]*aspect-ratio:\s*1 \/ 1 !important;[^}]*position:\s*relative !important;[^}]*z-index:\s*0 !important;[^}]*overflow:\s*hidden !important;[^}]*border-radius:\s*0 !important;[^}]*\}/u,
+  "Фото товара в мобильной карточке ЛК должно быть квадратным и не перекрывать бейджи."
+);
+assert.match(
+  theme,
+  /\.clover-app \.page-content-client \.embedded-catalog \.product-grid:not\(\.product-grid-list\) \.product-card-top\s*\{[^}]*position:\s*absolute !important;[^}]*top:\s*4px !important;[^}]*left:\s*4px !important;[^}]*right:\s*4px !important;[^}]*z-index:\s*2 !important;[^}]*pointer-events:\s*none !important;[^}]*\}/u,
+  "Бейджи мобильной карточки ЛК должны находиться поверх верхнего края фотографии."
+);
+assert.match(
+  theme,
+  /\.clover-app \.embedded-catalog \.product-card-list \.quantity-control\s*\{[^}]*height:\s*36px !important;[^}]*grid-template-columns:\s*36px minmax\(0, 1fr\) 36px !important;[^}]*border-radius:\s*8px !important;[^}]*\}/u,
+  "Итоговое mobile-правило списка ЛК должно оставлять кнопки количества шириной 36px."
+);
 const cartTheme = theme.split("/* Корзина вне body")[1]?.split(".order-thankyou-mobile")[0] || "";
 const overlayBlock = cartTheme.split(".cart-sheet-backdrop")[0] || "";
 if (
@@ -417,3 +470,5 @@ console.log("- Кнопка обновления фото витрины скр�
 console.log("- Высота рядов фото-каталога не считается от 100dvh");
 console.log("- Корзина и дата не порталятся в body");
 console.log("- Слой корзины без left+right+width 100% и без отрицательного margin");
+console.log("- Мобильный фото-каталог ЛК: две колонки, квадратное фото и overlay-бейджи");
+console.log("- Итоговые кнопки количества в мобильном списке ЛК имеют ширину 36px");
