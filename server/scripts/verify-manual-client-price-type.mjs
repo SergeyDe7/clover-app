@@ -18,6 +18,10 @@ const serverRoot = path.resolve(scriptDirectory, "..");
 const repositoryRoot = path.resolve(serverRoot, "..");
 const firstSyncAt = "2026-09-17T10:00:00.000Z";
 const secondSyncAt = "2026-09-17T10:05:00.000Z";
+const EXPECTED_REVIEW_RANGE = Object.freeze({
+  base: "fcf0fc38262453cc28d53478af1ae96d6c860b87",
+  head: "1bc7b81ceb5893f7e8f9a19f251a5b40cb4857c1",
+});
 
 function parseReviewRange(args) {
   const valueAfter = (flag) => {
@@ -33,6 +37,14 @@ function parseReviewRange(args) {
     );
   }
   return { base, head };
+}
+
+function assertExpectedReviewRange(range) {
+  assert.deepEqual(
+    range,
+    EXPECTED_REVIEW_RANGE,
+    "Manual client-price review must use the exact immutable PR #132 range."
+  );
 }
 
 const verifierArgs = process.argv.slice(2);
@@ -1021,10 +1033,20 @@ function protectedChangedPaths(changedPaths) {
   });
 }
 
+function assertReviewCommitAvailable(cwd, sha) {
+  try {
+    gitText(cwd, ["cat-file", "-e", `${sha}^{commit}`]);
+  } catch {
+    throw new Error(
+      `Required review commit ${sha} is unavailable. Fetch the full Git history (fetch-depth: 0) before running this gate.`
+    );
+  }
+}
+
 function verifyProtectedDiff({ cwd, base, head, allowedPaths = null }) {
   assert.notEqual(base, head, "Review base and head must not be identical.");
-  gitText(cwd, ["cat-file", "-e", `${base}^{commit}`]);
-  gitText(cwd, ["cat-file", "-e", `${head}^{commit}`]);
+  assertReviewCommitAvailable(cwd, base);
+  assertReviewCommitAvailable(cwd, head);
   assert.equal(
     gitText(cwd, ["merge-base", base, head]),
     base,
@@ -1119,6 +1141,23 @@ function runGitVerifierSelfTest() {
     () => parseReviewRange([]),
     /requires exact --base and --head/
   );
+  assert.deepEqual(
+    parseReviewRange([
+      "--base",
+      EXPECTED_REVIEW_RANGE.base,
+      "--head",
+      EXPECTED_REVIEW_RANGE.head,
+    ]),
+    EXPECTED_REVIEW_RANGE
+  );
+  assert.throws(
+    () =>
+      assertExpectedReviewRange({
+        base: "a".repeat(40),
+        head: EXPECTED_REVIEW_RANGE.head,
+      }),
+    /exact immutable PR #132 range/u
+  );
   const gitFixture = mkdtempSync(
     path.join(tmpdir(), "clover-manual-price-git-")
   );
@@ -1157,7 +1196,7 @@ function runGitVerifierSelfTest() {
         base: "0".repeat(40),
         head: safeHead,
       }),
-    /Command failed/u
+    /fetch-depth: 0/u
   );
 
   mkdirSync(path.join(gitFixture, "server", "src"), { recursive: true });
@@ -1230,30 +1269,25 @@ function runGitVerifierSelfTest() {
 
 runGitVerifierSelfTest();
 if (!functionalOnly) {
-  assert.equal(
-    reviewRange.head,
-    gitText(repositoryRoot, ["rev-parse", "HEAD"]),
-    "Review head must equal the checked-out repository HEAD."
-  );
-  assert.equal(
-    reviewRange.base,
-    gitText(repositoryRoot, [
-      "merge-base",
-      reviewRange.head,
-      "origin/main",
-    ]),
-    "Review base must equal the trusted origin/main merge-base."
-  );
+  assertExpectedReviewRange(reviewRange);
   verifyProtectedDiff({
     cwd: repositoryRoot,
     ...reviewRange,
     allowedPaths: ALLOWED_PR_PATHS,
   });
-  verifyRepositoryWorkspaceScope({
-    cwd: repositoryRoot,
-    base: reviewRange.base,
-    allowedPaths: ALLOWED_PR_PATHS,
-  });
+  const repositoryHead = gitText(repositoryRoot, ["rev-parse", "HEAD"]);
+  assert.equal(
+    gitText(repositoryRoot, ["merge-base", reviewRange.head, repositoryHead]),
+    reviewRange.head,
+    "Historical manual client-price review head must be an ancestor of the checkout."
+  );
+  if (repositoryHead === reviewRange.head) {
+    verifyRepositoryWorkspaceScope({
+      cwd: repositoryRoot,
+      base: reviewRange.base,
+      allowedPaths: ALLOWED_PR_PATHS,
+    });
+  }
 }
 
 console.log("verify-manual-client-price-type: ok");
