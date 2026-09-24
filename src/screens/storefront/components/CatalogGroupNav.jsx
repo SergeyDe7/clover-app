@@ -6,7 +6,9 @@ import {
   projectLocalizedGroupNav,
 } from "../../../shared/i18n/categoryDisplayProjection.js";
 import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
+import { storefrontHref } from "../mode.js";
 import { navigateStorefront } from "./StoreHeader.jsx";
+import { handleStorefrontLinkClick } from "./storefrontLink.js";
 
 function NavChevron() {
   return (
@@ -40,9 +42,12 @@ export function CatalogGroupNav({
   variant = "side",
   translations,
   language,
+  crawlableCategories = new Set(),
+  crawlableSubcategories = new Set(),
 }) {
   const { enabledLanguages, t, locale } = useLocalization();
   const displayLanguage = language || locale;
+  const enableCrawlableLinks = displayLanguage === "ru";
   const categoryOptions = storefrontCategoryDisplayOptions(
     displayLanguage,
     translations,
@@ -65,9 +70,13 @@ export function CatalogGroupNav({
     });
   };
 
-  const goAll = () => navigateStorefront({ name: "catalog" });
-  const goGroup = (name) => {
-    navigateStorefront({ name: "catalog", category: name });
+  const goGroup = (name, event) => {
+    const route = { name: "catalog", category: name };
+    if (event) {
+      if (!handleStorefrontLinkClick(event, route)) return;
+    } else {
+      navigateStorefront(route);
+    }
     if (groups.find((g) => g.name === name)?.children?.length) {
       setOpenParents((prev) => {
         const next = new Set(prev);
@@ -77,8 +86,13 @@ export function CatalogGroupNav({
       });
     }
   };
-  const goSub = (category, subcategory) => {
-    navigateStorefront({ name: "catalog", category, subcategory });
+  const goSub = (category, subcategory, event) => {
+    const route = { name: "catalog", category, subcategory };
+    if (event) {
+      if (!handleStorefrontLinkClick(event, route)) return;
+    } else {
+      navigateStorefront(route);
+    }
     setOpenParents((prev) => {
       const next = new Set(prev);
       next.add(category);
@@ -92,13 +106,26 @@ export function CatalogGroupNav({
       aria-label={t("storefront.productGroups")}
       aria-busy={!labelsReady ? "true" : undefined}
     >
-      <button
-        type="button"
-        className={`sf-cat-btn${!activeCategory ? " is-active" : ""}`}
-        onClick={goAll}
-      >
-        {t("shared.filter.all")}
-      </button>
+      {enableCrawlableLinks ? (
+        <a
+          className={`sf-cat-btn${!activeCategory ? " is-active" : ""}`}
+          href={storefrontHref({ name: "catalog" })}
+          aria-current={!activeCategory ? "page" : undefined}
+          onClick={(event) =>
+            handleStorefrontLinkClick(event, { name: "catalog" })
+          }
+        >
+          {t("shared.filter.all")}
+        </a>
+      ) : (
+        <button
+          type="button"
+          className={`sf-cat-btn${!activeCategory ? " is-active" : ""}`}
+          onClick={() => navigateStorefront({ name: "catalog" })}
+        >
+          {t("shared.filter.all")}
+        </button>
+      )}
 
       {!labelsReady ? (
         <p className="sf-muted">{t("storefront.loadingCategories")}</p>
@@ -109,17 +136,31 @@ export function CatalogGroupNav({
         const isOpen = openParents.has(group.name);
         const isActive = activeCategory === group.name && !activeSubcategory;
         const groupLabel = group.displayName || group.name;
+        const groupRoute = { name: "catalog", category: group.name };
+        const groupIsCrawlable =
+          enableCrawlableLinks && crawlableCategories.has(group.name);
 
         return (
           <div key={group.name} className="sf-group-nav-block">
             <div className="sf-group-nav-row">
-              <button
-                type="button"
-                className={`sf-cat-btn${isActive ? " is-active" : ""}`}
-                onClick={() => goGroup(group.name)}
-              >
-                {groupLabel}
-              </button>
+              {groupIsCrawlable ? (
+                <a
+                  className={`sf-cat-btn${isActive ? " is-active" : ""}`}
+                  href={storefrontHref(groupRoute)}
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={(event) => goGroup(group.name, event)}
+                >
+                  {groupLabel}
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  className={`sf-cat-btn${isActive ? " is-active" : ""}`}
+                  onClick={() => goGroup(group.name)}
+                >
+                  {groupLabel}
+                </button>
+              )}
               {hasChildren ? (
                 <button
                   type="button"
@@ -142,21 +183,40 @@ export function CatalogGroupNav({
             </div>
             {hasChildren && isOpen ? (
               <div className="sf-group-nav-children">
-                {group.children.map((child) => (
-                  <button
-                    key={child.name}
-                    type="button"
-                    className={`sf-cat-btn is-child${
-                      activeCategory === group.name &&
-                      canonicalizeProductSubcategory(activeSubcategory) === child.name
-                        ? " is-active"
-                        : ""
-                    }`}
-                    onClick={() => goSub(group.name, child.name)}
-                  >
-                    {child.displayName || child.name}
-                  </button>
-                ))}
+                {group.children.map((child) => {
+                  const isChildActive =
+                    activeCategory === group.name &&
+                    canonicalizeProductSubcategory(activeSubcategory) === child.name;
+                  const childRoute = {
+                    name: "catalog",
+                    category: group.name,
+                    subcategory: child.name,
+                  };
+                  const childIsCrawlable =
+                    enableCrawlableLinks &&
+                    activeCategory === group.name &&
+                    crawlableSubcategories.has(child.name);
+                  return childIsCrawlable ? (
+                    <a
+                      key={child.name}
+                      className={`sf-cat-btn is-child${isChildActive ? " is-active" : ""}`}
+                      href={storefrontHref(childRoute)}
+                      aria-current={isChildActive ? "page" : undefined}
+                      onClick={(event) => goSub(group.name, child.name, event)}
+                    >
+                      {child.displayName || child.name}
+                    </a>
+                  ) : (
+                    <button
+                      key={child.name}
+                      type="button"
+                      className={`sf-cat-btn is-child${isChildActive ? " is-active" : ""}`}
+                      onClick={() => goSub(group.name, child.name)}
+                    >
+                      {child.displayName || child.name}
+                    </button>
+                  );
+                })}
               </div>
             ) : null}
           </div>
