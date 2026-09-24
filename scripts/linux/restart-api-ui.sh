@@ -31,6 +31,7 @@
 # and execs them. ROOT stays CLOVER_DEPLOY_ROOT (never this file's directory).
 #
 set -euo pipefail
+umask 077
 
 ROOT="${CLOVER_DEPLOY_ROOT:-/opt/clover/clover-app}"
 STAGING_ROOT="${CLOVER_DEPLOY_STAGING:-/opt/clover/deployments/staging}"
@@ -118,6 +119,28 @@ die() {
   echo "ERROR: $*" >&2
   cleanup_temp
   exit 1
+}
+
+protect_sensitive_tree() {
+  local tree="$1" sensitive found=0
+  [[ -d "${tree}" && ! -L "${tree}" ]] || die "sensitive-tree guard refused non-directory: ${tree}"
+  sensitive="$(find -P "${tree}" -xdev -type l \
+    \( -name '*.sqlite' -o -name '*.sqlite-wal' -o -name '*.sqlite-shm' \
+       -o -name '*.db' -o -name '*.db-wal' -o -name '*.db-shm' \
+       -o -name '.env' -o -name '.env.production' -o -name '.env.local' -o -name '.env.test' \) \
+    -print -quit)"
+  [[ -z "${sensitive}" ]] || die "sensitive symlink refused in deploy artifact: ${sensitive}"
+  while IFS= read -r -d '' sensitive; do
+    found=1
+    chmod 600 -- "${sensitive}" || die "could not protect sensitive deploy artifact: ${sensitive}"
+    [[ "$(stat -Lc '%a' -- "${sensitive}")" == "600" ]] \
+      || die "sensitive deploy artifact mode verification failed: ${sensitive}"
+  done < <(find -P "${tree}" -xdev -type f \
+    \( -name '*.sqlite' -o -name '*.sqlite-wal' -o -name '*.sqlite-shm' \
+       -o -name '*.db' -o -name '*.db-wal' -o -name '*.db-shm' \
+       -o -name '.env' -o -name '.env.production' -o -name '.env.local' -o -name '.env.test' \) \
+    -print0)
+  (( found == 0 )) || die "sensitive regular file refused in UI deploy artifact: ${tree}"
 }
 
 critical() {
@@ -248,6 +271,7 @@ persist_prepared_artifact() {
   rm -rf "${tmp}"
   mkdir -p "${tmp}/dist"
   cp -a "${STAGED_DIST}/." "${tmp}/dist/"
+  protect_sensitive_tree "${tmp}/dist"
   manifest_file="${tmp}/manifest.json"
   node "${PREPARED_JS}" write \
     --dist "${tmp}/dist" \
@@ -568,6 +592,7 @@ echo "Recording previous release: ${PREV_SHA}"
 if [[ "${DEPLOY_MODE}" != "prepare" && -d "${LIVE_DIST}" ]]; then
   rm -rf "${LKG_ROOT}/dist"
   cp -a "${LIVE_DIST}" "${LKG_ROOT}/dist"
+  protect_sensitive_tree "${LKG_ROOT}/dist"
 fi
 if [[ -f "${LIVE_DIST}/index.html" ]]; then
   PREV_TAG="$(extract_tag "$(cat "${LIVE_DIST}/index.html")")"
@@ -732,6 +757,7 @@ fi
 rm -rf "${STAGED_DIST}"
 mkdir -p "${STAGED_DIST}"
 cp -a "${BUILD_WT}/dist/." "${STAGED_DIST}/"
+protect_sensitive_tree "${STAGED_DIST}"
 cd "${BUILD_PREV_PWD}"
 fi
 
