@@ -53,6 +53,7 @@ const dbPath = path.join(artifactDir, "fixture.sqlite");
 const outDir = path.join(artifactDir, "dist");
 const productCode = "НФ-00003681";
 const productName = "Жидкое мыло Синергетик миндальное молочко 500 мл";
+const categoryName = "Химия, чистящие средства";
 const langs = ["ru", "en", "uz", "ky", "tg", "zh", "ar"];
 const GOTO_MS = Number(process.env.CLOVER_BROWSER_GOTO_MS || 8000);
 const SETTLE_MS = Number(process.env.CLOVER_BROWSER_SETTLE_MS || 8000);
@@ -107,7 +108,7 @@ function seedDb() {
     code: productCode,
     oneCId: "onec-1",
     name: productName,
-    category: "Химия",
+    category: categoryName,
     subcategory: "",
     showOnStorefront: true,
   };
@@ -212,7 +213,7 @@ function productPayload() {
     name: productName,
     active: true,
     showOnStorefront: true,
-    category: "Химия",
+    category: categoryName,
     subcategory: "",
     price: 120,
     imageUrl: "/clover-logo.png",
@@ -265,7 +266,7 @@ function startCombinedServer(distDir) {
     if (url.pathname === "/api/public/catalog") {
       res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
       res.end(JSON.stringify({
-        categories: [{ category: "Химия", subcategory: "" }],
+        categories: [{ category: categoryName, subcategory: "" }],
         products: [productPayload()],
       }));
       return;
@@ -309,14 +310,17 @@ function startCombinedServer(distDir) {
 function expectedSeo(lang, pageName) {
   const htmlLang = lang === "zh" ? "zh-CN" : lang;
   const productPath = `/product/${encodeURIComponent(productCode)}`;
+  const categoryPath = `/catalog/${encodeURIComponent(categoryName)}`;
   const pathByPage = {
     home: `/${lang}/`,
     catalog: `/${lang}/catalog`,
+    category: `/${lang}${categoryPath}`,
     product: `/${lang}${productPath}`,
   };
   const ruByPage = {
     home: "https://clover-spb.ru/ru/",
     catalog: "https://clover-spb.ru/ru/catalog",
+    category: `https://clover-spb.ru/ru${categoryPath}`,
     product: `https://clover-spb.ru/ru${productPath}`,
   };
   return {
@@ -364,6 +368,45 @@ function assertSettled(pageName, lang, seo) {
   }
   if (pageName === "catalog") {
     assert.match(seo.bodyText, /\S/, `${prefix} empty catalog`);
+  }
+  const categoryPath = `/${lang}/catalog/${encodeURIComponent(categoryName)}`;
+  const productPath = `/${lang}/product/${encodeURIComponent(productCode)}`;
+  if (lang === "ru" && pageName === "catalog") {
+    assert.ok(
+      seo.crawlablePaths.includes(categoryPath),
+      `${prefix} missing crawlable category ${categoryPath}; links=${JSON.stringify(seo.crawlablePaths)}`
+    );
+    assert.ok(
+      seo.crawlablePaths.includes(productPath),
+      `${prefix} missing crawlable product ${productPath}; links=${JSON.stringify(seo.crawlablePaths)}`
+    );
+  }
+  if (lang === "ru" && pageName === "category") {
+    assert.ok(seo.heroHeading, `${prefix} empty category heading`);
+    assert.ok(
+      seo.crawlablePaths.includes(productPath),
+      `${prefix} missing crawlable product ${productPath}`
+    );
+  }
+  if (lang === "ru" && pageName === "product") {
+    if (seo.backLinkDisplay !== null) {
+      assert.equal(
+        seo.backLinkDisplay,
+        "inline-block",
+        `${prefix} back link display ${seo.backLinkDisplay}`
+      );
+    }
+    assert.ok(
+      seo.crawlablePaths.includes(categoryPath),
+      `${prefix} missing crawlable category ${categoryPath}`
+    );
+  }
+  if (lang !== "ru" && ["catalog", "category", "product"].includes(pageName)) {
+    assert.equal(
+      seo.crawlablePaths.includes(categoryPath) || seo.crawlablePaths.includes(productPath),
+      false,
+      `${prefix} must not add crawlable catalog detail links outside /ru/`
+    );
   }
 }
 
@@ -465,6 +508,8 @@ function dumpDom(url) {
   const env = { ...process.env };
   env.HOME = path.join(artifactDir, "chrome-home");
   mkdirSync(env.HOME, { recursive: true });
+  const chromeProfile = path.join(artifactDir, "chrome-profile");
+  mkdirSync(chromeProfile, { recursive: true });
   env.LANG = process.env.LANG || "C.UTF-8";
   delete env.DBUS_SESSION_BUS_ADDRESS;
   delete env.DBUS_STARTER_ADDRESS;
@@ -475,6 +520,9 @@ function dumpDom(url) {
       "--headless=new",
       "--disable-gpu",
       "--no-sandbox",
+      "--no-first-run",
+      "--no-default-browser-check",
+      `--user-data-dir=${chromeProfile}`,
       "--virtual-time-budget=4000",
       "--timeout=5000",
       "--window-size=1280,720",
@@ -523,6 +571,15 @@ function collectFromHtml(html, pageUrl) {
   const logoSrc = html.match(/sf-header[\s\S]{0,2500}?src="([^"]*clover-logo[^"]*)"/i)?.[1]
     || html.match(/src="([^"]*clover-logo[^"]*)"/i)?.[1]
     || "";
+  const crawlablePaths = [...html.matchAll(/<a\b[^>]*\shref="([^"]+)"[^>]*>/gi)]
+    .map((match) => {
+      try {
+        return new URL(match[1], pageUrl).pathname;
+      } catch {
+        return "";
+      }
+    })
+    .filter(Boolean);
   const text = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   return {
     href: pageUrl,
@@ -541,6 +598,7 @@ function collectFromHtml(html, pageUrl) {
     hasHero: hero,
     heroHeading: h1,
     heroImageSrcs: heroImgs.filter(Boolean),
+    crawlablePaths,
     nav,
     isLkShell: /class="[^"]*\bclover-app\b/.test(html) && !header,
     bodyText: text.slice(0, 400),
@@ -558,12 +616,55 @@ async function assetOk(src) {
   }
 }
 
+let browser = null;
+let browserPage = null;
+if (playwrightCore) {
+  const playwrightEntry = playwrightCore.endsWith(".mjs")
+    ? playwrightCore
+    : path.join(playwrightCore, "index.mjs");
+  if (!existsSync(playwrightEntry)) {
+    failBrowserUnavailable(`playwright entry missing: ${playwrightEntry}`);
+  }
+  const { chromium } = await import(pathToFileURL(playwrightEntry).href);
+  browser = await chromium.launch({ executablePath: chrome, headless: true });
+  browserPage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  browserPage.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  browserPage.on("pageerror", (error) => consoleErrors.push(error.message));
+  browserPage.on("requestfailed", (request) => {
+    networkErrors.push({ url: request.url(), error: request.failure()?.errorText || "failed" });
+  });
+}
+
 try {
   async function openAndCollect(pageName, lang) {
     const expect = expectedSeo(lang, pageName);
     const pageUrl = `${origin}${expect.pathname}`;
-    const html = dumpDom(pageUrl);
+    let html;
+    if (browserPage) {
+      await browserPage.goto(pageUrl, { waitUntil: "domcontentloaded", timeout: GOTO_MS });
+      await browserPage.waitForSelector(".sf-header", { timeout: SETTLE_MS });
+      if (["catalog", "category"].includes(pageName)) {
+        await browserPage.waitForSelector(".sf-product-card .sf-product-title", {
+          timeout: SETTLE_MS,
+        });
+      }
+      if (pageName === "product") {
+        await browserPage.waitForSelector(".sf-product-page h1", {
+          timeout: SETTLE_MS,
+        });
+      }
+      html = await browserPage.content();
+    } else {
+      html = dumpDom(pageUrl);
+    }
     const seo = collectFromHtml(html, pageUrl);
+    seo.backLinkDisplay = browserPage
+      ? await browserPage
+        .$eval(".sf-back", (element) => getComputedStyle(element).display)
+        .catch(() => "")
+      : null;
     seo.logoOk = seo.hasHeader && (await assetOk(seo.logoSrc || "/clover-logo.png"));
     seo.heroImages = [];
     for (const src of seo.heroImageSrcs) {
@@ -576,26 +677,35 @@ try {
       });
     }
     assertSettled(pageName, lang, seo);
-    results.push({ pageName, lang, ok: true, heading: seo.heroHeading, nav: seo.nav, dir: seo.dir });
+    results.push({
+      pageName,
+      lang,
+      ok: true,
+      heading: seo.heroHeading,
+      crawlableLinks: seo.crawlablePaths.length,
+      nav: seo.nav,
+      dir: seo.dir,
+    });
     return seo;
   }
 
   for (const lang of langs) {
     await openAndCollect("home", lang);
     await openAndCollect("catalog", lang);
+    await openAndCollect("category", lang);
     await openAndCollect("product", lang);
   }
 
   const report = {
     SEO_LOCALE_BROWSER_SMOKE: "PASS",
-    engine: "chrome-headless-shell-dump-dom",
+    engine: browserPage ? "playwright-chromium" : "chrome-headless-shell-dump-dom",
     origin,
     chrome,
     pages: results,
     languageSwitch: {
       clickNav: "NOT VERIFIED",
-      reason: "Playwright CDP/goto hangs on this host; dump-dom loaded each locale URL directly",
-      coveredUrls: "7 langs × home/catalog/product",
+      reason: "Each locale URL was loaded directly; selector state was verified after render",
+      coveredUrls: "7 langs × home/catalog/category/product",
     },
     consoleErrors: [],
     networkErrors: [],
@@ -612,5 +722,6 @@ try {
   writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   throw error;
 } finally {
+  if (browser) await browser.close();
   combined.server.close();
 }
