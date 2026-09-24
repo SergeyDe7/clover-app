@@ -717,7 +717,7 @@ export async function runProductBatchTranslation({
     const consumeChars = Math.max(0, Number(error?.usageBilledChars) || 0);
     const releaseChars = Math.max(
       0,
-      Number(error?.usageReleaseChars) != null
+      error?.usageReleaseChars != null
         ? Number(error.usageReleaseChars)
         : cost - consumeChars
     );

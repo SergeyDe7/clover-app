@@ -148,7 +148,7 @@ export function namespaceFailures({
 }) {
   const failures = [];
   const tag = extractBuildTag(html);
-  let releaseId = "";
+  let releaseId;
   try {
     releaseId = releaseIdFromBuildTag(tag);
   } catch (error) {
