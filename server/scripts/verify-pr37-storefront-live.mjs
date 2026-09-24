@@ -81,6 +81,23 @@ async function api(path, { method = "GET", token, body } = {}) {
   return { status: res.status, json };
 }
 
+async function fullPublicCatalog() {
+  const products = [];
+  let first = null;
+  let offset = 0;
+  for (let page = 0; page < 100; page += 1) {
+    const response = await api(`/api/public/catalog?limit=60&offset=${offset}`);
+    assert.equal(response.status, 200, `catalog page offset=${offset}`);
+    if (!first) first = response.json;
+    products.push(...(response.json?.products || []));
+    if (!response.json?.pagination?.hasMore) break;
+    const nextOffset = Number(response.json?.pagination?.nextOffset);
+    assert.ok(Number.isInteger(nextOffset) && nextOffset > offset, "catalog pagination advance");
+    offset = nextOffset;
+  }
+  return { ...(first || {}), products };
+}
+
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -99,9 +116,8 @@ async function main() {
 
   // --- 3: public catalog showOnStorefront + id-* ---
   {
-    const cat = await api("/api/public/catalog");
-    assert.equal(cat.status, 200);
-    const pub = cat.json.products || [];
+    const cat = await fullPublicCatalog();
+    const pub = cat.products || [];
     const sf = products.filter((p) => p.showOnStorefront === true && p.active !== false);
     const idSlug = pub.filter((p) => String(p.code || "").startsWith("id-"));
     const noOneCSf = sf.filter((p) => !String(p.oneCId || "").trim());
@@ -120,7 +136,7 @@ async function main() {
 
   // --- 4: pieceOrderMultiple on public order ---
   {
-    const multi = (await api("/api/public/catalog")).json.products.find(
+    const multi = (await fullPublicCatalog()).products.find(
       (p) => Number(p.pieceOrderMultiple) > 1 && String(p.oneCId || "").trim()
     );
     assert.ok(multi, "need storefront product with pieceOrderMultiple>1 and oneCId");

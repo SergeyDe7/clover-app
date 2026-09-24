@@ -83,6 +83,7 @@ import {
   passesPublicStorefrontEligibility,
   resolvePublicProductCode,
 } from "../../src/shared/sitemap/sitemapContract.js";
+import { paginatePublicCatalogProducts } from "./publicCatalogGuard.js";
 
 const STOREFRONT_GUEST_EMAIL = "storefront-guest@clover.local";
 
@@ -761,12 +762,33 @@ function buildCategories(products) {
   ]).map((name) => ({ name, count: counts.get(name) || 0 }));
 }
 
+function buildPublicSubcategories(products) {
+  const countsByCategory = new Map();
+  for (const product of products) {
+    const category = canonicalizeProductCategory(product.category || "Прочее");
+    const name = String(product.subcategory || "").trim();
+    if (!name) continue;
+    if (!countsByCategory.has(category)) countsByCategory.set(category, new Map());
+    const categoryCounts = countsByCategory.get(category);
+    categoryCounts.set(name, (categoryCounts.get(name) || 0) + 1);
+  }
+  return [...countsByCategory.entries()]
+    .flatMap(([category, categoryCounts]) =>
+      [...categoryCounts.entries()].map(([name, count]) => ({ category, name, count }))
+    )
+    .sort((a, b) =>
+      a.category.localeCompare(b.category, "ru") || a.name.localeCompare(b.name, "ru")
+    );
+}
+
 export function getPublicCatalog({
   category = "",
   subcategory = "",
   facet = "",
   q = "",
   language = "",
+  limit,
+  offset,
 } = {}) {
   const settings = getStorefrontSettings(
     getGlobalState("settings", DEFAULT_SETTINGS)
@@ -807,6 +829,8 @@ export function getPublicCatalog({
     );
   }
 
+  const page = paginatePublicCatalogProducts(products, { limit, offset });
+
   const selectedType =
     priceTypes.find((item) => item.id === settings.storefrontPriceTypeId) ||
     null;
@@ -829,11 +853,13 @@ export function getPublicCatalog({
   return {
     locale: projection.locale,
     categories: buildCategories(allProducts),
+    subcategories: buildPublicSubcategories(allProducts),
     categoryTranslations: projection.categoryTranslations,
     // List cards need prices/units/images; details + priceSources are product-page only
     // (/api/public/catalog/:code). Omitting them cuts ~2/3 of list JSON (memory/transfer);
     // catalog long tasks are dominated by mounting cards, not JSON.parse.
-    products: products.map(toPublicCatalogListProduct),
+    products: page.products.map(toPublicCatalogListProduct),
+    pagination: page.pagination,
     priceType,
     site: buildPublicSite(settings, new Date(), projection.locale),
   };
