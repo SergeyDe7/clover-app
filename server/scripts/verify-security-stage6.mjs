@@ -13,8 +13,8 @@ import {
   readFileSync,
   mkdtempSync,
   rmSync,
-  rmdirSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createServer } from "node:net";
@@ -229,7 +229,7 @@ async function verifyArtifactAndRollback() {
       () => verifyArtifact(artifactRoot, prepared.manifestSha256),
       /artifact link is forbidden/,
     );
-    rmdirSync(linkedArtifactEntry);
+    unlinkSync(linkedArtifactEntry);
     verifyArtifact(artifactRoot, prepared.manifestSha256);
 
     const script = repositoryRelative(

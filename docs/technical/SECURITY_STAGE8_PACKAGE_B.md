@@ -39,6 +39,11 @@ deliberately malformed GET-with-body probe. The harness now handles request and
 response reset events for that one opt-in probe; all ordinary requests still
 reject connection errors, and production HTTP behavior is unchanged.
 
+The Linux run additionally confirmed that the Stage 6 fixture must remove its
+directory symlink with `unlinkSync`, not the Windows-tolerated `rmdirSync`.
+This changes only fixture cleanup; the verifier still proves that artifact
+links are rejected before removing the fixture link itself.
+
 `ops/security-stage8/package-b/main-ruleset.json` targets only
 `refs/heads/main`. It blocks deletion and force pushes, requires changes through
 a pull request, requires resolved review threads, and requires current

@@ -11,6 +11,7 @@ const ruleset = JSON.parse(read("ops/security-stage8/package-b/main-ruleset.json
 const docs = read("docs/technical/SECURITY_STAGE8_PACKAGE_B.md");
 const serverPackage = JSON.parse(read("server/package.json"));
 const stage4PackageA = read("server/scripts/verify-security-stage4-package-a.mjs");
+const stage6Verifier = read("server/scripts/verify-security-stage6.mjs");
 
 assert.match(workflow, /^name: S8-B CI$/mu);
 assert.match(workflow, /^  pull_request:$/mu);
@@ -41,6 +42,8 @@ assert.match(resetProbe, /method: "GET"/u);
 assert.match(resetProbe, /pathname: "\/api\/auth\/login"/u);
 assert.match(resetProbe, /chunks: \[Buffer\.from\(JSON\.stringify\(\{ filler: "x"\.repeat\(AUTH_OVERSIZE\) \}\)\)\]/u);
 assert.match(resetProbe, /allowConnectionReset: true/u);
+assert.match(stage6Verifier, /unlinkSync\(linkedArtifactEntry\)/u);
+assert.doesNotMatch(stage6Verifier, /rmdirSync\(linkedArtifactEntry\)/u);
 
 assert.equal(ruleset.name, "S8-B main protection");
 assert.equal(ruleset.target, "branch");
