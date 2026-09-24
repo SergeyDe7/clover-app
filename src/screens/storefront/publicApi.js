@@ -53,8 +53,6 @@ export const storefrontApi = {
     if (params.facet) query.set("facet", params.facet);
     if (params.q) query.set("q", params.q);
     if (params.language) query.set("language", params.language);
-    if (params.limit != null) query.set("limit", String(params.limit));
-    if (params.offset != null) query.set("offset", String(params.offset));
     const suffix = query.toString() ? `?${query}` : "";
     return request(`/catalog${suffix}`);
   },

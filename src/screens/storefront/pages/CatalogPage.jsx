@@ -1,6 +1,6 @@
 import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { errorDisplayMessage } from "../../../shared/i18n/errorDisplay.js";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
 import { peekPublicSite, loadPublicSite } from "../publicSite.js";
 import {
@@ -22,12 +22,13 @@ import {
 import { storefrontHref } from "../mode.js";
 import { projectLocalizedGroupNav, categoryDisplayNameFromCanonical, categoryDisplayLabelsReady } from "../../../shared/i18n/categoryDisplayProjection.js";
 import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
+import {
+  matchesCatalogPrefixSearch,
+  productCatalogSearchHaystack,
+} from "../../../shared/appHelpers.js";
 import { sortProductsWithLidsGrouped } from "../../../shared/productCatalogOrder.js";
 import {
-  advanceCatalogRequestGeneration,
-  isCatalogRequestGenerationCurrent,
   makeCatalogRouteSnapshot,
-  mergeCatalogRoutePage,
   resolveStorefrontCatalogView,
 } from "../catalogRouteSnapshot.js";
 import {
@@ -67,8 +68,6 @@ export function CatalogPage({
   const [catalogRouteSnapshot, setCatalogRouteSnapshot] = useState(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [requestQuery, setRequestQuery] = useState("");
-  const [loadingMore, setLoadingMore] = useState(false);
   // Mobile: каталог открывается со свёрнутыми категориями; раскрытие — только тапом «Категории».
   const [treeOpen, setTreeOpen] = useState(false);
   // Mobile + category: search after chips so products start higher; desktop keeps top search.
@@ -78,24 +77,7 @@ export function CatalogPage({
   // (home → category) so the first catalog paint already has foreign labels.
   const translationBagRef = useRef(bagFromSite(publicLocale));
   const translationLocaleRef = useRef(publicLocale);
-  const loadingMoreRef = useRef(false);
   const [, setTranslationBagEpoch] = useState(0);
-  const requestKey = `${publicLocale}\u0000${routeKey}\u0000${requestQuery}`;
-  const catalogRequestGenerationRef = useRef({ key: "", generation: 0 });
-  const nextRequestGeneration = advanceCatalogRequestGeneration(
-    catalogRequestGenerationRef.current,
-    requestKey
-  );
-  if (nextRequestGeneration !== catalogRequestGenerationRef.current) {
-    catalogRequestGenerationRef.current = nextRequestGeneration;
-    loadingMoreRef.current = false;
-  }
-  const requestGeneration = catalogRequestGenerationRef.current.generation;
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setRequestQuery(query.trim()), 250);
-    return () => window.clearTimeout(timer);
-  }, [query]);
 
   const publishTranslationBag = (bag) => {
     const next = normalizeTranslationBag(bag, publicLocale);
@@ -129,27 +111,17 @@ export function CatalogPage({
 
   useEffect(() => {
     let cancelled = false;
+    const requestKey = catalogScrollRouteKey(category, subcategory, facet);
     setError("");
-    loadingMoreRef.current = false;
-    setLoadingMore(false);
     storefrontApi
       .catalog({
         category: category || undefined,
         subcategory: subcategory || undefined,
         facet: facet || undefined,
-        q: requestQuery || undefined,
         language: publicLocale,
-        limit: 60,
-        offset: 0,
       })
       .then((payload) => {
-        if (
-          !cancelled &&
-          isCatalogRequestGenerationCurrent(
-            catalogRequestGenerationRef.current,
-            requestGeneration
-          )
-        ) {
+        if (!cancelled) {
           setCatalogRouteSnapshot(makeCatalogRouteSnapshot(requestKey, payload));
         }
       })
@@ -159,7 +131,7 @@ export function CatalogPage({
     return () => {
       cancelled = true;
     };
-  }, [category, subcategory, facet, publicLocale, requestGeneration, requestKey, requestQuery, t]);
+  }, [category, subcategory, facet, publicLocale, t]);
 
   const prevRouteKeyRef = useRef(null);
   useLayoutEffect(() => {
@@ -187,8 +159,8 @@ export function CatalogPage({
   }, [category]);
 
   const { categories: navCategories, currentPayload } = useMemo(
-    () => resolveStorefrontCatalogView(requestKey, catalogRouteSnapshot),
-    [requestKey, catalogRouteSnapshot]
+    () => resolveStorefrontCatalogView(routeKey, catalogRouteSnapshot),
+    [routeKey, catalogRouteSnapshot]
   );
 
   if (translationLocaleRef.current !== publicLocale) {
@@ -224,8 +196,11 @@ export function CatalogPage({
 
   const products = useMemo(() => {
     if (!currentPayload) return [];
-    return currentPayload.products || [];
-  }, [currentPayload]);
+    const list = currentPayload.products || [];
+    return list.filter((product) =>
+      matchesCatalogPrefixSearch(productCatalogSearchHaystack(product), query)
+    );
+  }, [currentPayload, query]);
 
   const activeMeta = category ? getGroupMeta(category) : null;
   const facets = subcategory ? getSubgroupFacets(category, subcategory) : [];
@@ -252,7 +227,7 @@ export function CatalogPage({
 
   useEffect(() => {
     setRenderLimit(CATALOG_CARD_RENDER_BATCH);
-  }, [requestKey]);
+  }, [routeKey, query]);
 
   useEffect(() => {
     // Clamp after filter shrink; small result sets mount fully (no empty gap).
@@ -262,61 +237,6 @@ export function CatalogPage({
       return Math.min(current, totalCatalogCards);
     });
   }, [totalCatalogCards]);
-
-  const hasMore = Boolean(currentPayload?.pagination?.hasMore);
-  const nextOffset = currentPayload?.pagination?.nextOffset;
-
-  const loadNextPage = useCallback(() => {
-    if (!hasMore || loadingMoreRef.current || !Number.isInteger(nextOffset)) return;
-    loadingMoreRef.current = true;
-    setLoadingMore(true);
-    storefrontApi
-      .catalog({
-        category: category || undefined,
-        subcategory: subcategory || undefined,
-        facet: facet || undefined,
-        q: requestQuery || undefined,
-        language: publicLocale,
-        limit: 60,
-        offset: nextOffset,
-      })
-      .then((payload) => {
-        if (!isCatalogRequestGenerationCurrent(
-          catalogRequestGenerationRef.current,
-          requestGeneration
-        )) return;
-        setCatalogRouteSnapshot((current) =>
-          mergeCatalogRoutePage(current, requestKey, payload)
-        );
-      })
-      .catch((err) => {
-        if (isCatalogRequestGenerationCurrent(
-          catalogRequestGenerationRef.current,
-          requestGeneration
-        )) {
-          setError(errorDisplayMessage(err, t, "storefront.error.catalogLoadFailed"));
-        }
-      })
-      .finally(() => {
-        if (!isCatalogRequestGenerationCurrent(
-          catalogRequestGenerationRef.current,
-          requestGeneration
-        )) return;
-        loadingMoreRef.current = false;
-        setLoadingMore(false);
-      });
-  }, [
-    category,
-    facet,
-    hasMore,
-    nextOffset,
-    publicLocale,
-    requestGeneration,
-    requestKey,
-    requestQuery,
-    subcategory,
-    t,
-  ]);
 
   useEffect(() => {
     if (renderLimit >= totalCatalogCards) return undefined;
@@ -330,15 +250,11 @@ export function CatalogPage({
   // Fast scroll / near-end: demand more cards before the user hits an empty tail.
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    if (renderLimit >= totalCatalogCards && !hasMore) return undefined;
+    if (renderLimit >= totalCatalogCards) return undefined;
     const revealMore = () => {
-      if (renderLimit < totalCatalogCards) {
-        setRenderLimit((current) =>
-          nextRenderLimitAfterDemand(current, totalCatalogCards)
-        );
-        return;
-      }
-      loadNextPage();
+      setRenderLimit((current) =>
+        nextRenderLimitAfterDemand(current, totalCatalogCards)
+      );
     };
     const onScroll = () => {
       const doc = document.documentElement;
@@ -362,7 +278,7 @@ export function CatalogPage({
       window.removeEventListener("scroll", onScroll);
       observer?.disconnect();
     };
-  }, [hasMore, loadNextPage, renderLimit, totalCatalogCards, requestKey]);
+  }, [renderLimit, totalCatalogCards, routeKey, query]);
 
   const visibleSections = useMemo(
     () => sliceSectionsToRenderLimit(sections, renderLimit),
@@ -398,19 +314,17 @@ export function CatalogPage({
   const crawlableSubcategories = useMemo(
     () =>
       new Set(
-        (currentPayload?.subcategories || [])
-          .filter((item) => !category || item?.category === category)
-          .map((item) => canonicalizeProductSubcategory(item?.name))
+        (currentPayload?.products || [])
+          .map((product) => canonicalizeProductSubcategory(product?.subcategory))
           .filter(Boolean)
       ),
-    [category, currentPayload]
+    [currentPayload]
   );
   const crawlableCategories = useMemo(
     () =>
       new Set(
-        (currentPayload?.categories || [])
-          .filter((item) => Number(item?.count) > 0)
-          .map((item) => String(item?.name || "").trim())
+        (currentPayload?.products || [])
+          .map((product) => String(product?.category || "").trim())
           .filter(Boolean)
       ),
     [currentPayload]
@@ -676,12 +590,11 @@ export function CatalogPage({
             </section>
           ))}
 
-          {currentPayload && totalCatalogCards > 0 && (renderLimit < totalCatalogCards || hasMore) ? (
+          {currentPayload && totalCatalogCards > 0 && renderLimit < totalCatalogCards ? (
             <div
               ref={loadMoreSentinelRef}
               className="sf-catalog-load-sentinel"
               aria-hidden="true"
-              data-loading={loadingMore ? "true" : "false"}
             />
           ) : null}
 

@@ -236,7 +236,6 @@ import {
 } from "./authIssuance.js";
 import {
   consumePublicRateLimit,
-  createBoundedRateLimitStore,
   enforcePublicRateLimit,
   resetPublicRateLimit,
   resolveAnonymousRateLimitClient,
@@ -247,10 +246,6 @@ import {
   rejectOversizedPublicCatalogQuery,
   sendResourceOverloaded,
 } from "./resourceBounds.js";
-import {
-  resolvePublicCatalogClientSubject,
-  resolvePublicCatalogTrustedProxyIps,
-} from "./publicCatalogGuard.js";
 import {
   autoLinkCloverClients,
   buildOneCClientCandidates,
@@ -371,13 +366,6 @@ import {
 } from "../../src/shared/orderTrash.js";
 
 const app = express();
-// Bulk catalog traffic must not consume authentication limiter capacity.
-const publicCatalogReadRateLimitStore = createBoundedRateLimitStore({
-  maxEntries: 10_000,
-});
-const publicCatalogTrustedProxyIps = resolvePublicCatalogTrustedProxyIps(
-  process.env.CLOVER_TRUSTED_PROXY_IPS
-);
 const ONE_C_STATE_KEY = "oneCIntegration";
 
 const currentFile = fileURLToPath(import.meta.url);
@@ -725,14 +713,7 @@ function jsonBodyByRoute(req, res, next) {
 app.use(jsonBodyByRoute);
 app.use(credentialNoStoreMiddleware);
 app.use("/uploads/reconciliation", (req, res) => res.status(404).end());
-app.use(
-  "/uploads",
-  (_req, res, next) => {
-    res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
-    next();
-  },
-  express.static(uploadsDirectory, { maxAge: "1h" })
-);
+app.use("/uploads", express.static(uploadsDirectory, { maxAge: "1h" }));
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -1225,24 +1206,6 @@ function rejectPublicRateLimit(res, scope, subject) {
     subject,
     secret: jwtSecret,
   });
-}
-
-function rejectPublicCatalogReadLimit(req, res) {
-  const decision = consumePublicRateLimit({
-    scope: "catalogRead",
-    subject: resolvePublicCatalogClientSubject(req, publicCatalogTrustedProxyIps),
-    secret: jwtSecret,
-    store: publicCatalogReadRateLimitStore,
-  });
-  if (decision.allowed) return false;
-  setNoStore(res);
-  const retryAfter = Number(decision.retryAfterSeconds) || 0;
-  if (retryAfter > 0) res.setHeader("Retry-After", String(retryAfter));
-  res.status(429).json({
-    error: "Слишком много запросов к каталогу. Попробуйте позже.",
-    code: "CATALOG_RATE_LIMITED",
-  });
-  return true;
 }
 
 function rejectDiscoverablePasskeyOptionsLimit(req, res) {
@@ -2329,15 +2292,12 @@ const storefrontPdfGate = createConcurrencyGate({ max: 2, perKey: 1 });
 app.get("/api/public/catalog", (req, res) => {
   try {
     if (rejectOversizedPublicCatalogQuery(req, res)) return;
-    if (rejectPublicCatalogReadLimit(req, res)) return;
     const catalog = getPublicCatalog({
         category: String(req.query.category || ""),
         subcategory: String(req.query.subcategory || ""),
         facet: String(req.query.facet || ""),
         q: String(req.query.q || ""),
         language: String(req.query.language || ""),
-        limit: req.query.limit,
-        offset: req.query.offset,
       });
     res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
     res.setHeader("Content-Language", catalog.locale === "zh" ? "zh-CN" : catalog.locale);
