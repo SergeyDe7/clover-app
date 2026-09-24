@@ -10,6 +10,21 @@ const exchangePath = path.resolve(scriptDir, "../src/exchange.js");
 const source = readFrontendUiSource(projectRoot);
 const exchangeSource = await readFile(exchangePath, "utf8");
 
+function enclosingBlockHeader(blockSource, index) {
+  let depth = 0;
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    if (blockSource[cursor] === "}") depth += 1;
+    if (blockSource[cursor] !== "{") continue;
+    if (depth > 0) {
+      depth -= 1;
+      continue;
+    }
+    const headerStart = blockSource.lastIndexOf("}", cursor - 1) + 1;
+    return blockSource.slice(headerStart, cursor).trim();
+  }
+  return "";
+}
+
 const checks = [
   [
     'const UNIT_ORDER = ["piece", "pair", "meter", "roll", "pack", "bundle", "box"]',
@@ -24,8 +39,12 @@ const checks = [
     "В карточке товара есть удаление из каталога Clover, витрины и матриц",
   ],
   [
-    "Список без фото: исходный шрифт телефона, название целиком",
+    ".clover-app .product-card-list h2 {\n    grid-column: 1 !important;\n    grid-row: 1 !important;\n    font-size: 12px !important;",
     "В списке без фото на телефоне исходный шрифт и название целиком",
+  ],
+  [
+    "word-break: keep-all !important;\n    overflow-wrap: normal !important;",
+    "Название в списке без фото переносится по словам, а не по одной букве",
   ],
   [
     'className="purchase-price-card"',
@@ -40,16 +59,12 @@ const checks = [
     "Товарная матрица клиента свёрнута после обновления страницы",
   ],
   [
-    "<summary>1С и цены</summary>",
+    '<summary>{t("manager.clients.oneCAndPrices")}</summary>',
     "Настройки 1С и цен открываются внутри окна матрицы",
   ],
   [
     "grid-auto-flow: column !important",
     "Карточки с 1 и 2 единицами измерения одной высоты",
-  ],
-  [
-    "Телефон ЛК, вид «Фото»: компактные карточки, бейджи над фото",
-    "В ЛК клиента на телефоне вид «Фото» — компактные карточки, бейджи над рамкой фото",
   ],
   [
     'setSelectedIds(new Set(filteredProducts.map((item) => String(item.id))))',
@@ -92,10 +107,6 @@ const checks = [
     "Карточка клиента компактная, без лишней пустоты",
   ],
   [
-    "grid-template-columns: 38px minmax(0, 1fr) 38px !important",
-    "На телефоне в ЛК кнопки количества крупнее",
-  ],
-  [
     'Number.isFinite(Number(value))',
     "Проверка закупочной цены отличает отсутствующую цену от нуля",
   ],
@@ -112,7 +123,7 @@ const checks = [
     "Менеджер видит прикреплённую фотографию",
   ],
   [
-    'UNIT_CONFIG[unit].shortLabel',
+    'unitDisplayShort(unit, t) || UNIT_CONFIG[unit]?.shortLabel',
     "В карточке клиента цена подписана только единицей продажи",
   ],
   [
@@ -132,11 +143,11 @@ const checks = [
     "Кнопки отметки и удаления из матрицы стоят одной строкой",
   ],
   [
-    'label: "Данные клиента"',
+    'label: t("manager.clientDetails")',
     "В карточке клиента остаётся пункт «Данные клиента»",
   ],
   [
-    'label: "Матрица"',
+    'label: t("client.matrix.short"),\n                          onSelect: () => {\n                            restoredOpenClient.current = true;\n                            setOpenClientId(client.id);\n                            setMatrixWindowClientId(String(client.id));',
     "Пункт меню клиента открывает окно матрицы, а не прокрутку страницы",
   ],
   [
@@ -144,7 +155,7 @@ const checks = [
     "Из окна матрицы можно скачать Excel всей матрицы клиента",
   ],
   [
-    'label: "Заблокировать доступ"',
+    'label: t("manager.blockAccess")',
     "В меню клиента блокировка называется «Заблокировать доступ»",
   ],
   [
@@ -164,7 +175,7 @@ const checks = [
     "В каталоге можно удалить отмеченные галочками товары",
   ],
   [
-    "                            Выбрать все",
+    '                            t("shared.action.selectAll")',
     "В матрице клиента кнопка выбора называется «Выбрать все»",
   ],
   [
@@ -180,8 +191,8 @@ const checks = [
     "Поиск витрины учитывает подгруппу и фасет, как до смены на prefix search",
   ],
   [
-    '["orders", "Заказы"],\n  ["products", "Товары"],\n  ["storefront", "Витрина"],\n  ["clients", "Клиенты"],\n  ["acts", "Акты сверок"],\n  ["exchange", "1С"],\n  ["more", "Ещё"]',
-    "Главное меню: Заказы, Товары, Витрина, Клиенты, Акты сверок, 1С, Ещё",
+    '["orders", "manager.nav.orders"],\n  ["products", "manager.nav.products"],\n  ["storefront", "manager.nav.storefront"],\n  ["clients", "manager.nav.clients"],\n  ["acts", "manager.nav.acts"],\n  ["exchange", "manager.nav.exchange"],\n  ["price-list", "manager.nav.priceList"],\n  ["languages", "manager.nav.languages"],\n  ["more", "manager.nav.more"]',
+    "Главное меню менеджера содержит локализованные вкладки заказов, товаров, витрины, клиентов, актов, 1С, прайса и языков",
   ],
   [
     "restoreWindowScroll",
@@ -192,7 +203,7 @@ const checks = [
     "На витрине категория химии называется «Химия, чистящие средства»",
   ],
   [
-    "background: #f3f2ee;",
+    "html.sf-root,\nbody.sf-body {\n  background: #f5f7f4 !important;",
     "Фон витрины нейтральный, без зелёной заливки страницы",
   ],
   [
@@ -200,7 +211,7 @@ const checks = [
     "Подгруппа с мопами пишется со строчной буквы",
   ],
   [
-    '["matrix", "Моя матрица"],\n  ["catalog", "Добавить товары из каталога"],',
+    '["matrix", "client.nav.matrix"],\n  ["catalog", "client.nav.catalog"],',
     "В ЛК клиента есть «Моя матрица» и «Добавить товары из каталога»",
   ],
   [
@@ -208,7 +219,7 @@ const checks = [
     "В ЛК админа номер, телефон, адрес и состав заказа спрятаны за «Подробнее»",
   ],
   [
-    "settings.managerCanDeleteOrders ? (",
+    "!inTrash && canShowDelete ? (",
     "В карточке заказа кнопка «Удалить» стоит рядом со статусами, не внутри «Подробнее»",
   ],
   [
@@ -229,10 +240,9 @@ const checks = [
   ],
 ];
 
-for (const [fragment, description] of checks) {
-  if (!source.includes(fragment)) {
-    throw new Error(`Проверка не пройдена: ${description}`);
-  }
+const missingChecks = checks.filter(([fragment]) => !source.includes(fragment));
+if (missingChecks.length) {
+  throw new Error(`Проверка не пройдена: ${missingChecks.map(([, description]) => description).join("; ")}`);
 }
 
 {
@@ -276,7 +286,7 @@ if (source.includes('"Настройки клиента"') || source.includes("�
 {
   const pickerAt = source.indexOf("<OneCClientPicker");
   const lastPickerAt = source.lastIndexOf("<OneCClientPicker");
-  const matrixAt = source.indexOf("<summary>1С и цены");
+  const matrixAt = source.indexOf('<summary>{t("manager.clients.oneCAndPrices")}</summary>');
   if (pickerAt < 0) {
     throw new Error("Пропала кнопка выбора контрагента 1С.");
   }
@@ -382,6 +392,52 @@ if (!cartChunk.includes("document.documentElement") || !dateChunk.includes("docu
 
 const themePath = path.resolve(projectRoot, "src/styles/clover-theme.css");
 const theme = await readFile(themePath, "utf8");
+const mobilePhotoSelectors = [
+  ".clover-app .page-content-client .embedded-catalog .product-grid:not(.product-grid-list) {",
+  ".clover-app .page-content-client .embedded-catalog .product-grid:not(.product-grid-list) .product-card {",
+  ".clover-app .page-content-client .embedded-catalog .product-grid:not(.product-grid-list) .product-image-wrap {",
+  ".clover-app .page-content-client .embedded-catalog .product-grid:not(.product-grid-list) .product-card-top {",
+  ".clover-app .embedded-catalog .product-card-list .quantity-control {",
+];
+for (const selector of mobilePhotoSelectors) {
+  const selectorAt = theme.lastIndexOf(selector);
+  assert.notEqual(selectorAt, -1, `Не найден итоговый mobile-селектор: ${selector}`);
+  assert.match(
+    enclosingBlockHeader(theme, selectorAt),
+    /@media\s*\(max-width:\s*820px\)\s*$/u,
+    `Селектор должен находиться внутри итогового mobile-блока 820px: ${selector}`
+  );
+}
+assert.match(
+  orderEditor,
+  /<div className="product-card-top">[\s\S]{0,1600}?\{!isList && \(\s*<div className="product-image-wrap">/u,
+  "Карточка ЛК должна рендерить верхний слой бейджей перед фото."
+);
+assert.match(
+  theme,
+  /\.clover-app \.page-content-client \.embedded-catalog \.product-grid:not\(\.product-grid-list\)\s*\{[^}]*grid-template-columns:\s*1fr 1fr !important;[^}]*grid-auto-rows:\s*auto !important;[^}]*gap:\s*8px !important;[^}]*align-items:\s*stretch !important;[^}]*\}/u,
+  "Мобильный фото-каталог ЛК должен оставаться компактной сеткой из двух колонок."
+);
+assert.match(
+  theme,
+  /\.clover-app \.page-content-client \.embedded-catalog \.product-grid:not\(\.product-grid-list\) \.product-card\s*\{[^}]*position:\s*relative !important;[^}]*height:\s*100% !important;[^}]*overflow:\s*hidden !important;[^}]*padding:\s*0 !important;[^}]*\}/u,
+  "Мобильная фото-карточка ЛК должна оставаться контейнером для overlay-бейджей."
+);
+assert.match(
+  theme,
+  /\.clover-app \.page-content-client \.embedded-catalog \.product-grid:not\(\.product-grid-list\) \.product-image-wrap\s*\{[^}]*aspect-ratio:\s*1 \/ 1 !important;[^}]*position:\s*relative !important;[^}]*z-index:\s*0 !important;[^}]*overflow:\s*hidden !important;[^}]*border-radius:\s*0 !important;[^}]*\}/u,
+  "Фото товара в мобильной карточке ЛК должно быть квадратным и не перекрывать бейджи."
+);
+assert.match(
+  theme,
+  /\.clover-app \.page-content-client \.embedded-catalog \.product-grid:not\(\.product-grid-list\) \.product-card-top\s*\{[^}]*position:\s*absolute !important;[^}]*top:\s*4px !important;[^}]*left:\s*4px !important;[^}]*right:\s*4px !important;[^}]*z-index:\s*2 !important;[^}]*pointer-events:\s*none !important;[^}]*\}/u,
+  "Бейджи мобильной карточки ЛК должны находиться поверх верхнего края фотографии."
+);
+assert.match(
+  theme,
+  /\.clover-app \.embedded-catalog \.product-card-list \.quantity-control\s*\{[^}]*height:\s*36px !important;[^}]*grid-template-columns:\s*36px minmax\(0, 1fr\) 36px !important;[^}]*border-radius:\s*8px !important;[^}]*\}/u,
+  "Итоговое mobile-правило списка ЛК должно оставлять кнопки количества шириной 36px."
+);
 const cartTheme = theme.split("/* Корзина вне body")[1]?.split(".order-thankyou-mobile")[0] || "";
 const overlayBlock = cartTheme.split(".cart-sheet-backdrop")[0] || "";
 if (
@@ -414,3 +470,5 @@ console.log("- Кнопка обновления фото витрины скр�
 console.log("- Высота рядов фото-каталога не считается от 100dvh");
 console.log("- Корзина и дата не порталятся в body");
 console.log("- Слой корзины без left+right+width 100% и без отрицательного margin");
+console.log("- Мобильный фото-каталог ЛК: две колонки, квадратное фото и overlay-бейджи");
+console.log("- Итоговые кнопки количества в мобильном списке ЛК имеют ширину 36px");
