@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 
 const PRODUCTION_DATA = path.resolve("/opt/clover/clover-app/server/data");
-const workRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
+const workRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const WORKTREE_DATA = path.resolve(workRoot, "server/data");
 
 function rejectProductionPath(candidate) {
@@ -610,5 +610,6 @@ assert.equal(storeMod.readLocalizationSettings().enabledLanguages.includes("en")
   rejectProductionPath(resolved);
 }
 
-rmSync(tempDir, { recursive: true, force: true });
+dbMod.db.close();
+rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 console.log("verify-i18n-stage-3-persistence: ok");

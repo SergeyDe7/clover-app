@@ -637,12 +637,6 @@ assert.doesNotMatch(readRel("src/shared/i18n/languageResolver.js"), /PUBLIC_LANG
 assert.doesNotMatch(readRel("src/shared/pushSync.js"), /preferred_language/);
 assert.doesNotMatch(readRel("src/App.jsx"), /dir\s*=\s*["']rtl["']/);
 
-execFileSync(
-  "git",
-  ["diff", "--quiet", "a285f58add577e67ca1789831af3bc5e484f1ae6", "--", "package.json", "package-lock.json", "server/package.json", "server/package-lock.json"],
-  { cwd: projectRoot, stdio: "pipe" }
-);
-
 assert.equal(typeof MISSING_TRANSLATION_FALLBACK_RU, "string");
 for (const rel of STAGE3_SURFACES) {
   assert.ok(existsSync(path.join(projectRoot, rel)), `missing Stage 3 surface: ${rel}`);

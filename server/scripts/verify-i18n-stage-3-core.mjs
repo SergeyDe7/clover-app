@@ -57,6 +57,7 @@ const providerPath = path.join(projectRoot, "src/shared/i18n/LocalizationProvide
 const runtimePath = path.join(projectRoot, "src/shared/i18n/translationRuntime.js");
 const mainSrc = readSrc("src/main.jsx");
 const providerSrc = readSrc("src/shared/i18n/LocalizationProvider.jsx");
+const publicSurfaceLocaleSrc = readSrc("src/shared/i18n/publicSurfaceLocale.js");
 const indexSrc = readSrc("src/shared/i18n/index.js");
 const appModalSrc = readSrc("src/shared/AppModal.jsx");
 
@@ -79,10 +80,11 @@ assert.doesNotMatch(providerSrc, /from ["'].*\/db\.js["']/);
 assert.doesNotMatch(providerSrc, /navigator\.language/);
 assert.doesNotMatch(providerSrc, /Accept-Language/);
 assert.match(
-  providerSrc,
+  publicSurfaceLocaleSrc,
   /extractPublicLanguagePrefix\([\s\S]*infrastructureEnabled:\s*true/,
   "Stage 7 may read an explicit public URL locale behind its build gate"
 );
+assert.match(providerSrc, /resolvePublicSurfaceLocale\(/);
 assert.doesNotMatch(providerSrc, /localStorage/);
 assert.doesNotMatch(providerSrc, /sessionStorage/);
 assert.doesNotMatch(providerSrc, /preferred_language/);
@@ -184,7 +186,7 @@ const providerMountFiles = [];
 const runtimeFactoryFiles = [];
 const foreignActivationFiles = [];
 for (const file of listSrcJsFiles(path.join(projectRoot, "src"))) {
-  const rel = path.relative(projectRoot, file);
+  const rel = path.relative(projectRoot, file).split(path.sep).join("/");
   const src = readFileSync(file, "utf8");
   if (src.includes("LocalizationProvider.jsx") && rel !== "src/main.jsx") {
     providerImportFiles.push(rel);
@@ -202,8 +204,11 @@ for (const file of listSrcJsFiles(path.join(projectRoot, "src"))) {
 }
 assert.deepEqual(
   providerImportFiles,
-  ["src/shared/i18n/LanguageSelector.jsx"],
-  `LocalizationProvider.jsx imported outside Stage 6.2 selector: ${providerImportFiles.join(", ")}`
+  [
+    "src/shared/i18n/LanguageSelector.jsx",
+    "src/shared/i18n/useCategoryTranslations.js",
+  ],
+  `LocalizationProvider.jsx imported outside the reviewed adapter set: ${providerImportFiles.join(", ")}`
 );
 assert.deepEqual(providerMountFiles, ["src/main.jsx"]);
 assert.deepEqual(runtimeFactoryFiles, [], `createLocalizationRuntime used outside allowlist: ${runtimeFactoryFiles.join(", ")}`);

@@ -46,8 +46,22 @@ if (args.dryRun && !dbPath) {
   process.exit(2);
 }
 
-const resolvedDb = realpathSync(path.resolve(dbPath));
-if (lstatSync(path.resolve(dbPath)).isSymbolicLink()) {
+const requestedDb = path.resolve(dbPath);
+const requestedProductionDb =
+  requestedDb === path.join(PRODUCTION_DATA, "clover.sqlite") ||
+  requestedDb.startsWith(`${PRODUCTION_DATA}${path.sep}`);
+
+if (
+  args.apply &&
+  requestedProductionDb &&
+  process.env.CLOVER_ALLOW_PRODUCT_AUTO_IMPORT !== "YES"
+) {
+  console.error("Production apply requires CLOVER_ALLOW_PRODUCT_AUTO_IMPORT=YES.");
+  process.exit(2);
+}
+
+const resolvedDb = realpathSync(requestedDb);
+if (lstatSync(requestedDb).isSymbolicLink()) {
   console.error("Refusing symlink DB_PATH.");
   process.exit(2);
 }

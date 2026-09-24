@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:net";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
+import { launchTestChromium } from "./playwrightRuntime.mjs";
 
 import {
   PUBLIC_LOCALE_CODES,
@@ -24,21 +25,11 @@ const outDir = path.join(temp, "dist");
 const evidenceDir =
   process.env.STAGE7_LOCALE_SWITCH_EVIDENCE ||
   path.join(tmpdir(), "clover-stage7-locale-switch-evidence");
-const playwrightRoot =
-  process.env.PLAYWRIGHT_MODULE_ROOT ||
-  "/opt/clover/.npm/_npx/e41f203b7505f1fb/node_modules/playwright";
-const chromiumPath =
-  process.env.PLAYWRIGHT_CHROMIUM_PATH ||
-  "/opt/clover/.cache/ms-playwright/chromium-1148/chrome-linux/chrome";
-const chromeLibs =
-  process.env.PLAYWRIGHT_CHROME_LIBS ||
-  "/opt/clover/.tmp/chrome-libs/usr/lib/x86_64-linux-gnu";
-
 assert.equal(path.resolve(dbPath).startsWith(productionDataPrefix), false);
 mkdirSync(evidenceDir, { recursive: true });
 
 function cleanup() {
-  spawnSync("rm", ["-rf", temp]);
+  rmSync(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 }
 process.on("exit", cleanup);
 
@@ -160,11 +151,6 @@ function minimalEnvironment(extra = {}) {
     CLOVER_PUBLIC_LOCALE_ROUTES_ENABLED: "1",
     DB_PATH: dbPath,
     SITEMAP_OUT: path.join(outDir, "sitemap.xml"),
-    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1",
-    PLAYWRIGHT_BROWSERS_PATH: "/opt/clover/.cache/ms-playwright",
-    LD_LIBRARY_PATH: [chromeLibs, process.env.LD_LIBRARY_PATH || ""]
-      .filter(Boolean)
-      .join(":"),
     ...extra,
   };
 }
@@ -516,11 +502,7 @@ try {
   }
   assert.equal(ready, true, `preview startup failed\n${previewOutput}`);
 
-  const { chromium } = await import(
-    pathToFileURL(path.join(playwrightRoot, "index.mjs")).href
-  );
-  const browser = await chromium.launch({
-    executablePath: chromiumPath,
+  const browser = await launchTestChromium({
     headless: true,
     args: [
       "--no-sandbox",
@@ -528,13 +510,6 @@ try {
       "--disable-dev-shm-usage",
       `--host-resolver-rules=MAP clover-spb.ru 127.0.0.1`,
     ],
-    env: {
-      ...process.env,
-      LD_LIBRARY_PATH: [chromeLibs, process.env.LD_LIBRARY_PATH || ""]
-        .filter(Boolean)
-        .join(":"),
-      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1",
-    },
   });
   const blocked = [];
   const findings = {};

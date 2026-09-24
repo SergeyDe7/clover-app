@@ -15631,16 +15631,6 @@ export const SEED_EXACT_RU_ALLOWLIST = Object.freeze([
     "reason": "unavoidable brand or technical token copied from RU"
   },
   {
-    "key": "checkout.cart.positions",
-    "locale": "ky",
-    "reason": "unavoidable brand or technical token copied from RU"
-  },
-  {
-    "key": "checkout.cart.positions",
-    "locale": "tg",
-    "reason": "unavoidable brand or technical token copied from RU"
-  },
-  {
     "key": "client.accountant",
     "locale": "ky",
     "reason": "unavoidable brand or technical token copied from RU"
@@ -15652,16 +15642,6 @@ export const SEED_EXACT_RU_ALLOWLIST = Object.freeze([
   },
   {
     "key": "client.director",
-    "locale": "tg",
-    "reason": "unavoidable brand or technical token copied from RU"
-  },
-  {
-    "key": "client.matrix.short",
-    "locale": "ky",
-    "reason": "unavoidable brand or technical token copied from RU"
-  },
-  {
-    "key": "client.matrix.short",
     "locale": "tg",
     "reason": "unavoidable brand or technical token copied from RU"
   },
@@ -15918,11 +15898,6 @@ export const SEED_EXACT_RU_ALLOWLIST = Object.freeze([
   {
     "key": "shared.productName2",
     "locale": "ky",
-    "reason": "unavoidable brand or technical token copied from RU"
-  },
-  {
-    "key": "storefront.cabinet",
-    "locale": "tg",
     "reason": "unavoidable brand or technical token copied from RU"
   },
   {

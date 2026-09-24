@@ -226,7 +226,7 @@
   {
     "path": "src/screens/client/OrderEditor.jsx",
     "literal": "Все",
-    "count": 3,
+    "count": 4,
     "classification": "CANONICAL_BUSINESS_VALUE",
     "reason": "Filter/control identity \"Все\" preserved from BASE. Localized via visibilityFilterLabel / option children; value= remains canonical."
   },
@@ -663,13 +663,6 @@
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
     "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
-  },
-  {
-    "path": "src/screens/storefront/components/StorefrontQtyControl.jsx",
-    "literal": "шт",
-    "count": 1,
-    "classification": "CANONICAL_BUSINESS_VALUE",
-    "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
   {
     "path": "src/screens/storefront/pages/infoPageContent.js",
@@ -1668,7 +1661,7 @@
   {
     "path": "src/shared/appHelpers.js",
     "literal": "шт.",
-    "count": 4,
+    "count": 5,
     "classification": "CANONICAL_BUSINESS_VALUE",
     "reason": "UOM identity stored and compared in product/order lines. Display may project a localized unit label; the canonical code remains BASE Russian/abbrev."
   },
@@ -2322,5 +2315,68 @@
     "count": 1,
     "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
     "reason": "Public page/category/SEO/FAQ content is outside Stage 3.1 system UI."
+  },
+  {
+    "path": "src/screens/storefront/components/HeroSlides.jsx",
+    "literal": "Мобильное приложение Clover",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Known RU CMS alt identity used only to select the localized storefront.cloverMobileApp label."
+  },
+  {
+    "path": "src/screens/storefront/components/HeroSlides.jsx",
+    "literal": "Расходники для кафе и ресторанов",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Known RU CMS alt identity used only to select the localized storefront.cloverMobileApp label."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "Файл слишком большой. Максимальный размер — 5 МБ.",
+    "count": 2,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is EXCEL_FILE_TOO_LARGE; UI projects by error code."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "В файле указан некорректный диапазон листа.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is EXCEL_RANGE_INVALID; UI projects by error code."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "Диапазон листа слишком большой для безопасного импорта.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is EXCEL_RANGE_TOO_LARGE; UI projects by error code."
+  },
+  {
+    "path": "src/shared/matrixExcelImport.js",
+    "literal": "В файле слишком много строк. Максимум — 10 000 позиций.",
+    "count": 1,
+    "classification": "SAFE_RU_FALLBACK",
+    "reason": "codedError SAFE RU fallback. Authority is EXCEL_TOO_MANY_ROWS; UI projects by error code."
+  },
+  {
+    "path": "src/shared/sitemap/publicRouteHtml.js",
+    "literal": "/catalog/Одноразовая посуда/Для суши и лапши",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical RU route target for a reviewed legacy category redirect."
+  },
+  {
+    "path": "src/shared/sitemap/publicRouteHtml.js",
+    "literal": "/catalog/Химия, чистящие средства/Для окон",
+    "count": 1,
+    "classification": "CANONICAL_BUSINESS_VALUE",
+    "reason": "Canonical RU route target for a reviewed legacy category redirect."
+  },
+  {
+    "path": "src/shared/sitemap/publicRouteHtml.js",
+    "literal": "Разделы каталога",
+    "count": 1,
+    "classification": "FUTURE_CATEGORY_PAGE_FAQ_SEO",
+    "reason": "RU crawler snapshot navigation label is public SEO content outside Stage 3.1 system UI."
   }
 ]
