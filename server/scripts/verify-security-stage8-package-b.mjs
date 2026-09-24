@@ -25,6 +25,7 @@ assert.match(workflow, /^  frontend:$/mu);
 assert.match(workflow, /^    name: frontend$/mu);
 assert.match(workflow, /^  server:$/mu);
 assert.match(workflow, /^    name: server$/mu);
+assert.match(workflow, /server:[\s\S]*?persist-credentials: false\n          fetch-depth: 0/u);
 assert.match(workflow, /npm ci --ignore-scripts/u);
 assert.match(workflow, /npm exec -- vite build/u);
 assert.match(workflow, /npm run test:all/u);

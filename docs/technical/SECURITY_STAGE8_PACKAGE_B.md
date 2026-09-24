@@ -30,6 +30,8 @@ data. The server job installs the locked server dependency tree with lifecycle
 scripts disabled and runs the complete server verification suite. Its Linux
 fixture explicitly selects `/usr/bin/python3` through the fixture-only
 `S8A_FIXTURE_PYTHON` override; the production interpreter pin remains unchanged.
+The server checkout fetches full Git history because an existing protected-diff
+gate validates a pinned historical review commit.
 
 `ops/security-stage8/package-b/main-ruleset.json` targets only
 `refs/heads/main`. It blocks deletion and force pushes, requires changes through
