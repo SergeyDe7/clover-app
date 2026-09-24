@@ -174,6 +174,7 @@ export function localizedRouteMetadata(
   let title = STOREFRONT_DEFAULT_TITLE;
   let description = STOREFRONT_DEFAULT_DESCRIPTION;
   let type = "website";
+  let heading = "";
 
   if (route.name === "home") {
     title = translated(
@@ -210,6 +211,7 @@ export function localizedRouteMetadata(
         "title",
         getSeoCanonicalField("catalog", "title")
       );
+    heading = label;
     title = `${label} | ${STOREFRONT_SITE_NAME}`;
     description = formatSeoTemplate(
       translated(
@@ -234,6 +236,7 @@ export function localizedRouteMetadata(
       productTranslations
     );
     const name = String(product?.name || descriptor?.product?.name || route.code);
+    heading = name;
     title = `${name} | ${STOREFRONT_SITE_NAME}`;
     description =
       String(product?.storefrontDetails?.description || "").trim().slice(0, 160) ||
@@ -269,7 +272,7 @@ export function localizedRouteMetadata(
   } else if (route.name === "info") {
     const page = resolveStorefrontInfoPage(route.slug, infoPages);
     if (page) {
-      const heading = translated(
+      heading = translated(
         lookup,
         "page",
         "info",
@@ -293,7 +296,6 @@ export function localizedRouteMetadata(
         "description",
         page.description
       );
-      void heading;
       if (!title.includes(STOREFRONT_SITE_NAME)) {
         title = `${title} | ${STOREFRONT_SITE_NAME}`;
       }
@@ -301,6 +303,7 @@ export function localizedRouteMetadata(
   }
 
   return {
+    heading,
     title,
     description,
     type,
@@ -331,6 +334,7 @@ export function buildLocalizedRouteManifest({
       routes[pathname] = {
         pathname,
         sourcePath: descriptor.path,
+        routeName: descriptor?.route?.name || "",
         locale,
         direction: locale === "ar" ? "rtl" : "ltr",
         canonical: publicAbsoluteUrl(descriptor.path, locale),
@@ -346,6 +350,76 @@ export function buildLocalizedRouteManifest({
       };
     }
   }
+
+  // This SEO wave promotes only Russian pages. Build a crawlable, manifest-backed
+  // hierarchy from indexable descriptors so no static href can point at an empty
+  // registry category that would return 404 on a fresh request.
+  const russianCatalogDescriptors = descriptors.filter(
+    (descriptor) => descriptor?.route?.name === "catalog"
+  );
+  const russianProductDescriptors = descriptors.filter(
+    (descriptor) => descriptor?.route?.name === "product"
+  );
+  const russianRecord = (descriptor) =>
+    routes[publicPathForLocale(descriptor.path, DEFAULT_LOCALE)] || null;
+  const linkFor = (descriptor) => {
+    const target = russianRecord(descriptor);
+    if (!target?.pathname || !target?.heading) return null;
+    return { href: target.pathname, label: target.heading };
+  };
+
+  for (const descriptor of russianCatalogDescriptors) {
+    const record = russianRecord(descriptor);
+    if (!record) continue;
+    const route = descriptor.route || {};
+    let targets;
+    if (!route.category) {
+      targets = russianCatalogDescriptors.filter(
+        (candidate) => candidate?.route?.category && !candidate?.route?.subcategory
+      );
+    } else if (!route.subcategory) {
+      targets = [
+        ...russianCatalogDescriptors.filter(
+          (candidate) =>
+            candidate?.route?.category === route.category &&
+            candidate?.route?.subcategory
+        ),
+        ...russianProductDescriptors.filter(
+          (candidate) =>
+            String(candidate?.product?.category || "") === route.category &&
+            !String(candidate?.product?.subcategory || "").trim()
+        ),
+      ];
+    } else {
+      targets = russianProductDescriptors.filter(
+        (candidate) =>
+          String(candidate?.product?.category || "") === route.category &&
+          String(candidate?.product?.subcategory || "") === route.subcategory
+      );
+    }
+    const seen = new Set();
+    record.crawlLinks = targets
+      .map(linkFor)
+      .filter((link) => link && !seen.has(link.href) && seen.add(link.href));
+  }
+
+  for (const descriptor of russianProductDescriptors) {
+    const record = russianRecord(descriptor);
+    if (!record) continue;
+    const category = String(descriptor?.product?.category || "").trim();
+    const subcategory = String(descriptor?.product?.subcategory || "").trim();
+    const parent = russianCatalogDescriptors.find(
+      (candidate) =>
+        candidate?.route?.category === category &&
+        String(candidate?.route?.subcategory || "") === subcategory
+    ) || russianCatalogDescriptors.find(
+      (candidate) =>
+        candidate?.route?.category === category && !candidate?.route?.subcategory
+    );
+    const parentLink = parent ? linkFor(parent) : null;
+    record.crawlLinks = parentLink ? [parentLink] : [];
+  }
+
   for (const locale of locales) {
     const home = routes[publicPathForLocale("/", locale)];
     const organizationDescription = home?.description || "";

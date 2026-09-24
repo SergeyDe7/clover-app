@@ -3,7 +3,11 @@ import { errorDisplayMessage } from "../../../shared/i18n/errorDisplay.js";
 import { useEffect, useMemo, useState } from "react";
 import { storefrontApi } from "../publicApi.js";
 import { addToCart } from "../cartStorage.js";
-import { formatMoney, navigateStorefront } from "../components/StoreHeader.jsx";
+import {
+  formatMoney,
+  navigateStorefront,
+} from "../components/StoreHeader.jsx";
+import { handleStorefrontLinkClick } from "../components/storefrontLink.js";
 import {
   fromQuantityInputValue,
   getUnitMultiplier,
@@ -114,13 +118,25 @@ export function ProductPage({ code, routeLocale, site }) {
     return (
       <div className="sf-product-page">
         <p className="sf-error">{error}</p>
-        <button
-          type="button"
-          className="sf-btn sf-btn-ghost"
-          onClick={() => navigateStorefront({ name: "catalog" })}
-        >{
-          t("storefront.nav.toCatalog")
-        }</button>
+        {publicLocale === "ru" ? (
+          <a
+            className="sf-btn sf-btn-ghost"
+            href={storefrontHref({ name: "catalog" })}
+            onClick={(event) =>
+              handleStorefrontLinkClick(event, { name: "catalog" })
+            }
+          >
+            {t("storefront.nav.toCatalog")}
+          </a>
+        ) : (
+          <button
+            type="button"
+            className="sf-btn sf-btn-ghost"
+            onClick={() => navigateStorefront({ name: "catalog" })}
+          >
+            {t("storefront.nav.toCatalog")}
+          </button>
+        )}
       </div>
     );
   }
@@ -139,19 +155,38 @@ export function ProductPage({ code, routeLocale, site }) {
 
   return (
     <div className="sf-product-page">
-      <button
-        type="button"
-        className="sf-back"
-        onClick={() =>
-          navigateStorefront({
+      {publicLocale === "ru" ? (
+        <a
+          className="sf-back"
+          href={storefrontHref({
             name: "catalog",
             category: product.category || "",
-          })
-        }
-      >
-        <span className="sf-directional-back" aria-hidden="true">←</span>{" "}
-        {categoryLabel || t("storefront.nav.catalog")}
-      </button>
+          })}
+          onClick={(event) =>
+            handleStorefrontLinkClick(event, {
+              name: "catalog",
+              category: product.category || "",
+            })
+          }
+        >
+          <span className="sf-directional-back" aria-hidden="true">←</span>{" "}
+          {categoryLabel || t("storefront.nav.catalog")}
+        </a>
+      ) : (
+        <button
+          type="button"
+          className="sf-back"
+          onClick={() =>
+            navigateStorefront({
+              name: "catalog",
+              category: product.category || "",
+            })
+          }
+        >
+          <span className="sf-directional-back" aria-hidden="true">←</span>{" "}
+          {categoryLabel || t("storefront.nav.catalog")}
+        </button>
+      )}
 
       <div className="sf-product-layout">
         <div className="sf-product-gallery">

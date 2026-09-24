@@ -109,6 +109,28 @@ function localizeOrganizationJsonLd(raw, record) {
   }
 }
 
+function renderRussianSeoSnapshot(record, indexable) {
+  if (
+    !indexable ||
+    record?.locale !== DEFAULT_LOCALE ||
+    !["catalog", "product"].includes(record?.routeName) ||
+    !String(record?.heading || "").trim()
+  ) {
+    return "";
+  }
+  const links = (Array.isArray(record.crawlLinks) ? record.crawlLinks : [])
+    .filter((link) => String(link?.href || "").startsWith("/ru/"))
+    .map(
+      (link) =>
+        `<li><a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a></li>`
+    )
+    .join("");
+  const navigation = links
+    ? `<nav aria-label="Разделы каталога"><ul>${links}</ul></nav>`
+    : "";
+  return `<main data-seo-snapshot="ru"><h1>${escapeHtml(record.heading)}</h1><p>${escapeHtml(record.description)}</p>${navigation}</main>`;
+}
+
 export function resolvePublicRouteRequest(manifest, rawUrl) {
   if (manifest?.infrastructureEnabled !== true) return { action: "pass" };
   const raw = String(rawUrl || "/");
@@ -259,6 +281,13 @@ export function renderPublicRouteHtml(baseHtml, record, { indexable = true } = {
     /(<script type="application\/ld\+json">)([\s\S]*?)(<\/script>)/i,
     (_full, open, raw, close) => `${open}${localizeOrganizationJsonLd(raw, record)}${close}`
   );
+  const seoSnapshot = renderRussianSeoSnapshot(record, indexable);
+  if (seoSnapshot) {
+    html = html.replace(
+      /<div\s+id=["']root["']\s*>\s*<\/div>/i,
+      `<div id="root">${seoSnapshot}</div>`
+    );
+  }
   return html;
 }
 

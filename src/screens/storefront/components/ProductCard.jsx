@@ -2,7 +2,11 @@ import { useLocalization } from "../../../shared/i18n/LocalizationProvider";
 import { categoryDisplayNameFromCanonical } from "../../../shared/i18n/categoryDisplayProjection.js";
 import { useCategoryDisplayOptions } from "../../../shared/i18n/useCategoryTranslations.js";
 import { useEffect, useMemo, useState } from "react";
-import { formatMoney, navigateStorefront } from "./StoreHeader.jsx";
+import {
+  formatMoney,
+  navigateStorefront,
+} from "./StoreHeader.jsx";
+import { handleStorefrontLinkClick } from "./storefrontLink.js";
 import {
   getUnitMultiplier,
   getUnitOrderStep,
@@ -14,13 +18,14 @@ import {
   storefrontUnitLabel,
 } from "./StorefrontUnitChoice.jsx";
 import { productCardImageLoadingAttrs } from "./productCardImage.js";
+import { storefrontHref } from "../mode.js";
 
 export function ProductCard({
   product,
   imagePriorityIndex = Number.POSITIVE_INFINITY,
   categoryTranslations,
 }) {
-  const { t } = useLocalization();
+  const { t, locale } = useLocalization();
   const categoryOptions = useCategoryDisplayOptions(categoryTranslations);
   const categoryLabel = categoryDisplayNameFromCanonical(
     product.category,
@@ -39,39 +44,59 @@ export function ProductCard({
   const unitSize = getUnitMultiplier(product, unit);
   const unitLabel = storefrontUnitLabel(unit, t);
   const imageAttrs = productCardImageLoadingAttrs(imagePriorityIndex);
+  const productRoute = { name: "product", code: product.code };
+  const productMedia = product.imageUrl ? (
+    <img
+      src={product.imageUrl}
+      alt=""
+      loading={imageAttrs.loading}
+      {...(imageAttrs.fetchPriority ? { fetchPriority: imageAttrs.fetchPriority } : {})}
+    />
+  ) : (
+    <div className="sf-product-placeholder" aria-hidden="true" />
+  );
 
   return (
     <article className="sf-product-card">
-      <button
-        type="button"
-        className="sf-product-media"
-        onClick={() =>
-          navigateStorefront({ name: "product", code: product.code })
-        }
-      >
-        {product.imageUrl ? (
-          <img
-            src={product.imageUrl}
-            alt=""
-            loading={imageAttrs.loading}
-            {...(imageAttrs.fetchPriority ? { fetchPriority: imageAttrs.fetchPriority } : {})}
-          />
-        ) : (
-          <div className="sf-product-placeholder" aria-hidden="true" />
-        )}
-      </button>
+      {locale === "ru" ? (
+        <a
+          className="sf-product-media"
+          href={storefrontHref(productRoute)}
+          aria-label={product.name}
+          onClick={(event) => handleStorefrontLinkClick(event, productRoute)}
+        >
+          {productMedia}
+        </a>
+      ) : (
+        <button
+          type="button"
+          className="sf-product-media"
+          aria-label={product.name}
+          onClick={() => navigateStorefront(productRoute)}
+        >
+          {productMedia}
+        </button>
+      )}
       <div className="sf-product-body has-units">
         <p className="sf-product-cat">{categoryLabel}</p>
         <h3>
-          <button
-            type="button"
-            className="sf-product-title"
-            onClick={() =>
-              navigateStorefront({ name: "product", code: product.code })
-            }
-          >
-            {product.name}
-          </button>
+          {locale === "ru" ? (
+            <a
+              className="sf-product-title"
+              href={storefrontHref(productRoute)}
+              onClick={(event) => handleStorefrontLinkClick(event, productRoute)}
+            >
+              {product.name}
+            </a>
+          ) : (
+            <button
+              type="button"
+              className="sf-product-title"
+              onClick={() => navigateStorefront(productRoute)}
+            >
+              {product.name}
+            </button>
+          )}
         </h3>
         {product.code ? (
           <p className="sf-product-code">{t("shared.article.prefix", { article: product.code })}</p>

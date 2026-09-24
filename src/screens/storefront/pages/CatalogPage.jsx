@@ -8,6 +8,7 @@ import {
   navigateStorefront,
   resetCatalogScrollOnRouteIdentity,
 } from "../components/StoreHeader.jsx";
+import { handleStorefrontLinkClick } from "../components/storefrontLink.js";
 import { ProductCard } from "../components/ProductCard.jsx";
 import { CatalogGroupNav } from "../components/CatalogGroupNav.jsx";
 import { GroupIcon } from "../components/GroupIcon.jsx";
@@ -15,8 +16,10 @@ import {
   getGroupMeta,
   getGroupChildren,
   getSubgroupFacets,
+  canonicalizeProductSubcategory,
   groupProductsByCloverGroup,
 } from "../productGroups.js";
+import { storefrontHref } from "../mode.js";
 import { projectLocalizedGroupNav, categoryDisplayNameFromCanonical, categoryDisplayLabelsReady } from "../../../shared/i18n/categoryDisplayProjection.js";
 import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
 import {
@@ -60,6 +63,7 @@ export function CatalogPage({
 }) {
   const { enabledLanguages, t, locale } = useLocalization();
   const publicLocale = routeLocale || locale;
+  const enableCrawlableLinks = publicLocale === "ru";
   const routeKey = catalogScrollRouteKey(category, subcategory, facet);
   const [catalogRouteSnapshot, setCatalogRouteSnapshot] = useState(null);
   const [error, setError] = useState("");
@@ -307,6 +311,28 @@ export function CatalogPage({
       )[0]?.children || []
     );
   }, [category, categoryOptions, labelsReady]);
+  const crawlableSubcategories = useMemo(
+    () =>
+      new Set(
+        (currentPayload?.products || [])
+          .map((product) => canonicalizeProductSubcategory(product?.subcategory))
+          .filter(Boolean)
+      ),
+    [currentPayload]
+  );
+  const crawlableCategories = useMemo(
+    () =>
+      new Set(
+        (currentPayload?.products || [])
+          .map((product) => String(product?.category || "").trim())
+          .filter(Boolean)
+      ),
+    [currentPayload]
+  );
+  const activeCategoryIsCrawlable = useMemo(
+    () => !category || crawlableCategories.has(category),
+    [category, crawlableCategories]
+  );
 
   const title = !category
     ? t("storefront.nav.catalog")
@@ -373,6 +399,8 @@ export function CatalogPage({
                 variant="side"
                 translations={effectiveTranslations}
                 language={publicLocale}
+                crawlableCategories={crawlableCategories}
+                crawlableSubcategories={crawlableSubcategories}
               />
             ) : (
               <p className="sf-muted" aria-busy="true">
@@ -390,25 +418,53 @@ export function CatalogPage({
               </div>
               <div className="sf-group-landing-copy">
                 <nav className="sf-crumb sf-group-landing-crumb" aria-label={t("storefront.nav.aria")}>
-                  <button
-                    type="button"
-                    className="sf-back"
-                    onClick={() => navigateStorefront({ name: "catalog" })}
-                  >{
-                    t("storefront.nav.catalog")
-                  }</button>
+                  {enableCrawlableLinks ? (
+                    <a
+                      className="sf-back"
+                      href={storefrontHref({ name: "catalog" })}
+                      onClick={(event) =>
+                        handleStorefrontLinkClick(event, { name: "catalog" })
+                      }
+                    >
+                      {t("storefront.nav.catalog")}
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      className="sf-back"
+                      onClick={() => navigateStorefront({ name: "catalog" })}
+                    >
+                      {t("storefront.nav.catalog")}
+                    </button>
+                  )}
                   {category ? (
                     <>
                       <span className="sf-crumb-sep">/</span>
-                      <button
-                        type="button"
-                        className="sf-back"
-                        onClick={() =>
-                          navigateStorefront({ name: "catalog", category })
-                        }
-                      >
-                        {labelsReady ? categoryDisplayName : "\u00a0"}
-                      </button>
+                      {enableCrawlableLinks && activeCategoryIsCrawlable ? (
+                        <a
+                          className="sf-back"
+                          href={storefrontHref({ name: "catalog", category })}
+                          aria-current={!subcategory && !facet ? "page" : undefined}
+                          onClick={(event) =>
+                            handleStorefrontLinkClick(event, {
+                              name: "catalog",
+                              category,
+                            })
+                          }
+                        >
+                          {labelsReady ? categoryDisplayName : "\u00a0"}
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          className="sf-back"
+                          onClick={() =>
+                            navigateStorefront({ name: "catalog", category })
+                          }
+                        >
+                          {labelsReady ? categoryDisplayName : "\u00a0"}
+                        </button>
+                      )}
                     </>
                   ) : null}
                   {facet ? (
@@ -431,24 +487,34 @@ export function CatalogPage({
 
           {localizedSubgroups.length > 0 ? (
             <div className="sf-subcat-chips" aria-label={t("storefront.subgroups")}>
-              {localizedSubgroups.map((child) => (
-                <button
-                  key={child.name}
-                  type="button"
-                  className={`sf-chip${
-                    subcategory === child.name ? " is-active" : ""
-                  }`}
-                  onClick={() =>
-                    navigateStorefront({
-                      name: "catalog",
-                      category,
-                      subcategory: child.name,
-                    })
-                  }
-                >
-                  {child.displayName || child.name}
-                </button>
-              ))}
+              {localizedSubgroups.map((child) => {
+                const route = {
+                  name: "catalog",
+                  category,
+                  subcategory: child.name,
+                };
+                const isActive = subcategory === child.name;
+                return enableCrawlableLinks && crawlableSubcategories.has(child.name) ? (
+                  <a
+                    key={child.name}
+                    className={`sf-chip${isActive ? " is-active" : ""}`}
+                    href={storefrontHref(route)}
+                    aria-current={isActive && !facet ? "page" : undefined}
+                    onClick={(event) => handleStorefrontLinkClick(event, route)}
+                  >
+                    {child.displayName || child.name}
+                  </a>
+                ) : (
+                  <button
+                    key={child.name}
+                    type="button"
+                    className={`sf-chip${isActive ? " is-active" : ""}`}
+                    onClick={() => navigateStorefront(route)}
+                  >
+                    {child.displayName || child.name}
+                  </button>
+                );
+              })}
             </div>
           ) : null}
 

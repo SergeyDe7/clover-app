@@ -34,7 +34,9 @@ function RootShell() {
   );
 }
 
-createRoot(document.getElementById("root")).render(
+const reactRoot = document.getElementById("root");
+reactRoot?.querySelector("[data-seo-snapshot]")?.remove();
+createRoot(reactRoot).render(
   <StrictMode>
     <LocalizationProvider>
       <RootShell />
