@@ -13,7 +13,10 @@ const catalogPagePath = path.join(root, "src/screens/storefront/pages/CatalogPag
 const catalogPageSource = readFileSync(catalogPagePath, "utf8");
 
 const {
+  advanceCatalogRequestGeneration,
+  isCatalogRequestGenerationCurrent,
   makeCatalogRouteSnapshot,
+  mergeCatalogRoutePage,
   resolveStorefrontCatalogView,
 } = await import(
   pathToFileURL(path.join(root, "src/screens/storefront/catalogRouteSnapshot.js")).href
@@ -83,8 +86,8 @@ function extractCatalogFetchEffectBody(source) {
 }
 
 /**
- * Prove request-time route identity is captured in the fetch effect and used
- * when tagging the successful payload snapshot (not a live/current retag source).
+ * Prove that the initial fetch is bound to its render-time request identity and
+ * monotonic generation rather than a live route value.
  */
 function assertCatalogFetchRequestTimeBinding(source, label = "CatalogPage") {
   const body = extractCatalogFetchEffectBody(source);
@@ -99,15 +102,6 @@ function assertCatalogFetchRequestTimeBinding(source, label = "CatalogPage") {
     /cancelled\s*=\s*true/,
     `${label}: catalog fetch effect cleanup must set cancelled=true`
   );
-
-  const capture = body.match(
-    /\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*catalogScrollRouteKey\s*\(\s*category\s*,\s*subcategory\s*,\s*facet\s*\)/
-  );
-  assert.ok(
-    capture,
-    `${label}: fetch effect must capture request-time routeKey via catalogScrollRouteKey(category, subcategory, facet)`
-  );
-  const requestIdName = capture[1];
 
   assert.match(
     body,
@@ -131,20 +125,17 @@ function assertCatalogFetchRequestTimeBinding(source, label = "CatalogPage") {
     `${label}: snapshot must use the pre-captured request key binding, not a recomputed call at resolve time`
   );
 
+  assert.match(
+    body,
+    /isCatalogRequestGenerationCurrent\s*\(\s*catalogRequestGenerationRef\.current\s*,\s*requestGeneration\s*\)/,
+    `${label}: successful payload must validate its request generation`
+  );
   const snapshotCall = body.match(
-    /makeCatalogRouteSnapshot\s*\(\s*([A-Za-z_$][\w$]*)\s*,\s*([A-Za-z_$][\w$]*)\s*\)/
+    /makeCatalogRouteSnapshot\s*\(\s*requestKey\s*,\s*([A-Za-z_$][\w$]*)\s*\)/
   );
-  assert.ok(
-    snapshotCall,
-    `${label}: successful payload must call makeCatalogRouteSnapshot(capturedKey, payload)`
-  );
-  assert.equal(
-    snapshotCall[1],
-    requestIdName,
-    `${label}: makeCatalogRouteSnapshot must use the same captured request-time key (${requestIdName}), not a different/live identity`
-  );
+  assert.ok(snapshotCall, `${label}: successful payload must use render-time requestKey`);
 
-  return { requestIdName, payloadArg: snapshotCall[2] };
+  return { requestIdName: "requestKey", payloadArg: snapshotCall[1] };
 }
 
 const KEY_ALL = routeKey("", "", "");
@@ -251,6 +242,39 @@ assert.equal(
   "late stale snapshot A while current B → null"
 );
 
+assert.equal(
+  mergeCatalogRoutePage(disposableRetained, KEY_CHEMISTRY, {
+    products: [{ id: "late-chem-page-2" }],
+    pagination: { offset: 60, nextOffset: null, hasMore: false },
+  }),
+  disposableRetained,
+  "a nonzero stale page cannot replace a different route snapshot"
+);
+
+let abaGeneration = advanceCatalogRequestGeneration(null, KEY_CHEMISTRY);
+const oldAGeneration = abaGeneration.generation;
+let releaseOldA;
+const delayedOldA = new Promise((resolve) => { releaseOldA = resolve; });
+abaGeneration = advanceCatalogRequestGeneration(abaGeneration, KEY_HOUSEHOLD);
+abaGeneration = advanceCatalogRequestGeneration(abaGeneration, KEY_CHEMISTRY);
+let currentA = makeCatalogRouteSnapshot(KEY_CHEMISTRY, {
+  products: [{ id: "new-A-page-1" }],
+  pagination: { offset: 0, nextOffset: 60, hasMore: true },
+});
+releaseOldA({
+  products: [{ id: "old-A-page-2" }],
+  pagination: { offset: 60, nextOffset: 120, hasMore: true },
+});
+const delayedPayload = await delayedOldA;
+if (isCatalogRequestGenerationCurrent(abaGeneration, oldAGeneration)) {
+  currentA = mergeCatalogRoutePage(currentA, KEY_CHEMISTRY, delayedPayload);
+}
+assert.deepEqual(
+  currentA.payload.products.map((product) => product.id),
+  ["new-A-page-1"],
+  "delayed old A page must not merge after A -> B -> A"
+);
+
 // Always-return-payload helper mutation (in-memory): must violate mismatch invariant.
 function alwaysReturnPayloadView(_routeKey, snapshot) {
   const categories = Array.isArray(snapshot?.payload?.categories)
@@ -322,7 +346,7 @@ assert.throws(
   (err) =>
     /captured request-time key|same captured request-time key|not a different\/live identity/i.test(
       String(err?.message || err)
-    ),
+    ) || /render-time requestKey/i.test(String(err?.message || err)),
   "wrong-key CatalogPage mutation must FAIL request-binding assertion"
 );
 
@@ -364,6 +388,7 @@ console.log(
       requestCancellationPreserved: true,
       staleSnapshotRenderProtection: "TESTED",
       fullReactOverlappingAsyncLifecycle: "NOT_DIRECTLY_TESTED",
+      abaGenerationGuard: "TESTED",
     },
     transitions: [
       "A→B",

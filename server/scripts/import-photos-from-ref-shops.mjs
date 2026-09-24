@@ -338,12 +338,23 @@ function mintAdminToken() {
 }
 
 async function loadCloverProducts() {
-  const res = await fetch(`${BASE}/api/public/catalog`, {
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) throw new Error(`catalog HTTP ${res.status}`);
-  const data = await res.json();
-  const products = Array.isArray(data.products) ? data.products : [];
+  const products = [];
+  let offset = 0;
+  for (let page = 0; page < 100; page += 1) {
+    const query = new URLSearchParams({ limit: "60", offset: String(offset) });
+    const res = await fetch(`${BASE}/api/public/catalog?${query}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) throw new Error(`catalog HTTP ${res.status}`);
+    const data = await res.json();
+    products.push(...(Array.isArray(data.products) ? data.products : []));
+    if (!data.pagination?.hasMore) break;
+    const nextOffset = Number(data.pagination?.nextOffset);
+    if (!Number.isInteger(nextOffset) || nextOffset <= offset) {
+      throw new Error("catalog pagination did not advance");
+    }
+    offset = nextOffset;
+  }
   return products.map((p) => ({
     id: p.id,
     name: p.name,
