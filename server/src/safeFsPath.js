@@ -34,7 +34,14 @@ export function sameCanonicalPath(left, right) {
 export function nativeRealpath(filePath, fs = defaultFs) {
   const realpathSync = fs.realpathSync || defaultRealpathSync;
   if (typeof realpathSync.native === "function") {
-    return realpathSync.native(filePath);
+    try {
+      return realpathSync.native(filePath);
+    } catch (error) {
+      const canUseWindowsFallback =
+        process.platform === "win32" &&
+        (error?.code === "EPERM" || error?.code === "EACCES");
+      if (!canUseWindowsFallback) throw error;
+    }
   }
   return realpathSync(filePath);
 }
