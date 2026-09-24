@@ -20,7 +20,7 @@ export function readFrontendUiSource(root = projectRoot) {
         continue;
       }
       if (/\.(jsx?|css)$/i.test(name)) {
-        chunks.push(readFileSync(full, "utf8"));
+        chunks.push(readFileSync(full, "utf8").replace(/\r\n/gu, "\n"));
       }
     }
   }

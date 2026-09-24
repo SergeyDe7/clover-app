@@ -17,9 +17,11 @@ const tile = readFileSync(
 );
 
 assert.ok(
-  home.includes("STOREFRONT_HERO_TITLE") &&
-    home.includes("STOREFRONT_HERO_LEAD"),
-  "Главная витрины берёт описание компании из siteCopy."
+  home.includes('import {') &&
+    home.includes('storefrontHeroCopy,') &&
+    home.includes("hero.title || storefrontHeroCopy(locale).title") &&
+    home.includes("hero.lead || storefrontHeroCopy(locale).lead"),
+  "Главная витрины берёт локализованный fallback описания из siteCopy."
 );
 assert.doesNotMatch(
   home,

@@ -17,7 +17,7 @@ import {
 import { readFrontendUiSource } from "./readFrontendUiSource.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const serverSource = readFileSync(path.join(root, "server/src/server.js"), "utf8");
+const serverSource = readFileSync(path.join(root, "server/src/server.js"), "utf8").replace(/\r\n/gu, "\n");
 const appSource = readFrontendUiSource(root);
 
 assert.ok(
@@ -70,7 +70,7 @@ assert.ok(
   "Кабинет менеджера должен опираться на роль из bootstrap, а не на локальный дефолт."
 );
 
-const migrateManagerIdx = serverSource.indexOf('"/api/migrate/manager"');
+const migrateManagerIdx = serverSource.indexOf('app.post(\n  "/api/migrate/manager"');
 assert.ok(migrateManagerIdx > 0, "migrate/manager должен существовать.");
 const migrateManagerSlice = serverSource.slice(
   migrateManagerIdx,
@@ -91,7 +91,8 @@ assert.ok(
   "migrate/manager не должен писать products сырым телом."
 );
 
-const migrateClientIdx = serverSource.indexOf('"/api/migrate/client"');
+const migrateClientIdx = serverSource.indexOf('app.post(\n  "/api/migrate/client"');
+assert.ok(migrateClientIdx > 0, "migrate/client должен существовать.");
 const migrateClientSlice = serverSource.slice(
   migrateClientIdx,
   migrateClientIdx + 1800

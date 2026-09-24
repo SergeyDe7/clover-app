@@ -6,7 +6,7 @@ import { projectRoot } from "./readFrontendUiSource.mjs";
 const css = readFileSync(
   path.join(projectRoot, "src/screens/storefront/storefront.css"),
   "utf8"
-);
+).replace(/\r\n/gu, "\n");
 const nav = readFileSync(
   path.join(projectRoot, "src/screens/storefront/components/CatalogGroupNav.jsx"),
   "utf8"
@@ -31,18 +31,18 @@ const pageApp = readFileSync(
 
 assert.match(
   css,
-  /\.sf-group-nav-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+1\.75rem/,
-  "Колонка стрелки в дереве фиксированная — длинное имя не сдвигает шеврон."
+  /\.sf-group-nav-row\s*\{[^}]*display:\s*flex[^}]*min-width:\s*0/,
+  "Название и стрелка группы размещены в гибкой строке без переполнения."
 );
 assert.match(
   css,
-  /\.sf-group-nav-row\s*\{[^}]*align-items:\s*start/,
-  "Стрелка подгруппы сидит на первой строке названия, а не по центру переноса."
+  /\.sf-group-nav-row \.sf-cat-btn\s*\{[^}]*flex:\s*1 1 auto/,
+  "Название занимает доступную ширину строки группы."
 );
 assert.match(
   css,
-  /\.sf-group-nav-toggle\s*\{[^}]*width:\s*1\.75rem/,
-  "Кнопка стрелки одинаковой ширины у всех групп, не 52px."
+  /\.sf-group-nav-toggle\s*\{[^}]*flex:\s*0 0 32px;[^}]*width:\s*32px/,
+  "Стрелка имеет фиксированную ширину 32px."
 );
 assert.doesNotMatch(
   css,
@@ -51,8 +51,8 @@ assert.doesNotMatch(
 );
 assert.match(
   nav,
-  /sf-group-nav-toggle is-placeholder/,
-  "У групп без подгрупп колонка стрелки всё равно занята — линия шевронов общая."
+  /\{hasChildren \? \([\s\S]*className=\{`sf-group-nav-toggle/,
+  "Стрелка показана только у групп с подгруппами."
 );
 assert.match(
   nav,
@@ -125,52 +125,37 @@ assert.match(
 );
 assert.match(
   mobile,
-  /\.sf-product-grid\s*\{[^}]*grid-template-columns:\s*1fr\s+1fr/,
+  /\.sf-product-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(0,\s*1fr\)/,
   "На телефоне товары в две колонки — на экран помещается около четырёх карточек."
 );
 assert.match(
   mobile,
-  /\.sf-product-media\s*\{[^}]*aspect-ratio:\s*4\s*\/\s*3/,
-  "На телефоне фото в карточке ниже квадрата, чтобы ряд был компактнее."
+  /\.sf-product-media\s*\{[^}]*aspect-ratio:\s*1\s*\/\s*1/,
+  "На телефоне фото в карточке квадратное."
 );
 assert.match(
   css,
-  /\.sf-group-nav-item\s*\{[^}]*overflow:\s*hidden/,
-  "Полоска обрезается тем же скруглением 12px, что и кнопка."
+  /\.sf-cat-btn\s*\{[^}]*border-radius:\s*12px/,
+  "Кнопки дерева имеют скругление 12px."
 );
 assert.match(
   css,
-  /\.sf-group-nav-item\.is-active::before\s*\{[^}]*top:\s*0/,
-  "Полоска на всю высоту кнопки, не короткая капсула внутри."
+  /\.sf-cat-btn\.is-active\s*\{[^}]*background:\s*var\(--clover-green-soft/,
+  "Активная категория имеет мягкий зелёный фон."
 );
 assert.match(
   css,
-  /\.sf-group-nav-item\.is-active::before\s*\{[^}]*border-radius:\s*12px\s+0\s+0\s+12px/,
-  "Левые углы полоски как у кнопки, не прямая линия."
+  /\.sf-cat-btn\.is-active\s*\{[^}]*border-color:\s*var\(--clover-green-border/,
+  "Активная категория имеет зелёную границу."
 );
 assert.match(
   css,
-  /\.sf-group-nav-item\.is-active::before\s*\{[^}]*linear-gradient/,
-  "Ободок активной категории с зелёным градиентом."
-);
-assert.match(
-  css,
-  /\.sf-group-nav-item\.is-active::before\s*\{[^}]*--clover-green/,
-  "Градиент ободка из токенов Clover green."
-);
-assert.doesNotMatch(
-  css,
-  /\.sf-group-nav-item\.is-child\.is-active/,
-  "Зелёный ободок не ограничивать только подкатегорией."
-);
-assert.doesNotMatch(
-  css,
-  /\.sf-group-nav-item\.is-active\s*\{[^}]*box-shadow/,
-  "Ободок категории — полоска ::before, не inset-тень (её перекрывает иконка)."
+  /\.sf-cat-btn\.is-active\s*\{[^}]*color:\s*var\(--clover-selected-text/,
+  "Активная категория имеет контрастный текст из палитры Clover."
 );
 assert.match(
   nav,
-  /next\.delete\(group\.name\)/,
+  /if \(next\.has\(name\)\) next\.delete\(name\)/,
   "Клик по названию категории сворачивает её подгруппы."
 );
 assert.doesNotMatch(
@@ -185,7 +170,7 @@ assert.match(
 );
 assert.match(
   header,
-  /Войти в ЛК/,
+  /t\("storefront\.signInToCabinet"\)/,
   "В шапке есть «Войти в ЛК»."
 );
 assert.match(
@@ -198,15 +183,15 @@ assert.match(
   /StorefrontContacts/,
   "В шапке витрины есть кнопка «Контакты»."
 );
-assert.doesNotMatch(
-  mobile.split("@media")[0],
-  /\.sf-login(?:-desktop)?\s*\{[^}]*display:\s*none/,
-  "На телефоне «Войти в ЛК» не прячем."
+assert.match(
+  mobile,
+  /a\.sf-header-tool\.sf-login-mobile,[\s\S]*display:\s*inline-flex !important/,
+  "На телефоне ссылка входа в ЛК видна."
 );
 assert.match(
   boot,
-  /storefront \? STOREFRONT_THEME_COLOR : APP_THEME_COLOR/,
-  "После splash витрина не красится цветом ЛК — иначе телефон и компьютер расходятся."
+  /const shellColor = shouldRenderStorefront\(\)\s*\? STOREFRONT_THEME_COLOR\s*:\s*APP_THEME_COLOR/,
+  "После splash для витрины и ЛК выбираются разные цвета системной темы."
 );
 assert.match(
   css,

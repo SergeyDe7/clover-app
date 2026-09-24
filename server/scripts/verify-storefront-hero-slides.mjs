@@ -131,8 +131,13 @@ assert.match(css, /\.sf-hero-slide-btn/);
 const viteConfig = readFileSync(path.join(projectRoot, "vite.config.js"), "utf8");
 assert.match(
   viteConfig,
-  /url\.startsWith\("\/storefront\/"\)/,
+  /const relative = staticAssetRelativePath\(req\.url \|\| "\/"\)/,
   "preview must 404 missing /storefront/* instead of SPA HTML fallback"
 );
+const assetGuard = readFileSync(
+  path.join(projectRoot, "src/shared/staticAssetGuard.js"),
+  "utf8"
+);
+assert.match(assetGuard, /STATIC_ASSET_PREFIXES = \[[^\]]*"\/storefront\/"/);
 
 console.log("verify-storefront-hero-slides: ok");

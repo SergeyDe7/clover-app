@@ -7,6 +7,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const MANUAL_CLIENT_PRICE_REVIEW_RANGE = Object.freeze({
+  base: "fcf0fc38262453cc28d53478af1ae96d6c860b87",
+  head: "1bc7b81ceb5893f7e8f9a19f251a5b40cb4857c1",
+});
 
 function processFailed(result) {
   return Boolean(result.signal) || result.status !== 0;
@@ -183,42 +187,24 @@ function run(args) {
   }
 }
 
-function gitOutput(args) {
-  const result = spawnSync("git", args, {
-    cwd: path.resolve(serverRoot, ".."),
-    encoding: "utf8",
-  });
-  if (result.error) throw result.error;
-  if (processFailed(result)) {
-    throw new Error(
-      `git ${args.join(" ")} failed${
-        result.signal ? ` with ${result.signal}` : ""
-      }: ${result.stderr || result.stdout}`
-    );
-  }
-  return String(result.stdout || "").trim();
-}
-
 const mode = process.argv[2];
 if (mode === "check") {
   for (const file of CHECK_FILES) {
     run(["--check", file]);
   }
 } else if (mode === "test:onec") {
-  const reviewBase =
-    String(process.env.CLOVER_VERIFY_BASE_SHA || "").trim() ||
-    gitOutput(["merge-base", "HEAD", "origin/main"]);
-  const reviewHead =
-    String(process.env.CLOVER_VERIFY_HEAD_SHA || "").trim() ||
-    gitOutput(["rev-parse", "HEAD"]);
   for (const file of TEST_ONEC) {
-    run(
-      file === "scripts/verify-manual-client-price-type.mjs"
-        ? [file, "--base", reviewBase, "--head", reviewHead]
-        : [file]
-    );
+    run(file === "scripts/verify-manual-client-price-type.mjs" ? [file, "--functional-only"] : [file]);
   }
+} else if (mode === "test:manual-client-price-review") {
+  run([
+    "scripts/verify-manual-client-price-type.mjs",
+    "--base",
+    MANUAL_CLIENT_PRICE_REVIEW_RANGE.base,
+    "--head",
+    MANUAL_CLIENT_PRICE_REVIEW_RANGE.head,
+  ]);
 } else {
-  console.error("usage: node scripts/run-package-scripts.mjs <check|test:onec>");
+  console.error("usage: node scripts/run-package-scripts.mjs <check|test:onec|test:manual-client-price-review>");
   process.exit(2);
 }

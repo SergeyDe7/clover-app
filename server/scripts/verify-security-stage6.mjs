@@ -385,6 +385,12 @@ async function verifyArtifactAndRollback() {
     copyFileSync(path.join(root, "ops/security-stage6/scripts/promote-package-b.sh"), trustedOperator);
     copyFileSync(path.join(root, "server/scripts/securityStage6Artifact.mjs"), trustedVerifier);
     execFileSync("git", ["init", "-q", trustedRepo], { cwd: root, stdio: "pipe" });
+    // The fixture compares raw bootstrap bytes with Git blobs. Windows global
+    // autocrlf must not rewrite copied shell/JS files while staging them.
+    execFileSync("git", ["-C", trustedRepo, "config", "core.autocrlf", "false"], {
+      cwd: root,
+      stdio: "pipe",
+    });
     execFileSync("git", ["-C", trustedRepo, "add", "."], { cwd: root, stdio: "pipe" });
     execFileSync("git", [
       "-C", trustedRepo,

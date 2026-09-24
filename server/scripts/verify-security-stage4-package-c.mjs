@@ -270,7 +270,7 @@ async function stopServer(child) {
 
 let primary;
 try {
-  const serverSource = readFileSync(path.join(serverDir, "src/server.js"), "utf8");
+  const serverSource = readFileSync(path.join(serverDir, "src/server.js"), "utf8").replace(/\r\n/gu, "\n");
   const boundsMod = await import(moduleUrl(path.join(serverDir, "src/httpServerBounds.js")));
   const resourceMod = await import(moduleUrl(path.join(serverDir, "src/resourceBounds.js")));
   const enrichMod = await import(moduleUrl(path.join(serverDir, "src/productEnrichment.js")));
@@ -285,9 +285,9 @@ try {
     path.join(serverDir, "scripts/run-package-scripts.mjs"),
   ];
   note(
-    "source.lf-only",
-    packageCFiles.every((file) => !readFileSync(file).includes(0x0d)),
-    "Package C files stay LF so source-scan tests match"
+    "source.newlines-compatible",
+    packageCFiles.every((file) => !/(^|[^\r])\r(?!\n)/u.test(readFileSync(file, "utf8"))),
+    "Package C source allows LF/CRLF but rejects lone CR before source scans"
   );
   note(
     "source.explicit-http-bounds",
