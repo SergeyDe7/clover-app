@@ -282,7 +282,7 @@ for (const record of records) {
   assert.ok(manifestRecord, `manifest route for ${record.category}`);
   assert.equal(manifestRecord.title, record.metaTitle);
   assert.equal(manifestRecord.description, record.metaDescription);
-  assert.equal(manifestRecord.heading, record.h1);
+  assert.equal(manifestRecord.heading, record.category);
   assert.equal(manifestRecord.canonical, publicAbsoluteUrl(sitemapStorefrontPath(route), "ru"));
   assert.deepEqual(JSON.parse(JSON.stringify(manifestRecord.commercialSeo)), {
     category: record.category,
@@ -310,13 +310,13 @@ for (const record of records) {
   const { resolution, html } = renderRequest(pathname);
   assert.equal(resolution.indexable, true);
   assert.ok(html.includes(`<title>${record.metaTitle}</title>`));
-  assert.ok(html.includes(`<h1>${record.h1}</h1>`));
-  assert.ok(html.includes(record.lead));
-  assert.ok(html.includes(record.body));
-  for (const benefit of record.benefits) assert.ok(html.includes(benefit));
+  assert.ok(html.includes(`<h1>${record.category}</h1>`));
+  assert.equal(html.includes(record.lead), false, "commercial lead stays out of visible HTML");
+  assert.equal(html.includes(record.body), false, "commercial body stays out of visible HTML");
+  for (const benefit of record.benefits) assert.equal(html.includes(benefit), false);
   for (const item of record.faq) {
-    assert.ok(html.includes(`<summary>${item.q}</summary>`));
-    assert.ok(html.includes(`<p>${item.a}</p>`));
+    assert.equal(html.includes(`<summary>${item.q}</summary>`), false);
+    assert.equal(html.includes(`<p>${item.a}</p>`), false);
   }
   assert.ok(html.includes(`content="index,follow"`));
   assert.ok(html.includes(`<link rel="canonical" href="${manifestRecord.canonical}" />`));
@@ -334,7 +334,7 @@ for (const record of records) {
       `missing alternate ${alternate.hreflang}`
     );
   }
-  assert.equal(occurrenceCount(html, /data-seo-commercial-category=/g), 1);
+  assert.equal(occurrenceCount(html, /data-seo-commercial-category=/g), 0);
 
   const availablePopular = record.popularSubcategories.filter((name) =>
     manifestRecord.crawlLinks.some((link) => link.label === name)
@@ -379,7 +379,7 @@ for (const search of ["?q=стаканы", "?sort=price"]) {
 {
   const { resolution, html } = renderRequest(`${commercialPath}?utm_source=test`);
   assert.equal(resolution.indexable, true);
-  assert.match(html, /data-seo-commercial-category=/);
+  assert.doesNotMatch(html, /data-seo-commercial-category=/);
 }
 
 const firstSubcategory = subcategories[0];
