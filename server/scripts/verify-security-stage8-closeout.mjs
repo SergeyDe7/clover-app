@@ -29,7 +29,7 @@ const installResult = read("ops/security-stage8/closeout/INSTALL_RESULT.txt");
 const result = JSON.parse(read("ops/security-stage8/closeout/result-template.json"));
 const serverPackage = JSON.parse(read("server/package.json"));
 
-assert.match(closeout, /PHASE 1 BLOCKED \/ NOT DEPLOYED \/ PRODUCTION APPLY NOT RUN/u);
+assert.match(closeout, /PHASE 1 INVENTORY \+ ACL PASS \/ PREPARE NOT RUN \/ PRODUCTION APPLY NOT RUN/u);
 assert.match(closeout, /f2d8083a9314adcac48ebbb64a52aeccf1abc98a/u);
 assert.match(closeout, /baseline, not the production deployment target/u);
 assert.match(closeout, /exact 40-character merge commit/u);
@@ -75,7 +75,7 @@ assert.match(rollback, /Keep every already-hardened sensitive file at `0600`/u);
 assert.match(rollback, /previous source SHA/u);
 assert.doesNotMatch(rollback, /chmod\s+(644|777)/u);
 
-assert.match(remediation, /BLOCKED \/ PLAN ONLY \/ NO REMEDIATION APPLIED/u);
+assert.match(remediation, /PHASE 1 REMEDIATION COMPLETED \/ PREPARE NOT RUN \/ APPLY NOT RUN/u);
 assert.match(remediation, /595101cf369a02a0e1c1c83e442875fa19714cee/u);
 assert.match(remediation, /de353f37eea428437d635df604742c60a54fc9b7c590245b9d084048478ab9a6/u);
 assert.match(remediation, /\/opt\/clover\/worktrees/u);
@@ -97,11 +97,45 @@ assert.match(remediation, /git --no-replace-objects -C "\$\{REPO\}" merge-base -
 assert.match(remediation, /realpath -e -- "\$\{REPO\}"/u);
 assert.match(remediation, /stat -c '%U' -- "\$\{REPO\}"\)" = clover/u);
 assert.match(remediation, /Root must never invoke Git/u);
+const unprivilegedExportMatch = remediation.match(
+  /As unprivileged user `clover`[\s\S]*?```bash\r?\n([\s\S]*?)\r?\n```/u
+);
+assert.ok(unprivilegedExportMatch, "unprivileged export block must exist");
+const unprivilegedExportBlock = unprivilegedExportMatch[1];
+assert.match(unprivilegedExportBlock, /EXPORT_DIRECTORIES=\(/u);
+for (const directory of [
+  '"${EXPORT_ROOT}/scripts"',
+  '"${EXPORT_ROOT}/scripts/linux"',
+  '"${EXPORT_ROOT}/server"',
+  '"${EXPORT_ROOT}/server/scripts"',
+  '"${EXPORT_ROOT}/ops"',
+  '"${EXPORT_ROOT}/ops/security-stage8"',
+  '"${EXPORT_ROOT}/ops/security-stage8/package-a"',
+]) {
+  assert.ok(unprivilegedExportBlock.includes(directory), `export directory must be explicit: ${directory}`);
+}
+assert.match(unprivilegedExportBlock, /stat -c '%U:%G:%a'.*clover:clover:700/u);
+assert.doesNotMatch(unprivilegedExportBlock, /install -d -m 0700 -- "\$\(dirname/u);
 const privilegedBundleMatch = remediation.match(
   /Only after that unprivileged export succeeds[\s\S]*?```bash\r?\n([\s\S]*?)\r?\n```/u
 );
 assert.ok(privilegedBundleMatch, "privileged bundle block must exist");
 const privilegedBundleBlock = privilegedBundleMatch[1];
+assert.match(privilegedBundleBlock, /BUNDLE_DIRECTORIES=\(/u);
+for (const directory of [
+  '"${BUNDLE}"',
+  '"${BUNDLE}/scripts"',
+  '"${BUNDLE}/scripts/linux"',
+  '"${BUNDLE}/server"',
+  '"${BUNDLE}/server/scripts"',
+  '"${BUNDLE}/ops"',
+  '"${BUNDLE}/ops/security-stage8"',
+  '"${BUNDLE}/ops/security-stage8/package-a"',
+  '"${EVIDENCE_DIR}"',
+]) {
+  assert.ok(privilegedBundleBlock.includes(directory), `bundle directory must be explicit: ${directory}`);
+}
+assert.match(privilegedBundleBlock, /stat -c '%U:%G:%a'.*root:clover:750/u);
 assert.doesNotMatch(privilegedBundleBlock, /(?:^|\s)(?:\/usr\/bin\/)?git(?:\s|$)/mu);
 assert.doesNotMatch(privilegedBundleBlock, /\.git(?:\/|\s|$)/mu);
 for (const digest of [
@@ -150,7 +184,7 @@ assert.doesNotMatch(remediation, /rm\s+-rf/u);
 
 for (const marker of [
   "SECURITY_STAGE8_CLOSEOUT_STATUS=PENDING",
-  "PHASE1_STATUS=BLOCKED",
+  "PHASE1_STATUS=INVENTORY_ACL_PASS_PREPARE_NOT_RUN",
   "FAILED_PHASE1_TARGET_SHA=595101cf369a02a0e1c1c83e442875fa19714cee",
   "FAILED_INVENTORY_SHA256=de353f37eea428437d635df604742c60a54fc9b7c590245b9d084048478ab9a6",
   "FAILED_PHASE1_OBSERVED_AT_UTC=2026-09-25T19:34:23Z",
@@ -162,11 +196,13 @@ for (const marker of [
   "FAILED_PHASE1_GETFACL=NOT_INSTALLED",
   "PRIVILEGED_BUNDLE_ROOT=/var/lib/clover-security-stage8",
   "SOURCE_ROOT=/opt/clover/worktrees",
-  "PRIVILEGED_METADATA_AUDIT=REQUIRED",
-  "TARGET_SHA=NOT_RECORDED",
-  "TARGET_SHA_SOURCE=NOT_RECORDED",
-  "OPERATOR_EXPORT_ROOT=NOT_RECORDED",
-  "OPERATOR_BUNDLE_SHA256=NOT_VERIFIED",
+  "PRIVILEGED_METADATA_AUDIT=PASS",
+  "TARGET_SHA=2566b67039ad654c0d365518ab26f27a528b100c",
+  "TARGET_SHA_SOURCE=GITHUB_PR_178_MERGE_RESULT",
+  "OPERATOR_EXPORT_ROOT=/opt/clover/worktrees/security-stage8-operator-export-2566b67039ad654c0d365518ab26f27a528b100c",
+  "OPERATOR_BUNDLE_SHA256=VERIFIED",
+  "REVIEWED_INVENTORY_SHA256=cb1e7abb66b8a7c0e9f87efd3faf0cc4ae18c7fd9dd674d935d5fe45ec6e6952",
+  "ACL_PRE_SHA256=1496516c800e0fb54f31fc14676a096c4a2408e496d93fd260e8df1a52d08f14",
   "HARDENING_APPLY=NOT_RUN",
   "PREPARE=NOT_RUN",
   "POST_APPLY_INVENTORY_SHA256=NOT_RECORDED",
@@ -183,27 +219,27 @@ assert.doesNotMatch(installResult, /PASSWORD|SECRET|TOKEN|API_KEY|JWT/iu);
 assert.equal(result.schema, "clover-security-stage8-closeout/v1");
 assert.equal(result.status, "PENDING");
 assert.equal(result.candidateSourceSha, "f2d8083a9314adcac48ebbb64a52aeccf1abc98a");
-assert.equal(result.targetSha, null);
-assert.equal(result.targetShaSource, null);
+assert.equal(result.targetSha, "2566b67039ad654c0d365518ab26f27a528b100c");
+assert.equal(result.targetShaSource, "GitHub PR #178 merge result");
 assert.equal(result.observedFailedPhase1.observedAtUtc, "2026-09-25T19:34:23Z");
 assert.equal(result.observedFailedPhase1.liveSha, "fdbd39152dcaf049da974ae329412001a472114f");
 assert.equal(result.observedFailedPhase1.inventorySha256, "de353f37eea428437d635df604742c60a54fc9b7c590245b9d084048478ab9a6");
 assert.equal(result.observedFailedPhase1.getfacl, "NOT_INSTALLED");
 assert.equal(result.apply.approved, false);
 assert.equal(result.apply.hardeningApply, null);
-assert.equal(result.prepare.reviewedInventorySha256, null);
-assert.equal(result.prepare.phase1Status, null);
+assert.equal(result.prepare.reviewedInventorySha256, "cb1e7abb66b8a7c0e9f87efd3faf0cc4ae18c7fd9dd674d935d5fe45ec6e6952");
+assert.equal(result.prepare.phase1Status, "INVENTORY_ACL_PASS_PREPARE_NOT_RUN");
 assert.equal(result.prepare.sourceRoot, "/opt/clover/worktrees");
-assert.equal(result.prepare.operatorExportRoot, null);
+assert.equal(result.prepare.operatorExportRoot, "/opt/clover/worktrees/security-stage8-operator-export-2566b67039ad654c0d365518ab26f27a528b100c");
 assert.equal(result.prepare.privilegedBundleRoot, "/var/lib/clover-security-stage8");
-assert.equal(result.prepare.operatorBundleSha256Verified, null);
+assert.equal(result.prepare.operatorBundleSha256Verified, true);
 assert.deepEqual(result.prepare.operatorBundleExpectedSha256, {
   "scripts/linux/harden-deployment-artifacts.sh": "60016601d5dcb97996aa6a42b56049defd81fb9cd89008f1e77dcc480cf53cef",
   "scripts/linux/security_stage8_artifact_modes.py": "9f77dd3524146e60b12b52d2a996c9527b6401516141fea4a886404d6d2aa286",
   "server/scripts/securityStage8InventoryGate.mjs": "77331fdea55484b7f30dcdedfb27cd6f7aeb68d97443c509046985d03ec6b98c",
   "ops/security-stage8/package-a/deployment-sensitive-files.allowlist": "14d44f33ba2eab8efa923750a69fd4a426f6e7d6a6e2686673c64d734eb7dbb9",
 });
-assert.equal(result.prepare.privilegedMetadataAudit, null);
+assert.equal(result.prepare.privilegedMetadataAudit, "PASS");
 assert.equal(result.apply.postApplyInventorySha256, null);
 assert.equal(result.rollback.preCutoverBackupPath, null);
 assert.equal(result.rollback.preCutoverBackupSha256, null);
@@ -285,6 +321,11 @@ if (process.platform === "linux") {
     symlinkSync(outsideScripts, path.join(parentLink.source, "scripts"));
     const parentLinkRun = runImporter(parentLink);
     assert.notEqual(parentLinkRun.status, 0, "parent symlink must fail closed");
+
+    const modeDrift = makeFixture("parent-mode-drift");
+    chmodSync(path.join(modeDrift.source, "scripts"), 0o755);
+    const modeDriftRun = runImporter(modeDrift);
+    assert.notEqual(modeDriftRun.status, 0, "0755 source parent must fail closed");
 
     const fifo = makeFixture("fifo");
     const fifoPath = path.join(fifo.source, fixtureManifest[0][0]);

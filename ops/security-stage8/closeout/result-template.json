@@ -2,10 +2,11 @@
   "schema": "clover-security-stage8-closeout/v1",
   "status": "PENDING",
   "candidateSourceSha": "f2d8083a9314adcac48ebbb64a52aeccf1abc98a",
-  "targetSha": null,
-  "targetShaSource": null,
-  "previousSha": null,
-  "startedAtUtc": null,
+  "targetSha": "2566b67039ad654c0d365518ab26f27a528b100c",
+  "targetShaSource": "GitHub PR #178 merge result",
+  "previousSha": "fdbd39152dcaf049da974ae329412001a472114f",
+  "startedAtUtc": "2026-09-25T19:34:23Z",
+  "phase1CompletedAtUtc": "2026-09-25T21:00:57Z",
   "completedAtUtc": null,
   "observedFailedPhase1": {
     "observedAtUtc": "2026-09-25T19:34:23Z",
@@ -34,13 +35,13 @@
     "promote": "NOT_RUN"
   },
   "productionIdentity": {
-    "hostname": null,
+    "hostname": "clover",
     "repositoryRoot": "/opt/clover/clover-app",
     "deploymentRoot": "/opt/clover/deployments",
-    "apiUnit": null,
-    "uiUnit": null,
-    "apiUser": null,
-    "uiUser": null
+    "apiUnit": "clover-api.service",
+    "uiUnit": "clover-ui.service",
+    "apiUser": "clover",
+    "uiUser": "clover"
   },
   "github": {
     "rulesetId": 23989349,
@@ -54,10 +55,10 @@
     "openDependabotPullRequestCountAtPreparation": 0
   },
   "prepare": {
-    "linuxFixture": null,
-    "phase1Status": null,
+    "linuxFixture": "PASS",
+    "phase1Status": "INVENTORY_ACL_PASS_PREPARE_NOT_RUN",
     "sourceRoot": "/opt/clover/worktrees",
-    "operatorExportRoot": null,
+    "operatorExportRoot": "/opt/clover/worktrees/security-stage8-operator-export-2566b67039ad654c0d365518ab26f27a528b100c",
     "privilegedBundleRoot": "/var/lib/clover-security-stage8",
     "operatorBundleExpectedSha256": {
       "scripts/linux/harden-deployment-artifacts.sh": "60016601d5dcb97996aa6a42b56049defd81fb9cd89008f1e77dcc480cf53cef",
@@ -65,19 +66,26 @@
       "server/scripts/securityStage8InventoryGate.mjs": "77331fdea55484b7f30dcdedfb27cd6f7aeb68d97443c509046985d03ec6b98c",
       "ops/security-stage8/package-a/deployment-sensitive-files.allowlist": "14d44f33ba2eab8efa923750a69fd4a426f6e7d6a6e2686673c64d734eb7dbb9"
     },
-    "operatorBundleSha256Verified": null,
-    "privilegedMetadataAudit": null,
-    "hardeningDryRun": null,
-    "reviewedInventoryPath": null,
-    "reviewedInventorySha256": null,
-    "unexpectedInventoryRows": null,
-    "aclReview": null,
+    "operatorBundleSha256Verified": true,
+    "privilegedMetadataAudit": "PASS",
+    "hardeningDryRun": "PASS",
+    "reviewedInventoryPath": "/var/lib/clover-security-stage8/2566b67039ad654c0d365518ab26f27a528b100c/evidence/inventory-pre.txt",
+    "reviewedInventorySha256": "cb1e7abb66b8a7c0e9f87efd3faf0cc4ae18c7fd9dd674d935d5fe45ec6e6952",
+    "inventoryGateSha256": "edb6a7f3820014adafc36f5d2cd221391fe1721fc71b1b87a411687b69e7c756",
+    "allowlistedInventoryRows": 17,
+    "unexpectedInventoryRows": 0,
+    "aclReview": {
+      "status": "PASS",
+      "reportSha256": "1496516c800e0fb54f31fc14676a096c4a2408e496d93fd260e8df1a52d08f14",
+      "objects": 17,
+      "extendedOrDefaultEntries": 0
+    },
     "preparedPath": null,
     "manifestSha256": null,
     "releaseId": null,
     "expectedLocale": null,
     "expectedMetrika": null,
-    "liveUnchanged": null
+    "liveUnchanged": true
   },
   "apply": {
     "approved": false,
@@ -111,5 +119,5 @@
     "used": false,
     "result": null
   },
-  "residualNotVerified": []
+  "residualNotVerified": ["PREPARE", "PRODUCTION_APPLY_AND_DEPLOY"]
 }

@@ -2,13 +2,11 @@
 
 ## Status and boundary
 
-`BLOCKED / PLAN ONLY / NO REMEDIATION APPLIED`.
+`PHASE 1 REMEDIATION COMPLETED / PREPARE NOT RUN / APPLY NOT RUN`.
 
-This plan records the fail-closed production stop observed on 2026-09-25. It
-does not authorize deletion, unlink, chmod, chown, sudo configuration, PREPARE,
-APPLY, PROMOTE, restart, database access, or 1C access. Each production mutation
-below requires separate explicit owner approval after the exact target is
-re-read.
+This record includes the fail-closed production stop observed on 2026-09-25 and
+the separately approved remediation completed on 2026-09-26. It does not
+authorize PREPARE, APPLY, PROMOTE, restart, database access, or 1C access.
 
 ## Confirmed facts
 
@@ -20,8 +18,16 @@ re-read.
   `de353f37eea428437d635df604742c60a54fc9b7c590245b9d084048478ab9a6`.
 - PREPARE, APPLY, and PROMOTE were not run. API/UI PIDs, restart counts, health,
   UI tag, and live index/JS checksums were unchanged after the stop.
+- Retry target `2566b67039ad654c0d365518ab26f27a528b100c` came from the
+  GitHub PR #178 merge result. The Linux fixture passed, the privileged
+  inventory gate passed 17 of 17 allowlisted objects, and the physical ACL
+  report contained no extended or default ACL entries.
+- Reviewed pre-apply inventory SHA-256:
+  `cb1e7abb66b8a7c0e9f87efd3faf0cc4ae18c7fd9dd674d935d5fe45ec6e6952`.
+- Reviewed physical ACL report SHA-256:
+  `1496516c800e0fb54f31fc14676a096c4a2408e496d93fd260e8df1a52d08f14`.
 
-## Blockers
+## Historical blockers
 
 1. The first closeout procedure placed its target worktree under the inventory
    root. The target contains tracked `.env.production`, so the inventory
@@ -71,9 +77,8 @@ drift.
 4. If the privileged run reveals any new sensitive path, stop and amend the
    exact allowlist through a reviewed PR. Never suppress `NOT_ALLOWLISTED`,
    `NOT_VERIFIED`, `ALLOWLIST_MISSING`, or `SYMLINK_REFUSED`.
-5. `getfacl` was confirmed absent. ACL closure remains blocked until a separate
-   owner-approved installation of the distribution ACL tooling (or an equally
-   reviewed root-owned tool). Do not install a package as part of this plan.
+5. `getfacl` was confirmed absent during the first attempt. Its separately
+   approved installation completed before the successful ACL evidence capture.
 
 The following guarded commands are documentation only until the owner approves
 these exact production mutations:
@@ -143,12 +148,27 @@ git --no-replace-objects -C "${REPO}" merge-base --is-ancestor \
 EXPORT_ROOT="/opt/clover/worktrees/security-stage8-operator-export-${TARGET_SHA}"
 test ! -e "${EXPORT_ROOT}" && test ! -L "${EXPORT_ROOT}"
 install -d -m 0700 -- "${EXPORT_ROOT}"
+EXPORT_DIRECTORIES=(
+  "${EXPORT_ROOT}/scripts"
+  "${EXPORT_ROOT}/scripts/linux"
+  "${EXPORT_ROOT}/server"
+  "${EXPORT_ROOT}/server/scripts"
+  "${EXPORT_ROOT}/ops"
+  "${EXPORT_ROOT}/ops/security-stage8"
+  "${EXPORT_ROOT}/ops/security-stage8/package-a"
+)
+for directory in "${EXPORT_DIRECTORIES[@]}"; do
+  test ! -e "${directory}" && test ! -L "${directory}"
+  install -d -m 0700 -- "${directory}"
+  test "$(stat -c '%U:%G:%a' -- "${directory}")" = clover:clover:700
+done
 
 export_blob() {
   repo_path="$1"
   expected_sha256="$2"
   destination="${EXPORT_ROOT}/${repo_path}"
-  install -d -m 0700 -- "$(dirname -- "${destination}")"
+  test "$(stat -c '%U:%G:%a' -- "$(dirname -- "${destination}")")" = \
+    clover:clover:700
   git --no-replace-objects -C "${REPO}" show \
     "${TARGET_SHA}:${repo_path}" >"${destination}.tmp"
   test "$(sha256sum "${destination}.tmp" | cut -d' ' -f1)" = "${expected_sha256}"
@@ -224,11 +244,22 @@ test "$(stat -c '%U:%G:%a' -- "${TARGET_ROOT}")" = root:clover:750
 
 test ! -e "${BUNDLE}" && test ! -L "${BUNDLE}"
 test ! -e "${EVIDENCE_DIR}" && test ! -L "${EVIDENCE_DIR}"
-install -d -o root -g clover -m 0750 -- \
-  "${BUNDLE}/scripts/linux" \
-  "${BUNDLE}/server/scripts" \
-  "${BUNDLE}/ops/security-stage8/package-a" \
+BUNDLE_DIRECTORIES=(
+  "${BUNDLE}"
+  "${BUNDLE}/scripts"
+  "${BUNDLE}/scripts/linux"
+  "${BUNDLE}/server"
+  "${BUNDLE}/server/scripts"
+  "${BUNDLE}/ops"
+  "${BUNDLE}/ops/security-stage8"
+  "${BUNDLE}/ops/security-stage8/package-a"
   "${EVIDENCE_DIR}"
+)
+for directory in "${BUNDLE_DIRECTORIES[@]}"; do
+  test ! -e "${directory}" && test ! -L "${directory}"
+  install -d -o root -g clover -m 0750 -- "${directory}"
+  test "$(stat -c '%U:%G:%a' -- "${directory}")" = root:clover:750
+done
 
 # Paste this reviewed bootstrap from the trusted PR view, never from a file in
 # the production checkout. Isolated system Python ignores PYTHONPATH and local
