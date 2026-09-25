@@ -118,6 +118,55 @@ function renderRussianSeoSnapshot(record, indexable) {
   ) {
     return "";
   }
+  const commercial = record?.commercialSeo;
+  if (commercial) {
+    const crawlLinks = (Array.isArray(record.crawlLinks)
+      ? record.crawlLinks
+      : []
+    ).filter(
+      (link) =>
+        String(link?.href || "").startsWith("/ru/") &&
+        String(link?.label || "").trim()
+    );
+    const linksByLabel = new Map(
+      crawlLinks.map((link) => [String(link.label).trim(), link])
+    );
+    const popularLinks = (Array.isArray(commercial.popularSubcategories)
+      ? commercial.popularSubcategories
+      : []
+    )
+      .map((name) => linksByLabel.get(String(name || "").trim()))
+      .filter(Boolean)
+      .map(
+        (link) =>
+          `<li><a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a></li>`
+      )
+      .join("");
+    const fallbackLinks = crawlLinks
+      .map(
+        (link) =>
+          `<li><a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a></li>`
+      )
+      .join("");
+    const popular = popularLinks
+      ? `<nav aria-label="Популярные разделы"><ul>${popularLinks}</ul></nav>`
+      : fallbackLinks
+        ? `<nav aria-label="Разделы каталога"><ul>${fallbackLinks}</ul></nav>`
+        : "";
+    const benefits = (Array.isArray(commercial.benefits)
+      ? commercial.benefits
+      : []
+    )
+      .map((item) => `<li>${escapeHtml(item)}</li>`)
+      .join("");
+    const faq = (Array.isArray(commercial.faq) ? commercial.faq : [])
+      .map(
+        (item) =>
+          `<details><summary>${escapeHtml(item?.q)}</summary><p>${escapeHtml(item?.a)}</p></details>`
+      )
+      .join("");
+    return `<main data-seo-snapshot="ru" data-seo-commercial-category="${escapeHtml(commercial.category)}"><h1>${escapeHtml(commercial.h1)}</h1><p>${escapeHtml(commercial.lead)}</p>${popular}<section aria-label="Информация для бизнеса"><p>${escapeHtml(commercial.body)}</p><ul>${benefits}</ul><div>${faq}</div></section></main>`;
+  }
   const links = (Array.isArray(record.crawlLinks) ? record.crawlLinks : [])
     .filter((link) => String(link?.href || "").startsWith("/ru/"))
     .map(
