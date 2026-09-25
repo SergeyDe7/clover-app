@@ -2,7 +2,7 @@
 
 ## Status
 
-**PHASE 1 BLOCKED / NOT DEPLOYED / PRODUCTION APPLY NOT RUN.**
+**PHASE 1 INVENTORY + ACL PASS / PREPARE NOT RUN / PRODUCTION APPLY NOT RUN.**
 
 This document is the operator plan and evidence contract for closing Security
 Stage 8. It must not be changed to `PASS` until the production apply, deploy,
@@ -53,6 +53,26 @@ The confirmed blockers and the separately approved remediation procedure are in
 `ops/security-stage8/closeout/PHASE1_REMEDIATION.md`. Stage 8A `--apply`,
 PREPARE, PROMOTE, service restart, database operation, and 1C operation were not
 run.
+
+## Production Phase 1 remediation result (2026-09-26)
+
+PR #178 merged as `2566b67039ad654c0d365518ab26f27a528b100c` and both
+required post-merge checks passed. The failed source worktree was removed by
+Git's exact registered-worktree operation, and only the confirmed historical
+`.env.production` symlink was unlinked. The protected target worktree passed
+the complete Linux Stage 8A fixture.
+
+The root-owned operator bundle independently matched all four pinned SHA-256
+values. The pre-apply inventory gate passed all 17 allowlisted objects with
+inventory SHA-256
+`cb1e7abb66b8a7c0e9f87efd3faf0cc4ae18c7fd9dd674d935d5fe45ec6e6952`.
+The physical ACL report covered the same 17 objects, contained no extended or
+default ACL entry, and has SHA-256
+`1496516c800e0fb54f31fc14676a096c4a2408e496d93fd260e8df1a52d08f14`.
+The live checkout remained at
+`fdbd39152dcaf049da974ae329412001a472114f`; tracked status, service PIDs,
+restart counters, and HTTP health remained unchanged. PREPARE, APPLY, and
+PROMOTE were not run.
 
 Do not infer any of these values from an older closeout. Record them again in
 the result file derived from
