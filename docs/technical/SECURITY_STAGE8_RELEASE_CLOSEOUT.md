@@ -2,7 +2,7 @@
 
 ## Status
 
-**PREPARED / NOT DEPLOYED / PRODUCTION APPLY NOT RUN.**
+**PHASE 1 BLOCKED / NOT DEPLOYED / PRODUCTION APPLY NOT RUN.**
 
 This document is the operator plan and evidence contract for closing Security
 Stage 8. It must not be changed to `PASS` until the production apply, deploy,
@@ -31,18 +31,28 @@ or the baseline SHA above is not an acceptable deployment target.
   alert count and open Dependabot PR count were both zero.
 - Secret scanning and push protection are enabled.
 - Post-merge S8-B CI for `main@f2d8083` completed successfully for both jobs.
+- Closeout PR #177 merged as
+  `595101cf369a02a0e1c1c83e442875fa19714cee`; both post-merge S8-B jobs passed.
 
 These are sanitized control-plane facts. Tokens, environment values, database
 contents, PII, and raw vulnerable-file contents must never be copied into the
 closeout evidence.
 
-## Production facts still required
+## Observed production Phase 1 stop (2026-09-25)
 
-The current production checkout, process identity, service unit paths, listener
-owners, live UI tag/bundle, database path, and deployment artifact modes have
-not been re-read during this preparation. Stage 8A `--apply` has not been run.
-The Windows portable verifier does not prove Linux `openat`, `fchmod`, `flock`,
-owner, or ACL behavior.
+The production baseline was re-read as user `clover` on host `clover`. The live
+checkout remained at `fdbd39152dcaf049da974ae329412001a472114f`, with no
+tracked drift; API and UI remained active with zero restarts and healthy HTTP
+responses. The Linux Stage 8A fixture passed, including `openat`, `fchmod`,
+`flock`, traversal, symlink, and idempotency cases.
+
+The production inventory gate then stopped before PREPARE. Its sanitized
+evidence SHA-256 is
+`de353f37eea428437d635df604742c60a54fc9b7c590245b9d084048478ab9a6`.
+The confirmed blockers and the separately approved remediation procedure are in
+`ops/security-stage8/closeout/PHASE1_REMEDIATION.md`. Stage 8A `--apply`,
+PREPARE, PROMOTE, service restart, database operation, and 1C operation were not
+run.
 
 Do not infer any of these values from an older closeout. Record them again in
 the result file derived from
@@ -61,19 +71,27 @@ Stop before any write when the active service paths do not resolve to
 2. Record live `HEAD`, tracked status, API health, origin UI response, nginx
    HTTPS response, UI release tag, main JS bundle, and their checksums. Do not
    read or copy `.env`, SQLite, WAL, SHM, archive, or backup contents.
-3. Fetch the exact target object without resetting the live checkout. Verify it
-   is a fast-forward descendant of the observed live SHA. Create a protected,
+3. Record `TARGET_SHA` from the merged closeout PR returned by GitHub on the
+   trusted operator workstation; never derive it from a production branch or
+   mutable production ref. Fetch that exact object without resetting the live
+   checkout. As unprivileged `clover`, verify it is a fast-forward descendant
+   of the observed live SHA. Create a protected,
    detached target checkout and bootstrap the launcher from the same Git object:
 
    ```bash
    umask 077
    ROOT=/opt/clover/clover-app
+   SOURCE_ROOT=/opt/clover/worktrees
    STAGING=/opt/clover/deployments/staging
-   S8_SOURCE="${STAGING}/security-stage8-source-${TARGET_SHA}"
+   S8_SOURCE="${SOURCE_ROOT}/security-stage8-closeout-${TARGET_SHA}"
    DELIVERED="${STAGING}/delivered-deploy-${TARGET_SHA}"
+   test "$(realpath -e -- "${SOURCE_ROOT}")" = /opt/clover/worktrees
+   test ! -e "${S8_SOURCE}"
    git -C "${ROOT}" worktree add --detach "${S8_SOURCE}" "${TARGET_SHA}"
    test "$(git -C "${S8_SOURCE}" rev-parse HEAD)" = "${TARGET_SHA}"
    test -z "$(git -C "${S8_SOURCE}" status --porcelain=v1 --untracked-files=no)"
+   test "$(stat -c '%a' -- "${S8_SOURCE}")" = 700
+   test "$(stat -c '%U:%G' -- "${S8_SOURCE}")" = clover:clover
    install -d -m 700 "${DELIVERED}"
    git -C "${ROOT}" show "${TARGET_SHA}:scripts/linux/run-target-deploy.sh" \
      >"${DELIVERED}/run-target-deploy.sh.tmp"
@@ -89,16 +107,48 @@ Stop before any write when the active service paths do not resolve to
    bash scripts/linux/verify-security-stage8-package-a.sh
    ```
 
-5. Run the metadata-only inventory from that same exact checkout and save the
-   sanitized output plus its SHA-256 for an exact pre-apply drift comparison:
+5. Before retrying inventory, complete every separately approved action in
+   `PHASE1_REMEDIATION.md`. A privileged metadata operator is required because
+   the unprivileged production identity cannot traverse two historical roots.
+   Unprivileged `clover` must first export the four operator files for the
+   externally approved merge SHA. The privileged operator then imports them
+   into a root-owned bundle only after all copied bytes match the four literal,
+   independently reviewed SHA-256 values in `PHASE1_REMEDIATION.md`. Root must
+   never invoke Git or read `.git`. Never execute privileged code from
+   `${S8_SOURCE}`. The
+   inventory and gate receipts are root-owned, group-restricted to `clover`,
+   and atomically published evidence:
 
    ```bash
-   bash scripts/linux/harden-deployment-artifacts.sh --dry-run \
-     | tee "${STAGING}/security-stage8-inventory-${TARGET_SHA}.txt"
-   node server/scripts/securityStage8InventoryGate.mjs --phase pre \
-     --inventory "${STAGING}/security-stage8-inventory-${TARGET_SHA}.txt" \
-     --allowlist ops/security-stage8/package-a/deployment-sensitive-files.allowlist
-   sha256sum "${STAGING}/security-stage8-inventory-${TARGET_SHA}.txt"
+   # Run only inside the separately approved interactive root shell.
+   set -euo pipefail
+   umask 077
+   export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+   ROOT_BUNDLE="/var/lib/clover-security-stage8/${TARGET_SHA}/operator"
+   EVIDENCE_DIR="/var/lib/clover-security-stage8/${TARGET_SHA}/evidence"
+   INVENTORY="${EVIDENCE_DIR}/inventory-pre.txt"
+   test "$(stat -c '%U:%G:%a' -- "${ROOT_BUNDLE}")" = root:clover:750
+   test "$(stat -c '%U:%G:%a' -- "${EVIDENCE_DIR}")" = root:clover:750
+   /usr/bin/bash "${ROOT_BUNDLE}/scripts/linux/harden-deployment-artifacts.sh" --dry-run \
+     >"${INVENTORY}.tmp"
+   chown root:clover "${INVENTORY}.tmp"
+   chmod 0440 "${INVENTORY}.tmp"
+   mv "${INVENTORY}.tmp" "${INVENTORY}"
+   sha256sum "${INVENTORY}" >"${INVENTORY}.sha256.tmp"
+   chown root:clover "${INVENTORY}.sha256.tmp"
+   chmod 0440 "${INVENTORY}.sha256.tmp"
+   mv "${INVENTORY}.sha256.tmp" "${INVENTORY}.sha256"
+   /usr/bin/sudo -u clover -- /usr/bin/env -i PATH=/usr/bin:/bin /usr/bin/node \
+     "${ROOT_BUNDLE}/server/scripts/securityStage8InventoryGate.mjs" --phase pre \
+     --inventory "${INVENTORY}" \
+     --allowlist "${ROOT_BUNDLE}/ops/security-stage8/package-a/deployment-sensitive-files.allowlist" \
+     >"${EVIDENCE_DIR}/inventory-pre-gate.txt.tmp"
+   chown root:clover "${EVIDENCE_DIR}/inventory-pre-gate.txt.tmp"
+   chmod 0440 "${EVIDENCE_DIR}/inventory-pre-gate.txt.tmp"
+   mv "${EVIDENCE_DIR}/inventory-pre-gate.txt.tmp" \
+     "${EVIDENCE_DIR}/inventory-pre-gate.txt"
+   sha256sum --check "${INVENTORY}.sha256"
+   sha256sum "${EVIDENCE_DIR}/inventory-pre-gate.txt"
    ```
 
    Exit code zero from the hardener is not sufficient. The inventory gate fails
@@ -153,25 +203,36 @@ apply, deploy, restart services, change databases, or touch 1C.
    chmod 600 "${BACKUP}/FILES.sha256"
    ```
 
-2. Re-run the Stage 8A dry-run from `${S8_SOURCE}` and require its sanitized
+2. Re-run the Stage 8A dry-run from `${ROOT_BUNDLE}` with the same privileged
+   metadata operator and require its sanitized
    output SHA-256 to equal the reviewed Phase 1 inventory checksum. Under the
-   shared deployment lock, run from that exact target checkout:
+   shared deployment lock, run from that exact target-pinned root-owned bundle:
 
    ```bash
-   bash scripts/linux/harden-deployment-artifacts.sh --apply
+   /usr/bin/bash "${ROOT_BUNDLE}/scripts/linux/harden-deployment-artifacts.sh" --apply
    ```
 
 3. Repeat the metadata inventory into a new post-apply file, gate that exact
    file as phase `post`, and record its SHA-256 separately:
 
    ```bash
-   POST_INVENTORY="${STAGING}/security-stage8-post-apply-${TARGET_SHA}.txt"
-   bash scripts/linux/harden-deployment-artifacts.sh --dry-run \
-     | tee "${POST_INVENTORY}"
-   node server/scripts/securityStage8InventoryGate.mjs --phase post \
+   POST_INVENTORY="${EVIDENCE_DIR}/inventory-post.txt"
+   /usr/bin/bash "${ROOT_BUNDLE}/scripts/linux/harden-deployment-artifacts.sh" --dry-run \
+     >"${POST_INVENTORY}.tmp"
+   chown root:clover "${POST_INVENTORY}.tmp"
+   chmod 0440 "${POST_INVENTORY}.tmp"
+   mv "${POST_INVENTORY}.tmp" "${POST_INVENTORY}"
+   /usr/bin/sudo -u clover -- /usr/bin/env -i PATH=/usr/bin:/bin /usr/bin/node \
+     "${ROOT_BUNDLE}/server/scripts/securityStage8InventoryGate.mjs" --phase post \
      --inventory "${POST_INVENTORY}" \
-     --allowlist ops/security-stage8/package-a/deployment-sensitive-files.allowlist
+     --allowlist "${ROOT_BUNDLE}/ops/security-stage8/package-a/deployment-sensitive-files.allowlist" \
+     >"${EVIDENCE_DIR}/inventory-post-gate.txt.tmp"
+   chown root:clover "${EVIDENCE_DIR}/inventory-post-gate.txt.tmp"
+   chmod 0440 "${EVIDENCE_DIR}/inventory-post-gate.txt.tmp"
+   mv "${EVIDENCE_DIR}/inventory-post-gate.txt.tmp" \
+     "${EVIDENCE_DIR}/inventory-post-gate.txt"
    sha256sum "${POST_INVENTORY}"
+   sha256sum "${EVIDENCE_DIR}/inventory-post-gate.txt"
    ```
 
    The post gate requires every allowlisted regular file to report mode `0600`.
