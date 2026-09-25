@@ -3,6 +3,7 @@
   "status": "PENDING",
   "candidateSourceSha": "f2d8083a9314adcac48ebbb64a52aeccf1abc98a",
   "targetSha": null,
+  "targetShaSource": null,
   "previousSha": null,
   "startedAtUtc": null,
   "completedAtUtc": null,
@@ -56,7 +57,15 @@
     "linuxFixture": null,
     "phase1Status": null,
     "sourceRoot": "/opt/clover/worktrees",
+    "operatorExportRoot": null,
     "privilegedBundleRoot": "/var/lib/clover-security-stage8",
+    "operatorBundleExpectedSha256": {
+      "scripts/linux/harden-deployment-artifacts.sh": "60016601d5dcb97996aa6a42b56049defd81fb9cd89008f1e77dcc480cf53cef",
+      "scripts/linux/security_stage8_artifact_modes.py": "9f77dd3524146e60b12b52d2a996c9527b6401516141fea4a886404d6d2aa286",
+      "server/scripts/securityStage8InventoryGate.mjs": "77331fdea55484b7f30dcdedfb27cd6f7aeb68d97443c509046985d03ec6b98c",
+      "ops/security-stage8/package-a/deployment-sensitive-files.allowlist": "14d44f33ba2eab8efa923750a69fd4a426f6e7d6a6e2686673c64d734eb7dbb9"
+    },
+    "operatorBundleSha256Verified": null,
     "privilegedMetadataAudit": null,
     "hardeningDryRun": null,
     "reviewedInventoryPath": null,

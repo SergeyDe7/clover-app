@@ -71,8 +71,11 @@ Stop before any write when the active service paths do not resolve to
 2. Record live `HEAD`, tracked status, API health, origin UI response, nginx
    HTTPS response, UI release tag, main JS bundle, and their checksums. Do not
    read or copy `.env`, SQLite, WAL, SHM, archive, or backup contents.
-3. Fetch the exact target object without resetting the live checkout. Verify it
-   is a fast-forward descendant of the observed live SHA. Create a protected,
+3. Record `TARGET_SHA` from the merged closeout PR returned by GitHub on the
+   trusted operator workstation; never derive it from a production branch or
+   mutable production ref. Fetch that exact object without resetting the live
+   checkout. As unprivileged `clover`, verify it is a fast-forward descendant
+   of the observed live SHA. Create a protected,
    detached target checkout and bootstrap the launcher from the same Git object:
 
    ```bash
@@ -107,8 +110,12 @@ Stop before any write when the active service paths do not resolve to
 5. Before retrying inventory, complete every separately approved action in
    `PHASE1_REMEDIATION.md`. A privileged metadata operator is required because
    the unprivileged production identity cannot traverse two historical roots.
-   The operator must first build a root-owned, target-pinned bundle and verify
-   every Git blob. Never execute privileged code from `${S8_SOURCE}`. The
+   Unprivileged `clover` must first export the four operator files for the
+   externally approved merge SHA. The privileged operator then imports them
+   into a root-owned bundle only after all copied bytes match the four literal,
+   independently reviewed SHA-256 values in `PHASE1_REMEDIATION.md`. Root must
+   never invoke Git or read `.git`. Never execute privileged code from
+   `${S8_SOURCE}`. The
    inventory and gate receipts are root-owned, group-restricted to `clover`,
    and atomically published evidence:
 

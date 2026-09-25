@@ -64,9 +64,10 @@ drift.
    only. Do not follow it and do not remove the containing recovery worktree.
 3. Use a one-time interactive privileged operator for metadata inventory. Do
    not grant persistent passwordless sudo and do not loosen directory modes to
-   make discovery pass. Root must execute only a root-owned target-pinned bundle
-   with every Git blob verified; never execute from the `clover`-writable source
-   worktree. Run the gate as `clover` from that same root-owned bundle.
+   make discovery pass. Git export must run only as unprivileged `clover`.
+   Root must never invoke Git against the `clover`-owned repository; it may only
+   import regular files and accept them after comparing independently reviewed
+   SHA-256 values. Run the gate as `clover` from the resulting root-owned bundle.
 4. If the privileged run reveals any new sensitive path, stop and amend the
    exact allowlist through a reviewed PR. Never suppress `NOT_ALLOWLISTED`,
    `NOT_VERIFIED`, `ALLOWLIST_MISSING`, or `SYMLINK_REFUSED`.
@@ -105,23 +106,93 @@ test "$(git -C "${RECOVERY_WT}" status --porcelain=v1 --untracked-files=no)" = \
   $' D .env.production\n M vite.config.js'
 ```
 
-After those separately approved actions, the interactive privileged operator
-must build the immutable operator bundle without executing repository code:
+After merge, obtain `APPROVED_TARGET_SHA` from the GitHub PR merge result on the
+trusted operator workstation, record its source, and require the exact
+40-character lowercase commit ID. Do not derive it from a production branch or
+mutable production ref. The failed target `595101c...` is incident evidence,
+not the retry target.
+
+As unprivileged user `clover`, verify that the approved target is a descendant
+of the observed live SHA and export only the four reviewed operator files. Git
+configuration or a promisor helper can at worst run with `clover` privileges;
+root never reads `.git` or invokes Git. `GIT_NO_LAZY_FETCH=1` makes missing
+objects fail closed. The four literal SHA-256 values below are independent of
+Git object IDs and were reviewed from the exact Git blobs in PR #178:
+
+```bash
+set -euo pipefail
+umask 077
+export PATH=/usr/bin:/bin
+export GIT_CONFIG_NOSYSTEM=1
+export GIT_CONFIG_GLOBAL=/dev/null
+export GIT_NO_LAZY_FETCH=1
+REPO=/opt/clover/clover-app
+: "${APPROVED_TARGET_SHA:?record the GitHub PR merge commit first}"
+[[ "${APPROVED_TARGET_SHA}" =~ ^[0-9a-f]{40}$ ]] || {
+  echo 'ERROR: APPROVED_TARGET_SHA must be exactly 40 lowercase hex characters' >&2
+  exit 2
+}
+TARGET_SHA="${APPROVED_TARGET_SHA}"
+test "${TARGET_SHA}" != 595101cf369a02a0e1c1c83e442875fa19714cee
+test "$(realpath -e -- "${REPO}")" = "${REPO}"
+test "$(stat -c '%U' -- "${REPO}")" = clover
+test "${TARGET_SHA}" = "$(git --no-replace-objects -C "${REPO}" rev-parse "${TARGET_SHA}^{commit}")"
+git --no-replace-objects -C "${REPO}" merge-base --is-ancestor \
+  fdbd39152dcaf049da974ae329412001a472114f "${TARGET_SHA}"
+
+EXPORT_ROOT="/opt/clover/worktrees/security-stage8-operator-export-${TARGET_SHA}"
+test ! -e "${EXPORT_ROOT}" && test ! -L "${EXPORT_ROOT}"
+install -d -m 0700 -- "${EXPORT_ROOT}"
+
+export_blob() {
+  repo_path="$1"
+  expected_sha256="$2"
+  destination="${EXPORT_ROOT}/${repo_path}"
+  install -d -m 0700 -- "$(dirname -- "${destination}")"
+  git --no-replace-objects -C "${REPO}" show \
+    "${TARGET_SHA}:${repo_path}" >"${destination}.tmp"
+  test "$(sha256sum "${destination}.tmp" | cut -d' ' -f1)" = "${expected_sha256}"
+  chmod 0400 "${destination}.tmp"
+  mv "${destination}.tmp" "${destination}"
+}
+
+export_blob scripts/linux/harden-deployment-artifacts.sh \
+  60016601d5dcb97996aa6a42b56049defd81fb9cd89008f1e77dcc480cf53cef
+export_blob scripts/linux/security_stage8_artifact_modes.py \
+  9f77dd3524146e60b12b52d2a996c9527b6401516141fea4a886404d6d2aa286
+export_blob server/scripts/securityStage8InventoryGate.mjs \
+  77331fdea55484b7f30dcdedfb27cd6f7aeb68d97443c509046985d03ec6b98c
+export_blob ops/security-stage8/package-a/deployment-sensitive-files.allowlist \
+  14d44f33ba2eab8efa923750a69fd4a426f6e7d6a6e2686673c64d734eb7dbb9
+if find -P "${EXPORT_ROOT}" -type l -print -quit | grep -q .; then
+  echo 'ERROR: symlink in unprivileged export' >&2
+  exit 2
+fi
+```
+
+Only after that unprivileged export succeeds may the interactive privileged
+operator build the immutable bundle. This block contains no Git invocation and
+does not read repository configuration or objects. A raced or substituted
+source cannot be accepted unless its copied bytes match the independently
+pinned SHA-256:
 
 ```bash
 set -euo pipefail
 umask 077
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
-REPO=/opt/clover/clover-app
+: "${TARGET_SHA:?paste the same approved GitHub merge commit}"
 BASE=/var/lib/clover-security-stage8
 TARGET_ROOT="${BASE}/${TARGET_SHA}"
 BUNDLE="${TARGET_ROOT}/operator"
 EVIDENCE_DIR="${TARGET_ROOT}/evidence"
-test "${TARGET_SHA}" = "595101cf369a02a0e1c1c83e442875fa19714cee"
-test "$(realpath -e -- "${REPO}")" = "${REPO}"
-test "$(stat -c '%U' -- "${REPO}")" = clover
-test "${TARGET_SHA}" = "$(/usr/bin/git --no-replace-objects \
-  -c safe.directory="${REPO}" -C "${REPO}" rev-parse "${TARGET_SHA}^{commit}")"
+EXPORT_ROOT="/opt/clover/worktrees/security-stage8-operator-export-${TARGET_SHA}"
+[[ "${TARGET_SHA}" =~ ^[0-9a-f]{40}$ ]] || {
+  echo 'ERROR: TARGET_SHA must be exactly 40 lowercase hex characters' >&2
+  exit 2
+}
+test "${TARGET_SHA}" != 595101cf369a02a0e1c1c83e442875fa19714cee
+test "$(realpath -e -- "${EXPORT_ROOT}")" = "${EXPORT_ROOT}"
+test "$(stat -c '%U:%G:%a' -- "${EXPORT_ROOT}")" = clover:clover:700
 test "$(realpath -e -- /var/lib)" = /var/lib
 test "$(stat -c '%U:%G:%a' -- /var/lib)" = root:root:755
 test "$(id -gn clover)" = clover
@@ -159,31 +230,138 @@ install -d -o root -g clover -m 0750 -- \
   "${BUNDLE}/ops/security-stage8/package-a" \
   "${EVIDENCE_DIR}"
 
-install_blob() {
-  repo_path="$1"
-  mode="$2"
-  destination="${BUNDLE}/${repo_path}"
-  expected="$(/usr/bin/git --no-replace-objects \
-    -c safe.directory="${REPO}" -C "${REPO}" \
-    rev-parse "${TARGET_SHA}:${repo_path}")"
-  /usr/bin/git --no-replace-objects \
-    -c safe.directory="${REPO}" -C "${REPO}" \
-    show "${TARGET_SHA}:${repo_path}" >"${destination}.tmp"
-  test "$(/usr/bin/git --no-replace-objects \
-    -c safe.directory="${REPO}" -C "${REPO}" \
-    hash-object "${destination}.tmp")" = "${expected}"
-  chown root:clover "${destination}.tmp"
-  chmod "${mode}" "${destination}.tmp"
-  mv "${destination}.tmp" "${destination}"
-  test "$(/usr/bin/git --no-replace-objects \
-    -c safe.directory="${REPO}" -C "${REPO}" \
-    hash-object "${destination}")" = "${expected}"
-}
+# Paste this reviewed bootstrap from the trusted PR view, never from a file in
+# the production checkout. Isolated system Python ignores PYTHONPATH and local
+# modules. Every path component is opened relative to a pinned directory fd.
+/usr/bin/env -i PATH=/usr/bin:/bin /usr/bin/python3 -I - \
+  "${EXPORT_ROOT}" "${BUNDLE}" <<'PY'
+import grp
+import hashlib
+import os
+import pwd
+import stat
+import sys
 
-install_blob scripts/linux/harden-deployment-artifacts.sh 0550
-install_blob scripts/linux/security_stage8_artifact_modes.py 0550
-install_blob server/scripts/securityStage8InventoryGate.mjs 0550
-install_blob ops/security-stage8/package-a/deployment-sensitive-files.allowlist 0440
+source_root, destination_root = sys.argv[1:3]
+if len(sys.argv) == 3:
+    clover_uid = pwd.getpwnam("clover").pw_uid
+    clover_gid = grp.getgrnam("clover").gr_gid
+    destination_uid = 0
+elif len(sys.argv) == 6:  # Linux fixture only; production command passes no IDs.
+    clover_uid = int(sys.argv[3])
+    clover_gid = int(sys.argv[4])
+    destination_uid = int(sys.argv[5])
+else:
+    raise RuntimeError("unexpected importer arguments")
+manifest = (
+    ("scripts/linux/harden-deployment-artifacts.sh", 6591,
+     "60016601d5dcb97996aa6a42b56049defd81fb9cd89008f1e77dcc480cf53cef", 0o550),
+    ("scripts/linux/security_stage8_artifact_modes.py", 4924,
+     "9f77dd3524146e60b12b52d2a996c9527b6401516141fea4a886404d6d2aa286", 0o550),
+    ("server/scripts/securityStage8InventoryGate.mjs", 4398,
+     "77331fdea55484b7f30dcdedfb27cd6f7aeb68d97443c509046985d03ec6b98c", 0o550),
+    ("ops/security-stage8/package-a/deployment-sensitive-files.allowlist", 1270,
+     "14d44f33ba2eab8efa923750a69fd4a426f6e7d6a6e2686673c64d734eb7dbb9", 0o440),
+)
+directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+
+def require_directory(fd, uid, gid, mode):
+    details = os.fstat(fd)
+    if not stat.S_ISDIR(details.st_mode):
+        raise RuntimeError("non-directory component")
+    if (details.st_uid, details.st_gid, stat.S_IMODE(details.st_mode)) != (uid, gid, mode):
+        raise RuntimeError("directory ownership or mode mismatch")
+
+def descend(root_fd, components, uid, gid, mode):
+    current = os.dup(root_fd)
+    try:
+        for component in components:
+            following = os.open(component, directory_flags, dir_fd=current)
+            require_directory(following, uid, gid, mode)
+            os.close(current)
+            current = following
+        return current
+    except BaseException:
+        os.close(current)
+        raise
+
+source_root_fd = os.open(source_root, directory_flags)
+destination_root_fd = os.open(destination_root, directory_flags)
+require_directory(source_root_fd, clover_uid, clover_gid, 0o700)
+require_directory(destination_root_fd, destination_uid, clover_gid, 0o750)
+
+try:
+    for relative_path, expected_size, expected_sha256, destination_mode in manifest:
+        components = relative_path.split("/")
+        source_parent_fd = descend(source_root_fd, components[:-1], clover_uid, clover_gid, 0o700)
+        destination_parent_fd = descend(
+            destination_root_fd, components[:-1], destination_uid, clover_gid, 0o750
+        )
+        source_fd = destination_fd = None
+        temporary_name = components[-1] + ".tmp"
+        try:
+            source_fd = os.open(
+                components[-1],
+                os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC,
+                dir_fd=source_parent_fd,
+            )
+            source_details = os.fstat(source_fd)
+            if not stat.S_ISREG(source_details.st_mode):
+                raise RuntimeError("source is not a regular file")
+            if (source_details.st_uid, source_details.st_gid,
+                    stat.S_IMODE(source_details.st_mode), source_details.st_size) != (
+                    clover_uid, clover_gid, 0o400, expected_size):
+                raise RuntimeError("source ownership, mode, or size mismatch")
+            destination_fd = os.open(
+                temporary_name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+                0,
+                dir_fd=destination_parent_fd,
+            )
+            digest = hashlib.sha256()
+            remaining = expected_size
+            while remaining:
+                chunk = os.read(source_fd, min(65536, remaining))
+                if not chunk:
+                    raise RuntimeError("source ended before expected size")
+                digest.update(chunk)
+                view = memoryview(chunk)
+                while view:
+                    written = os.write(destination_fd, view)
+                    view = view[written:]
+                remaining -= len(chunk)
+            if os.read(source_fd, 1):
+                raise RuntimeError("source exceeds expected size")
+            if digest.hexdigest() != expected_sha256:
+                raise RuntimeError("independent SHA-256 mismatch")
+            os.fsync(destination_fd)
+            os.fchown(destination_fd, destination_uid, clover_gid)
+            os.fchmod(destination_fd, destination_mode)
+            os.close(destination_fd)
+            destination_fd = None
+            os.rename(
+                temporary_name,
+                components[-1],
+                src_dir_fd=destination_parent_fd,
+                dst_dir_fd=destination_parent_fd,
+            )
+        except BaseException:
+            if destination_fd is not None:
+                os.close(destination_fd)
+            try:
+                os.unlink(temporary_name, dir_fd=destination_parent_fd)
+            except FileNotFoundError:
+                pass
+            raise
+        finally:
+            if source_fd is not None:
+                os.close(source_fd)
+            os.close(source_parent_fd)
+            os.close(destination_parent_fd)
+finally:
+    os.close(source_root_fd)
+    os.close(destination_root_fd)
+PY
 test "$(stat -c '%U:%G:%a' -- "${BUNDLE}")" = root:clover:750
 test "$(stat -c '%U:%G:%a' -- "${EVIDENCE_DIR}")" = root:clover:750
 test "$(stat -c '%U:%G:%a' -- "${BASE}")" = root:clover:750
