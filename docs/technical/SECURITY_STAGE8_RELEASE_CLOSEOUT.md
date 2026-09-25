@@ -2,7 +2,7 @@
 
 ## Status
 
-**PHASE 1 INVENTORY + ACL PASS / PREPARE NOT RUN / PRODUCTION APPLY NOT RUN.**
+**PASS — PRODUCTION APPLY, PROMOTE, POST-AUDIT, AND EXTERNAL SMOKE COMPLETE.**
 
 This document is the operator plan and evidence contract for closing Security
 Stage 8. It must not be changed to `PASS` until the production apply, deploy,
@@ -11,11 +11,11 @@ recorded evidence.
 
 Candidate source before this closeout preparation:
 `f2d8083a9314adcac48ebbb64a52aeccf1abc98a` (`main`, PR #176 merge).
-This SHA is a baseline, not the production deployment target: it does not
-contain this closeout gate. After this closeout is reviewed and merged,
-`TARGET_SHA` must be the exact 40-character merge commit that contains
-`server/scripts/securityStage8InventoryGate.mjs`. A branch name such as `main`
-or the baseline SHA above is not an acceptable deployment target.
+This SHA was a baseline, not the production deployment target. The deployed
+target is the exact PR #179 merge commit
+`a573e749641607a855c127e7a138966165a8050f`; it contains the closeout gate and
+was addressed by immutable SHA throughout PREPARE and PROMOTE. A branch name
+such as `main` was not used as the deployment target.
 
 ## Confirmed GitHub evidence (2026-09-25)
 
@@ -73,6 +73,43 @@ The live checkout remained at
 `fdbd39152dcaf049da974ae329412001a472114f`; tracked status, service PIDs,
 restart counters, and HTTP health remained unchanged. PREPARE, APPLY, and
 PROMOTE were not run.
+
+## Production completion result (2026-09-26)
+
+PR #179 merged as `a573e749641607a855c127e7a138966165a8050f` and both
+required checks passed. The four privileged operator files from the pinned
+`2566b67039ad654c0d365518ab26f27a528b100c` bundle had the same Git object IDs
+as the deployed target. The immutable prepared artifact was created at
+`/opt/clover/deployments/staging/prepared-a573e749641607a855c127e7a138966165a8050f`.
+Its 83-file manifest has SHA-256
+`e20fe30c7beaea6996f70f62a0fada436e6c3785909115264fdc3e1f1efe5728`;
+its verified contract fields are `expectedLocaleStamp=enabled` and
+`expectedMetrikaEnabled=on`.
+
+Immediately before mutation, the previous UI was copied to the mode-`0700`
+last-known-good directory
+`/opt/clover/deployments/lkg/security-stage8-20260925T212649Z-fdbd39152dcaf049da974ae329412001a472114f`.
+Its 82-file manifest has SHA-256
+`8d40177ab7be68b51b541a68fb8b755df2dce4e3b9cb05fe359f02e03a92157c`.
+
+The approved hardening apply passed. The post-apply inventory has SHA-256
+`cb1e7abb66b8a7c0e9f87efd3faf0cc4ae18c7fd9dd674d935d5fe45ec6e6952`;
+all 17 allowlisted regular files are mode `0600`. The physical ACL report has
+SHA-256 `1496516c800e0fb54f31fc14676a096c4a2408e496d93fd260e8df1a52d08f14`
+and contains no extended or default ACL entry.
+
+PROMOTE deployed the exact target with UI release `ui-20260925I49u0uCM` and
+bundle `/assets/20260925I49u0uCM/index-B8UmCG9p.js`. The tracked production tree
+was clean. API, origin UI, and nginx returned HTTP 200; service restart counters
+remained zero. Asset/MIME, prepared-manifest verification, sitemap, and SEO-004
+origin/nginx probes passed. The sitemap contained 5,299 URLs and has SHA-256
+`7f58b6a72bd5825b58c1df0d07fe79ca18251e78d3099c17f5c1800e560dc0ec`.
+
+External browser smoke passed at desktop `1280x720` and mobile `390x844`.
+The expected Russian category H1 and products rendered, the mobile page had no
+horizontal overflow, and the browser produced no warning or error console
+entries. Application rollback remained available and was not used. Permission
+rollback is intentionally forbidden. No residual item remains unverified.
 
 Do not infer any of these values from an older closeout. Record them again in
 the result file derived from

@@ -29,10 +29,16 @@ const installResult = read("ops/security-stage8/closeout/INSTALL_RESULT.txt");
 const result = JSON.parse(read("ops/security-stage8/closeout/result-template.json"));
 const serverPackage = JSON.parse(read("server/package.json"));
 
-assert.match(closeout, /PHASE 1 INVENTORY \+ ACL PASS \/ PREPARE NOT RUN \/ PRODUCTION APPLY NOT RUN/u);
+assert.match(closeout, /PASS — PRODUCTION APPLY, PROMOTE, POST-AUDIT, AND EXTERNAL SMOKE COMPLETE/u);
 assert.match(closeout, /f2d8083a9314adcac48ebbb64a52aeccf1abc98a/u);
 assert.match(closeout, /baseline, not the production deployment target/u);
-assert.match(closeout, /exact 40-character merge commit/u);
+assert.match(closeout, /a573e749641607a855c127e7a138966165a8050f/u);
+assert.match(closeout, /all 17 allowlisted regular files are mode `0600`/u);
+assert.match(closeout, /no extended or default ACL entry/u);
+assert.match(closeout, /expectedLocaleStamp=enabled/u);
+assert.match(closeout, /expectedMetrikaEnabled=on/u);
+assert.match(closeout, /desktop `1280x720` and mobile `390x844`/u);
+assert.match(closeout, /No residual item remains unverified/u);
 assert.match(closeout, /Ruleset `23989349`/u);
 assert.match(closeout, /GitHub Actions App `15368`/u);
 assert.match(closeout, /verify-security-stage8-package-a\.sh/u);
@@ -183,8 +189,8 @@ assert.match(remediation, /Never suppress `NOT_ALLOWLISTED`/u);
 assert.doesNotMatch(remediation, /rm\s+-rf/u);
 
 for (const marker of [
-  "SECURITY_STAGE8_CLOSEOUT_STATUS=PENDING",
-  "PHASE1_STATUS=INVENTORY_ACL_PASS_PREPARE_NOT_RUN",
+  "SECURITY_STAGE8_CLOSEOUT_STATUS=PASS",
+  "PHASE1_STATUS=PASS",
   "FAILED_PHASE1_TARGET_SHA=595101cf369a02a0e1c1c83e442875fa19714cee",
   "FAILED_INVENTORY_SHA256=de353f37eea428437d635df604742c60a54fc9b7c590245b9d084048478ab9a6",
   "FAILED_PHASE1_OBSERVED_AT_UTC=2026-09-25T19:34:23Z",
@@ -197,19 +203,28 @@ for (const marker of [
   "PRIVILEGED_BUNDLE_ROOT=/var/lib/clover-security-stage8",
   "SOURCE_ROOT=/opt/clover/worktrees",
   "PRIVILEGED_METADATA_AUDIT=PASS",
-  "TARGET_SHA=2566b67039ad654c0d365518ab26f27a528b100c",
-  "TARGET_SHA_SOURCE=GITHUB_PR_178_MERGE_RESULT",
+  "PRIVILEGED_BUNDLE_SOURCE_SHA=2566b67039ad654c0d365518ab26f27a528b100c",
+  "TARGET_SHA=a573e749641607a855c127e7a138966165a8050f",
+  "TARGET_SHA_SOURCE=GITHUB_PR_179_MERGE_RESULT",
   "OPERATOR_EXPORT_ROOT=/opt/clover/worktrees/security-stage8-operator-export-2566b67039ad654c0d365518ab26f27a528b100c",
   "OPERATOR_BUNDLE_SHA256=VERIFIED",
   "REVIEWED_INVENTORY_SHA256=cb1e7abb66b8a7c0e9f87efd3faf0cc4ae18c7fd9dd674d935d5fe45ec6e6952",
   "ACL_PRE_SHA256=1496516c800e0fb54f31fc14676a096c4a2408e496d93fd260e8df1a52d08f14",
-  "HARDENING_APPLY=NOT_RUN",
-  "PREPARE=NOT_RUN",
-  "POST_APPLY_INVENTORY_SHA256=NOT_RECORDED",
-  "LAST_KNOWN_GOOD_PATH=NOT_RECORDED",
-  "PREVIOUS_UI_TAG=NOT_RECORDED",
-  "PREVIOUS_UI_BUNDLE=NOT_RECORDED",
-  "PROMOTE=NOT_RUN",
+  "HARDENING_APPLY=PASS",
+  "POST_APPLY_INVENTORY_SHA256=cb1e7abb66b8a7c0e9f87efd3faf0cc4ae18c7fd9dd674d935d5fe45ec6e6952",
+  "ALLOWLISTED_REGULAR_FILES_0600=PASS_17_OF_17",
+  "PREPARE=PASS",
+  "PREPARED_MANIFEST_SHA256=e20fe30c7beaea6996f70f62a0fada436e6c3785909115264fdc3e1f1efe5728",
+  "PREPARED_EXPECTED_LOCALE_STAMP=enabled",
+  "PREPARED_EXPECTED_METRIKA_ENABLED=on",
+  "LAST_KNOWN_GOOD_PATH=/opt/clover/deployments/lkg/security-stage8-20260925T212649Z-fdbd39152dcaf049da974ae329412001a472114f",
+  "PREVIOUS_UI_TAG=ui-20260924uB0fzjIT",
+  "PREVIOUS_UI_BUNDLE=/assets/20260924uB0fzjIT/index-GaRMwR1l.js",
+  "PROMOTE=PASS",
+  "DEPLOYED_UI_TAG=ui-20260925I49u0uCM",
+  "DESKTOP_SMOKE=PASS_1280x720",
+  "MOBILE_SMOKE=PASS_390x844_NO_HORIZONTAL_OVERFLOW",
+  "RESIDUAL_NOT_VERIFIED=NONE",
   "PERMISSION_ROLLBACK=FORBIDDEN",
 ]) {
   assert.match(installResult, new RegExp(marker, "u"));
@@ -217,18 +232,18 @@ for (const marker of [
 assert.doesNotMatch(installResult, /PASSWORD|SECRET|TOKEN|API_KEY|JWT/iu);
 
 assert.equal(result.schema, "clover-security-stage8-closeout/v1");
-assert.equal(result.status, "PENDING");
+assert.equal(result.status, "PASS");
 assert.equal(result.candidateSourceSha, "f2d8083a9314adcac48ebbb64a52aeccf1abc98a");
-assert.equal(result.targetSha, "2566b67039ad654c0d365518ab26f27a528b100c");
-assert.equal(result.targetShaSource, "GitHub PR #178 merge result");
+assert.equal(result.targetSha, "a573e749641607a855c127e7a138966165a8050f");
+assert.equal(result.targetShaSource, "GitHub PR #179 merge result");
 assert.equal(result.observedFailedPhase1.observedAtUtc, "2026-09-25T19:34:23Z");
 assert.equal(result.observedFailedPhase1.liveSha, "fdbd39152dcaf049da974ae329412001a472114f");
 assert.equal(result.observedFailedPhase1.inventorySha256, "de353f37eea428437d635df604742c60a54fc9b7c590245b9d084048478ab9a6");
 assert.equal(result.observedFailedPhase1.getfacl, "NOT_INSTALLED");
-assert.equal(result.apply.approved, false);
-assert.equal(result.apply.hardeningApply, null);
+assert.equal(result.apply.approved, true);
+assert.equal(result.apply.hardeningApply, "PASS");
 assert.equal(result.prepare.reviewedInventorySha256, "cb1e7abb66b8a7c0e9f87efd3faf0cc4ae18c7fd9dd674d935d5fe45ec6e6952");
-assert.equal(result.prepare.phase1Status, "INVENTORY_ACL_PASS_PREPARE_NOT_RUN");
+assert.equal(result.prepare.phase1Status, "PASS");
 assert.equal(result.prepare.sourceRoot, "/opt/clover/worktrees");
 assert.equal(result.prepare.operatorExportRoot, "/opt/clover/worktrees/security-stage8-operator-export-2566b67039ad654c0d365518ab26f27a528b100c");
 assert.equal(result.prepare.privilegedBundleRoot, "/var/lib/clover-security-stage8");
@@ -240,14 +255,31 @@ assert.deepEqual(result.prepare.operatorBundleExpectedSha256, {
   "ops/security-stage8/package-a/deployment-sensitive-files.allowlist": "14d44f33ba2eab8efa923750a69fd4a426f6e7d6a6e2686673c64d734eb7dbb9",
 });
 assert.equal(result.prepare.privilegedMetadataAudit, "PASS");
-assert.equal(result.apply.postApplyInventorySha256, null);
-assert.equal(result.rollback.preCutoverBackupPath, null);
-assert.equal(result.rollback.preCutoverBackupSha256, null);
-assert.equal(result.rollback.lastKnownGoodPath, null);
-assert.equal(result.rollback.previousUiTag, null);
-assert.equal(result.rollback.previousUiBundle, null);
+assert.equal(result.prepare.privilegedBundleSourceSha, "2566b67039ad654c0d365518ab26f27a528b100c");
+assert.equal(result.prepare.operatorFilesMatchDeployTarget, true);
+assert.equal(result.prepare.manifestSha256, "e20fe30c7beaea6996f70f62a0fada436e6c3785909115264fdc3e1f1efe5728");
+assert.ok(["enabled", "disabled"].includes(result.prepare.expectedLocaleStamp));
+assert.ok(["on", "off"].includes(result.prepare.expectedMetrikaEnabled));
+assert.equal(result.prepare.expectedLocaleStamp, "enabled");
+assert.equal(result.prepare.expectedMetrikaEnabled, "on");
+assert.equal(installResult.includes(`PREPARED_EXPECTED_LOCALE_STAMP=${result.prepare.expectedLocaleStamp}`), true);
+assert.equal(installResult.includes(`PREPARED_EXPECTED_METRIKA_ENABLED=${result.prepare.expectedMetrikaEnabled}`), true);
+assert.equal(result.apply.postApplyInventorySha256, "cb1e7abb66b8a7c0e9f87efd3faf0cc4ae18c7fd9dd674d935d5fe45ec6e6952");
+assert.equal(result.apply.allowlistedRegularFiles0600, 17);
+assert.equal(result.apply.promote, "PASS");
+assert.equal(result.postcheck.liveShaMatches, true);
+assert.equal(result.postcheck.trackedTreeClean, true);
+assert.equal(result.postcheck.desktopSmoke, "PASS_1280x720");
+assert.equal(result.postcheck.mobileSmoke, "PASS_390x844_NO_HORIZONTAL_OVERFLOW");
+assert.equal(result.postcheck.browserConsoleWarningsAndErrors, 0);
+assert.equal(result.rollback.preCutoverBackupPath, "/opt/clover/deployments/lkg/security-stage8-20260925T212649Z-fdbd39152dcaf049da974ae329412001a472114f");
+assert.equal(result.rollback.preCutoverBackupSha256, "8d40177ab7be68b51b541a68fb8b755df2dce4e3b9cb05fe359f02e03a92157c");
+assert.equal(result.rollback.lastKnownGoodPath, result.rollback.preCutoverBackupPath);
+assert.equal(result.rollback.previousUiTag, "ui-20260924uB0fzjIT");
+assert.equal(result.rollback.previousUiBundle, "/assets/20260924uB0fzjIT/index-GaRMwR1l.js");
 assert.equal(result.rollback.permissionRollbackForbidden, true);
 assert.equal(result.rollback.used, false);
+assert.deepEqual(result.residualNotVerified, []);
 assert.deepEqual(result.github.requiredChecks, ["frontend", "server"]);
 assert.equal(result.github.actionsAppId, 15368);
 assert.equal(result.github.rulesetId, 23989349);
@@ -455,4 +487,4 @@ assert.equal(
 );
 assert.match(serverPackage.scripts["test:all"], /npm run test:security-stage8-closeout/u);
 
-console.log("SECURITY_STAGE8_CLOSEOUT_PREPARE_VERIFY_PASS");
+console.log("SECURITY_STAGE8_CLOSEOUT_FINAL_VERIFY_PASS");
