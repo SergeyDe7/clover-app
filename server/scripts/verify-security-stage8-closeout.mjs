@@ -299,6 +299,7 @@ if (process.platform === "linux") {
     const oversized = makeFixture("oversized");
     const oversizedPath = path.join(oversized.source, fixtureManifest[0][0]);
     const original = readFileSync(oversizedPath);
+    chmodSync(oversizedPath, 0o600);
     writeFileSync(oversizedPath, Buffer.concat([original, Buffer.from("x")]));
     chmodSync(oversizedPath, 0o400);
     const oversizedRun = runImporter(oversized);
