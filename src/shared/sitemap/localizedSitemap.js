@@ -232,7 +232,6 @@ export function localizedRouteMetadata(
       locale,
     });
     if (commercial) {
-      heading = commercial.h1;
       title = commercial.metaTitle;
       description = commercial.metaDescription;
       return {

@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import {
   CATALOG_CARD_RENDER_BATCH,
+  catalogScrollRemaining,
   countSectionProducts,
+  isCatalogScrollNearEnd,
   nextRenderLimitAfterDemand,
   orderedProductIds,
   scheduleCatalogRenderBump,
   sliceSectionsToRenderLimit,
+  stabilizeSectionProductOrder,
 } from "../../src/screens/storefront/catalogProgressiveRender.js";
 
 const sections = [
@@ -46,6 +49,33 @@ assert.equal(nextRenderLimitAfterDemand(36, 90), 108 > 90 ? 90 : 108);
 assert.equal(nextRenderLimitAfterDemand(36, 90), 90);
 assert.equal(nextRenderLimitAfterDemand(20, 100), 92);
 assert.equal(nextRenderLimitAfterDemand(100, 100), 100);
+
+// Catalog owns an internal scroller. A viewport-sized document must not make
+// the catalog look permanently near its end and auto-fetch every API page.
+const internalScroller = { scrollHeight: 4_000, scrollTop: 0, clientHeight: 600 };
+assert.equal(catalogScrollRemaining(internalScroller), 3_400);
+assert.equal(isCatalogScrollNearEnd(internalScroller), false);
+assert.equal(
+  isCatalogScrollNearEnd({ ...internalScroller, scrollTop: 3_200 }),
+  true
+);
+assert.equal(isCatalogScrollNearEnd({ scrollHeight: 600, clientHeight: 0 }), false);
+
+// A newly fetched product may sort ahead of an existing one, but cards already
+// on screen must not jump. Only genuinely new ids are appended per section.
+{
+  const initial = stabilizeSectionProductOrder([
+    { name: "A", products: [{ id: "a2" }, { id: "a3" }] },
+    { name: "B", products: [{ id: "b2" }] },
+  ]);
+  const next = stabilizeSectionProductOrder([
+    { name: "A", products: [{ id: "a1" }, { id: "a2" }, { id: "a3" }] },
+    { name: "B", products: [{ id: "b1" }, { id: "b2" }] },
+  ], initial);
+  assert.deepEqual(orderedProductIds(next), ["a2", "a3", "b2", "a1", "b1"]);
+  assert.deepEqual(orderedProductIds(next).slice(0, 3), orderedProductIds(initial));
+  assert.equal(next[2].continuation, true);
+}
 
 // No requestIdleCallback: timer fallback runs
 {

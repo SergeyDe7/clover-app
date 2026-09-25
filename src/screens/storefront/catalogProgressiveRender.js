@@ -5,6 +5,83 @@
 
 export const CATALOG_CARD_RENDER_BATCH = 36;
 
+/** Remaining vertical distance inside the actual catalog scroller. */
+export function catalogScrollRemaining(metrics = {}) {
+  const scrollHeight = Math.max(0, Number(metrics.scrollHeight) || 0);
+  const scrollTop = Math.max(0, Number(metrics.scrollTop) || 0);
+  const clientHeight = Math.max(0, Number(metrics.clientHeight) || 0);
+  return Math.max(0, scrollHeight - scrollTop - clientHeight);
+}
+
+export function isCatalogScrollNearEnd(metrics, preloadViewports = 1.5) {
+  const clientHeight = Math.max(0, Number(metrics?.clientHeight) || 0);
+  if (clientHeight <= 0) return false;
+  return catalogScrollRemaining(metrics) < clientHeight * preloadViewports;
+}
+
+/**
+ * Keep already-rendered cards in place when another API page is merged.
+ * New cards are appended as continuation chunks so adding a product to an
+ * earlier category cannot shift every category that was already on screen.
+ */
+export function stabilizeSectionProductOrder(sections, previousSections = []) {
+  const currentSections = sections || [];
+  if (!previousSections.length) {
+    return currentSections.map((section, index) => ({
+      ...section,
+      renderKey: `${index}:${section?.name || "section"}`,
+    }));
+  }
+
+  const productsById = new Map();
+  for (const section of currentSections) {
+    for (const product of section?.products || []) {
+      if (product?.id == null || productsById.has(product.id)) continue;
+      productsById.set(product.id, product);
+    }
+  }
+
+  const seen = new Set();
+  const stableSections = [];
+  for (const previous of previousSections) {
+    const products = [];
+    for (const previousProduct of previous?.products || []) {
+      const id = previousProduct?.id;
+      if (id == null || seen.has(id) || !productsById.has(id)) continue;
+      seen.add(id);
+      products.push(productsById.get(id));
+    }
+    if (products.length) stableSections.push({ ...previous, products });
+  }
+
+  for (const section of currentSections) {
+    const newProducts = (section?.products || []).filter((product) => {
+      const id = product?.id;
+      if (id == null || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    if (!newProducts.length) continue;
+
+    const last = stableSections[stableSections.length - 1];
+    if (last?.name === section?.name) {
+      stableSections[stableSections.length - 1] = {
+        ...last,
+        products: [...last.products, ...newProducts],
+      };
+      continue;
+    }
+    stableSections.push({
+      ...section,
+      continuation: true,
+      renderKey: `continuation:${section?.name || "section"}:${newProducts[0]?.id}`,
+      products: newProducts,
+    });
+  }
+
+  return stableSections;
+}
+
 /** Slice section lists to a global card budget (stable order, no dupes). */
 export function sliceSectionsToRenderLimit(sections, renderLimit) {
   let remaining = Math.max(0, Number(renderLimit) || 0);
