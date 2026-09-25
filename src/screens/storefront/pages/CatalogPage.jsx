@@ -23,7 +23,6 @@ import { storefrontHref } from "../mode.js";
 import { projectLocalizedGroupNav, categoryDisplayNameFromCanonical, categoryDisplayLabelsReady } from "../../../shared/i18n/categoryDisplayProjection.js";
 import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
 import { sortProductsWithLidsGrouped } from "../../../shared/productCatalogOrder.js";
-import { resolveCategoryCommercialSeo } from "../../../shared/seo/categoryCommercialSeo.js";
 import {
   advanceCatalogRequestGeneration,
   isCatalogRequestGenerationCurrent,
@@ -33,9 +32,11 @@ import {
 } from "../catalogRouteSnapshot.js";
 import {
   CATALOG_CARD_RENDER_BATCH,
+  isCatalogScrollNearEnd,
   nextRenderLimitAfterDemand,
   scheduleCatalogRenderBump,
   sliceSectionsToRenderLimit,
+  stabilizeSectionProductOrder,
 } from "../catalogProgressiveRender.js";
 
 function bagFromSite(locale) {
@@ -244,11 +245,25 @@ export function CatalogPage({
     return groupProductsByCloverGroup(products);
   }, [category, subcategory, products, currentPayload]);
 
+  const stableSectionOrderRef = useRef({ key: "", sections: [] });
+  const stableSections = useMemo(() => {
+    const previousSections = stableSectionOrderRef.current.key === requestKey
+      ? stableSectionOrderRef.current.sections
+      : [];
+    const stabilized = stabilizeSectionProductOrder(sections, previousSections);
+    stableSectionOrderRef.current = {
+      key: requestKey,
+      sections: stabilized,
+    };
+    return stabilized;
+  }, [requestKey, sections]);
+
   const totalCatalogCards = useMemo(
-    () => sections.reduce((sum, section) => sum + (section.products?.length || 0), 0),
-    [sections]
+    () => stableSections.reduce((sum, section) => sum + (section.products?.length || 0), 0),
+    [stableSections]
   );
   const [renderLimit, setRenderLimit] = useState(CATALOG_CARD_RENDER_BATCH);
+  const catalogMainRef = useRef(null);
   const loadMoreSentinelRef = useRef(null);
 
   useEffect(() => {
@@ -331,6 +346,8 @@ export function CatalogPage({
   // Fast scroll / near-end: demand more cards before the user hits an empty tail.
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
+    const scrollRoot = catalogMainRef.current;
+    if (!scrollRoot) return undefined;
     if (renderLimit >= totalCatalogCards && !hasMore) return undefined;
     const revealMore = () => {
       if (renderLimit < totalCatalogCards) {
@@ -342,11 +359,9 @@ export function CatalogPage({
       loadNextPage();
     };
     const onScroll = () => {
-      const doc = document.documentElement;
-      const remaining = doc.scrollHeight - window.scrollY - window.innerHeight;
-      if (remaining < window.innerHeight * 1.5) revealMore();
+      if (isCatalogScrollNearEnd(scrollRoot)) revealMore();
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
+    scrollRoot.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     const node = loadMoreSentinelRef.current;
     let observer = null;
@@ -355,19 +370,19 @@ export function CatalogPage({
         (entries) => {
           if (entries.some((entry) => entry.isIntersecting)) revealMore();
         },
-        { root: null, rootMargin: "400px 0px", threshold: 0 }
+        { root: scrollRoot, rootMargin: "400px 0px", threshold: 0 }
       );
       observer.observe(node);
     }
     return () => {
-      window.removeEventListener("scroll", onScroll);
+      scrollRoot.removeEventListener("scroll", onScroll);
       observer?.disconnect();
     };
   }, [hasMore, loadNextPage, renderLimit, totalCatalogCards, requestKey]);
 
   const visibleSections = useMemo(
-    () => sliceSectionsToRenderLimit(sections, renderLimit),
-    [sections, renderLimit]
+    () => sliceSectionsToRenderLimit(stableSections, renderLimit),
+    [stableSections, renderLimit]
   );
 
   const imagePriorityById = useMemo(() => {
@@ -419,34 +434,6 @@ export function CatalogPage({
   const activeCategoryIsCrawlable = useMemo(
     () => !category || crawlableCategories.has(category),
     [category, crawlableCategories]
-  );
-
-  const commercialSeo = useMemo(
-    () =>
-      resolveCategoryCommercialSeo({
-        category,
-        subcategory,
-        facet,
-        locale: publicLocale,
-      }),
-    [category, facet, publicLocale, subcategory]
-  );
-  const showCommercialSeo =
-    Boolean(commercialSeo) &&
-    Boolean(currentPayload) &&
-    activeCategoryIsCrawlable &&
-    products.length > 0 &&
-    !error &&
-    query.trim() === "" &&
-    requestQuery.trim() === "";
-  const popularCommercialLinks = useMemo(
-    () =>
-      commercialSeo
-        ? commercialSeo.popularSubcategories.filter((name) =>
-            crawlableSubcategories.has(name)
-          )
-        : [],
-    [commercialSeo, crawlableSubcategories]
   );
 
   const title = !category
@@ -525,13 +512,9 @@ export function CatalogPage({
           </div>
         </aside>
 
-        <div className="sf-catalog-main">
+        <div className="sf-catalog-main" ref={catalogMainRef}>
           {category && activeMeta ? (
-            <header
-              className={`sf-group-landing${
-                showCommercialSeo ? " has-commercial-seo" : ""
-              }`}
-            >
+            <header className="sf-group-landing">
               <div className="sf-group-landing-icon" aria-hidden="true">
                 <GroupIcon name={activeMeta.icon} />
               </div>
@@ -594,17 +577,8 @@ export function CatalogPage({
                   ) : null}
                 </nav>
                 <h1 aria-busy={!labelsReady ? "true" : undefined}>
-                  {labelsReady
-                    ? showCommercialSeo
-                      ? commercialSeo.h1
-                      : title
-                    : "\u00a0"}
+                  {labelsReady ? title : "\u00a0"}
                 </h1>
-                {showCommercialSeo ? (
-                  <p className="sf-category-commercial-lead">
-                    {commercialSeo.lead}
-                  </p>
-                ) : null}
               </div>
             </header>
           ) : (
@@ -644,35 +618,6 @@ export function CatalogPage({
                 );
               })}
             </div>
-          ) : null}
-
-          {showCommercialSeo && popularCommercialLinks.length > 0 ? (
-            <nav
-              className="sf-category-commercial-popular"
-              aria-label="Популярные разделы"
-            >
-              <p className="sf-category-commercial-popular-title">
-                Популярные разделы
-              </p>
-              <ul className="sf-category-commercial-popular-list">
-                {popularCommercialLinks.map((name) => {
-                  const route = { name: "catalog", category, subcategory: name };
-                  return (
-                    <li key={name}>
-                      <a
-                        className="sf-category-commercial-popular-link"
-                        href={storefrontHref(route)}
-                        onClick={(event) =>
-                          handleStorefrontLinkClick(event, route)
-                        }
-                      >
-                        {name}
-                      </a>
-                    </li>
-                  );
-                })}
-              </ul>
-            </nav>
           ) : null}
 
           {subcategory && facets.length > 0 ? (
@@ -720,8 +665,8 @@ export function CatalogPage({
           {error ? <p className="sf-error">{error}</p> : null}
 
           {visibleSections.map((section) => (
-            <section className="sf-group-block" key={section.name}>
-              {!category ? (
+            <section className="sf-group-block" key={section.renderKey || section.name}>
+              {!category && !section.continuation ? (
                 <div className="sf-group-head">
                   <h2>
                     {labelsReady
@@ -754,30 +699,6 @@ export function CatalogPage({
               aria-hidden="true"
               data-loading={loadingMore ? "true" : "false"}
             />
-          ) : null}
-
-          {showCommercialSeo ? (
-            <section
-              className="sf-category-commercial-lower"
-              aria-labelledby="sf-category-commercial-heading"
-            >
-              <h2 id="sf-category-commercial-heading">Закупки для бизнеса</h2>
-              <p className="sf-category-commercial-body">{commercialSeo.body}</p>
-              <ul className="sf-category-commercial-benefits">
-                {commercialSeo.benefits.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-              <h2>Частые вопросы</h2>
-              <div className="sf-category-commercial-faq">
-                {commercialSeo.faq.map((item) => (
-                  <details key={item.q} className="sf-category-commercial-faq-item">
-                    <summary>{item.q}</summary>
-                    <p>{item.a}</p>
-                  </details>
-                ))}
-              </div>
-            </section>
           ) : null}
 
           {!error && currentPayload && !products.length ? (

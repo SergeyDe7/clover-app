@@ -153,19 +153,7 @@ function renderRussianSeoSnapshot(record, indexable) {
       : fallbackLinks
         ? `<nav aria-label="Разделы каталога"><ul>${fallbackLinks}</ul></nav>`
         : "";
-    const benefits = (Array.isArray(commercial.benefits)
-      ? commercial.benefits
-      : []
-    )
-      .map((item) => `<li>${escapeHtml(item)}</li>`)
-      .join("");
-    const faq = (Array.isArray(commercial.faq) ? commercial.faq : [])
-      .map(
-        (item) =>
-          `<details><summary>${escapeHtml(item?.q)}</summary><p>${escapeHtml(item?.a)}</p></details>`
-      )
-      .join("");
-    return `<main data-seo-snapshot="ru" data-seo-commercial-category="${escapeHtml(commercial.category)}"><h1>${escapeHtml(commercial.h1)}</h1><p>${escapeHtml(commercial.lead)}</p>${popular}<section aria-label="Информация для бизнеса"><p>${escapeHtml(commercial.body)}</p><ul>${benefits}</ul><div>${faq}</div></section></main>`;
+    return `<main data-seo-snapshot="ru"><h1>${escapeHtml(commercial.category)}</h1>${popular}</main>`;
   }
   const links = (Array.isArray(record.crawlLinks) ? record.crawlLinks : [])
     .filter((link) => String(link?.href || "").startsWith("/ru/"))
