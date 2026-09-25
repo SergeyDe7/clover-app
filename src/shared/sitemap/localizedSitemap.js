@@ -27,6 +27,7 @@ import {
   STOREFRONT_DEFAULT_TITLE,
   STOREFRONT_SITE_NAME,
 } from "../i18n/storefrontSeoDefaults.js";
+import { resolveCategoryCommercialSeo } from "../seo/categoryCommercialSeo.js";
 import {
   SITEMAP_STATIC_PATHS,
   escapeXml,
@@ -224,6 +225,33 @@ export function localizedRouteMetadata(
       ),
       { label }
     );
+    const commercial = resolveCategoryCommercialSeo({
+      category: route.category,
+      subcategory: route.subcategory,
+      facet: route.facet,
+      locale,
+    });
+    if (commercial) {
+      heading = commercial.h1;
+      title = commercial.metaTitle;
+      description = commercial.metaDescription;
+      return {
+        heading,
+        title,
+        description,
+        type,
+        ogLocale: OG_LOCALES[locale] || OG_LOCALES.ru,
+        commercialSeo: {
+          category: commercial.category,
+          h1: commercial.h1,
+          lead: commercial.lead,
+          body: commercial.body,
+          benefits: [...commercial.benefits],
+          popularSubcategories: [...commercial.popularSubcategories],
+          faq: commercial.faq.map((item) => ({ q: item.q, a: item.a })),
+        },
+      };
+    }
   } else if (route.name === "product") {
     const canonical =
       productsById?.get?.(String(descriptor?.product?.id || "")) ||

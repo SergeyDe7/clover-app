@@ -23,6 +23,7 @@ import {
 } from "../../shared/i18n/publicLocaleRouting.js";
 import { categoryDisplayNameFromCanonical } from "../../shared/i18n/categoryDisplayProjection.js";
 import { storefrontCategoryDisplayOptions } from "../../shared/i18n/storefrontCategoryDisplay.js";
+import { resolveCategoryCommercialSeo } from "../../shared/seo/categoryCommercialSeo.js";
 
 export {
   STOREFRONT_DEFAULT_DESCRIPTION,
@@ -201,6 +202,12 @@ export function storefrontRouteDocumentMeta(route, site, options = {}) {
     };
   }
   if (route.name === "catalog") {
+    const commercial = resolveCategoryCommercialSeo({
+      category: route.category || "",
+      subcategory: route.subcategory || "",
+      facet: route.facet || "",
+      locale,
+    });
     const categoryOptions = storefrontCategoryDisplayOptions(
       locale,
       site?.categoryTranslations,
@@ -222,12 +229,14 @@ export function storefrontRouteDocumentMeta(route, site, options = {}) {
     const label =
       parts.length ? parts.join(" — ") : site?.seo?.catalog?.title || "Каталог";
     return {
-      title: `${label} | ${STOREFRONT_SITE_NAME}`,
-      description: formatSeoTemplate(
-        site?.seo?.catalog?.descriptionTemplate ||
-          getSeoCanonicalField("catalog", "descriptionTemplate"),
-        { label }
-      ),
+      title: commercial?.metaTitle || `${label} | ${STOREFRONT_SITE_NAME}`,
+      description:
+        commercial?.metaDescription ||
+        formatSeoTemplate(
+          site?.seo?.catalog?.descriptionTemplate ||
+            getSeoCanonicalField("catalog", "descriptionTemplate"),
+          { label }
+        ),
       path: routeHref(route),
       ...common,
     };

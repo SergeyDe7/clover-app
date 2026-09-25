@@ -53,7 +53,8 @@ const dbPath = path.join(artifactDir, "fixture.sqlite");
 const outDir = path.join(artifactDir, "dist");
 const productCode = "НФ-00003681";
 const productName = "Жидкое мыло Синергетик миндальное молочко 500 мл";
-const categoryName = "Химия, чистящие средства";
+const categoryName = "Одноразовая посуда";
+const popularSubcategory = "Стаканы";
 const langs = ["ru", "en", "uz", "ky", "tg", "zh", "ar"];
 const GOTO_MS = Number(process.env.CLOVER_BROWSER_GOTO_MS || 8000);
 const SETTLE_MS = Number(process.env.CLOVER_BROWSER_SETTLE_MS || 8000);
@@ -109,7 +110,7 @@ function seedDb() {
     oneCId: "onec-1",
     name: productName,
     category: categoryName,
-    subcategory: "",
+    subcategory: popularSubcategory,
     showOnStorefront: true,
   };
   const insert = db.prepare("INSERT INTO app_state(key, value_json) VALUES (?, ?)");
@@ -266,7 +267,8 @@ function startCombinedServer(distDir) {
     if (url.pathname === "/api/public/catalog") {
       res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
       res.end(JSON.stringify({
-        categories: [{ category: categoryName, subcategory: "" }],
+        categories: [{ name: categoryName, count: 1 }],
+        subcategories: [{ category: categoryName, name: popularSubcategory, count: 1 }],
         products: [productPayload()],
       }));
       return;
@@ -601,6 +603,9 @@ function collectFromHtml(html, pageUrl) {
     crawlablePaths,
     nav,
     isLkShell: /class="[^"]*\bclover-app\b/.test(html) && !header,
+    hasCommercialHeader: /class="[^"]*\bsf-group-landing\b[^"]*\bhas-commercial-seo\b/.test(html),
+    hasCommercialLower: /class="[^"]*\bsf-category-commercial-lower\b/.test(html),
+    hasCommercialPopular: /class="[^"]*\bsf-category-commercial-popular\b/.test(html),
     bodyText: text.slice(0, 400),
   };
 }
@@ -677,6 +682,16 @@ try {
       });
     }
     assertSettled(pageName, lang, seo);
+    if (pageName === "category" && lang === "ru") {
+      assert.equal(seo.hasCommercialHeader, true, "ru category missing commercial header");
+      assert.equal(seo.hasCommercialLower, true, "ru category missing commercial lower content");
+      assert.equal(seo.hasCommercialPopular, true, "ru category missing popular links");
+      assert.equal(seo.heroHeading, "Одноразовая посуда оптом в Санкт-Петербурге");
+    }
+    if (pageName === "category" && lang !== "ru") {
+      assert.equal(seo.hasCommercialHeader, false, `${lang} category must not show RU commercial content`);
+      assert.equal(seo.hasCommercialLower, false, `${lang} category must not show RU commercial lower content`);
+    }
     results.push({
       pageName,
       lang,
@@ -694,6 +709,35 @@ try {
     await openAndCollect("catalog", lang);
     await openAndCollect("category", lang);
     await openAndCollect("product", lang);
+  }
+
+  if (browserPage) {
+    const categoryPath = `/ru/catalog/${encodeURIComponent(categoryName)}`;
+    const subcategoryPath = `${categoryPath}/${encodeURIComponent(popularSubcategory)}`;
+    const facetPath = `${subcategoryPath}/${encodeURIComponent("Прозрачные")}`;
+    const commercialSelector = ".sf-group-landing.has-commercial-seo";
+    for (const negativePath of [subcategoryPath, facetPath]) {
+      await browserPage.goto(`${origin}${negativePath}`, { waitUntil: "domcontentloaded", timeout: GOTO_MS });
+      await browserPage.waitForSelector(".sf-product-card .sf-product-title", { timeout: SETTLE_MS });
+      assert.equal(await browserPage.locator(commercialSelector).count(), 0, `${negativePath} commercial content`);
+    }
+    await browserPage.goto(`${origin}${categoryPath}`, { waitUntil: "domcontentloaded", timeout: GOTO_MS });
+    await browserPage.waitForSelector(commercialSelector, { timeout: SETTLE_MS });
+    await browserPage.locator('input[type="search"]').first().fill("стакан");
+    await browserPage.waitForTimeout(350);
+    assert.equal(await browserPage.locator(commercialSelector).count(), 0, "search result commercial content");
+
+    await browserPage.setViewportSize({ width: 390, height: 844 });
+    await browserPage.goto(`${origin}${categoryPath}`, { waitUntil: "domcontentloaded", timeout: GOTO_MS });
+    await browserPage.waitForSelector(commercialSelector, { timeout: SETTLE_MS });
+    const mobileState = await browserPage.evaluate(() => ({
+      headerDisplay: getComputedStyle(document.querySelector(".sf-group-landing.has-commercial-seo")).display,
+      popularDisplay: getComputedStyle(document.querySelector(".sf-category-commercial-popular")).display,
+      lowerVisible: Boolean(document.querySelector(".sf-category-commercial-lower")),
+    }));
+    assert.notEqual(mobileState.headerDisplay, "none", "mobile commercial header hidden");
+    assert.equal(mobileState.popularDisplay, "none", "mobile popular links must be hidden");
+    assert.equal(mobileState.lowerVisible, true, "mobile commercial lower content missing");
   }
 
   const report = {

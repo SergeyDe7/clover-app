@@ -1,5 +1,32 @@
 # CLOVER SEO HANDOFF
 
+## SEO-004 Priority B2B category pages — current refresh
+
+BASE: `eccbe445cad5091b7e1601f9b72e17dc72e6d3b7`
+
+SCOPE:
+- refresh the useful PR #104 commercial content on the current locale-routing architecture;
+- keep the source contract shared by browser metadata, React UI, sitemap manifest,
+  and initial raw HTML;
+- publish only the three approved RU top-level categories;
+- emit popular links only when the target is present in the generated manifest.
+
+VERIFICATION:
+- deterministic `test:seo-004-commercial-categories` covers exact content,
+  negative route/locale guards, browser/manifest metadata parity, raw HTML,
+  canonical/robots/alternates, and manifest-backed popular links;
+- included in `server` `test:all`.
+- focused SEO-004, crawlable-links, and stale-route verifiers: PASS;
+- Vite production build and Stage 7 route/HTML/sitemap verifier: PASS;
+- full `server` `test:all`: PASS on Windows; the existing Stage 8A Linux-only
+  `openat`/`fchmod`/`flock` check remains explicitly not verified on Windows.
+- Playwright/Edge browser smoke: PASS for 28 locale/page combinations, including
+  RU commercial desktop/mobile UI and negative search/subcategory/facet/non-RU guards.
+
+PRODUCTION: **NOT DEPLOYED**
+
+---
+
 ## SEO-002 Google product soft 404
 
 TASK:

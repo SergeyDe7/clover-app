@@ -23,6 +23,7 @@ import { storefrontHref } from "../mode.js";
 import { projectLocalizedGroupNav, categoryDisplayNameFromCanonical, categoryDisplayLabelsReady } from "../../../shared/i18n/categoryDisplayProjection.js";
 import { storefrontCategoryDisplayOptions } from "../../../shared/i18n/storefrontCategoryDisplay.js";
 import { sortProductsWithLidsGrouped } from "../../../shared/productCatalogOrder.js";
+import { resolveCategoryCommercialSeo } from "../../../shared/seo/categoryCommercialSeo.js";
 import {
   advanceCatalogRequestGeneration,
   isCatalogRequestGenerationCurrent,
@@ -420,6 +421,34 @@ export function CatalogPage({
     [category, crawlableCategories]
   );
 
+  const commercialSeo = useMemo(
+    () =>
+      resolveCategoryCommercialSeo({
+        category,
+        subcategory,
+        facet,
+        locale: publicLocale,
+      }),
+    [category, facet, publicLocale, subcategory]
+  );
+  const showCommercialSeo =
+    Boolean(commercialSeo) &&
+    Boolean(currentPayload) &&
+    activeCategoryIsCrawlable &&
+    products.length > 0 &&
+    !error &&
+    query.trim() === "" &&
+    requestQuery.trim() === "";
+  const popularCommercialLinks = useMemo(
+    () =>
+      commercialSeo
+        ? commercialSeo.popularSubcategories.filter((name) =>
+            crawlableSubcategories.has(name)
+          )
+        : [],
+    [commercialSeo, crawlableSubcategories]
+  );
+
   const title = !category
     ? t("storefront.nav.catalog")
     : !labelsReady
@@ -498,7 +527,11 @@ export function CatalogPage({
 
         <div className="sf-catalog-main">
           {category && activeMeta ? (
-            <header className="sf-group-landing">
+            <header
+              className={`sf-group-landing${
+                showCommercialSeo ? " has-commercial-seo" : ""
+              }`}
+            >
               <div className="sf-group-landing-icon" aria-hidden="true">
                 <GroupIcon name={activeMeta.icon} />
               </div>
@@ -561,8 +594,17 @@ export function CatalogPage({
                   ) : null}
                 </nav>
                 <h1 aria-busy={!labelsReady ? "true" : undefined}>
-                  {labelsReady ? title : "\u00a0"}
+                  {labelsReady
+                    ? showCommercialSeo
+                      ? commercialSeo.h1
+                      : title
+                    : "\u00a0"}
                 </h1>
+                {showCommercialSeo ? (
+                  <p className="sf-category-commercial-lead">
+                    {commercialSeo.lead}
+                  </p>
+                ) : null}
               </div>
             </header>
           ) : (
@@ -602,6 +644,35 @@ export function CatalogPage({
                 );
               })}
             </div>
+          ) : null}
+
+          {showCommercialSeo && popularCommercialLinks.length > 0 ? (
+            <nav
+              className="sf-category-commercial-popular"
+              aria-label="Популярные разделы"
+            >
+              <p className="sf-category-commercial-popular-title">
+                Популярные разделы
+              </p>
+              <ul className="sf-category-commercial-popular-list">
+                {popularCommercialLinks.map((name) => {
+                  const route = { name: "catalog", category, subcategory: name };
+                  return (
+                    <li key={name}>
+                      <a
+                        className="sf-category-commercial-popular-link"
+                        href={storefrontHref(route)}
+                        onClick={(event) =>
+                          handleStorefrontLinkClick(event, route)
+                        }
+                      >
+                        {name}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
           ) : null}
 
           {subcategory && facets.length > 0 ? (
@@ -683,6 +754,30 @@ export function CatalogPage({
               aria-hidden="true"
               data-loading={loadingMore ? "true" : "false"}
             />
+          ) : null}
+
+          {showCommercialSeo ? (
+            <section
+              className="sf-category-commercial-lower"
+              aria-labelledby="sf-category-commercial-heading"
+            >
+              <h2 id="sf-category-commercial-heading">Закупки для бизнеса</h2>
+              <p className="sf-category-commercial-body">{commercialSeo.body}</p>
+              <ul className="sf-category-commercial-benefits">
+                {commercialSeo.benefits.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+              <h2>Частые вопросы</h2>
+              <div className="sf-category-commercial-faq">
+                {commercialSeo.faq.map((item) => (
+                  <details key={item.q} className="sf-category-commercial-faq-item">
+                    <summary>{item.q}</summary>
+                    <p>{item.a}</p>
+                  </details>
+                ))}
+              </div>
+            </section>
           ) : null}
 
           {!error && currentPayload && !products.length ? (
