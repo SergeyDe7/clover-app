@@ -1,0 +1,219 @@
+# Security Stage 8 — release closeout
+
+## Status
+
+**PREPARED / NOT DEPLOYED / PRODUCTION APPLY NOT RUN.**
+
+This document is the operator plan and evidence contract for closing Security
+Stage 8. It must not be changed to `PASS` until the production apply, deploy,
+post-apply permission audit, health checks, and external smoke have all produced
+recorded evidence.
+
+Candidate source before this closeout preparation:
+`f2d8083a9314adcac48ebbb64a52aeccf1abc98a` (`main`, PR #176 merge).
+This SHA is a baseline, not the production deployment target: it does not
+contain this closeout gate. After this closeout is reviewed and merged,
+`TARGET_SHA` must be the exact 40-character merge commit that contains
+`server/scripts/securityStage8InventoryGate.mjs`. A branch name such as `main`
+or the baseline SHA above is not an acceptable deployment target.
+
+## Confirmed GitHub evidence (2026-09-25)
+
+- Package A merged in PR #172 (`fdbd39152dcaf049da974ae329412001a472114f`).
+- Package B merged in PR #173 (`b416bc5f1473ac40ecbad8a67aaa268c70cc4792`).
+- Package C merged in PR #175 (`eccbe445cad5091b7e1601f9b72e17dc72e6d3b7`).
+- Ruleset `23989349` (`S8-B main protection`) is active for `main`, has no
+  bypass actor, blocks deletion and force-push, requires a pull request and
+  resolved review threads, and requires strict `frontend` and `server` checks
+  from GitHub Actions App `15368`.
+- GitHub Actions is enabled and `sha_pinning_required=true`.
+- Dependabot security updates are enabled and not paused; the open Dependabot
+  alert count and open Dependabot PR count were both zero.
+- Secret scanning and push protection are enabled.
+- Post-merge S8-B CI for `main@f2d8083` completed successfully for both jobs.
+
+These are sanitized control-plane facts. Tokens, environment values, database
+contents, PII, and raw vulnerable-file contents must never be copied into the
+closeout evidence.
+
+## Production facts still required
+
+The current production checkout, process identity, service unit paths, listener
+owners, live UI tag/bundle, database path, and deployment artifact modes have
+not been re-read during this preparation. Stage 8A `--apply` has not been run.
+The Windows portable verifier does not prove Linux `openat`, `fchmod`, `flock`,
+owner, or ACL behavior.
+
+Do not infer any of these values from an older closeout. Record them again in
+the result file derived from
+`ops/security-stage8/closeout/result-template.json`.
+
+## Phase 1 — read-only baseline and off-live PREPARE
+
+Run only from the confirmed production host and keep TEST/production separate.
+Stop before any write when the active service paths do not resolve to
+`/opt/clover/clover-app`.
+
+1. Record `hostname`, UTC time, service `FragmentPath`, `User`, `ExecStart`,
+   `MainPID`, `NRestarts`, `ActiveState`, and `SubState` for `clover-api` and
+   `clover-ui`; record `/proc/<pid>/cwd`, `/proc/<pid>/exe`, and listeners on
+   ports `4100` and `5273`.
+2. Record live `HEAD`, tracked status, API health, origin UI response, nginx
+   HTTPS response, UI release tag, main JS bundle, and their checksums. Do not
+   read or copy `.env`, SQLite, WAL, SHM, archive, or backup contents.
+3. Fetch the exact target object without resetting the live checkout. Verify it
+   is a fast-forward descendant of the observed live SHA. Create a protected,
+   detached target checkout and bootstrap the launcher from the same Git object:
+
+   ```bash
+   umask 077
+   ROOT=/opt/clover/clover-app
+   STAGING=/opt/clover/deployments/staging
+   S8_SOURCE="${STAGING}/security-stage8-source-${TARGET_SHA}"
+   DELIVERED="${STAGING}/delivered-deploy-${TARGET_SHA}"
+   git -C "${ROOT}" worktree add --detach "${S8_SOURCE}" "${TARGET_SHA}"
+   test "$(git -C "${S8_SOURCE}" rev-parse HEAD)" = "${TARGET_SHA}"
+   test -z "$(git -C "${S8_SOURCE}" status --porcelain=v1 --untracked-files=no)"
+   install -d -m 700 "${DELIVERED}"
+   git -C "${ROOT}" show "${TARGET_SHA}:scripts/linux/run-target-deploy.sh" \
+     >"${DELIVERED}/run-target-deploy.sh.tmp"
+   test "$(git -C "${ROOT}" rev-parse "${TARGET_SHA}:scripts/linux/run-target-deploy.sh")" \
+     = "$(git -C "${ROOT}" hash-object "${DELIVERED}/run-target-deploy.sh.tmp")"
+   chmod 700 "${DELIVERED}/run-target-deploy.sh.tmp"
+   mv "${DELIVERED}/run-target-deploy.sh.tmp" "${DELIVERED}/run-target-deploy.sh"
+   ```
+
+4. From `${S8_SOURCE}`, run the complete Linux fixture:
+
+   ```bash
+   bash scripts/linux/verify-security-stage8-package-a.sh
+   ```
+
+5. Run the metadata-only inventory from that same exact checkout and save the
+   sanitized output plus its SHA-256 for an exact pre-apply drift comparison:
+
+   ```bash
+   bash scripts/linux/harden-deployment-artifacts.sh --dry-run \
+     | tee "${STAGING}/security-stage8-inventory-${TARGET_SHA}.txt"
+   node server/scripts/securityStage8InventoryGate.mjs --phase pre \
+     --inventory "${STAGING}/security-stage8-inventory-${TARGET_SHA}.txt" \
+     --allowlist ops/security-stage8/package-a/deployment-sensitive-files.allowlist
+   sha256sum "${STAGING}/security-stage8-inventory-${TARGET_SHA}.txt"
+   ```
+
+   Exit code zero from the hardener is not sufficient. The inventory gate fails
+   closed on every `NOT_ALLOWLISTED`, `NOT_VERIFIED`, `ALLOWLIST_MISSING`, or
+   `SYMLINK_REFUSED` row, missing allowlisted path, or duplicate classification.
+   Review every row and effective ACL separately; POSIX mode output does not
+   prove ACL isolation.
+6. Run the target-pinned deployment prerequisite dry-run and then build the
+   immutable off-live artifact:
+
+   ```bash
+   CLOVER_DEPLOY_ROOT=/opt/clover/clover-app CLOVER_DEPLOY_DRY_RUN=1 \
+     bash /opt/clover/deployments/staging/delivered-deploy-${TARGET_SHA}/run-target-deploy.sh "${TARGET_SHA}"
+   CLOVER_DEPLOY_ROOT=/opt/clover/clover-app \
+     bash /opt/clover/deployments/staging/delivered-deploy-${TARGET_SHA}/run-target-deploy.sh prepare "${TARGET_SHA}"
+   ```
+
+7. Record the prepared directory, manifest SHA-256, release ID, locale flag,
+   Metrika expectation, and rollback baseline SHA/tag/bundle. PREPARE must leave
+   live source, live `dist`, and both services unchanged.
+
+Phase 1 may create a protected staging artifact, but it must not chmod the
+historical targets, switch the live checkout or UI, or restart services.
+
+## Approval boundary
+
+Stop after Phase 1 and request separate explicit approval for both production
+file-mode hardening and live PROMOTE. Approval to prepare is not approval to
+apply, deploy, restart services, change databases, or touch 1C.
+
+## Phase 2 — approved APPLY and PROMOTE
+
+1. Re-read the production identity, exact live SHA/status, services, health,
+   prepared manifest SHA-256, and deploy lock immediately before mutation.
+   Create a timestamped, mode-`0700` copy of the current UI before PROMOTE and
+   record file hashes without copying any `.env`, SQLite, WAL, or SHM file:
+
+   ```bash
+   UTC="$(date -u +%Y%m%dT%H%M%SZ)"
+   PREV_SHA="$(git -C /opt/clover/clover-app rev-parse HEAD)"
+   BACKUP="/opt/clover/deployments/lkg/security-stage8-${UTC}-${PREV_SHA}"
+   install -d -m 700 "${BACKUP}"
+   cp -a -- /opt/clover/clover-app/dist "${BACKUP}/pre-dist"
+   if find -P "${BACKUP}/pre-dist" \
+     \( -name '.env*' -o -name '*.sqlite*' -o -name '*.db*' \) -print -quit \
+     | grep -q .; then
+     echo 'ERROR: sensitive filename in UI backup' >&2
+     exit 1
+   fi
+   find -P "${BACKUP}/pre-dist" -type f -print0 | sort -z \
+     | xargs -0 sha256sum >"${BACKUP}/FILES.sha256"
+   chmod 600 "${BACKUP}/FILES.sha256"
+   ```
+
+2. Re-run the Stage 8A dry-run from `${S8_SOURCE}` and require its sanitized
+   output SHA-256 to equal the reviewed Phase 1 inventory checksum. Under the
+   shared deployment lock, run from that exact target checkout:
+
+   ```bash
+   bash scripts/linux/harden-deployment-artifacts.sh --apply
+   ```
+
+3. Repeat the metadata inventory into a new post-apply file, gate that exact
+   file as phase `post`, and record its SHA-256 separately:
+
+   ```bash
+   POST_INVENTORY="${STAGING}/security-stage8-post-apply-${TARGET_SHA}.txt"
+   bash scripts/linux/harden-deployment-artifacts.sh --dry-run \
+     | tee "${POST_INVENTORY}"
+   node server/scripts/securityStage8InventoryGate.mjs --phase post \
+     --inventory "${POST_INVENTORY}" \
+     --allowlist ops/security-stage8/package-a/deployment-sensitive-files.allowlist
+   sha256sum "${POST_INVENTORY}"
+   ```
+
+   The post gate requires every allowlisted regular file to report mode `0600`.
+   Effective ACL review must separately show no unrelated access. Preserve any
+   successfully hardened `0600` modes if a later target fails.
+4. The hardener releases the shared lock before PROMOTE; this is not one atomic
+   lock transaction. Re-read identity, live SHA/status, services, health,
+   post-apply inventory, prepared manifest checksum, and lock state again.
+   Only after Stage 8A passes without drift, promote the prepared artifact:
+
+   ```bash
+   CLOVER_DEPLOY_ROOT=/opt/clover/clover-app \
+     bash /opt/clover/deployments/staging/delivered-deploy-${TARGET_SHA}/run-target-deploy.sh \
+       promote "${PREPARED_PATH}" "${TARGET_SHA}"
+   ```
+
+5. Verify exact live SHA, clean tracked status, API/UI service state and restart
+   counts, API health, origin and nginx assets/MIME, live tag/bundle, sitemap,
+   the three SEO-004 category routes, and desktop/mobile external browser smoke.
+   No real order or 1C action is part of this closeout.
+
+## Stop conditions
+
+Stop without PROMOTE when any of the following is observed:
+
+- repository, target SHA, active process path, unit path, or environment differs;
+- tracked production drift or a non-fast-forward target;
+- deploy lock contention;
+- Stage 8A fixture failure, unexpected inventory row, missing target, symlink,
+  Python identity mismatch, owner mismatch, or unresolved ACL access;
+- prepared manifest/checksum/locale/Metrika mismatch;
+- backup/LKG evidence is missing;
+- health, asset, MIME, sitemap, or browser smoke is not clean.
+
+## Completion rule
+
+Change this document to `PASS` only after the sanitized result contains the
+exact target and previous SHA, timestamps, manifest/checksums, Stage 8A
+dry-run/apply/post-apply summaries, Linux fixture result, service and health
+evidence, external smoke result, and residual `NOT VERIFIED` items. Deployment
+rollback and the intentionally forbidden permission rollback are documented in
+`ops/security-stage8/closeout/ROLLBACK.md`.
+The human-readable receipt must be saved as
+`ops/security-stage8/closeout/INSTALL_RESULT.txt`; the JSON template is the
+machine-readable companion, not a replacement for that receipt.

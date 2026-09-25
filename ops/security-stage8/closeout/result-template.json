@@ -1,0 +1,76 @@
+{
+  "schema": "clover-security-stage8-closeout/v1",
+  "status": "PENDING",
+  "candidateSourceSha": "f2d8083a9314adcac48ebbb64a52aeccf1abc98a",
+  "targetSha": null,
+  "previousSha": null,
+  "startedAtUtc": null,
+  "completedAtUtc": null,
+  "productionIdentity": {
+    "hostname": null,
+    "repositoryRoot": "/opt/clover/clover-app",
+    "deploymentRoot": "/opt/clover/deployments",
+    "apiUnit": null,
+    "uiUnit": null,
+    "apiUser": null,
+    "uiUser": null
+  },
+  "github": {
+    "rulesetId": 23989349,
+    "rulesetEnforcement": "active",
+    "requiredChecks": ["frontend", "server"],
+    "actionsAppId": 15368,
+    "shaPinningRequired": true,
+    "dependabotAlertsEnabled": true,
+    "dependabotSecurityUpdatesEnabled": true,
+    "openAlertCountAtPreparation": 0,
+    "openDependabotPullRequestCountAtPreparation": 0
+  },
+  "prepare": {
+    "linuxFixture": null,
+    "hardeningDryRun": null,
+    "reviewedInventoryPath": null,
+    "reviewedInventorySha256": null,
+    "unexpectedInventoryRows": null,
+    "aclReview": null,
+    "preparedPath": null,
+    "manifestSha256": null,
+    "releaseId": null,
+    "expectedLocale": null,
+    "expectedMetrika": null,
+    "liveUnchanged": null
+  },
+  "apply": {
+    "approved": false,
+    "hardeningApply": null,
+    "postApplyInventoryPath": null,
+    "postApplyInventorySha256": null,
+    "allowlistedRegularFiles0600": null,
+    "effectiveAclIsolation": null,
+    "promote": null
+  },
+  "postcheck": {
+    "liveShaMatches": null,
+    "trackedTreeClean": null,
+    "apiHealth": null,
+    "uiOrigin": null,
+    "uiNginx": null,
+    "assetsAndMime": null,
+    "sitemap": null,
+    "seo004Routes": null,
+    "desktopSmoke": null,
+    "mobileSmoke": null
+  },
+  "rollback": {
+    "applicationRollbackAvailable": null,
+    "preCutoverBackupPath": null,
+    "preCutoverBackupSha256": null,
+    "lastKnownGoodPath": null,
+    "previousUiTag": null,
+    "previousUiBundle": null,
+    "permissionRollbackForbidden": true,
+    "used": false,
+    "result": null
+  },
+  "residualNotVerified": []
+}
