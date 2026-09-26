@@ -247,7 +247,85 @@ function productMap(products) {
   return new Map((products || []).map((product) => [String(product.id), product]));
 }
 
+function normalizeOrderCounterparty(value = {}) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    source: source.source === "address" ? "address" : "",
+    addressId: String(source.addressId || "").trim(),
+    oneCId: String(source.oneCId || "").trim(),
+    oneCCode: String(source.oneCCode || "").trim(),
+    oneCName: String(source.oneCName || "").trim(),
+    oneCInn: String(source.oneCInn || "").trim(),
+    capturedAt: String(source.capturedAt || "").trim(),
+  };
+}
+
+/**
+ * Server-authoritative snapshot: selected order address -> 1C counterparty.
+ * Incoming order fields are ignored; only the persisted client address is used.
+ */
+export function captureAddressCounterparty(order, addresses, capturedAt = new Date().toISOString()) {
+  const addressId = String(order?.addressId || "").trim();
+  const address = (Array.isArray(addresses) ? addresses : []).find(
+    (item) => String(item?.id || "").trim() === addressId
+  );
+  return normalizeOrderCounterparty({
+    source: "address",
+    addressId,
+    oneCId: address?.oneCId,
+    oneCCode: address?.oneCCode,
+    oneCName: address?.oneCName,
+    oneCInn: address?.oneCInn,
+    capturedAt,
+  });
+}
+
+/**
+ * New orders receive a canonical address snapshot. Existing orders preserve the
+ * original snapshot (or its legacy absence), so a client cannot replace it.
+ */
+export function bindClientOrderCounterparties({
+  orders,
+  previousOrders,
+  addresses,
+  capturedAt = new Date().toISOString(),
+}) {
+  const previousById = new Map(
+    (Array.isArray(previousOrders) ? previousOrders : []).map((order) => [
+      String(order?.id || ""),
+      order,
+    ])
+  );
+
+  return (Array.isArray(orders) ? orders : []).map((order) => {
+    const previous = previousById.get(String(order?.id || ""));
+    const next = { ...order };
+    if (previous) {
+      if (Object.hasOwn(previous, "oneCCounterparty")) {
+        next.oneCCounterparty = normalizeOrderCounterparty(previous.oneCCounterparty);
+      } else {
+        delete next.oneCCounterparty;
+      }
+      return next;
+    }
+    next.oneCCounterparty = captureAddressCounterparty(order, addresses, capturedAt);
+    return next;
+  });
+}
+
 function clientLinkFor1C(order, clientLinks, storefrontCounterpart = null) {
+  if (Object.hasOwn(order || {}, "oneCCounterparty")) {
+    const snapshot = normalizeOrderCounterparty(order.oneCCounterparty);
+    return {
+      matched1C: Boolean(snapshot.oneCId),
+      oneCId: snapshot.oneCId,
+      oneCCode: snapshot.oneCCode,
+      oneCName: snapshot.oneCName,
+      oneCInn: snapshot.oneCInn,
+      oneCLinkMode: "order-address-snapshot",
+      oneCLinkedAt: snapshot.capturedAt,
+    };
+  }
   const raw = clientLinks?.[order?.clientId] || {};
   if (!isStorefrontOrder(order)) return raw;
   return overlayStorefrontClientLink(
@@ -286,7 +364,15 @@ export function validateOrderFor1C({
   if (!order?.address) issues.push("Не заполнен адрес доставки.");
   if (!order?.firstDeliveryDate) warnings.push("Не указана дата доставки.");
 
-  if (!link?.matched1C || !String(link?.oneCId || "").trim()) {
+  if (
+    Object.hasOwn(order || {}, "oneCCounterparty") &&
+    order?.oneCCounterparty?.source === "address" &&
+    !String(link?.oneCId || "").trim()
+  ) {
+    issues.push(
+      "Для выбранного адреса доставки не выбран контрагент 1С. Откройте карточку клиента и сопоставьте адрес с контрагентом."
+    );
+  } else if (!link?.matched1C || !String(link?.oneCId || "").trim()) {
     warnings.push(
       "Клиент ещё не связан с контрагентом 1С. При получении заказа 1С должна определить его по названию, телефону или email и вернуть найденный ID в подтверждении."
     );

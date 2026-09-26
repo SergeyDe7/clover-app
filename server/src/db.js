@@ -1488,6 +1488,18 @@ export function replaceOrders({
           ordersToWrite.push(JSON.parse(JSON.stringify(current)));
           continue;
         }
+        if (current) {
+          const protectedOrder = { ...order };
+          if (Object.hasOwn(current, "oneCCounterparty")) {
+            protectedOrder.oneCCounterparty = JSON.parse(
+              JSON.stringify(current.oneCCounterparty)
+            );
+          } else {
+            delete protectedOrder.oneCCounterparty;
+          }
+          ordersToWrite.push(protectedOrder);
+          continue;
+        }
         ordersToWrite.push(order);
       }
 

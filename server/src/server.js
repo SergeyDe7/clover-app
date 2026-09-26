@@ -98,6 +98,7 @@ import {
 import {
   assertSafeManagerOrderReplace,
   alignLinePricesToCeilTotal,
+  bindClientOrderCounterparties,
   build1CPayload,
   exchangeDatabaseLabel,
   isOneCClaimExpired,
@@ -917,8 +918,9 @@ function sanitizeOrderItemForClient(item = {}) {
 
 function sanitizeOrderForClient(order = {}) {
   if (!order || typeof order !== "object") return order;
+  const { oneCCounterparty: _oneCCounterparty, ...safeOrder } = order;
   return {
-    ...order,
+    ...safeOrder,
     items: (Array.isArray(order.items) ? order.items : []).map(
       sanitizeOrderItemForClient
     ),
@@ -927,6 +929,21 @@ function sanitizeOrderForClient(order = {}) {
 
 function sanitizeOrdersForClient(orders) {
   return (Array.isArray(orders) ? orders : []).map(sanitizeOrderForClient);
+}
+
+function sanitizeAddressesForClient(addresses) {
+  return (Array.isArray(addresses) ? addresses : []).map((address) => {
+    if (!address || typeof address !== "object") return address;
+    const {
+      oneCId: _oneCId,
+      oneCCode: _oneCCode,
+      oneCName: _oneCName,
+      oneCInn: _oneCInn,
+      oneCLinkedAt: _oneCLinkedAt,
+      ...safeAddress
+    } = address;
+    return safeAddress;
+  });
 }
 
 function assertCanManageTargetStaff(req, target) {
@@ -1554,6 +1571,7 @@ const managerClientAddressSchema = z.object({
   address: z.string().trim().min(3).max(500),
   isDefault: z.boolean().optional().default(false),
   deliveryZoneId: z.string().trim().max(160).optional().default(""),
+  oneCId: z.string().trim().max(160).optional(),
 });
 
 const managerClientUpdateSchema = z.object({
@@ -1579,14 +1597,51 @@ const managerClientUpdateSchema = z.object({
   managerNote: z.string().trim().max(2000).optional().default(""),
 });
 
-function normalizeManagerClientAddresses(addresses) {
-  const normalized = addresses.map((item) => ({
-    id: String(item.id || randomUUID()),
-    label: String(item.label || "Адрес").trim(),
-    address: String(item.address || "").trim(),
-    isDefault: Boolean(item.isDefault),
-    deliveryZoneId: normalizeDeliveryZoneId(item.deliveryZoneId),
-  }));
+function normalizeManagerClientAddresses(
+  addresses,
+  { oneCClients = [], previousAddresses = [], now = new Date().toISOString() } = {}
+) {
+  const oneCById = new Map(
+    normalizeOneCClients(oneCClients).map((item) => [String(item.id), item])
+  );
+  const previousById = new Map(
+    (Array.isArray(previousAddresses) ? previousAddresses : []).map((item) => [
+      String(item?.id || ""),
+      item,
+    ])
+  );
+  const normalized = addresses.map((item) => {
+    const id = String(item.id || randomUUID());
+    const previous = previousById.get(id) || {};
+    const oneCId = String(
+      item.oneCId === undefined ? previous.oneCId || "" : item.oneCId || ""
+    ).trim();
+    const catalogItem = oneCId ? oneCById.get(oneCId) : null;
+    if (oneCId && !catalogItem && String(previous.oneCId || "").trim() !== oneCId) {
+      const error = new Error(
+        "Выбранный контрагент не найден в загруженном каталоге 1С. Обновите каталог и выберите его снова."
+      );
+      error.status = 422;
+      error.code = "ONEC_ADDRESS_COUNTERPARTY_UNKNOWN";
+      throw error;
+    }
+    const source = catalogItem || (oneCId ? previous : {});
+    const sameAsPrevious = oneCId && String(previous.oneCId || "").trim() === oneCId;
+    return {
+      id,
+      label: String(item.label || "Адрес").trim(),
+      address: String(item.address || "").trim(),
+      isDefault: Boolean(item.isDefault),
+      deliveryZoneId: normalizeDeliveryZoneId(item.deliveryZoneId),
+      oneCId,
+      oneCCode: oneCId ? String(source.code || source.oneCCode || "").trim() : "",
+      oneCName: oneCId ? String(source.name || source.oneCName || "").trim() : "",
+      oneCInn: oneCId ? String(source.inn || source.oneCInn || "").trim() : "",
+      oneCLinkedAt: oneCId
+        ? (sameAsPrevious ? String(previous.oneCLinkedAt || now) : now)
+        : "",
+    };
+  });
 
   if (!normalized.length) return [];
 
@@ -1597,6 +1652,65 @@ function normalizeManagerClientAddresses(addresses) {
     ...item,
     isDefault: index === selectedIndex,
   }));
+}
+
+function buildOneCClientOwnershipMap(clients, clientLinks) {
+  const ownership = new Map();
+  const clientById = new Map(
+    (Array.isArray(clients) ? clients : []).map((client) => [String(client.id), client])
+  );
+  for (const [clientId, link] of Object.entries(clientLinks || {})) {
+    const oneCId = String(link?.oneCId || "").trim();
+    if (!oneCId) continue;
+    ownership.set(oneCId, {
+      clientId: String(clientId),
+      clientName: clientById.get(String(clientId))?.companyName || "",
+      linkMode: link?.oneCLinkMode || "manual",
+    });
+  }
+  for (const client of Array.isArray(clients) ? clients : []) {
+    for (const address of Array.isArray(client?.addresses) ? client.addresses : []) {
+      const oneCId = String(address?.oneCId || "").trim();
+      if (!oneCId || ownership.has(oneCId)) continue;
+      ownership.set(oneCId, {
+        clientId: String(client.id),
+        clientName: client.companyName || "",
+        linkMode: "address",
+      });
+    }
+  }
+  return ownership;
+}
+
+function assertAddressCounterpartyOwnership(clientId, addresses, clients, clientLinks) {
+  const ownership = buildOneCClientOwnershipMap(clients, clientLinks);
+  for (const address of Array.isArray(addresses) ? addresses : []) {
+    const oneCId = String(address?.oneCId || "").trim();
+    if (!oneCId) continue;
+    const owner = ownership.get(oneCId);
+    if (owner && String(owner.clientId) !== String(clientId)) {
+      const error = new Error(
+        `Контрагент 1С «${address.oneCName || oneCId}» уже связан с другим клиентом Clover.`
+      );
+      error.status = 409;
+      error.code = "ONEC_ADDRESS_COUNTERPARTY_CONFLICT";
+      throw error;
+    }
+  }
+}
+
+function assertGlobalCounterpartyNotOwnedByOtherAddress(clientId, oneCId, clients) {
+  const conflict = (Array.isArray(clients) ? clients : []).find((client) =>
+    String(client?.id || "") !== String(clientId) &&
+    (Array.isArray(client?.addresses) ? client.addresses : []).some(
+      (address) => String(address?.oneCId || "").trim() === String(oneCId || "").trim()
+    )
+  );
+  if (!conflict) return;
+  const error = new Error("Этот контрагент 1С уже связан с адресом другого клиента Clover.");
+  error.status = 409;
+  error.code = "ONEC_ADDRESS_COUNTERPARTY_CONFLICT";
+  throw error;
 }
 
 function normalizeClientProfileContacts(profile = {}, accountEmail = "") {
@@ -3281,7 +3395,7 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     orders: sanitizeOrdersForClient(listOrders(req.user.id)),
     trashedOrders: [],
     profile: state.profile,
-    addresses: state.addresses,
+    addresses: sanitizeAddressesForClient(state.addresses),
     favorites: state.favorites,
     settings: {
       ...baseClientSettings,
@@ -3577,6 +3691,12 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
       deliveryOneCName: settings.deliveryOneCName || "Доставка",
     };
     const clientAddresses = getClientState(req.user.id).addresses || [];
+    orders = bindClientOrderCounterparties({
+      orders,
+      previousOrders: [...previousById.values()],
+      addresses: clientAddresses,
+      capturedAt: new Date().toISOString(),
+    });
     orders = applyClientSpbDeliveryFees(orders, {
       showPrices: Boolean(settings.showPrices),
       oneCProducts: getGlobalState("oneCProducts", []),
@@ -4928,12 +5048,16 @@ app.put(
       auditFromRequest(req, "addresses.save_rejected_empty", {
         kept: current.length,
       });
-      return res.json({ ok: true, addresses: current, rejectedEmpty: true });
+      return res.json({
+        ok: true,
+        addresses: sanitizeAddressesForClient(current),
+        rejectedEmpty: true,
+      });
     }
 
     const addresses = preserveClientAddressDeliveryZones(incoming, current);
     setClientStateField(req.user.id, "addresses", addresses);
-    res.json({ ok: true, addresses });
+    res.json({ ok: true, addresses: sanitizeAddressesForClient(addresses) });
   }
 );
 
@@ -5626,7 +5750,17 @@ app.put(
         });
       }
 
-      const addresses = normalizeManagerClientAddresses(parsed.addresses);
+      const previousAddresses = getClientState(clientUser.id).addresses || [];
+      const addresses = normalizeManagerClientAddresses(parsed.addresses, {
+        oneCClients: getGlobalState("oneCClients", []),
+        previousAddresses,
+      });
+      assertAddressCounterpartyOwnership(
+        clientUser.id,
+        addresses,
+        listClients(),
+        getGlobalState("clientLinks", {})
+      );
       const profile = normalizeClientProfileContacts(
         parsed.profile,
         parsed.profile.email
@@ -7200,15 +7334,7 @@ app.get(
     const search = String(req.query.search || "").trim();
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
     const offset = Math.max(0, Number(req.query.offset) || 0);
-    const linksByOneCId = new Map(
-      Object.entries(clientLinks)
-        .filter(([, link]) => String(link?.oneCId || "").trim())
-        .map(([clientId, link]) => [String(link.oneCId), {
-          clientId,
-          clientName: clients.find((client) => String(client.id) === String(clientId))?.companyName || "",
-          linkMode: link.oneCLinkMode || "manual",
-        }])
-    );
+    const linksByOneCId = buildOneCClientOwnershipMap(clients, clientLinks);
     const filtered = search
       ? items.filter((item) => matchesTextSearch(
           `${item.name} ${item.code} ${item.id} ${item.inn} ${item.phone} ${item.email}`,
@@ -7242,15 +7368,7 @@ app.get(
       ? candidateMap[String(client.id)]
       : [];
     const clientLinks = getGlobalState("clientLinks", {});
-    const linksByOneCId = new Map(
-      Object.entries(clientLinks)
-        .filter(([, link]) => String(link?.oneCId || "").trim())
-        .map(([clientId, link]) => [String(link.oneCId), {
-          clientId,
-          clientName: clients.find((item) => String(item.id) === String(clientId))?.companyName || "",
-          linkMode: link.oneCLinkMode || "manual",
-        }])
-    );
+    const linksByOneCId = buildOneCClientOwnershipMap(clients, clientLinks);
     res.json({
       client,
       items: items.map((entry) => ({
@@ -7275,6 +7393,11 @@ app.post(
       const requestedId = String(req.body?.oneCId || req.body?.id || "").trim();
       const item = oneCClients.find((entry) => entry.id === requestedId) ||
         normalizeOneCClient(req.body?.item || req.body || {});
+      assertGlobalCounterpartyNotOwnedByOtherAddress(
+        req.params.clientId,
+        item.id,
+        listClients()
+      );
       const updatedLinks = linkCloverClient(
         links,
         req.params.clientId,
@@ -7320,6 +7443,14 @@ app.post(
         oneCClients,
         linkedAt
       );
+      for (const [clientId, link] of Object.entries(nextLinked.clientLinks || {})) {
+        if (!String(link?.oneCId || "").trim()) continue;
+        assertGlobalCounterpartyNotOwnedByOtherAddress(
+          clientId,
+          link.oneCId,
+          clients
+        );
+      }
       if (nextLinked.changed) {
         setGlobalState("clientLinks", nextLinked.clientLinks);
       }

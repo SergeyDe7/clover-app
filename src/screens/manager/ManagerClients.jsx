@@ -92,7 +92,7 @@ function generateAccessPassword(length = 10) {
   return out;
 }
 
-function OneCClientPicker({ client, link, onChange }) {
+function OneCClientPicker({ client, link, onChange, addressMode = false }) {
   const { t } = useLocalization();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState(client.companyName || "");
@@ -105,10 +105,12 @@ function OneCClientPicker({ client, link, onChange }) {
     setLoading(true);
     setError("");
     try {
-      const candidates = await api.getOneCClientCandidates(client.id);
-      if ((candidates.items || []).length) {
-        setItems(candidates.items || []);
-        return;
+      if (!addressMode) {
+        const candidates = await api.getOneCClientCandidates(client.id);
+        if ((candidates.items || []).length) {
+          setItems(candidates.items || []);
+          return;
+        }
       }
       const result = await api.getOneCClients({ search: client.companyName || "", limit: 30 });
       setItems(result.items || []);
@@ -138,6 +140,16 @@ function OneCClientPicker({ client, link, onChange }) {
     setLoading(true);
     setError("");
     try {
+      if (addressMode) {
+        onChange({
+          oneCId: String(item.id || "").trim(),
+          oneCCode: String(item.code || "").trim(),
+          oneCName: String(item.name || "").trim(),
+          oneCInn: String(item.inn || "").trim(),
+        });
+        setOpen(false);
+        return;
+      }
       const result = await api.linkOneCClient(client.id, item.id, item);
       onChange(result.clientLink || {});
       setOpen(false);
@@ -150,12 +162,12 @@ function OneCClientPicker({ client, link, onChange }) {
 
   const clearLink = () => {
     onChange({
-      matched1C: false,
+      ...(addressMode ? {} : { matched1C: false }),
       oneCId: "",
       oneCCode: "",
       oneCName: "",
       oneCInn: "",
-      oneCLinkMode: "manual-cleared",
+      ...(addressMode ? {} : { oneCLinkMode: "manual-cleared" }),
       oneCLinkedAt: "",
     });
   };
@@ -165,12 +177,18 @@ function OneCClientPicker({ client, link, onChange }) {
       <div className="one-c-link-editor-head">
         <div>
           <span className={link.oneCId ? "badge green" : "badge yellow"}>
-            {link.oneCId ? t("manager.linkedTo1c") : t("manager.willBeSetWhenOrdering")}
+            {link.oneCId
+              ? t("manager.linkedTo1c")
+              : addressMode
+                ? t("manager.notSelected")
+                : t("manager.willBeSetWhenOrdering")}
           </span>
           <p className="muted small" style={{ marginTop: 8 }}>
             {link.oneCId
               ? `${link.oneCName || t("manager.clients.oneCCounterparty")} · ${link.oneCCode || t("manager.clients.noCode")}`
-              : t("manager.cloverWillSendTheNamePhone")}
+              : addressMode
+                ? `${t("manager.clients.oneCCounterparty")}: ${t("manager.notSelected")}`
+                : t("manager.cloverWillSendTheNamePhone")}
           </p>
         </div>
         <div className="inline-actions">
@@ -208,6 +226,7 @@ function OneCClientPicker({ client, link, onChange }) {
             {items.map((item) => {
               const linkedToCurrent = item.cloverLink && String(item.cloverLink.clientId) === String(client.id);
               const linkedElsewhere = item.cloverLink && !linkedToCurrent;
+              const selectedForPicker = String(link.oneCId || "") === String(item.id || "");
               return (
                 <article key={item.id}>
                   <div>
@@ -218,12 +237,12 @@ function OneCClientPicker({ client, link, onChange }) {
                     {linkedElsewhere && <span className="warning-text">{t("manager.clients.alreadyLinkedToClient", { name: item.cloverLink.clientName })}</span>}
                   </div>
                   <button
-                    className={linkedToCurrent ? "secondary-button" : "primary-button"}
+                    className={selectedForPicker ? "secondary-button" : "primary-button"}
                     type="button"
                     disabled={loading || Boolean(linkedElsewhere)}
                     onClick={() => selectClient(item)}
                   >
-                    {linkedToCurrent ? t("manager.selected") : linkedElsewhere ? t("manager.alreadyLinked") : t("shared.action.choose")}
+                    {selectedForPicker ? t("manager.selected") : linkedElsewhere ? t("manager.alreadyLinked") : t("shared.action.choose")}
                   </button>
                 </article>
               );
@@ -252,6 +271,11 @@ export function normalizeManagerClientAddresses(addresses = []) {
           address,
           isDefault: index === 0,
           deliveryZoneId: "",
+          oneCId: "",
+          oneCCode: "",
+          oneCName: "",
+          oneCInn: "",
+          oneCLinkedAt: "",
         };
       }
 
@@ -264,6 +288,11 @@ export function normalizeManagerClientAddresses(addresses = []) {
         address,
         isDefault: Boolean(item?.isDefault),
         deliveryZoneId: String(item?.deliveryZoneId || "").trim(),
+        oneCId: String(item?.oneCId || "").trim(),
+        oneCCode: String(item?.oneCCode || "").trim(),
+        oneCName: String(item?.oneCName || "").trim(),
+        oneCInn: String(item?.oneCInn || "").trim(),
+        oneCLinkedAt: String(item?.oneCLinkedAt || "").trim(),
       };
     })
     .filter(Boolean);
@@ -373,6 +402,11 @@ function ManagerClientEditor({
           address: "",
           isDefault: current.addresses.length === 0,
           deliveryZoneId: "",
+          oneCId: "",
+          oneCCode: "",
+          oneCName: "",
+          oneCInn: "",
+          oneCLinkedAt: "",
         },
       ],
     }));
@@ -451,6 +485,7 @@ function ManagerClientEditor({
       label: item.label.trim(),
       address: item.address.trim(),
       deliveryZoneId: String(item.deliveryZoneId || "").trim(),
+      oneCId: String(item.oneCId || "").trim(),
     }));
 
     if (!companyName && !contactName) {
@@ -725,9 +760,18 @@ function ManagerClientEditor({
                     <option key={zone.id} value={zone.id}>
                       {zone.name || zone.id}
                     </option>
-                  ))}
+                ))}
               </select>
             </label>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <strong>{t("manager.clients.oneCCounterparty")}</strong>
+              <OneCClientPicker
+                client={client}
+                link={item}
+                addressMode
+                onChange={(patch) => updateAddress(item.id, patch)}
+              />
+            </div>
             <label className="manager-client-default-address">
               <input
                 type="radio"
