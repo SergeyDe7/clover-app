@@ -20,6 +20,18 @@ export function isCatalogScrollNearEnd(metrics, preloadViewports = 1.5) {
 }
 
 /**
+ * The root catalog is a single continuous grid. Category labels remain on
+ * ProductCard and navigation stays in the sidebar, so pagination cannot leave
+ * empty columns between short category chunks.
+ */
+export function makeFlatCatalogSection(products, name = "catalog") {
+  const list = Array.isArray(products) ? products : [];
+  return list.length
+    ? [{ name, products: list, count: list.length, hideHeading: true }]
+    : [];
+}
+
+/**
  * Keep already-rendered cards in place when another API page is merged.
  * New cards are appended as continuation chunks so adding a product to an
  * earlier category cannot shift every category that was already on screen.
