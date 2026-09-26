@@ -7,6 +7,7 @@ import {
   bindClientOrderCounterparties,
   bindStaffOrderCounterparties,
   build1CPayload,
+  pinOrderCounterpartyFallback,
   validateOrderFor1C,
 } from "../src/exchange.js";
 import { preserveClientAddressDeliveryZones } from "../src/deliveryFee.js";
@@ -308,15 +309,81 @@ const [unmapped] = bindClientOrderCounterparties({
   addresses: [unmappedAddress],
   capturedAt,
 });
+const fallbackCapturedAt = "2026-09-26T12:30:00.000Z";
+const pinnedFallback = pinOrderCounterpartyFallback(
+  unmapped,
+  {
+    "client-1": {
+      matched1C: true,
+      oneCId: "legacy-counterparty",
+      oneCCode: "LEGACY-1",
+      oneCName: "Прежний контрагент клиента",
+    },
+  },
+  fallbackCapturedAt
+);
+assert.equal(pinnedFallback.oneCCounterparty.source, "client-fallback");
+assert.equal(pinnedFallback.oneCCounterparty.capturedAt, fallbackCapturedAt);
+const repinnedAfterClientLinkChange = pinOrderCounterpartyFallback(
+  { ...pinnedFallback, clientId: "client-changed-after-capture" },
+  {
+    "client-changed-after-capture": {
+      matched1C: true,
+      oneCId: "changed-counterparty",
+    },
+  },
+  "2026-09-26T13:00:00.000Z"
+);
+assert.equal(
+  repinnedAfterClientLinkChange.oneCCounterparty.oneCId,
+  "legacy-counterparty"
+);
+assert.equal(
+  repinnedAfterClientLinkChange.oneCCounterparty.capturedAt,
+  fallbackCapturedAt
+);
+assert.equal(
+  pinOrderCounterpartyFallback(pinnedFallback, {}).oneCCounterparty.oneCId,
+  "legacy-counterparty"
+);
+
 const missingValidation = validateOrderFor1C({
-  order: unmapped,
+  order: pinnedFallback,
   products,
   clientLinks: {
-    "client-1": { matched1C: true, oneCId: "legacy-counterparty" },
+    "client-1": { matched1C: true, oneCId: "changed-counterparty" },
   },
 });
-assert.equal(missingValidation.ready, false);
-assert.match(missingValidation.issues.join(" "), /выбранного адреса доставки/u);
+assert.equal(missingValidation.ready, true);
+assert.equal(missingValidation.client1CId, "legacy-counterparty");
+assert.doesNotMatch(missingValidation.issues.join(" "), /выбранного адреса доставки/u);
+
+const unmappedPayload = build1CPayload({
+  order: pinnedFallback,
+  products,
+  clientLinks: {
+    "client-1": {
+      matched1C: true,
+      oneCId: "changed-counterparty",
+      oneCCode: "CHANGED-1",
+      oneCName: "Новый контрагент клиента",
+    },
+  },
+});
+assert.equal(unmappedPayload.client.oneCId, "legacy-counterparty");
+assert.equal(unmappedPayload.client.oneCCode, "LEGACY-1");
+assert.equal(unmappedPayload.client.oneCName, "Прежний контрагент клиента");
+
+const missingEverywhereValidation = validateOrderFor1C({
+  order: pinOrderCounterpartyFallback(unmapped, {}, fallbackCapturedAt),
+  products,
+  clientLinks: {},
+});
+assert.equal(missingEverywhereValidation.ready, false);
+assert.match(
+  missingEverywhereValidation.issues.join(" "),
+  /выбранного адреса доставки/u
+);
 
 const legacyPayload = build1CPayload({
   order: order("legacy-order", addresses[0]),

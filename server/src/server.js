@@ -106,6 +106,7 @@ import {
   normalizeExchangeState,
   ONEC_CLAIM_REQUEUE_INTERVAL_MS,
   payloadToCsv,
+  pinOrderCounterpartyFallback,
   sanitizeOrderExchangeForSave,
   summarizeExchange,
   validateOrderFor1C,
@@ -7801,7 +7802,7 @@ app.post(
       ...getGlobalState("settings", DEFAULT_SETTINGS),
     };
     const oneCProducts = getGlobalState("oneCProducts", []);
-    const orderWithDelivery = ensureSpbDeliveryOnOrder(
+    const orderWithDeliveryBase = ensureSpbDeliveryOnOrder(
       stored.payload,
       {
         deliveryOneCId: deliverySettings.deliveryOneCId,
@@ -7816,6 +7817,12 @@ app.post(
         deliveryZones: sanitizeDeliveryZones(deliverySettings.deliveryZones),
       }
     );
+    const attemptedAt = new Date().toISOString();
+    const orderWithDelivery = pinOrderCounterpartyFallback(
+      orderWithDeliveryBase,
+      clientLinks,
+      attemptedAt
+    );
     const sendGrand = (orderWithDelivery.items || []).reduce(
       (sum, line) => sum + (Number(line.lineTotal) || 0),
       0
@@ -7829,7 +7836,6 @@ app.post(
       deliverySettings,
       oneCProducts,
     });
-    const attemptedAt = new Date().toISOString();
     const exchange = {
       ...previous,
       // Заказ считается переданным только после подтверждения от 1С (ACK).
