@@ -99,6 +99,7 @@ import {
   assertSafeManagerOrderReplace,
   alignLinePricesToCeilTotal,
   bindClientOrderCounterparties,
+  bindStaffOrderCounterparties,
   build1CPayload,
   exchangeDatabaseLabel,
   isOneCClaimExpired,
@@ -3710,6 +3711,12 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     // Protected-order authority is the DB re-read inside replaceOrders
     // (S2-NEW-001), not a request-start previousById snapshot.
   } else if (isStaffRole(req.user.role)) {
+    orders = bindStaffOrderCounterparties({
+      orders,
+      previousOrders: [...previousById.values()],
+      clients: listClients(),
+      capturedAt: new Date().toISOString(),
+    });
     const settings = {
       ...DEFAULT_SETTINGS,
       ...getGlobalState("settings", DEFAULT_SETTINGS),
@@ -3732,12 +3739,13 @@ app.put("/api/state/orders", authRequired, async (req, res) => {
     orders,
     userId: req.user.id,
     managerMode: isStaffRole(req.user.role),
+    enforceStaffCounterpartyAuthority: isStaffRole(req.user.role),
   });
-  // Client writes may have substituted latest DB protected rows inside the
-  // transaction — refresh so response/notifications match committed state.
-  if (isClientRole(req.user.role)) {
-    orders = listOrders(req.user.id, { includeDeleted: true });
-  }
+  // The transaction may substitute the latest authoritative rows/snapshots;
+  // refresh so response and notifications match committed state.
+  orders = isStaffRole(req.user.role)
+    ? listOrders(null, { includeDeleted: true })
+    : listOrders(req.user.id, { includeDeleted: true });
   auditFromRequest(req, "orders.save", { count: orders.length });
 
   if (isClientRole(req.user.role)) {
@@ -5912,7 +5920,10 @@ app.post(
     // Не затираем серверные адреса пустым localStorage при migrate после смены пароля.
     const addresses =
       addressesIncoming.length > 0
-        ? addressesIncoming
+        ? preserveClientAddressDeliveryZones(
+            addressesIncoming,
+            currentState.addresses
+          )
         : Array.isArray(currentState.addresses) && currentState.addresses.length
           ? currentState.addresses
           : addressesIncoming;

@@ -271,7 +271,16 @@ export function autoLinkCloverClients(clients, clientLinks, oneCClients, now = n
     pushIndex(indexes.name, normalizeName(item.name), item);
   }
 
-  const usedIds = new Set(Object.values(links).map((link) => cleanText(link?.oneCId)).filter(Boolean));
+  const usedIds = new Set(
+    [
+      ...Object.values(links).map((link) => cleanText(link?.oneCId)),
+      ...sourceClients.flatMap((client) =>
+        (Array.isArray(client?.addresses) ? client.addresses : []).map(
+          (address) => cleanText(address?.oneCId)
+        )
+      ),
+    ].filter(Boolean)
+  );
   const nextLinks = { ...links };
   const report = {
     cloverTotal: sourceClients.length,

@@ -11,6 +11,10 @@ import {
   isClientOrderDeletableByOmission,
   isClientOrderMutable,
 } from "./orderClientEdit.js";
+import {
+  bindClientOrderCounterparties,
+  bindStaffOrderCounterparties,
+} from "./exchange.js";
 import { emptyStaffPermissionsPayload, staffPermissionsPayload } from "./roles.js";
 import { maybeApplyLegacyManagerPermissionsMigration } from "./staffPermissionsMigrate.js";
 import { maybeApplyStripPlaintextPasswordsMigration } from "./passwordVaultMigrate.js";
@@ -24,6 +28,7 @@ import { logSafe } from "./safeLog.js";
  * Production runtime never calls hooks even if a property is mutated.
  */
 let beforeClientMergeHook = null;
+let beforeStaffAuthorityHook = null;
 
 function isReplaceOrdersTestRuntime() {
   return process.env.NODE_ENV === "test";
@@ -40,12 +45,28 @@ export const replaceOrdersTestHooks = {
     }
     beforeClientMergeHook = typeof value === "function" ? value : null;
   },
+  get beforeStaffAuthority() {
+    return isReplaceOrdersTestRuntime() ? beforeStaffAuthorityHook : null;
+  },
+  set beforeStaffAuthority(value) {
+    if (!isReplaceOrdersTestRuntime()) {
+      beforeStaffAuthorityHook = null;
+      return;
+    }
+    beforeStaffAuthorityHook = typeof value === "function" ? value : null;
+  },
 };
 
 function runReplaceOrdersBeforeClientMergeHook(ctx) {
   if (!isReplaceOrdersTestRuntime()) return;
   if (typeof beforeClientMergeHook !== "function") return;
   beforeClientMergeHook(ctx);
+}
+
+function runReplaceOrdersBeforeStaffAuthorityHook() {
+  if (!isReplaceOrdersTestRuntime()) return;
+  if (typeof beforeStaffAuthorityHook !== "function") return;
+  beforeStaffAuthorityHook();
 }
 
 const currentFile = fileURLToPath(import.meta.url);
@@ -1456,6 +1477,7 @@ export function replaceOrders({
   orders,
   userId = null,
   managerMode = false,
+  enforceStaffCounterpartyAuthority = false,
 }) {
   const normalizedOrders = Array.isArray(orders) ? orders : [];
 
@@ -1475,6 +1497,7 @@ export function replaceOrders({
       const existingById = new Map(
         existing.map((order) => [String(order?.id || "").trim(), order])
       );
+      const persistedAddresses = getClientState(userId).addresses || [];
       const seen = new Set();
       ordersToWrite = [];
 
@@ -1489,18 +1512,20 @@ export function replaceOrders({
           continue;
         }
         if (current) {
-          const protectedOrder = { ...order };
-          if (Object.hasOwn(current, "oneCCounterparty")) {
-            protectedOrder.oneCCounterparty = JSON.parse(
-              JSON.stringify(current.oneCCounterparty)
-            );
-          } else {
-            delete protectedOrder.oneCCounterparty;
-          }
+          const [protectedOrder] = bindClientOrderCounterparties({
+            orders: [order],
+            previousOrders: [current],
+            addresses: persistedAddresses,
+          });
           ordersToWrite.push(protectedOrder);
           continue;
         }
-        ordersToWrite.push(order);
+        const [protectedOrder] = bindClientOrderCounterparties({
+          orders: [order],
+          previousOrders: [],
+          addresses: persistedAddresses,
+        });
+        ordersToWrite.push(protectedOrder);
       }
 
       for (const prior of existing) {
@@ -1511,6 +1536,20 @@ export function replaceOrders({
         ordersToWrite.push(JSON.parse(JSON.stringify(prior)));
         seen.add(id);
       }
+    }
+
+    // HTTP staff bulk-save opts into a second authority check after the write
+    // lock is acquired. This closes the request-start -> transaction race for
+    // client ownership, selected address, and the captured 1C counterparty.
+    // Legacy/internal bulk loaders keep their existing behavior unless they
+    // explicitly opt in.
+    if (managerMode && enforceStaffCounterpartyAuthority) {
+      runReplaceOrdersBeforeStaffAuthorityHook();
+      ordersToWrite = bindStaffOrderCounterparties({
+        orders: ordersToWrite,
+        previousOrders: listOrders(null, { includeDeleted: true }),
+        clients: listClients(),
+      });
     }
 
     if (managerMode) {
