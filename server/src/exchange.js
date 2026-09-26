@@ -250,7 +250,9 @@ function productMap(products) {
 function normalizeOrderCounterparty(value = {}) {
   const source = value && typeof value === "object" ? value : {};
   return {
-    source: source.source === "address" ? "address" : "",
+    source: ["address", "client-fallback"].includes(source.source)
+      ? source.source
+      : "",
     addressId: String(source.addressId || "").trim(),
     oneCId: String(source.oneCId || "").trim(),
     oneCCode: String(source.oneCCode || "").trim(),
@@ -295,6 +297,38 @@ export function captureAddressCounterparty(order, addresses, capturedAt = new Da
     oneCInn: address?.oneCInn,
     capturedAt,
   });
+}
+
+/**
+ * Pins the current trusted client-level 1C link before an order enters the
+ * queue. Once captured, retries keep using the same counterparty even if the
+ * client card is linked to another 1C counterparty later.
+ */
+export function pinOrderCounterpartyFallback(
+  order,
+  clientLinks,
+  capturedAt = new Date().toISOString()
+) {
+  if (!Object.hasOwn(order || {}, "oneCCounterparty")) return order;
+  const snapshot = normalizeOrderCounterparty(order.oneCCounterparty);
+  if (snapshot.oneCId) return order;
+
+  const clientLink = clientLinks?.[order?.clientId] || {};
+  const oneCId = String(clientLink?.oneCId || "").trim();
+  if (!clientLink?.matched1C || !oneCId) return order;
+
+  return {
+    ...order,
+    oneCCounterparty: normalizeOrderCounterparty({
+      source: "client-fallback",
+      addressId: snapshot.addressId,
+      oneCId,
+      oneCCode: clientLink.oneCCode,
+      oneCName: clientLink.oneCName,
+      oneCInn: clientLink.oneCInn,
+      capturedAt,
+    }),
+  };
 }
 
 /**
