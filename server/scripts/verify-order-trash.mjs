@@ -120,6 +120,9 @@ try {
     emailVerified: true,
     approvalStatus: "approved",
   });
+  db.setClientStateField(user.id, "addresses", [
+    { id: "trash-address", label: "Основной", address: "Тестовый адрес" },
+  ]);
 
   db.replaceOrders({
     orders: [
@@ -127,6 +130,8 @@ try {
         id: "keep-1",
         status: "Новый",
         number: "CL-1",
+        addressId: "trash-address",
+        address: "Тестовый адрес",
         createdAt: "2026-08-01T10:00:00.000Z",
         updatedAt: "2026-08-01T10:00:00.000Z",
         exchange: { status: "not_sent" },
@@ -135,6 +140,8 @@ try {
         id: "trash-1",
         status: "Новый",
         number: "CL-2",
+        addressId: "trash-address",
+        address: "Тестовый адрес",
         createdAt: "2026-08-01T10:01:00.000Z",
         updatedAt: "2026-08-01T10:01:00.000Z",
         deletedAt: "2026-08-01T11:00:00.000Z",
