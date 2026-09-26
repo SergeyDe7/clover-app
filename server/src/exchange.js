@@ -247,7 +247,189 @@ function productMap(products) {
   return new Map((products || []).map((product) => [String(product.id), product]));
 }
 
+function normalizeOrderCounterparty(value = {}) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    source: source.source === "address" ? "address" : "",
+    addressId: String(source.addressId || "").trim(),
+    oneCId: String(source.oneCId || "").trim(),
+    oneCCode: String(source.oneCCode || "").trim(),
+    oneCName: String(source.oneCName || "").trim(),
+    oneCInn: String(source.oneCInn || "").trim(),
+    capturedAt: String(source.capturedAt || "").trim(),
+  };
+}
+
+function orderAddressError(addressId) {
+  const error = new Error(
+    addressId
+      ? "Выбранный адрес доставки не найден в вашей карточке. Обновите страницу и выберите адрес снова."
+      : "Выберите адрес доставки из вашей карточки клиента."
+  );
+  error.status = 400;
+  error.code = "ORDER_ADDRESS_UNKNOWN";
+  return error;
+}
+
+function resolvePersistedOrderAddress(order, addresses) {
+  const addressId = String(order?.addressId || "").trim();
+  const address = (Array.isArray(addresses) ? addresses : []).find(
+    (item) => String(item?.id || "").trim() === addressId
+  );
+  if (!address) throw orderAddressError(addressId);
+  return { addressId, address };
+}
+
+/**
+ * Server-authoritative snapshot: selected order address -> 1C counterparty.
+ * Incoming order fields are ignored; only the persisted client address is used.
+ */
+export function captureAddressCounterparty(order, addresses, capturedAt = new Date().toISOString()) {
+  const { addressId, address } = resolvePersistedOrderAddress(order, addresses);
+  return normalizeOrderCounterparty({
+    source: "address",
+    addressId,
+    oneCId: address?.oneCId,
+    oneCCode: address?.oneCCode,
+    oneCName: address?.oneCName,
+    oneCInn: address?.oneCInn,
+    capturedAt,
+  });
+}
+
+/**
+ * New orders receive a canonical address snapshot. Existing orders preserve the
+ * original snapshot (or its legacy absence), so a client cannot replace it.
+ */
+export function bindClientOrderCounterparties({
+  orders,
+  previousOrders,
+  addresses,
+  capturedAt = new Date().toISOString(),
+}) {
+  const previousById = new Map(
+    (Array.isArray(previousOrders) ? previousOrders : []).map((order) => [
+      String(order?.id || ""),
+      order,
+    ])
+  );
+
+  return (Array.isArray(orders) ? orders : []).map((order) => {
+    const previous = previousById.get(String(order?.id || ""));
+    const addressId = String(order?.addressId || "").trim();
+    const previousAddressId = String(previous?.addressId || "").trim();
+    if (previous && previousAddressId === addressId) {
+      const next = { ...order };
+      if (addressId) {
+        next.addressId = addressId;
+        // The selected address may have been removed from the current client
+        // card after the order was created. Keep the historical pair stored on
+        // the order; current card authority is required only for new/changed
+        // selections.
+        next.address = String(previous?.address || "").trim();
+      } else {
+        // Historical orders created before addressId existed keep their stored
+        // address and legacy client-level 1C fallback while the address choice
+        // remains unchanged.
+        next.address = String(previous?.address || "").trim();
+      }
+      if (Object.hasOwn(previous, "oneCCounterparty")) {
+        next.oneCCounterparty = normalizeOrderCounterparty(previous.oneCCounterparty);
+      } else {
+        delete next.oneCCounterparty;
+      }
+      return next;
+    }
+    const { address } = resolvePersistedOrderAddress(order, addresses);
+    const next = {
+      ...order,
+      addressId,
+      address: String(address?.address || "").trim(),
+    };
+    next.oneCCounterparty = captureAddressCounterparty(order, addresses, capturedAt);
+    return next;
+  });
+}
+
+/**
+ * Staff bulk-save cannot write 1C routing snapshots. Existing snapshots are
+ * preserved while the selected address is unchanged. A changed/new addressId
+ * is resolved only against that client's persisted addresses and captured by
+ * the server; an unknown address fails closed.
+ */
+export function bindStaffOrderCounterparties({
+  orders,
+  previousOrders,
+  clients,
+  capturedAt = new Date().toISOString(),
+}) {
+  const previousById = new Map(
+    (Array.isArray(previousOrders) ? previousOrders : []).map((order) => [
+      String(order?.id || ""),
+      order,
+    ])
+  );
+  const addressesByClientId = new Map(
+    (Array.isArray(clients) ? clients : []).map((client) => [
+      String(client?.id || ""),
+      Array.isArray(client?.addresses) ? client.addresses : [],
+    ])
+  );
+
+  return (Array.isArray(orders) ? orders : []).map((order) => {
+    const previous = previousById.get(String(order?.id || ""));
+    const addressId = String(order?.addressId || "").trim();
+    const previousAddressId = String(previous?.addressId || "").trim();
+    const clientId = String(order?.clientId || "").trim();
+    const previousClientId = String(previous?.clientId || "").trim();
+    const sameHistoricalRoute =
+      previous &&
+      addressId === previousAddressId &&
+      clientId === previousClientId;
+    if (sameHistoricalRoute) {
+      const next = { ...order };
+      if (addressId) {
+        next.addressId = addressId;
+        // Preserve the order's historical address/snapshot even when that
+        // address was later removed from the client card.
+        next.address = String(previous?.address || "").trim();
+      } else {
+        next.address = String(previous?.address || "").trim();
+      }
+      if (Object.hasOwn(previous, "oneCCounterparty")) {
+        next.oneCCounterparty = normalizeOrderCounterparty(previous.oneCCounterparty);
+      } else {
+        delete next.oneCCounterparty;
+      }
+      return next;
+    }
+
+    const addresses = addressesByClientId.get(clientId) || [];
+    const [bound] = bindClientOrderCounterparties({
+      orders: [order],
+      // Reaching this branch means the address or owner changed (or the order
+      // is new), so the old route must never qualify for preservation.
+      previousOrders: [],
+      addresses,
+      capturedAt,
+    });
+    return bound;
+  });
+}
+
 function clientLinkFor1C(order, clientLinks, storefrontCounterpart = null) {
+  if (Object.hasOwn(order || {}, "oneCCounterparty")) {
+    const snapshot = normalizeOrderCounterparty(order.oneCCounterparty);
+    return {
+      matched1C: Boolean(snapshot.oneCId),
+      oneCId: snapshot.oneCId,
+      oneCCode: snapshot.oneCCode,
+      oneCName: snapshot.oneCName,
+      oneCInn: snapshot.oneCInn,
+      oneCLinkMode: "order-address-snapshot",
+      oneCLinkedAt: snapshot.capturedAt,
+    };
+  }
   const raw = clientLinks?.[order?.clientId] || {};
   if (!isStorefrontOrder(order)) return raw;
   return overlayStorefrontClientLink(
@@ -286,7 +468,15 @@ export function validateOrderFor1C({
   if (!order?.address) issues.push("Не заполнен адрес доставки.");
   if (!order?.firstDeliveryDate) warnings.push("Не указана дата доставки.");
 
-  if (!link?.matched1C || !String(link?.oneCId || "").trim()) {
+  if (
+    Object.hasOwn(order || {}, "oneCCounterparty") &&
+    order?.oneCCounterparty?.source === "address" &&
+    !String(link?.oneCId || "").trim()
+  ) {
+    issues.push(
+      "Для выбранного адреса доставки не выбран контрагент 1С. Откройте карточку клиента и сопоставьте адрес с контрагентом."
+    );
+  } else if (!link?.matched1C || !String(link?.oneCId || "").trim()) {
     warnings.push(
       "Клиент ещё не связан с контрагентом 1С. При получении заказа 1С должна определить его по названию, телефону или email и вернуть найденный ID в подтверждении."
     );

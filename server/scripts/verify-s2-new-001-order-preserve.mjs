@@ -288,7 +288,15 @@ const clientB = createUser({
   emailVerified: true, approvalStatus: "approved",
   profile: { companyName: "B Co", contactName: "B" },
 });
-setClientStateField(clientA.id, "addresses", [{ id: "addr-a", label: "A", street: "A1" }]);
+setClientStateField(clientA.id, "addresses", [{ id: "addr-a", label: "A", address: "A1" }]);
+setClientStateField(clientB.id, "addresses", [{
+  id: "addr-b", label: "B", address: "B1",
+  oneCId: "trusted-client-b-counterparty",
+  oneCCode: "TRUSTED-B",
+  oneCName: "Trusted B",
+  oneCInn: "7800000099",
+  oneCLinkedAt: "2026-09-01T00:00:00.000Z",
+}]);
 setGlobalState("products", [{
   id: "prod-1", name: "P1", active: true, pricePiece: 100,
   purchasePrices: { piece: 40 }, purchasePriceUpdatedAt: "2026-09-01T00:00:00.000Z",
@@ -318,12 +326,14 @@ const line = (id, qty, price) => ({
 const orderNew = {
   id: "o-new", number: "N-1", clientId: clientA.id, customerName: "A Co",
   customerEmail: clientA.email, status: "Новый", exchange: { status: "not_sent" },
+  addressId: "addr-a", address: "A1",
   items: [line("line-new", 1, 120)], customItems: [], deliveryFee: 0,
   firstDeliveryDate: "2026-09-25", createdAt: nowIso, updatedAt: nowIso,
 };
 const orderAcc = {
   id: "o-acc", number: "A-1", clientId: clientA.id, customerName: "A Co",
   customerEmail: clientA.email, status: "Принят",
+  addressId: "addr-a", address: "A1",
   exchange: { status: "not_sent", documentId: "1C-KEEP-ME", oneCNumber: "UNF-42" },
   oneCDocumentId: "1C-KEEP-ME",
   items: [line("line-acc", 2, 120)], customItems: [], deliveryFee: 0,
@@ -333,6 +343,7 @@ const orderAcc = {
 const orderQueued = {
   id: "o-queue", number: "Q-1", clientId: clientA.id, customerName: "A Co",
   customerEmail: clientA.email, status: "Новый",
+  addressId: "addr-a", address: "A1",
   exchange: { status: "ready", claimId: "claim-preserve", documentId: null },
   items: [line("line-q", 1, 120)], customItems: [], deliveryFee: 0,
   firstDeliveryDate: "2026-09-27", createdAt: nowIso, updatedAt: nowIso,
@@ -340,6 +351,7 @@ const orderQueued = {
 const orderB = {
   id: "o-b", number: "B-1", clientId: clientB.id, customerName: "B Co",
   customerEmail: clientB.email, status: "Новый", exchange: { status: "not_sent" },
+  addressId: "addr-b", address: "B1",
   items: [line("line-b", 1, 200)], customItems: [], deliveryFee: 0,
   firstDeliveryDate: "2026-09-28", createdAt: nowIso, updatedAt: nowIso,
 };
@@ -489,6 +501,8 @@ async function runHttpMatrix(seeded) {
         customerEmail: seeded.clientA.email,
         status: "Новый",
         exchange: { status: "not_sent" },
+        addressId: "addr-a",
+        address: "A1",
         items: [
           {
             id: "line-d",
@@ -754,6 +768,107 @@ async function runHttpMatrix(seeded) {
       assert.equal(find(boot.orders, "o-new").items[0].quantity, draftQty);
       assert.equal(Number(find(boot.orders, "o-new").items[0].unitPrice), draftPrice);
       note("http.M", true, "idempotent ids/protected/draft price");
+    }
+
+    // O: localStorage migration cannot forge manager-owned address routing.
+    {
+      const forgedCounterparty = "victim-counterparty-id";
+      const migrate = await api(base, "/api/migrate/client", {
+        method: "POST",
+        token: tokenB,
+        body: {
+          addresses: [
+            {
+              id: "addr-b",
+              label: "B updated",
+              address: "B2",
+              oneCId: forgedCounterparty,
+              oneCCode: "FORGED",
+              oneCName: "Forged existing",
+              oneCInn: "0000000000",
+            },
+            {
+              id: "addr-b-new",
+              label: "B new",
+              address: "B3",
+              oneCId: forgedCounterparty,
+              oneCCode: "FORGED-NEW",
+              oneCName: "Forged new",
+              oneCInn: "1111111111",
+            },
+          ],
+        },
+      });
+      assert.equal(migrate.status, 200, JSON.stringify(migrate.json));
+
+      const bootB = await api(base, "/api/bootstrap", { token: tokenB });
+      assert.equal(bootB.status, 200, JSON.stringify(bootB.json));
+      const migratedOrder = {
+        id: "o-migrated-address",
+        number: "MIG-1",
+        clientId: seeded.clientB.id,
+        customerName: "B Co",
+        customerEmail: seeded.clientB.email,
+        status: "Новый",
+        exchange: { status: "not_sent" },
+        addressId: "addr-b-new",
+        address: "Forged free text",
+        items: [{
+          id: "line-mig",
+          productId: "prod-1",
+          name: "P1",
+          quantity: 1,
+          unit: "piece",
+          unitPrice: 200,
+          lineTotal: 200,
+        }],
+        customItems: [],
+        deliveryFee: 0,
+        firstDeliveryDate: "2026-10-01",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const save = await api(base, "/api/state/orders", {
+        method: "PUT",
+        token: tokenB,
+        body: { orders: [...(bootB.json?.orders || []), migratedOrder] },
+      });
+      assert.equal(save.status, 200, JSON.stringify(save.json));
+
+      const inspect = runSnippet(`
+        process.env.DB_PATH = ${JSON.stringify(databasePath)};
+        process.env.MANAGER_EMAIL = ""; process.env.MANAGER_PASSWORD = "";
+        const { getClientState, listOrders, db } = await import(${JSON.stringify(
+          pathToFileURL(path.join(serverDir, "src/db.js")).href
+        )});
+        const state = getClientState(${JSON.stringify(seeded.clientB.id)});
+        const saved = listOrders(${JSON.stringify(seeded.clientB.id)}).find(
+          (item) => item.id === "o-migrated-address"
+        );
+        console.log("MIGRATION_AUTHORITY_RESULT=" + JSON.stringify({
+          existing: state.addresses.find((item) => item.id === "addr-b"),
+          added: state.addresses.find((item) => item.id === "addr-b-new"),
+          snapshot: saved?.oneCCounterparty || null,
+        }));
+        db.close();
+      `);
+      assert.equal(inspect.status, 0, inspect.stderr + inspect.stdout);
+      const marker = String(inspect.stdout)
+        .split(/\r?\n/u)
+        .find((line) => line.startsWith("MIGRATION_AUTHORITY_RESULT="));
+      assert.ok(marker, inspect.stdout);
+      const inspected = JSON.parse(marker.slice("MIGRATION_AUTHORITY_RESULT=".length));
+      assert.equal(inspected.existing.oneCId, "trusted-client-b-counterparty");
+      assert.equal(inspected.existing.oneCCode, "TRUSTED-B");
+      assert.equal(inspected.added.oneCId, "");
+      assert.equal(inspected.added.oneCCode, "");
+      assert.equal(inspected.snapshot.oneCId, "");
+      assert.notEqual(inspected.snapshot.oneCId, forgedCounterparty);
+      note(
+        "http.O",
+        true,
+        "migrate strips forged address 1C fields; new order snapshot is not victim"
+      );
     }
 
     note("http.N", true, "txn rollback covered in unit.N; HTTP validates pre-write rejects");

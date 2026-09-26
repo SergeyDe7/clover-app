@@ -122,9 +122,9 @@ export function projectClientDeliveryZones(raw) {
 }
 
 /**
- * Client PUT /addresses must not escalate zone assignment.
- * Existing address → keep prior deliveryZoneId.
- * New address → empty zone.
+ * Client PUT /addresses must not escalate manager-owned assignment.
+ * Existing address → keep prior deliveryZoneId and 1C counterparty fields.
+ * New address → empty zone and no 1C counterparty.
  */
 export function preserveClientAddressDeliveryZones(incoming, current = []) {
   const currentById = new Map(
@@ -139,7 +139,15 @@ export function preserveClientAddressDeliveryZones(incoming, current = []) {
     const deliveryZoneId = previous
       ? normalizeDeliveryZoneId(previous.deliveryZoneId)
       : "";
-    return { ...item, deliveryZoneId };
+    return {
+      ...item,
+      deliveryZoneId,
+      oneCId: previous ? String(previous.oneCId || "").trim() : "",
+      oneCCode: previous ? String(previous.oneCCode || "").trim() : "",
+      oneCName: previous ? String(previous.oneCName || "").trim() : "",
+      oneCInn: previous ? String(previous.oneCInn || "").trim() : "",
+      oneCLinkedAt: previous ? String(previous.oneCLinkedAt || "").trim() : "",
+    };
   });
 }
 
