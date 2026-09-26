@@ -6,6 +6,7 @@ import {
   mergeClientLinksPreservingOneCLinks,
   normalizeOneCClients,
   selectRelevantOneCClients,
+  unlinkCloverClient,
 } from "../src/oneCClients.js";
 
 const clients = [
@@ -53,6 +54,49 @@ assert.equal(auto.clientLinks["client-3"].oneCId, "onec-client-3");
 const manual = linkCloverClient({}, "client-1", realItems[0]);
 assert.equal(manual["client-1"].matched1C, true);
 assert.equal(manual["client-1"].oneCName, "Восточная лавка");
+
+const linksBeforeUnlink = {
+  ...manual,
+  "client-1": {
+    ...manual["client-1"],
+    matrixMode: "selected",
+    matrixProductIds: ["p1"],
+    defaultPricingMode: "purchase_markup",
+    defaultMarkupPercent: 15,
+    personalPrices: { p1: { source: "fixed", price: 125 } },
+  },
+  "client-2": { oneCId: "keep-me", managerNote: "Не менять" },
+};
+const unlinked = unlinkCloverClient(linksBeforeUnlink, "client-1");
+assert.equal(unlinked["client-1"].matched1C, false);
+assert.equal(unlinked["client-1"].oneCId, "");
+assert.equal(unlinked["client-1"].oneCCode, "");
+assert.equal(unlinked["client-1"].oneCName, "");
+assert.equal(unlinked["client-1"].oneCInn, "");
+assert.equal(unlinked["client-1"].oneCMatchName, "");
+assert.equal(unlinked["client-1"].oneCLinkedAt, "");
+assert.equal(unlinked["client-1"].oneCLinkMode, "manual-cleared");
+assert.deepEqual(unlinked["client-1"].matrixProductIds, ["p1"]);
+assert.equal(unlinked["client-1"].defaultPricingMode, "purchase_markup");
+assert.equal(unlinked["client-1"].defaultMarkupPercent, 15);
+assert.equal(unlinked["client-1"].personalPrices.p1.price, 125);
+assert.deepEqual(unlinked["client-2"], linksBeforeUnlink["client-2"]);
+assert.equal(linksBeforeUnlink["client-1"].oneCId, "onec-client-1");
+const afterAutoLink = autoLinkCloverClients(
+  clients,
+  unlinked,
+  catalog,
+  "2026-07-24T23:00:00.000Z"
+);
+assert.equal(afterAutoLink.clientLinks["client-1"].oneCId, "");
+assert.equal(afterAutoLink.clientLinks["client-1"].oneCLinkMode, "manual-cleared");
+const manuallyRelinked = linkCloverClient(
+  afterAutoLink.clientLinks,
+  "client-1",
+  realItems[0]
+);
+assert.equal(manuallyRelinked["client-1"].oneCId, "onec-client-1");
+assert.equal(manuallyRelinked["client-1"].oneCLinkMode, "manual");
 
 const preserved = mergeClientLinksPreservingOneCLinks(
   { "client-1": { matrixMode: "all", oneCId: "" } },
