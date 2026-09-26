@@ -1886,11 +1886,17 @@ html.sf-catalog-lock #root::-webkit-scrollbar {
     overscroll-behavior-x: contain;
   }
   .sf-subcat-chips .sf-chip {
+    display: inline-flex;
     flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
     min-height: 36px;
     padding: 7px 11px;
+    box-sizing: border-box;
     font-size: 0.86rem;
     line-height: 1.15;
+    text-align: center;
+    white-space: nowrap;
   }
   .sf-facet-tree {
     display: flex;

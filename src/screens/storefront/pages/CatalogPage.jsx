@@ -17,7 +17,6 @@ import {
   getGroupChildren,
   getSubgroupFacets,
   canonicalizeProductSubcategory,
-  groupProductsByCloverGroup,
 } from "../productGroups.js";
 import { storefrontHref } from "../mode.js";
 import { projectLocalizedGroupNav, categoryDisplayNameFromCanonical, categoryDisplayLabelsReady } from "../../../shared/i18n/categoryDisplayProjection.js";
@@ -33,6 +32,7 @@ import {
 import {
   CATALOG_CARD_RENDER_BATCH,
   isCatalogScrollNearEnd,
+  makeFlatCatalogSection,
   nextRenderLimitAfterDemand,
   scheduleCatalogRenderBump,
   sliceSectionsToRenderLimit,
@@ -242,7 +242,7 @@ export function CatalogPage({
         ? [{ name: subcategory || category, products: sorted, count: sorted.length }]
         : [];
     }
-    return groupProductsByCloverGroup(products);
+    return makeFlatCatalogSection(products);
   }, [category, subcategory, products, currentPayload]);
 
   const stableSectionOrderRef = useRef({ key: "", sections: [] });
@@ -666,7 +666,7 @@ export function CatalogPage({
 
           {visibleSections.map((section) => (
             <section className="sf-group-block" key={section.renderKey || section.name}>
-              {!category && !section.continuation ? (
+              {!category && !section.continuation && !section.hideHeading ? (
                 <div className="sf-group-head">
                   <h2>
                     {labelsReady
