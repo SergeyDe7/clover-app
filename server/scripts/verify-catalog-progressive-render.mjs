@@ -4,6 +4,7 @@ import {
   catalogScrollRemaining,
   countSectionProducts,
   isCatalogScrollNearEnd,
+  makeFlatCatalogSection,
   nextRenderLimitAfterDemand,
   orderedProductIds,
   scheduleCatalogRenderBump,
@@ -60,6 +61,37 @@ assert.equal(
   true
 );
 assert.equal(isCatalogScrollNearEnd({ scrollHeight: 600, clientHeight: 0 }), false);
+
+// The root catalog must stay one continuous grid across API pages. Splitting
+// category chunks into separate four-column grids created the visible holes.
+{
+  const firstProducts = Array.from({ length: 60 }, (_, i) => ({
+    id: `p${i}`,
+    category: i % 2 ? "A" : "B",
+  }));
+  const allProducts = [
+    ...firstProducts,
+    ...Array.from({ length: 60 }, (_, i) => ({
+      id: `p${i + 60}`,
+      category: i % 3 ? "C" : "A",
+    })),
+  ];
+  const initial = stabilizeSectionProductOrder(makeFlatCatalogSection(firstProducts));
+  const next = stabilizeSectionProductOrder(
+    makeFlatCatalogSection(allProducts),
+    initial
+  );
+
+  assert.equal(initial.length, 1);
+  assert.equal(next.length, 1);
+  assert.equal(next[0].products.length, 120);
+  assert.equal(next[0].continuation, undefined);
+  assert.equal(next[0].hideHeading, true);
+  assert.deepEqual(
+    orderedProductIds(next).slice(0, 60),
+    orderedProductIds(initial)
+  );
+}
 
 // A newly fetched product may sort ahead of an existing one, but cards already
 // on screen must not jump. Only genuinely new ids are appended per section.
