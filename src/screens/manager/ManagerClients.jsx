@@ -160,8 +160,8 @@ function OneCClientPicker({ client, link, onChange, addressMode = false }) {
     }
   };
 
-  const clearLink = () => {
-    onChange({
+  const clearLink = async () => {
+    const clearedLink = {
       ...(addressMode ? {} : { matched1C: false }),
       oneCId: "",
       oneCCode: "",
@@ -169,7 +169,30 @@ function OneCClientPicker({ client, link, onChange, addressMode = false }) {
       oneCInn: "",
       ...(addressMode ? {} : { oneCLinkMode: "manual-cleared" }),
       oneCLinkedAt: "",
-    });
+    };
+
+    if (addressMode) {
+      onChange(clearedLink);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      const result = await api.unlinkOneCClient(client.id);
+      onChange(result.clientLink || clearedLink);
+      setItems((current) =>
+        current.map((item) =>
+          String(item.cloverLink?.clientId || "") === String(client.id)
+            ? { ...item, cloverLink: null }
+            : item
+        )
+      );
+    } catch (unlinkError) {
+      setError(errorDisplayMessage(unlinkError, t, "shared.error.saveFailed"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -196,11 +219,12 @@ function OneCClientPicker({ client, link, onChange, addressMode = false }) {
             {link.oneCId ? t("manager.changeCounterparty") : t("manager.chooseA1cCounterparty")}
           </button>
           {link.oneCId && (
-            <button className="secondary-button" type="button" onClick={clearLink}>{t("manager.unlink")}</button>
+            <button className="secondary-button" type="button" disabled={loading} onClick={clearLink}>{t("manager.unlink")}</button>
           )}
         </div>
       </div>
 
+      {error && <div className="sync-error">{error}</div>}
       {open && (
         <div className="one-c-picker">
           <div className="one-c-products-search">
@@ -221,7 +245,6 @@ function OneCClientPicker({ client, link, onChange, addressMode = false }) {
             </button>
             <button className="secondary-button" type="button" onClick={() => setOpen(false)}>{t("shared.action.close")}</button>
           </div>
-          {error && <div className="sync-error">{error}</div>}
           <div className="one-c-products-list one-c-picker-list">
             {items.map((item) => {
               const linkedToCurrent = item.cloverLink && String(item.cloverLink.clientId) === String(client.id);

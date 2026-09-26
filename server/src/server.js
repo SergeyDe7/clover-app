@@ -264,6 +264,7 @@ import {
   normalizeOneCClient,
   normalizeOneCClients,
   selectRelevantOneCClients,
+  unlinkCloverClient,
 } from "./oneCClients.js";
 import {
   enrichProductWithPurchasePrices,
@@ -7433,6 +7434,39 @@ app.post(
         oneCName: item.name,
       });
       res.json({ ok: true, clientLink: updatedLinks[req.params.clientId], clientLinks: updatedLinks });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.delete(
+  "/api/admin/one-c/clients/:clientId/link",
+  authRequired,
+  roleRequired("manager"),
+  (req, res, next) => {
+    try {
+      const clientId = String(req.params.clientId || "").trim();
+      const client = findUserById(clientId);
+      if (!client || client.role !== "client") {
+        return res.status(404).json({ error: "Клиент Clover не найден." });
+      }
+
+      const links = getGlobalState("clientLinks", {});
+      const previousLink = links[clientId] || {};
+      const updatedLinks = unlinkCloverClient(links, clientId);
+      setGlobalState("clientLinks", updatedLinks);
+
+      auditFromRequest(req, "one-c.client.unlink", {
+        clientId,
+        oneCId: previousLink.oneCId || "",
+        oneCName: previousLink.oneCName || "",
+      });
+      res.json({
+        ok: true,
+        clientLink: updatedLinks[clientId],
+        clientLinks: updatedLinks,
+      });
     } catch (error) {
       next(error);
     }

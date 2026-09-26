@@ -551,6 +551,7 @@ const admin = createUser({
   email: "manual-price-admin@test.local",
   passwordHash,
   role: "admin",
+  permissions: { fullAccess: true },
   emailVerified: true,
   approvalStatus: "approved",
 });
@@ -871,6 +872,77 @@ async function runHttpRegressions() {
       links[seeded.clientB.id].managerNote,
       "B legitimate migrated note"
     );
+
+    const clientProfile = {
+      companyName: "HTTP Client A",
+      contactName: "A",
+      phone: "",
+      email: seeded.clientA.email,
+      contacts: [],
+    };
+    const linkedAddress = {
+      id: "http-address-a",
+      label: "Основной",
+      address: "Санкт-Петербург, Невский проспект, 1",
+      isDefault: true,
+      deliveryZoneId: "",
+      oneCId: "http-onec-a",
+    };
+    const saveAddressLink = await httpApi(
+      baseUrl,
+      `/api/admin/clients/${encodeURIComponent(seeded.clientA.id)}`,
+      {
+        method: "PUT",
+        token,
+        body: { profile: clientProfile, addresses: [linkedAddress], managerNote: "" },
+      }
+    );
+    assert.equal(saveAddressLink.status, 200, JSON.stringify(saveAddressLink.json));
+    assert.equal(saveAddressLink.json.client.addresses[0].oneCId, "http-onec-a");
+
+    const clearAddressLink = await httpApi(
+      baseUrl,
+      `/api/admin/clients/${encodeURIComponent(seeded.clientA.id)}`,
+      {
+        method: "PUT",
+        token,
+        body: {
+          profile: clientProfile,
+          addresses: [{ ...linkedAddress, oneCId: "" }],
+          managerNote: "",
+        },
+      }
+    );
+    assert.equal(clearAddressLink.status, 200, JSON.stringify(clearAddressLink.json));
+    assert.equal(clearAddressLink.json.client.addresses[0].oneCId, "");
+    assert.equal(clearAddressLink.json.client.addresses[0].oneCName, "");
+
+    const unauthenticatedUnlink = await httpApi(
+      baseUrl,
+      `/api/admin/one-c/clients/${encodeURIComponent(seeded.clientA.id)}/link`,
+      { method: "DELETE" }
+    );
+    assert.equal(unauthenticatedUnlink.status, 401);
+
+    const unlink = await httpApi(
+      baseUrl,
+      `/api/admin/one-c/clients/${encodeURIComponent(seeded.clientA.id)}/link`,
+      { method: "DELETE", token }
+    );
+    assert.equal(unlink.status, 200, JSON.stringify(unlink.json));
+    assert.equal(unlink.json.clientLink.oneCId, "");
+    assert.equal(unlink.json.clientLink.matched1C, false);
+    assert.equal(unlink.json.clientLink.oneCLinkMode, "manual-cleared");
+    assert.equal(unlink.json.clientLink.oneCPriceTypeSource, "manual");
+    assert.equal(unlink.json.clientLink.managerNote, links[seeded.clientA.id].managerNote);
+
+    const repeatedUnlink = await httpApi(
+      baseUrl,
+      `/api/admin/one-c/clients/${encodeURIComponent(seeded.clientA.id)}/link`,
+      { method: "DELETE", token }
+    );
+    assert.equal(repeatedUnlink.status, 200, JSON.stringify(repeatedUnlink.json));
+    assert.equal(repeatedUnlink.json.clientLink.oneCLinkMode, "manual-cleared");
   } catch (error) {
     console.error(stderr.slice(-2500));
     throw error;
