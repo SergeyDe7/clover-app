@@ -114,6 +114,11 @@ assert.match(
   "На телефоне подгруппы категории доступны чипами над товарами."
 );
 assert.match(
+  mobile,
+  /\.sf-subcat-chips \.sf-chip\s*\{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;[^}]*box-sizing:\s*border-box;[^}]*white-space:\s*nowrap/,
+  "Подписи подкатегорий центрируются внутри кнопок и не съезжают в Safari."
+);
+assert.match(
   page,
   /setTreeOpen\(false\)/,
   "После выбора категории на телефоне дерево сворачивается, товары сразу видны."
