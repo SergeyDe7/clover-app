@@ -68,6 +68,9 @@ try {
 
     await page.locator(".address-picker-option").nth(1).click();
     await dialog.waitFor({ state: "detached" });
+    await page.waitForFunction(() =>
+      document.activeElement?.classList.contains("address-picker-trigger")
+    );
     assert.equal(
       await page.evaluate(() => document.activeElement?.classList.contains("address-picker-trigger")),
       true,
