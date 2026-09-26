@@ -367,6 +367,7 @@ export const STAFF_ROUTE_POLICIES = Object.freeze([
   { method: "GET", path: "/api/admin/one-c/clients", kind: "feature", feature: "clients" },
   { method: "GET", path: "/api/admin/one-c/clients/:clientId/candidates", kind: "feature", feature: "clients" },
   { method: "POST", path: "/api/admin/one-c/clients/:clientId/link", kind: "feature", feature: "clients" },
+  { method: "DELETE", path: "/api/admin/one-c/clients/:clientId/link", kind: "feature", feature: "clients" },
   { method: "POST", path: "/api/admin/one-c/clients/auto-link", kind: "feature", feature: "clients" },
 
   { method: "GET", path: "/api/admin/one-c/config", kind: "feature", feature: "exchange" },
