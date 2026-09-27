@@ -101,6 +101,7 @@ import {
   bindClientOrderCounterparties,
   bindStaffOrderCounterparties,
   build1CPayload,
+  clientLinkFor1C,
   exchangeDatabaseLabel,
   isOneCClaimExpired,
   normalizeExchangeState,
@@ -288,10 +289,7 @@ import {
   preserveClientAddressDeliveryZones,
   projectClientDeliveryZones,
 } from "./deliveryFee.js";
-import {
-  overlayStorefrontClientLink,
-  resolveStorefrontOneCClient,
-} from "./storefrontCounterparty.js";
+import { resolveStorefrontOneCClient } from "./storefrontCounterparty.js";
 import {
   createStorefrontOrder,
   storefrontOrderSchema,
@@ -4425,9 +4423,9 @@ async function handleOneCTestOrder(req, res, next) {
       ),
       oneCClients: getGlobalState("oneCClients", []),
     });
-    const clientLink = overlayStorefrontClientLink(
-      realOrder,
-      normalizeClientLink(clientLinks[realOrder.clientId]),
+    const clientLink = clientLinkFor1C(
+      orderForClaim,
+      clientLinks,
       storefrontCounterpart
     );
 
