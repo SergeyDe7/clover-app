@@ -232,10 +232,31 @@ assert.ok(
 
 const resetIdx = serverSource.indexOf('"/api/admin/exchange/orders/:orderId/reset"');
 assert.ok(resetIdx > 0, "reset endpoint должен существовать.");
-const resetSlice = serverSource.slice(resetIdx, resetIdx + 1200);
+const resetSlice = serverSource.slice(resetIdx, resetIdx + 3500);
 assert.ok(
   resetSlice.includes("ONEC_SENT_LOCKED") || resetSlice.includes('status === "sent"'),
   "Reset endpoint обязан блокировать уже принятый в 1С заказ."
+);
+assert.ok(
+  resetSlice.includes("const outcome = runInTransaction") &&
+    resetSlice.indexOf("getOrderById") > resetSlice.indexOf("runInTransaction") &&
+    resetSlice.indexOf("const order = updateOrderPayload") > resetSlice.indexOf("getOrderById"),
+  "Reset обязан перечитать и изменить заказ внутри одного BEGIN IMMEDIATE."
+);
+
+const draftIdx = serverSource.indexOf('"/api/admin/one-c/orders/:orderId/draft"');
+assert.ok(draftIdx > 0, "draft endpoint должен существовать.");
+const draftSlice = serverSource.slice(draftIdx, draftIdx + 9500);
+assert.ok(
+  draftSlice.includes("draftAttemptId") &&
+    draftSlice.includes("ONEC_DRAFT_IN_PROGRESS") &&
+    draftSlice.includes("ONEC_DRAFT_STATE_CHANGED"),
+  "Draft обязан резервировать одну попытку и отклонять устаревшее завершение."
+);
+assert.ok(
+  draftSlice.indexOf("runInTransaction") < draftSlice.indexOf("createOneCDraft") &&
+    draftSlice.lastIndexOf("runInTransaction") > draftSlice.indexOf("createOneCDraft"),
+  "Draft обязан резервировать и завершать попытку транзакционно вокруг внешнего вызова 1С."
 );
 
 const { readFrontendUiSource } = await import("./readFrontendUiSource.mjs");

@@ -10,6 +10,11 @@
  *     final state remains sent regardless of which transaction wins.
  *  3. Two backend processes ACK different orders with the same receipt in one
  *     contour: exactly one succeeds, one gets DOCUMENT_NUMBER_IN_USE.
+ *  4. Manager reset races ACK across two backend processes: exactly one wins;
+ *     a successful ACK can never be overwritten back to not_sent.
+ *  5. Draft creation and reset reject sent orders and an active draft attempt
+ *     before any external 1C call can run.
+ *  6. A valid unclaimed order still creates exactly one simulation draft.
  *
  * Uses only synthetic keys and one temporary SQLite database. No real 1C,
  * production database, network service, email, or messenger is touched.
@@ -29,6 +34,9 @@ const serverRoot = path.resolve(__dirname, "..");
 const serverEntry = path.join(serverRoot, "src/server.js");
 const requeueWorkerEntry = path.join(__dirname, "onec-concurrency-requeue-worker.mjs");
 const testKey = `onec-concurrency-${randomUUID()}-${randomUUID()}`;
+const testJwtSecret = `onec-concurrency-jwt-${randomUUID()}-${randomUUID()}`;
+const managerEmail = "onec-concurrency-manager@clover.test";
+const managerPassword = `Manager-${randomUUID()}-Aa1!`;
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -93,6 +101,25 @@ async function httpJson(baseUrl, method, route, body) {
   return { status: response.status, text, json };
 }
 
+async function managerJson(baseUrl, token, method, route, body) {
+  const response = await fetch(`${baseUrl}${route}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await response.text();
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+  return { status: response.status, text, json };
+}
+
 function openDatabase(databasePath) {
   const database = new DatabaseSync(databasePath);
   database.exec("PRAGMA busy_timeout = 8000");
@@ -116,6 +143,20 @@ function seedUser(databasePath) {
   }
 }
 
+function approveManager(databasePath) {
+  const database = openDatabase(databasePath);
+  try {
+    const result = database.prepare(
+      `UPDATE users
+       SET role = 'admin', email_verified = 1, approval_status = 'approved', disabled_at = ''
+       WHERE email = ?`
+    ).run(managerEmail);
+    assert.equal(Number(result.changes || 0), 1, "Synthetic manager must be seeded.");
+  } finally {
+    database.close();
+  }
+}
+
 function insertOrder(databasePath, order) {
   const database = openDatabase(databasePath);
   try {
@@ -124,6 +165,22 @@ function insertOrder(databasePath, order) {
       `INSERT INTO orders(id, user_id, payload_json, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?)`
     ).run(order.id, "onec-concurrency-user", JSON.stringify(order), now, now);
+  } finally {
+    database.close();
+  }
+}
+
+function setAppState(databasePath, key, value) {
+  const database = openDatabase(databasePath);
+  try {
+    const now = new Date().toISOString();
+    database.prepare(
+      `INSERT INTO app_state(key, value_json, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET
+         value_json = excluded.value_json,
+         updated_at = excluded.updated_at`
+    ).run(key, JSON.stringify(value), now);
   } finally {
     database.close();
   }
@@ -166,7 +223,7 @@ function startBackend({ port, databasePath, tempDirectory, label }) {
       PATH: process.env.PATH,
       NODE_ENV: "test",
       DB_PATH: databasePath,
-      JWT_SECRET: `onec-concurrency-jwt-${label}-${randomUUID()}`,
+      JWT_SECRET: testJwtSecret,
       HOST: "127.0.0.1",
       PORT: String(port),
       APP_PUBLIC_URL: `http://127.0.0.1:${port}`,
@@ -181,7 +238,8 @@ function startBackend({ port, databasePath, tempDirectory, label }) {
       ONEC_CLAIM_REQUEUE_INTERVAL_MS: "600000",
       SMTP_HOST: "",
       TELEGRAM_BOT_TOKEN: "",
-      MANAGER_EMAIL: "",
+      MANAGER_EMAIL: managerEmail,
+      MANAGER_PASSWORD: managerPassword,
       HTTP_PROXY: "",
       HTTPS_PROXY: "",
       ALL_PROXY: "",
@@ -251,6 +309,7 @@ try {
   const backendA = startBackend({ port: portA, databasePath, tempDirectory, label: "a" });
   children.push(backendA);
   await waitForServer(backendA, "backend-a");
+  approveManager(databasePath);
 
   const backendB = startBackend({ port: portB, databasePath, tempDirectory, label: "b" });
   children.push(backendB);
@@ -259,6 +318,13 @@ try {
   const baseA = `http://127.0.0.1:${portA}`;
   const baseB = `http://127.0.0.1:${portB}`;
   seedUser(databasePath);
+  const managerLogin = await managerJson(baseA, "", "POST", "/api/auth/login", {
+    email: managerEmail,
+    password: managerPassword,
+  });
+  assert.equal(managerLogin.status, 200, managerLogin.text);
+  const managerToken = managerLogin.json?.token || managerLogin.json?.accessToken;
+  assert.ok(managerToken, "Manager login must return a bearer token.");
 
   // Scenario 1: concurrent claim.
   const claimId = "onec-concurrency-claim";
@@ -388,6 +454,160 @@ try {
     1
   );
   console.log("PASS duplicate-receipt-race: one 200, one DOCUMENT_NUMBER_IN_USE");
+
+  // Scenario 4: ACK racing manager reset must serialize under BEGIN IMMEDIATE.
+  for (let index = 0; index < 12; index += 1) {
+    const orderId = `onec-concurrency-ack-reset-${index}`;
+    const orderNumber = `CL-CONCURRENCY-ACK-RESET-${index}`;
+    insertOrder(
+      databasePath,
+      baseOrder(orderId, orderNumber, {
+        status: "sending",
+        database: "TEST",
+        attempts: 1,
+        channel: "onec-pull",
+        lastAttemptAt: new Date().toISOString(),
+      })
+    );
+    const [ackResult, resetResult] = await Promise.all([
+      httpJson(baseA, "POST", `/api/one-c/orders/${orderId}/ack`, {
+        orderNumber,
+        documentNumber: `DOC-CONCURRENCY-ACK-RESET-${index}`,
+      }),
+      managerJson(
+        baseB,
+        managerToken,
+        "POST",
+        `/api/admin/exchange/orders/${orderId}/reset`
+      ),
+    ]);
+    assert.deepEqual(
+      [ackResult.status, resetResult.status].sort((left, right) => left - right),
+      [200, 409],
+      `ACK/reset must have one winner: ${JSON.stringify({ ackResult, resetResult })}`
+    );
+    const finalOrder = readOrder(databasePath, orderId);
+    if (ackResult.status === 200) {
+      assert.equal(resetResult.json?.code, "ONEC_SENT_LOCKED");
+      assert.equal(finalOrder?.exchange?.status, "sent");
+      assert.equal(
+        finalOrder?.exchange?.receipt,
+        `DOC-CONCURRENCY-ACK-RESET-${index}`
+      );
+    } else {
+      assert.equal(ackResult.json?.code, "ACK_STATUS_INVALID");
+      assert.equal(finalOrder?.exchange?.status, "not_sent");
+    }
+  }
+  console.log("PASS ack-vs-reset: one winner per race, successful ACK remains sent");
+
+  // Scenario 5: sent and active draft states fail closed before validation/call.
+  const sentDraftId = "onec-concurrency-draft-sent";
+  insertOrder(
+    databasePath,
+    baseOrder(sentDraftId, "CL-CONCURRENCY-DRAFT-SENT", {
+      status: "sent",
+      database: "TEST",
+      attempts: 1,
+      receipt: "DOC-CONCURRENCY-DRAFT-SENT",
+    })
+  );
+  const sentDraftResult = await managerJson(
+    baseA,
+    managerToken,
+    "POST",
+    `/api/admin/one-c/orders/${sentDraftId}/draft`
+  );
+  assert.equal(sentDraftResult.status, 409, sentDraftResult.text);
+  assert.equal(sentDraftResult.json?.code, "ONEC_SENT_LOCKED");
+
+  const activeDraftId = "onec-concurrency-draft-active";
+  insertOrder(
+    databasePath,
+    baseOrder(activeDraftId, "CL-CONCURRENCY-DRAFT-ACTIVE", {
+      status: "sending",
+      database: "TEST",
+      attempts: 1,
+      channel: "onec-draft",
+      draftAttemptId: randomUUID(),
+      draftAttemptAt: new Date().toISOString(),
+      lastAttemptAt: new Date().toISOString(),
+    })
+  );
+  const [duplicateDraftResult, activeDraftResetResult] = await Promise.all([
+    managerJson(
+      baseA,
+      managerToken,
+      "POST",
+      `/api/admin/one-c/orders/${activeDraftId}/draft`
+    ),
+    managerJson(
+      baseB,
+      managerToken,
+      "POST",
+      `/api/admin/exchange/orders/${activeDraftId}/reset`
+    ),
+  ]);
+  assert.equal(duplicateDraftResult.status, 409, duplicateDraftResult.text);
+  assert.equal(duplicateDraftResult.json?.code, "ONEC_DRAFT_IN_PROGRESS");
+  assert.equal(activeDraftResetResult.status, 409, activeDraftResetResult.text);
+  assert.equal(activeDraftResetResult.json?.code, "ONEC_DRAFT_IN_PROGRESS");
+  assert.equal(readOrder(databasePath, activeDraftId)?.exchange?.status, "sending");
+  console.log("PASS draft-locks: sent and active draft attempts fail closed");
+
+  // Scenario 6: the normal simulation draft path still succeeds once.
+  const draftProduct = {
+    id: 1,
+    code: "CL-CONCURRENCY-1",
+    name: "Synthetic draft product",
+    oneCId: "onec-concurrency-product-1",
+    oneCCode: "ONEC-CONCURRENCY-1",
+    oneCName: "Synthetic 1C draft product",
+  };
+  setAppState(databasePath, "products", [draftProduct]);
+  const normalDraftId = "onec-concurrency-draft-normal";
+  insertOrder(databasePath, {
+    ...baseOrder(normalDraftId, "CL-CONCURRENCY-DRAFT-NORMAL", {
+      status: "not_sent",
+      attempts: 0,
+    }),
+    address: "Synthetic TEST address",
+    firstDeliveryDate: "2026-09-28",
+    items: [
+      {
+        productId: draftProduct.id,
+        name: draftProduct.name,
+        unit: "piece",
+        quantity: 1,
+        multiplier: 1,
+        unitPrice: 100,
+        lineTotal: 100,
+      },
+    ],
+    total: 100,
+  });
+  const normalDraftResult = await managerJson(
+    baseA,
+    managerToken,
+    "POST",
+    `/api/admin/one-c/orders/${normalDraftId}/draft`
+  );
+  assert.equal(normalDraftResult.status, 200, normalDraftResult.text);
+  assert.equal(normalDraftResult.json?.result?.mode, "simulation");
+  const normalDraftOrder = readOrder(databasePath, normalDraftId);
+  assert.equal(normalDraftOrder?.exchange?.status, "draft");
+  assert.equal(normalDraftOrder?.exchange?.attempts, 1);
+  assert.ok(String(normalDraftOrder?.exchange?.receipt || "").startsWith("SIM-"));
+  const repeatedDraftResult = await managerJson(
+    baseB,
+    managerToken,
+    "POST",
+    `/api/admin/one-c/orders/${normalDraftId}/draft`
+  );
+  assert.equal(repeatedDraftResult.status, 409, repeatedDraftResult.text);
+  assert.equal(repeatedDraftResult.json?.code, "ONEC_DRAFT_LOCKED");
+  assert.equal(readOrder(databasePath, normalDraftId)?.exchange?.attempts, 1);
+  console.log("PASS normal-draft: one simulation draft, repeat locked");
   console.log("verify-onec-multiprocess-concurrency: PASS");
 } finally {
   await Promise.allSettled(children.map((child) => stopChild(child)));
