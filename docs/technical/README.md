@@ -6,6 +6,7 @@
 |----------|------------|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Стек, роли, модули, порты |
 | [INTEGRATION_1C.md](./INTEGRATION_1C.md) | Обмен Clover ↔ 1С УНФ TEST |
+| [ONEC_IDEMPOTENCY_HARDENING.md](./ONEC_IDEMPOTENCY_HARDENING.md) | Точный Clover ID, проверка перед ACK, установка и rollback |
 | [PROD_CONTOUR.md](./PROD_CONTOUR.md) | Подготовка prod-контура (рабочая 1С / VLAVKA) |
 | [MANAGER_WORKING_1C.md](./MANAGER_WORKING_1C.md) | Менеджеру: селект «Рабочая 1С» для живых заказов |
 | [ACCEPTANCE_ORDERS_VLAVKA.md](./ACCEPTANCE_ORDERS_VLAVKA.md) | Протокол 2–3 приёмочных заказов в рабочую 1С |
