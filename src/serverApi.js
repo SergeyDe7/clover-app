@@ -879,6 +879,12 @@ export const api = {
     });
   },
 
+  unlinkOneCClient(clientId) {
+    return request(`/admin/one-c/clients/${encodeURIComponent(clientId)}/link`, {
+      method: "DELETE",
+    });
+  },
+
   autoLinkOneCClients() {
     return request("/admin/one-c/clients/auto-link", {
       method: "POST",

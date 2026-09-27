@@ -10,6 +10,20 @@ const exchangePath = path.resolve(scriptDir, "../src/exchange.js");
 const source = readFrontendUiSource(projectRoot);
 const exchangeSource = await readFile(exchangePath, "utf8");
 
+assert.ok(
+  source.includes("api.unlinkOneCClient(client.id)"),
+  "Отвязка основного контрагента клиента должна сохраняться через API."
+);
+assert.ok(
+  source.includes("unlinkOneCClient(clientId)"),
+  "Frontend API должен поддерживать отвязку контрагента клиента."
+);
+assert.match(
+  source,
+  /\{error && <div className="sync-error">\{error\}<\/div>\}\s*\{open && \(/u,
+  "Ошибка отвязки должна быть видна и при закрытом списке контрагентов."
+);
+
 function enclosingBlockHeader(blockSource, index) {
   let depth = 0;
   for (let cursor = index - 1; cursor >= 0; cursor -= 1) {

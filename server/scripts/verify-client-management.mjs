@@ -35,6 +35,9 @@ const client = createUser({
 });
 
 setClientStateField(client.id, "favorites", [1, 2, 3]);
+setClientStateField(client.id, "addresses", [
+  { id: "old-address", label: "Старый адрес", address: "Старый адрес" },
+]);
 replaceOrders({
   userId: client.id,
   managerMode: false,
@@ -45,6 +48,8 @@ replaceOrders({
       clientId: client.id,
       customerName: "Старое название",
       customerEmail: "old-client@example.local",
+      addressId: "old-address",
+      address: "Старый адрес",
       items: [],
       createdAt: "2026-07-24T00:00:00.000Z",
     },

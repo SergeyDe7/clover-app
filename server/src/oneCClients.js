@@ -271,7 +271,16 @@ export function autoLinkCloverClients(clients, clientLinks, oneCClients, now = n
     pushIndex(indexes.name, normalizeName(item.name), item);
   }
 
-  const usedIds = new Set(Object.values(links).map((link) => cleanText(link?.oneCId)).filter(Boolean));
+  const usedIds = new Set(
+    [
+      ...Object.values(links).map((link) => cleanText(link?.oneCId)),
+      ...sourceClients.flatMap((client) =>
+        (Array.isArray(client?.addresses) ? client.addresses : []).map(
+          (address) => cleanText(address?.oneCId)
+        )
+      ),
+    ].filter(Boolean)
+  );
   const nextLinks = { ...links };
   const report = {
     cloverTotal: sourceClients.length,
@@ -307,6 +316,11 @@ export function autoLinkCloverClients(clients, clientLinks, oneCClients, now = n
         if (JSON.stringify(enriched) !== JSON.stringify(current)) changed = true;
         nextLinks[client.id] = enriched;
       }
+      continue;
+    }
+
+    if (current.oneCLinkMode === "manual-cleared") {
+      report.unmatched += 1;
       continue;
     }
 
@@ -433,6 +447,27 @@ const ONE_C_CLIENT_LINK_FIELDS = [
   "oneCLinkMode",
   "oneCLinkedAt",
 ];
+
+export function unlinkCloverClient(clientLinks, clientId) {
+  const links = clientLinks && typeof clientLinks === "object" ? clientLinks : {};
+  const normalizedClientId = cleanText(clientId);
+  if (!normalizedClientId) throw new Error("Не удалось определить клиента Clover.");
+
+  const previous =
+    links[normalizedClientId] && typeof links[normalizedClientId] === "object"
+      ? links[normalizedClientId]
+      : {};
+  const clearedLink = { ...previous };
+  for (const field of ONE_C_CLIENT_LINK_FIELDS) {
+    clearedLink[field] = field === "matched1C" ? false : "";
+  }
+  clearedLink.oneCLinkMode = "manual-cleared";
+
+  return {
+    ...links,
+    [normalizedClientId]: clearedLink,
+  };
+}
 
 function comparablePricingMode(value) {
   const mode = cleanText(value);

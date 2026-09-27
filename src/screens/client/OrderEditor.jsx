@@ -207,6 +207,7 @@ export function OrderEditor({
     return validateDeliveryDate(initial).ok ? initial : "";
   });
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [addressPickerOpen, setAddressPickerOpen] = useState(false);
   const [cartSheetOpen, setCartSheetOpen] = useState(false);
   const [addressId, setAddressId] = useState(() =>
     resolveCheckoutAddressId(addresses, initialSource.addressId || "")
@@ -215,6 +216,8 @@ export function OrderEditor({
   const [missingFields, setMissingFields] = useState({ date: false, address: false });
   const cartDateFieldRef = useRef(null);
   const cartAddressFieldRef = useRef(null);
+  const addressPickerTriggerRef = useRef(null);
+  const addressPickerPanelRef = useRef(null);
   const catalogLayoutRef = useRef(null);
   const catalogHostRef = useRef(null);
   const catalogToolbarRef = useRef(null);
@@ -446,16 +449,20 @@ export function OrderEditor({
 
   // Один адрес в списке — всегда подставляем автоматически.
   useEffect(() => {
-    if (addresses.length !== 1) return;
+    if (addresses.length !== 1) {
+      if (addresses.length < 2) setAddressPickerOpen(false);
+      return;
+    }
     const soleId = addresses[0].id;
     if (addressId !== soleId) {
       setAddressId(soleId);
       setMissingFields((current) => ({ ...current, address: false }));
     }
+    setAddressPickerOpen(false);
   }, [addresses, addressId]);
 
   useLayoutEffect(() => {
-    if (!cartSheetOpen && !datePickerOpen) return undefined;
+    if (!cartSheetOpen && !datePickerOpen && !addressPickerOpen) return undefined;
     const html = document.documentElement;
     const body = document.body;
     const scrollY = window.scrollY;
@@ -476,7 +483,7 @@ export function OrderEditor({
     const scrollRoot = (event) =>
       event.target instanceof Element
         ? event.target.closest(
-            ".cart-sheet-scroll, .delivery-date-sheet-panel, [data-manager-contact-scroll], .manager-contact-popover"
+            ".cart-sheet-scroll, .address-picker-list, .delivery-date-sheet-panel, [data-manager-contact-scroll], .manager-contact-popover"
           )
         : null;
     const onTouchStart = (event) => {
@@ -529,7 +536,7 @@ export function OrderEditor({
       document.removeEventListener("touchstart", onTouchStart);
       document.removeEventListener("touchmove", onTouchMove);
     };
-  }, [cartSheetOpen, datePickerOpen]);
+  }, [cartSheetOpen, datePickerOpen, addressPickerOpen]);
 
   const updateDeliveryDate = async (value) => {
     if (!value) {
@@ -566,6 +573,40 @@ export function OrderEditor({
   const closeDatePickerToCart = () => {
     setDatePickerOpen(false);
     setCartSheetOpen(true);
+  };
+
+  const closeAddressPickerToCart = () => {
+    setAddressPickerOpen(false);
+    setCartSheetOpen(true);
+    window.setTimeout(() => addressPickerTriggerRef.current?.focus(), 0);
+  };
+
+  const selectCheckoutAddress = (value) => {
+    updateAddressId(value);
+    closeAddressPickerToCart();
+  };
+
+  const handleAddressPickerKeyDown = (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeAddressPickerToCart();
+      return;
+    }
+    if (event.key !== "Tab") return;
+
+    const focusable = Array.from(
+      addressPickerPanelRef.current?.querySelectorAll("button:not([disabled])") || []
+    );
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   };
 
   const updateAddressId = (value) => {
@@ -1275,11 +1316,13 @@ export function OrderEditor({
     }
     if (!checkoutAddress) {
       focusMissingFields(false, true);
+      if (addresses.length > 1) {
+        setAddressPickerOpen(true);
+        return;
+      }
       await appAlert({
         title: t("checkout.needAddress"),
-        message: addresses.length > 1
-          ? t("client.youHaveSeveralAddressesChooseWhere")
-          : t("client.chooseAnAddressFromTheList"),
+        message: t("client.chooseAnAddressFromTheList"),
         tone: "warn",
       });
       return;
@@ -2384,28 +2427,38 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                 )}
               </div>
 
-              <label
+              <div
                 className={`field cart-sheet-address${missingFields.address ? " is-invalid" : ""}`}
                 ref={cartAddressFieldRef}
-              >{
-                t("client.address.title")
-                }<select
-                  value={addressId}
-                  onChange={(e) => updateAddressId(e.target.value)}
+              >
+                <span>{t("client.address.title")}</span>
+                <button
+                  ref={addressPickerTriggerRef}
+                  className={`address-picker-trigger${selectedAddress ? " is-selected" : ""}${missingFields.address ? " is-invalid" : ""}`}
+                  type="button"
+                  onClick={() => setAddressPickerOpen(true)}
+                  disabled={addresses.length < 2}
+                  aria-haspopup="dialog"
                   aria-invalid={missingFields.address}
                 >
-                  <option value="">{t("client.chooseAnAddress")}</option>
-                  {addresses.map((item) => (
-                    <option value={item.id} key={item.id}>
-                      {addressLabel(item.label, t) || item.label}
-                      {item.isDefault ? t("client.primary") : ""} · {item.address}
-                    </option>
-                  ))}
-                </select>
+                  <span className="address-picker-trigger-text">
+                    <strong>
+                      {selectedAddress
+                        ? addressLabel(selectedAddress.label, t) || selectedAddress.label
+                        : t("client.chooseAnAddress")}
+                    </strong>
+                    <small>
+                      {selectedAddress?.address || t("client.youHaveSeveralAddressesChooseWhere")}
+                    </small>
+                  </span>
+                  <span className="delivery-date-action">
+                    {selectedAddress ? t("shared.action.edit") : t("client.chooseAnAddress")}
+                  </span>
+                </button>
                 {missingFields.address && (
                   <span className="field-error-hint">{t("checkout.needAddress")}</span>
                 )}
-              </label>
+              </div>
 
               <label className="field cart-sheet-comment" style={{ marginTop: 10 }}>{
                 t("client.orderComment")
@@ -2481,6 +2534,58 @@ main.clover-app > .client-order-catalog-toolbar .category-list .category-button.
                 earliestIso={earliestDeliveryDate}
                 onPick={handleCalendarPick}
               />
+            </div>
+          </div>,
+          document.documentElement
+        )
+        : null}
+
+        {addressPickerOpen && addresses.length > 1 && typeof document !== "undefined"
+          ? createPortal(
+          <div
+            className="delivery-date-sheet address-picker-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="checkout-address-picker-title"
+            onKeyDown={handleAddressPickerKeyDown}
+          >
+            <button
+              className="delivery-date-sheet-backdrop"
+              type="button"
+              aria-label={t("shared.action.close")}
+              onClick={closeAddressPickerToCart}
+            />
+            <div
+              ref={addressPickerPanelRef}
+              className="delivery-date-sheet-panel address-picker-sheet-panel"
+            >
+              <div className="delivery-date-sheet-head">
+                <strong id="checkout-address-picker-title">{t("client.chooseAnAddress")}</strong>
+                <button className="header-button" type="button" onClick={closeAddressPickerToCart}>
+                  {t("shared.action.close")}
+                </button>
+              </div>
+              <p className="address-picker-hint">
+                {t("client.youHaveSeveralAddressesChooseWhere")}
+              </p>
+              <div className="address-picker-list" role="group" aria-labelledby="checkout-address-picker-title">
+                {addresses.map((item, index) => (
+                  <button
+                    className={`address-picker-option${item.id === addressId ? " is-selected" : ""}`}
+                    type="button"
+                    key={item.id}
+                    onClick={() => selectCheckoutAddress(item.id)}
+                    aria-pressed={item.id === addressId}
+                    autoFocus={item.id === (addressId || addresses[0]?.id) || (!addressId && index === 0)}
+                  >
+                    <span className="address-picker-option-title">
+                      <strong>{addressLabel(item.label, t) || item.label}</strong>
+                      {item.isDefault ? <small>{t("client.primary")}</small> : null}
+                    </span>
+                    <span>{item.address}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>,
           document.documentElement

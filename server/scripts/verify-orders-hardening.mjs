@@ -101,6 +101,10 @@ assert.ok(
   migrateClientSlice.includes("previousClientOrders.length === 0"),
   "migrate/client не должен затирать уже существующие серверные заказы."
 );
+assert.ok(
+  migrateClientSlice.includes("preserveClientAddressDeliveryZones"),
+  "migrate/client не должен принимать manager-owned delivery/1C поля адреса из localStorage."
+);
 
 const products = [
   { id: "1", name: "В матрице", active: true },
