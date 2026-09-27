@@ -7,6 +7,7 @@ import {
   bindClientOrderCounterparties,
   bindStaffOrderCounterparties,
   build1CPayload,
+  clientLinkFor1C,
   pinOrderCounterpartyFallback,
   validateOrderFor1C,
 } from "../src/exchange.js";
@@ -89,6 +90,55 @@ assert.equal(payload1.client.oneCId, "counterparty-onec-1");
 assert.equal(payload2.client.oneCId, "counterparty-onec-2");
 assert.equal(payload1.client.oneCName, "ООО Ресторан Центр");
 assert.equal(payload2.client.oneCName, "ООО Ресторан Юг");
+
+const claimLink1 = clientLinkFor1C(bound[0], {
+  "client-1": {
+    matched1C: true,
+    oneCId: "wrong-global-counterparty",
+    oneCCode: "WRONG",
+    oneCName: "Неверный общий контрагент",
+  },
+});
+const claimLink2 = clientLinkFor1C(bound[1], {
+  "client-1": {
+    matched1C: true,
+    oneCId: "wrong-global-counterparty",
+    oneCCode: "WRONG",
+    oneCName: "Неверный общий контрагент",
+  },
+});
+assert.equal(claimLink1.oneCId, "counterparty-onec-1");
+assert.equal(claimLink1.oneCCode, "К-1");
+assert.equal(claimLink2.oneCId, "counterparty-onec-2");
+assert.equal(claimLink2.oneCCode, "К-2");
+
+const legacyClaimLink = clientLinkFor1C(order("legacy-order", addresses[0]), {
+  "client-1": {
+    matched1C: true,
+    oneCId: "legacy-counterparty",
+    oneCCode: "LEGACY",
+    oneCName: "Старый общий контрагент",
+  },
+});
+assert.equal(legacyClaimLink.oneCId, "legacy-counterparty");
+
+const unmappedAddressClaimLink = clientLinkFor1C(
+  {
+    ...order("unmapped-address-order", addresses[0]),
+    oneCCounterparty: {
+      source: "address",
+      addressId: addresses[0].id,
+      oneCId: "",
+    },
+  },
+  {
+    "client-1": {
+      matched1C: true,
+      oneCId: "must-not-fallback",
+    },
+  }
+);
+assert.equal(unmappedAddressClaimLink.oneCId, "");
 
 const changedAddresses = addresses.map((item) =>
   item.id === "address-1"
@@ -556,6 +606,10 @@ assert.match(serverSource, /oneCId:\s*z\.string\(\).*ONEC_ADDRESS_COUNTERPARTY_U
 assert.match(serverSource, /bindClientOrderCounterparties\(\{/u);
 assert.match(serverSource, /bindStaffOrderCounterparties\(\{/u);
 assert.match(serverSource, /oneCCounterparty:\s*_oneCCounterparty/u);
+assert.match(
+  serverSource,
+  /clientLinkFor1C\s*\(\s*orderForClaim,\s*clientLinks,\s*storefrontCounterpart\s*\)/u
+);
 assert.match(serverSource, /sanitizeAddressesForClient\(state\.addresses\)/u);
 assert.match(serverSource, /assertGlobalCounterpartyNotOwnedByOtherAddress/u);
 assert.match(serverSource, /item\.oneCId === undefined \? previous\.oneCId/u);
