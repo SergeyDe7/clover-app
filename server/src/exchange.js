@@ -451,7 +451,7 @@ export function bindStaffOrderCounterparties({
   });
 }
 
-function clientLinkFor1C(order, clientLinks, storefrontCounterpart = null) {
+export function clientLinkFor1C(order, clientLinks, storefrontCounterpart = null) {
   if (Object.hasOwn(order || {}, "oneCCounterparty")) {
     const snapshot = normalizeOrderCounterparty(order.oneCCounterparty);
     return {
