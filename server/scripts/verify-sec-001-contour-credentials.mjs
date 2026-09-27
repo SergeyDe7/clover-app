@@ -183,6 +183,27 @@ function orderFingerprint(order) {
   });
 }
 
+function readOneCAckAuditActions(dbPath, orderId) {
+  const db = new DatabaseSync(dbPath);
+  try {
+    return db
+      .prepare(
+        `SELECT action, details_json
+         FROM audit_log
+         WHERE action LIKE 'one-c.order.ack%'
+         ORDER BY created_at ASC`
+      )
+      .all()
+      .map((row) => ({
+        action: row.action,
+        details: JSON.parse(row.details_json || "{}"),
+      }))
+      .filter((row) => row.details?.orderId === orderId);
+  } finally {
+    db.close();
+  }
+}
+
 // --- Unit / config matrix ---
 {
   const envOk = {
@@ -560,6 +581,28 @@ try {
   );
 
   const beforeL = orderFingerprint(readOrder(dbPath, testOrderId));
+  const missingOrderNumber = await httpJson(
+    baseUrl,
+    "POST",
+    `/api/one-c/orders/${testOrderId}/ack`,
+    {
+      headers: {
+        "X-Clover-Key": TEST_KEY,
+        "X-Clover-Database": "TEST",
+      },
+      body: {
+        documentNumber: "DOC-MISSING-ORDER-NUMBER",
+      },
+    }
+  );
+  mark(
+    "Z",
+    missingOrderNumber.status === 422 &&
+      missingOrderNumber.json?.code === "ORDER_NUMBER_REQUIRED" &&
+      orderFingerprint(readOrder(dbPath, testOrderId)) === beforeL,
+    `${missingOrderNumber.status} ${missingOrderNumber.text}`
+  );
+
   const l = await httpJson(baseUrl, "POST", `/api/one-c/orders/${testOrderId}/ack`, {
     headers: {
       "X-Clover-Key": TEST_KEY,
@@ -573,7 +616,9 @@ try {
   const afterL = orderFingerprint(readOrder(dbPath, testOrderId));
   mark(
     "L",
-    l.status === 409 && beforeL === afterL,
+    l.status === 409 &&
+      l.json?.code === "ORDER_NUMBER_MISMATCH" &&
+      beforeL === afterL,
     `status=${l.status} ${l.text}`
   );
 
@@ -609,6 +654,78 @@ try {
     m.status === 200 && m.json?.duplicateAck === true && orderFingerprint(readOrder(dbPath, testOrderId)) === sentFp,
     `${m.status} ${m.text}`
   );
+  const ackAudit = readOneCAckAuditActions(dbPath, testOrderId);
+  mark(
+    "ZA",
+    ackAudit.some((entry) => entry.action === "one-c.order.ack") &&
+      ackAudit.some((entry) => entry.action === "one-c.order.ack.duplicate") &&
+      ackAudit.some(
+        (entry) =>
+          entry.action === "one-c.order.ack.rejected" &&
+          entry.details?.code === "ORDER_NUMBER_REQUIRED"
+      ),
+    JSON.stringify(ackAudit)
+  );
+
+  const sameReceiptOtherContour = await httpJson(
+    baseUrl,
+    "POST",
+    `/api/one-c/orders/${vlavkaOrderId}/ack`,
+    {
+      headers: {
+        "X-Clover-Key": VLAVKA_KEY,
+        "X-Clover-Database": "VLAVKA",
+      },
+      body: {
+        orderNumber: "CL-SEC001-VLAVKA",
+        documentNumber: "DOC-SEC001-1",
+      },
+    }
+  );
+  mark(
+    "ZB",
+    sameReceiptOtherContour.status === 200 &&
+      readOrder(dbPath, vlavkaOrderId)?.exchange?.status === "sent",
+    `${sameReceiptOtherContour.status} ${sameReceiptOtherContour.text}`
+  );
+
+  const receiptConflictId = "sec001-order-receipt-conflict";
+  insertOrder(dbPath, {
+    id: receiptConflictId,
+    number: "CL-SEC001-CONFLICT",
+    userId: "user-sec001",
+    status: "Новый",
+    items: [],
+    exchange: {
+      status: "sending",
+      database: "TEST",
+      attempts: 1,
+      channel: "onec-pull",
+      lastAttemptAt: claimedAt,
+    },
+  });
+  const sameReceiptSameContour = await httpJson(
+    baseUrl,
+    "POST",
+    `/api/one-c/orders/${receiptConflictId}/ack`,
+    {
+      headers: {
+        "X-Clover-Key": TEST_KEY,
+        "X-Clover-Database": "TEST",
+      },
+      body: {
+        orderNumber: "CL-SEC001-CONFLICT",
+        documentNumber: "DOC-SEC001-1",
+      },
+    }
+  );
+  mark(
+    "ZC",
+    sameReceiptSameContour.status === 409 &&
+      sameReceiptSameContour.json?.code === "DOCUMENT_NUMBER_IN_USE" &&
+      readOrder(dbPath, receiptConflictId)?.exchange?.status === "sending",
+    `${sameReceiptSameContour.status} ${sameReceiptSameContour.text}`
+  );
 
   const o = await httpJson(baseUrl, "POST", `/api/one-c/orders/${testOrderId}/ack`, {
     headers: {
@@ -622,7 +739,9 @@ try {
   });
   mark(
     "O",
-    o.status === 409 && orderFingerprint(readOrder(dbPath, testOrderId)) === sentFp,
+    o.status === 409 &&
+      o.json?.code === "ACK_DOCUMENT_MISMATCH" &&
+      orderFingerprint(readOrder(dbPath, testOrderId)) === sentFp,
     `${o.status} ${o.text}`
   );
 

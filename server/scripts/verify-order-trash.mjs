@@ -37,6 +37,10 @@ try {
   const sent = { ...active, exchange: { status: "sent" } };
   assert.equal(canTrashOrder(sent, "client").ok, false);
   assert.equal(canTrashOrder(sent, "manager").ok, true);
+  assert.equal(
+    canPurgeOrder({ ...sent, deletedAt: "2026-08-01T12:00:00.000Z" }, "admin").code,
+    "ONEC_RECEIPT_HISTORY"
+  );
 
   const clientOld = { ...active, status: "Отменён" };
   assert.equal(canTrashOrder(clientOld, "client").ok, false);
@@ -58,8 +62,8 @@ try {
   assert.equal(canTrashOrder(completed, "manager").ok, false);
   assert.equal(canTrashOrder(completed, "admin").ok, true);
   assert.equal(canPurgeOrder(completed, "manager").ok, false);
-  assert.equal(canPurgeOrder(completed, "admin").ok, true);
-  assert.equal(canPurgeOrder(completed, "admin").code, undefined);
+  assert.equal(canPurgeOrder(completed, "admin").ok, false);
+  assert.equal(canPurgeOrder(completed, "admin").code, "ONEC_RECEIPT_HISTORY");
 
   const delivering = {
     id: "ord-delivering",

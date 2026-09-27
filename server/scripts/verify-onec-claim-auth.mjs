@@ -50,6 +50,12 @@ assert.ok(
   serverSource.includes('status: "sending"'),
   "Claim должен писать exchange.status=sending."
 );
+const claimIdx = serverSource.indexOf("function claimOrderForOneC");
+const claimSlice = serverSource.slice(claimIdx, claimIdx + 1800);
+assert.ok(
+  claimSlice.includes("runInTransaction"),
+  "Claim должен перечитывать ready-заказ под BEGIN IMMEDIATE."
+);
 assert.ok(
   serverSource.includes("function requireOneCAllowedDatabase"),
   "Pull/ACK/каталог должны использовать allowlist баз (prod-контур)."
@@ -162,6 +168,12 @@ assert.ok(
   serverSource.includes("releaseExpiredOneCClaims"),
   "Сервер должен вызывать releaseExpiredOneCClaims."
 );
+const queueSnapshotIdx = serverSource.indexOf("function oneCQueueSnapshot");
+const queueSnapshotSlice = serverSource.slice(queueSnapshotIdx, queueSnapshotIdx + 500);
+assert.ok(
+  queueSnapshotIdx >= 0 && !queueSnapshotSlice.includes("releaseExpiredOneCClaims"),
+  "Read-only queue-status не должен менять claims во время просмотра."
+);
 
 const requeueSource = readFileSync(
   path.join(root, "server/src/onecClaimRequeue.js"),
@@ -174,6 +186,20 @@ assert.ok(
 assert.ok(
   requeueSource.includes("releaseExpiredClaimExchange"),
   "Requeue должен использовать общий helper releaseExpiredClaimExchange."
+);
+assert.ok(
+  requeueSource.includes("runInTransaction"),
+  "Requeue должен перечитывать sending-заказы под BEGIN IMMEDIATE."
+);
+
+const ackIdx = serverSource.indexOf('app.post("/api/one-c/orders/:orderId/ack"');
+const ackSlice = serverSource.slice(ackIdx, ackIdx + 9000);
+assert.ok(
+  ackSlice.includes("runInTransaction") &&
+    ackSlice.includes("ORDER_NUMBER_REQUIRED") &&
+    ackSlice.includes("one-c.order.ack.rejected") &&
+    ackSlice.includes("one-c.order.ack.duplicate"),
+  "ACK должен быть строгим, транзакционным и журналировать решения."
 );
 
 assert.ok(
@@ -206,10 +232,31 @@ assert.ok(
 
 const resetIdx = serverSource.indexOf('"/api/admin/exchange/orders/:orderId/reset"');
 assert.ok(resetIdx > 0, "reset endpoint должен существовать.");
-const resetSlice = serverSource.slice(resetIdx, resetIdx + 1200);
+const resetSlice = serverSource.slice(resetIdx, resetIdx + 3500);
 assert.ok(
   resetSlice.includes("ONEC_SENT_LOCKED") || resetSlice.includes('status === "sent"'),
   "Reset endpoint обязан блокировать уже принятый в 1С заказ."
+);
+assert.ok(
+  resetSlice.includes("const outcome = runInTransaction") &&
+    resetSlice.indexOf("getOrderById") > resetSlice.indexOf("runInTransaction") &&
+    resetSlice.indexOf("const order = updateOrderPayload") > resetSlice.indexOf("getOrderById"),
+  "Reset обязан перечитать и изменить заказ внутри одного BEGIN IMMEDIATE."
+);
+
+const draftIdx = serverSource.indexOf('"/api/admin/one-c/orders/:orderId/draft"');
+assert.ok(draftIdx > 0, "draft endpoint должен существовать.");
+const draftSlice = serverSource.slice(draftIdx, draftIdx + 9500);
+assert.ok(
+  draftSlice.includes("draftAttemptId") &&
+    draftSlice.includes("ONEC_DRAFT_IN_PROGRESS") &&
+    draftSlice.includes("ONEC_DRAFT_STATE_CHANGED"),
+  "Draft обязан резервировать одну попытку и отклонять устаревшее завершение."
+);
+assert.ok(
+  draftSlice.indexOf("runInTransaction") < draftSlice.indexOf("createOneCDraft") &&
+    draftSlice.lastIndexOf("runInTransaction") > draftSlice.indexOf("createOneCDraft"),
+  "Draft обязан резервировать и завершать попытку транзакционно вокруг внешнего вызова 1С."
 );
 
 const { readFrontendUiSource } = await import("./readFrontendUiSource.mjs");

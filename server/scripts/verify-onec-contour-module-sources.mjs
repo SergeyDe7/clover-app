@@ -77,7 +77,7 @@ function resolveToken(token, contourFn) {
  * @param {string} rel
  * @param {"VLAVKA" | "TEST"} kind
  */
-function assertModuleConsistent(rel, kind) {
+function assertModuleConsistent(rel, kind, { requireHardening = true } = {}) {
   const abs = path.join(repoRoot, rel);
   const text = readFileSync(abs, "utf8");
   const { headers, bodies, contourFn } = extractContours(text);
@@ -125,6 +125,76 @@ function assertModuleConsistent(rel, kind) {
     );
   }
 
+  if (requireHardening) {
+    assert.ok(
+      text.includes("[CLOVER-ID:"),
+      `${rel}: exact immutable Clover ID marker is required`
+    );
+    assert.ok(
+      text.includes("НайтиЗаказПоCloverID") &&
+        text.includes("ПроверитьЗаписанныйЗаказClover"),
+      `${rel}: exact lookup and persisted-document verification are required`
+    );
+    assert.equal(
+      text.includes("ВЫБРАТЬ ПЕРВЫЕ 1000"),
+      false,
+      `${rel}: identity lookup must not be limited to the newest 1000 documents`
+    );
+    assert.equal(
+      text.includes("НайтиРанееСозданныйЗаказ"),
+      false,
+      `${rel}: legacy short-number lookup must be removed`
+    );
+    assert.ok(
+      text.includes(".Ссылка.ПолучитьОбъект()") ||
+        text.includes("СсылкаДокумента.ПолучитьОбъект()"),
+      `${rel}: document must be re-read from 1C before ACK`
+    );
+    const lockIdx = text.indexOf("БлокировкаClover.Заблокировать()");
+    const lockedLookupIdx = text.indexOf(
+      "Заказ = НайтиЗаказПоCloverID(CloverID)",
+      lockIdx
+    );
+    const writeIdx = text.indexOf("Заказ.Записать()", lockedLookupIdx);
+    const commitIdx = text.indexOf("ЗафиксироватьТранзакцию()", writeIdx);
+    assert.ok(
+      lockIdx >= 0 &&
+        lockedLookupIdx > lockIdx &&
+        writeIdx > lockedLookupIdx &&
+        commitIdx > writeIdx,
+      `${rel}: lookup and creation must be serialized by a 1C data lock`
+    );
+    assert.ok(
+      text.includes(
+        'Заказы.Комментарий ПОДОБНО &ШаблонМаркера СПЕЦСИМВОЛ ""~""'
+      ) &&
+        text.includes("ЭкранироватьШаблонПодобноClover") &&
+        text.includes('СтрЗаменить(Результат, "_", "~_")') &&
+        text.includes("ИзвлечьТочныйCloverIDИзКомментария"),
+      `${rel}: lookup must prefilter on the server and then compare exact Clover ID`
+    );
+    assert.ok(
+      text.includes(
+        "НачатьТранзакцию(РежимУправленияБлокировкойДанных.Управляемый)"
+      ),
+      `${rel}: explicit managed-lock transaction mode is required`
+    );
+    const lookupStart = text.indexOf("Функция НайтиЗаказПоCloverID");
+    const lookupEnd = text.indexOf("КонецФункции", lookupStart);
+    const lookupSlice = text.slice(lookupStart, lookupEnd);
+    assert.ok(
+      lookupSlice.includes("Заказы.ПометкаУдаления КАК ПометкаУдаления") &&
+        lookupSlice.includes("CLOVER_ID_MARKED_FOR_DELETION") &&
+        !lookupSlice.includes("НЕ Заказы.ПометкаУдаления"),
+      `${rel}: a marked-for-deletion Clover document must block create and ACK`
+    );
+    assert.ok(
+      text.includes("ДанныеПринятия.Вставить(\"orderId\"") &&
+        !text.includes("ДанныеПринятия.Вставить(\"orderNumber\""),
+      `${rel}: accepted-status callback must use immutable orderId`
+    );
+  }
+
   return { rel, kind, headerContour, bodyCount: bodies.length, contourFn };
 }
 
@@ -167,14 +237,33 @@ function assertRegressionDetectorWorks() {
 
 const reports = [];
 for (const mod of MODULES) {
-  reports.push(assertModuleConsistent(mod.file, mod.kind));
+  reports.push(
+    assertModuleConsistent(mod.file, mod.kind, {
+      // This stage is TEST-only. VLAVKA remains byte-for-byte unchanged and
+      // is checked only for its existing contour isolation.
+      requireHardening: mod.kind === "TEST",
+    })
+  );
 }
 assertRegressionDetectorWorks();
+
+for (const rel of [
+  "one_c_extension_source/CONTRACT.json",
+  "one_c_extension_ready/CONTRACT.json",
+]) {
+  const contract = JSON.parse(readFileSync(path.join(repoRoot, rel), "utf8"));
+  assert.equal(
+    contract.cloverInbound.orderAccepted.body.orderId,
+    "exact immutable Clover order ID used by the 1C module",
+    `${rel}: orderAccepted must expose one unambiguous immutable orderId`
+  );
+}
 
 // Header-only VLAVKA snippet must stay VLAVKA (no TEST body).
 assertModuleConsistent(
   "one_c_patches/vlavka/ЗАГОЛОВКИ_VLAVKA.txt",
-  "VLAVKA"
+  "VLAVKA",
+  { requireHardening: false }
 );
 
 console.log("verify-onec-contour-module-sources: ok");

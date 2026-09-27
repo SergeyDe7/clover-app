@@ -1,4 +1,9 @@
-import { listOrders, updateOrderPayload, writeAudit } from "./db.js";
+import {
+  listOrders,
+  runInTransaction,
+  updateOrderPayload,
+  writeAudit,
+} from "./db.js";
 import { releaseExpiredClaimExchange } from "./exchange.js";
 import { logCaughtError } from "./safeLog.js";
 
@@ -7,28 +12,32 @@ import { logCaughtError } from "./safeLog.js";
  * Используется на pull и фоновым timer.
  */
 export function releaseExpiredOneCClaims(nowMs = Date.now()) {
-  let released = 0;
-  for (const order of listOrders()) {
-    const nextExchange = releaseExpiredClaimExchange(order.exchange, nowMs);
-    if (!nextExchange) continue;
+  return runInTransaction(() => {
+    // Read only after BEGIN IMMEDIATE. This prevents a stale requeue snapshot
+    // from overwriting an ACK committed by another server process.
+    let released = 0;
+    for (const order of listOrders()) {
+      const nextExchange = releaseExpiredClaimExchange(order.exchange, nowMs);
+      if (!nextExchange) continue;
 
-    updateOrderPayload(order.id, {
-      ...order,
-      exchange: nextExchange,
-      updatedAt: new Date(nowMs).toISOString(),
-    });
-    writeAudit({
-      action: "one-c.claim.expired-requeue",
-      details: {
-        orderId: order.id,
-        number: order.number || "",
-        previousStatus: "sending",
-        nextStatus: "ready",
-      },
-    });
-    released += 1;
-  }
-  return released;
+      updateOrderPayload(order.id, {
+        ...order,
+        exchange: nextExchange,
+        updatedAt: new Date(nowMs).toISOString(),
+      });
+      writeAudit({
+        action: "one-c.claim.expired-requeue",
+        details: {
+          orderId: order.id,
+          number: order.number || "",
+          previousStatus: "sending",
+          nextStatus: "ready",
+        },
+      });
+      released += 1;
+    }
+    return released;
+  });
 }
 
 export function runOneCClaimRequeueTick(deps = {}) {

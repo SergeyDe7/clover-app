@@ -111,16 +111,21 @@
     },
     "orderAck": {
       "method": "POST",
-      "path": "/api/one-c/orders/{orderId}/ack"
+      "path": "/api/one-c/orders/{orderId}/ack",
+      "body": {
+        "orderNumber": "required exact Clover order number",
+        "documentNumber": "required 1C document number"
+      },
+      "identity": "orderId path + orderNumber + contour must identify the same order",
+      "idempotency": "same contour/orderId/orderNumber/documentNumber is idempotent"
     },
     "orderAccepted": {
       "method": "POST",
       "path": "/api/one-c/orders/accepted",
       "body": {
-        "orderNumber": "Clover order number",
+        "orderId": "exact immutable Clover order ID used by the 1C module",
         "documentNumber": "1C document number (optional if unique)",
-        "oneCState": "Manual СостояниеЗаказа label",
-        "orderId": "optional Clover UUID"
+        "oneCState": "Manual СостояниеЗаказа label"
       },
       "effect": "Business status Новый → Принят after ACK; idempotent otherwise"
     },

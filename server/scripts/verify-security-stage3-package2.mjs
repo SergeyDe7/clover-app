@@ -464,7 +464,11 @@ test("live 1C handlers wire public error helper instead of error.message", () =>
   ]) {
     const start = serverSource.indexOf(`"${route}"`);
     assert.ok(start >= 0, route);
-    const slice = serverSource.slice(start, start + 5000);
+    const nextRouteStart = serverSource.indexOf("\napp.", start + 1);
+    const slice = serverSource.slice(
+      start,
+      nextRouteStart > start ? nextRouteStart : start + 12_000
+    );
     assert.match(slice, /logOneCFailure/u);
     assert.doesNotMatch(slice, /error: error\.message/u);
   }

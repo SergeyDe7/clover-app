@@ -2152,29 +2152,36 @@ function nextOrderForOneC(database = TEST_DATABASE_NAME) {
  * Sync-only, чтобы два параллельных pull не получили один заказ.
  */
 function claimOrderForOneC(orderId, database = TEST_DATABASE_NAME) {
-  const stored = getOrderById(orderId);
-  if (!stored) return null;
+  return runInTransaction(() => {
+    // BEGIN IMMEDIATE serializes competing workers. Re-read after acquiring
+    // the database write lock so only one process can win ready → sending.
+    const stored = getOrderById(orderId);
+    if (!stored) return null;
 
-  const previous = normalizeExchangeState(stored.payload.exchange);
-  if (previous.status !== "ready") return null;
-  if (previous.database !== String(database || TEST_DATABASE_NAME).toLocaleUpperCase("ru-RU")) {
-    return null;
-  }
+    const previous = normalizeExchangeState(stored.payload.exchange);
+    if (previous.status !== "ready") return null;
+    if (
+      previous.database !==
+      String(database || TEST_DATABASE_NAME).toLocaleUpperCase("ru-RU")
+    ) {
+      return null;
+    }
 
-  const claimedAt = new Date().toISOString();
-  const contour = exchangeDatabaseLabel(previous.database || database);
-  return updateOrderPayload(stored.id, {
-    ...stored.payload,
-    exchange: {
-      ...previous,
-      status: "sending",
-      attempts: previous.attempts + 1,
-      checkedAt: claimedAt,
-      lastAttemptAt: claimedAt,
-      channel: "onec-pull",
-      message: `Заказ выдан ${contour}, ожидается ACK.`,
-    },
-    updatedAt: claimedAt,
+    const claimedAt = new Date().toISOString();
+    const contour = exchangeDatabaseLabel(previous.database || database);
+    return updateOrderPayload(stored.id, {
+      ...stored.payload,
+      exchange: {
+        ...previous,
+        status: "sending",
+        attempts: previous.attempts + 1,
+        checkedAt: claimedAt,
+        lastAttemptAt: claimedAt,
+        channel: "onec-pull",
+        message: `Заказ выдан ${contour}, ожидается ACK.`,
+      },
+      updatedAt: claimedAt,
+    });
   });
 }
 
@@ -2217,7 +2224,6 @@ function canReturnOrderToOneCQueue(order = {}) {
 }
 
 function oneCQueueSnapshot(database = "") {
-  releaseExpiredOneCClaims();
   const target = String(database || "").toLocaleUpperCase("ru-RU");
 
   const rows = [...listOrders()]
@@ -4662,182 +4668,228 @@ app.post("/api/one-c/sale-prices", (req, res, next) => {
 app.get("/api/one-c/test-order", handleOneCTestOrder);
 app.post("/api/one-c/test-order", handleOneCTestOrder);
 
+function oneCDocumentFingerprint(documentNumber) {
+  return createHash("sha256")
+    .update(String(documentNumber || ""), "utf8")
+    .digest("hex")
+    .slice(0, 16);
+}
+
 app.post("/api/one-c/orders/:orderId/ack", (req, res) => {
-  const stored = getOrderById(req.params.orderId);
-
-  if (!stored) {
-    return res.status(404).json({
-      error: "Заказ не найден.",
-    });
-  }
-
   const ackDatabase = requireOneCAllowedDatabase(req, res);
   if (!ackDatabase) return;
 
-  const previous = normalizeExchangeState(stored.payload.exchange);
-  if (
-    previous.database &&
-    previous.database !== ackDatabase &&
-    previous.status !== "not_sent"
-  ) {
-    return res.status(409).json({
-      error: `Заказ стоит в очереди контура ${previous.database}, а ACK пришёл от ${ackDatabase}.`,
-      code: "ONEC_CONTOUR_MISMATCH",
-    });
-  }
-
-  const expectedOrderNumber = String(stored.payload.number || "").trim();
+  const orderId = String(req.params.orderId || "").trim();
   const providedOrderNumber = String(req.body?.orderNumber || "").trim();
-  const legacyAck = providedOrderNumber === "";
-  const receivedOrderNumber = providedOrderNumber || expectedOrderNumber;
-  const documentNumber = String(
-    req.body?.documentNumber || req.body?.documentId || ""
-  ).trim();
+  const documentNumber = String(req.body?.documentNumber || "").trim();
+  const credentialId = String(req.oneCAuth?.credentialId || "");
 
-  if (!expectedOrderNumber) {
-    return res.status(422).json({
-      error: "Подтверждение отклонено: у заказа Clover отсутствует номер.",
+  const outcome = runInTransaction(() => {
+    const auditDetails = {
+      orderId,
+      database: ackDatabase,
+      credentialId,
+      documentFingerprint: oneCDocumentFingerprint(documentNumber),
+    };
+    const reject = (status, code, error) => {
+      writeAudit({
+        action: "one-c.order.ack.rejected",
+        details: { ...auditDetails, code },
+      });
+      return { status, body: { error, code } };
+    };
+
+    if (!providedOrderNumber) {
+      return reject(
+        422,
+        "ORDER_NUMBER_REQUIRED",
+        "1С не передала номер заказа Clover."
+      );
+    }
+    if (!documentNumber) {
+      return reject(
+        422,
+        "DOCUMENT_NUMBER_REQUIRED",
+        "1С не передала номер созданного документа."
+      );
+    }
+
+    // BEGIN IMMEDIATE is already held here. Every decision is made from a
+    // fresh snapshot, so competing ACK/requeue workers cannot interleave.
+    const stored = getOrderById(orderId);
+    if (!stored) {
+      return reject(404, "ORDER_NOT_FOUND", "Заказ не найден.");
+    }
+
+    const previous = normalizeExchangeState(stored.payload.exchange);
+    if (
+      previous.database &&
+      previous.database !== ackDatabase &&
+      previous.status !== "not_sent"
+    ) {
+      return reject(
+        409,
+        "ONEC_CONTOUR_MISMATCH",
+        "ACK пришёл из другого контура 1С."
+      );
+    }
+
+    const expectedOrderNumber = String(stored.payload.number || "").trim();
+    if (!expectedOrderNumber) {
+      return reject(
+        422,
+        "ORDER_NUMBER_MISSING",
+        "У заказа Clover отсутствует номер."
+      );
+    }
+    if (providedOrderNumber !== expectedOrderNumber) {
+      return reject(
+        409,
+        "ORDER_NUMBER_MISMATCH",
+        "Подтверждение относится к другому заказу Clover."
+      );
+    }
+
+    if (previous.status === "sent") {
+      if (String(previous.receipt || "").trim() === documentNumber) {
+        writeAudit({
+          action: "one-c.order.ack.duplicate",
+          details: auditDetails,
+        });
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            orderId: stored.id,
+            orderNumber: expectedOrderNumber,
+            status: "sent",
+            duplicateAck: true,
+          },
+        };
+      }
+      return reject(
+        409,
+        "ACK_DOCUMENT_MISMATCH",
+        "Заказ уже подтверждён другим номером документа 1С."
+      );
+    }
+
+    if (previous.status !== "ready" && previous.status !== "sending") {
+      return reject(
+        409,
+        "ACK_STATUS_INVALID",
+        `Заказ не находится в очереди ${exchangeDatabaseLabel(ackDatabase)}.`
+      );
+    }
+
+    const duplicateReceiptOrder = listOrders(null, { includeDeleted: true }).find((candidate) => {
+      if (String(candidate.id || "") === String(stored.id || "")) return false;
+      const candidateExchange = normalizeExchangeState(candidate.exchange);
+      return (
+        candidateExchange.database === ackDatabase &&
+        String(candidateExchange.receipt || "").trim() === documentNumber
+      );
     });
-  }
+    if (duplicateReceiptOrder) {
+      return reject(
+        409,
+        "DOCUMENT_NUMBER_IN_USE",
+        "Этот номер документа 1С уже связан с другим заказом Clover."
+      );
+    }
 
-  if (receivedOrderNumber !== expectedOrderNumber) {
-    return res.status(409).json({
-      error: "Подтверждение относится к другому заказу Clover.",
-      expectedOrderNumber,
+    const acknowledgedAt = new Date().toISOString();
+    const acknowledgedCustomer =
+      req.body?.customer && typeof req.body.customer === "object"
+        ? req.body.customer
+        : {};
+    const customer = normalizeOneCClient({
+      ...acknowledgedCustomer,
+      id:
+        acknowledgedCustomer.id ||
+        acknowledgedCustomer.oneCId ||
+        req.body?.counterpartyId ||
+        req.body?.clientId ||
+        req.body?.customerId,
+      code:
+        acknowledgedCustomer.code ||
+        acknowledgedCustomer.oneCCode ||
+        req.body?.counterpartyCode ||
+        req.body?.clientCode,
+      name:
+        acknowledgedCustomer.name ||
+        acknowledgedCustomer.oneCName ||
+        req.body?.counterpartyName ||
+        req.body?.clientName ||
+        req.body?.customerName ||
+        stored.payload.customerName,
+      inn:
+        acknowledgedCustomer.inn ||
+        acknowledgedCustomer.oneCInn ||
+        req.body?.counterpartyInn ||
+        req.body?.clientInn,
+      phone:
+        acknowledgedCustomer.phone ||
+        req.body?.counterpartyPhone ||
+        req.body?.clientPhone ||
+        stored.payload.customerPhone,
+      email:
+        acknowledgedCustomer.email ||
+        req.body?.counterpartyEmail ||
+        req.body?.clientEmail ||
+        stored.payload.customerEmail,
     });
-  }
 
-  if (!documentNumber) {
-    return res.status(422).json({
-      error: "1С не передала номер созданного документа.",
+    if (stored.payload.clientId && customer.id && customer.name) {
+      const currentLinks = getGlobalState("clientLinks", {});
+      setGlobalState(
+        "clientLinks",
+        linkCloverClient(
+          currentLinks,
+          stored.payload.clientId,
+          customer,
+          acknowledgedAt
+        )
+      );
+    }
+
+    updateOrderPayload(stored.id, {
+      ...stored.payload,
+      exchange: {
+        ...previous,
+        status: "sent",
+        checkedAt: acknowledgedAt,
+        lastAttemptAt: acknowledgedAt,
+        sentAt: acknowledgedAt,
+        receipt: documentNumber,
+        channel: "onec-pull",
+        message: "Заказ получен и создан в 1С.",
+      },
+      updatedAt: acknowledgedAt,
     });
-  }
+    writeAudit({
+      action: "one-c.order.ack",
+      details: {
+        ...auditDetails,
+        orderNumber: expectedOrderNumber,
+      },
+    });
 
-  if (previous.status === "sent") {
-    if (String(previous.receipt || "").trim() === documentNumber) {
-      return res.json({
+    return {
+      status: 200,
+      body: {
         ok: true,
         orderId: stored.id,
+        orderNumber: expectedOrderNumber,
         status: "sent",
-        duplicateAck: true,
-      });
-    }
-    return res.status(409).json({
-      error: "Заказ уже подтверждён другим номером документа 1С.",
-    });
-  }
-
-  if (previous.status !== "ready" && previous.status !== "sending") {
-    return res.status(409).json({
-      error: `Подтверждение отклонено: заказ не находится в очереди ${exchangeDatabaseLabel(ackDatabase)}.`,
-    });
-  }
-
-  const duplicateReceiptOrder = listOrders().find((candidate) => {
-    if (String(candidate.id || "") === String(stored.id || "")) return false;
-    return (
-      String(normalizeExchangeState(candidate.exchange).receipt || "").trim() ===
-      documentNumber
-    );
+        clientLinked: Boolean(
+          stored.payload.clientId && customer.id && customer.name
+        ),
+      },
+    };
   });
 
-  if (duplicateReceiptOrder) {
-    return res.status(409).json({
-      error:
-        "Этот номер документа 1С уже связан с другим заказом Clover. Подтверждение отклонено для защиты от ложного дубля.",
-      conflictingOrderNumber: duplicateReceiptOrder.number || "",
-    });
-  }
-
-  const acknowledgedAt = new Date().toISOString();
-  const acknowledgedCustomer =
-    req.body?.customer && typeof req.body.customer === "object"
-      ? req.body.customer
-      : {};
-  const customer = normalizeOneCClient({
-    ...acknowledgedCustomer,
-    id:
-      acknowledgedCustomer.id ||
-      acknowledgedCustomer.oneCId ||
-      req.body?.counterpartyId ||
-      req.body?.clientId ||
-      req.body?.customerId,
-    code:
-      acknowledgedCustomer.code ||
-      acknowledgedCustomer.oneCCode ||
-      req.body?.counterpartyCode ||
-      req.body?.clientCode,
-    name:
-      acknowledgedCustomer.name ||
-      acknowledgedCustomer.oneCName ||
-      req.body?.counterpartyName ||
-      req.body?.clientName ||
-      req.body?.customerName ||
-      stored.payload.customerName,
-    inn:
-      acknowledgedCustomer.inn ||
-      acknowledgedCustomer.oneCInn ||
-      req.body?.counterpartyInn ||
-      req.body?.clientInn,
-    phone:
-      acknowledgedCustomer.phone ||
-      req.body?.counterpartyPhone ||
-      req.body?.clientPhone ||
-      stored.payload.customerPhone,
-    email:
-      acknowledgedCustomer.email ||
-      req.body?.counterpartyEmail ||
-      req.body?.clientEmail ||
-      stored.payload.customerEmail,
-  });
-
-  if (stored.payload.clientId && customer.id && customer.name) {
-    const currentLinks = getGlobalState("clientLinks", {});
-    const updatedLinks = linkCloverClient(
-      currentLinks,
-      stored.payload.clientId,
-      customer,
-      acknowledgedAt
-    );
-    setGlobalState("clientLinks", updatedLinks);
-  }
-
-  const exchange = {
-    ...previous,
-    status: "sent",
-    checkedAt: acknowledgedAt,
-    lastAttemptAt: acknowledgedAt,
-    sentAt: acknowledgedAt,
-    receipt: documentNumber,
-    channel: "onec-pull",
-    message: "Заказ получен и создан в 1С.",
-  };
-
-  updateOrderPayload(stored.id, {
-    ...stored.payload,
-    exchange,
-    updatedAt: acknowledgedAt,
-  });
-
-  writeAudit({
-    action: "one-c.order.ack",
-    details: {
-      orderId: stored.id,
-      orderNumber: expectedOrderNumber,
-      documentNumber,
-      database: ackDatabase,
-      legacyAck,
-    },
-  });
-
-  res.json({
-    ok: true,
-    orderId: stored.id,
-    orderNumber: expectedOrderNumber,
-    status: "sent",
-    legacyAckAccepted: legacyAck,
-    clientLinked: Boolean(stored.payload.clientId && customer.id && customer.name),
-  });
+  return res.status(outcome.status).json(outcome.body);
 });
 
 /**
@@ -7562,8 +7614,28 @@ app.post(
   authRequired,
   roleRequired("manager"),
   async (req, res) => {
-    const stored = getOrderById(req.params.orderId);
-    if (!stored) return res.status(404).json({ error: "Заказ не найден." });
+    const initialStored = getOrderById(req.params.orderId);
+    if (!initialStored) return res.status(404).json({ error: "Заказ не найден." });
+
+    const initialExchange = normalizeExchangeState(initialStored.payload.exchange);
+    if (initialExchange.status === "sent") {
+      return res.status(409).json({
+        error: "Заказ уже принят в 1С. Повторный черновик создавать нельзя.",
+        code: "ONEC_SENT_LOCKED",
+      });
+    }
+    if (initialExchange.status === "draft") {
+      return res.status(409).json({
+        error: "Черновик этого заказа уже создан в 1С.",
+        code: "ONEC_DRAFT_LOCKED",
+      });
+    }
+    if (initialExchange.status === "sending") {
+      return res.status(409).json({
+        error: "Заказ уже обрабатывается обменом с 1С.",
+        code: "ONEC_DRAFT_IN_PROGRESS",
+      });
+    }
 
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const clientLinks = getGlobalState("clientLinks", {});
@@ -7572,7 +7644,7 @@ app.post(
       ...getGlobalState("settings", DEFAULT_SETTINGS),
     };
     const validation = validateOrderFor1C({
-      order: stored.payload,
+      order: initialStored.payload,
       products,
       clientLinks,
       deliverySettings,
@@ -7584,6 +7656,93 @@ app.post(
         validation,
       });
     }
+
+    const attemptId = randomUUID();
+    const attemptedAt = new Date().toISOString();
+    const reservation = runInTransaction(() => {
+      const stored = getOrderById(req.params.orderId);
+      if (!stored) {
+        return {
+          ok: false,
+          status: 404,
+          body: { error: "Заказ не найден.", code: "ORDER_NOT_FOUND" },
+        };
+      }
+
+      const previous = normalizeExchangeState(stored.payload.exchange);
+      if (previous.status === "sent") {
+        return {
+          ok: false,
+          status: 409,
+          body: {
+            error: "Заказ уже принят в 1С. Повторный черновик создавать нельзя.",
+            code: "ONEC_SENT_LOCKED",
+          },
+        };
+      }
+      if (previous.status === "draft") {
+        return {
+          ok: false,
+          status: 409,
+          body: {
+            error: "Черновик этого заказа уже создан в 1С.",
+            code: "ONEC_DRAFT_LOCKED",
+          },
+        };
+      }
+      if (previous.status === "sending") {
+        return {
+          ok: false,
+          status: 409,
+          body: {
+            error: "Заказ уже обрабатывается обменом с 1С.",
+            code: "ONEC_DRAFT_IN_PROGRESS",
+          },
+        };
+      }
+      if (!["not_sent", "ready", "error"].includes(previous.status)) {
+        return {
+          ok: false,
+          status: 409,
+          body: {
+            error: "Текущее состояние заказа не позволяет создать черновик 1С.",
+            code: "ONEC_DRAFT_NOT_ALLOWED",
+          },
+        };
+      }
+
+      const exchange = {
+        ...previous,
+        status: "sending",
+        attempts: previous.attempts + 1,
+        checkedAt: attemptedAt,
+        lastAttemptAt: attemptedAt,
+        sentAt: "",
+        receipt: "",
+        remoteDocument: null,
+        channel: "onec-draft",
+        message: "Создание черновика в 1С.",
+        draftAttemptId: attemptId,
+        draftAttemptAt: attemptedAt,
+      };
+      const order = updateOrderPayload(stored.id, {
+        ...stored.payload,
+        exchange,
+        updatedAt: attemptedAt,
+      });
+      return {
+        ok: true,
+        status: 200,
+        stored: { ...stored, payload: order },
+        order,
+        exchange,
+      };
+    });
+    if (!reservation.ok) {
+      return res.status(reservation.status).json(reservation.body);
+    }
+
+    const stored = reservation.stored;
 
     const config = getGlobalState(ONE_C_STATE_KEY, DEFAULT_ONE_C_CONFIG);
     const payload = build1CPayload({
@@ -7604,8 +7763,6 @@ app.post(
           conduct: false,
         },
       });
-      const previous = normalizeExchangeState(stored.payload.exchange);
-      const attemptedAt = new Date().toISOString();
       const remoteDocument = {
         id: result.documentId || "",
         number: result.documentNumber || "",
@@ -7614,23 +7771,55 @@ app.post(
         duplicate: Boolean(result.duplicate),
         mode: result.mode,
       };
-      const exchange = {
-        ...previous,
-        status: "draft",
-        attempts: previous.attempts + 1,
-        checkedAt: attemptedAt,
-        lastAttemptAt: attemptedAt,
-        sentAt: attemptedAt,
-        receipt: result.documentNumber || result.documentId || "",
-        remoteDocument,
-        channel: result.mode === "real" ? "onec" : "simulation",
-        message: result.message,
-      };
-      const order = updateOrderPayload(stored.id, {
-        ...stored.payload,
-        exchange,
-        updatedAt: attemptedAt,
+      const completion = runInTransaction(() => {
+        const current = getOrderById(stored.id);
+        const currentRawExchange = current?.payload?.exchange || {};
+        const previous = normalizeExchangeState(currentRawExchange);
+        if (
+          !current ||
+          previous.status !== "sending" ||
+          String(currentRawExchange.draftAttemptId || "") !== attemptId
+        ) {
+          return {
+            ok: false,
+            order: current?.payload || null,
+            exchange: previous,
+          };
+        }
+
+        const exchange = {
+          ...previous,
+          status: "draft",
+          checkedAt: attemptedAt,
+          lastAttemptAt: attemptedAt,
+          sentAt: attemptedAt,
+          receipt: result.documentNumber || result.documentId || "",
+          remoteDocument,
+          channel: result.mode === "real" ? "onec" : "simulation",
+          message: result.message,
+        };
+        const order = updateOrderPayload(current.id, {
+          ...current.payload,
+          exchange,
+          updatedAt: attemptedAt,
+        });
+        return { ok: true, order, exchange };
       });
+      if (!completion.ok) {
+        auditFromRequest(req, "exchange.send.draft.rejected", {
+          orderId: stored.id,
+          orderNumber: stored.payload.number,
+          code: "ONEC_DRAFT_STATE_CHANGED",
+        });
+        return res.status(409).json({
+          error: "Состояние заказа изменилось во время создания черновика 1С.",
+          code: "ONEC_DRAFT_STATE_CHANGED",
+          order: completion.order,
+          exchange: completion.exchange,
+        });
+      }
+
+      const { order, exchange } = completion;
 
       auditFromRequest(req, "exchange.send.draft", {
         orderId: order.id,
@@ -7654,33 +7843,49 @@ app.post(
         component: "oneC",
         orderId: stored.id,
       });
-      const previous = normalizeExchangeState(stored.payload.exchange);
-      const attemptedAt = new Date().toISOString();
-      const exchange = {
-        ...previous,
-        status: "error",
-        attempts: previous.attempts + 1,
-        checkedAt: attemptedAt,
-        lastAttemptAt: attemptedAt,
-        channel: "onec",
-        message: presented.exchangeMessage,
-        code: presented.body.code,
-        correlationId: presented.body.correlationId,
-      };
-      const order = updateOrderPayload(stored.id, {
-        ...stored.payload,
-        exchange,
-        updatedAt: attemptedAt,
+      const failure = runInTransaction(() => {
+        const current = getOrderById(stored.id);
+        const currentRawExchange = current?.payload?.exchange || {};
+        const previous = normalizeExchangeState(currentRawExchange);
+        if (
+          !current ||
+          previous.status !== "sending" ||
+          String(currentRawExchange.draftAttemptId || "") !== attemptId
+        ) {
+          return {
+            updated: false,
+            order: current?.payload || null,
+            exchange: previous,
+          };
+        }
+
+        const exchange = {
+          ...previous,
+          status: "error",
+          checkedAt: attemptedAt,
+          lastAttemptAt: attemptedAt,
+          channel: "onec",
+          message: presented.exchangeMessage,
+          code: presented.body.code,
+          correlationId: presented.body.correlationId,
+        };
+        const order = updateOrderPayload(current.id, {
+          ...current.payload,
+          exchange,
+          updatedAt: attemptedAt,
+        });
+        return { updated: true, order, exchange };
       });
       auditFromRequest(req, "exchange.send.draft.error", {
-        orderId: order.id,
-        orderNumber: order.number,
+        orderId: stored.id,
+        orderNumber: stored.payload.number,
+        stateUpdated: failure.updated,
         ...presented.auditDetails,
       });
       res.status(presented.httpStatus).json({
         ...presented.body,
-        order,
-        exchange,
+        order: failure.order,
+        exchange: failure.exchange,
       });
     }
   }
@@ -7934,72 +8139,101 @@ app.post(
   authRequired,
   roleRequired("manager"),
   (req, res) => {
-    const stored = getOrderById(req.params.orderId);
-    if (!stored) return res.status(404).json({ error: "Заказ не найден." });
+    const outcome = runInTransaction(() => {
+      // Fresh read under BEGIN IMMEDIATE: ACK cannot commit between this
+      // decision and updateOrderPayload, so sent can never be reset.
+      const stored = getOrderById(req.params.orderId);
+      if (!stored) {
+        return { status: 404, body: { error: "Заказ не найден." } };
+      }
 
-    const previous = normalizeExchangeState(stored.payload.exchange);
+      const rawExchange = stored.payload.exchange || {};
+      const previous = normalizeExchangeState(rawExchange);
 
-    // После ACK / документа 1С отозвать нельзя.
-    if (previous.status === "sent") {
-      return res.status(409).json({
-        error:
-          "Заказ уже принят в 1С (есть подтверждение документа). Отменить передачу нельзя.",
-        code: "ONEC_SENT_LOCKED",
+      // После ACK / документа 1С отозвать нельзя.
+      if (previous.status === "sent") {
+        return {
+          status: 409,
+          body: {
+            error:
+              "Заказ уже принят в 1С (есть подтверждение документа). Отменить передачу нельзя.",
+            code: "ONEC_SENT_LOCKED",
+          },
+        };
+      }
+      if (
+        previous.status === "draft" &&
+        (String(previous.receipt || "").trim() ||
+          String(previous.remoteDocument?.id || previous.remoteDocument?.number || "").trim())
+      ) {
+        return {
+          status: 409,
+          body: {
+            error:
+              "У заказа уже есть черновик в 1С. Отменить передачу нельзя.",
+            code: "ONEC_DRAFT_LOCKED",
+          },
+        };
+      }
+      if (
+        previous.status === "sending" &&
+        String(rawExchange.draftAttemptId || "").trim()
+      ) {
+        return {
+          status: 409,
+          body: {
+            error: "Черновик заказа уже создаётся в 1С. Сброс сейчас запрещён.",
+            code: "ONEC_DRAFT_IN_PROGRESS",
+          },
+        };
+      }
+
+      if (
+        previous.status !== "ready" &&
+        previous.status !== "sending" &&
+        previous.status !== "error"
+      ) {
+        return {
+          status: 409,
+          body: {
+            error:
+              "Сброс доступен для заказов в очереди, с ошибкой или ожидающих ACK (до принятия в 1С).",
+            code: "ONEC_RESET_NOT_ALLOWED",
+          },
+        };
+      }
+
+      const exchange = {
+        ...previous,
+        status: "not_sent",
+        checkedAt: "",
+        lastAttemptAt: "",
+        sentAt: "",
+        claimedAt: "",
+        claimedBy: "",
+        receipt: "",
+        remoteDocument: null,
+        channel: "",
+        message:
+          previous.status === "error"
+            ? "Статус передачи сброшен менеджером."
+            : "Передача в 1С отменена менеджером. Можно передать снова.",
+      };
+      const order = updateOrderPayload(stored.id, {
+        ...stored.payload,
+        exchange,
+        updatedAt: new Date().toISOString(),
       });
-    }
-    if (
-      previous.status === "draft" &&
-      (String(previous.receipt || "").trim() ||
-        String(previous.remoteDocument?.id || previous.remoteDocument?.number || "").trim())
-    ) {
-      return res.status(409).json({
-        error:
-          "У заказа уже есть черновик в 1С. Отменить передачу нельзя.",
-        code: "ONEC_DRAFT_LOCKED",
-      });
-    }
 
-    if (
-      previous.status !== "ready" &&
-      previous.status !== "sending" &&
-      previous.status !== "error"
-    ) {
-      return res.status(409).json({
-        error:
-          "Сброс доступен для заказов в очереди, с ошибкой или ожидающих ACK (до принятия в 1С).",
-        code: "ONEC_RESET_NOT_ALLOWED",
+      auditFromRequest(req, "exchange.reset", {
+        orderId: order.id,
+        orderNumber: order.number,
+        from: previous.status,
       });
-    }
-
-    const exchange = {
-      ...previous,
-      status: "not_sent",
-      checkedAt: "",
-      lastAttemptAt: "",
-      sentAt: "",
-      claimedAt: "",
-      claimedBy: "",
-      receipt: "",
-      remoteDocument: null,
-      channel: "",
-      message:
-        previous.status === "error"
-          ? "Статус передачи сброшен менеджером."
-          : "Передача в 1С отменена менеджером. Можно передать снова.",
-    };
-    const order = updateOrderPayload(stored.id, {
-      ...stored.payload,
-      exchange,
-      updatedAt: new Date().toISOString(),
+      return { status: 200, body: { ok: true, order, exchange } };
     });
 
-    auditFromRequest(req, "exchange.reset", {
-      orderId: order.id,
-      orderNumber: order.number,
-      from: previous.status,
-    });
-
-    res.json({ ok: true, order, exchange });
+    res.status(outcome.status).json(outcome.body);
   }
 );
 
@@ -8790,6 +9024,16 @@ app.use((error, req, res, _next) => {
   ) {
     return res.status(409).json({
       error: "Такая запись уже существует.",
+    });
+  }
+
+  if (
+    error?.code === "SQLITE_BUSY" ||
+    String(error?.message || "").includes("database is locked")
+  ) {
+    return res.status(503).json({
+      error: "База Clover временно занята. Повторите запрос.",
+      code: "DATABASE_BUSY_RETRY",
     });
   }
 

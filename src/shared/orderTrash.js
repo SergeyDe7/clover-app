@@ -120,6 +120,13 @@ export function canPurgeOrder(order, role = "manager", t) {
   if (!order?.id) {
     return { ok: false, code: "NOT_FOUND", error: uiText(t, "shared.order.notFound") };
   }
+  if (exchangeStatusOf(order) === "sent") {
+    return {
+      ok: false,
+      code: "ONEC_RECEIPT_HISTORY",
+      error: uiText(t, "shared.order.exchangeBlocked"),
+    };
+  }
   const trashed = isOrderTrashed(order);
   const adminHardDelete =
     role === "admin" && isAdminHardDeleteStatus(order.status);
