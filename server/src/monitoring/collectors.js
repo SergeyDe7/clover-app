@@ -14,6 +14,9 @@ const MAX_BYTES = 64 * 1024;
 const MAX_DIRECTORY_ENTRIES = 512;
 const DEFAULT_TIMEOUT_MS = 3_000;
 const MAX_OBSERVATION_STATE_BYTES = 64 * 1024;
+// Legacy backup evidence was emitted at whole-second precision. Exact size and
+// SHA-256 binding still apply inside this bounded timestamp compatibility window.
+const MAX_ARCHIVE_MTIME_SKEW_MS = 1_000;
 const OBSERVATION_COMPONENTS = Object.freeze(["api", "ui", "nginx"]);
 
 export function createObservationState(environment) {
@@ -453,7 +456,7 @@ export function collectBackup({ backupDirectory, evidencePath, environment, now 
     }
     const newest = newestBackup(backupDirectory || "/opt/clover/clover-app/server/backups/daily");
     if (!newest) return { status: "unknown", value: null, scope: "backup", facts: {} };
-    if (!evidence.archiveSha256 || newest.mtimeMs > completedAtMs ||
+    if (!evidence.archiveSha256 || newest.mtimeMs - completedAtMs > MAX_ARCHIVE_MTIME_SKEW_MS ||
         completedAtMs - newest.mtimeMs > checkWindowMs || newest.size !== evidence.archiveSize ||
         sha256File(newest.path) !== evidence.archiveSha256) {
       throw new Error("backup_evidence_archive_mismatch");
