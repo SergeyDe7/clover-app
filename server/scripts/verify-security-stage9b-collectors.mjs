@@ -165,6 +165,63 @@ test("backup and deploy collectors expose age/counts without raw lines or paths"
   }
 });
 
+test("backup collector tolerates only bounded whole-second producer precision", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "clover-monitor-backup-precision-"));
+  try {
+    const backup = path.join(root, "clover-data-env.20260928T110000Z.tgz");
+    const evidencePath = path.join(root, "backup-evidence.json");
+    const completedAtMs = Math.floor((NOW - 60_000) / 1_000) * 1_000;
+    writeFileSync(backup, "fixture");
+    utimesSync(backup, new Date(completedAtMs + 152), new Date(completedAtMs + 152));
+    const backupStat = statSync(backup);
+    writeFileSync(evidencePath, JSON.stringify(createBackupEvidence({
+      environment: "test",
+      completedAt: new Date(completedAtMs).toISOString(),
+      result: "success",
+      archiveSize: backupStat.size,
+      archiveSha256: createHash("sha256").update(readFileSync(backup)).digest("hex"),
+      integrityOk: true,
+      integrityCheckedAt: new Date(completedAtMs).toISOString(),
+      restoreOk: true,
+      restoreCheckedAt: new Date(completedAtMs).toISOString(),
+      restoreFixture: true,
+    })));
+
+    assert.equal(collectBackup({
+      backupDirectory: root, evidencePath, environment: "test", now: NOW,
+    }).status, "ok", "valid archive must survive whole-second evidence precision");
+
+    utimesSync(backup, new Date(completedAtMs + 999), new Date(completedAtMs + 999));
+    assert.equal(collectBackup({
+      backupDirectory: root, evidencePath, environment: "test", now: NOW,
+    }).status, "ok", "sub-second skew at the upper edge must remain valid");
+
+    utimesSync(backup, new Date(completedAtMs + 1_000), new Date(completedAtMs + 1_000));
+    assert.equal(collectBackup({
+      backupDirectory: root, evidencePath, environment: "test", now: NOW,
+    }).status, "ok", "the bounded one-second precision edge must remain valid");
+
+    utimesSync(backup, new Date(completedAtMs + 1_001), new Date(completedAtMs + 1_001));
+    assert.equal(collectBackup({
+      backupDirectory: root, evidencePath, environment: "test", now: NOW,
+    }).status, "unknown", "archive beyond the bounded precision window must fail closed");
+
+    writeFileSync(backup, "Fixture");
+    utimesSync(backup, new Date(completedAtMs + 152), new Date(completedAtMs + 152));
+    assert.equal(collectBackup({
+      backupDirectory: root, evidencePath, environment: "test", now: NOW,
+    }).status, "unknown", "same-size tamper within the precision window must fail SHA-256 binding");
+
+    writeFileSync(backup, "fixture-extra");
+    utimesSync(backup, new Date(completedAtMs + 152), new Date(completedAtMs + 152));
+    assert.equal(collectBackup({
+      backupDirectory: root, evidencePath, environment: "test", now: NOW,
+    }).status, "unknown", "wrong-size archive within the precision window must fail closed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("TLS collector uses injected socket and returns expiry only", async () => {
   let receivedOptions;
   const connectFn = (_options, callback) => {

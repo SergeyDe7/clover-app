@@ -56,7 +56,7 @@ write_backup_failure_evidence() {
   [[ "${EVIDENCE_WRITTEN}" -eq 0 && -f "${EVIDENCE_WRITER}" && -d "${EVIDENCE_DIR}" ]] || return 0
   node "${EVIDENCE_WRITER}" backup --out "${BACKUP_EVIDENCE}" \
     --environment "${MONITOR_ENVIRONMENT}" --result failed --archive-size 0 \
-    --integrity-ok false --restore-ok false --completed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --integrity-ok false --restore-ok false --completed-at "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)" \
     >/dev/null 2>&1 || true
 }
 
@@ -89,7 +89,7 @@ RESTORE_FIXTURE="$(mktemp -d "${BACKUP_ROOT}/.restore-fixture.XXXXXX")"
 chmod 700 "${RESTORE_FIXTURE}"
 tar -xzf "$ARCHIVE" -C "${RESTORE_FIXTURE}" --no-same-owner
 [[ -d "${RESTORE_FIXTURE}/data" && -f "${RESTORE_FIXTURE}/.env" ]]
-COMPLETED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+COMPLETED_AT="$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
 node "${EVIDENCE_WRITER}" backup --out "${BACKUP_EVIDENCE}" \
   --environment "${MONITOR_ENVIRONMENT}" --result success --archive "$ARCHIVE" \
   --integrity-ok true --restore-ok true --completed-at "${COMPLETED_AT}"

@@ -1362,6 +1362,11 @@ test("deploy wrapper evidence covers success, failure and rollback outcomes", ()
     assert.match(backupWrapper, /CLOVER_MONITOR_EVIDENCE_DIR/u);
     assert.match(backupWrapper, /--integrity-ok/u);
     assert.match(backupWrapper, /--restore-ok/u);
+    assert.equal(
+      (backupWrapper.match(/date -u \+%Y-%m-%dT%H:%M:%S\.%3NZ/gu) || []).length,
+      2,
+      "backup evidence timestamps must preserve millisecond precision on success and failure"
+    );
     const deployWrapper = readFileSync(
       path.join(REPOSITORY_DIRECTORY, "scripts", "linux", "restart-api-ui.sh"),
       "utf8"
