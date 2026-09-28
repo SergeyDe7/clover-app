@@ -11,6 +11,7 @@ import { staffHasFeature, STAFF_FEATURE_IDS } from "../../src/shared/appHelpers.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const managerDir = path.join(root, "src/screens/manager");
 const helpersPath = path.join(root, "src/shared/appHelpers.js");
+const themePath = path.join(root, "src/styles/clover-theme.css");
 const screenPath = path.join(managerDir, "ManagerScreen.jsx");
 
 const MAIN_TAB_TO_PANEL = {
@@ -60,7 +61,25 @@ function extractExportedArray(source, name) {
 }
 
 const helpersSource = readFileSync(helpersPath, "utf8");
+const themeSource = readFileSync(themePath, "utf8");
 const screenSource = readFileSync(screenPath, "utf8");
+
+assert.ok(
+  themeSource.includes("--status-new-bg: var(--clover-onec-blue);"),
+  "Статус «Новый» должен использовать тот же синий токен, что кнопка передачи в 1С"
+);
+assert.ok(
+  themeSource.includes("--status-new-text: #fff;"),
+  "У статуса «Новый» должен оставаться контрастный белый текст"
+);
+assert.ok(
+  /\.clover-app \.manager-send-onec-button\.manager-send-onec-idle\s*\{[^}]*background:\s*var\(--clover-onec-blue\)\s*!important;/s.test(themeSource),
+  "Кнопка передачи в 1С должна использовать общий синий токен"
+);
+assert.ok(
+  themeSource.includes("select.manager-order-status-select.status-new"),
+  "У синего выпадающего статуса «Новый» должна быть отдельная контрастная стрелка"
+);
 
 const mainTabs = extractExportedArray(helpersSource, "MANAGER_TABS");
 const moreTabs = extractExportedArray(helpersSource, "MANAGER_MORE_TABS");

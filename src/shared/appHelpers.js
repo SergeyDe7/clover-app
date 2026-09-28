@@ -1657,7 +1657,7 @@ textarea { resize: vertical; }
 .badge.blue { background: #e4eefc; color: #2f5f9a; }
 .badge.gray { background: #eef1ee; color: #556055; }
 .badge.red { background: #fdecec; color: #a54f4f; }
-.badge.status-new, .status-new { background: #e8eef4; color: #3d5568; }
+.badge.status-new, .status-new { background: #3d6b9e; color: #fff; }
 .badge.status-work, .status-work { background: #fff1d6; color: #7a5a14; }
 .badge.status-ready, .status-ready { background: #e4eefc; color: #2f5f9a; }
 .badge.status-done, .status-done { background: #dff0da; color: #2f6b32; }
