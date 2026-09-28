@@ -357,6 +357,13 @@ import {
   publicManagerNotificationStatus,
 } from "./managerNotifications.js";
 import {
+  requireRuntimeFeature,
+  runtimeKillSwitchStatus,
+  sendRuntimeFeaturePaused,
+  isRuntimeFeaturePaused,
+  runtimeStatusProjectionRevision,
+} from "./runtimeKillSwitches.js";
+import {
   findClientOrderMatrixViolations,
   isMatrixProductForLink,
   ordersRequiringMatrixCheck,
@@ -2373,6 +2380,12 @@ function repriceClientOrders(orders, products, rawLink, oneCProducts = []) {
 }
 
 app.get("/api/health", (req, res) => {
+  try {
+    res.setHeader("X-Clover-Runtime-Status-Revision", runtimeStatusProjectionRevision(process.env));
+  } catch {
+    // Missing/invalid key is visible to the monitor as a missing revision. Never
+    // disclose key material or configuration values in the public health body.
+  }
   res.json({
     ok: true,
     service: "clover-server", version: "4.0.4",
@@ -2492,7 +2505,7 @@ app.get("/api/public/catalog/:code", (req, res) => {
 });
 
 /** Гостевой заказ с витрины — только сайтовые цены. */
-app.post("/api/public/orders", async (req, res) => {
+app.post("/api/public/orders", requireRuntimeFeature("guestOrders"), async (req, res) => {
   try {
     const parsedGuestOrder = storefrontOrderSchema.parse(req.body);
     if (rejectPublicRateLimit(res, "guestOrder", parsedGuestOrder.phone)) return;
@@ -2544,7 +2557,7 @@ function liveAuthIssuanceDeps() {
   };
 }
 
-app.post("/api/auth/register", async (req, res, next) => {
+app.post("/api/auth/register", requireRuntimeFeature("registration"), async (req, res, next) => {
   try {
     const input = registerSchema.parse(req.body);
     if (rejectPublicRateLimit(res, "register", input.email)) return;
@@ -3355,6 +3368,7 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
           mail: publicMailStatus(),
           push: publicPushStatus(),
           managerNotifications: publicManagerNotificationStatus(settings),
+          runtimeKillSwitches: runtimeKillSwitchStatus(),
         },
       })
     );
@@ -4161,6 +4175,9 @@ app.post(
 
 async function handleOneCTestOrder(req, res, next) {
   try {
+    if (isRuntimeFeaturePaused("oneCClaims")) {
+      return sendRuntimeFeaturePaused(res);
+    }
     const database = requireOneCAllowedDatabase(req, res);
     if (!database) return;
 
@@ -4696,6 +4713,11 @@ app.post("/api/one-c/orders/:orderId/ack", (req, res) => {
         action: "one-c.order.ack.rejected",
         details: { ...auditDetails, code },
       });
+      if (code === "ONEC_CONTOUR_MISMATCH") {
+        // Monitoring consumes the allowlisted action count only. Do not attach
+        // order, document, credential, request, or other identifying details.
+        writeAudit({ action: "one-c.contour.mismatch", details: {} });
+      }
       return { status, body: { error, code } };
     };
 
@@ -5674,6 +5696,7 @@ app.post(
   "/api/admin/storefront/map-image",
   authRequired,
   roleRequired("admin"),
+  requireRuntimeFeature("uploads"),
   mapImageUpload.single("image"),
   (req, res) => {
     if (!req.file) {
@@ -5689,6 +5712,7 @@ app.post(
   "/api/admin/storefront/hero-image",
   authRequired,
   roleRequired("admin"),
+  requireRuntimeFeature("uploads"),
   heroImageUpload.single("image"),
   (req, res) => {
     if (!req.file) {
@@ -5704,6 +5728,7 @@ app.post(
   "/api/admin/storefront/promo-image",
   authRequired,
   roleRequired("admin"),
+  requireRuntimeFeature("uploads"),
   promoImageUpload.single("image"),
   (req, res) => {
     if (!req.file) {
@@ -6098,6 +6123,7 @@ app.post(
   "/api/admin/products/:productId/image",
   authRequired,
   roleRequired("manager"),
+  requireRuntimeFeature("uploads"),
   imageUpload.single("image"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -6284,6 +6310,7 @@ app.post(
   "/api/admin/products/:productId/certificate",
   authRequired,
   roleRequired("manager"),
+  requireRuntimeFeature("uploads"),
   certificateUpload.single("certificate"),
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
@@ -8341,6 +8368,9 @@ app.post("/api/one-c/reconciliation/:requestId/result", (req, res, next) => {
   try {
     const database = requireOneCAllowedDatabase(req, res);
     if (!database) return;
+    if (isRuntimeFeaturePaused("uploads")) {
+      return sendRuntimeFeaturePaused(res);
+    }
     const current = getReconciliationRequestInternal(req.params.requestId);
     if (!current) return res.status(404).json({ error: "Запрос акта сверки не найден." });
     const base64 = String(req.body?.fileBase64 || "").replace(/^data:application\/pdf;base64,/, "");
@@ -8471,7 +8501,10 @@ app.delete(
 
 app.post(
   "/api/admin/reconciliation/:requestId/file",
-  authRequired, roleRequired("manager"), reconciliationUpload.single("file"),
+  authRequired,
+  roleRequired("manager"),
+  requireRuntimeFeature("uploads"),
+  reconciliationUpload.single("file"),
   async (req, res, next) => {
     try {
       if (!req.file?.path) {

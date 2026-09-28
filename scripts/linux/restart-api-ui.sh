@@ -64,6 +64,19 @@ PREPARED_KEEP=""
 PREPARED_PATH=""
 DEPLOY_MODE="deploy"
 BASELINE_SHA=""
+MONITOR_ENVIRONMENT="${CLOVER_MONITOR_ENVIRONMENT:-production}"
+MONITOR_EVIDENCE_DIR="/var/lib/clover-monitor-evidence"
+DEPLOY_RECEIPT="${MONITOR_EVIDENCE_DIR}/deploy-receipt.json"
+EVIDENCE_WRITER="/opt/clover/clover-app/server/scripts/write-monitor-evidence.mjs"
+if [[ -n "${CLOVER_MONITOR_FIXTURE_ROOT:-}" ]]; then
+  MONITOR_FIXTURE_ROOT="$(realpath -e -- "${CLOVER_MONITOR_FIXTURE_ROOT}")"
+  MONITOR_EVIDENCE_DIR="$(realpath -m -- "${CLOVER_MONITOR_EVIDENCE_DIR:-${MONITOR_FIXTURE_ROOT}/evidence}")"
+  DEPLOY_RECEIPT="$(realpath -m -- "${CLOVER_MONITOR_DEPLOY_RECEIPT:-${MONITOR_EVIDENCE_DIR}/deploy-receipt.json}")"
+  EVIDENCE_WRITER="$(realpath -m -- "${CLOVER_MONITOR_EVIDENCE_WRITER:-${MONITOR_FIXTURE_ROOT}/server/scripts/write-monitor-evidence.mjs}")"
+  for fixture_path in "${MONITOR_EVIDENCE_DIR}" "${DEPLOY_RECEIPT}" "${EVIDENCE_WRITER}"; do
+    [[ "${fixture_path}" == "${MONITOR_FIXTURE_ROOT}"/* ]] || { echo "ERROR: monitor fixture path escapes fixture root" >&2; exit 2; }
+  done
+fi
 
 if [[ "${1:-}" == "prepare" ]]; then
   DEPLOY_MODE="prepare"
@@ -93,6 +106,17 @@ fi
 TARGET_SHA="$(printf '%s' "${TARGET_SHA}" | tr 'A-F' 'a-f')"
 PINNED_SHA="${TARGET_SHA}"
 
+if [[ -z "${CLOVER_MONITOR_FIXTURE_ROOT:-}" && -n "${CLOVER_MONITOR_PINNED_EVIDENCE_WRITER:-}" ]]; then
+  EXPECTED_PINNED_WRITER="${STAGING_ROOT}/delivered-deploy-${PINNED_SHA}/server/scripts/write-monitor-evidence.mjs"
+  PINNED_WRITER_REAL="$(realpath -e -- "${CLOVER_MONITOR_PINNED_EVIDENCE_WRITER}")" \
+    || { echo "ERROR: target-pinned monitor evidence writer is missing" >&2; exit 2; }
+  EXPECTED_PINNED_WRITER_REAL="$(realpath -e -- "${EXPECTED_PINNED_WRITER}")" \
+    || { echo "ERROR: expected target-pinned monitor evidence writer is missing" >&2; exit 2; }
+  [[ "${PINNED_WRITER_REAL}" == "${EXPECTED_PINNED_WRITER_REAL}" ]] \
+    || { echo "ERROR: target-pinned monitor evidence writer mismatch" >&2; exit 2; }
+  EVIDENCE_WRITER="${PINNED_WRITER_REAL}"
+fi
+
 LIVE_DIST="${ROOT}/dist"
 STAGED_DIST=""
 BUILD_WT=""
@@ -115,8 +139,18 @@ cleanup_temp() {
   fi
 }
 
+write_deploy_evidence() {
+  local event="$1" result="$2" sha="${3:-${TARGET_SHA:-}}"
+  [[ "${sha}" =~ ^[0-9a-f]{40}$ ]] || return 1
+  [[ -f "${EVIDENCE_WRITER}" && -d "${MONITOR_EVIDENCE_DIR}" ]] || return 1
+  node "${EVIDENCE_WRITER}" deploy --out "${DEPLOY_RECEIPT}" \
+    --environment "${MONITOR_ENVIRONMENT}" --event "${event}" --result "${result}" \
+    --occurred-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --release-sha "${sha}"
+}
+
 die() {
   echo "ERROR: $*" >&2
+  write_deploy_evidence failure failed "${TARGET_SHA:-}" >/dev/null 2>&1 || true
   cleanup_temp
   exit 1
 }
@@ -463,11 +497,14 @@ rollback_release() {
         critical "rollback browser-route checks failed after cutover (${why})"
       fi
       echo "Rollback restored previous release (${PREV_SHA})." >&2
+      write_deploy_evidence rollback rollback_succeeded "${TARGET_SHA}" \
+        || critical "rollback succeeded but monitoring receipt could not be written (${why})"
       cleanup_temp
       exit 1
     fi
     echo "CRITICAL: rollback health checks failed" >&2
   fi
+  write_deploy_evidence rollback rollback_failed "${TARGET_SHA}" >/dev/null 2>&1 || true
   critical "rollback failed after cutover (${why})"
 }
 
@@ -904,6 +941,8 @@ echo "Listener diagnostics (no process termination):"
 ss -tlnp 2>/dev/null | grep -E ':4100|:5273' || echo "WARN: expected ports 4100/5273 not listed" >&2
 
 echo "Deploy OK."
+write_deploy_evidence success succeeded "${TARGET_SHA}" \
+  || critical "deploy succeeded but monitoring receipt could not be written"
 echo "Deployed SHA: ${TARGET_SHA}"
 echo "UI build tag: ${BUILD_TAG}"
 echo "UI bundle: ${MAIN_JS}"

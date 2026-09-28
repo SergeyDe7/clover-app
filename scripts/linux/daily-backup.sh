@@ -20,6 +20,21 @@ BACKUP_ROOT="${CLOVER_SERVER_BACKUP_DIR:-$SERVER/backups}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 KEEP_DAYS="${CLOVER_BACKUP_KEEP_DAYS:-14}"
 LOCK_FILE="${CLOVER_BACKUP_LOCK_FILE:-$BACKUP_ROOT/.daily-backup.lock}"
+EVIDENCE_DIR="/var/lib/clover-monitor-evidence"
+BACKUP_EVIDENCE="${EVIDENCE_DIR}/backup-evidence.json"
+EVIDENCE_WRITER="/opt/clover/clover-app/server/scripts/write-monitor-evidence.mjs"
+if [[ -n "${CLOVER_MONITOR_FIXTURE_ROOT:-}" ]]; then
+  FIXTURE_ROOT="$(realpath -e -- "${CLOVER_MONITOR_FIXTURE_ROOT}")"
+  EVIDENCE_DIR="$(realpath -m -- "${CLOVER_MONITOR_EVIDENCE_DIR:-${FIXTURE_ROOT}/evidence}")"
+  BACKUP_EVIDENCE="$(realpath -m -- "${CLOVER_MONITOR_BACKUP_EVIDENCE:-${EVIDENCE_DIR}/backup-evidence.json}")"
+  EVIDENCE_WRITER="$(realpath -m -- "${CLOVER_MONITOR_EVIDENCE_WRITER:-${FIXTURE_ROOT}/server/scripts/write-monitor-evidence.mjs}")"
+  for fixture_path in "${EVIDENCE_DIR}" "${BACKUP_EVIDENCE}" "${EVIDENCE_WRITER}"; do
+    [[ "${fixture_path}" == "${FIXTURE_ROOT}"/* ]] || { echo "ERROR: monitor fixture path escapes fixture root" >&2; exit 2; }
+  done
+fi
+# Producer contract: write-monitor-evidence.mjs backup; canonical production path,
+# overrides require a contained fixture root.
+MONITOR_ENVIRONMENT="${CLOVER_MONITOR_ENVIRONMENT:-production}"
 
 mkdir -p "$BACKUP_ROOT" "$OUT_DIR"
 chmod 700 "$BACKUP_ROOT" "$OUT_DIR"
@@ -34,6 +49,27 @@ fi
 
 ARCHIVE="$OUT_DIR/clover-data-env.$STAMP.tgz"
 TMP_ARCHIVE="${ARCHIVE}.tmp.$$"
+RESTORE_FIXTURE=""
+EVIDENCE_WRITTEN=0
+
+write_backup_failure_evidence() {
+  [[ "${EVIDENCE_WRITTEN}" -eq 0 && -f "${EVIDENCE_WRITER}" && -d "${EVIDENCE_DIR}" ]] || return 0
+  node "${EVIDENCE_WRITER}" backup --out "${BACKUP_EVIDENCE}" \
+    --environment "${MONITOR_ENVIRONMENT}" --result failed --archive-size 0 \
+    --integrity-ok false --restore-ok false --completed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    >/dev/null 2>&1 || true
+}
+
+cleanup_backup_fixture() {
+  local rc=$?
+  if [[ -n "${RESTORE_FIXTURE}" && -d "${RESTORE_FIXTURE}" ]]; then
+    rm -rf -- "${RESTORE_FIXTURE}"
+  fi
+  if [[ "${rc}" -ne 0 ]]; then
+    write_backup_failure_evidence
+  fi
+}
+trap cleanup_backup_fixture EXIT
 
 tar -czf "$TMP_ARCHIVE" \
   -C "$SERVER" \
@@ -45,6 +81,21 @@ tar -czf "$TMP_ARCHIVE" \
 }
 chmod 600 "$TMP_ARCHIVE"
 mv -f "$TMP_ARCHIVE" "$ARCHIVE"
+
+# The evidence binds a readable archive to an isolated restore fixture. No
+# restored data is executed and the fixture is removed before the job exits.
+tar -tzf "$ARCHIVE" >/dev/null
+RESTORE_FIXTURE="$(mktemp -d "${BACKUP_ROOT}/.restore-fixture.XXXXXX")"
+chmod 700 "${RESTORE_FIXTURE}"
+tar -xzf "$ARCHIVE" -C "${RESTORE_FIXTURE}" --no-same-owner
+[[ -d "${RESTORE_FIXTURE}/data" && -f "${RESTORE_FIXTURE}/.env" ]]
+COMPLETED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+node "${EVIDENCE_WRITER}" backup --out "${BACKUP_EVIDENCE}" \
+  --environment "${MONITOR_ENVIRONMENT}" --result success --archive "$ARCHIVE" \
+  --integrity-ok true --restore-ok true --completed-at "${COMPLETED_AT}"
+EVIDENCE_WRITTEN=1
+rm -rf -- "${RESTORE_FIXTURE}"
+RESTORE_FIXTURE=""
 # Полный zip со снимком БД и фото (если Node доступен).
 # Используем scripts из репозитория, откуда вызван этот файл; данные — из CLOVER_ROOT.
 if [[ -x /usr/bin/node || -n "$(command -v node)" ]]; then

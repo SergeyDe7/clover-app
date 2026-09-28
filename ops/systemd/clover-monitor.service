@@ -1,0 +1,39 @@
+[Unit]
+Description=Clover bounded security monitor (read-only)
+Wants=clover-monitor-snapshot.service
+After=clover-monitor-snapshot.service clover-api.service clover-ui.service nginx.service
+
+[Service]
+Type=oneshot
+User=clover-monitor
+Group=clover-monitor
+WorkingDirectory=/opt/clover/clover-app/server
+Environment=NODE_ENV=production
+Environment=CLOVER_MONITOR_ENVIRONMENT=production
+Environment=CLOVER_MONITOR_STATE_DIR=/var/lib/clover-monitor
+Environment=CLOVER_MONITOR_RUNTIME_SNAPSHOT=/var/lib/clover-monitor-evidence/runtime-snapshot.json
+Environment=CLOVER_MONITOR_DEPLOY_RECEIPT=/var/lib/clover-monitor-evidence/deploy-receipt.json
+Environment=CLOVER_MONITOR_STRICT_STATUS_MODE=true
+Environment=CLOVER_MONITOR_STATUS_HMAC_KEY_FILE=/etc/clover/monitor-status.hmac
+EnvironmentFile=/etc/clover/monitor-status.env
+ExecStart=/usr/bin/node /opt/clover/clover-app/server/scripts/clover-monitor.mjs --runtime-snapshot /var/lib/clover-monitor-evidence/runtime-snapshot.json --status-file /etc/clover/monitor-status.env --status-hmac-key-file /etc/clover/monitor-status.hmac
+StateDirectory=clover-monitor
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/var/lib/clover-monitor
+ReadOnlyPaths=/var/lib/clover-monitor-evidence /etc/clover/monitor-status.hmac /etc/clover/monitor-status.env
+ProtectProc=invisible
+RestrictNamespaces=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+TimeoutStartSec=45
