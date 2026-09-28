@@ -471,7 +471,7 @@ export function collectBackup({ backupDirectory, evidencePath, environment, now 
   }
 }
 
-export function collectTls({ host = "clover-spb.ru", port = 443, now = Date.now(), timeoutMs, connectFn = tls.connect } = {}) {
+export function collectTls({ host = "clover-spb.ru", connectHost = host, port = 443, now = Date.now(), timeoutMs, connectFn = tls.connect } = {}) {
   return new Promise((resolve) => {
     let settled = false;
     let socket;
@@ -484,7 +484,7 @@ export function collectTls({ host = "clover-spb.ru", port = 443, now = Date.now(
     };
     const timer = setTimeout(() => finish({ status: "unknown", value: null, scope: "global", facts: {} }), boundedTimeout(timeoutMs));
     try {
-      socket = connectFn({ host, port, servername: host, rejectUnauthorized: true }, () => {
+      socket = connectFn({ host: connectHost, port, servername: host, rejectUnauthorized: true }, () => {
         const certificate = socket.getPeerCertificate?.() || {};
         const expiresAt = Date.parse(String(certificate.valid_to || ""));
         finish({
@@ -546,7 +546,7 @@ export async function collectOperationalFacts(options = {}, deps = {}) {
     }),
     (deps.collectSystemd || collectSystemd)({ execFileFn: deps.execFileFn, timeoutMs: options.probeTimeoutMs }),
     (deps.collectResources || collectResources)({ osModule: deps.osModule, statfsFn: deps.statfsFn, readFileFn: deps.readFileFn, diskPath: options.diskPath, sampleMs: options.resourceSampleMs, delay: deps.delay }),
-    (deps.collectTls || collectTls)({ host: options.tlsHost, port: options.tlsPort, now: options.now, timeoutMs: options.probeTimeoutMs, connectFn: deps.tlsConnect }),
+    (deps.collectTls || collectTls)({ host: options.tlsHost, connectHost: options.tlsConnectHost, port: options.tlsPort, now: options.now, timeoutMs: options.probeTimeoutMs, connectFn: deps.tlsConnect }),
   ]);
   const value = (index, fallback) => settled[index].status === "fulfilled" ? settled[index].value : fallback;
   return {

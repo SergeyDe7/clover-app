@@ -15,6 +15,12 @@ id clover-monitor || useradd --system --gid clover-monitor --home-dir /nonexiste
 install -d -o root -g clover-monitor -m 0750 /etc/clover
 install -o root -g clover-monitor -m 0640 <STATUS_SOURCE> /etc/clover/monitor-status.env
 install -o root -g clover-monitor -m 0640 <HMAC_KEY_SOURCE> /etc/clover/monitor-status.hmac
+install -d -o root -g root -m 0755 /usr/lib/clover-monitor/server/scripts
+install -d -o root -g root -m 0755 /usr/lib/clover-monitor/server/src/monitoring
+install -o root -g root -m 0644 server/package.json /usr/lib/clover-monitor/server/package.json
+install -o root -g root -m 0644 server/scripts/clover-monitor.mjs /usr/lib/clover-monitor/server/scripts/clover-monitor.mjs
+install -o root -g root -m 0644 server/src/runtimeKillSwitches.js /usr/lib/clover-monitor/server/src/runtimeKillSwitches.js
+install -o root -g root -m 0644 server/src/monitoring/*.js /usr/lib/clover-monitor/server/src/monitoring/
 install -o root -g root -m 0644 ops/tmpfiles.d/clover-monitor-evidence.conf /usr/lib/tmpfiles.d/clover-monitor-evidence.conf
 install -o root -g root -m 0644 ops/systemd/clover-monitor-snapshot.service /etc/systemd/system/clover-monitor-snapshot.service
 install -o root -g root -m 0644 ops/systemd/clover-monitor.service /etc/systemd/system/clover-monitor.service
@@ -51,7 +57,11 @@ Stop instead of enabling the timer if either one-shot result is not exactly
 successful. Verify the timer only after enablement; a failed activation requires
 the rollback below.
 
-Before copying, save every existing target file to a root-only backup directory.
+Before copying, save every existing target file and the complete existing
+`/usr/lib/clover-monitor` tree to a root-only backup directory. Verify that the
+runtime contains only `package.json`, `scripts/clover-monitor.mjs`,
+`src/runtimeKillSwitches.js` and the source-controlled `src/monitoring/*.js`
+closed dependency set. Reject symlinks and unexpected files.
 Verify exact owners/modes, that `clover-monitor` is not a member of `clover`, and
 that it cannot open SQLite or backup paths.
 
@@ -62,7 +72,8 @@ systemctl disable --now clover-monitor.timer
 systemctl stop clover-monitor.service clover-monitor-snapshot.service
 # Restore the saved API environment and restart clover-api.service only under
 # separate deployment approval.
-# Restore every saved target file; remove only targets that did not exist before.
+# Restore every saved target file and the complete runtime tree; remove only
+# targets that did not exist before.
 systemctl daemon-reload
 systemctl reset-failed clover-monitor.service clover-monitor-snapshot.service
 setfacl -R -x u:clover-monitor /var/lib/clover-monitor-evidence

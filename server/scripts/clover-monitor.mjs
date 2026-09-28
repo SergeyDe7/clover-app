@@ -43,6 +43,7 @@ export function parseArgs(argv = process.argv.slice(2), env = process.env) {
     deployWindowMs: Number(env.CLOVER_MONITOR_DEPLOY_WINDOW_MS || 15 * 60_000),
     diskPath: env.CLOVER_MONITOR_DISK_PATH || "/opt/clover",
     tlsHost: env.CLOVER_MONITOR_TLS_HOST || "clover-spb.ru",
+    tlsConnectHost: env.CLOVER_MONITOR_TLS_CONNECT_HOST || env.CLOVER_MONITOR_TLS_HOST || "clover-spb.ru",
     tlsPort: Number(env.CLOVER_MONITOR_TLS_PORT || 443),
     probeTimeoutMs: Number(env.CLOVER_MONITOR_PROBE_TIMEOUT_MS || 3_000),
     now: Date.now(),
@@ -62,6 +63,9 @@ export function parseArgs(argv = process.argv.slice(2), env = process.env) {
   out.environment = assertMonitorEnvironment(out.environment);
   if (!/^(?:[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?)$/iu.test(out.tlsHost)) {
     throw new Error("monitor_tls_host_invalid");
+  }
+  if (!/^(?:[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?)$/iu.test(out.tlsConnectHost)) {
+    throw new Error("monitor_tls_connect_host_invalid");
   }
   if (!Number.isInteger(out.tlsPort) || out.tlsPort < 1 || out.tlsPort > 65_535) {
     throw new Error("monitor_tls_port_invalid");
@@ -247,6 +251,7 @@ export async function runMonitor(options, deps = {}) {
       deployWindowMs: options.deployWindowMs,
       diskPath: options.diskPath,
       tlsHost: options.tlsHost,
+      tlsConnectHost: options.tlsConnectHost,
       tlsPort: options.tlsPort,
       probeTimeoutMs: options.probeTimeoutMs,
       expectedRuntimeStatusRevision,

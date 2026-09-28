@@ -166,7 +166,9 @@ test("backup and deploy collectors expose age/counts without raw lines or paths"
 });
 
 test("TLS collector uses injected socket and returns expiry only", async () => {
+  let receivedOptions;
   const connectFn = (_options, callback) => {
+    receivedOptions = _options;
     const socket = new EventEmitter();
     socket.authorized = true;
     socket.getPeerCertificate = () => ({ valid_to: "Nov 10 12:00:00 2026 GMT", subject: { CN: "private" } });
@@ -174,10 +176,12 @@ test("TLS collector uses injected socket and returns expiry only", async () => {
     queueMicrotask(callback);
     return socket;
   };
-  const result = await collectTls({ host: "fixture.invalid", now: NOW, connectFn });
+  const result = await collectTls({ host: "fixture.invalid", connectHost: "127.0.0.1", now: NOW, connectFn });
   assert.equal(result.status, "ok");
   assert.ok(result.value > 0);
   assert.equal(JSON.stringify(result).includes("private"), false);
+  assert.equal(receivedOptions.host, "127.0.0.1");
+  assert.equal(receivedOptions.servername, "fixture.invalid");
 });
 
 test("aggregate collector isolates a failed probe and performs no fallback network", async () => {

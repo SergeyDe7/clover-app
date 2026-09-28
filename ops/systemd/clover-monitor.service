@@ -7,16 +7,17 @@ After=clover-monitor-snapshot.service clover-api.service clover-ui.service nginx
 Type=oneshot
 User=clover-monitor
 Group=clover-monitor
-WorkingDirectory=/opt/clover/clover-app/server
+WorkingDirectory=/usr/lib/clover-monitor/server
 Environment=NODE_ENV=production
 Environment=CLOVER_MONITOR_ENVIRONMENT=production
 Environment=CLOVER_MONITOR_STATE_DIR=/var/lib/clover-monitor
 Environment=CLOVER_MONITOR_RUNTIME_SNAPSHOT=/var/lib/clover-monitor-evidence/runtime-snapshot.json
 Environment=CLOVER_MONITOR_DEPLOY_RECEIPT=/var/lib/clover-monitor-evidence/deploy-receipt.json
 Environment=CLOVER_MONITOR_STRICT_STATUS_MODE=true
+Environment=CLOVER_MONITOR_TLS_CONNECT_HOST=127.0.0.1
 Environment=CLOVER_MONITOR_STATUS_HMAC_KEY_FILE=/etc/clover/monitor-status.hmac
 EnvironmentFile=/etc/clover/monitor-status.env
-ExecStart=/usr/bin/node /opt/clover/clover-app/server/scripts/clover-monitor.mjs --runtime-snapshot /var/lib/clover-monitor-evidence/runtime-snapshot.json --status-file /etc/clover/monitor-status.env --status-hmac-key-file /etc/clover/monitor-status.hmac
+ExecStart=/usr/bin/node /usr/lib/clover-monitor/server/scripts/clover-monitor.mjs --runtime-snapshot /var/lib/clover-monitor-evidence/runtime-snapshot.json --status-file /etc/clover/monitor-status.env --status-hmac-key-file /etc/clover/monitor-status.hmac
 StateDirectory=clover-monitor
 StateDirectoryMode=0700
 UMask=0077
