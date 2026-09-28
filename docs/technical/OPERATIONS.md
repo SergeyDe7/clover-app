@@ -1,13 +1,20 @@
 # Эксплуатация Clover
 
-Security Stage 9B monitoring is source-controlled but not installed in
-production. See [SECURITY_STAGE9B_MONITORING.md](./SECURITY_STAGE9B_MONITORING.md).
+Security Stage 9B monitoring is installed in production. The
+`clover-monitor.timer` state was re-verified as `active/waiting` during the Stage 9
+closeout on 2026-09-28. The timer runs the bounded snapshot/monitor chain; it does not
+authorize a real notification, kill-switch change or 1C operation. Contracts and
+operator response are documented in
+[SECURITY_STAGE9B_MONITORING.md](./SECURITY_STAGE9B_MONITORING.md),
+[SECURITY_STAGE9C_INCIDENT_RUNBOOK.md](./SECURITY_STAGE9C_INCIDENT_RUNBOOK.md) and
+[SECURITY_STAGE9_CLOSEOUT.md](./SECURITY_STAGE9_CLOSEOUT.md).
 
 ## Linux (DC)
 
 | Действие | Команда / файл |
 |----------|----------------|
 | Юниты | `clover-api.service`, `clover-ui.service` (`enabled`) |
+| Мониторинг | `clover-monitor.timer` (`active/waiting` на момент Stage 9 closeout) |
 | Health | `curl -s http://127.0.0.1:4100/api/health` → `version: "4.0.4"` |
 | UI | http://127.0.0.1:5273/ и https://clover-order.ru/ |
 | Ежедневный backup | `scripts/linux/install-daily-backup-cron.sh` (user crontab 03:15) |

@@ -51,3 +51,14 @@ Clover — система принятия и обработки заказов 
 ## I18N Stage 8 (актуально)
 
 Подготовка пакетного перевода товаров в админке; провайдер по умолчанию **отключён**. Подключение Azure/другого сервиса — отдельное решение. См. `docs/technical/i18n-stage-8-product-batch-translation.md`.
+
+## Security Stage 9 (закрыт 2026-09-28)
+
+- Stage 9A: read-only аудит мониторинга и пробелов — завершён.
+- Stage 9B: bounded monitoring, sanitized alerts и runtime kill switches — внедрены.
+- Stage 9C: incident runbook и безопасное fixture-учение — завершены.
+- Production SHA на момент закрытия: `b9e7c099ad4b1e2077a464cb1e4210ffb8eed48e`.
+- Закрытый реестр owner/fallback создан вне Git по подтверждению владельца.
+- Принятый остаток: production restore — `NOT VERIFIED`, риск принят владельцем;
+  любое реальное восстановление по-прежнему требует отдельного согласования.
+- Closeout: `docs/technical/SECURITY_STAGE9_CLOSEOUT.md`.
