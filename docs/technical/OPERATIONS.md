@@ -1,5 +1,8 @@
 # Эксплуатация Clover
 
+Security Stage 9B monitoring is source-controlled but not installed in
+production. See [SECURITY_STAGE9B_MONITORING.md](./SECURITY_STAGE9B_MONITORING.md).
+
 ## Linux (DC)
 
 | Действие | Команда / файл |
