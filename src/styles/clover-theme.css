@@ -73,10 +73,12 @@ html {
   --clover-info-text: #355a78;
   --clover-neutral-bg: #eef1ee;
   --clover-neutral-text: #556055;
+  --clover-onec-blue: #3d6b9e;
+  --clover-onec-blue-hover: #345d89;
 
   /* Order status scale */
-  --status-new-bg: #e8eef4;
-  --status-new-text: #3d5568;
+  --status-new-bg: var(--clover-onec-blue);
+  --status-new-text: #fff;
   --status-work-bg: #fff1d6;
   --status-work-text: #7a5a14;
   --status-ready-bg: #e4eefc;
@@ -2546,6 +2548,10 @@ body:has(.clover-app) {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235d695d' d='M1.2 1.1L6 5.9l4.8-4.8L12 2.3 6 8.3 0 2.3z'/%3E%3C/svg%3E") !important;
 }
 
+.clover-app select.manager-order-status-select.status-new {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23ffffff' d='M1.2 1.1L6 5.9l4.8-4.8L12 2.3 6 8.3 0 2.3z'/%3E%3C/svg%3E") !important;
+}
+
 .clover-app .manager-orders-filters select {
   min-height: 44px !important;
   padding: 10px 32px 10px 14px !important;
@@ -2735,12 +2741,12 @@ body:has(.clover-app) {
 
 /* До передачи в 1С — заметная, но не «успех» */
 .clover-app .manager-send-onec-button.manager-send-onec-idle {
-  background: #3d6b9e !important;
+  background: var(--clover-onec-blue) !important;
   color: #fff !important;
 }
 
 .clover-app .manager-send-onec-button.manager-send-onec-idle:hover:not(:disabled) {
-  background: #345d89 !important;
+  background: var(--clover-onec-blue-hover) !important;
 }
 
 /* Кнопка запроса акта сверки у клиента — тот же синий, что «Передать в 1С» */
@@ -2749,7 +2755,7 @@ body:has(.clover-app) {
   padding: 10px 16px !important;
   border: none !important;
   border-radius: var(--radius-sm) !important;
-  background: #3d6b9e !important;
+  background: var(--clover-onec-blue) !important;
   color: #fff !important;
   font-weight: var(--fw-bold) !important;
   line-height: 1.2 !important;
