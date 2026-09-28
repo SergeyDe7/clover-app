@@ -20,6 +20,9 @@ environment changes and real alert delivery require separate owner approval.
   files are written under umask 077. The unit uses a dedicated `clover-monitor`
   account. The snapshot producer uses the existing application account; no ACL is
   granted from SQLite/backups to `clover-monitor`.
+- The monitor executable and its closed dependency set are installed read-only
+  under `/usr/lib/clover-monitor`. The monitor account is not granted traversal
+  access to the application checkout, `.env`, SQLite, backups or uploads.
 - Local sanitized output is the mandatory fallback. Email/Telegram incident
   delivery is not enabled by this package and must not be inferred from product
   notification settings.
