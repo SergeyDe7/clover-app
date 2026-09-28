@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -290,6 +290,7 @@ function createRuntimeSnapshotFixture(root) {
   const evidenceDirectory = path.join(root, "evidence");
   mkdirSync(backupDirectory);
   mkdirSync(evidenceDirectory);
+  chmodSync(evidenceDirectory, 0o770);
   const archivePath = path.join(backupDirectory, "clover-data-env.20260928T115900Z.tgz");
   writeFileSync(archivePath, "fixture-backup");
   utimesSync(archivePath, new Date(NOW - 60_000), new Date(NOW - 60_000));
