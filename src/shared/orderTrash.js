@@ -48,6 +48,18 @@ function exchangeStatusOf(order) {
 }
 
 /**
+ * Единый выбор действия для кнопки удаления в рабочем списке.
+ * Переданный в 1С выполненный заказ только архивируется; остальные выполненные
+ * заказы администратор может удалить навсегда по прежнему правилу.
+ */
+export function orderRemovalMode(order, role = "manager") {
+  const adminCompleted =
+    role === "admin" && isAdminHardDeleteStatus(order?.status);
+  if (!adminCompleted) return "trash";
+  return exchangeStatusOf(order) === "sent" ? "archive" : "purge";
+}
+
+/**
  * Можно ли отправить заказ в корзину.
  * Клиент: только «Новый» и ещё не ушедший в 1С.
  * Менеджер: не принят / не в работе / не выполнен и не в очереди обмена

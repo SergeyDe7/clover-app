@@ -22,7 +22,12 @@ import {
   productArticle,
 } from "../../shared/appHelpers";
 import { unitDisplayShort } from "../../shared/i18n/unitDisplay.js";
-import { canPurgeOrder, canTrashOrder, isAdminHardDeleteStatus } from "../../shared/orderTrash";
+import {
+  canPurgeOrder,
+  canTrashOrder,
+  isAdminHardDeleteStatus,
+  orderRemovalMode,
+} from "../../shared/orderTrash";
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { EmptyState } from "../../shared/uxFeedback";
 import {
@@ -687,6 +692,11 @@ export function ManagerOrders({
         const trashGate = canTrashOrder(order, staffRole, t);
         const hardDeleteCompleted =
           staffRole === "admin" && isAdminHardDeleteStatus(order.status);
+        const archiveTransferredCompleted =
+          orderRemovalMode(order, staffRole) === "archive";
+        const deleteGate = hardDeleteCompleted && !archiveTransferredCompleted
+          ? canPurgeOrder(order, staffRole, t)
+          : trashGate;
         const canShowDelete =
           !inTrash &&
           (settings.managerCanDeleteOrders || hardDeleteCompleted);
@@ -795,17 +805,21 @@ export function ManagerOrders({
                   <button
                     className="danger-button manager-order-inline-action"
                     type="button"
-                    disabled={!trashGate.ok}
+                    disabled={!deleteGate.ok}
                     title={
-                      trashGate.ok
-                        ? hardDeleteCompleted
+                      deleteGate.ok
+                        ? hardDeleteCompleted && !archiveTransferredCompleted
                           ? t("manager.deleteTheOrderFromCloverForever")
                           : t("manager.moveOrderToTrash")
-                        : trashGate.error
+                        : deleteGate.error
                     }
                     onClick={() => onDeleteOrder(order)}
                   >
-                    {hardDeleteCompleted ? t("shared.action.deleteForever") : t("shared.action.delete")}
+                    {archiveTransferredCompleted
+                      ? t("shared.action.archive")
+                      : hardDeleteCompleted
+                        ? t("shared.action.deleteForever")
+                        : t("shared.action.delete")}
                   </button>
                 ) : null}
               </div>
