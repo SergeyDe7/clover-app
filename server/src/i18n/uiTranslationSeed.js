@@ -1137,6 +1137,14 @@ export const SEEDS = {
     "zh-CN": "添加",
     "ar": "إضافة"
   },
+  "shared.action.archive": {
+    "en": "Archive",
+    "uz": "Arxivga",
+    "ky": "Архивге",
+    "tg": "Ба бойгонӣ",
+    "zh-CN": "归档",
+    "ar": "أرشفة"
+  },
   "shared.action.delete": {
     "en": "Delete",
     "uz": "O‘chirish",

@@ -16,6 +16,7 @@ export const TRANSPORT_ERROR_CODES = Object.freeze([
 
 /** Finite domain codes thrown by non-React helpers. Locale-independent. */
 export const DOMAIN_ERROR_CODES = Object.freeze([
+  "ONEC_RECEIPT_HISTORY",
   "PHOTO_PREPARE_FAILED",
   "PHOTO_UNRECOGNIZED",
   "PHOTO_REQUIRED",
@@ -49,6 +50,7 @@ export const TRANSPORT_ERROR_KEY_BY_CODE = Object.freeze({
 });
 
 export const DOMAIN_ERROR_KEY_BY_CODE = Object.freeze({
+  ONEC_RECEIPT_HISTORY: "shared.order.exchangeBlocked",
   PHOTO_PREPARE_FAILED: "shared.error.photoPrepareFailed",
   PHOTO_UNRECOGNIZED: "shared.error.photoUnrecognized",
   PHOTO_REQUIRED: "shared.error.photoRequired",

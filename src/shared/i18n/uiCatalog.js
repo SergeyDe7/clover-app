@@ -992,6 +992,13 @@ const RAW_CATALOG = [
     "critical": true
   },
   {
+    "key": "shared.action.archive",
+    "sourceRu": "В архив",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
+  },
+  {
     "key": "shared.action.delete",
     "sourceRu": "Удалить",
     "namespace": "ui",

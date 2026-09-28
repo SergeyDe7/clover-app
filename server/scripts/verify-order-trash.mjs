@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -16,7 +16,11 @@ try {
     isOrderTrashed,
     preserveTrashedOrders,
     lockOrderTrashFields,
+    orderRemovalMode,
   } = await import("../../src/shared/orderTrash.js");
+  const { errorDisplayMessage } = await import(
+    "../../src/shared/i18n/errorDisplay.js"
+  );
 
   const active = {
     id: "ord-1",
@@ -64,6 +68,63 @@ try {
   assert.equal(canPurgeOrder(completed, "manager").ok, false);
   assert.equal(canPurgeOrder(completed, "admin").ok, false);
   assert.equal(canPurgeOrder(completed, "admin").code, "ONEC_RECEIPT_HISTORY");
+  assert.equal(orderRemovalMode(completed, "admin"), "archive");
+  assert.equal(
+    orderRemovalMode(
+      { ...completed, exchange: { ...completed.exchange, status: "not_sent" } },
+      "admin"
+    ),
+    "purge"
+  );
+  assert.equal(orderRemovalMode(active, "admin"), "trash");
+  assert.equal(
+    errorDisplayMessage({ code: "ONEC_RECEIPT_HISTORY" }),
+    "Заказ уже в обмене с 1С. Удаление запрещено."
+  );
+
+  const appSource = readFileSync(new URL("../../src/App.jsx", import.meta.url), "utf8");
+  assert.match(
+    appSource,
+    /const archiveTransferredCompleted = removalMode === "archive"/,
+    "the API action must use the shared removal-mode decision"
+  );
+  assert.match(
+    appSource,
+    /const gate = hardDeleteCompleted && !archiveTransferredCompleted\s*\?\s*canPurgeOrder\(order, staffRole, t\)\s*:\s*canTrashOrder\(order, staffRole, t\)/,
+    "an archive-only order must use the trash gate instead of the purge gate"
+  );
+  assert.equal(
+    [...appSource.matchAll(/if \(hardDeleteCompleted && !archiveTransferredCompleted\)/g)].length,
+    2,
+    "permanent-delete confirmation and API call must both exclude archive-only orders"
+  );
+
+  const managerOrdersSource = readFileSync(
+    new URL("../../src/screens/manager/ManagerOrders.jsx", import.meta.url),
+    "utf8"
+  );
+  assert.match(
+    managerOrdersSource,
+    /orderRemovalMode\(order, staffRole\) === "archive"/,
+    "the order card must use the shared removal-mode decision"
+  );
+  assert.match(
+    managerOrdersSource,
+    /const deleteGate = hardDeleteCompleted && !archiveTransferredCompleted\s*\?\s*canPurgeOrder\(order, staffRole, t\)\s*:\s*trashGate/,
+    "the order card must use the same archive-only gate as the API action"
+  );
+  assert.match(managerOrdersSource, /disabled=\{!deleteGate\.ok\}/);
+  assert.match(managerOrdersSource, /t\("shared\.action\.archive"\)/);
+
+  const errorDisplaySource = readFileSync(
+    new URL("../../src/shared/i18n/errorDisplay.js", import.meta.url),
+    "utf8"
+  );
+  assert.match(
+    errorDisplaySource,
+    /ONEC_RECEIPT_HISTORY:\s*"shared\.order\.exchangeBlocked"/,
+    "server receipt-history refusal must have a specific user-facing message"
+  );
 
   const delivering = {
     id: "ord-delivering",

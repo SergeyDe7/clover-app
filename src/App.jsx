@@ -40,7 +40,12 @@ import {
 } from "./shared/appHelpers";
 import { clearAppBadge, syncAppBadge } from "./shared/appBadge";
 import { appAlert, appConfirm } from "./shared/AppModal";
-import { canTrashOrder, isAdminHardDeleteStatus } from "./shared/orderTrash";
+import {
+  canPurgeOrder,
+  canTrashOrder,
+  isAdminHardDeleteStatus,
+  orderRemovalMode,
+} from "./shared/orderTrash";
 import { orderStatusLabel } from "./shared/i18n/displayLabels";
 import { errorDisplayMessage } from "./shared/i18n/errorDisplay.js";
 import {
@@ -1845,6 +1850,8 @@ function App() {
     const staffRole = authUser?.role === "admin" ? "admin" : "manager";
     const hardDeleteCompleted =
       staffRole === "admin" && isAdminHardDeleteStatus(order?.status);
+    const removalMode = orderRemovalMode(order, staffRole);
+    const archiveTransferredCompleted = removalMode === "archive";
 
     if (!settings.managerCanDeleteOrders && !hardDeleteCompleted) {
       await appAlert({
@@ -1855,13 +1862,15 @@ function App() {
       return;
     }
 
-    const gate = canTrashOrder(order, staffRole, t);
+    const gate = hardDeleteCompleted && !archiveTransferredCompleted
+      ? canPurgeOrder(order, staffRole, t)
+      : canTrashOrder(order, staffRole, t);
     if (!gate.ok) {
       await appAlert({ title: t("auth.cannotDelete"), message: gate.error, tone: "warn" });
       return;
     }
 
-    if (hardDeleteCompleted) {
+    if (hardDeleteCompleted && !archiveTransferredCompleted) {
       const ok = await appConfirm({
         title: t("auth.order.deleteForeverTitle", { number: order.number }),
         message:
@@ -1880,7 +1889,7 @@ function App() {
     void (async () => {
       try {
         // «Навсегда» — сразу purge, без trash (иначе всплывает «перемещён в корзину»).
-        if (hardDeleteCompleted) {
+        if (hardDeleteCompleted && !archiveTransferredCompleted) {
           const purgeResult = await api.purgeOrder(orderId);
           skipNextOrdersSyncRef.current = true;
           if (Array.isArray(purgeResult?.orders)) setOrders(purgeResult.orders);
@@ -1897,12 +1906,15 @@ function App() {
         }
         setSyncError("");
       } catch (error) {
-        const message = hardDeleteCompleted
+        const message = hardDeleteCompleted && !archiveTransferredCompleted
           ? t("auth.order.notDeleted", { message: errorDisplayMessage(error, t) })
           : t("auth.order.notMovedToTrash", { message: errorDisplayMessage(error, t) });
         setSyncError(message);
         void appAlert({
-          title: hardDeleteCompleted ? t("auth.deletion") : t("storefront.nav.cart"),
+          title:
+            hardDeleteCompleted && !archiveTransferredCompleted
+              ? t("auth.deletion")
+              : t("storefront.nav.cart"),
           message,
           tone: "danger",
         });
