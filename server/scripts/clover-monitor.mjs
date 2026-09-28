@@ -85,6 +85,7 @@ const STATUS_ONLY_ENV_NAMES = MONITOR_STATUS_ENV_NAMES;
 export function parseStatusOnlyFile(filePath, {
   strictMode = process.env.CLOVER_MONITOR_STRICT_STATUS_MODE === "true",
   now = Date.now(),
+  expectedUid = 0,
 } = {}) {
   const names = new Set(STATUS_ONLY_ENV_NAMES);
   const values = {};
@@ -109,7 +110,8 @@ export function parseStatusOnlyFile(filePath, {
     closeSync(fd);
   }
   if (strictMode && process.platform !== "win32") {
-    if (stat.uid !== 0) throw new Error("monitor_status_file_owner_invalid");
+    if (!Number.isInteger(expectedUid) || expectedUid < 0) throw new Error("monitor_status_expected_uid_invalid");
+    if (stat.uid !== expectedUid) throw new Error("monitor_status_file_owner_invalid");
     if ((stat.mode & 0o777) !== 0o640) throw new Error("monitor_status_file_mode_invalid");
   }
   if (Buffer.byteLength(source) > 64 * 1024) throw new Error("monitor_status_file_too_large");
@@ -207,7 +209,7 @@ export async function runMonitor(options, deps = {}) {
     }
   }
   const statusProjection = options.statusFilePath
-    ? parseStatusOnlyFile(options.statusFilePath, { now })
+    ? (deps.parseStatusOnlyFile || parseStatusOnlyFile)(options.statusFilePath, { now })
     : {};
   const expectedRuntimeStatusRevision = options.statusFilePath && options.statusHmacKeyPath
     ? runtimeStatusProjectionRevision(statusProjection, readStatusHmacKey(options.statusHmacKeyPath))

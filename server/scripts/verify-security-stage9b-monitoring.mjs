@@ -41,7 +41,7 @@ import {
   requireRuntimeFeature,
   runtimeKillSwitchStatus,
 } from "../src/runtimeKillSwitches.js";
-import { runMonitor } from "./clover-monitor.mjs";
+import { parseStatusOnlyFile, runMonitor } from "./clover-monitor.mjs";
 
 const NOW_ISO = "2026-09-28T12:00:00.000Z";
 const NOW_MS = Date.parse(NOW_ISO);
@@ -1447,6 +1447,11 @@ test("mandatory status artifact rejects missing, future and incomplete files vis
     writeNdjson: () => {},
     alertSink: { emit: (events) => ({ delivered: events.length, failed: 0 }) },
     statusEnv: {},
+    parseStatusOnlyFile: (filePath, { now }) => parseStatusOnlyFile(filePath, {
+      strictMode: true,
+      now,
+      expectedUid: typeof process.getuid === "function" ? process.getuid() : 0,
+    }),
   };
   const options = {
     environment: "test",
@@ -1460,7 +1465,14 @@ test("mandatory status artifact rejects missing, future and incomplete files vis
     await assert.rejects(runMonitor(options, deps), /ENOENT|monitor_status_(?:missing|invalid)/u);
 
     writeFileSync(statusPath, "ONEC_WRITE_ENABLED=false\n", "utf8");
+    chmodSync(statusPath, 0o640);
     utimesSync(statusPath, new Date(NOW_MS), new Date(NOW_MS));
+    if (process.platform !== "win32" && typeof process.getuid === "function" && process.getuid() !== 0) {
+      assert.throws(
+        () => parseStatusOnlyFile(statusPath, { strictMode: true, now: NOW_MS }),
+        /monitor_status_file_owner_invalid/u
+      );
+    }
     await assert.rejects(runMonitor(options, deps), /monitor_status_(?:incomplete|invalid)/u);
 
     const example = readFileSync(
