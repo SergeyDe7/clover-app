@@ -25,6 +25,7 @@ import { unitDisplayShort } from "../../shared/i18n/unitDisplay.js";
 import {
   canPurgeOrder,
   canTrashOrder,
+  countPurgeableOrders,
   isAdminHardDeleteStatus,
   orderRemovalMode,
 } from "../../shared/orderTrash";
@@ -206,6 +207,7 @@ export function ManagerOrders({
   const effectiveSearch = headerSearch.trim();
   const inTrash = ordersView === "trash";
   const sourceOrders = inTrash ? trashedOrders : orders;
+  const purgeableTrashCount = countPurgeableOrders(trashedOrders, staffRole, t);
 
   useEffect(() => {
     if (statusFilter) setStatus(statusFilter);
@@ -582,9 +584,9 @@ export function ManagerOrders({
           onClick={() => onOrdersViewChange?.("trash")}
         >
           {t("manager.orders.trash")}
-          {trashedOrders.length > 0 ? (
-            <span className="manager-nav-count" aria-label={t("manager.orders.inTrashCount", { count: trashedOrders.length })}>
-              {trashedOrders.length}
+          {purgeableTrashCount > 0 ? (
+            <span className="manager-nav-count" aria-label={t("manager.orders.inTrashCount", { count: purgeableTrashCount })}>
+              {purgeableTrashCount}
             </span>
           ) : null}
         </button>

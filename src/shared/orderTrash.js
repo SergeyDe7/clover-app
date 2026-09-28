@@ -159,6 +159,13 @@ export function canPurgeOrder(order, role = "manager", t) {
   return { ok: true };
 }
 
+/** Количество заказов в корзине, которые текущая роль может удалить навсегда. */
+export function countPurgeableOrders(orders, role = "manager", t) {
+  return (Array.isArray(orders) ? orders : []).filter(
+    (order) => canPurgeOrder(order, role, t).ok
+  ).length;
+}
+
 /**
  * Soft-deleted заказы из previous, которых нет во входящем списке —
  * их нужно сохранить при replaceOrders.
