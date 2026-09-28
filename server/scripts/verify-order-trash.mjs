@@ -13,6 +13,7 @@ try {
     canTrashOrder,
     canRestoreOrder,
     canPurgeOrder,
+    countPurgeableOrders,
     isOrderTrashed,
     preserveTrashedOrders,
     lockOrderTrashFields,
@@ -77,6 +78,40 @@ try {
     "purge"
   );
   assert.equal(orderRemovalMode(active, "admin"), "trash");
+
+  const archivedSent = {
+    ...completed,
+    deletedAt: "2026-09-28T10:00:00.000Z",
+    deletedBy: { role: "admin" },
+  };
+  const regularTrash = {
+    ...active,
+    deletedAt: "2026-09-28T10:01:00.000Z",
+    deletedBy: { role: "admin" },
+  };
+  const completedNotSentTrash = {
+    ...completed,
+    exchange: { ...completed.exchange, status: "not_sent" },
+    deletedAt: "2026-09-28T10:02:00.000Z",
+    deletedBy: { role: "admin" },
+  };
+  assert.equal(countPurgeableOrders([archivedSent], "admin"), 0);
+  assert.equal(countPurgeableOrders([archivedSent, regularTrash], "admin"), 1);
+  assert.equal(
+    countPurgeableOrders(
+      [regularTrash, completedNotSentTrash, archivedSent],
+      "manager"
+    ),
+    1
+  );
+  assert.equal(
+    countPurgeableOrders(
+      [regularTrash, completedNotSentTrash, archivedSent],
+      "admin"
+    ),
+    2
+  );
+  assert.equal(countPurgeableOrders(null, "admin"), 0);
   assert.equal(
     errorDisplayMessage({ code: "ONEC_RECEIPT_HISTORY" }),
     "Заказ уже в обмене с 1С. Удаление запрещено."
@@ -115,6 +150,16 @@ try {
   );
   assert.match(managerOrdersSource, /disabled=\{!deleteGate\.ok\}/);
   assert.match(managerOrdersSource, /t\("shared\.action\.archive"\)/);
+  assert.match(
+    managerOrdersSource,
+    /const purgeableTrashCount = countPurgeableOrders\(trashedOrders, staffRole, t\)/,
+    "trash badge must count only orders that the current role can purge"
+  );
+  assert.doesNotMatch(
+    managerOrdersSource,
+    /manager\.orders\.inTrashCount[\s\S]{0,80}trashedOrders\.length/,
+    "trash badge must not expose the total archive size"
+  );
 
   const errorDisplaySource = readFileSync(
     new URL("../../src/shared/i18n/errorDisplay.js", import.meta.url),
