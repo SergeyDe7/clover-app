@@ -1,7 +1,9 @@
 # ADR: Stage 9C incident response and fixture drill
 
-- Status: Proposed for Stage 9C review
+- Status: Accepted
 - Date: 2026-09-28
+- Accepted by owner: 2026-09-28; private contact register created and the
+  `production restore NOT VERIFIED` residual explicitly accepted.
 - Baseline inspected: `c7b14a0` (historical SHA is not authority for a future action)
 - Related contract: `SECURITY_STAGE9B_MONITORING.md`
 
