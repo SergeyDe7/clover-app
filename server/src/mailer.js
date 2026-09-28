@@ -1,3 +1,5 @@
+import { isOutboundChannelPaused } from "./runtimeKillSwitches.js";
+
 function smtpConfig() {
   const host = String(process.env.SMTP_HOST || "").trim();
   const port = Number(process.env.SMTP_PORT || 465);
@@ -18,8 +20,11 @@ function smtpConfig() {
 
 export function publicMailStatus() {
   const config = smtpConfig();
+  const paused = isOutboundChannelPaused("email");
   return {
     configured: config.configured,
+    enabled: config.configured && !paused,
+    paused,
     from: config.configured ? config.from : "",
   };
 }
@@ -72,6 +77,9 @@ export function normalizeMailAttachments(value = []) {
 }
 
 export async function sendCloverMail({ to, subject, text, html, attachments = [] }) {
+  if (isOutboundChannelPaused("email")) {
+    return { sent: false, reason: "feature_paused" };
+  }
   const config = smtpConfig();
   if (!config.configured) {
     return { sent: false, reason: "smtp_not_configured" };

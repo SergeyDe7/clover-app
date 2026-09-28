@@ -94,6 +94,11 @@ extract_file "server/scripts/releaseNamespace.js" "${EXTRACT}/releaseNamespace.j
 extract_file "server/scripts/preparedDist.mjs" "${EXTRACT}/preparedDist.mjs"
 extract_file "server/scripts/assert-metrika-release.mjs" "${EXTRACT}/assert-metrika-release.mjs"
 extract_file "server/scripts/seoPostCutoverProbe.mjs" "${EXTRACT}/seoPostCutoverProbe.mjs"
+mkdir -p "${EXTRACT}/server/scripts" "${EXTRACT}/server/src/monitoring"
+extract_file "server/scripts/write-monitor-evidence.mjs" "${EXTRACT}/server/scripts/write-monitor-evidence.mjs"
+extract_file "server/src/monitoring/collectors.js" "${EXTRACT}/server/src/monitoring/collectors.js"
+extract_file "server/src/monitoring/contracts.js" "${EXTRACT}/server/src/monitoring/contracts.js"
+extract_file "server/src/monitoring/sanitizeAlert.js" "${EXTRACT}/server/src/monitoring/sanitizeAlert.js"
 chmod +x "${EXTRACT}/restart-api-ui.sh" || true
 if [[ "${LAUNCH_MODE}" == "promote" ]]; then
   EXTRACTED_SHA="$(node "${EXTRACT}/preparedDist.mjs" inspect-sha --manifest "${PREPARED_PATH}/manifest.json")"
@@ -109,6 +114,15 @@ export CLOVER_DEPLOY_STAGING="${STAGING_ROOT}"
 export CLOVER_DEPLOY_PROBE_JS="${EXTRACT}/uiAssetProbe.mjs"
 export CLOVER_DEPLOY_SEO_GATE_JS="${EXTRACT}/seoPostCutoverProbe.mjs"
 export CLOVER_DEPLOY_METRIKA_JS="${EXTRACT}/assert-metrika-release.mjs"
+if [[ -n "${CLOVER_MONITOR_FIXTURE_ROOT:-}" ]]; then
+  export CLOVER_MONITOR_EVIDENCE_WRITER="${EXTRACT}/server/scripts/write-monitor-evidence.mjs"
+else
+  unset CLOVER_MONITOR_EVIDENCE_WRITER CLOVER_MONITOR_EVIDENCE_DIR CLOVER_MONITOR_DEPLOY_RECEIPT || true
+  # This path is not an operator override: it is the writer extracted from the
+  # exact target commit above. It must survive a first-release rollback after
+  # ROOT has already been reset to the previous SHA.
+  export CLOVER_MONITOR_PINNED_EVIDENCE_WRITER="${EXTRACT}/server/scripts/write-monitor-evidence.mjs"
+fi
 export CLOVER_DEPLOY_TARGET_SHA="${PINNED_SHA}"
 echo "FIRST_DEPLOY_LAUNCHER: invoked=${EXTRACT}/restart-api-ui.sh"
 echo "FIRST_DEPLOY_LAUNCHER: mode=${LAUNCH_MODE}"

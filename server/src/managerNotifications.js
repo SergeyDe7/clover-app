@@ -16,6 +16,7 @@ import {
   publicPushStatus,
   sendOrderPush,
 } from "./push.js";
+import { isOutboundChannelPaused } from "./runtimeKillSwitches.js";
 
 const EVENT_SETTING = {
   new_order: "managerNotifyNewOrders",
@@ -113,6 +114,9 @@ function publicUrl(notification) {
 }
 
 async function sendTelegram(notification, settings) {
+  if (isOutboundChannelPaused("telegram")) {
+    return { channel: "telegram", sent: false, reason: "feature_paused" };
+  }
   const config = telegramConfig(settings);
   if (!config.configured) {
     return { channel: "telegram", sent: false, reason: "telegram_not_configured" };
@@ -269,21 +273,24 @@ export function publicManagerNotificationStatus(settings = currentSettings()) {
   return {
     inApp: { enabled: settings.managerNotificationsEnabled !== false },
     email: {
-      enabled: Boolean(settings.managerNotifyEmail),
+      enabled: Boolean(settings.managerNotifyEmail) && !mail.paused,
+      paused: Boolean(mail.paused),
       configured: Boolean(mail.configured && emailRecipients(settings).length),
       smtpConfigured: Boolean(mail.configured),
       recipientConfigured: Boolean(emailRecipients(settings).length),
       recipient: String(settings.managerNotificationEmail || process.env.MANAGER_NOTIFICATION_EMAIL || ""),
     },
     telegram: {
-      enabled: Boolean(settings.managerNotifyTelegram),
+      enabled: Boolean(settings.managerNotifyTelegram) && !isOutboundChannelPaused("telegram"),
+      paused: isOutboundChannelPaused("telegram"),
       configured: telegram.configured,
       tokenConfigured: Boolean(telegram.token),
       chatConfigured: Boolean(telegram.chatId),
       chatId: telegram.chatId ? `${telegram.chatId.slice(0, 4)}…${telegram.chatId.slice(-3)}` : "",
     },
     push: {
-      enabled: settings.managerNotifyPush !== false,
+      enabled: settings.managerNotifyPush !== false && !isOutboundChannelPaused("push"),
+      paused: isOutboundChannelPaused("push"),
       configured: Boolean(push.enabled),
     },
   };

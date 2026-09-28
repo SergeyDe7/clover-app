@@ -3,6 +3,7 @@ import {
   listPushSubscriptions,
 } from "./db.js";
 import { logCaughtError } from "./safeLog.js";
+import { isOutboundChannelPaused } from "./runtimeKillSwitches.js";
 
 function config() {
   const publicKey = String(process.env.VAPID_PUBLIC_KEY || "").trim();
@@ -18,8 +19,11 @@ function config() {
 
 export function publicPushStatus() {
   const current = config();
+  const paused = isOutboundChannelPaused("push");
   return {
-    enabled: current.enabled,
+    enabled: current.enabled && !paused,
+    configured: current.enabled,
+    paused,
     publicKey: current.enabled ? current.publicKey : "",
   };
 }
@@ -33,6 +37,9 @@ async function loadWebPush() {
 }
 
 export async function sendPushToSubscriptions(subscriptions, payload, deps = {}) {
+  if (isOutboundChannelPaused("push", deps.env || process.env)) {
+    return { enabled: false, sent: 0, failed: 0, reason: "feature_paused" };
+  }
   const webpush = deps.webpush || await loadWebPush();
   if (!webpush) return { enabled: false, sent: 0, failed: 0 };
 

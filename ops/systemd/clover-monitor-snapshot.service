@@ -1,0 +1,32 @@
+[Unit]
+Description=Clover sanitized monitoring snapshot producer
+Before=clover-monitor.service
+
+[Service]
+Type=oneshot
+User=clover
+Group=clover
+WorkingDirectory=/opt/clover/clover-app/server
+Environment=NODE_ENV=production
+Environment=CLOVER_MONITOR_ENVIRONMENT=production
+Environment=DB_PATH=/opt/clover/clover-app/server/data/clover.sqlite
+Environment=CLOVER_MONITOR_BACKUP_DIR=/opt/clover/clover-app/server/backups/daily
+Environment=CLOVER_MONITOR_BACKUP_EVIDENCE=/var/lib/clover-monitor-evidence/backup-evidence.json
+Environment=CLOVER_MONITOR_RUNTIME_SNAPSHOT=/var/lib/clover-monitor-evidence/runtime-snapshot.json
+ExecStart=/usr/bin/node /opt/clover/clover-app/server/scripts/write-monitor-snapshot.mjs
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/var/lib/clover-monitor-evidence
+RestrictNamespaces=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+TimeoutStartSec=30
