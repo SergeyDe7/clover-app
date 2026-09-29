@@ -33,6 +33,7 @@ import {
 import { appAlert, appConfirm } from "../../shared/AppModal";
 import { addressLabel } from "../../shared/i18n/displayLabels";
 import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
+import { isValidNewPassword, PASSWORD_MIN_LENGTH } from "../../shared/passwordPolicy.js";
 import { MatrixOneCProductAdd } from "./MatrixOneCProductAdd";
 import { MatrixCloverCatalogAdd } from "./MatrixCloverCatalogAdd";
 import { ProductEditor } from "./ProductEditor";
@@ -79,7 +80,7 @@ function typedSalePriceForUnit(product, priceTypeId, unit) {
   return piece * Math.max(1, Number(product?.[sizeField]) || 1);
 }
 
-function generateAccessPassword(length = 10) {
+function generateAccessPassword(length = PASSWORD_MIN_LENGTH) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
   const bytes =
     typeof crypto !== "undefined" && crypto.getRandomValues
@@ -580,8 +581,8 @@ function ManagerClientEditor({
   };
 
   const savePassword = async () => {
-    const password = passwordDraft.trim();
-    if (password.length < 6) {
+    const password = passwordDraft;
+    if (!isValidNewPassword(password)) {
       await appAlert({
         title: t("manager.passwordTooShort"),
         message: t("shared.passwordMustBeAtLeast6"),
@@ -593,7 +594,7 @@ function ManagerClientEditor({
     try {
       const result = await api.setClientPassword(client.id, password);
       await onReload();
-      const once = String(result?.temporaryPassword || password).trim();
+      const once = String(result?.temporaryPassword || password);
       setPasswordDraft(once);
       const login = String(result?.login || client.email || "").trim();
       setMessage(
@@ -847,7 +848,7 @@ function ManagerClientEditor({
               autoComplete="new-password"
               value={passwordDraft}
               onChange={(event) => setPasswordDraft(event.target.value)}
-              minLength={6}
+              minLength={PASSWORD_MIN_LENGTH}
               disabled={passwordBusy}
             />
           </label>
@@ -1228,8 +1229,8 @@ export function ManagerClients({
     const contactName = provisionForm.contactName.trim();
     const phone = provisionForm.phone.trim();
     const email = provisionForm.email.trim().toLowerCase();
-    const password = provisionForm.password.trim();
-    if (!companyName || !contactName || !phone || !email || password.length < 6) {
+    const password = provisionForm.password;
+    if (!companyName || !contactName || !phone || !email || !isValidNewPassword(password)) {
       await appAlert({
         title: t("manager.checkTheFields"),
         message: t("manager.fillInAllFieldsThePassword"),
@@ -1675,7 +1676,7 @@ export function ManagerClients({
                   }))
                 }
                 required
-                minLength={6}
+                minLength={PASSWORD_MIN_LENGTH}
                 disabled={provisionBusy}
               />
             </label>

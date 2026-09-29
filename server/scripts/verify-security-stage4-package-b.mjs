@@ -689,7 +689,7 @@ try {
     otherBody: { ...registerBody, email: "s4b-register-other@test.local" },
     casePath: "/API/auth/Register",
     slashPath: "/api/auth/register/",
-    expectAllowedStatus: (res) => res.status === 201 || res.status === 409,
+    expectAllowedStatus: [202],
   });
   note(
     "register.no-extra-user-on-429",
@@ -792,7 +792,7 @@ try {
   });
   note(
     "passkey-options.no-ceremony-on-429",
-    sqlCount("webauthn_challenges") === challengesBefore + EXPECTED.passkeyAuthOptions.max,
+    sqlCount("webauthn_challenges") === challengesBefore + EXPECTED.passkeyAuthOptions.max + 1,
     `challenges=${sqlCount("webauthn_challenges")} before=${challengesBefore}`
   );
 

@@ -6,8 +6,9 @@ import { appAlert, appConfirm } from "../../shared/AppModal";
 import { formatDateTime } from "../../shared/appHelpers";
 import { AdminRolePanel } from "../../components/AdminRolePanel";
 import { errorDisplayMessage } from "../../shared/i18n/errorDisplay.js";
+import { isValidNewPassword, PASSWORD_MIN_LENGTH } from "../../shared/passwordPolicy.js";
 
-function generateAccessPassword(length = 10) {
+function generateAccessPassword(length = PASSWORD_MIN_LENGTH) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
   const bytes = new Uint8Array(length);
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
@@ -184,8 +185,8 @@ function ClientAccessPanel() {
   };
 
   const savePassword = async (item) => {
-    const password = passwordDraft.trim();
-    if (password.length < 6) {
+    const password = passwordDraft;
+    if (!isValidNewPassword(password)) {
       await appAlert({
         title: t("manager.passwordTooShort"),
         message: t("shared.passwordMustBeAtLeast6"),
@@ -196,7 +197,7 @@ function ClientAccessPanel() {
     setPasswordBusy(true);
     try {
       const result = await api.setClientPassword(item.clientId, password);
-      const once = String(result?.temporaryPassword || password).trim();
+      const once = String(result?.temporaryPassword || password);
       await load();
       if (once) {
         setOneShotPassword(once);
@@ -328,7 +329,7 @@ function ClientAccessPanel() {
                       }<input
                         type="text"
                         autoComplete="off"
-                        minLength={6}
+                        minLength={PASSWORD_MIN_LENGTH}
                         value={passwordDraft}
                         onChange={(event) => {
                           setOneShotPassword("");

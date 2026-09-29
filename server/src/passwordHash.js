@@ -3,6 +3,7 @@
  * S2-NEW-002: single wrapper — no custom cryptography.
  */
 import bcrypt from "bcryptjs";
+import { WRITE_PASSWORD_MAX_UTF8_BYTES } from "./passwordPolicy.js";
 
 export const PASSWORD_HASH_ALGORITHM = "bcrypt";
 export const PASSWORD_HASH_COST = 12;
@@ -37,6 +38,9 @@ export async function hashPassword(plain, cost = PASSWORD_HASH_COST) {
   if (!password) {
     throw new Error("password_required");
   }
+  if (Buffer.byteLength(password, "utf8") > WRITE_PASSWORD_MAX_UTF8_BYTES) {
+    throw new Error("password_exceeds_bcrypt_limit");
+  }
   return bcrypt.hash(password, Number(cost) || PASSWORD_HASH_COST);
 }
 
@@ -44,6 +48,9 @@ export function hashPasswordSync(plain, cost = PASSWORD_HASH_COST) {
   const password = String(plain ?? "");
   if (!password) {
     throw new Error("password_required");
+  }
+  if (Buffer.byteLength(password, "utf8") > WRITE_PASSWORD_MAX_UTF8_BYTES) {
+    throw new Error("password_exceeds_bcrypt_limit");
   }
   return bcrypt.hashSync(password, Number(cost) || PASSWORD_HASH_COST);
 }

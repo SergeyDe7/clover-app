@@ -316,7 +316,7 @@ async function main() {
         phone: "+70000000000",
       },
     });
-    note("register.created", reg.status === 201, `status=${reg.status} code=${reg.json?.code || ""}`);
+    note("register.accepted", reg.status === 202, `status=${reg.status} code=${reg.json?.code || ""}`);
     note(
       "register.no-store",
       String(reg.headers.get("cache-control") || "").includes("no-store"),

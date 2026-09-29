@@ -237,7 +237,7 @@ export async function runStage4ClosureMatrixAsync(ctx) {
   assert.equal(restored.field.state, "AUTO");
 
   const snapshot = exportDatabaseSnapshot();
-  assert.equal(snapshot.version, 5);
+  assert.equal(snapshot.version, 6);
   const restoredRow = snapshot.productTranslations.find(
     (row) =>
       String(row.product_id || row.productId) === String(sample.productId) &&

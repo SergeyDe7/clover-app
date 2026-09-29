@@ -4,6 +4,31 @@ import {
 } from "./authUrlPolicy.js";
 import { logSafe } from "./safeLog.js";
 
+const AUTH_RESPONSE_MIN_MS = 300;
+const NEUTRAL_REGISTRATION_MESSAGE =
+  "Если регистрация может быть создана, инструкции будут отправлены на указанную почту.";
+
+async function waitForNeutralAuthTiming(startedAt, deps) {
+  const now = typeof deps.now === "function" ? deps.now : Date.now;
+  const wait = typeof deps.wait === "function"
+    ? deps.wait
+    : (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs));
+  const remainingMs = AUTH_RESPONSE_MIN_MS - (now() - startedAt);
+  if (remainingMs > 0) await wait(remainingMs);
+}
+
+function queueAuthMail(sendCloverMail, payload, event) {
+  void Promise.resolve()
+    .then(() => sendCloverMail(payload))
+    .catch(() => {
+      logSafe("error", {
+        event,
+        code: "MAIL_SEND_FAILED",
+        component: "authIssuance",
+      });
+    });
+}
+
 function required(deps, name) {
   const fn = deps?.[name];
   if (typeof fn !== "function") {
@@ -24,6 +49,8 @@ function developmentLinkAllowed(req, env, deps) {
 }
 
 export async function executeClientRegistration(input, deps = {}) {
+  const now = typeof deps.now === "function" ? deps.now : Date.now;
+  const startedAt = now();
   const env = deps.env || process.env;
   const cabinetUrl = resolveCabinetUrl(input.req, env, deps);
   const findUserByEmail = required(deps, "findUserByEmail");
@@ -36,29 +63,47 @@ export async function executeClientRegistration(input, deps = {}) {
   const sendCloverMail = required(deps, "sendCloverMail");
   const writeAudit = required(deps, "writeAudit");
   const queueManagerNotification = required(deps, "queueManagerNotification");
-  const publicMailStatus = required(deps, "publicMailStatus");
 
+  // Hash on both paths so an existing account cannot be identified by bcrypt timing.
+  const passwordHash = await hashPassword(input.password);
   if (findUserByEmail(input.email)) {
+    await waitForNeutralAuthTiming(startedAt, deps);
     return {
-      status: 409,
-      body: { error: "Аккаунт с такой почтой уже существует." },
+      status: 202,
+      body: {
+        ok: true,
+        message: NEUTRAL_REGISTRATION_MESSAGE,
+      },
     };
   }
 
-  const passwordHash = await hashPassword(input.password);
-  const user = createUser({
-    email: input.email,
-    passwordHash,
-    role: "client",
-    emailVerified: false,
-    approvalStatus: "pending",
-    profile: {
-      companyName: input.companyName,
-      contactName: input.contactName,
-      phone: input.phone,
+  let user;
+  try {
+    user = createUser({
       email: input.email,
-    },
-  });
+      passwordHash,
+      role: "client",
+      emailVerified: false,
+      approvalStatus: "pending",
+      profile: {
+        companyName: input.companyName,
+        contactName: input.contactName,
+        phone: input.phone,
+        email: input.email,
+      },
+    });
+  } catch (error) {
+    // A concurrent registration can win the UNIQUE(email) race. Keep the same
+    // public contract as the ordinary duplicate-account path.
+    if (findUserByEmail(input.email)) {
+      await waitForNeutralAuthTiming(startedAt, deps);
+      return {
+        status: 202,
+        body: { ok: true, message: NEUTRAL_REGISTRATION_MESSAGE },
+      };
+    }
+    throw error;
+  }
 
   const plainToken = createPlainToken();
   createAuthToken({
@@ -72,25 +117,14 @@ export async function executeClientRegistration(input, deps = {}) {
     companyName: input.companyName,
     verifyUrl,
   });
-  let mail;
-  try {
-    mail = await sendCloverMail({ to: input.email, ...message });
-  } catch (_mailError) {
-    logSafe("error", {
-      event: "auth.mail.verification",
-      code: "MAIL_SEND_FAILED",
-      component: "authIssuance",
-    });
-    mail = { sent: false, reason: "send_failed" };
-  }
-  mail = mail || { sent: false, reason: "unknown" };
+  queueAuthMail(sendCloverMail, { to: input.email, ...message }, "auth.mail.verification");
 
   writeAudit({
     userId: user.id,
     userEmail: user.email,
     userRole: user.role,
     action: "auth.register",
-    details: { companyName: input.companyName, mailSent: Boolean(mail.sent) },
+    details: { companyName: input.companyName, mailQueued: true },
   });
 
   queueManagerNotification({
@@ -101,23 +135,19 @@ export async function executeClientRegistration(input, deps = {}) {
     sourceId: user.id,
   });
 
+  await waitForNeutralAuthTiming(startedAt, deps);
   return {
-    status: 201,
+    status: 202,
     body: {
       ok: true,
-      requiresEmailVerification: true,
-      message: mail.sent
-        ? "Регистрация создана. Подтвердите электронную почту по ссылке из письма."
-        : "Регистрация создана. Отправка писем пока не настроена — используйте тестовую ссылку на этом компьютере.",
-      mail: { sent: Boolean(mail.sent), status: publicMailStatus() },
-      developmentLink: developmentLinkAllowed(input.req, env, deps)
-        ? verifyUrl
-        : undefined,
+      message: NEUTRAL_REGISTRATION_MESSAGE,
     },
   };
 }
 
 export async function executeResendVerification(input, deps = {}) {
+  const now = typeof deps.now === "function" ? deps.now : Date.now;
+  const startedAt = now();
   const env = deps.env || process.env;
   const cabinetUrl = resolveCabinetUrl(input.req, env, deps);
   const findUserByEmail = required(deps, "findUserByEmail");
@@ -144,18 +174,11 @@ export async function executeResendVerification(input, deps = {}) {
       ? getClientState(user.id).profile?.companyName
       : "Менеджер Clover";
     const message = verificationEmail({ companyName, verifyUrl });
-    try {
-      await sendCloverMail({ to: input.email, ...message });
-    } catch (_error) {
-      logSafe("error", {
-        event: "auth.mail.resend",
-        code: "MAIL_SEND_FAILED",
-        component: "authIssuance",
-      });
-    }
+    queueAuthMail(sendCloverMail, { to: input.email, ...message }, "auth.mail.resend");
     if (developmentLinkAllowed(input.req, env, deps)) developmentLink = verifyUrl;
   }
 
+  await waitForNeutralAuthTiming(startedAt, deps);
   return {
     status: 200,
     body: {
@@ -168,6 +191,8 @@ export async function executeResendVerification(input, deps = {}) {
 }
 
 export async function executeForgotPassword(input, deps = {}) {
+  const now = typeof deps.now === "function" ? deps.now : Date.now;
+  const startedAt = now();
   const env = deps.env || process.env;
   const cabinetUrl = resolveCabinetUrl(input.req, env, deps);
   const findUserByEmail = required(deps, "findUserByEmail");
@@ -190,15 +215,7 @@ export async function executeForgotPassword(input, deps = {}) {
     });
     const resetUrl = `${cabinetUrl}/?reset=${encodeURIComponent(plainToken)}`;
     const message = resetPasswordEmail({ resetUrl });
-    try {
-      await sendCloverMail({ to: input.email, ...message });
-    } catch (_error) {
-      logSafe("error", {
-        event: "auth.mail.reset",
-        code: "MAIL_SEND_FAILED",
-        component: "authIssuance",
-      });
-    }
+    queueAuthMail(sendCloverMail, { to: input.email, ...message }, "auth.mail.reset");
     if (developmentLinkAllowed(input.req, env, deps)) developmentLink = resetUrl;
     writeAudit({
       userId: user.id,
@@ -209,6 +226,7 @@ export async function executeForgotPassword(input, deps = {}) {
     });
   }
 
+  await waitForNeutralAuthTiming(startedAt, deps);
   return {
     status: 200,
     body: {

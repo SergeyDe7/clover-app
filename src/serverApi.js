@@ -1,6 +1,10 @@
 import { stripProductForSave } from "./shared/appHelpers";
+import {
+  clearSessionToken,
+  readSessionToken,
+  writeSessionToken,
+} from "./shared/sessionTokenStorage";
 
-const TOKEN_KEY = "clover-api-token";
 const DEFAULT_TIMEOUT_MS = 20000;
 const AUTH_TIMEOUT_MS = 12000;
 const BOOTSTRAP_TIMEOUT_MS = 25000;
@@ -48,15 +52,15 @@ function makeTransportError(code, { status = 0, payload, message, retryAfterSeco
 }
 
 export function getApiToken() {
-  return localStorage.getItem(TOKEN_KEY) || "";
+  return readSessionToken({ sessionStorage, localStorage });
 }
 
 export function setApiToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
+  writeSessionToken(token, { sessionStorage, localStorage });
 }
 
 export function clearApiToken() {
-  localStorage.removeItem(TOKEN_KEY);
+  clearSessionToken({ sessionStorage, localStorage });
 }
 
 function withTimeoutSignal(timeoutMs, userSignal) {
@@ -233,8 +237,11 @@ export const api = {
     });
   },
 
-  logoutOtherSessions() {
-    return request("/auth/logout-other-sessions", { method: "POST" });
+  logoutOtherSessions(currentPassword) {
+    return request("/auth/logout-other-sessions", {
+      method: "POST",
+      body: { currentPassword },
+    });
   },
 
   createManager(email, password, contact = {}) {
@@ -305,8 +312,11 @@ export const api = {
     return request("/passkeys");
   },
 
-  getPasskeyRegistrationOptions() {
-    return request("/passkeys/registration/options", { method: "POST" });
+  getPasskeyRegistrationOptions(currentPassword) {
+    return request("/passkeys/registration/options", {
+      method: "POST",
+      body: { currentPassword },
+    });
   },
 
   verifyPasskeyRegistration(ceremonyId, response) {
@@ -316,8 +326,11 @@ export const api = {
     });
   },
 
-  deletePasskey(credentialId) {
-    return request(`/passkeys/${encodeURIComponent(credentialId)}`, { method: "DELETE" });
+  deletePasskey(credentialId, currentPassword) {
+    return request(`/passkeys/${encodeURIComponent(credentialId)}/delete`, {
+      method: "POST",
+      body: { currentPassword },
+    });
   },
 
   getPasskeyAuthenticationOptions(email) {

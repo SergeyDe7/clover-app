@@ -85,7 +85,10 @@
       <div class="mark" aria-hidden="true"></div>
       <h1>Нет связи</h1>
       <p>Проверьте интернет и попробуйте снова. Clover откроется, как только сеть вернётся.</p>
-      <button type="button" onclick="location.reload()">Повторить</button>
+      <button id="retry" type="button">Повторить</button>
     </main>
+    <script>
+      document.getElementById("retry")?.addEventListener("click", () => location.reload());
+    </script>
   </body>
 </html>

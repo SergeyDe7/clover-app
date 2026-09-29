@@ -298,12 +298,12 @@ export const SEEDS = {
     "ar": "حفظ كلمة المرور"
   },
   "auth.reset.hint": {
-    "en": "Create a new password at least 6 characters long.",
-    "uz": "Kamida 6 belgidan iborat yangi parol o‘ylab toping.",
-    "ky": "Кеминде 6 белгиден турган жаңы сырсөз ойлоп табыңыз.",
-    "tg": "Рамзи навро ҳадди ақал 6 аломат созед.",
-    "zh-CN": "请设置至少 6 个字符的新密码。",
-    "ar": "أنشئ كلمة مرور جديدة لا تقل عن 6 أحرف."
+    "en": "Create a password of 12–200 characters and no more than 72 UTF-8 bytes.",
+    "uz": "Kamida 12 belgidan iborat yangi parol o‘ylab toping.",
+    "ky": "Кеминде 12 белгиден турган жаңы сырсөз ойлоп табыңыз.",
+    "tg": "Рамзи навро ҳадди ақал 12 аломат созед.",
+    "zh-CN": "请设置至少 12 个字符的新密码。",
+    "ar": "أنشئ كلمة مرور جديدة لا تقل عن 12 حرفًا."
   },
   "auth.reset.mismatch": {
     "en": "Passwords do not match.",
@@ -3794,12 +3794,12 @@ export const SEEDS = {
     "ar": "خطأ في الملف"
   },
   "manager.fillInAllFieldsThePassword": {
-    "en": "Fill in all fields. The password must be at least 6 characters.",
-    "uz": "Barcha maydonlarni to‘ldiring. Parol kamida 6 belgi bo‘lishi kerak.",
-    "ky": "Бардык талааларды толтуруңуз. Сырсөз кеминде 6 белги болушу керек.",
-    "tg": "Ҳамаи майдонҳоро пур кунед. Рамз бояд ҳадди ақал 6 аломат бошад.",
-    "zh-CN": "请填写所有字段。密码至少 6 个字符。",
-    "ar": "أكمل كل الحقول. يجب ألا تقل كلمة المرور عن 6 أحرف."
+    "en": "Fill in all fields. The password must be 12–200 characters and no more than 72 UTF-8 bytes.",
+    "uz": "Barcha maydonlarni to‘ldiring. Parol kamida 12 belgi bo‘lishi kerak.",
+    "ky": "Бардык талааларды толтуруңуз. Сырсөз кеминде 12 белги болушу керек.",
+    "tg": "Ҳамаи майдонҳоро пур кунед. Рамз бояд ҳадди ақал 12 аломат бошад.",
+    "zh-CN": "请填写所有字段。密码至少 12 个字符。",
+    "ar": "أكمل كل الحقول. يجب ألا تقل كلمة المرور عن 12 حرفًا."
   },
   "manager.fillInTheNameAndFull": {
     "en": "Fill in the name and full address in every row.",
@@ -6642,12 +6642,12 @@ export const SEEDS = {
     "ar": "يغيّر المدير كلمة المرور. هنا يمكن إضافة Face ID أو بصمة أو إنهاء الجلسات الأخرى."
   },
   "shared.atLeast6Characters": {
-    "en": "at least 6 characters",
-    "uz": "kamida 6 belgi",
-    "ky": "кеминде 6 белги",
-    "tg": "ҳадди ақал 6 аломат",
-    "zh-CN": "至少 6 个字符",
-    "ar": "6 أحرف على الأقل"
+    "en": "12–200 characters, no more than 72 UTF-8 bytes",
+    "uz": "12–200 belgi, UTF-8 da 72 baytdan oshmasin",
+    "ky": "12–200 белги, UTF-8 боюнча 72 байттан ашпасын",
+    "tg": "12–200 аломат, на бештар аз 72 байти UTF-8",
+    "zh-CN": "12–200 个字符，UTF-8 不超过 72 字节",
+    "ar": "من 12 إلى 200 حرف، وبحد أقصى 72 بايت UTF-8"
   },
   "shared.changePassword": {
     "en": "Change password",
@@ -7090,12 +7090,12 @@ export const SEEDS = {
     "ar": "تم تغيير كلمة المرور."
   },
   "shared.passwordMustBeAtLeast6": {
-    "en": "Password must be at least 6 characters.",
-    "uz": "Parol kamida 6 belgidan iborat bo‘lishi kerak.",
-    "ky": "Сырсөз кеминде 6 белги болушу керек.",
-    "tg": "Рамз бояд ҳадди ақал 6 аломат бошад.",
-    "zh-CN": "密码至少 6 个字符。",
-    "ar": "يجب ألا تقل كلمة المرور عن 6 أحرف."
+    "en": "Password must be 12–200 characters and no more than 72 UTF-8 bytes.",
+    "uz": "Parol kamida 12 belgidan iborat bo‘lishi kerak.",
+    "ky": "Сырсөз кеминде 12 белги болушу керек.",
+    "tg": "Рамз бояд ҳадди ақал 12 аломат бошад.",
+    "zh-CN": "密码至少 12 个字符。",
+    "ar": "يجب ألا تقل كلمة المرور عن 12 حرفًا."
   },
   "shared.passwordSaved": {
     "en": "Password saved",
@@ -7866,12 +7866,12 @@ export const SEEDS = {
     "ar": "إدارة المديرين"
   },
   "admin.passwordMustBeAtLeast6": {
-    "en": "Password must be at least 6 characters. After creation it is stored in the log below.",
-    "uz": "Parol kamida 6 belgidan iborat bo‘lsin. Yaratilgach pastdagi jurnalda saqlanadi.",
-    "ky": "Сырсөз кеминде 6 белги. Түзүлгөндөн кийин төмөнкү журналда сакталат.",
-    "tg": "Парол на камтар аз 6 аломат. Пас аз эҷод дар журнали поён нигоҳ дошта мешавад.",
-    "zh-CN": "密码不少于 6 个字符。创建后会保存在下方日志中。",
-    "ar": "كلمة المرور لا تقل عن 6 أحرف. بعد الإنشاء تُحفظ في السجل أدناه."
+    "en": "Password must be 12–200 characters and no more than 72 UTF-8 bytes. After creation it is stored in the log below.",
+    "uz": "Parol kamida 12 belgidan iborat bo‘lsin. Yaratilgach pastdagi jurnalda saqlanadi.",
+    "ky": "Сырсөз кеминде 12 белги. Түзүлгөндөн кийин төмөнкү журналда сакталат.",
+    "tg": "Парол на камтар аз 12 аломат. Пас аз эҷод дар журнали поён нигоҳ дошта мешавад.",
+    "zh-CN": "密码不少于 12 个字符。创建后会保存在下方日志中。",
+    "ar": "كلمة المرور لا تقل عن 12 حرفًا. بعد الإنشاء تُحفظ في السجل أدناه."
   },
   "admin.passwordsFromBeforeThisLogCannot": {
     "en": "Passwords from before this log cannot be recovered — set a new one.",
@@ -11154,12 +11154,12 @@ export const SEEDS = {
     "ar": "المبلغ"
   },
   "shared.atLeast6CharactersAfterChanging": {
-    "en": "At least 6 characters. After changing, you can end other sessions separately.",
-    "uz": "Kamida 6 belgi. Almashtirgach, boshqa sessiyalarni alohida yakunlash mumkin.",
-    "ky": "Кеминде 6 белги. Алмаштыргандан кийин башка сеанстарды өзүнчө бүтүрсө болот.",
-    "tg": "На камтар аз 6 аломат. Пас аз иваз сессияҳои дигарро алоҳида анҷом додан мумкин.",
-    "zh-CN": "至少 6 个字符。更改后可单独结束其他会话。",
-    "ar": "6 أحرف على الأقل. بعد التغيير يمكن إنهاء الجلسات الأخرى على حدة."
+    "en": "12–200 characters, no more than 72 UTF-8 bytes. After changing, you can end other sessions separately.",
+    "uz": "12–200 belgi, UTF-8 da 72 baytdan oshmasin. Almashtirgach, boshqa sessiyalarni alohida yakunlash mumkin.",
+    "ky": "12–200 белги, UTF-8 боюнча 72 байттан ашпасын. Алмаштыргандан кийин башка сеанстарды өзүнчө бүтүрсө болот.",
+    "tg": "12–200 аломат, на бештар аз 72 байти UTF-8. Пас аз иваз сессияҳои дигарро алоҳида анҷом додан мумкин.",
+    "zh-CN": "12–200 个字符，UTF-8 不超过 72 字节。更改后可单独结束其他会话。",
+    "ar": "من 12 إلى 200 حرف، وبحد أقصى 72 بايت UTF-8. بعد التغيير يمكن إنهاء الجلسات الأخرى على حدة."
   },
   "shared.brandOrSpecifications": {
     "en": "Brand or specifications",
@@ -11200,6 +11200,14 @@ export const SEEDS = {
     "tg": "Пароли ҷорӣ",
     "zh-CN": "当前密码",
     "ar": "كلمة المرور الحالية"
+  },
+  "shared.security.reauthHint": {
+    "en": "Confirm your current password before managing sessions and passkeys.",
+    "uz": "Sessiyalar va kirish kalitlarini boshqarishdan oldin joriy parolni tasdiqlang.",
+    "ky": "Сеанстарды жана кирүү ачкычтарын башкаруудан мурун учурдагы сырсөздү ырастаңыз.",
+    "tg": "Пеш аз идоракунии сессияҳо ва калидҳои дастрасӣ пароли ҷориро тасдиқ кунед.",
+    "zh-CN": "管理会话和通行密钥前，请确认当前密码。",
+    "ar": "أكد كلمة المرور الحالية قبل إدارة الجلسات ومفاتيح المرور."
   },
   "shared.deletePhoto": {
     "en": "Delete photo",
