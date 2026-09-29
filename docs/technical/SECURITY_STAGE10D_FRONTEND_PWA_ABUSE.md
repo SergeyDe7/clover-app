@@ -134,7 +134,7 @@ reload, затем откатывать UI. Иначе старый offline `onc
   aggregate read-only inventory этих записей, либо явное принятие этого
   ограничения владельцем.
 - **P2:** rate-limit store process-local, сбрасывается при restart и не разделяется между несколькими backend workers. Исправление через persistent/shared storage затронет архитектуру/БД и требует отдельного пакета.
-- **P2:** fail-closed client store при 10 000 одновременно активных новых IP временно отказывает новым IP до expiry. Это осознанный availability/security компромисс, но владелец ещё не принял его как остаточный риск.
+- **P2:** fail-closed client store при 10 000 одновременно активных новых IP временно отказывает новым IP до expiry. Это осознанный availability/security компромисс; владелец принял его как остаточный риск при финальном closeout 2026-09-29.
 - **P2:** произвольные legacy/external `imageUrl` и `certificateUrl` ещё не сведены к same-origin allowlist. Подтверждённого XSS нет; остаётся риск privacy/referrer и несовместимости с будущей строгой CSP.
 - **P2 / NOT TESTED:** реальный browser/PWA flow login A → draft → logout/обрыв → login B, offline/online, полный restart, update worker и CSP telemetry на Android/iOS/Windows.
 - **P3:** SW install пока подавляет ошибку shell precache; SW/page message handlers имеют минимальную, а не строгую schema/source validation.
@@ -151,4 +151,4 @@ reload, затем откатывать UI. Иначе старый offline `onc
 - QA: `READY для локального Stage 10D gate по P0/P1`.
 - Reviewer: `READY по P0/P1 / APPROVE WITH CONDITIONS`.
 
-Локальный Stage 10D gate: `READY по P0/P1`; P0 = 0, P1 = 0. Это не означает overall Stage 10 READY или production READY. Для полного closeout остаются решение владельца по перечисленным P2/`NOT VERIFIED`, GitHub CI, безопасный rollout/rollback и production read-only post-check в Stage 10E/10F.
+Локальный Stage 10D gate: `READY по P0/P1`; P0 = 0, P1 = 0. Финальный Stage 10 closeout, решение владельца по P2/`NOT VERIFIED`, GitHub CI, безопасный rollout и production read-only post-check зафиксированы в Stage 10F.
