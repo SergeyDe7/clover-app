@@ -33,6 +33,8 @@ jobs:
           cache: npm
       - name: Install locked frontend dependencies
         run: npm ci --ignore-scripts
+      - name: Audit locked frontend dependencies
+        run: npm audit --package-lock-only --audit-level=high
       - name: Lint
         run: npm run lint
       - name: Build frontend without production data access
@@ -62,8 +64,13 @@ jobs:
       - name: Install locked root test dependencies
         run: npm ci --ignore-scripts
         working-directory: .
+      - name: Audit locked root test dependencies
+        run: npm audit --package-lock-only --audit-level=high
+        working-directory: .
       - name: Install locked server dependencies
         run: npm ci --ignore-scripts
+      - name: Audit locked server dependencies
+        run: npm audit --package-lock-only --audit-level=high
       - name: Run complete server verification suite
         run: npm run test:all
         env:

@@ -258,7 +258,7 @@ const RAW_CATALOG = [
   },
   {
     "key": "auth.reset.hint",
-    "sourceRu": "Придумайте новый пароль длиной не менее 6 символов.",
+    "sourceRu": "Придумайте пароль из 12–200 символов, не более 72 байт UTF-8.",
     "namespace": "ui",
     "surface": "auth",
     "critical": true
@@ -3317,7 +3317,7 @@ const RAW_CATALOG = [
   },
   {
     "key": "manager.fillInAllFieldsThePassword",
-    "sourceRu": "Заполните все поля. Пароль — не короче 6 символов.",
+    "sourceRu": "Заполните все поля. Пароль: 12–200 символов, не более 72 байт UTF-8.",
     "namespace": "ui",
     "surface": "manager",
     "critical": false
@@ -5809,7 +5809,7 @@ const RAW_CATALOG = [
   },
   {
     "key": "shared.atLeast6Characters",
-    "sourceRu": "минимум 6 символов",
+    "sourceRu": "12–200 символов, не более 72 байт UTF-8",
     "namespace": "ui",
     "surface": "shared",
     "critical": false
@@ -6201,7 +6201,7 @@ const RAW_CATALOG = [
   },
   {
     "key": "shared.passwordMustBeAtLeast6",
-    "sourceRu": "Пароль должен быть не короче 6 символов.",
+    "sourceRu": "Пароль: 12–200 символов, не более 72 байт UTF-8.",
     "namespace": "ui",
     "surface": "shared",
     "critical": false
@@ -6880,7 +6880,7 @@ const RAW_CATALOG = [
   },
   {
     "key": "admin.passwordMustBeAtLeast6",
-    "sourceRu": "Пароль не короче 6 символов. После создания сохраняется в журнале ниже.",
+    "sourceRu": "Пароль: 12–200 символов, не более 72 байт UTF-8. После создания сохраняется в журнале ниже.",
     "namespace": "ui",
     "surface": "admin",
     "critical": false
@@ -9757,7 +9757,7 @@ const RAW_CATALOG = [
   },
   {
     "key": "shared.atLeast6CharactersAfterChanging",
-    "sourceRu": "Минимум 6 символов. После смены другие сессии можно завершить отдельно.",
+    "sourceRu": "12–200 символов, не более 72 байт UTF-8. После смены другие сессии можно завершить отдельно.",
     "namespace": "ui",
     "surface": "shared",
     "critical": false
@@ -9796,6 +9796,13 @@ const RAW_CATALOG = [
     "namespace": "ui",
     "surface": "shared",
     "critical": false
+  },
+  {
+    "key": "shared.security.reauthHint",
+    "sourceRu": "Подтвердите текущий пароль перед управлением сеансами и ключами доступа.",
+    "namespace": "ui",
+    "surface": "shared",
+    "critical": true
   },
   {
     "key": "shared.deletePhoto",

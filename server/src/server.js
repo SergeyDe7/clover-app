@@ -1,9 +1,8 @@
 import "dotenv/config";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -52,6 +51,7 @@ import {
   revokeOtherSessions,
   createAuthToken,
   consumeAuthToken,
+  resetPasswordWithToken,
   createReconciliationRequest,
   getReconciliationRequestInternal,
   listReconciliationRequests,
@@ -73,6 +73,7 @@ import {
   deletePasskey,
   createWebAuthnChallenge,
   consumeWebAuthnChallenge,
+  getDatabasePath,
 } from "./db.js";
 import {
   DEFAULT_PRODUCTS,
@@ -88,6 +89,8 @@ import {
   listServerBackups,
   publicBackupMetadata,
   restoreServerBackup,
+  resolveManagedUploadFilePath,
+  uploadsDirectory,
 } from "./backups.js";
 import {
   CLIENT_PREVIEW_FILE,
@@ -353,6 +356,12 @@ import {
   verifyPasskeyAuthentication,
 } from "./passkeys.js";
 import {
+  isPasswordProofAllowed,
+  isWritePasswordAllowed,
+  PASSWORD_PROOF_MESSAGE,
+  WRITE_PASSWORD_MESSAGE,
+} from "./passwordPolicy.js";
+import {
   notifyManagers,
   publicManagerNotificationStatus,
 } from "./managerNotifications.js";
@@ -371,6 +380,11 @@ import {
 import { matchesTextSearch } from "../../src/shared/appHelpers.js";
 import { validateDeliveryDate } from "../../src/shared/deliveryDateRules.js";
 import {
+  validatePdfContent,
+  validateUploadedFileContent,
+} from "./uploadContentPolicy.js";
+import { denyPrivateUploadNamespace } from "./uploadPathPolicy.js";
+import {
   canPurgeOrder,
   canRestoreOrder,
   canTrashOrder,
@@ -384,15 +398,21 @@ const app = express();
 const publicCatalogReadRateLimitStore = createBoundedRateLimitStore({
   maxEntries: 10_000,
 });
+// Separate fail-closed buckets cap cross-subject spray without changing the
+// established per-email/per-phone limits or requiring a production DB write.
+const publicClientAbuseRateLimitStore = createBoundedRateLimitStore({
+  maxEntries: 10_000,
+  failClosedOnCapacity: true,
+});
 const publicCatalogTrustedProxyIps = resolvePublicCatalogTrustedProxyIps(
   process.env.CLOVER_TRUSTED_PROXY_IPS
 );
 const ONE_C_STATE_KEY = "oneCIntegration";
 
-const currentFile = fileURLToPath(import.meta.url);
-const currentDirectory = path.dirname(currentFile);
-const serverDirectory = path.resolve(currentDirectory, "..");
-const uploadsDirectory = path.resolve(serverDirectory, "uploads");
+const oneCPreviewDirectory = path.resolve(
+  process.env.CLOVER_ONEC_PREVIEW_DIR
+    || path.resolve(path.dirname(path.resolve(getDatabasePath())), "one-c-preview")
+);
 mkdirSync(uploadsDirectory, { recursive: true });
 
 const imageUpload = multer({
@@ -406,7 +426,7 @@ const imageUpload = multer({
       };
       callback(
         null,
-        `product-${String(req.params.productId || "item")}-${Date.now()}-${randomUUID()}${extensionMap[file.mimetype] || ".img"}`
+        `product-${Date.now()}-${randomUUID()}${extensionMap[file.mimetype] || ".img"}`
       );
     },
   }),
@@ -509,10 +529,16 @@ const reconciliationUpload = multer({
   storage: multer.diskStorage({
     destination: reconciliationDirectory,
     filename(req, file, callback) {
-      callback(null, `act-${String(req.params.requestId || "request")}-${Date.now()}-${randomUUID()}.pdf`);
+      callback(null, `act-${Date.now()}-${randomUUID()}.pdf`);
     },
   }),
-  limits: { fileSize: 15 * 1024 * 1024 },
+  limits: {
+    fileSize: 15 * 1024 * 1024,
+    fields: 1,
+    fieldSize: 8 * 1024,
+    files: 1,
+    parts: 2,
+  },
   fileFilter(req, file, callback) {
     if (file.mimetype !== "application/pdf") {
       return callback(new Error("Разрешён только PDF-файл акта сверки."));
@@ -574,6 +600,34 @@ app.use(cors({
   credentials: false,
 }));
 
+const CROSS_SITE_PUBLIC_MUTATION_PATHS = new Set([
+  "/api/auth/register",
+  "/api/auth/verify-email",
+  "/api/auth/resend-verification",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+  "/api/auth/login",
+  "/api/passkeys/authentication/options",
+  "/api/passkeys/authentication/verify",
+]);
+
+function rejectCrossSitePrivateMutation(req, res, next) {
+  const method = String(req.method || "GET").toUpperCase();
+  if (["GET", "HEAD", "OPTIONS"].includes(method)) return next();
+  if (String(req.get("Sec-Fetch-Site") || "").trim().toLowerCase() !== "cross-site") return next();
+  const pathname = normalizeJsonBodyPath(req.path);
+  if (!pathname.startsWith("/api/")) return next();
+  if (pathname.startsWith("/api/public/") || pathname.startsWith("/api/one-c/")) return next();
+  if (CROSS_SITE_PUBLIC_MUTATION_PATHS.has(pathname)) return next();
+  setNoStore(res);
+  return res.status(403).json({
+    error: "Запрос с другого сайта отклонён.",
+    code: "CROSS_SITE_REQUEST_DENIED",
+  });
+}
+
+app.use(rejectCrossSitePrivateMutation);
+
 function privateApiNoStoreMiddleware(req, res, next) {
   const pathname = String(req.path || "");
   if (/^\/api(?:\/|$)/i.test(pathname) && !/^\/api\/public(?:\/|$)/i.test(pathname)) {
@@ -613,6 +667,7 @@ const JSON_BODY_RULES = Object.freeze([
       "/api/passkeys/authentication/options",
       "/api/passkeys/authentication/verify",
     ]),
+    patterns: [/^\/api\/passkeys\/[^/]+\/delete$/],
   },
   {
     limit: JSON_BODY_LIMITS.PUBLIC_ORDER,
@@ -733,9 +788,9 @@ function jsonBodyByRoute(req, res, next) {
 
 app.use(jsonBodyByRoute);
 app.use(credentialNoStoreMiddleware);
-app.use("/uploads/reconciliation", (req, res) => res.status(404).end());
 app.use(
   "/uploads",
+  denyPrivateUploadNamespace,
   (_req, res, next) => {
     res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
     next();
@@ -986,6 +1041,12 @@ function assertCanSetStaffPassword(req, target) {
     error.status = 404;
     throw error;
   }
+  if (String(target.id) === String(req.user.id)) {
+    const error = new Error("Нельзя сбросить собственный пароль административным действием.");
+    error.status = 409;
+    error.code = "STAFF_SELF_PASSWORD_FORBIDDEN";
+    throw error;
+  }
 }
 
 function auditFromRequest(req, action, details = {}) {
@@ -1134,7 +1195,8 @@ function signToken(user) {
     },
     jwtSecret,
     {
-      expiresIn: "7d",
+      algorithm: "HS256",
+      expiresIn: "2h",
       issuer: "clover-server",
       audience: "clover-app",
     }
@@ -1155,6 +1217,7 @@ function authRequired(req, res, next) {
 
   try {
     const payload = jwt.verify(token, jwtSecret, {
+      algorithms: ["HS256"],
       issuer: "clover-server",
       audience: "clover-app",
     });
@@ -1464,19 +1527,19 @@ const registerSchema = z.object({
   contactName: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(5).max(50),
   email: z.string().trim().email().max(200),
-  password: z.string().min(6).max(200),
+  password: z.string().refine(isWritePasswordAllowed, WRITE_PASSWORD_MESSAGE),
 });
 
 const managerClientProvisionSchema = registerSchema;
 
 const managerClientPasswordSchema = z.object({
-  password: z.string().min(6).max(200),
+  password: z.string().refine(isWritePasswordAllowed, WRITE_PASSWORD_MESSAGE),
 });
 
 const managerCreateSchema = z
   .object({
     email: z.string().trim().email().max(200),
-    password: z.string().min(6).max(200),
+    password: z.string().refine(isWritePasswordAllowed, WRITE_PASSWORD_MESSAGE),
     fullName: z.string().trim().max(160).optional(),
     phone: z.string().trim().max(50).optional(),
     max: z.string().trim().max(120).optional(),
@@ -1492,7 +1555,7 @@ const staffContactSchema = z.object({
 });
 
 const staffPasswordSchema = z.object({
-  password: z.string().min(6).max(200),
+  password: z.string().refine(isWritePasswordAllowed, WRITE_PASSWORD_MESSAGE),
 });
 
 const staffFeatureId = z
@@ -1512,7 +1575,7 @@ const staffPermissionsSchema = z
 
 const loginSchema = z.object({
   email: z.string().trim().email().max(200),
-  password: z.string().min(1).max(200),
+  password: z.string().refine(isPasswordProofAllowed, PASSWORD_PROOF_MESSAGE),
 });
 
 const tokenSchema = z.object({
@@ -1524,13 +1587,63 @@ const forgotPasswordSchema = z.object({
 });
 
 const resetPasswordSchema = tokenSchema.extend({
-  password: z.string().min(6).max(200),
+  password: z.string().refine(isWritePasswordAllowed, WRITE_PASSWORD_MESSAGE),
 });
 
 const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1).max(200),
-  newPassword: z.string().min(6).max(200),
+  currentPassword: z.string().refine(isPasswordProofAllowed, PASSWORD_PROOF_MESSAGE),
+  newPassword: z.string().refine(isWritePasswordAllowed, WRITE_PASSWORD_MESSAGE),
 });
+
+async function requireValidatedUploadedContent(req, res, next) {
+  if (!req.file) return next();
+  try {
+    await validateUploadedFileContent(req.file);
+    next();
+  } catch (error) {
+    if (req.file?.path && existsSync(req.file.path)) {
+      try { unlinkSync(req.file.path); } catch { /* best-effort cleanup */ }
+    }
+    next(error);
+  }
+}
+
+function rejectPublicClientAbuseLimit(req, res, scope) {
+  const decision = consumePublicRateLimit({
+    scope,
+    subject: resolvePublicCatalogClientSubject(req, publicCatalogTrustedProxyIps),
+    secret: jwtSecret,
+    store: publicClientAbuseRateLimitStore,
+  });
+  if (decision.allowed) return false;
+  return Boolean(sendAuthRateLimited(res, decision));
+}
+
+const currentPasswordProofSchema = z.object({
+  currentPassword: z.string().refine(isPasswordProofAllowed, PASSWORD_PROOF_MESSAGE),
+}).strict();
+
+async function assertCurrentPassword(req, currentPassword) {
+  const reauthLimit = consumePublicRateLimit({
+    scope: "reauth",
+    subject: String(req.user?.id || ""),
+    secret: jwtSecret,
+  });
+  if (!reauthLimit.allowed) {
+    const error = new Error("Слишком много попыток подтверждения пароля.");
+    error.status = 429;
+    error.code = "AUTH_RATE_LIMITED";
+    throw error;
+  }
+  const user = findUserByEmail(req.user?.email);
+  if (!user || !(await verifyPassword(currentPassword, user.password_hash))) {
+    const error = new Error("Текущий пароль указан неверно.");
+    error.status = 403;
+    error.code = "CURRENT_PASSWORD_INVALID";
+    throw error;
+  }
+  return user;
+}
 
 const passkeyAuthenticationOptionsSchema = z.object({
   email: z.string().trim().email().max(200).optional(),
@@ -1555,6 +1668,10 @@ const reconciliationSchema = z.object({
 
 const reconciliationManagerSchema = z.object({
   status: z.enum(["new", "processing", "ready", "rejected"]),
+  managerComment: z.string().trim().max(2000).optional().default(""),
+});
+
+const reconciliationUploadFieldsSchema = z.object({
   managerComment: z.string().trim().max(2000).optional().default(""),
 });
 
@@ -2487,6 +2604,7 @@ app.get("/api/public/catalog", (req, res) => {
 
 app.get("/api/public/catalog/:code", (req, res) => {
   try {
+    if (rejectPublicCatalogReadLimit(req, res)) return;
     const language = String(req.query.language || "");
     const product = getPublicProductByCode(req.params.code, language);
     if (!product) {
@@ -2507,7 +2625,9 @@ app.get("/api/public/catalog/:code", (req, res) => {
 /** Гостевой заказ с витрины — только сайтовые цены. */
 app.post("/api/public/orders", requireRuntimeFeature("guestOrders"), async (req, res) => {
   try {
+    setNoStore(res);
     const parsedGuestOrder = storefrontOrderSchema.parse(req.body);
+    if (rejectPublicClientAbuseLimit(req, res, "guestOrderClient")) return;
     if (rejectPublicRateLimit(res, "guestOrder", parsedGuestOrder.phone)) return;
     const order = createStorefrontOrder(parsedGuestOrder, {
       notify: (created) => {
@@ -2523,15 +2643,25 @@ app.post("/api/public/orders", requireRuntimeFeature("guestOrders"), async (req,
     res.status(201).json({ ok: true, order });
   } catch (error) {
     if (error?.name === "ZodError") {
+      setNoStore(res);
       return res.status(400).json({
         error: "Проверьте данные формы заказа.",
         details: error.issues,
       });
     }
     const status = Number(error?.status) || 500;
+    setNoStore(res);
+    if (status >= 500) {
+      logCaughtError("http.public.order", error, {
+        component: "public",
+        httpStatus: status,
+      });
+    }
     res.status(status).json({
-      error: error?.message || "Не удалось оформить заказ.",
-      code: error?.code || "",
+      error: status >= 500
+        ? "Не удалось оформить заказ."
+        : error?.message || "Не удалось оформить заказ.",
+      code: status >= 500 ? "" : error?.code || "",
     });
   }
 });
@@ -2560,6 +2690,7 @@ function liveAuthIssuanceDeps() {
 app.post("/api/auth/register", requireRuntimeFeature("registration"), async (req, res, next) => {
   try {
     const input = registerSchema.parse(req.body);
+    if (rejectPublicClientAbuseLimit(req, res, "registerClient")) return;
     if (rejectPublicRateLimit(res, "register", input.email)) return;
     const result = await executeClientRegistration(
       {
@@ -2572,7 +2703,7 @@ app.post("/api/auth/register", requireRuntimeFeature("registration"), async (req
       },
       liveAuthIssuanceDeps()
     );
-    if (result.status === 201) setNoStore(res);
+    setNoStore(res);
     res.status(result.status).json(result.body);
   } catch (error) {
     next(error);
@@ -2582,6 +2713,7 @@ app.post("/api/auth/register", requireRuntimeFeature("registration"), async (req
 app.post("/api/auth/verify-email", (req, res, next) => {
   try {
     const input = tokenSchema.parse(req.body);
+    if (rejectPublicClientAbuseLimit(req, res, "verifyEmailClient")) return;
     if (rejectPublicRateLimit(res, "verifyEmail", input.token)) return;
     const token = consumeAuthToken({ type: "verify_email", tokenHash: tokenHash(input.token) });
     if (!token) {
@@ -2610,6 +2742,7 @@ app.post("/api/auth/verify-email", (req, res, next) => {
 app.post("/api/auth/resend-verification", async (req, res, next) => {
   try {
     const input = forgotPasswordSchema.parse(req.body);
+    if (rejectPublicClientAbuseLimit(req, res, "resendVerificationClient")) return;
     if (rejectPublicRateLimit(res, "resendVerification", input.email)) return;
     const result = await executeResendVerification(
       { email: normalizeEmail(input.email), req },
@@ -2625,6 +2758,7 @@ app.post("/api/auth/resend-verification", async (req, res, next) => {
 app.post("/api/auth/forgot-password", async (req, res, next) => {
   try {
     const input = forgotPasswordSchema.parse(req.body);
+    if (rejectPublicClientAbuseLimit(req, res, "forgotPasswordClient")) return;
     if (rejectPublicRateLimit(res, "forgotPassword", input.email)) return;
     const result = await executeForgotPassword(
       { email: normalizeEmail(input.email), req },
@@ -2640,18 +2774,15 @@ app.post("/api/auth/forgot-password", async (req, res, next) => {
 app.post("/api/auth/reset-password", async (req, res, next) => {
   try {
     const input = resetPasswordSchema.parse(req.body);
+    if (rejectPublicClientAbuseLimit(req, res, "resetPasswordClient")) return;
     if (rejectPublicRateLimit(res, "resetPassword", input.token)) return;
-    const token = consumeAuthToken({ type: "reset_password", tokenHash: tokenHash(input.token) });
-    if (!token) {
-      return res.status(400).json({ error: "Ссылка восстановления недействительна или уже использована." });
-    }
     const passwordHash = await hashPassword(input.password);
-    const user = updateUserPassword(token.userId, passwordHash);
+    const user = resetPasswordWithToken({
+      tokenHash: tokenHash(input.token),
+      passwordHash,
+    });
     if (!user) {
-      return res.status(500).json({
-        error: "Не удалось сохранить пароль.",
-        code: "PASSWORD_WRITE_FAILED",
-      });
+      return res.status(400).json({ error: "Ссылка восстановления недействительна или уже использована." });
     }
     if (user.email) clearLoginLimit(user.email);
     const warnings = [];
@@ -2682,6 +2813,8 @@ app.post("/api/auth/login", async (req, res, next) => {
   try {
     const input = loginSchema.parse(req.body);
     const email = normalizeEmail(input.email);
+
+    if (rejectPublicClientAbuseLimit(req, res, "loginClient")) return;
 
     const loginLimit = consumePublicRateLimit({
       scope: "login",
@@ -2791,15 +2924,21 @@ app.post("/api/auth/change-password", authRequired, async (req, res, next) => {
 });
 
 
-app.post("/api/auth/logout-other-sessions", authRequired, (req, res) => {
-  const updatedUser = revokeOtherSessions(req.user.id);
-  auditFromRequest(req, "auth.sessions.revoke_other", {});
-  setNoStore(res);
-  res.json({
-    ok: true,
-    message: "Другие сессии завершены.",
-    token: signToken(updatedUser),
-  });
+app.post("/api/auth/logout-other-sessions", authRequired, async (req, res, next) => {
+  try {
+    const input = currentPasswordProofSchema.parse(req.body || {});
+    await assertCurrentPassword(req, input.currentPassword);
+    const updatedUser = revokeOtherSessions(req.user.id);
+    auditFromRequest(req, "auth.sessions.revoke_other", {});
+    setNoStore(res);
+    res.json({
+      ok: true,
+      message: "Другие сессии завершены.",
+      token: signToken(updatedUser),
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.post("/api/admin/managers", authRequired, roleRequired("manager"), async (req, res, next) => {
@@ -3140,6 +3279,8 @@ app.get("/api/passkeys", authRequired, (req, res) => {
 
 app.post("/api/passkeys/registration/options", authRequired, async (req, res, next) => {
   try {
+    const input = currentPasswordProofSchema.parse(req.body || {});
+    await assertCurrentPassword(req, input.currentPassword);
     const options = await registrationOptions({
       req,
       user: req.user,
@@ -3200,19 +3341,34 @@ app.post("/api/passkeys/registration/verify", authRequired, async (req, res, nex
   }
 });
 
-app.delete("/api/passkeys/:credentialId", authRequired, (req, res) => {
-  const credential = getPasskey(req.params.credentialId);
-  if (!credential || credential.userId !== String(req.user.id)) {
-    return res.status(404).json({ error: "Ключ доступа не найден." });
+app.post("/api/passkeys/:credentialId/delete", authRequired, async (req, res, next) => {
+  try {
+    const input = currentPasswordProofSchema.parse(req.body || {});
+    await assertCurrentPassword(req, input.currentPassword);
+    const credential = getPasskey(req.params.credentialId);
+    if (!credential || credential.userId !== String(req.user.id)) {
+      return res.status(404).json({ error: "Ключ доступа не найден." });
+    }
+    deletePasskey(req.user.id, credential.id);
+    auditFromRequest(req, "auth.passkey.delete", { credentialId: credential.id });
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
   }
-  deletePasskey(req.user.id, credential.id);
-  auditFromRequest(req, "auth.passkey.delete", { credentialId: credential.id });
-  res.json({ ok: true });
+});
+
+app.delete("/api/passkeys/:credentialId", authRequired, (_req, res) => {
+  res.setHeader("Allow", "POST");
+  return res.status(405).json({
+    error: "Используйте подтверждённое удаление ключа доступа.",
+    code: "PASSKEY_DELETE_REAUTH_REQUIRED",
+  });
 });
 
 app.post("/api/passkeys/authentication/options", async (req, res, next) => {
   try {
     const input = passkeyAuthenticationOptionsSchema.parse(req.body || {});
+    if (rejectPublicClientAbuseLimit(req, res, "passkeyAuthOptionsClient")) return;
     const email = input.email ? normalizeEmail(input.email) : "";
     if (email) {
       if (rejectPublicRateLimit(res, "passkeyAuthOptions", email)) return;
@@ -3220,26 +3376,17 @@ app.post("/api/passkeys/authentication/options", async (req, res, next) => {
       return;
     }
 
-    // С почтой — узкий список ключей аккаунта. Без почты — discoverable (Face ID выбирает ключ сам).
-    if (email) {
-      const user = findUserByEmail(email);
-      const credentials = user ? listPasskeys(user.id) : [];
-      if (!user || !user.email_verified || (isClientRole(user.role) && user.approval_status !== "approved") || !credentials.length) {
-        return res.status(400).json({ error: "Для этого аккаунта вход по Face ID или ключу доступа пока не настроен." });
-      }
-      const options = await authenticationOptions({ req, credentials });
-      const ceremony = createWebAuthnChallenge({
-        userId: user.id,
-        type: "authentication",
-        challenge: options.challenge,
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-      });
-      return res.json({ ceremonyId: ceremony.id, options, mode: "account" });
-    }
-
+    const candidate = email ? findUserByEmail(email) : null;
+    const candidateEligible = Boolean(
+      candidate
+      && !candidate.disabled_at
+      && candidate.email_verified
+      && (!isClientRole(candidate.role) || candidate.approval_status === "approved")
+      && listPasskeys(candidate.id).length > 0
+    );
     const options = await authenticationOptions({ req, credentials: [] });
     const ceremony = createWebAuthnChallenge({
-      userId: "",
+      userId: candidateEligible ? String(candidate.id) : "",
       type: "authentication",
       challenge: options.challenge,
       expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
@@ -3253,6 +3400,7 @@ app.post("/api/passkeys/authentication/options", async (req, res, next) => {
 app.post("/api/passkeys/authentication/verify", async (req, res, next) => {
   try {
     const input = passkeyAuthenticationVerifySchema.parse(req.body || {});
+    if (rejectPublicClientAbuseLimit(req, res, "passkeyAuthVerifyClient")) return;
     const email = input.email ? normalizeEmail(input.email) : "";
     if (rejectPublicRateLimit(res, "passkeyAuthVerify", email || input.ceremonyId)) return;
     const ceremony = consumeWebAuthnChallenge(input.ceremonyId, "authentication");
@@ -3271,6 +3419,12 @@ app.post("/api/passkeys/authentication/verify", async (req, res, next) => {
       || (ceremony.userId && ceremony.userId !== String(user.id))
     ) {
       return res.status(400).json({ error: "Не удалось подтвердить вход. Повторите попытку." });
+    }
+    if (user.disabled_at) {
+      return res.status(403).json({
+        error: "Для аккаунта пока недоступен вход.",
+        code: "ACCOUNT_DISABLED",
+      });
     }
     if (!user.email_verified || (isClientRole(user.role) && user.approval_status !== "approved")) {
       return res.status(403).json({ error: "Для аккаунта пока недоступен вход." });
@@ -5698,6 +5852,7 @@ app.post(
   roleRequired("admin"),
   requireRuntimeFeature("uploads"),
   mapImageUpload.single("image"),
+  requireValidatedUploadedContent,
   (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: "Выберите изображение карты." });
@@ -5714,6 +5869,7 @@ app.post(
   roleRequired("admin"),
   requireRuntimeFeature("uploads"),
   heroImageUpload.single("image"),
+  requireValidatedUploadedContent,
   (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: "Выберите изображение слайда." });
@@ -5730,6 +5886,7 @@ app.post(
   roleRequired("admin"),
   requireRuntimeFeature("uploads"),
   promoImageUpload.single("image"),
+  requireValidatedUploadedContent,
   (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: "Выберите изображение акции." });
@@ -6124,7 +6281,15 @@ app.post(
   authRequired,
   roleRequired("manager"),
   requireRuntimeFeature("uploads"),
+  (req, res, next) => {
+    const exists = getGlobalState("products", DEFAULT_PRODUCTS).some(
+      (product) => String(product.id) === String(req.params.productId)
+    );
+    if (!exists) return res.status(404).json({ error: "Товар не найден." });
+    next();
+  },
   imageUpload.single("image"),
+  requireValidatedUploadedContent,
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const productIndex = products.findIndex(
@@ -6285,7 +6450,7 @@ const certificateUpload = multer({
         (fromName === ".pdf" ? ".pdf" : ".bin");
       callback(
         null,
-        `product-cert-${String(req.params.productId || "item")}-${Date.now()}-${randomUUID()}${extension}`
+        `product-cert-${Date.now()}-${randomUUID()}${extension}`
       );
     },
   }),
@@ -6311,7 +6476,15 @@ app.post(
   authRequired,
   roleRequired("manager"),
   requireRuntimeFeature("uploads"),
+  (req, res, next) => {
+    const exists = getGlobalState("products", DEFAULT_PRODUCTS).some(
+      (product) => String(product.id) === String(req.params.productId)
+    );
+    if (!exists) return res.status(404).json({ error: "Товар не найден." });
+    next();
+  },
   certificateUpload.single("certificate"),
+  requireValidatedUploadedContent,
   (req, res) => {
     const products = getGlobalState("products", DEFAULT_PRODUCTS);
     const productIndex = products.findIndex(
@@ -6578,11 +6751,7 @@ app.post("/api/one-c/products-preview", async (req, res, next) => {
       ])
     );
 
-    const previewDirectory = path.resolve(
-      serverDirectory,
-      "data",
-      "one-c-preview"
-    );
+    const previewDirectory = oneCPreviewDirectory;
     writePreviewArtifact(
       path.resolve(previewDirectory, PRODUCTS_PREVIEW_FILE),
       {
@@ -7374,7 +7543,7 @@ app.post("/api/one-c/clients-preview", async (req, res, next) => {
       };
     });
 
-    const previewDirectory = path.resolve(serverDirectory, "data", "one-c-preview");
+    const previewDirectory = oneCPreviewDirectory;
     try {
       writePreviewArtifact(
         path.resolve(previewDirectory, CLIENT_PREVIEW_FILE),
@@ -8360,7 +8529,7 @@ app.get("/api/one-c/reconciliation/requests", (req, res) => {
   const database = requireOneCAllowedDatabase(req, res);
   if (!database) return;
   const status = String(req.query.status || "new");
-  const requests = listReconciliationRequests().filter((item) => !status || item.status === status);
+  const requests = listReconciliationRequests(null, database).filter((item) => !status || item.status === status);
   res.json({ ok: true, database, requests });
 });
 
@@ -8371,23 +8540,40 @@ app.post("/api/one-c/reconciliation/:requestId/result", (req, res, next) => {
     if (isRuntimeFeaturePaused("uploads")) {
       return sendRuntimeFeaturePaused(res);
     }
-    const current = getReconciliationRequestInternal(req.params.requestId);
+    const current = getReconciliationRequestInternal(req.params.requestId, database);
     if (!current) return res.status(404).json({ error: "Запрос акта сверки не найден." });
     const base64 = String(req.body?.fileBase64 || "").replace(/^data:application\/pdf;base64,/, "");
     if (!base64) return res.status(400).json({ error: "1С не передала PDF-файл." });
     const buffer = Buffer.from(base64, "base64");
-    if (buffer.length < 5 || buffer.length > 15 * 1024 * 1024 || buffer.subarray(0, 5).toString("ascii") !== "%PDF-") {
+    if (buffer.length > 15 * 1024 * 1024) {
       return res.status(400).json({ error: "Передан некорректный PDF-файл." });
     }
-    if (current.file_path && existsSync(current.file_path)) unlinkSync(current.file_path);
-    const filePath = path.resolve(reconciliationDirectory, `act-${current.id}-${Date.now()}-${randomUUID()}.pdf`);
+    try {
+      validatePdfContent(buffer);
+    } catch {
+      return res.status(400).json({ error: "Передан некорректный PDF-файл." });
+    }
+    const filePath = path.resolve(reconciliationDirectory, `act-${Date.now()}-${randomUUID()}.pdf`);
     writeFileSync(filePath, buffer, { flag: "wx" });
-    const request = updateReconciliationRequest(current.id, {
-      status: "ready",
-      fileName: String(req.body?.fileName || `Акт-сверки-${current.id}.pdf`).slice(0, 240),
-      filePath,
-      managerComment: String(req.body?.managerComment || "Акт получен автоматически из 1С.").slice(0, 2000),
-    });
+    let request;
+    try {
+      request = updateReconciliationRequest(current.id, {
+        status: "ready",
+        fileName: String(req.body?.fileName || `Акт-сверки-${current.id}.pdf`).slice(0, 240),
+        filePath,
+        managerComment: String(req.body?.managerComment || "Акт получен автоматически из 1С.").slice(0, 2000),
+      }, database);
+      if (!request) throw new Error("Reconciliation request disappeared during file update.");
+    } catch (error) {
+      if (existsSync(filePath)) unlinkSync(filePath);
+      throw error;
+    }
+    const currentFilePath = resolveManagedUploadFilePath(current.file_path);
+    if (currentFilePath && currentFilePath !== filePath && existsSync(currentFilePath)) {
+      try { unlinkSync(currentFilePath); } catch (error) {
+        logCaughtError("reconciliation.file.cleanup", error, { component: "reconciliation" });
+      }
+    }
     writeAudit({ action: "one-c.reconciliation.receive", details: { requestId: request.id, bytes: buffer.length } });
     sendOrderPush(request.userId, {
       title: "Акт сверки готов",
@@ -8428,7 +8614,8 @@ app.post("/api/reconciliation", authRequired, roleRequired("client"), (req, res,
       return res.status(400).json({ error: "Укажите корректный период: дата начала не должна быть позже даты окончания." });
     }
     const request = createReconciliationRequest({
-      userId: req.user.id, periodType: input.periodType, year, dateFrom, dateTo, clientComment: input.comment,
+      userId: req.user.id, database: defaultExchangeDatabase(), periodType: input.periodType,
+      year, dateFrom, dateTo, clientComment: input.comment,
     });
     auditFromRequest(req, "reconciliation.create", { requestId: request.id, periodType: request.periodType, dateFrom, dateTo });
     const clientProfile = getClientState(req.user.id).profile || {};
@@ -8476,9 +8663,10 @@ app.delete(
       return res.status(404).json({ error: "Запрос акта сверки не найден." });
     }
 
-    if (deleted.file_path && existsSync(deleted.file_path)) {
+    const deletedFilePath = resolveManagedUploadFilePath(deleted.file_path);
+    if (deletedFilePath && existsSync(deletedFilePath)) {
       try {
-        unlinkSync(deleted.file_path);
+        unlinkSync(deletedFilePath);
       } catch (error) {
         logCaughtError("reconciliation.file.cleanup", error, { component: "reconciliation" });
       }
@@ -8504,29 +8692,40 @@ app.post(
   authRequired,
   roleRequired("manager"),
   requireRuntimeFeature("uploads"),
+  (req, res, next) => {
+    if (!getReconciliationRequestInternal(req.params.requestId)) {
+      return res.status(404).json({ error: "Запрос акта сверки не найден." });
+    }
+    next();
+  },
   reconciliationUpload.single("file"),
+  requireValidatedUploadedContent,
   async (req, res, next) => {
+    let fileCommitted = false;
     try {
+      const fields = reconciliationUploadFieldsSchema.parse(req.body || {});
       if (!req.file?.path) {
         return res.status(400).json({ error: "Выберите PDF-файл акта сверки." });
-      }
-      const header = readFileSync(req.file.path).subarray(0, 5).toString("ascii");
-      if (header !== "%PDF-") {
-        unlinkSync(req.file.path);
-        return res.status(400).json({ error: "Файл не является корректным PDF." });
       }
       const current = getReconciliationRequestInternal(req.params.requestId);
       if (!current) {
         if (req.file?.path && existsSync(req.file.path)) unlinkSync(req.file.path);
         return res.status(404).json({ error: "Запрос акта сверки не найден." });
       }
-      if (current.file_path && existsSync(current.file_path)) unlinkSync(current.file_path);
       const request = updateReconciliationRequest(current.id, {
         status: "ready",
         fileName: req.file?.originalname || "Акт-сверки.pdf",
         filePath: req.file?.path || "",
-        managerComment: String(req.body?.managerComment || current.manager_comment || ""),
+        managerComment: fields.managerComment || String(current.manager_comment || "").slice(0, 2000),
       });
+      if (!request) throw new Error("Reconciliation request disappeared during file update.");
+      fileCommitted = true;
+      const currentFilePath = resolveManagedUploadFilePath(current.file_path);
+      if (currentFilePath && currentFilePath !== req.file.path && existsSync(currentFilePath)) {
+        try { unlinkSync(currentFilePath); } catch (error) {
+          logCaughtError("reconciliation.file.cleanup", error, { component: "reconciliation" });
+        }
+      }
       auditFromRequest(req, "reconciliation.file.upload", { requestId: request.id, fileName: request.fileName });
       sendOrderPush(request.userId, {
         title: "Акт сверки готов", body: "Откройте Clover, чтобы скачать PDF.",
@@ -8562,7 +8761,12 @@ app.post(
         }
       }
       res.json({ ok: true, request, mail: { sent: Boolean(mail.sent) } });
-    } catch (error) { next(error); }
+    } catch (error) {
+      if (!fileCommitted && req.file?.path && existsSync(req.file.path)) {
+        try { unlinkSync(req.file.path); } catch { /* best-effort cleanup */ }
+      }
+      next(error);
+    }
   }
 );
 
@@ -8575,11 +8779,12 @@ app.get("/api/reconciliation/:requestId/file", authRequired, (req, res) => {
   if (!isStaffRole(req.user.role) && String(request.user_id) !== String(req.user.id)) {
     return res.status(403).json({ error: "Недостаточно прав для скачивания этого файла." });
   }
-  if (!request.file_path || !existsSync(request.file_path)) {
+  const managedFilePath = resolveManagedUploadFilePath(request.file_path);
+  if (!managedFilePath || !existsSync(managedFilePath)) {
     return res.status(404).json({ error: "PDF-файл ещё не прикреплён." });
   }
   auditFromRequest(req, "reconciliation.file.download", { requestId: request.id });
-  return res.download(request.file_path, request.file_name || "Акт-сверки.pdf");
+  return res.download(managedFilePath, request.file_name || "Акт-сверки.pdf");
 });
 
 app.patch("/api/admin/clients/:clientId/approval", authRequired, roleRequired("manager"), async (req, res) => {
@@ -9024,9 +9229,18 @@ app.use((error, req, res, _next) => {
   }
 
   if (error instanceof z.ZodError) {
+    const weakPassword = error.issues.some((issue) => (
+      issue?.minimum === 12
+      || issue?.message === WRITE_PASSWORD_MESSAGE
+    ));
     return res.status(400).json({
       error:
-        "Проверьте заполнение полей и формат email.",
+        weakPassword ? WRITE_PASSWORD_MESSAGE : "Проверьте заполнение полей и формат email.",
+      ...(weakPassword ? {
+        code: "PASSWORD_POLICY_WEAK",
+        minLength: 12,
+        maxLength: 200,
+      } : {}),
       details: error.issues,
     });
   }

@@ -853,7 +853,7 @@ test("SEC3-001 canonical HTTPS origin keeps register, resend, and forgot issuanc
     phone: "+70000000000",
     req,
   }, registerSpies.deps);
-  assert.equal(registered.status, 201);
+  assert.equal(registered.status, 202);
   assert.equal(registerSpies.calls.createUser.length, 1);
   assert.equal(registerSpies.calls.createAuthToken.length, 1);
   assert.equal(registerSpies.calls.sendCloverMail.length, 1);

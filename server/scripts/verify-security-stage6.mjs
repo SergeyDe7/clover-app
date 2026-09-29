@@ -174,11 +174,17 @@ function verifyStaticPolicy() {
   assert.match(serverEnvExample, /^ALLOW_LAN_ORIGINS=false$/m);
   assert.match(datacenterEnvExample, /^ALLOW_LAN_ORIGINS=false$/m);
   assert.match(headers, /Content-Security-Policy\s+"[^"]*frame-ancestors 'self'/);
-  assert.match(headers, /Content-Security-Policy-Report-Only/);
+  assert.match(headers, /Content-Security-Policy\s+"default-src 'self'/);
+  assert.doesNotMatch(headers, /Content-Security-Policy-Report-Only/);
   assert.match(headers, /script-src 'self' 'unsafe-inline' https:\/\/mc\.yandex\.ru/);
-  assert.match(headers, /frame-src https:\/\/yandex\.ru https:\/\/\*\.yandex\.ru/);
+  assert.match(headers, /script-src-attr 'none'/);
+  assert.match(headers, /frame-src https:\/\/yandex\.ru https:\/\/\*\.yandex\.ru https:\/\/yandex\.com https:\/\/\*\.yandex\.com/);
   assert.match(headers, /Cross-Origin-Opener-Policy "same-origin"/);
   assert.match(headers, /X-Permitted-Cross-Domain-Policies "none"/);
+
+  const offline = read("public/offline.html");
+  assert.doesNotMatch(offline, /\son[a-z]+\s*=/i);
+  assert.match(offline, /addEventListener\("click"/);
 }
 
 function findBash() {

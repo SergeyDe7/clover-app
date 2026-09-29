@@ -18,14 +18,24 @@ export const ANONYMOUS_CLIENT_COOKIE = "clover_rl_client";
 
 export const PUBLIC_RATE_LIMIT_POLICIES = Object.freeze({
   login: Object.freeze({ max: 20, windowMs: 10 * 60 * 1000 }),
+  loginClient: Object.freeze({ max: 60, windowMs: 10 * 60 * 1000 }),
+  reauth: Object.freeze({ max: 10, windowMs: 10 * 60 * 1000 }),
   register: Object.freeze({ max: 8, windowMs: 10 * 60 * 1000 }),
+  registerClient: Object.freeze({ max: 60, windowMs: 10 * 60 * 1000 }),
   forgotPassword: Object.freeze({ max: 5, windowMs: 15 * 60 * 1000 }),
+  forgotPasswordClient: Object.freeze({ max: 60, windowMs: 15 * 60 * 1000 }),
   resendVerification: Object.freeze({ max: 5, windowMs: 15 * 60 * 1000 }),
+  resendVerificationClient: Object.freeze({ max: 60, windowMs: 15 * 60 * 1000 }),
   verifyEmail: Object.freeze({ max: 8, windowMs: 10 * 60 * 1000 }),
+  verifyEmailClient: Object.freeze({ max: 60, windowMs: 10 * 60 * 1000 }),
   resetPassword: Object.freeze({ max: 8, windowMs: 10 * 60 * 1000 }),
+  resetPasswordClient: Object.freeze({ max: 60, windowMs: 10 * 60 * 1000 }),
   passkeyAuthOptions: Object.freeze({ max: 10, windowMs: 10 * 60 * 1000 }),
+  passkeyAuthOptionsClient: Object.freeze({ max: 20, windowMs: 10 * 60 * 1000 }),
   passkeyAuthVerify: Object.freeze({ max: 10, windowMs: 10 * 60 * 1000 }),
+  passkeyAuthVerifyClient: Object.freeze({ max: 20, windowMs: 10 * 60 * 1000 }),
   guestOrder: Object.freeze({ max: 6, windowMs: 10 * 60 * 1000 }),
+  guestOrderClient: Object.freeze({ max: 12, windowMs: 10 * 60 * 1000 }),
   catalogRead: Object.freeze({ max: 30, windowMs: 60 * 1000 }),
 });
 
@@ -163,6 +173,7 @@ export function resolveAnonymousRateLimitClient({
 export function createBoundedRateLimitStore({
   maxEntries = DEFAULT_MAX_ENTRIES,
   now = () => Date.now(),
+  failClosedOnCapacity = false,
 } = {}) {
   const map = new Map();
   let lastPruneAt = 0;
@@ -249,8 +260,8 @@ export function createBoundedRateLimitStore({
       }
       if (map.size >= maxEntries) {
         return {
-          allowed: true,
-          retryAfterSeconds: 0,
+          allowed: !failClosedOnCapacity,
+          retryAfterSeconds: failClosedOnCapacity ? Math.ceil(windowMs / 1000) : 0,
           count: 0,
           tracked: false,
           capacity: true,

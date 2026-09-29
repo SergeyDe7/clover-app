@@ -4,8 +4,9 @@ import { appAlert, appConfirm } from "../shared/AppModal";
 import { STAFF_FEATURE_OPTIONS, STAFF_FEATURE_IDS, formatDateTime } from "../shared/appHelpers";
 import { useLocalization } from "../shared/i18n/LocalizationProvider";
 import { errorDisplayMessage } from "../shared/i18n/errorDisplay.js";
+import { isValidNewPassword, PASSWORD_MIN_LENGTH } from "../shared/passwordPolicy.js";
 
-function generateAccessPassword(length = 10) {
+function generateAccessPassword(length = PASSWORD_MIN_LENGTH) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
   const bytes = new Uint8Array(length);
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
@@ -183,7 +184,7 @@ export function AdminRolePanel({ currentUser }) {
       await appAlert({ title: t("shared.notCreated"), message, tone: "danger" });
       return;
     }
-    if (nextPassword.length < 6) {
+    if (!isValidNewPassword(nextPassword)) {
       const message = t("shared.passwordMustBeAtLeast6");
       setError(message);
       await appAlert({ title: t("shared.notCreated"), message, tone: "danger" });
@@ -195,7 +196,7 @@ export function AdminRolePanel({ currentUser }) {
     setNotice("");
     try {
       const result = await api.createManager(nextEmail, nextPassword, contact);
-      const once = String(result?.temporaryPassword || nextPassword).trim();
+      const once = String(result?.temporaryPassword || nextPassword);
       const createdId = result?.manager?.id ? String(result.manager.id) : "";
       setNotice(t("admin.staff.managerCreated", { email: nextEmail }));
       setFormKey((value) => value + 1);
@@ -259,7 +260,7 @@ export function AdminRolePanel({ currentUser }) {
   };
 
   const savePassword = async (user) => {
-    if (draftPassword.length < 6) {
+    if (!isValidNewPassword(draftPassword)) {
       const message = t("shared.passwordMustBeAtLeast6");
       setError(message);
       await appAlert({ title: t("auth.login.password"), message, tone: "danger" });
@@ -268,9 +269,9 @@ export function AdminRolePanel({ currentUser }) {
     setBusyId(user.id);
     setError("");
     try {
-      const password = draftPassword.trim();
+      const password = draftPassword;
       const result = await api.setStaffPassword(user.id, password);
-      const once = String(result?.temporaryPassword || password).trim();
+      const once = String(result?.temporaryPassword || password);
       await load();
       if (once) {
         setOneShotById({ [String(user.id)]: once });
@@ -377,7 +378,7 @@ export function AdminRolePanel({ currentUser }) {
                 name="managerPassword"
                 autoComplete="new-password"
                 required
-                minLength={6}
+                minLength={PASSWORD_MIN_LENGTH}
                 defaultValue=""
                 placeholder={t("shared.atLeast6Characters")}
               />
@@ -735,7 +736,7 @@ export function AdminRolePanel({ currentUser }) {
                         <input
                           type="text"
                           autoComplete="new-password"
-                          minLength={6}
+                          minLength={PASSWORD_MIN_LENGTH}
                           value={passwordEditorValue}
                           onChange={(event) => {
                             setOneShotById((current) => {
@@ -772,7 +773,7 @@ export function AdminRolePanel({ currentUser }) {
                         <button
                           className="primary-button"
                           type="button"
-                          disabled={busyId === user.id || draftPassword.length < 6}
+                          disabled={busyId === user.id || !isValidNewPassword(draftPassword)}
                           onClick={() => void savePassword(user)}
                         >
                           {user.hasPassword ? t("shared.changePassword2") : t("auth.reset.submit")}

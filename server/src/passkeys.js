@@ -10,12 +10,51 @@ function hostWithoutPort(value) {
 }
 
 export function passkeyConfiguration(req) {
-  const configuredOrigin = stripTrailingSlash(process.env.PASSKEY_ORIGIN || process.env.APP_PUBLIC_URL);
+  const isProduction = String(process.env.NODE_ENV || "").trim().toLowerCase() === "production";
+  const explicitOrigin = stripTrailingSlash(process.env.PASSKEY_ORIGIN);
+  const explicitRpId = String(process.env.PASSKEY_RP_ID || "").trim().toLowerCase();
+  if (isProduction && (!explicitOrigin || !explicitRpId)) {
+    const error = new Error("Passkey configuration is unavailable.");
+    error.status = 503;
+    error.code = "PASSKEY_CONFIG_INVALID";
+    throw error;
+  }
+
+  const configuredOrigin = explicitOrigin || stripTrailingSlash(process.env.APP_PUBLIC_URL);
   const requestOrigin = stripTrailingSlash(`${req.protocol}://${req.get("host")}`);
   const origin = configuredOrigin || requestOrigin;
-  const originUrl = new URL(origin);
+  let originUrl;
+  try {
+    originUrl = new URL(origin);
+  } catch {
+    const error = new Error("Passkey configuration is unavailable.");
+    error.status = 503;
+    error.code = "PASSKEY_CONFIG_INVALID";
+    throw error;
+  }
   const defaultRpId = hostWithoutPort(originUrl.hostname || req.hostname);
-  const rpID = String(process.env.PASSKEY_RP_ID || defaultRpId).trim() || defaultRpId;
+  const rpID = explicitRpId || defaultRpId;
+  const rpIdValid = /^[a-z0-9.-]+$/.test(rpID)
+    && !rpID.startsWith(".")
+    && !rpID.endsWith(".");
+  if (
+    isProduction
+    && (
+      originUrl.protocol !== "https:"
+      || originUrl.username
+      || originUrl.password
+      || originUrl.pathname !== "/"
+      || originUrl.search
+      || originUrl.hash
+      || !rpIdValid
+      || (originUrl.hostname !== rpID && !originUrl.hostname.endsWith(`.${rpID}`))
+    )
+  ) {
+    const error = new Error("Passkey configuration is unavailable.");
+    error.status = 503;
+    error.code = "PASSKEY_CONFIG_INVALID";
+    throw error;
+  }
   const rpName = String(process.env.PASSKEY_RP_NAME || "Clover").trim() || "Clover";
   return { origin, rpID, rpName };
 }

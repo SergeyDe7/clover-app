@@ -8,8 +8,7 @@
  * Does not touch production / live 1C / env.
  */
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -77,9 +76,12 @@ function resolveToken(token, contourFn) {
  * @param {string} rel
  * @param {"VLAVKA" | "TEST"} kind
  */
-function assertModuleConsistent(rel, kind, { requireHardening = true } = {}) {
-  const abs = path.join(repoRoot, rel);
-  const text = readFileSync(abs, "utf8");
+function assertModuleTextConsistent(
+  text,
+  rel,
+  kind,
+  { requireHardening = true } = {}
+) {
   const { headers, bodies, contourFn } = extractContours(text);
 
   assert.ok(headers.length > 0, `${rel}: missing X-Clover-Database header`);
@@ -125,6 +127,47 @@ function assertModuleConsistent(rel, kind, { requireHardening = true } = {}) {
     );
   }
 
+  if (kind === "VLAVKA" && requireHardening) {
+    const keyFnStart = text.indexOf("Функция ПолучитьКлючОбмена()");
+    const keyFnEnd = text.indexOf("КонецФункции", keyFnStart);
+    const keyFnSlice = text.slice(keyFnStart, keyFnEnd);
+    const keyLiterals = [...keyFnSlice.matchAll(/"([^"]*)"/g)].map(
+      (match) => match[1]
+    );
+    assert.ok(
+      keyFnStart >= 0 && keyFnEnd > keyFnStart,
+      `${rel}: ПолучитьКлючОбмена() function is required`
+    );
+    assert.equal(
+      (text.match(/\*\*\*REPLACE_WITH_ONEC_API_KEY\*\*\*/g) || []).length,
+      1,
+      `${rel}: source-controlled VLAVKA module must contain exactly one key placeholder`
+    );
+    assert.deepEqual(
+      keyLiterals,
+      ["***REPLACE_WITH_ONEC_API_KEY***"],
+      `${rel}: key function must contain only the explicit placeholder and no embedded secret`
+    );
+    const fileWideSecretPatterns = [
+      { label: "long hex token", pattern: /\b[0-9a-fA-F]{32,}\b/ },
+      {
+        label: "provider-style API token",
+        pattern: /\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]{16,}\b/,
+      },
+      {
+        label: "JWT-like token",
+        pattern: /\beyJ[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/,
+      },
+    ];
+    for (const { label, pattern } of fileWideSecretPatterns) {
+      assert.equal(
+        pattern.test(text),
+        false,
+        `${rel}: source-controlled VLAVKA module contains a ${label}`
+      );
+    }
+  }
+
   if (requireHardening) {
     assert.ok(
       text.includes("[CLOVER-ID:"),
@@ -145,24 +188,61 @@ function assertModuleConsistent(rel, kind, { requireHardening = true } = {}) {
       false,
       `${rel}: legacy short-number lookup must be removed`
     );
-    assert.ok(
-      text.includes(".Ссылка.ПолучитьОбъект()") ||
-        text.includes("СсылкаДокумента.ПолучитьОбъект()"),
-      `${rel}: document must be re-read from 1C before ACK`
+    const persistedCheckStart = text.indexOf(
+      "Функция ПроверитьЗаписанныйЗаказClover("
     );
-    const lockIdx = text.indexOf("БлокировкаClover.Заблокировать()");
-    const lockedLookupIdx = text.indexOf(
+    const persistedCheckEnd = text.indexOf(
+      "КонецФункции",
+      persistedCheckStart
+    );
+    const persistedCheckSlice = text.slice(
+      persistedCheckStart,
+      persistedCheckEnd
+    );
+    assert.ok(
+      persistedCheckStart >= 0 && persistedCheckEnd > persistedCheckStart,
+      `${rel}: persisted-document verifier function is required`
+    );
+    assert.ok(
+      persistedCheckSlice.includes(
+        "ПроверенныйЗаказ = СсылкаДокумента.ПолучитьОбъект()"
+      ) &&
+        persistedCheckSlice.includes("ФактическийID <> ОжидаемыйID"),
+      `${rel}: persisted verifier must re-read the exact document and compare Clover ID`
+    );
+    const createFlowStart = text.indexOf("Функция СоздатьОдинТестовыйЗаказ()");
+    const createFlowEnd = text.indexOf("КонецФункции", createFlowStart);
+    const createFlowSlice = text.slice(createFlowStart, createFlowEnd);
+    assert.ok(
+      createFlowStart >= 0 && createFlowEnd > createFlowStart,
+      `${rel}: order creation flow is required`
+    );
+    const lockIdx = createFlowSlice.indexOf("БлокировкаClover.Заблокировать()");
+    const lockedLookupIdx = createFlowSlice.indexOf(
       "Заказ = НайтиЗаказПоCloverID(CloverID)",
       lockIdx
     );
-    const writeIdx = text.indexOf("Заказ.Записать()", lockedLookupIdx);
-    const commitIdx = text.indexOf("ЗафиксироватьТранзакцию()", writeIdx);
+    const writeIdx = createFlowSlice.indexOf("Заказ.Записать()", lockedLookupIdx);
+    const rereadIdx = createFlowSlice.indexOf(
+      "ПроверенныйЗаказ = ПроверитьЗаписанныйЗаказClover(",
+      writeIdx
+    );
+    const commitIdx = createFlowSlice.indexOf(
+      "ЗафиксироватьТранзакцию()",
+      rereadIdx
+    );
+    const ackIdx = createFlowSlice.indexOf(
+      "ПодтвердитьЗаказВClover(",
+      commitIdx
+    );
     assert.ok(
       lockIdx >= 0 &&
         lockedLookupIdx > lockIdx &&
         writeIdx > lockedLookupIdx &&
-        commitIdx > writeIdx,
-      `${rel}: lookup and creation must be serialized by a 1C data lock`
+        rereadIdx > writeIdx &&
+        commitIdx > rereadIdx &&
+        ackIdx > commitIdx,
+      `${rel}: required order is lock -> lookup -> write -> persisted verify -> commit -> ACK`
     );
     assert.ok(
       text.includes(
@@ -185,17 +265,69 @@ function assertModuleConsistent(rel, kind, { requireHardening = true } = {}) {
     assert.ok(
       lookupSlice.includes("Заказы.ПометкаУдаления КАК ПометкаУдаления") &&
         lookupSlice.includes("CLOVER_ID_MARKED_FOR_DELETION") &&
+        lookupSlice.includes("ИзвлечьТочныйCloverIDИзКомментария(") &&
+        lookupSlice.includes("ВыборкаЗаказа.Комментарий) = CloverID Тогда") &&
         !lookupSlice.includes("НЕ Заказы.ПометкаУдаления"),
-      `${rel}: a marked-for-deletion Clover document must block create and ACK`
+      `${rel}: lookup must compare exact Clover ID and block marked-for-deletion documents`
     );
     assert.ok(
       text.includes("ДанныеПринятия.Вставить(\"orderId\"") &&
         !text.includes("ДанныеПринятия.Вставить(\"orderNumber\""),
       `${rel}: accepted-status callback must use immutable orderId`
     );
+    const guardStart = text.indexOf(
+      "Процедура ПроверитьНеизменностьCloverIDПередЗаписью("
+    );
+    const guardEnd = text.indexOf("КонецПроцедуры", guardStart);
+    const guardSlice = text.slice(guardStart, guardEnd);
+    const beforeWriteStart = text.indexOf(
+      "Процедура ОбработатьЗаписьЗаказаCloverПередЗаписью("
+    );
+    const beforeWriteEnd = text.indexOf("КонецПроцедуры", beforeWriteStart);
+    const beforeWriteSlice = text.slice(beforeWriteStart, beforeWriteEnd);
+    assert.ok(
+      guardStart >= 0 &&
+        guardEnd > guardStart &&
+        guardSlice.includes("Источник.Ссылка.Комментарий") &&
+        guardSlice.includes("ТекущийCloverID <> ПредыдущийCloverID") &&
+        guardSlice.includes("Отказ = Истина") &&
+        guardSlice.includes("CLOVER_ID_IMMUTABLE") &&
+        !guardSlice.includes("Источник.Комментарий <> ПредыдущийКомментарий"),
+      `${rel}: existing Clover ID marker must be immutable`
+    );
+    assert.ok(
+      beforeWriteStart >= 0 &&
+        beforeWriteEnd > beforeWriteStart &&
+        beforeWriteSlice.includes(
+          "ПроверитьНеизменностьCloverIDПередЗаписью(Источник, Отказ)"
+        ),
+      `${rel}: BeforeWrite subscription must invoke Clover ID immutability guard`
+    );
   }
 
   return { rel, kind, headerContour, bodyCount: bodies.length, contourFn };
+}
+
+function assertModuleConsistent(rel, kind, options = {}) {
+  const abs = path.join(repoRoot, rel);
+  return assertModuleTextConsistent(readFileSync(abs, "utf8"), rel, kind, options);
+}
+
+function expectModuleRejected(label, text, options = {}) {
+  assert.throws(
+    () =>
+      assertModuleTextConsistent(text, `fixture:${label}`, "VLAVKA", {
+        requireHardening: true,
+        ...options,
+      }),
+    undefined,
+    `mutation fixture must be rejected: ${label}`
+  );
+}
+
+function mutateRequired(text, from, to, label) {
+  assert.ok(text.includes(from), `fixture source missing mutation target: ${label}`);
+  return text.replaceAll(from, to);
 }
 
 function assertRegressionDetectorWorks() {
@@ -205,43 +337,102 @@ function assertRegressionDetectorWorks() {
 КонецПроцедуры
 ДанныеЦен.Вставить("database", "TEST");
 `;
-  const { headers, bodies, contourFn } = extractContours(bad);
-  const header = resolveToken(headers[0], contourFn);
-  const body = resolveToken(bodies[0], contourFn);
-  assert.equal(header, "VLAVKA");
-  assert.equal(body, "TEST");
-  assert.notEqual(
-    header,
-    body,
-    "fixture must demonstrate VLAVKA header vs TEST body conflict"
+  assert.throws(
+    () =>
+      assertModuleTextConsistent(bad, "fixture:contour-conflict", "VLAVKA", {
+        requireHardening: false,
+      }),
+    undefined,
+    "main verifier must reject VLAVKA header with TEST body"
   );
 
-  // Write temp file and ensure assertModuleConsistent would fail.
-  const dir = mkdtempSync(path.join(tmpdir(), "clover-contour-mod-"));
-  const rel = path.join(dir, "bad-vlava.txt");
-  writeFileSync(rel, bad, "utf8");
-  let failed = false;
-  try {
-    // Inline check mirroring VLAVKA rule:
-    assert.equal(
-      /ДанныеЦен\.Вставить\(\s*"database"\s*,\s*"TEST"\s*\)/.test(bad),
-      false,
-      "expected fail"
-    );
-  } catch {
-    failed = true;
+  const source = readFileSync(
+    path.join(repoRoot, "one_c_patches/vlavka/ПОЛНЫЙ_МОДУЛЬ_VLAVKA.txt"),
+    "utf8"
+  );
+  const providerTokenFixture = ["sk", "live", "abcdefghijklmnopqrstuvwx"].join("_");
+  const mutations = [
+    [
+      "embedded-non-hex-secret",
+      'Возврат "***REPLACE_WITH_ONEC_API_KEY***";',
+      'ЛишнийКлюч = "non-hex-production-api-key-that-must-never-enter-git";\n\tВозврат "***REPLACE_WITH_ONEC_API_KEY***";',
+    ],
+    [
+      "external-provider-secret",
+      "Процедура ДобавитьЗаголовкиОбмена(ЗапросHTTP) Экспорт",
+      `ВнешнийСекрет = "${providerTokenFixture}";\nПроцедура ДобавитьЗаголовкиОбмена(ЗапросHTTP) Экспорт`,
+    ],
+    [
+      "external-hex-secret",
+      "Процедура ДобавитьЗаголовкиОбмена(ЗапросHTTP) Экспорт",
+      'ВнешнийHexСекрет = "0123456789abcdef0123456789abcdef";\nПроцедура ДобавитьЗаголовкиОбмена(ЗапросHTTP) Экспорт',
+    ],
+    [
+      "external-jwt-secret",
+      "Процедура ДобавитьЗаголовкиОбмена(ЗапросHTTP) Экспорт",
+      'ВнешнийJWT = "eyJabcdefghijklmnop.qrstuvwx.yzABCDEF";\nПроцедура ДобавитьЗаголовкиОбмена(ЗапросHTTP) Экспорт',
+    ],
+    ["missing-id-marker", "[CLOVER-ID:", "[CLOVER-LEGACY-ID:"],
+    [
+      "inexact-id-comparison",
+      "ВыборкаЗаказа.Комментарий) = CloverID Тогда",
+      'ВыборкаЗаказа.Комментарий) <> "" Тогда',
+    ],
+    [
+      "missing-managed-transaction",
+      "НачатьТранзакцию(РежимУправленияБлокировкойДанных.Управляемый)",
+      "НачатьТранзакцию()",
+    ],
+    [
+      "missing-data-lock",
+      "БлокировкаClover.Заблокировать()",
+      "// Блокировка удалена",
+    ],
+    [
+      "marked-deletion-bypass",
+      "CLOVER_ID_MARKED_FOR_DELETION",
+      "CLOVER_ID_DELETE_IGNORED",
+    ],
+    [
+      "missing-target-reread",
+      "ПроверенныйЗаказ = СсылкаДокумента.ПолучитьОбъект()",
+      "ПроверенныйЗаказ = СсылкаДокумента",
+    ],
+    [
+      "commit-before-verified-ack-order-missing",
+      "ЗафиксироватьТранзакцию();",
+      "// ЗафиксироватьТранзакцию удалено",
+    ],
+    [
+      "mutable-status-identity",
+      'ДанныеПринятия.Вставить("orderId"',
+      'ДанныеПринятия.Вставить("orderNumber"',
+    ],
+    [
+      "missing-before-write-id-guard",
+      "ПроверитьНеизменностьCloverIDПередЗаписью(Источник, Отказ);",
+      "// Проверка неизменности Clover ID удалена",
+    ],
+  ];
+  for (const [label, from, to] of mutations) {
+    expectModuleRejected(label, mutateRequired(source, from, to, label));
   }
-  rmSync(dir, { recursive: true, force: true });
-  assert.equal(failed, true, "regression detector must flag header VLAVKA + body TEST");
+
+  const marker = "[CLOVER-ID:fixture-order-id]";
+  const oldComment = `${marker}\nСтарый текст менеджера`;
+  const editedComment = `${marker}\nНовый текст менеджера`;
+  assert.equal(oldComment.split("\n", 1)[0], editedComment.split("\n", 1)[0]);
+  assert.notEqual(oldComment, editedComment);
 }
 
 const reports = [];
 for (const mod of MODULES) {
   reports.push(
     assertModuleConsistent(mod.file, mod.kind, {
-      // This stage is TEST-only. VLAVKA remains byte-for-byte unchanged and
-      // is checked only for its existing contour isolation.
-      requireHardening: mod.kind === "TEST",
+      // Both contour templates must retain immutable-ID idempotency hardening.
+      // The VLAVKA source is secretless and represents the production-tested
+      // module with one explicit key placeholder.
+      requireHardening: true,
     })
   );
 }

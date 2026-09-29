@@ -62,6 +62,7 @@ function useIsNarrow() {
 }
 
 function ClientDashboard({
+  authUserId,
   profile,
   setProfile,
   onLanguageChange,
@@ -613,6 +614,7 @@ function ClientDashboard({
 
             {canCreateOrder ? (
               <OrderEditor
+                ownerUserId={authUserId}
                 key={orderEditorKey}
                 embedded
                 session={orderSession}

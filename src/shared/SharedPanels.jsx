@@ -10,6 +10,7 @@ import { formatDateTime } from "./appHelpers";
 import { historyActorLabel, orderHistoryLabel } from "./i18n/displayLabels";
 import { errorDisplayMessage } from "./i18n/errorDisplay.js";
 import { appConfirm } from "./AppModal";
+import { isValidNewPassword, PASSWORD_MIN_LENGTH } from "./passwordPolicy.js";
 import {
   installPushSyncListeners,
   pushRestoreHintMessage,
@@ -294,6 +295,7 @@ export function PasswordSecurityPanel({
 } = {}) {
   const { t } = useLocalization();
   const [form, setForm] = useState({ currentPassword: "", newPassword: "", repeatPassword: "" });
+  const [reauthPassword, setReauthPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [passkeys, setPasskeys] = useState([]);
@@ -320,6 +322,10 @@ export function PasswordSecurityPanel({
       setError(t("shared.theNewPasswordsDoNotMatch"));
       return;
     }
+    if (!isValidNewPassword(form.newPassword)) {
+      setError(t("shared.atLeast6Characters"));
+      return;
+    }
     setBusy(true);
     try {
       const result = await api.changePassword(form.currentPassword, form.newPassword);
@@ -338,8 +344,9 @@ export function PasswordSecurityPanel({
     setError("");
     setMessage("");
     try {
-      const result = await api.logoutOtherSessions();
+      const result = await api.logoutOtherSessions(reauthPassword);
       if (result.token) setApiToken(result.token);
+      setReauthPassword("");
       setMessage(t("shared.otherSessionsWereEnded"));
     } catch (sessionError) {
       setError(errorDisplayMessage(sessionError, t, "shared.error.requestFailed"));
@@ -357,9 +364,10 @@ export function PasswordSecurityPanel({
     }
     setPasskeyBusy(true);
     try {
-      const ceremony = await api.getPasskeyRegistrationOptions();
+      const ceremony = await api.getPasskeyRegistrationOptions(reauthPassword);
       const response = await startPasskeyRegistration(ceremony.options);
       await api.verifyPasskeyRegistration(ceremony.ceremonyId, response);
+      setReauthPassword("");
       setMessage(t("shared.passkeyAdded"));
       await loadPasskeys();
     } catch (registrationError) {
@@ -381,7 +389,8 @@ export function PasswordSecurityPanel({
     setPasskeyBusy(true);
     setError("");
     try {
-      await api.deletePasskey(credentialId);
+      await api.deletePasskey(credentialId, reauthPassword);
+      setReauthPassword("");
       setMessage(t("shared.passkeyDeleted"));
       await loadPasskeys();
     } catch (deleteError) {
@@ -428,7 +437,7 @@ export function PasswordSecurityPanel({
               }<input
                 type="password"
                 autoComplete="new-password"
-                minLength="6"
+                minLength={PASSWORD_MIN_LENGTH}
                 value={form.newPassword}
                 onChange={(event) => setForm({ ...form, newPassword: event.target.value })}
                 required
@@ -439,7 +448,7 @@ export function PasswordSecurityPanel({
               }<input
                 type="password"
                 autoComplete="new-password"
-                minLength="6"
+                minLength={PASSWORD_MIN_LENGTH}
                 value={form.repeatPassword}
                 onChange={(event) => setForm({ ...form, repeatPassword: event.target.value })}
                 required
@@ -456,11 +465,28 @@ export function PasswordSecurityPanel({
 
       <div className="security-block">
         <div className="security-block-head">
+          <h3>{t("shared.currentPassword")}</h3>
+          <p className="muted small">{t("shared.security.reauthHint")}</p>
+        </div>
+        <label className="field">
+          {t("shared.currentPassword")}
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={reauthPassword}
+            onChange={(event) => setReauthPassword(event.target.value)}
+            required
+          />
+        </label>
+      </div>
+
+      <div className="security-block">
+        <div className="security-block-head">
           <h3>{t("shared.sessions")}</h3>
           <p className="muted small">{t("shared.endsSignInOnOtherDevices")}</p>
         </div>
         <div className="security-block-actions">
-          <button className="secondary-button" type="button" disabled={busy} onClick={endOtherSessions}>{
+          <button className="secondary-button" type="button" disabled={busy || !reauthPassword} onClick={endOtherSessions}>{
             t("shared.endOtherSessions")
           }</button>
         </div>
@@ -474,7 +500,7 @@ export function PasswordSecurityPanel({
               t("shared.faceAndFingerprintDataStayOn")
             }</p>
           </div>
-          <button className="secondary-button" type="button" disabled={passkeyBusy} onClick={addPasskey}>
+          <button className="secondary-button" type="button" disabled={passkeyBusy || !reauthPassword} onClick={addPasskey}>
             {passkeyBusy ? t("auth.login.wait") : passkeys.length ? t("shared.addAnotherDevice") : t("shared.enableDeviceSignIn")}
           </button>
         </div>
@@ -485,7 +511,7 @@ export function PasswordSecurityPanel({
                 <strong>{t("shared.passkey.accessKeyNumbered", { n: index + 1 })}</strong>
                 <span>{item.backedUp ? t("shared.syncedWithTheDeviceAccount") : t("shared.savedOnThisDevice")}</span>
               </div>
-              <button className="danger-button" type="button" disabled={passkeyBusy} onClick={() => removePasskey(item.id)}>{
+              <button className="danger-button" type="button" disabled={passkeyBusy || !reauthPassword} onClick={() => removePasskey(item.id)}>{
                 t("shared.action.delete")
               }</button>
             </div>
