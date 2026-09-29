@@ -717,7 +717,10 @@ export function build1CPayload({
 }
 
 function csvCell(value) {
-  const text = String(value ?? "");
+  let text = String(value ?? "");
+  if (typeof value === "string" && /^\s*[=+\-@]/u.test(text)) {
+    text = `'${text}`;
+  }
   return `"${text.replaceAll('"', '""')}"`;
 }
 

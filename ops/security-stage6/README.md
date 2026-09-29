@@ -12,6 +12,8 @@ Files:
 - `docs/deploy/server.env.datacenter.example`
 - `server/scripts/verify-security-stage6.mjs`
 - `server/scripts/securityStage6Artifact.mjs`
+- `server/scripts/verify-security-stage10d-csp-browser.mjs`
+- `docs/technical/SECURITY_STAGE10D_FRONTEND_PWA_ABUSE.md`
 - `server/package.json`
 
 Package A makes production CORS fail closed for development/LAN origins and
@@ -24,12 +26,25 @@ Files:
 
 - `ops/security-stage6/package-b/nginx/clover-security-headers.conf`
 - `ops/security-stage6/scripts/promote-package-b.sh`
+- `public/offline.html`
 - `public/sw.js`
 
 The nginx file is a full replacement candidate for the installed
 `/etc/nginx/snippets/clover-security-headers.conf`; it is not installed by this
-local preparation. CSP resource loading remains Report-Only, while the minimal
-`base-uri`, `object-src`, `frame-ancestors` and `form-action` policy is enforced.
+local preparation. The complete resource-loading CSP is now an enforcement
+candidate; inline event attributes are forbidden. Existing inline script blocks
+and styles remain temporarily allowed for the current JSON-LD, boot, print and
+React style paths. Production promotion requires a read-only inventory of live
+product/certificate URLs, deployment of the compatible UI first, browser smoke,
+`nginx -t` and the existing exact-file rollback procedure.
+
+Order is security-critical. The Package B promoter installs only the nginx
+header snippet; it does not deploy `public/offline.html` or the application UI.
+The target-pinned release containing the listener-based offline page must be
+deployed and smoke-tested before enabling `script-src-attr 'none'`. Rollback is
+the reverse safety order: restore and validate/reload the previous CSP header
+first, then roll back the UI release. This prevents the former inline
+`onclick` retry control from being served under a policy that blocks it.
 
 ## Gates
 

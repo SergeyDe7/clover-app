@@ -582,7 +582,7 @@ assert.equal(batch instanceof Map, true);
 assert.ok(batch.get("722")?.name);
 
 const snapshot = exportDatabaseSnapshot();
-assert.equal(snapshot.version, 5);
+assert.equal(snapshot.version, 6);
 const keepAuto = getProductTranslationWorkspace(722).fields.name.languages.en.value;
 importDatabaseSnapshot(structuredClone(snapshot));
 assert.equal(getProductTranslationWorkspace(722).fields.name.languages.en.value, keepAuto);

@@ -169,6 +169,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS reconciliation_requests (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
+    database TEXT NOT NULL DEFAULT '',
     period_type TEXT NOT NULL,
     year INTEGER,
     date_from TEXT NOT NULL DEFAULT '',
@@ -925,6 +926,26 @@ ensureColumn("users", "password_changed_at", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("users", "last_login_at", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("users", "disabled_at", "TEXT NOT NULL DEFAULT ''");
 ensureColumn("users", "permissions_json", "TEXT NOT NULL DEFAULT '{}'");
+ensureColumn("reconciliation_requests", "database", "TEXT NOT NULL DEFAULT ''");
+const legacyReconciliationRows = Number(db.prepare(`
+  SELECT COUNT(*) AS count
+  FROM reconciliation_requests
+  WHERE TRIM(database) = ''
+`).get()?.count || 0);
+if (legacyReconciliationRows > 0) {
+  const legacyDatabase = String(
+    process.env.CLOVER_LEGACY_RECONCILIATION_DATABASE || ""
+  ).trim().toLocaleUpperCase("ru-RU");
+  if (!["TEST", "VLAVKA"].includes(legacyDatabase)) {
+    throw new Error(
+      "RECONCILIATION_CONTOUR_MIGRATION_REQUIRED: set CLOVER_LEGACY_RECONCILIATION_DATABASE to TEST or VLAVKA before migrating legacy reconciliation requests."
+    );
+  }
+  db.prepare(`UPDATE reconciliation_requests SET database = ? WHERE TRIM(database) = ''`)
+    .run(legacyDatabase);
+}
+db.exec(`CREATE INDEX IF NOT EXISTS idx_reconciliation_database_status
+  ON reconciliation_requests(database, status, created_at DESC)`);
 maybeApplyLegacyManagerPermissionsMigration(db);
 maybeApplyStripPlaintextPasswordsMigration(db);
 
@@ -1007,6 +1028,7 @@ function repairStaleUsersForeignKeys() {
     reconciliation_requests: `CREATE TABLE reconciliation_requests (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
+      database TEXT NOT NULL DEFAULT '',
       period_type TEXT NOT NULL,
       year INTEGER,
       date_from TEXT NOT NULL DEFAULT '',
@@ -1058,6 +1080,7 @@ function repairStaleUsersForeignKeys() {
     "CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)",
     "CREATE INDEX IF NOT EXISTS idx_auth_tokens_lookup ON auth_tokens(type, token_hash, expires_at)",
     "CREATE INDEX IF NOT EXISTS idx_reconciliation_user ON reconciliation_requests(user_id, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_reconciliation_database_status ON reconciliation_requests(database, status, created_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id)",
     "CREATE INDEX IF NOT EXISTS idx_passkey_user ON passkey_credentials(user_id)",
   ];
@@ -1989,8 +2012,45 @@ export function consumeAuthToken({ type, tokenHash }) {
   return { id: row.id, userId: row.user_id, type: row.type, expiresAt: row.expires_at };
 }
 
+/** Atomically consumes one valid reset token and rotates the user's session epoch. */
+export function resetPasswordWithToken({ tokenHash, passwordHash }) {
+  return runInTransaction(() => {
+    const row = db.prepare(`
+      SELECT id, user_id, expires_at
+      FROM auth_tokens
+      WHERE type = 'reset_password' AND token_hash = ? AND used_at = ''
+    `).get(String(tokenHash));
+    if (!row || Date.parse(row.expires_at) <= Date.now()) return null;
+
+    const changedAt = randomUUID();
+    const passwordUpdate = db.prepare(`
+      UPDATE users
+      SET password_hash = ?, password_changed_at = ?
+      WHERE id = ?
+    `).run(String(passwordHash), changedAt, String(row.user_id));
+    if (Number(passwordUpdate.changes) !== 1) return null;
+
+    const tokenUpdate = db.prepare(`
+      UPDATE auth_tokens
+      SET used_at = ?
+      WHERE id = ? AND used_at = ''
+    `).run(now(), String(row.id));
+    if (Number(tokenUpdate.changes) !== 1) {
+      throw new Error("Reset token was consumed concurrently.");
+    }
+    db.prepare(`
+      UPDATE auth_tokens
+      SET used_at = ?
+      WHERE user_id = ? AND type = 'reset_password' AND used_at = ''
+    `).run(now(), String(row.user_id));
+    db.prepare(`DELETE FROM passkey_credentials WHERE user_id = ?`).run(String(row.user_id));
+    return findUserById(String(row.user_id));
+  });
+}
+
 export function createReconciliationRequest({
   userId,
+  database = "TEST",
   periodType,
   year = null,
   dateFrom = "",
@@ -2001,11 +2061,12 @@ export function createReconciliationRequest({
   const createdAt = now();
   db.prepare(`
     INSERT INTO reconciliation_requests(
-      id, user_id, period_type, year, date_from, date_to, status,
+      id, user_id, database, period_type, year, date_from, date_to, status,
       client_comment, manager_comment, file_name, file_path, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, 'new', ?, '', '', '', ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, '', '', '', ?, ?)
   `).run(
-    id, String(userId), String(periodType), year == null ? null : Number(year),
+    id, String(userId), String(database || "TEST").trim().toLocaleUpperCase("ru-RU"),
+    String(periodType), year == null ? null : Number(year),
     String(dateFrom || ''), String(dateTo || ''), String(clientComment || ''),
     createdAt, createdAt
   );
@@ -2017,6 +2078,7 @@ function reconciliationRow(row) {
   return {
     id: row.id,
     userId: row.user_id,
+    database: String(row.database || "TEST").toLocaleUpperCase("ru-RU"),
     periodType: row.period_type,
     year: row.year,
     dateFrom: row.date_from || "",
@@ -2031,20 +2093,37 @@ function reconciliationRow(row) {
   };
 }
 
-export function getReconciliationRequest(id) {
-  return reconciliationRow(db.prepare(`
-    SELECT * FROM reconciliation_requests WHERE id = ?
-  `).get(String(id)));
+export function getReconciliationRequest(id, database = null) {
+  const row = database
+    ? db.prepare(`SELECT * FROM reconciliation_requests WHERE id = ? AND database = ?`)
+      .get(String(id), String(database).trim().toLocaleUpperCase("ru-RU"))
+    : db.prepare(`SELECT * FROM reconciliation_requests WHERE id = ?`).get(String(id));
+  return reconciliationRow(row);
 }
 
-export function getReconciliationRequestInternal(id) {
+export function getReconciliationRequestInternal(id, database = null) {
+  if (database) {
+    return db.prepare(`SELECT * FROM reconciliation_requests WHERE id = ? AND database = ?`)
+      .get(String(id), String(database).trim().toLocaleUpperCase("ru-RU")) || null;
+  }
   return db.prepare(`SELECT * FROM reconciliation_requests WHERE id = ?`).get(String(id)) || null;
 }
 
-export function listReconciliationRequests(userId = null) {
-  const rows = userId
-    ? db.prepare(`SELECT * FROM reconciliation_requests WHERE user_id = ? ORDER BY created_at DESC`).all(String(userId))
-    : db.prepare(`SELECT * FROM reconciliation_requests ORDER BY created_at DESC`).all();
+export function listReconciliationRequests(userId = null, database = null) {
+  const normalizedDatabase = database
+    ? String(database).trim().toLocaleUpperCase("ru-RU")
+    : null;
+  let rows;
+  if (userId && normalizedDatabase) {
+    rows = db.prepare(`SELECT * FROM reconciliation_requests WHERE user_id = ? AND database = ? ORDER BY created_at DESC`)
+      .all(String(userId), normalizedDatabase);
+  } else if (userId) {
+    rows = db.prepare(`SELECT * FROM reconciliation_requests WHERE user_id = ? ORDER BY created_at DESC`).all(String(userId));
+  } else if (normalizedDatabase) {
+    rows = db.prepare(`SELECT * FROM reconciliation_requests WHERE database = ? ORDER BY created_at DESC`).all(normalizedDatabase);
+  } else {
+    rows = db.prepare(`SELECT * FROM reconciliation_requests ORDER BY created_at DESC`).all();
+  }
   const clients = new Map(listClients().map((client) => [String(client.id), client]));
   return rows.map((row) => ({
     ...reconciliationRow(row),
@@ -2052,8 +2131,8 @@ export function listReconciliationRequests(userId = null) {
   }));
 }
 
-export function updateReconciliationRequest(id, patch = {}) {
-  const current = getReconciliationRequestInternal(id);
+export function updateReconciliationRequest(id, patch = {}, database = null) {
+  const current = getReconciliationRequestInternal(id, database);
   if (!current) return null;
   const status = ["new", "processing", "ready", "rejected"].includes(patch.status)
     ? patch.status
@@ -2068,15 +2147,16 @@ export function updateReconciliationRequest(id, patch = {}) {
     SET status = ?, manager_comment = ?, file_name = ?, file_path = ?, updated_at = ?
     WHERE id = ?
   `).run(status, managerComment, fileName, filePath, now(), String(id));
-  return getReconciliationRequest(id);
+  return getReconciliationRequest(id, database);
 }
 
-export function deleteReconciliationRequest(id) {
-  const current = getReconciliationRequestInternal(id);
+export function deleteReconciliationRequest(id, database = null) {
+  const current = getReconciliationRequestInternal(id, database);
   if (!current) return null;
-  const result = db
-    .prepare(`DELETE FROM reconciliation_requests WHERE id = ?`)
-    .run(String(id));
+  const result = database
+    ? db.prepare(`DELETE FROM reconciliation_requests WHERE id = ? AND database = ?`)
+      .run(String(id), String(database).trim().toLocaleUpperCase("ru-RU"))
+    : db.prepare(`DELETE FROM reconciliation_requests WHERE id = ?`).run(String(id));
   if (!result.changes) return null;
   return current;
 }
@@ -2499,11 +2579,12 @@ export function listExchangeAudit(limit = 300) {
 
 export function exportDatabaseSnapshot() {
   return {
-    version: 5,
+    version: 6,
     exportedAt: now(),
     users: db.prepare(`
       SELECT id, email, password_hash, role, created_at,
-             email_verified, approval_status, password_changed_at, last_login_at
+             email_verified, approval_status, password_changed_at, last_login_at,
+             disabled_at, permissions_json
       FROM users
       ORDER BY created_at
     `).all(),
@@ -2551,16 +2632,81 @@ export function exportDatabaseSnapshot() {
   };
 }
 
-function assertSnapshotArray(snapshot, key) {
-  if (!Array.isArray(snapshot?.[key])) {
-    throw new Error(`В резервной копии отсутствует раздел ${key}.`);
+function snapshotSecurityError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  error.status = 409;
+  return error;
+}
+
+export function validateDatabaseSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+    throw snapshotSecurityError("BACKUP_INTEGRITY", "Некорректный формат резервной копии.");
   }
+  if (Number(snapshot.version) !== 6) {
+    throw snapshotSecurityError(
+      "BACKUP_SECURITY_STATE_MISSING",
+      "Резервная копия не содержит полного состояния безопасности пользователей."
+    );
+  }
+  const requiredSections = [
+    "users", "clientState", "appState", "orders", "auditLog", "authTokens",
+    "reconciliationRequests", "pushSubscriptions", "managerNotifications", "passkeys",
+    "productTranslations", "translationGlossary",
+  ];
+  for (const key of requiredSections) {
+    if (!Array.isArray(snapshot[key])) {
+      throw snapshotSecurityError("BACKUP_SECURITY_STATE_MISSING", `В резервной копии отсутствует раздел ${key}.`);
+    }
+  }
+  for (const row of snapshot.users) {
+    const requiredFields = [
+      "id", "email", "password_hash", "role", "created_at", "email_verified",
+      "approval_status", "password_changed_at", "last_login_at", "disabled_at", "permissions_json",
+    ];
+    if (
+      !row
+      || typeof row !== "object"
+      || requiredFields.some((field) => !Object.prototype.hasOwnProperty.call(row, field))
+    ) {
+      throw snapshotSecurityError(
+        "BACKUP_SECURITY_STATE_MISSING",
+        "В резервной копии отсутствует состояние блокировки или прав пользователя."
+      );
+    }
+    if (!["client", "manager", "admin"].includes(String(row.role))) {
+      throw snapshotSecurityError("BACKUP_SECURITY_STATE_INVALID", "Некорректная роль пользователя в резервной копии.");
+    }
+    if (!["pending", "approved", "rejected"].includes(String(row.approval_status))) {
+      throw snapshotSecurityError("BACKUP_SECURITY_STATE_INVALID", "Некорректный статус пользователя в резервной копии.");
+    }
+    if (row.email_verified !== 0 && row.email_verified !== 1) {
+      throw snapshotSecurityError("BACKUP_SECURITY_STATE_INVALID", "Некорректный статус подтверждения email в резервной копии.");
+    }
+    if (
+      !String(row.id)
+      || !String(row.email)
+      || !String(row.password_hash)
+      || typeof row.password_changed_at !== "string"
+      || typeof row.last_login_at !== "string"
+      || typeof row.disabled_at !== "string"
+    ) {
+      throw snapshotSecurityError("BACKUP_SECURITY_STATE_INVALID", "Некорректное состояние пользователя в резервной копии.");
+    }
+    try {
+      const permissions = JSON.parse(String(row.permissions_json));
+      if (!permissions || typeof permissions !== "object" || Array.isArray(permissions)) {
+        throw new Error("permissions must be an object");
+      }
+    } catch {
+      throw snapshotSecurityError("BACKUP_SECURITY_STATE_INVALID", "Некорректные права пользователя в резервной копии.");
+    }
+  }
+  return snapshot;
 }
 
 export function importDatabaseSnapshot(snapshot) {
-  for (const key of ["users", "clientState", "appState", "orders"]) {
-    assertSnapshotArray(snapshot, key);
-  }
+  validateDatabaseSnapshot(snapshot);
 
   db.exec("BEGIN IMMEDIATE");
 
@@ -2582,8 +2728,9 @@ export function importDatabaseSnapshot(snapshot) {
     const insertUser = db.prepare(`
       INSERT INTO users(
         id, email, password_hash, role, created_at,
-        email_verified, approval_status, password_changed_at, last_login_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        email_verified, approval_status, password_changed_at, last_login_at,
+        disabled_at, permissions_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const row of snapshot.users) {
       insertUser.run(
@@ -2592,10 +2739,12 @@ export function importDatabaseSnapshot(snapshot) {
         String(row.password_hash),
         String(row.role),
         String(row.created_at),
-        row.email_verified === undefined ? 1 : Number(Boolean(row.email_verified)),
+        Number(row.email_verified),
         String(row.approval_status || "approved"),
         String(row.password_changed_at || ""),
-        String(row.last_login_at || "")
+        String(row.last_login_at || ""),
+        String(row.disabled_at || ""),
+        String(row.permissions_json)
       );
     }
 
@@ -2681,13 +2830,24 @@ export function importDatabaseSnapshot(snapshot) {
 
     const insertReconciliation = db.prepare(`
       INSERT INTO reconciliation_requests(
-        id, user_id, period_type, year, date_from, date_to, status,
+        id, user_id, database, period_type, year, date_from, date_to, status,
         client_comment, manager_comment, file_name, file_path, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const row of Array.isArray(snapshot.reconciliationRequests) ? snapshot.reconciliationRequests : []) {
       insertReconciliation.run(
-        String(row.id || randomUUID()), String(row.user_id), String(row.period_type || "custom"),
+        String(row.id || randomUUID()), String(row.user_id),
+        (() => {
+          const database = String(row.database || "").trim().toLocaleUpperCase("ru-RU");
+          if (["TEST", "VLAVKA"].includes(database)) return database;
+          const legacyDatabase = String(
+            process.env.CLOVER_LEGACY_RECONCILIATION_DATABASE || ""
+          ).trim().toLocaleUpperCase("ru-RU");
+          if (["TEST", "VLAVKA"].includes(legacyDatabase)) return legacyDatabase;
+          throw new Error(
+            "RECONCILIATION_CONTOUR_MIGRATION_REQUIRED: backup reconciliation row has no trusted database contour."
+          );
+        })(), String(row.period_type || "custom"),
         row.year == null ? null : Number(row.year), String(row.date_from || ""), String(row.date_to || ""),
         String(row.status || "new"), String(row.client_comment || ""), String(row.manager_comment || ""),
         String(row.file_name || ""), String(row.file_path || ""),
@@ -2781,14 +2941,13 @@ export function importDatabaseSnapshot(snapshot) {
       );
     }
 
+    ensureGlobalState();
+    seedManager();
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
     throw error;
   }
-
-  ensureGlobalState();
-  seedManager();
 }
 
 ensureGlobalState();

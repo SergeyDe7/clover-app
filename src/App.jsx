@@ -7,6 +7,7 @@ import {
 } from "./shared/i18n/languagePreference.js";
 import { applyProductDisplayNameMap } from "./shared/i18n/productDisplayName.js";
 import { LanguageSelector } from "./shared/i18n/LanguageSelector.jsx";
+import { isValidNewPassword, PASSWORD_MIN_LENGTH } from "./shared/passwordPolicy.js";
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import cloverLogo from "./assets/clover-logo.png";
@@ -59,6 +60,16 @@ import {
   syncPushSubscription,
 } from "./shared/pushSync";
 import { ManagerContact } from "./screens/client/ManagerContact";
+import {
+  LEGACY_CLIENT_DATA_KEYS,
+  LEGACY_CLIENT_OWNER_KEY,
+  LEGACY_MANAGER_DATA_KEYS,
+  LEGACY_MANAGER_OWNER_KEY,
+  clearStorageKeys,
+  legacyClientProfileMatchesUser,
+  legacyStorageBelongsTo,
+  userDraftStorageKey,
+} from "./shared/browserStorageSecurity";
 
 const ClientScreen = lazy(() =>
   import("./screens/client/ClientScreen").then((m) => ({ default: m.ClientScreen }))
@@ -239,6 +250,10 @@ function LoginView({ onAuth, authBusy, authError }) {
         return;
       }
       if (mode === "reset") {
+        if (!isValidNewPassword(form.password)) {
+          setLocalError(t("shared.atLeast6Characters"));
+          return;
+        }
         if (form.password !== form.confirmPassword) {
           setLocalError(t("auth.reset.mismatch"));
           return;
@@ -248,6 +263,10 @@ function LoginView({ onAuth, authBusy, authError }) {
         window.history.replaceState({}, "", window.location.pathname);
         setMode("login");
         setForm((current) => ({ ...current, password: "", confirmPassword: "" }));
+        return;
+      }
+      if (mode === "register" && !isValidNewPassword(form.password)) {
+        setLocalError(t("shared.atLeast6Characters"));
         return;
       }
       const result = await onAuth({
@@ -385,7 +404,7 @@ function LoginView({ onAuth, authBusy, authError }) {
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
                   placeholder={mode === "login" ? t("auth.login.password") : undefined}
                   aria-label={mode === "login" ? t("auth.login.password") : undefined}
-                  minLength={mode === "login" ? 1 : 6}
+                  minLength={mode === "login" ? 1 : PASSWORD_MIN_LENGTH}
                   value={form.password}
                   onChange={(event) => updateField("password", event.target.value)}
                   required
@@ -413,7 +432,7 @@ function LoginView({ onAuth, authBusy, authError }) {
                   id="confirmPassword"
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
-                  minLength="6"
+                  minLength={PASSWORD_MIN_LENGTH}
                   value={form.confirmPassword}
                   onChange={(event) => updateField("confirmPassword", event.target.value)}
                   required
@@ -1213,15 +1232,29 @@ function App() {
 
       // Critical path: bootstrap then show LK.
       // One-time local→server migrate is non-critical — run after first cabinet paint.
+      // Legacy browser data has no trustworthy account identity. Migrate only
+      // when an explicit owner marker binds it to this authenticated account.
+      // Unowned data stays quarantined instead of being assigned to whoever
+      // signs in next on a shared browser.
+      const legacyProfile = safeRead(STORAGE.profile, EMPTY_PROFILE);
+      const clientLegacyOwned =
+        legacyStorageBelongsTo(localStorage, LEGACY_CLIENT_OWNER_KEY, result.user.id) ||
+        legacyClientProfileMatchesUser(legacyProfile, result.user);
+      // Manager legacy data is organization-global rather than account-private.
+      // Only an authenticated staff role can invoke the protected migration.
+      const managerLegacyOwned =
+        result.user.role === "manager" || result.user.role === "admin";
       const pendingMigrate = {
         user: result.user,
-        profile: safeRead(STORAGE.profile, EMPTY_PROFILE),
-        addresses: safeRead(STORAGE.addresses, []),
-        favorites: safeRead(STORAGE.favorites, []),
-        orders: safeRead(STORAGE.orders, []),
-        products: safeRead(STORAGE.products, []),
-        settings: safeRead(STORAGE.settings, null),
-        clientLinks: safeRead(STORAGE.clientLinks, null),
+        clientLegacyOwned,
+        managerLegacyOwned,
+        profile: clientLegacyOwned ? legacyProfile : EMPTY_PROFILE,
+        addresses: clientLegacyOwned ? safeRead(STORAGE.addresses, []) : [],
+        favorites: clientLegacyOwned ? safeRead(STORAGE.favorites, []) : [],
+        orders: clientLegacyOwned ? safeRead(STORAGE.orders, []) : [],
+        products: managerLegacyOwned ? safeRead(STORAGE.products, []) : [],
+        settings: managerLegacyOwned ? safeRead(STORAGE.settings, null) : null,
+        clientLinks: managerLegacyOwned ? safeRead(STORAGE.clientLinks, null) : null,
       };
 
       await loadBootstrap();
@@ -1231,6 +1264,7 @@ function App() {
           const user = pendingMigrate.user;
           if (
             user.role === "client" &&
+            pendingMigrate.clientLegacyOwned &&
             !localStorage.getItem(`clover-server-migrated-client-${user.id}`) &&
             (
               Object.values(pendingMigrate.profile).some(Boolean) ||
@@ -1247,11 +1281,16 @@ function App() {
               orders: pendingMigrate.orders,
             });
             localStorage.setItem(`clover-server-migrated-client-${user.id}`, "1");
+            clearStorageKeys(localStorage, [
+              ...LEGACY_CLIENT_DATA_KEYS,
+              LEGACY_CLIENT_OWNER_KEY,
+            ]);
             await loadBootstrap({ silent: true });
           }
 
           if (
             (user.role === "manager" || user.role === "admin") &&
+            pendingMigrate.managerLegacyOwned &&
             !localStorage.getItem("clover-server-migrated-manager") &&
             (
               pendingMigrate.products.length ||
@@ -1265,6 +1304,10 @@ function App() {
               clientLinks: pendingMigrate.clientLinks,
             });
             localStorage.setItem("clover-server-migrated-manager", "1");
+            clearStorageKeys(localStorage, [
+              ...LEGACY_MANAGER_DATA_KEYS,
+              LEGACY_MANAGER_OWNER_KEY,
+            ]);
             await loadBootstrap({ silent: true });
           }
         } catch {
@@ -1333,6 +1376,9 @@ function App() {
     profileLocaleCoordinatorRef.current.invalidateSession();
     invalidateLanguageRequests();
     clearApiToken();
+    // Retire the old unscoped draft key. Account-scoped drafts cannot be read
+    // by a different authenticated user on the same browser.
+    clearStorageKeys(localStorage, [STORAGE.draft]);
     writeManagerActiveTab("orders");
     writeOpenManagerClientId("");
     setManagerNotice(null);
@@ -1388,6 +1434,8 @@ function App() {
 
   const createFreshNewOrderSession = () => {
     try {
+      const draftKey = userDraftStorageKey(authUser?.id);
+      if (draftKey) localStorage.removeItem(draftKey);
       localStorage.removeItem(STORAGE.draft);
     } catch {
       // ignore storage errors
@@ -2190,6 +2238,7 @@ function App() {
     content = (
       <Suspense fallback={<ListSkeleton />}>
         <ClientScreen
+          authUserId={authUser?.id}
           profile={profile}
           setProfile={setProfile}
           onLanguageChange={async (locale) => {

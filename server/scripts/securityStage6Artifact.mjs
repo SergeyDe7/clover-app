@@ -23,14 +23,17 @@ export const checksumsName = "SHA256SUMS.txt";
 export const sourceFiles = Object.freeze([
   "docs/deploy/server.env.datacenter.example",
   "docs/technical/SECURITY_STAGE6_PREPARE.md",
+  "docs/technical/SECURITY_STAGE10D_FRONTEND_PWA_ABUSE.md",
   "ops/security-stage6/README.md",
   "ops/security-stage6/package-b/nginx/clover-security-headers.conf",
   "ops/security-stage6/scripts/promote-package-b.sh",
+  "public/offline.html",
   "public/sw.js",
   "server/.env.example",
   "server/package.json",
   "server/scripts/securityStage6Artifact.mjs",
   "server/scripts/verify-security-stage6.mjs",
+  "server/scripts/verify-security-stage10d-csp-browser.mjs",
   "server/src/server.js",
   "vite.config.js",
 ]);

@@ -1,4 +1,5 @@
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { userDraftStorageKey } from "../../shared/browserStorageSecurity";
 import { categoryDisplayNameFromCanonical } from "../../shared/i18n/categoryDisplayProjection.js";
 import { useCategoryDisplayOptions } from "../../shared/i18n/useCategoryTranslations.js";
 // Редактор заказа клиента: каталог, корзина и оформление.
@@ -131,6 +132,7 @@ function resolveCheckoutAddressId(addresses, preferredId) {
 }
 
 export function OrderEditor({
+  ownerUserId,
   session,
   products,
   addresses,
@@ -150,7 +152,10 @@ export function OrderEditor({
   const { t, locale } = useLocalization();
   const categoryOptions = useCategoryDisplayOptions();
   const initialOrder = session.order || null;
-  const savedDraft = session.mode === "new" && settings.enableDrafts ? safeRead(STORAGE.draft, null) : null;
+  const draftStorageKey = userDraftStorageKey(ownerUserId);
+  const savedDraft = session.mode === "new" && settings.enableDrafts && draftStorageKey
+    ? safeRead(draftStorageKey, null)
+    : null;
   const initialSource = initialOrder || savedDraft || {};
 
   const [search, setSearch] = useState("");
@@ -754,7 +759,8 @@ export function OrderEditor({
   useEffect(() => {
     if (draftSaveLockedRef.current) return;
     if (session.mode !== "new" || !settings.enableDrafts) return;
-    safeWrite(STORAGE.draft, {
+    if (!draftStorageKey) return;
+    safeWrite(draftStorageKey, {
       items: selectedItems,
       customItems,
       firstDeliveryDate: deliveryDate,
@@ -762,7 +768,7 @@ export function OrderEditor({
       address: selectedAddress?.address || "",
       clientComment,
     });
-  }, [session.mode, settings.enableDrafts, selectedItems, customItems, deliveryDate, addressId, selectedAddress, clientComment]);
+  }, [session.mode, settings.enableDrafts, draftStorageKey, selectedItems, customItems, deliveryDate, addressId, selectedAddress, clientComment]);
 
   const syncCartOrder = (id, nextQty) => {
     const sid = String(id);
@@ -1362,7 +1368,7 @@ export function OrderEditor({
 
     draftSaveLockedRef.current = true;
     try {
-      localStorage.removeItem(STORAGE.draft);
+      if (draftStorageKey) localStorage.removeItem(draftStorageKey);
     } catch {
       // ignore
     }
@@ -1420,7 +1426,7 @@ export function OrderEditor({
 
     draftSaveLockedRef.current = true;
     try {
-      localStorage.removeItem(STORAGE.draft);
+      if (draftStorageKey) localStorage.removeItem(draftStorageKey);
     } catch {
       // ignore
     }

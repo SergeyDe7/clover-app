@@ -2,9 +2,8 @@
 
 ## Scope and confirmed baseline
 
-S8-C is limited to npm dependency vulnerability visibility and security-update
-pull requests. It does not enable CodeQL, ordinary dependency version-update pull
-requests, auto-merge, deployment, production changes, off-site backup, database
+S8-C is limited to npm dependency vulnerability visibility and dependency-update
+pull requests. It does not enable CodeQL, auto-merge, deployment, production changes, off-site backup, database
 changes, dotenv access, or 1C changes.
 
 The read-only audit on 2026-09-25 confirmed repository
@@ -26,8 +25,8 @@ does not replace the GitHub dependency graph and Dependabot alert scan.
 ## Source-controlled behavior
 
 `.github/dependabot.yml` covers the npm manifests at `/` and `/server`. The
-entry sets `open-pull-requests-limit: 0`, so scheduled ordinary version-update
-pull requests are disabled while security-update pull requests remain enabled.
+entry sets `open-pull-requests-limit: 5`, so weekly ordinary version-update
+pull requests are bounded while security-update pull requests remain enabled.
 Security updates are intentionally not grouped: one incompatible remediation
 must not delay unrelated critical fixes or enlarge their rollback scope. No
 `target-branch` is set, allowing the security-update configuration to apply to

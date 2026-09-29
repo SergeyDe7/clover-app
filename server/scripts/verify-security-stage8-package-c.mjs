@@ -15,7 +15,7 @@ assert.match(config, /^version: 2$/mu);
 assert.equal([...config.matchAll(/package-ecosystem:/gu)].length, 1);
 assert.match(config, /package-ecosystem: "npm"[\s\S]*?directories:\n      - "\/"\n      - "\/server"/u);
 assert.doesNotMatch(config, /package-ecosystem: "github-actions"/u);
-assert.equal([...config.matchAll(/open-pull-requests-limit: 0/gu)].length, 1);
+assert.equal([...config.matchAll(/open-pull-requests-limit: 5/gu)].length, 1);
 assert.equal([...config.matchAll(/interval: "weekly"/gu)].length, 1);
 assert.equal([...config.matchAll(/timezone: "Europe\/Moscow"/gu)].length, 1);
 assert.doesNotMatch(config, /groups:|applies-to:|patterns:/u);

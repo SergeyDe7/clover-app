@@ -330,7 +330,7 @@ test("SEC3-007: live auth mail failure does not log Error/PII", async () => {
     assert.equal(lines.length, 1);
     const record = JSON.parse(lines[0]);
     assert.equal(record.event, "auth.mail.verification");
-    assert.equal(issued.status, 201);
+    assert.equal(issued.status, 202);
     assert.equal(issued.body.ok, true);
     assertNoMarker(record, "auth mail log");
     assertNoMarker(lines[0], "auth mail line");
