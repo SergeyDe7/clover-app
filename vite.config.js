@@ -38,8 +38,10 @@ const allowedHosts = [
 
 const UI_BUILD_PLACEHOLDER = "%CLOVER_UI_BUILD%";
 const PUBLIC_LOCALE_ROUTES_PLACEHOLDER = "%CLOVER_PUBLIC_LOCALE_ROUTES%";
-const YANDEX_WEBMASTER_VERIFICATION_PATH =
-  "/yandex_6f5d5034b15ac460.html";
+const YANDEX_WEBMASTER_VERIFICATION_PATHS = new Set([
+  "/yandex_6f5d5034b15ac460.html",
+  "/yandex_257bb31b05255480.html",
+]);
 
 function publicLocaleRoutesBuildValue() {
   return isPublicLocaleRoutesEnabledFromEnv() ? "enabled" : "disabled";
@@ -126,7 +128,7 @@ function publicLocaleHtmlDelivery() {
           res.end("Not found");
           return;
         }
-        if (requestPath === YANDEX_WEBMASTER_VERIFICATION_PATH) {
+        if (YANDEX_WEBMASTER_VERIFICATION_PATHS.has(requestPath)) {
           const verificationPath = path.join(outDir, requestPath.slice(1));
           if (
             fs.existsSync(verificationPath) &&
