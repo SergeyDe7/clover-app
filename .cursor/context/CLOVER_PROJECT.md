@@ -62,3 +62,20 @@ Clover — система принятия и обработки заказов 
 - Принятый остаток: production restore — `NOT VERIFIED`, риск принят владельцем;
   любое реальное восстановление по-прежнему требует отдельного согласования.
 - Closeout: `docs/technical/SECURITY_STAGE9_CLOSEOUT.md`.
+
+## Security Stage 10 (закрыт 2026-09-29)
+
+- Threat model, identity/authorization, data/integrations, frontend/PWA,
+  supply-chain/release и adversarial regression завершены.
+- PR #197 и post-merge CI: PASS; независимые Security/QA/Reviewer: READY.
+- Production checkout на момент closeout:
+  `49bb1c5d1ca66b803bcb3a05877bef7a21c95d82` (потомок Stage 10 merge
+  `a5ae6c3143378dab2359c8259478e3ea069e7708`).
+- Enforced CSP совпадает с tracked candidate; API/UI/nginx active, health и
+  публичный browser smoke PASS; P0=0, P1=0.
+- Владелец принял все записанные P2, P3 и `NOT VERIFIED`. P3
+  Яндекс-верификации (публичный URL 404)
+  вынесен в отдельную будущую задачу.
+- Production restore остаётся `NOT VERIFIED`; реальный restore требует отдельного
+  согласования.
+- Closeout: `docs/technical/SECURITY_STAGE10_CLOSEOUT.md`.

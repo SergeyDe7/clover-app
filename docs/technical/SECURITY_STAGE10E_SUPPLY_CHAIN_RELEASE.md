@@ -30,7 +30,7 @@ then removes the new verifier/docs and repeats Stage 8B/10E checks. GitHub setti
 push, PR, merge and deploy were not performed.
 
 Residual P2/NOT VERIFIED: ruleset requires zero human approvals (one-collaborator
-constraint; owner decision required), no SAST/code-scanning analysis, artifacts
+constraint; owner accepted at final closeout), no SAST/code-scanning analysis, artifacts
 use SHA-256 but no signing/provenance attestation, health omits commit SHA,
 production checkout contains an untracked historical `dist.lkg-*`, and full
 production rollback/restore is not verified.
