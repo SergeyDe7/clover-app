@@ -38,6 +38,8 @@ const allowedHosts = [
 
 const UI_BUILD_PLACEHOLDER = "%CLOVER_UI_BUILD%";
 const PUBLIC_LOCALE_ROUTES_PLACEHOLDER = "%CLOVER_PUBLIC_LOCALE_ROUTES%";
+const YANDEX_WEBMASTER_VERIFICATION_PATH =
+  "/yandex_6f5d5034b15ac460.html";
 
 function publicLocaleRoutesBuildValue() {
   return isPublicLocaleRoutesEnabledFromEnv() ? "enabled" : "disabled";
@@ -123,6 +125,16 @@ function publicLocaleHtmlDelivery() {
           res.setHeader("Cache-Control", "no-store");
           res.end("Not found");
           return;
+        }
+        if (requestPath === YANDEX_WEBMASTER_VERIFICATION_PATH) {
+          const verificationPath = path.join(outDir, requestPath.slice(1));
+          if (
+            fs.existsSync(verificationPath) &&
+            fs.statSync(verificationPath).isFile()
+          ) {
+            next();
+            return;
+          }
         }
         const manifestPath = path.join(outDir, "public-route-manifest.json");
         if (!fs.existsSync(manifestPath)) {
