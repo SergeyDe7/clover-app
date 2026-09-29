@@ -5,6 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { createServer } from "node:net";
 import {
   existsSync,
@@ -25,6 +26,10 @@ const temp = mkdtempSync(path.join(tmpdir(), "clover-seo-locale-html-"));
 const dbPath = path.join(temp, "fixture.sqlite");
 const outDir = path.join(temp, "dist");
 const chrome = String(process.env.CLOVER_BROWSER_CHROME || "").trim();
+const yandexVerificationFile = "yandex_6f5d5034b15ac460.html";
+const yandexVerificationPath = `/${yandexVerificationFile}`;
+const yandexVerificationSha256 =
+  "a7c78987fa701848b861fc33c9af49d35d33a311d84c8ba0505cdc86934c1b32";
 
 process.on("exit", () => rmSync(temp, { recursive: true, force: true }));
 
@@ -192,6 +197,34 @@ await new Promise((resolve, reject) => {
 await new Promise((r) => setTimeout(r, 300));
 
 try {
+  const expectedVerification = readFileSync(
+    path.join(root, "public", yandexVerificationFile),
+    "utf8"
+  );
+  assert.equal(
+    createHash("sha256").update(expectedVerification).digest("hex"),
+    yandexVerificationSha256
+  );
+  const verification = await fetchText(
+    `http://127.0.0.1:${port}${yandexVerificationPath}`
+  );
+  assert.equal(verification.status, 200);
+  assert.equal(verification.body, expectedVerification);
+  const verificationHead = await fetch(
+    `http://127.0.0.1:${port}${yandexVerificationPath}`,
+    { method: "HEAD", redirect: "manual" }
+  );
+  assert.equal(verificationHead.status, 200);
+  assert.match(
+    verificationHead.headers.get("content-type") || "",
+    /^text\/html\b/i
+  );
+  rmSync(path.join(outDir, yandexVerificationFile));
+  const missingVerification = await fetchText(
+    `http://127.0.0.1:${port}${yandexVerificationPath}`
+  );
+  assert.equal(missingVerification.status, 404);
+
   const langs = ["ru", "en", "uz", "ky", "tg", "zh", "ar"];
   const productPath = `/product/${encodeURIComponent("НФ-00003681")}`;
   for (const lang of langs) {
@@ -272,7 +305,7 @@ try {
   assert.match(parseHead(cart.body).robots, /noindex/);
 
   const asset = readFileSync(path.join(outDir, "index.html"), "utf8").match(
-    /src="(\/assets\/index-[^"]+\.js)"/
+    /src="(\/assets\/(?:[^"/]+\/)?index-[^"]+\.js)"/
   )[1];
   const assetRes = await fetchText(`http://127.0.0.1:${port}${asset}`);
   assert.equal(assetRes.status, 200);
