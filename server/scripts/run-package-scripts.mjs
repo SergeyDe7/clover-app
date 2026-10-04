@@ -111,6 +111,7 @@ const CHECK_FILES = [
   "scripts/verify-order-status-roles.mjs",
   "scripts/verify-onec-accepted-status.mjs",
   "scripts/verify-bootstrap-search-opt.mjs",
+  "scripts/verify-bootstrap-live.mjs",
   "scripts/verify-v18.mjs",
   "scripts/verify-runtime-integrations.mjs",
   "scripts/verify-manager-notifications.mjs",

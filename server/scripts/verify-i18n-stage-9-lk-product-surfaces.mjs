@@ -42,10 +42,15 @@ assert.equal(existsSync(snapSrc), true);
 
 const appSrc = readFileSync(path.join(root, "src/App.jsx"), "utf8");
 const bootstrapCalls = [...appSrc.matchAll(/api\.bootstrap\(([^)]*)\)/g)].map((m) => m[1].trim());
-assert.ok(bootstrapCalls.length >= 5, "expected bootstrap call sites");
+assert.ok(bootstrapCalls.length >= 4, "expected full bootstrap call sites");
 assert.ok(
   bootstrapCalls.every((c) => c.startsWith("resolveProductBootstrapLanguage")),
   `bare bootstrap remains: ${JSON.stringify(bootstrapCalls)}`
+);
+assert.match(
+  appSrc,
+  /api\.liveBootstrap\(resolveProductBootstrapLanguage\(\)\)/,
+  "live bootstrap must retain the explicit product language"
 );
 
 const tmp = mkdtempSync(path.join(tmpdir(), "clover-stage9-lk-surfaces-"));
@@ -87,7 +92,7 @@ const report = {
   scope: ["lk-matrix-product-names", "lk-catalog-product-names", "live-refresh-bootstrap-language"],
   skippedAlreadyPassing: ["lk-sticky-over-profile-ru", "home-categories", "hero"],
   expectedProduct,
-  unit: { bootstrapCallsAllPassLanguage: true, bootstrapCallCount: bootstrapCalls.length },
+  unit: { bootstrapCallsAllPassLanguage: true, bootstrapCallCount: bootstrapCalls.length, liveBootstrapPassesLanguage: true },
   api: {},
   browser: { ok: [], defects: [] },
 };
