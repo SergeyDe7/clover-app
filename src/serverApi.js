@@ -360,6 +360,13 @@ export const api = {
     return request(`/bootstrap${suffix}`, { timeoutMs: BOOTSTRAP_TIMEOUT_MS });
   },
 
+  liveBootstrap(language = "") {
+    const query = new URLSearchParams();
+    if (language) query.set("language", language);
+    const suffix = query.toString() ? `?${query}` : "";
+    return request(`/bootstrap/live${suffix}`, { timeoutMs: BOOTSTRAP_TIMEOUT_MS });
+  },
+
   productDisplay(language = "") {
     const query = new URLSearchParams();
     if (language) query.set("language", language);

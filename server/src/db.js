@@ -1150,6 +1150,18 @@ export function getGlobalState(key, fallback) {
   return row ? parseJson(row.value_json, fallback) : fallback;
 }
 
+export function getGlobalStateUpdatedAt(key) {
+  return String(db.prepare("SELECT updated_at FROM app_state WHERE key = ?").get(key)?.updated_at || "");
+}
+
+export function getProductTranslationRevision(language) {
+  if (!language || language === "ru") return "";
+  const row = db.prepare(
+    "SELECT count(*) AS count, max(updated_at) AS updated_at FROM product_translations WHERE language_code = ?"
+  ).get(language);
+  return `${row?.count || 0}:${row?.updated_at || ""}`;
+}
+
 export function setGlobalState(key, value) {
   db.prepare(`
     INSERT INTO app_state(key, value_json, updated_at)

@@ -926,7 +926,13 @@ function App() {
       requestInProgress = true;
 
       try {
-        const data = await api.bootstrap(resolveProductBootstrapLanguage());
+        let data = await api.liveBootstrap(resolveProductBootstrapLanguage());
+        if (
+          String(data.catalogPricesVersion || "") !==
+          catalogPricesVersionRef.current
+        ) {
+          data = await api.bootstrap(resolveProductBootstrapLanguage());
+        }
         if (!active) return;
 
         const incomingOrders = Array.isArray(data.orders) ? data.orders : [];
@@ -985,8 +991,6 @@ function App() {
               ? prev
               : next;
           });
-        } else if (data.user?.role === "client") {
-          setFullCatalogProducts([]);
         }
         if (data.catalogPolicy) {
           setCatalogPolicy((current) => ({
