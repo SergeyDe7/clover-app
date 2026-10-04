@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { gzip } from "node:zlib";
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -20,6 +21,8 @@ import {
   findUserById,
   getClientState,
   getGlobalState,
+  getGlobalStateUpdatedAt,
+  getProductTranslationRevision,
   listClients,
   listOrders,
   listTrashedOrders,
@@ -548,7 +551,7 @@ const reconciliationUpload = multer({
 });
 
 const port = Number(process.env.PORT || 4100);
-const host = process.env.HOST || "0.0.0.0";
+const host = process.env.HOST || "127.0.0.1";
 const jwtSecret = String(process.env.JWT_SECRET || "").trim();
 if (jwtSecret.length < 32 || /^(?:change-this.*|development-secret.*|clover-local-development-secret-change-before-production)$/i.test(jwtSecret)) {
   throw new Error("JWT_SECRET must be a unique secret of at least 32 characters in server/.env.");
@@ -3455,15 +3458,90 @@ app.post("/api/passkeys/authentication/verify", async (req, res, next) => {
   }
 });
 
+function catalogDataRevision() {
+  return [
+    String(getGlobalState("catalogPricesVersion", "") || ""),
+    getGlobalStateUpdatedAt("products"),
+    getGlobalStateUpdatedAt("oneCProducts"),
+  ].join("::");
+}
+
+function clientCatalogPricesRevision(pricesVersion, link, language) {
+  const publicLink = { ...link };
+  delete publicLink.managerNote;
+  return [
+    pricesVersion,
+    createHash("sha256").update(JSON.stringify(publicLink)).digest("hex").slice(0, 16),
+    getProductTranslationRevision(language),
+  ].join("::");
+}
+
+function sendBootstrapJson(req, res, payload) {
+  setNoStore(res);
+  if (!req.acceptsEncodings("gzip")) return res.json(payload);
+
+  const json = Buffer.from(JSON.stringify(payload));
+  gzip(json, { level: 1 }, (error, compressed) => {
+    if (error) return res.json(payload);
+    res.type("json");
+    res.vary("Accept-Encoding");
+    res.setHeader("Content-Encoding", "gzip");
+    res.setHeader("Content-Length", compressed.length);
+    res.end(compressed);
+  });
+}
+
+// Frequent status updates must not resend the full catalog after every login.
+app.get("/api/bootstrap/live", authRequired, (req, res) => {
+  const settings = getGlobalState("settings", DEFAULT_SETTINGS);
+  const allClientLinks = getGlobalState("clientLinks", {});
+  const pricesVersion = catalogDataRevision();
+
+  if (isStaffRole(req.user.role)) {
+    const normalizedClientLinks = Object.fromEntries(
+      Object.entries(allClientLinks).map(([clientId, link]) => [
+        clientId,
+        normalizeClientLink(link),
+      ])
+    );
+    const live = projectStaffBootstrap({
+      user: publicUser(req.user),
+      products: [],
+      settings,
+      clientLinks: normalizedClientLinks,
+      clients: listClients(),
+      orders: listOrders(),
+      trashedOrders: listTrashedOrders(),
+      reconciliationRequests: listReconciliationRequests(),
+      managerNotifications: listManagerNotifications({ limit: 100 }),
+      oneCPriceTypes: normalizeOneCPriceTypes(getGlobalState("oneCPriceTypes", [])),
+      catalogPricesVersion: pricesVersion,
+    });
+    delete live.products;
+    return sendBootstrapJson(req, res, live);
+  }
+
+  const link = normalizeClientLink(allClientLinks[req.user.id] || {});
+  const state = getClientState(req.user.id);
+  const displayLanguage =
+    normalizeLanguagePreference(req.query?.language) ||
+    normalizeLanguagePreference(state.profile?.locale) ||
+    "";
+  return sendBootstrapJson(req, res, {
+    user: publicUser(req.user),
+    orders: sanitizeOrdersForClient(listOrders(req.user.id)),
+    reconciliationRequests: listReconciliationRequests(req.user.id),
+    catalogPricesVersion: clientCatalogPricesRevision(pricesVersion, link, displayLanguage),
+  });
+});
+
 app.get("/api/bootstrap", authRequired, (req, res) => {
   const storedProducts = getGlobalState(
     "products",
     DEFAULT_PRODUCTS
   );
   // Avoid re-running category/article inference on every bootstrap when catalog unchanged.
-  const pricesVersionHint = String(
-    getGlobalState("catalogPricesVersion", "") || ""
-  );
+  const pricesVersionHint = catalogDataRevision();
   const catalogSig = Array.isArray(storedProducts)
     ? `${pricesVersionHint}|${storedProducts.length}|${storedProducts[0]?.id || ""}|${storedProducts[storedProducts.length - 1]?.id || ""}|${storedProducts[0]?.name || ""}`
     : pricesVersionHint;
@@ -3501,7 +3579,7 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
       ])
     );
 
-    return res.json(
+    return sendBootstrapJson(req, res,
       projectStaffBootstrap({
         user: publicUser(req.user),
         products: managerProducts,
@@ -3515,9 +3593,7 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
         oneCPriceTypes: normalizeOneCPriceTypes(
           getGlobalState("oneCPriceTypes", [])
         ),
-        catalogPricesVersion: String(
-          getGlobalState("catalogPricesVersion", "") || ""
-        ),
+        catalogPricesVersion: pricesVersionHint,
         services: {
           mail: publicMailStatus(),
           push: publicPushStatus(),
@@ -3535,29 +3611,23 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     clientLink,
     oneCProducts
   );
-  const pricesVersion = String(
-    getGlobalState("catalogPricesVersion", "") || ""
-  );
+  const pricesVersion = pricesVersionHint;
+  const displayLanguage =
+    normalizeLanguagePreference(req.query?.language) ||
+    normalizeLanguagePreference(state.profile?.locale) ||
+    "";
   // Версия учитывает и выгрузку цен 1С, и настройки матрицы/вида цен клиента.
-  const clientPricesRevision = [
+  const clientPricesRevision = clientCatalogPricesRevision(
     pricesVersion,
-    String(catalog.link?.defaultPricingMode || ""),
-    String(catalog.link?.defaultMarkupPercent ?? ""),
-    String(catalog.link?.oneCPriceTypeId || ""),
-    String(catalog.link?.matrixMode || ""),
-    String((catalog.link?.matrixProductIds || []).length),
-  ].join("::");
+    catalog.link,
+    displayLanguage
+  );
 
   const baseClientSettings = publicClientSettings(settings);
   const managerContactSettings = resolveClientManagerContactSettings(
     baseClientSettings,
     catalog.link?.personalManagerId
   );
-
-  const displayLanguage =
-    normalizeLanguagePreference(req.query?.language) ||
-    normalizeLanguagePreference(state.profile?.locale) ||
-    "";
 
   const clientPayload = {
     user: publicUser(req.user),
@@ -3591,7 +3661,7 @@ app.get("/api/bootstrap", authRequired, (req, res) => {
     productDisplayLanguage: displayLanguage || "ru",
   };
 
-  return res.json(clientPayload);
+  return sendBootstrapJson(req, res, clientPayload);
 });
 
 /** Display-only product name map for the active UI locale (provider-independent reads). */
