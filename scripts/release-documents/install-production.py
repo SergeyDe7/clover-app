@@ -55,12 +55,17 @@ def backup_database(database,backup):
 def control(verb):subprocess.run(['systemctl',verb,*UNITS],check=True)
 def health():
  for label,url in [('backend','http://127.0.0.1:4100/api/health'),('frontend','http://127.0.0.1:5273/')]:
-  for retry in range(45):
+  started=time.monotonic();deadline=started+180;next_log=started+30
+  while time.monotonic()<deadline:
    try:
     with urllib.request.urlopen(url,timeout=2) as result:
      if result.status==200:break
    except Exception:pass
-   time.sleep(1)
+   now=time.monotonic()
+   if now>=next_log:
+    print('WAIT_'+label.upper()+' elapsed='+str(int(now-started))+'s; startup deadline=180s',flush=True)
+    next_log=now+30
+   time.sleep(min(1,max(0,deadline-time.monotonic())))
   else:raise ValueError('HEALTH_FAILED:'+label)
 
 def own(path):

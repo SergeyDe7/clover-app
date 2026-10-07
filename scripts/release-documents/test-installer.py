@@ -79,4 +79,25 @@ class Checks(unittest.TestCase):
  def test_module_import_runs_actual_clover_uid_before_restart(self):
   with patch.object(c.subprocess,'run') as run:c.verify_clover_module_import(pathlib.Path.cwd().resolve())
   args=run.call_args.args[0];self.assertEqual(args[:4],['runuser','-u','clover','--']);self.assertIn('--input-type=module',args);self.assertIn('runtime.js',args[-1]);self.assertTrue(run.call_args.kwargs['check'])
+ def test_slow_backend_startup_over45seconds_is_not_restarted(self):
+  state={'time':0.0,'requests':0}
+  class Ready:
+   status=200
+   def __enter__(self):return self
+   def __exit__(self,*a):return False
+  def urlopen(*a,**kw):
+   state['requests']+=1
+   if state['requests']<=75:raise OSError('synthetic slow startup')
+   return Ready()
+  def sleep(seconds):state['time']+=seconds
+  with patch.object(c.time,'monotonic',side_effect=lambda:state['time']),patch.object(c.time,'sleep',side_effect=sleep),patch.object(c.urllib.request,'urlopen',side_effect=urlopen),patch('builtins.print') as log:
+   c.health()
+  self.assertEqual(state['time'],75.0);self.assertEqual(state['requests'],77);self.assertEqual(log.call_count,2)
+  self.assertIn('elapsed=30s',log.call_args_list[0].args[0]);self.assertIn('elapsed=60s',log.call_args_list[1].args[0])
+ def test_health_failure_waits_full_monotonic180seconds(self):
+  state={'time':0.0}
+  def sleep(seconds):state['time']+=seconds
+  with patch.object(c.time,'monotonic',side_effect=lambda:state['time']),patch.object(c.time,'sleep',side_effect=sleep),patch.object(c.urllib.request,'urlopen',side_effect=OSError('synthetic unavailable')),patch('builtins.print'):
+   with self.assertRaisesRegex(ValueError,'HEALTH_FAILED:backend'):c.health()
+  self.assertEqual(state['time'],180.0)
 if __name__=='__main__':unittest.main()
