@@ -28,7 +28,7 @@ class Checks(unittest.TestCase):
  def test_full_health_failure_rolls_back_source_dist_deps_env_without_database_restore(self):
   with tempfile.TemporaryDirectory() as td:
    p=pathlib.Path(td);root=p/'app';stage=p/'stage';package=p/'package';backup=p/'backups';storage=p/'private-storage';templates=p/'templates'
-   for directory in [root/'server/src',root/'server/data',root/'dist',root/'server/node_modules',stage/'dist',stage/'server/node_modules',package/'payload/server/src/documents',backup,templates]:directory.mkdir(parents=True,exist_ok=True)
+   for directory in [root/'server/src',root/'src/screens/documents',root/'src/shared/contracts',root/'server/data',root/'dist',root/'server/node_modules',stage/'dist',stage/'server/node_modules',package/'payload/server/src/documents',backup,templates]:directory.mkdir(parents=True,exist_ok=True)
    (root/'server/src/server.js').write_text('old-source');(root/'dist/index.html').write_text('old-dist');(root/'server/node_modules/dependency.json').write_text('old-dependency')
    (stage/'dist/index.html').write_text('new-dist');(stage/'server/node_modules/dependency.json').write_text('new-dependency')
    (package/'payload/server/src/server.js').write_text('new-source');(package/'payload/server/src/documents/runtime.js').write_text('new-runtime')
@@ -64,4 +64,19 @@ class Checks(unittest.TestCase):
    self.assertEqual(c.read_ai_key_file(keyfile),'synthetic-test-key')
    keyfile.stat=lambda:types.SimpleNamespace(st_uid=123,st_mode=0o100644,st_size=99)
    with self.assertRaisesRegex(ValueError,'UNSAFE_AI_KEY_FILE_PERMISSIONS'):c.read_ai_key_file(keyfile)
+ def test_new_contract_permissions_are_scoped_and_public_dist_readable(self):
+  with tempfile.TemporaryDirectory() as td:
+   root=pathlib.Path(td);trees=['server/src/documents','src/screens/documents','src/shared/contracts']
+   for rel in trees:
+    tree=root/rel;tree.mkdir(parents=True);(tree/'module.js').write_text('public source')
+   unrelated=root/'server/src/unrelated.js';unrelated.write_text('unchanged')
+   dist=root/'dist/assets';dist.mkdir(parents=True);(dist/'bundle.js').write_text('public asset')
+   touched=[]
+   with patch.object(c,'own',side_effect=lambda p:touched.append(p)),patch.object(c.os,'chmod') as chmod:
+    c.prepare_contract_source_permissions(root);c.prepare_public_dist_permissions(root)
+   self.assertEqual(touched,[root/rel for rel in trees]);self.assertFalse(any(call.args[0]==unrelated for call in chmod.call_args_list))
+   self.assertIn(unittest.mock.call(root/'dist',0o755),chmod.call_args_list);self.assertIn(unittest.mock.call(dist/'bundle.js',0o644),chmod.call_args_list)
+ def test_module_import_runs_actual_clover_uid_before_restart(self):
+  with patch.object(c.subprocess,'run') as run:c.verify_clover_module_import(pathlib.Path.cwd().resolve())
+  args=run.call_args.args[0];self.assertEqual(args[:4],['runuser','-u','clover','--']);self.assertIn('--input-type=module',args);self.assertIn('runtime.js',args[-1]);self.assertTrue(run.call_args.kwargs['check'])
 if __name__=='__main__':unittest.main()

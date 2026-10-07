@@ -69,6 +69,28 @@ def own(path):
   for p in path.rglob('*'):
    if not p.is_symlink():os.chown(p,user.pw_uid,user.pw_gid)
 
+def prepare_contract_source_permissions(root):
+ # Only the three new contract module trees; unrelated source stays untouched.
+ for rel in ['server/src/documents','src/screens/documents','src/shared/contracts']:
+  tree=under(root,rel)
+  if not tree.is_dir() or tree.is_symlink():raise ValueError('CONTRACT_SOURCE_TREE_REQUIRED')
+  own(tree)
+  for entry in [tree,*tree.rglob('*')]:
+   if entry.is_symlink():raise ValueError('CONTRACT_SOURCE_SYMLINK_REFUSED')
+   os.chmod(entry,0o750 if entry.is_dir() else 0o640)
+
+def prepare_public_dist_permissions(root):
+ tree=root/'dist'
+ if tree.is_symlink() or not tree.is_dir():raise ValueError('PUBLIC_DIST_TREE_REQUIRED')
+ for entry in [tree,*tree.rglob('*')]:
+  if entry.is_symlink():raise ValueError('PUBLIC_DIST_SYMLINK_REFUSED')
+  os.chmod(entry,0o755 if entry.is_dir() else 0o644)
+
+def verify_clover_module_import(root):
+ module=(root/'server/src/documents/runtime.js').as_uri()
+ code="import("+json.dumps(module)+").then(()=>console.log('PASS contract runtime import as actual clover uid'))"
+ subprocess.run(['runuser','-u','clover','--','env','PATH=/usr/local/bin:/usr/bin:/bin','LANG=C.UTF-8','node','--input-type=module','-e',code],check=True)
+
 def prepare_private_parent(parent):
  if parent!=PRIVATE_PARENT or parent.is_symlink():raise ValueError('WRONG_PRIVATE_PARENT')
  parent.mkdir(mode=0o750,parents=False,exist_ok=True)
@@ -157,6 +179,9 @@ def run(m,package,backup_parent,with_ai=False,resume_seed=False,ai_key_file=None
    target=under(root,rel);target.parent.mkdir(parents=True,exist_ok=True);changed.append(rel);shutil.copy2(under(package/'payload',rel),target);own(target)
   for name,target in [('dist',root/'dist'),('node_modules',root/'server/node_modules')]:
    saved=backup/('original-'+name);existed=switch_tree(target,candidate/name,saved);trees.append((name,target,saved,existed))
+  prepare_contract_source_permissions(root)
+  prepare_public_dist_permissions(root)
+  verify_clover_module_import(root)
   prepare_private_parent(storage.parent)
   storage.mkdir(mode=0o700,parents=False,exist_ok=True);own(storage)
   config=storage/'runtime.json';config.write_text(json.dumps(m['runtimeConfig'])+'\n');os.chmod(config,0o600);own(config)
@@ -201,7 +226,7 @@ def run(m,package,backup_parent,with_ai=False,resume_seed=False,ai_key_file=None
   # Never overwrite orders or generated contracts with the earlier database snapshot.
   try:subprocess.run(['systemctl','daemon-reload'],check=True);control('start');health()
   except Exception:rollback_ok=False
-  (backup/'INSTALL_RESULT.txt').write_text('FAIL\nRollback='+str(rollback_ok)+'\nDatabase preserved; additive state='+str(database_touched)+'\nError='+type(error).__name__+'\n')
+  (backup/'INSTALL_RESULT.txt').write_text('FAIL\nRollback='+str(rollback_ok)+'\nDatabase preserved; additive state='+str(database_touched)+'\nError='+type(error).__name__+(':'+str(error) if isinstance(error,ValueError) and str(error).split(':')[0] in ['HEALTH_FAILED','WRITERS_NOT_STOPPED','API_PID_REQUIRED','CONTRACT_SOURCE_TREE_REQUIRED','CONTRACT_SOURCE_SYMLINK_REFUSED','PUBLIC_DIST_TREE_REQUIRED','PUBLIC_DIST_SYMLINK_REFUSED','ACTIVE_SERVICE_REQUIRED','BASELINE_DRIFT','SOURCE_HASH_FAILED','SERVICE_CONFIG_DRIFT'] else '')+'\n')
   raise
  finally:key=''
 
