@@ -49,9 +49,19 @@ class Checks(unittest.TestCase):
    def health():
     state['health']+=1
     if state['health']==1:raise ValueError('INJECTED_FRONTEND_HEALTH_FAILURE')
-   with patch.object(c,'ROOT',root),patch.object(c,'ACCEPTED_STAGE',stage),patch.object(c,'ENV',env),patch.object(c,'DROPIN',dropin),patch.object(c.socket,'gethostname',return_value='7bb07791b941'),patch.object(c.os,'geteuid',return_value=0,create=True),patch.object(c,'own',lambda *a:None),patch.object(c.subprocess,'check_output',side_effect=check_output),patch.object(c.subprocess,'run',side_effect=process),patch.object(c,'health',side_effect=health):
+   with patch.object(c,'ROOT',root),patch.object(c,'ACCEPTED_STAGE',stage),patch.object(c,'ENV',env),patch.object(c,'DROPIN',dropin),patch.object(c.socket,'gethostname',return_value='7bb07791b941'),patch.object(c.os,'geteuid',return_value=0,create=True),patch.object(c,'PRIVATE_PARENT',storage.parent),patch.object(c,'prepare_private_parent',lambda *a:None),patch.object(c,'own',lambda *a:None),patch.object(c.subprocess,'check_output',side_effect=check_output),patch.object(c.subprocess,'run',side_effect=process),patch.object(c,'health',side_effect=health):
     with self.assertRaisesRegex(ValueError,'INJECTED_FRONTEND_HEALTH_FAILURE'):c.run(m,package,backup)
    self.assertEqual((root/'server/src/server.js').read_text(),'old-source');self.assertFalse((root/'server/src/documents/runtime.js').exists());self.assertEqual((root/'dist/index.html').read_text(),'old-dist');self.assertEqual((root/'server/node_modules/dependency.json').read_text(),'old-dependency');self.assertFalse(env.exists());self.assertFalse(dropin.exists());self.assertTrue(state['active'])
    live=sqlite3.connect(database);self.assertEqual(live.execute('SELECT count(*) FROM orders').fetchone()[0],2);self.assertIsNotNone(live.execute("SELECT name FROM sqlite_master WHERE name='additive_seed'").fetchone());live.close()
    result=next(backup.glob('contracts-*/INSTALL_RESULT.txt')).read_text();self.assertIn('Rollback=True',result);self.assertIn('Database preserved',result)
+ def test_root700_private_parent_gets_only_clover_group_traverse(self):
+  parent=types.SimpleNamespace(is_symlink=lambda:False,mkdir=lambda **kw:None,stat=lambda:types.SimpleNamespace(st_uid=0))
+  with patch.object(c,'PRIVATE_PARENT',parent),patch.object(c.pwd,'getpwnam',return_value=types.SimpleNamespace(pw_uid=123,pw_gid=456),create=True),patch.object(c.os,'chown',create=True) as chown,patch.object(c.os,'chmod') as chmod:
+   c.prepare_private_parent(parent);chown.assert_called_once_with(parent,0,456);chmod.assert_called_once_with(parent,0o750)
+ def test_private_ai_key_file_requires_fixed_path_owner_and_private_mode(self):
+  keyfile=types.SimpleNamespace(is_symlink=lambda:False,is_file=lambda:True,stat=lambda:types.SimpleNamespace(st_uid=123,st_mode=0o100600,st_size=99),read_text=lambda:'{"apiKey":"synthetic-test-key"}')
+  with patch.object(c,'AI_KEY_FILE',keyfile),patch.object(c.pwd,'getpwnam',return_value=types.SimpleNamespace(pw_uid=123),create=True):
+   self.assertEqual(c.read_ai_key_file(keyfile),'synthetic-test-key')
+   keyfile.stat=lambda:types.SimpleNamespace(st_uid=123,st_mode=0o100644,st_size=99)
+   with self.assertRaisesRegex(ValueError,'UNSAFE_AI_KEY_FILE_PERMISSIONS'):c.read_ai_key_file(keyfile)
 if __name__=='__main__':unittest.main()

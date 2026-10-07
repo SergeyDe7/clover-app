@@ -8,6 +8,8 @@ ROOT=pathlib.Path('/opt/clover/clover-app')
 ACCEPTED_STAGE=pathlib.Path('/opt/clover/contracts-test-staging-20261007/staging')
 ENV=pathlib.Path('/etc/clover/contracts.env')
 DROPIN=pathlib.Path('/etc/systemd/system/clover-api.service.d/contracts.conf')
+PRIVATE_PARENT=pathlib.Path('/opt/clover/private')
+AI_KEY_FILE=pathlib.Path('/opt/clover/.config/clover/contracts-ai-key.json')
 
 def digest(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def under(root,rel):
@@ -67,6 +69,21 @@ def own(path):
   for p in path.rglob('*'):
    if not p.is_symlink():os.chown(p,user.pw_uid,user.pw_gid)
 
+def prepare_private_parent(parent):
+ if parent!=PRIVATE_PARENT or parent.is_symlink():raise ValueError('WRONG_PRIVATE_PARENT')
+ parent.mkdir(mode=0o750,parents=False,exist_ok=True)
+ user=pwd.getpwnam('clover')
+ if parent.stat().st_uid not in [0,user.pw_uid]:raise ValueError('UNEXPECTED_PRIVATE_PARENT_OWNER')
+ os.chown(parent,0,user.pw_gid);os.chmod(parent,0o750)
+
+def read_ai_key_file(p):
+ if p!=AI_KEY_FILE or p.is_symlink() or not p.is_file():raise ValueError('WRONG_AI_KEY_FILE')
+ st=p.stat();user=pwd.getpwnam('clover')
+ if st.st_uid not in [0,user.pw_uid] or st.st_mode & 0o077 or st.st_size>8192:raise ValueError('UNSAFE_AI_KEY_FILE_PERMISSIONS')
+ value=json.loads(p.read_text()).get('apiKey','')
+ if not isinstance(value,str) or not value:raise ValueError('AI_KEY_FILE_EMPTY')
+ return value
+
 def switch_tree(target,candidate,saved):
  if target.is_symlink():raise ValueError('LIVE_TREE_SYMLINK_REFUSED')
  existed=target.exists()
@@ -81,7 +98,7 @@ def restore_tree(target,saved,existed,failed):
  if target.exists():target.rename(failed)
  if existed:saved.rename(target)
 
-def run(m,package,backup_parent,with_ai=False):
+def run(m,package,backup_parent,with_ai=False,resume_seed=False,ai_key_file=None):
  if os.geteuid()!=0:raise ValueError('ROOT_REQUIRED_USE_SUDO_IN_SAME_TTY')
  if socket.gethostname()!=m['baselineHost'] or m['baselineHost']!='7bb07791b941':raise ValueError('WRONG_HOST')
  root=pathlib.Path(m['appRoot']).resolve(strict=True)
@@ -102,7 +119,9 @@ def run(m,package,backup_parent,with_ai=False):
  verify_tree(stage/'server/node_modules',m['dependenciesSha256'])
  templates=pathlib.Path(m['templatesRoot']).resolve(strict=True);verify_tree(templates,m['privateTemplatesSha256'])
  storage=pathlib.Path(m['storageRoot'])
- if storage.is_symlink() or storage.exists() and any(storage.iterdir()):raise ValueError('NEW_EMPTY_PRIVATE_STORAGE_REQUIRED')
+ if storage.is_symlink() or (not resume_seed and storage.exists() and any(storage.iterdir())):raise ValueError('NEW_EMPTY_PRIVATE_STORAGE_REQUIRED')
+ if resume_seed and not storage.is_dir():raise ValueError('RESUME_PRIVATE_STORAGE_REQUIRED')
+ if storage.parent!=PRIVATE_PARENT:raise ValueError('INTENDED_PRIVATE_STORAGE_PARENT_REQUIRED')
  if str(storage) in [str(root/'dist'),str(root/'public')] or root in storage.resolve().parents:raise ValueError('STORAGE_MUST_BE_OUTSIDE_APP')
  parent=backup_parent.resolve(strict=True)
  if root in parent.parents or parent==root or package in parent.parents:raise ValueError('PRIVATE_BACKUP_OUTSIDE_APP_REQUIRED')
@@ -113,7 +132,7 @@ def run(m,package,backup_parent,with_ai=False):
   if subprocess.run(['systemctl','is-active','--quiet',unit]).returncode!=0:raise ValueError('ACTIVE_SERVICE_REQUIRED:'+unit)
  stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
  backup=parent/('contracts-'+stamp);backup.mkdir(mode=0o700)
- key=getpass.getpass('Optional OpenAI API key (empty = AI unavailable, contracts remain available): ') if with_ai else ''
+ key=read_ai_key_file(pathlib.Path(ai_key_file)) if ai_key_file else (getpass.getpass('Optional OpenAI API key (empty = AI unavailable, contracts remain available): ') if with_ai else '')
  if key and not all(ch.isascii() and (ch.isalnum() or ch in '_-') for ch in key):raise ValueError('INVALID_KEY')
  # Prepare complete trees before stopping production, leaving old dependencies intact.
  candidate=root/('.contracts-candidate-'+stamp);candidate.mkdir(mode=0o700)
@@ -138,14 +157,15 @@ def run(m,package,backup_parent,with_ai=False):
    target=under(root,rel);target.parent.mkdir(parents=True,exist_ok=True);changed.append(rel);shutil.copy2(under(package/'payload',rel),target);own(target)
   for name,target in [('dist',root/'dist'),('node_modules',root/'server/node_modules')]:
    saved=backup/('original-'+name);existed=switch_tree(target,candidate/name,saved);trees.append((name,target,saved,existed))
-  storage.mkdir(mode=0o700,parents=True,exist_ok=True);own(storage)
+  prepare_private_parent(storage.parent)
+  storage.mkdir(mode=0o700,parents=False,exist_ok=True);own(storage)
   config=storage/'runtime.json';config.write_text(json.dumps(m['runtimeConfig'])+'\n');os.chmod(config,0o600);own(config)
   python=m['pythonExecutable']
   env=['CLOVER_DOCUMENTS_ENABLED=true','CLOVER_DOCUMENTS_STORAGE_DIR='+str(storage),'CLOVER_DOCUMENTS_CONFIG_FILE='+str(config),'CLOVER_DOCUMENTS_CONVERTER=/usr/bin/libreoffice','CLOVER_DOCUMENTS_FILE_VALIDATOR_PYTHON='+python,'CLOVER_DOCUMENTS_FNS_ENABLED=true','CLOVER_DOCUMENTS_FNS_REQUIRED=true','CLOVER_DOCUMENTS_AI_AUTO_RECOGNITION=true','CLOVER_DOCUMENTS_AI_MODEL='+m['aiModel'],'CLOVER_DOCUMENTS_AI_ONLY_WHEN_NEEDED=false','CLOVER_DOCUMENTS_AI_ENABLED='+('true' if key else 'false'),'CLOVER_DOCUMENTS_AI_EXTERNAL_CONSENT='+('true' if key else 'false')]
   if key:env.append('CLOVER_DOCUMENTS_AI_API_KEY='+key)
   ENV.parent.mkdir(mode=0o755,parents=True,exist_ok=True);ENV.write_text('\n'.join(env)+'\n');os.chmod(ENV,0o600)
   DROPIN.parent.mkdir(mode=0o755,parents=True,exist_ok=True);DROPIN.write_text('[Service]\nEnvironmentFile='+str(ENV)+'\n')
-  seed_input=backup/'seed-input.private.json';seed_input.write_text(json.dumps({'appRoot':str(root),'database':m['database'],'templatesRoot':str(templates),'storageRoot':str(storage),'adminId':m['adminId']}));os.chmod(seed_input,0o600)
+  seed_input=backup/'seed-input.private.json';seed_input.write_text(json.dumps({'appRoot':str(root),'database':m['database'],'templatesRoot':str(templates),'storageRoot':str(storage),'adminId':m['adminId'],'resume':resume_seed}));os.chmod(seed_input,0o600)
   database_touched=True
   subprocess.run(['node',str(package/'seed-approved.mjs'),str(seed_input)],check=True,env={'PATH':'/usr/local/bin:/usr/bin:/bin','LANG':'C.UTF-8'})
   own(storage)
@@ -186,10 +206,10 @@ def run(m,package,backup_parent,with_ai=False):
  finally:key=''
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('--manifest',required=True);p.add_argument('--package-root',required=True);p.add_argument('--backup-root',required=True);p.add_argument('--approval',required=True);p.add_argument('--configure-ai',action='store_true');a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--manifest',required=True);p.add_argument('--package-root',required=True);p.add_argument('--backup-root',required=True);p.add_argument('--approval',required=True);p.add_argument('--configure-ai',action='store_true');p.add_argument('--resume-seed',action='store_true');p.add_argument('--ai-key-file');a=p.parse_args()
  if a.approval!='PRODUCTION_DOCUMENTS_APPROVED':raise ValueError('APPROVAL_REQUIRED')
  package=pathlib.Path(a.package_root).resolve(strict=True);m=json.loads(pathlib.Path(a.manifest).read_text())
  parent=pathlib.Path(a.backup_root)
  with (parent/'.contracts-install.lock').open('a') as lock:
-  fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB);run(m,package,parent,a.configure_ai)
+  fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB);run(m,package,parent,a.configure_ai,a.resume_seed,a.ai_key_file)
 if __name__=='__main__':main()
