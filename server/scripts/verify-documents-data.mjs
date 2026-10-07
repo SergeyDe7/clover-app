@@ -1,0 +1,94 @@
+import assert from 'node:assert/strict';
+import { DatabaseSync, backup } from 'node:sqlite';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
+import { applyDocumentsSchema, DOCUMENTS_ROLLBACK_SQL } from '../src/documents/schema.js';
+import { createDocumentsRepository } from '../src/documents/repository.js';
+
+function open(path) { const db=new DatabaseSync(path);db.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=15000;');return db; }
+if (!isMainThread) {
+ const db=open(workerData.path), repo=createDocumentsRepository(db);
+ const numbers=[];
+ for(let i=0;i<12;i++) {
+  const doc=repo.createDraft({clientId:'client',entityId:'ip-ten',payment:{type:'prepayment'},counterparty:{name:'Проверочный клиент'},date:'2026-10-05',actorId:'admin',idempotencyKey:`worker-${workerData.index}-${i}`});
+  numbers.push(repo.reserveNumber(doc.id));
+ }
+ db.close();parentPort.postMessage(numbers);
+} else {
+ const dir=mkdtempSync(join(tmpdir(),'clover-documents-data-')),path=join(dir,'isolated.sqlite');
+ const db=open(path);db.exec("PRAGMA journal_mode=WAL; CREATE TABLE users(id TEXT PRIMARY KEY,role TEXT NOT NULL) STRICT; INSERT INTO users VALUES('admin','admin'),('client','client'),('other','client');");
+ await backup(db,join(dir,'before.sqlite'));
+ applyDocumentsSchema(db);applyDocumentsSchema(db);
+ const repo=createDocumentsRepository(db);
+ repo.createLegalEntity({id:'ip-ten',name:'ИП Тен В.П.'});
+ const entity=repo.createLegalEntityRevision({entityId:'ip-ten',data:{name:'ИП Тен В.П.'},actorId:'admin'});
+ const client=repo.saveCounterparty({clientId:'client',data:{name:'Проверочный клиент'},actorId:'admin'});
+ const template=repo.createTemplateVersion({templateId:'test',entityId:'ip-ten',paymentType:'prepayment',storageKey:'templates/test.docx',sha256:'a'.repeat(64),config:{requiredFields:['name']},actorId:'admin'});
+ const input={clientId:'client',entityId:'ip-ten',payment:{type:'prepayment'},counterparty:{name:'Проверочный клиент'},date:'2026-10-05',actorId:'admin',idempotencyKey:'same'};
+ const doc=repo.createDraft(input);
+ assert.equal(repo.createDraft(input).id,doc.id);
+ assert.throws(()=>repo.createDraft({...input,clientId:'other'}),/IDEMPOTENCY_CONFLICT/);
+ assert.throws(()=>repo.createDraft({...input,counterparty:{name:'Изменено'}}),/IDEMPOTENCY_CONFLICT/);
+ assert.throws(()=>repo.createDraft({...input,date:'2026-10-06'}),/IDEMPOTENCY_CONFLICT/);
+ assert.throws(()=>repo.createDraft({...input,idempotencyKey:'bad',payment:{type:'postpayment',days:0}}),/INVALID_PAYMENT/);
+ assert.throws(()=>repo.reserveNumber(doc.id),/SEQUENCE_NOT_CONFIGURED/);
+ repo.configureSequence({nextNumber:40,prefix:'TEST-'});
+ assert.equal(repo.reserveNumber(doc.id),'TEST-40');assert.equal(repo.reserveNumber(doc.id),'TEST-40');
+ assert.throws(()=>repo.configureSequence({nextNumber:1}),/SEQUENCE_ALREADY_USED/);
+ const revision=repo.createRevision({documentId:doc.id,entityRevisionId:entity,counterpartySnapshotId:client,templateVersionId:template,actorId:'admin',date:'2026-10-05'});
+ const imported=repo.createImport({clientId:'client',actorId:'admin',storageKey:'imports/card.pdf',sha256:'c'.repeat(64)});
+ repo.updateImport({id:imported.id,state:'running'});repo.updateImport({id:imported.id,state:'succeeded',result:{text:'Проверка'}});
+ assert.equal(repo.getImport(imported.id).result.text,'Проверка');
+ assert.throws(()=>repo.updateImport({id:imported.id,state:'running'}),/INVALID_IMPORT_TRANSITION/);
+ repo.saveCounterparty({clientId:'client',data:{name:'Новое имя'},actorId:'admin'});
+ assert.equal(repo.getRevision(doc.id).snapshot.counterparty.name,'Проверочный клиент');
+ assert.throws(()=>db.prepare('UPDATE document_revisions SET snapshot_json=? WHERE id=?').run('{}',revision.id),/IMMUTABLE/);
+ assert.throws(()=>db.prepare("DELETE FROM users WHERE id='client'").run(),/FOREIGN KEY/);
+ assert.throws(()=>repo.transitionStatus({documentId:doc.id,status:'generated'}),/BOTH_OUTPUTS_REQUIRED/);
+ const file={documentId:doc.id,revisionId:revision.id,originalName:'Договор',mime:'application/octet-stream',size:10,sha256:'b'.repeat(64),actorId:'admin'};
+ repo.addFile({...file,purpose:'docx',storageKey:'documents/doc.docx'});
+ repo.addFile({...file,purpose:'pdf',storageKey:'documents/doc.pdf'});
+ assert.throws(()=>repo.addFile({...file,purpose:'pdf',storageKey:'documents/duplicate.pdf'}),/UNIQUE/);
+ repo.transitionStatus({documentId:doc.id,status:'generated'});
+ repo.transitionStatus({documentId:doc.id,status:'signing'});
+ assert.throws(()=>repo.transitionStatus({documentId:doc.id,status:'signed',signedDate:'2026-10-05'}),/SIGNED_FILE/);
+ repo.addFile({...file,purpose:'signed',storageKey:'documents/signed.pdf'});
+ assert.throws(()=>repo.transitionStatus({documentId:doc.id,status:'signed',signedDate:'2026-02-30'}),/SIGNED_DATE_INVALID/);
+ repo.transitionStatus({documentId:doc.id,status:'signed',signedDate:'2026-10-05'});
+ const job=repo.createJob({documentId:doc.id,kind:'generation',idempotencyKey:'job'});
+ assert.equal(repo.createJob({documentId:doc.id,kind:'generation',idempotencyKey:'job'}).id,job.id);
+ repo.updateJob({id:job.id,state:'running'});repo.updateJob({id:job.id,state:'succeeded',result:{ok:true}});
+ assert.throws(()=>repo.updateJob({id:job.id,state:'running'}),/INVALID_JOB/);
+ const leasedDoc=repo.createDraft({...input,idempotencyKey:'lease-crash'});
+ repo.reserveNumber(leasedDoc.id);
+ const leasedRevision=repo.createRevision({documentId:leasedDoc.id,entityRevisionId:entity,counterpartySnapshotId:client,templateVersionId:template,actorId:'admin',date:'2026-10-05'});
+ const first=repo.claimGenerationJob(leasedDoc.id,{nowMs:1000,leaseMs:100});assert.equal(first.claimed,true);
+ const busy=repo.claimGenerationJob(leasedDoc.id,{nowMs:1099,leaseMs:100});assert.equal(busy.claimed,false);assert.equal(busy.lease_token,first.lease_token);
+ assert.throws(()=>repo.finalizeGeneration({jobId:first.id,leaseToken:first.lease_token,documentId:leasedDoc.id,revisionId:leasedRevision.id,files:[],nowMs:1100}),/GENERATION_LEASE_LOST/);
+ const reclaimed=repo.claimGenerationJob(leasedDoc.id,{nowMs:1100,leaseMs:100});assert.equal(reclaimed.id,first.id);assert.equal(reclaimed.claimed,true);assert.notEqual(reclaimed.lease_token,first.lease_token);
+ const pair=['docx','pdf'].map(purpose=>({...file,purpose,storageKey:`documents/lease.${purpose}`}));
+ const finalize={jobId:first.id,documentId:leasedDoc.id,revisionId:leasedRevision.id,files:pair};
+ assert.throws(()=>repo.finalizeGeneration({...finalize,leaseToken:first.lease_token,nowMs:1101}),/GENERATION_LEASE_LOST/);
+ assert.equal(repo.failGeneration({jobId:first.id,leaseToken:first.lease_token,errorCode:'OLD_WORKER'}),false);
+ assert.throws(()=>repo.finalizeGeneration({...finalize,leaseToken:reclaimed.lease_token,nowMs:1101,files:[pair[0],{...pair[1],sha256:'invalid'}]}),/CHECK/);
+ assert.equal(repo.getDocument(leasedDoc.id).files.length,0);assert.equal(repo.getDocument(leasedDoc.id).status,'draft');assert.equal(repo.getJob(first.id).state,'running');
+ const generated=repo.finalizeGeneration({...finalize,leaseToken:reclaimed.lease_token,nowMs:1101});assert.equal(generated.files.length,2);assert.equal(generated.status,'generated');
+ assert.equal(repo.finalizeGeneration({...finalize,leaseToken:reclaimed.lease_token,nowMs:9999}).files.length,2);
+ assert.equal(repo.claimGenerationJob(leasedDoc.id,{nowMs:9999}).claimed,false);
+ const workers=await Promise.all(Array.from({length:4},(_,index)=>new Promise((resolve,reject)=> {
+  const worker=new Worker(new URL(import.meta.url),{workerData:{path,index}});worker.on('message',resolve);worker.on('error',reject);worker.on('exit',code=>{if(code!==0)reject(new Error(`Worker exit ${code}`));});
+ })));
+ const numbers=workers.flat();assert.equal(numbers.length,48);assert.equal(new Set(numbers).size,48);
+ assert.equal(repo.listDocuments('client').length,50);
+ assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
+ await backup(db,join(dir,'after.sqlite'));const restored=open(join(dir,'after.sqlite'));
+ assert.equal(restored.prepare('SELECT count(*) AS n FROM documents').get().n,50);assert.equal(createDocumentsRepository(restored).getRevision(doc.id).snapshot.number,'TEST-40');
+ assert.equal(restored.prepare('PRAGMA integrity_check').get().integrity_check,'ok');restored.close();
+ db.exec('BEGIN IMMEDIATE');assert.throws(()=>db.exec(DOCUMENTS_ROLLBACK_SQL),/RESTORE_VERIFIED_BACKUP_REQUIRED/);db.exec('ROLLBACK');db.close();
+ const empty=open(':memory:');empty.exec('CREATE TABLE users(id TEXT PRIMARY KEY,role TEXT) STRICT;');applyDocumentsSchema(empty);empty.exec('BEGIN IMMEDIATE');empty.exec(DOCUMENTS_ROLLBACK_SQL);empty.exec('COMMIT');
+ assert.equal(empty.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type='table' AND name='documents'").get().n,0);empty.close();
+ const before=open(join(dir,'before.sqlite'));assert.equal(before.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type='table' AND name='documents'").get().n,0);before.close();
+ console.log(`PASS documents data: immutable snapshots, idempotency, foreign keys, status guards, generation crash recovery leases and atomic pair finalization, 48 concurrent reservations, backup restore and guarded rollback. Isolated artifacts: ${dir}`);
+}

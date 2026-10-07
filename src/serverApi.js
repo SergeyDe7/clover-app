@@ -1,4 +1,6 @@
 import { stripProductForSave } from "./shared/appHelpers";
+import { createDocumentAiSession } from "./shared/contracts/documentAiSession.js";
+let documentAiSession = createDocumentAiSession();
 import {
   clearSessionToken,
   readSessionToken,
@@ -56,10 +58,12 @@ export function getApiToken() {
 }
 
 export function setApiToken(token) {
+  documentAiSession = createDocumentAiSession();
   writeSessionToken(token, { sessionStorage, localStorage });
 }
 
 export function clearApiToken() {
+  documentAiSession = createDocumentAiSession();
   clearSessionToken({ sessionStorage, localStorage });
 }
 
@@ -194,6 +198,104 @@ async function requestBlob(path, options = {}) {
 }
 
 export const api = {
+  getDocumentLegalEntities() {
+    return request("/documents/admin/legal-entities");
+  },
+  saveDocumentLegalEntity(payload) {
+    return request("/documents/admin/legal-entities", { method: "POST", body: payload });
+  },
+  setDocumentLegalEntityActive(id, active) {
+    return request(`/documents/admin/legal-entities/${encodeURIComponent(id)}/activation`, { method: "POST", body: { active, confirmed: true } });
+  },
+  uploadDocumentTemplate(payload) {
+    const body = new FormData();
+    body.append("file", payload.file);
+    body.append("templateId", payload.templateId);
+    body.append("entityId", payload.entityId);
+    body.append("paymentType", payload.paymentType);
+    body.append("approved", "true");
+    body.append("config", JSON.stringify(payload.config));
+    return request("/documents/admin/templates", { method: "POST", body, timeoutMs: 120000 });
+  },
+  async previewDocumentTemplate(id, buyerType, format) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120000);
+    try {
+      return await requestBlob(`/documents/admin/templates/${encodeURIComponent(id)}/preview`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ buyerType, format }), signal: controller.signal });
+    } finally { clearTimeout(timer); }
+  },
+  getDocumentOptions(clientId) {
+    return request(`/documents/clients/${encodeURIComponent(clientId)}/options`);
+  },
+  listDocuments(clientId) {
+    return request(`/documents/clients/${encodeURIComponent(clientId)}`);
+  },
+  importDocumentCard(clientId, file) {
+    const body = new FormData(); body.append("file", file);
+    return request(`/documents/clients/${encodeURIComponent(clientId)}/imports`, { method: "POST", body, timeoutMs: 120000 });
+  },
+  getDocumentImport(id) {
+    return request(`/documents/imports/${encodeURIComponent(id)}`);
+  },
+  getStandaloneDocumentOptions() { return request("/documents/admin/generator/options"); },
+  importStandaloneDocumentCard(file) {
+    const body = new FormData(); body.append("file", file);
+    return request("/documents/admin/generator/imports", { method: "POST", body, timeoutMs: 120000 });
+  },
+  validateStandaloneDocumentDraft(payload) {
+    return request("/documents/admin/generator/validate", { method: "POST", body: payload });
+  },
+  createStandaloneDocumentDraft(payload) {
+    return request("/documents/admin/generator/drafts", { method: "POST", body: payload });
+  },
+  getDocumentAiSession() { return documentAiSession; },
+  getArchiveDocumentOptions() { return request("/documents/admin/archive-options"); },
+  importArchivedDocument({ clientId, legalEntityId, number, counterparty, idempotencyKey, file }) {
+    const body = new FormData();
+    for (const [key, value] of Object.entries({ legalEntityId, number, idempotencyKey })) body.append(key, value);
+    if (clientId) body.append("clientId", clientId);
+    body.append("counterparty", JSON.stringify(counterparty));
+    body.append("signed", "true"); body.append("file", file);
+    return request("/documents/admin/archive-import", { method: "POST", body, timeoutMs: 120000 });
+  },
+  enhanceDocumentImport(id, { consent, sheetId } = {}) {
+    return request(`/documents/imports/${encodeURIComponent(id)}/ai`, { method: "POST", body: { consent: consent === true, ...(sheetId ? { sheetId } : {}) }, timeoutMs: 120000 });
+  },
+  getDocumentDraftReview(id) {
+    return request(`/documents/${encodeURIComponent(id)}/review`);
+  },
+  validateDocumentDraft(clientId, payload) {
+    return request(`/documents/clients/${encodeURIComponent(clientId)}/validate`, { method: "POST", body: payload });
+  },
+  createDocumentDraft(clientId, payload) {
+    return request(`/documents/clients/${encodeURIComponent(clientId)}/drafts`, { method: "POST", body: payload });
+  },
+  generateDocument(id) {
+    return request(`/documents/${encodeURIComponent(id)}/generate`, { method: "POST", timeoutMs: 120000 });
+  },
+  getDocumentJob(id) {
+    return request(`/documents/jobs/${encodeURIComponent(id)}`);
+  },
+  downloadDocumentFile(documentId, fileId) {
+    return requestBlob(`/documents/${encodeURIComponent(documentId)}/files/${encodeURIComponent(fileId)}`);
+  },
+  listSavedDocuments() { return request("/documents/archive"); },
+  listTrashedDocuments() { return request("/documents/trash"); },
+  trashDocument(id) { return request(`/documents/${encodeURIComponent(id)}/trash`, { method: "POST", body: { confirmed: true } }); },
+  restoreDocument(id) { return request(`/documents/${encodeURIComponent(id)}/restore`, { method: "POST", body: { confirmed: true } }); },
+  uploadSignedDocument(documentId, file, date) {
+    const body = new FormData(); body.append("file", file); if (date) body.append("date", date);
+    return request(`/documents/${encodeURIComponent(documentId)}/signed-files`, { method: "POST", body });
+  },
+  uploadDocumentAttachment(documentId, { file, title, category, idempotencyKey }) {
+    const body = new FormData(); body.append("file", file);
+    body.append("title", title); body.append("category", category); body.append("idempotencyKey", idempotencyKey);
+    return request(`/documents/${encodeURIComponent(documentId)}/attachments`, { method: "POST", body, timeoutMs: 120000 });
+  },
+  purgeDocument(id) {
+    return request(`/documents/${encodeURIComponent(id)}/purge`, { method: "POST", body: { confirmed: true }, timeoutMs: 120000 });
+  },
+
   getPublicManagerContact() {
     return request("/public/manager-contact");
   },

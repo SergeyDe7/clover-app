@@ -8,6 +8,8 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import multer from "multer";
+import { createDocumentRuntime } from "./documents/runtime.js";
+import { assertLegacyRestoreAllowed, assertClientDocumentDeletionAllowed } from "./documents/backup.js";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 import {
@@ -3535,6 +3537,15 @@ app.get("/api/bootstrap/live", authRequired, (req, res) => {
   });
 });
 
+app.use("/api/documents", createDocumentRuntime({
+  db,
+  authRequired,
+  findUser: findUserById,
+  clientLink: (clientId) => getGlobalState("clientLinks", {})[clientId] || {},
+  audit: auditFromRequest,
+  publicRoots: [uploadsDirectory],
+}));
+
 app.get("/api/bootstrap", authRequired, (req, res) => {
   const storedProducts = getGlobalState(
     "products",
@@ -6700,6 +6711,7 @@ app.post(
   (req, res, next) => {
     try {
       assertRestorableBackup(req.params.fileName);
+      assertLegacyRestoreAllowed(db);
       createServerBackup({
         label: "before-restore",
         reason: "Автоматическая копия перед восстановлением",
@@ -9096,6 +9108,9 @@ app.delete(
         return res.status(404).json({ error: "Клиент Clover не найден." });
       }
 
+      try { assertClientDocumentDeletionAllowed(db, clientUser.id); } catch (error) {
+        return res.status(error.status || 409).json({ code: error.code, error: error.message });
+      }
       const removed = deleteClientUser(clientUser.id);
       if (!removed) {
         return res.status(404).json({ error: "Клиент Clover не найден." });
@@ -9253,6 +9268,9 @@ app.post(
       });
     }
 
+    try { assertLegacyRestoreAllowed(db); } catch (error) {
+      return res.status(error.status || 409).json({ code: error.code, error: error.message });
+    }
     createServerBackup({
       label: "before-reset",
       reason: "Автоматическая копия перед полным сбросом",

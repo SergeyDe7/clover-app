@@ -19,6 +19,7 @@ export const MANAGER_TABS = [
   ["storefront", "manager.nav.storefront"],
   ["clients", "manager.nav.clients"],
   ["acts", "manager.nav.acts"],
+  ["contracts", "manager.nav.contracts"],
   ["exchange", "manager.nav.exchange"],
   ["price-list", "manager.nav.priceList"],
   ["languages", "manager.nav.languages"],
@@ -51,7 +52,7 @@ export const STAFF_FEATURE_IDS = STAFF_FEATURE_OPTIONS.map(([id]) => id);
 export function staffHasFeature(authUser, featureId) {
   if (!authUser) return false;
   const id = String(featureId || "");
-  if (id === "storefront" || id === "price-list" || id === "languages") {
+  if (id === "storefront" || id === "price-list" || id === "languages" || id === "contracts") {
     return authUser.role === "admin";
   }
   if (authUser.role === "admin") return true;

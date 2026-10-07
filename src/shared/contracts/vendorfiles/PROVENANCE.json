@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/petrovich/petrovich-js",
+  "commit": "41858f9e3073aa593856968d90061d0771f57743",
+  "license": "MIT",
+  "runtime": "rules.js contains the unmodified rules.json data; nameDeclension.js is Clover's conservative adapter. Original petrovich.js (saved as petrovich.source.txt) is retained for audit, not executed.",
+  "sha256": {
+    "rules.json": "474bd34d255fd3b3d0eefcd732f8835cb3ca3b26e17c1166e5e78534e38a9a6d",
+    "rules.js": "399ba01cdb512ee087c52eab504a5387e8ee1cc0f039cfbd34ad3218dabcae0f",
+    "petrovich.source.txt": "ae055ca6b6bbae8afea1f4b6841f8af59fdf2a243611b4bf6a7488c007bcc916",
+    "LICENSE": "085592914b0868f0d01ee79ad6f7a442e2a05367adf19402f29078ca19cb112a"
+  }
+}

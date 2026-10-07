@@ -1,0 +1,121 @@
+/* Scoped Clover visual system; works in the cabinet and standalone preview. */
+.document-workspace { min-width: 0; max-width: 100%; padding: clamp(16px, 3vw, 28px); border: 1px solid #e2eae0; border-radius: 22px; background: #fff; color: #293329; font-family: "Manrope", "Segoe UI", system-ui, sans-serif; font-size: 15px; line-height: 1.5; box-shadow: 0 6px 22px rgb(48 82 45 / 4%); }
+.document-workspace *, .document-workspace *::before, .document-workspace *::after { box-sizing: border-box; }
+.document-workspace .panel-heading { display: block; margin-bottom: 24px; }
+.document-workspace .panel-heading .eyebrow { margin: 0 0 8px; color: var(--clover-green-deep, #386f37); font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.document-workspace h2 { margin: 0 0 10px; font-size: clamp(23px, 3vw, 30px); line-height: 1.25; letter-spacing: -0.02em; }
+.document-workspace .panel-heading p:not(.eyebrow) { max-width: 760px; margin: 0; color: #617061; }
+.document-workspace h3 { margin: 0; font-size: 20px; line-height: 1.35; }
+.document-workspace .document-fieldset { min-width: 0; margin: 24px 0; padding: 20px; border: 1px solid #e2eae0; border-radius: 22px; background: #fff; }
+.document-workspace legend { max-width: 100%; padding: 0 8px; color: #386f37; font-size: 16px; font-weight: 800; line-height: 1.4; overflow-wrap: anywhere; }
+.document-workspace .document-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
+.document-workspace .field { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin: 0; color: #3f4c3f; font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
+.document-workspace .document-field--wide { grid-column: 1 / -1; }
+.document-workspace .document-recognize-button { margin-top: 16px; }
+.document-workspace input:not([type="checkbox"]), .document-workspace select, .document-workspace textarea { width: 100%; min-width: 0; min-height: 48px; margin: 0; padding: 11px 14px; border: 1px solid #d5dfd2; border-radius: 14px; background: #fbfdfb; color: #293329; font: inherit; font-size: 16px; font-weight: 400; line-height: 1.45; transition: border-color 0.15s ease, background-color 0.15s ease; }
+.document-workspace textarea { min-height: 112px; max-width: 100%; resize: vertical; white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden; }
+.document-workspace select { padding-right: 30px; }
+.document-workspace input:not([type="checkbox"]):hover:not(:disabled), .document-workspace select:hover:not(:disabled), .document-workspace textarea:hover:not(:disabled) { border-color: #9fbd99; }
+.document-workspace input:focus, .document-workspace select:focus, .document-workspace textarea:focus { border-color: var(--clover-green, #5b9d57); background: #fff; }
+.document-workspace input:disabled, .document-workspace select:disabled, .document-workspace textarea:disabled { background: #f2f5f1; color: #647164; cursor: not-allowed; }
+.document-workspace input[type="file"] { min-height: 74px; padding: 14px; border: 1px dashed #a9c6a3; background: #f4f9f2; white-space: normal; overflow: hidden; font-size: 14px; }
+.document-workspace input[type="file"]::file-selector-button { min-height: 44px; max-width: 100%; margin-right: 12px; padding: 9px 14px; border: 1px solid #b7d0b1; border-radius: 12px; background: #fff; color: #386f37; font: inherit; font-weight: 700; cursor: pointer; }
+.document-workspace input[type="file"]::file-selector-button:hover { background: #eef7eb; }
+.document-workspace small, .document-workspace .document-hint { color: #617061; font-size: 13px; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
+.document-workspace small { display: block; }
+.document-workspace .document-hint { margin: 12px 0; }
+.document-workspace .document-message { margin: 16px 0; padding: 14px 16px; border: 1px solid #cfe2c8; border-radius: 14px; background: #eef7eb; color: #356c32; line-height: 1.55; overflow-wrap: anywhere; }
+.document-workspace .document-message strong { font-weight: 800; }
+.document-workspace .document-message ul { margin: 8px 0 0; padding-left: 20px; }
+.document-workspace .document-message li + li { margin-top: 6px; }
+.document-workspace .document-message p { margin: 8px 0 0; }
+.document-workspace ul.document-message { padding-left: 36px; }
+.document-workspace .document-message--error { border-color: #ebc5bf; background: #fff0ed; color: #8b271c; }
+.document-workspace .document-message--warning { border-color: #eadba9; background: #fff8e4; color: #66501a; }
+.document-workspace .document-field--issue input, .document-workspace .document-field--issue select, .document-workspace .document-field--issue textarea { border-color: #a56a16; background: #fffdf6; }
+.document-workspace .document-field--issue small { color: #805411; }
+.document-workspace .document-confirm { display: flex; align-items: flex-start; gap: 12px; min-height: 48px; margin-top: 20px; padding: 16px; border: 1px solid #d9e7d4; border-radius: 14px; background: #f4f9f2; color: #3f4c3f; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; cursor: pointer; }
+.document-workspace .document-confirm input { flex: 0 0 auto; width: 20px; height: 20px; margin: 2px 0 0; accent-color: #386f37; cursor: pointer; }
+.document-workspace .primary-button, .document-workspace .secondary-button { min-height: 46px; max-width: 100%; padding: 11px 18px; border: 1px solid #b7d0b1; border-radius: 14px; background: #fff; color: #386f37; font: inherit; font-size: 14px; font-weight: 750; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease; }
+.document-workspace .primary-button { border-color: var(--clover-green-deep, #386f37); background: var(--clover-green-deep, #386f37); color: #fff; }
+.document-workspace .primary-button:hover:not(:disabled) { border-color: #2d5e2c; background: #2d5e2c; }
+.document-workspace .secondary-button:hover:not(:disabled) { border-color: #5b9d57; background: #eef7eb; }
+.document-workspace button:disabled { opacity: 0.55; cursor: not-allowed; }
+.document-workspace .document-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.document-workspace form > .document-actions { padding-top: 4px; }
+.document-workspace .document-list-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-top: 32px; padding-top: 24px; border-top: 1px solid #e2eae0; }
+.document-workspace .document-list { display: grid; gap: 16px; margin: 18px 0 0; padding: 0; list-style: none; }
+.document-workspace .document-card { min-width: 0; padding: 20px; border: 1px solid #e2eae0; border-radius: 22px; background: #fff; overflow-wrap: anywhere; }
+.document-workspace .document-card > div:first-child { margin-bottom: 14px; }
+.document-workspace .document-card strong { font-size: 16px; font-weight: 800; }
+.document-workspace .document-status { display: inline-block; margin-left: 12px; padding: 4px 10px; border: 1px solid #d9e7d4; border-radius: 999px; background: #eef7eb; color: #386f37; font-size: 12px; font-weight: 700; vertical-align: middle; }
+.document-workspace .document-signed { margin-bottom: 0; background: #fbfdfb; }
+.document-workspace button:focus-visible, .document-workspace input:focus-visible, .document-workspace select:focus-visible, .document-workspace textarea:focus-visible { outline: 3px solid #386f37; outline-offset: 3px; }
+@media (max-width: 640px) {
+  .document-workspace { padding: 16px; border-radius: 22px; }
+  .document-workspace .document-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .document-workspace .document-fieldset, .document-workspace .document-card { padding: 14px; }
+  .document-workspace legend { font-size: 15px; }
+  .document-workspace .document-actions > button, .document-workspace .document-list-heading > button { width: 100%; }
+  .document-workspace .document-confirm { padding: 12px; }
+  .document-workspace .document-status { margin-left: 0; margin-top: 8px; }
+  .document-workspace .document-card strong { display: block; }
+  .document-workspace input[type="file"] { padding: 10px; }
+  .document-workspace input[type="file"]::file-selector-button { margin-right: 8px; padding: 9px 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .document-workspace input, .document-workspace select, .document-workspace textarea, .document-workspace button { transition: none; }
+}
+
+.document-workspace .document-card--unsigned { border-color: #e4aaaa; background: #fff2f2; }
+.document-workspace .document-card--signed { border-color: #91c39b; background: #eff9f0; }
+.document-workspace .document-signature-state { font-weight: 700; }
+.document-workspace .document-card--unsigned .document-signature-state { color: #9b2727; }
+.document-workspace .document-card--signed .document-signature-state { color: #286b35; }
+.document-workspace .document-archive-search { margin-top: 18px; max-width: 520px; }
+
+.document-workspace .document-archive-link { display: inline-block; text-decoration: none; margin-bottom: 14px; }
+.document-workspace .document-list-heading { scroll-margin-top: 24px; }
+
+.document-workspace .document-check-summary { margin: 0 0 16px; padding: 14px 16px; border: 1px solid #d9e7d4; border-radius: 14px; background: #f4f9f2; }
+.document-workspace .document-check-summary p { margin: 6px 0; }
+.document-workspace .document-check-state--checked { color: #286b35; }
+.document-workspace .document-check-state--needs_input, .document-workspace .document-check-state--needs_review { color: #805411; }
+.document-workspace .document-attention-list { margin-top: 10px; }
+.document-workspace .document-attention-list p { margin: 4px 0; }
+.document-workspace .document-field-link { padding: 2px 0; border: 0; background: none; color: #386f37; font: inherit; font-weight: 750; text-align: left; text-decoration: underline; cursor: pointer; }
+.document-workspace .document-review-confirm { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; padding: 8px 0; font-size: 13px; cursor: pointer; }
+.document-workspace .document-review-confirm input { flex: 0 0 auto; width: 20px; height: 20px; margin: 0; accent-color: #386f37; }
+.document-workspace [id$="-input"] { scroll-margin-top: 24px; }
+.document-workspace .document-card-alternative { margin-top: 16px; }
+.document-workspace .field > label:not(.document-review-confirm) { cursor: pointer; }
+.document-workspace .field .document-review-confirm { color: #3f4c3f; font-weight: 400; }
+.document-workspace .document-ai-controls { margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2eae0; }
+.document-workspace .document-ai-controls .document-confirm { margin: 12px 0; }
+.document-workspace .document-card--trashed { border-color: #d5dfd2; background: #f5f6f4; }
+.document-workspace .document-trash-button { color: #8b271c; border-color: #ebc5bf; }
+.document-workspace .document-trash-confirm { margin-top: 10px; }
+
+.document-workspace .document-list { gap: 10px; }
+.document-workspace .document-card { padding: 12px 14px; border-radius: 14px; }
+.document-workspace .document-card > div:first-child { margin-bottom: 6px; }
+.document-workspace .document-card strong { font-size: 14px; }
+.document-workspace .document-card .document-hint, .document-workspace .document-signature-state { margin: 4px 0; font-size: 12px; }
+.document-workspace .document-card .document-status { padding: 2px 7px; font-size: 11px; }
+.document-workspace .document-card .document-actions { margin-top: 8px; gap: 6px; }
+.document-workspace .document-card button { min-height: 34px; padding: 6px 10px; font-size: 12px; }
+.document-workspace .document-scan-details { margin-top: 8px; }
+.document-workspace .document-scan-details summary { cursor: pointer; font-size: 13px; font-weight: 700; }
+.document-workspace .document-historic-import .document-actions { margin-top: 16px; }
+.document-workspace [hidden], .admin-document-center [hidden] { display: none !important; }
+.document-workspace .document-scan-details .document-fieldset { margin-top: 8px; padding: 10px; border-radius: 12px; }
+.document-workspace .document-scan-details .document-grid { grid-template-columns: minmax(0,1fr); }
+.document-workspace .document-package-list { margin: 10px 0; padding: 0; list-style: none; }
+.document-workspace .document-package-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid #d9e7d4; }
+.document-workspace .document-package-list li > div { min-width: 0; }
+.document-workspace .document-package-list span { display: block; margin-top: 4px; font-size: 12px; color: #617061; }
+.document-workspace .document-package-list button { flex-shrink: 0; }
+.document-workspace .document-package-form .document-actions { margin-top: 14px; }
+@media (max-width: 640px) {
+ .document-workspace .document-card .document-actions > button { width: auto; flex: 1 1 auto; }
+}

@@ -1,0 +1,6 @@
+.admin-document-center { min-width: 0; }
+.admin-document-center .admin-document-client-picker { margin-top: 0; margin-bottom: 18px; padding: 18px; }
+.admin-document-center .admin-document-client-picker label { display: block; margin-bottom: 8px; color: #3f4c3f; font-weight: 700; }
+.admin-document-center .admin-document-client-picker select { width: 100%; min-width: 0; min-height: 48px; padding: 11px 14px; border: 1px solid #d5dfd2; border-radius: 14px; background: #fbfdfb; color: #293329; font: inherit; font-size: 16px; }
+.admin-document-center .admin-document-client-picker select:focus-visible { outline: 3px solid #386f37; outline-offset: 3px; }
+.admin-document-center .admin-document-client-picker p { margin: 10px 0 0; color: #617061; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
