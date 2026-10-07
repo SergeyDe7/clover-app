@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {assertRuntimeOptions} from './runtime-acceptance.mjs';
+const good={enabled:true,capabilities:{create:true},blockers:[],verification:{required:true,blocking:false,sources:[{id:'fns',configured:true}]},legalEntities:[{},{}],ai:{available:true,provider:'openai',autoRecognition:true,onlyWhenNeeded:false}};
+assertRuntimeOptions(good,true);
+for(const field of ['available','autoRecognition'])assert.throws(()=>assertRuntimeOptions({...good,ai:{...good.ai,[field]:false}},true));
+assert.throws(()=>assertRuntimeOptions({...good,ai:{...good.ai,provider:'disabled'}},true));
+assert.throws(()=>assertRuntimeOptions({...good,ai:{...good.ai,onlyWhenNeeded:true}},true));
+assert.throws(()=>assertRuntimeOptions({...good,enabled:false},true));
+assert.throws(()=>assertRuntimeOptions({...good,verification:{...good.verification,blocking:true}},true));
+assert.throws(()=>assertRuntimeOptions({...good,legalEntities:[]},true));
+const disabled={...good,ai:{available:false,provider:'disabled',autoRecognition:false,onlyWhenNeeded:false}};
+assertRuntimeOptions(disabled,false);assert.throws(()=>assertRuntimeOptions(good,false));
+console.log('PASS runtime acceptance: module/FNS/entities/AI enabled and truthful disabled status');
