@@ -34,7 +34,7 @@ import { api } from "../../serverApi";
 
 function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, dirtyClientLinkIdsRef, oneCPriceTypes = [], catalogPricesVersion = "", managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onRestoreOrder, onPurgeOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onApplyReconciliationRequests, onLogout }) {
   const isAdmin = authUser?.role === "admin";
-  const documentsEnabled = import.meta.env.VITE_CLOVER_DOCUMENTS_UI_ENABLED === "true";
+  const documentsEnabled = import.meta.env.VITE_CLOVER_DOCUMENTS_UI_ENABLED !== "false";
   const [tab, setTab] = useState(readManagerActiveTab);
   const [moreTab, setMoreTab] = useState(() => {
     const saved = readManagerMoreTab();
