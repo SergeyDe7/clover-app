@@ -37,5 +37,6 @@ test('imported contracts use the same name/INN search and actual signed-file ind
   const legacy = { ...imported, counterparty: { ...draft, inn: '123456789047' } };
   assert.deepEqual(filterSavedDocuments([legacy], '123456'), [legacy]);
   assert.equal(hasSignedScan(imported), true);
-  assert.equal(hasSignedScan({ ...imported, files: [{ type: 'original_scan' }] }), false);
+  assert.equal(hasSignedScan({ ...imported, files: [{ type: 'original_scan' }] }), true);
+  assert.equal(hasSignedScan({ ...imported, kind: 'contract', files: [{ type: 'original_scan' }] }), false);
 });

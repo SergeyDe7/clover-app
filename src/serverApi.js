@@ -250,9 +250,9 @@ export const api = {
   },
   getDocumentAiSession() { return documentAiSession; },
   getArchiveDocumentOptions() { return request("/documents/admin/archive-options"); },
-  importArchivedDocument({ clientId, legalEntityId, number, counterparty, idempotencyKey, file }) {
+  importArchivedDocument({ clientId, legalEntityId, number, counterparty, idempotencyKey, file, folder = "clients" }) {
     const body = new FormData();
-    for (const [key, value] of Object.entries({ legalEntityId, number, idempotencyKey })) body.append(key, value);
+    for (const [key, value] of Object.entries({ legalEntityId, number, idempotencyKey, folder })) body.append(key, value);
     if (clientId) body.append("clientId", clientId);
     body.append("counterparty", JSON.stringify(counterparty));
     body.append("signed", "true"); body.append("file", file);

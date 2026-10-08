@@ -20,7 +20,7 @@ const fields = z.object(Object.fromEntries(counterpartyKeys.map((key) => [key, z
 const draftSchema = z.object({ legalEntityId: z.string().min(1).max(100), date: z.string().max(10),
   payment: z.object({ type: z.enum(["prepayment", "postpayment"]), days: z.number().int().positive().max(9999).nullable().optional() }).strict(),
   counterparty: fields, verification: z.object({choices:z.object(Object.fromEntries(["type","fullName","inn","kpp","ogrn","ogrnip","legalAddress"].map(key=>[key,z.enum(["original","registry"]).optional()]))).strict(),expectedRegistry:z.object(Object.fromEntries(["type","fullName","inn","kpp","ogrn","ogrnip","legalAddress"].map(key=>[key,z.string().max(2000).optional()]))).strict().optional()}).strict().optional(), confirmed: z.boolean(), importId: z.string().uuid().nullable().optional(), idempotencyKey: z.string().min(1).max(100) }).strict();
-const safeDocument = (doc) => ({ id: doc.id, clientId: doc.clientId, entityId: doc.entityId, kind:doc.kind, number: doc.number, status: doc.status,
+const safeDocument = (doc) => ({ id: doc.id, clientId: doc.clientId, entityId: doc.entityId, kind:doc.kind, folder:doc.kind==='imported_contract'?doc.folder:'clients', number: doc.number, status: doc.status,
   createdAt: doc.createdAt, counterparty: {type:doc.draftData.counterparty.type, fullName:doc.draftData.counterparty.fullName, inn:doc.draftData.counterparty.inn}, files: doc.status === "draft" ? [] : doc.files.map((file) => ({ id: file.id, type: file.type, name: file.name, ...(file.type === "attachment" ? { category:file.category,title:file.title,createdAt:file.createdAt } : {}) })) });
 
 // Runtime is injected, so tests never import the production DB or start the server.
@@ -287,18 +287,18 @@ export function createDocumentsRouter({ enabled = false, runtimeError, repositor
   }));
   router.post('/admin/archive-import',upload,wrap(async(req,res)=>{
     requireAdmin(req);
-    const input=z.object({clientId:z.string().min(1).max(100).optional(),legalEntityId:z.string().min(1).max(100),number:z.string().trim().min(1).max(100),counterparty:z.string().max(6000),signed:z.literal('true'),confirmed:z.literal('true').optional(),idempotencyKey:z.string().min(1).max(100)}).strict().parse(req.body);
+    const input=z.object({clientId:z.string().min(1).max(100).optional(),legalEntityId:z.string().min(1).max(100),number:z.string().trim().min(1).max(100),folder:z.enum(['clients','suppliers','other']).default('clients'),counterparty:z.string().max(6000),signed:z.literal('true'),confirmed:z.literal('true').optional(),idempotencyKey:z.string().min(1).max(100)}).strict().parse(req.body);
     const counterparty=z.object({type:z.enum(['ip','ooo']).optional(),fullName:z.string().trim().min(1).max(2000),inn:z.string().regex(/^\d{10}(\d{2})?$/).optional()}).strict().parse(JSON.parse(input.counterparty));
     if(counterparty.inn!==undefined&&(!validInn(counterparty.inn)||(counterparty.type!==undefined&&(counterparty.type==='ip'?counterparty.inn.length!==12:counterparty.inn.length!==10))))throw documentError('INN_INVALID','Проверьте ИНН и тип контрагента.');
     const clientId=input.clientId?client(req,input.clientId):null;
     if(!repo.listLegalEntities({includeInactive:true}).some(entity=>entity.id===input.legalEntityId))throw documentError('ENTITY_NOT_FOUND','Юрлицо не найдено.',404);
     if(!req.file)throw documentError('DOCUMENT_FILE_REQUIRED','Выберите подписанный договор.');
     const checked=inspectDocumentUpload(req.file.buffer,req.file.originalname,true);
-    const previous=repo.findArchivedImport({clientId,entityId:input.legalEntityId,number:input.number,counterparty,actorId:req.user.id,idempotencyKey:input.idempotencyKey,sha256:checked.sha256});
+    const previous=repo.findArchivedImport({clientId,entityId:input.legalEntityId,number:input.number,counterparty,actorId:req.user.id,idempotencyKey:input.idempotencyKey,sha256:checked.sha256,folder:input.folder});
     if(previous)return res.status(201).json({document:{...safeDocument(previous),canDelete:true,canRestore:false,canCreate:false,canUploadSigned:false,canAttachDocuments:true}});
     await validateSignedDocument(req.file.buffer,checked.extension,{python:config.fileValidatorPython});
     const file=storage.put(req.file.buffer,checked.extension);
-    const document=repo.importArchivedDocument({clientId,entityId:input.legalEntityId,number:input.number,counterparty,actorId:req.user.id,idempotencyKey:input.idempotencyKey,
+    const document=repo.importArchivedDocument({clientId,folder:input.folder,entityId:input.legalEntityId,number:input.number,counterparty,actorId:req.user.id,idempotencyKey:input.idempotencyKey,
       file:{storageKey:file.key,originalName:req.file.originalname.slice(0,180),mime:checked.extension==='pdf'?'application/pdf':checked.extension==='png'?'image/png':'image/jpeg',size:file.size,sha256:file.sha256}});
     audit(req,'document.archive.import',{documentId:document.id,clientId,signedDeclared:true,source:'archive_upload'});res.status(201).json({document:{...safeDocument(document),canDelete:true,canRestore:false,canCreate:false,canUploadSigned:false,canAttachDocuments:true}});
   }));

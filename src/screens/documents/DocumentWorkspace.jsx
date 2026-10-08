@@ -12,7 +12,7 @@ import { guardDocumentSubmission } from '../../shared/contracts/documentPrefligh
 import { canResumeDraftReview, canSaveDraftReview, draftReviewFingerprint, isFieldReviewConfirmed, isRelevantRequisiteField, recognitionAmbiguityGates, relevantRequisiteAttention, revokeFieldReviews } from '../../shared/contracts/reviewAcknowledgements.js';
 import { fillSignerPositionGenitive } from '../../shared/contracts/signerPosition.js';
 import { normalizeRussianPhone, formatRussianPhoneInput, russianPhoneCaret } from '../../shared/contracts/russianPhone.js';
-import { hasSignedScan, filterSavedDocuments } from '../../shared/contracts/savedDocuments.js';
+import { hasSignedScan, filterSavedDocuments, SAVED_DOCUMENT_FOLDERS, savedDocumentsInFolder, unsignedGeneratedContractCount } from '../../shared/contracts/savedDocuments.js';
 import { documentTrashActions } from '../../shared/contracts/documentTrash.js';
 import { DOCUMENT_ATTACHMENT_CATEGORIES, canAttachDocumentFiles, validateDocumentAttachment } from '../../shared/contracts/documentAttachments.js';
 import { automaticAiKey, blocksAutomaticAiSession, canAutomaticallyEnhanceCard, runAutomaticCardEnhancement, skippedAiMessage } from '../../shared/contracts/automaticAi.js';
@@ -127,6 +127,7 @@ function Workspace({ clientId, standalone = false, api, aiSession, capabilities 
   const [validation, setValidation] = useState(null);
   const [signedFiles, setSignedFiles] = useState({});
   const [savedInn, setSavedInn] = useState('');
+  const [savedFolder, setSavedFolder] = useState('clients');
   const [trashView, setTrashView] = useState(false);
   const [trashedDocuments, setTrashedDocuments] = useState([]);
   const [pendingTrashId, setPendingTrashId] = useState(null);
@@ -140,7 +141,8 @@ function Workspace({ clientId, standalone = false, api, aiSession, capabilities 
   const historicRequestKey = useRef(null);
   const [historicFileKey, setHistoricFileKey] = useState(0);
   const [generationFeedback, setGenerationFeedback] = useState(null);
-  const savedDocuments = filterSavedDocuments(trashView ? trashedDocuments : documents, savedInn);
+  const savedDocuments = filterSavedDocuments(savedDocumentsInFolder(trashView ? trashedDocuments : documents, savedFolder), savedInn);
+  const unsignedClientCount = unsignedGeneratedContractCount(documents);
   const archiveCapabilities = { delete: capabilities.delete ?? options?.capabilities?.delete ?? false, restore: capabilities.restore ?? options?.capabilities?.restore ?? false, purge: capabilities.purge ?? options?.capabilities?.purge ?? false };
   const canAttach = capabilities.attachDocuments ?? options?.capabilities?.attachDocuments ?? false;
   const canCreate = capabilities.create ?? options?.capabilities?.create ?? false;
@@ -302,7 +304,7 @@ function Workspace({ clientId, standalone = false, api, aiSession, capabilities 
       setHistoricError(''); setHistoricNotice('');
       try {
         historicRequestKey.current ||= crypto.randomUUID();
-        await api.importArchivedDocument({ legalEntityId: historicDraft.legalEntityId, number: historicDraft.number.trim(), counterparty: { fullName: historicDraft.fullName.trim() }, file: historicFile, idempotencyKey: historicRequestKey.current });
+        await api.importArchivedDocument({ folder: savedFolder, legalEntityId: historicDraft.legalEntityId, number: historicDraft.number.trim(), counterparty: { fullName: historicDraft.fullName.trim() }, file: historicFile, idempotencyKey: historicRequestKey.current });
         if (!alive.current) return;
         setHistoricFile(null); setHistoricFileKey(current => current + 1);
         setHistoricNotice('Подписанный договор сохранён в архиве.');
@@ -490,7 +492,7 @@ function Workspace({ clientId, standalone = false, api, aiSession, capabilities 
       if (!generate || blockers.length) {
         setGenerationFeedback(savedRegistryFeedback(document.id, 'Черновик договора сохранён.', created));
         setNotice(blockers.length && generate ? 'Черновик сохранён. Формирование файлов недоступно: устраните перечисленные ограничения конфигурации.' : 'Черновик договора сохранён.');
-        setSavedInn(''); onShowSaved?.();
+        setSavedInn(''); setSavedFolder('clients'); setTrashView(false); onShowSaved?.();
         return;
       }
       setBusy('Формируем DOCX и PDF…');
@@ -503,7 +505,7 @@ function Workspace({ clientId, standalone = false, api, aiSession, capabilities 
       if (completed.status !== 'succeeded') throw new Error('Формирование не завершено. Проверьте состояние сохранённого договора.');
       setGenerationFeedback(savedRegistryFeedback(document.id, 'Договор сформирован. DOCX и PDF доступны для скачивания.', created, generation, completed));
       setNotice('Договор сформирован. DOCX и PDF доступны в списке документов.');
-      setSavedInn(''); onShowSaved?.();
+      setSavedInn(''); setSavedFolder('clients'); setTrashView(false); onShowSaved?.();
     }));
     if (!submission.preflight.valid) {
       setNotice('');
@@ -820,10 +822,12 @@ function Workspace({ clientId, standalone = false, api, aiSession, capabilities 
       </div>
       <div hidden={view === 'create'}>
       <div className="document-list-heading" id={`${id}-saved-contracts`}><h3>{trashView ? 'Корзина договоров' : 'Сохранённые договоры'}</h3><div className="document-actions">{canImportArchived && !trashView && <button type="button" className="secondary-button" disabled={Boolean(busy)} aria-expanded={historicOpen} aria-controls={`${id}-historic-import`} onClick={() => historicOpen ? setHistoricOpen(false) : openHistoricImport()}>Загрузить старый договор</button>}{archiveCapabilities.restore && <button type="button" className="secondary-button" disabled={Boolean(busy)} aria-pressed={trashView} onClick={toggleTrash}>{trashView ? 'Сохранённые договоры' : 'Корзина'}</button>}<button type="button" className="secondary-button" disabled={Boolean(busy) || options.enabled === false} onClick={() => perform('Обновляем список…', trashView ? refreshTrash : refresh)}>Обновить список</button></div></div>
-      {canImportArchived && !trashView && historicOpen && <form id={`${id}-historic-import`} className="document-historic-import" onSubmit={importHistoric} noValidate><fieldset className="document-fieldset" disabled={Boolean(busy)}><legend>Подписанный старый договор</legend><div className="document-grid">
+      <nav className="document-folder-tabs" aria-label="Папки договоров">{Object.entries(SAVED_DOCUMENT_FOLDERS).map(([folder, label]) => <button key={folder} type="button" className={`secondary-button document-folder-tab${savedFolder === folder ? ' document-folder-tab--active' : ''}`} aria-pressed={savedFolder === folder} disabled={Boolean(busy)} onClick={() => { if (savedFolder !== folder) { setSavedFolder(folder); historicRequestKey.current = null; setHistoricNotice(''); } setPendingTrashId(null); setPendingPurgeId(null); }}>{label}{folder === 'clients' && unsignedClientCount > 0 && <span className="document-folder-badge" aria-label={`Без подписанного скана: ${unsignedClientCount}`}>{unsignedClientCount}</span>}</button>)}</nav>
+      {savedFolder === 'clients' && unsignedClientCount > 0 && !trashView && <p className="document-hint">Без подписанного скана: {unsignedClientCount}.</p>}
+      {canImportArchived && !trashView && historicOpen && <form id={`${id}-historic-import`} className="document-historic-import" onSubmit={importHistoric} noValidate><fieldset className="document-fieldset" disabled={Boolean(busy)}><legend>Подписанный старый договор</legend><p className="document-hint">Сохранится в папку «{SAVED_DOCUMENT_FOLDERS[savedFolder]}».</p><div className="document-grid">
         <label className="field">Наше юрлицо<DocumentSelect aria-label="Наше юрлицо для старого договора" value={historicDraft.legalEntityId} onChange={event => editHistoric('legalEntityId', event.target.value)}><option value="">Выберите юрлицо</option>{(options.archiveLegalEntities || options.legalEntities || []).map(entity => <option key={entity.id} value={entity.id}>{entity.name}</option>)}</DocumentSelect></label>
         <label className="field">Номер старого договора<input maxLength={100} value={historicDraft.number} onChange={event => editHistoric('number', event.target.value)} /></label>
-        <label className="field document-field--wide">Наименование клиента<input maxLength={2000} value={historicDraft.fullName} onChange={event => editHistoric('fullName', event.target.value)} /></label>
+        <label className="field document-field--wide">Наименование контрагента<input maxLength={2000} value={historicDraft.fullName} onChange={event => editHistoric('fullName', event.target.value)} /></label>
         <label className="field document-field--wide">Подписанный договор<input key={historicFileKey} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={event => { setHistoricFile(event.target.files?.[0] || null); setHistoricError(''); setHistoricNotice(''); historicRequestKey.current = null; }} /></label>
       </div><div className="document-actions"><button className="primary-button" disabled={Boolean(busy)}>{busy === 'Сохраняем старый договор…' ? busy : 'Сохранить в архив'}</button><button className="secondary-button" type="button" onClick={() => setHistoricOpen(false)}>Закрыть</button></div>
         {busy === 'Сохраняем старый договор…' && <p className="document-message" role="status">Загружаем подписанный договор…</p>}
@@ -833,7 +837,7 @@ function Workspace({ clientId, standalone = false, api, aiSession, capabilities 
       {trashView && <p className="document-hint">Договоры в корзине сохраняют свой номер и файлы. Восстановите договор, чтобы скачать документы или прикрепить подписанный экземпляр.</p>}
       {archiveFeedback?.kind === 'success' && <p className="document-message" role="status">{archiveFeedback.message}</p>}
       <label className="field document-archive-search">Поиск по названию или ИНН<input type="search" value={savedInn} onChange={(event) => setSavedInn(event.target.value)} placeholder="Начните вводить название или ИНН" /></label>
-      {savedDocuments.length === 0 ? <p className="document-hint">{savedInn ? 'По этому запросу договоров не найдено.' : trashView ? 'Корзина пуста.' : 'Договоров пока нет.'}</p> : <ul className="document-list">{savedDocuments.map((document) => <li key={document.id} className={`document-card ${trashView ? 'document-card--trashed' : hasSignedScan(document) ? 'document-card--signed' : 'document-card--unsigned'}`}>
+      {savedDocuments.length === 0 ? <p className="document-hint">{savedInn ? 'По этому запросу договоров не найдено.' : trashView ? 'В этой папке корзина пуста.' : 'В этой папке договоров пока нет.'}</p> : <ul className="document-list">{savedDocuments.map((document) => <li key={document.id} className={`document-card ${trashView ? 'document-card--trashed' : hasSignedScan(document) ? 'document-card--signed' : 'document-card--unsigned'}`}>
         <div><strong>{isImportedContract(document) ? 'Загруженный договор' : 'Договор'} {document.number ? `№ ${document.number}` : 'без номера'}</strong><span className="document-status">{document.status === 'purging' ? STATUSES.purging : trashView ? 'В корзине' : STATUSES[document.status] || document.status}</span>{document.createdAt && <p className="document-hint">{new Date(document.createdAt).toLocaleDateString('ru-RU')}</p>}</div>
         {document.status === 'purging' ? <p className="document-message document-message--warning" role="status">Удаление не завершено — повторите удаление.</p> : <><p className="document-hint">{document.counterparty?.fullName}{document.counterparty?.inn && ` · ИНН ${document.counterparty.inn}`}</p><p className="document-signature-state">{hasSignedScan(document) ? 'Подписанный скан прикреплён' : 'Подписанный скан не прикреплён'}</p></>}
         <div className="inline-actions document-actions">{!trashView && (document.files || []).filter(file => (file.type || file.kind) !== 'attachment').map((file) => <button key={file.id} className="secondary-button" type="button" disabled={Boolean(busy)} onClick={() => download(document, file)}>Скачать {fileLabel(file)}</button>)}
@@ -854,3 +858,4 @@ function Workspace({ clientId, standalone = false, api, aiSession, capabilities 
     </>}
   </section>;
 }
+

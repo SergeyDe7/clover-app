@@ -1,5 +1,22 @@
+export const SAVED_DOCUMENT_FOLDERS = { clients: 'Клиенты', suppliers: 'Поставщики', other: 'Прочее' };
+export function savedDocumentFolder(document) {
+  const imported = document?.kind === 'imported_contract' || document?.type === 'imported_contract';
+  return imported && Object.hasOwn(SAVED_DOCUMENT_FOLDERS, document.folder) ? document.folder : 'clients';
+}
 export function hasSignedScan(document) {
-  return (document.files || []).some(file => file.type === 'signed');
+  const imported = document?.kind === 'imported_contract' || document?.type === 'imported_contract';
+  return (document?.files || []).some(file => (file.type || file.kind) === 'signed' || (imported && (file.type || file.kind) === 'original_scan') ||
+    ((file.type || file.kind) === 'attachment' && file.category === 'signed_contract'));
+}
+export function unsignedGeneratedContractCount(documents) {
+  return documents.filter(document => savedDocumentFolder(document) === 'clients' &&
+    document?.kind !== 'imported_contract' && document?.type !== 'imported_contract' &&
+    !document.deletedAt && !document.deleted_at && !document.trashed && !document.inTrash &&
+    !['draft', 'cancelled', 'purging'].includes(document.status) &&
+    String(document.number || '').trim() && !hasSignedScan(document)).length;
+}
+export function savedDocumentsInFolder(documents, folder = 'clients') {
+  return documents.filter(document => savedDocumentFolder(document) === folder);
 }
 const normalizeName = value => String(value || '').normalize('NFC').toLocaleLowerCase('ru-RU').replace(/ё/gu,'е').replace(/[«»“”„"]/gu,'').trim().replace(/\s+/gu,' ');
 const withoutLegalForm = value => value.replace(/^(?:общество с ограниченной ответственностью|индивидуальный предприниматель|ооо|ип)(?:\s+|$)/u,'');

@@ -6,6 +6,12 @@ const now = () => new Date().toISOString();
 const canonical = value => JSON.stringify(value, (_, v) => v && typeof v === 'object' && !Array.isArray(v)
  ? Object.fromEntries(Object.keys(v).sort().map(k => [k,v[k]])) : v);
 const required = value => { if (typeof value !== 'string' || !value.trim()) throw new Error('REQUIRED_VALUE'); return value; };
+const archiveFolder = value => {
+ if(!['clients','suppliers','other'].includes(value))throw documentError('DOCUMENT_FOLDER_INVALID','Выберите папку договора.',400);
+ return value;
+};
+const archiveMetadata = data => ({...data,folder:archiveFolder(data.folder ?? 'clients')});
+const sameArchiveMetadata = (json,data) => canonical(archiveMetadata(JSON.parse(json)))===canonical(archiveMetadata(data));
 const dateCheck = date => {
  if(typeof date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('INVALID_DATE');
  const parsed=new Date(`${date}T00:00:00Z`);
@@ -27,8 +33,8 @@ export function createDocumentsRepository(db) {
  const tx = fn => { db.exec('BEGIN IMMEDIATE'); try { const result=fn(); db.exec('COMMIT'); return result; } catch(error) {db.exec('ROLLBACK');throw error;} };
  const available = id => {if(get('SELECT document_id FROM document_trash WHERE document_id=?',id)||get('SELECT id FROM document_archive_entries WHERE id=? AND deleted_at IS NOT NULL',id)) throw documentError('DOCUMENT_TRASHED','Договор находится в корзине. Сначала восстановите его.',409);};
  const attachments = id => db.prepare('SELECT * FROM document_attachments WHERE document_id=? OR archive_id=? ORDER BY created_at,id').all(id,id).map(file=>({...file,type:'attachment',name:file.original_name,createdAt:file.created_at}));
- const importedDocument = row => ({...row,kind:'imported_contract',number:row.historical_number,status:'signed',clientId:row.client_id,entityId:row.entity_id,createdAt:row.created_at,payment:{},draftData:JSON.parse(row.metadata_json),files:db.prepare('SELECT id,purpose,original_name,mime,size,sha256 FROM document_archive_files WHERE document_id=? ORDER BY created_at,id').all(row.id).map(file=>({...file,type:file.purpose,name:file.original_name})).concat(attachments(row.id))});
- const document = (id,{includeTrashed=false}={}) => {if(get('SELECT id FROM document_tombstones WHERE id=?',id))throw documentError('DOCUMENT_PURGED','Договор удалён окончательно.',410);const archived=get('SELECT * FROM document_archive_entries WHERE id=?',id);if(archived){if(!includeTrashed)available(id);return importedDocument(archived);} const row=get('SELECT * FROM documents WHERE id=?',id); if(!row) throw new Error('DOCUMENT_NOT_FOUND'); if(!includeTrashed)available(id); return {...row,clientId:row.client_id,entityId:row.entity_id,createdAt:row.created_at,payment:JSON.parse(row.payment_json),draftData:JSON.parse(row.request_json),files:db.prepare('SELECT id,purpose,original_name,mime,size,sha256,revision_id FROM document_files WHERE document_id=? ORDER BY created_at,id').all(id).map(file=>({...file,type:file.purpose,name:file.original_name,revisionId:file.revision_id})).concat(attachments(id))}; };
+ const importedDocument = row => ({...row,kind:'imported_contract',folder:archiveMetadata(JSON.parse(row.metadata_json)).folder,number:row.historical_number,status:'signed',clientId:row.client_id,entityId:row.entity_id,createdAt:row.created_at,payment:{},draftData:JSON.parse(row.metadata_json),files:db.prepare('SELECT id,purpose,original_name,mime,size,sha256 FROM document_archive_files WHERE document_id=? ORDER BY created_at,id').all(row.id).map(file=>({...file,type:file.purpose,name:file.original_name})).concat(attachments(row.id))});
+ const document = (id,{includeTrashed=false}={}) => {if(get('SELECT id FROM document_tombstones WHERE id=?',id))throw documentError('DOCUMENT_PURGED','Договор удалён окончательно.',410);const archived=get('SELECT * FROM document_archive_entries WHERE id=?',id);if(archived){if(!includeTrashed)available(id);return importedDocument(archived);} const row=get('SELECT * FROM documents WHERE id=?',id); if(!row) throw new Error('DOCUMENT_NOT_FOUND'); if(!includeTrashed)available(id); return {...row,folder:'clients',clientId:row.client_id,entityId:row.entity_id,createdAt:row.created_at,payment:JSON.parse(row.payment_json),draftData:JSON.parse(row.request_json),files:db.prepare('SELECT id,purpose,original_name,mime,size,sha256,revision_id FROM document_files WHERE document_id=? ORDER BY created_at,id').all(id).map(file=>({...file,type:file.purpose,name:file.original_name,revisionId:file.revision_id})).concat(attachments(id))}; };
  return {
   createLegalEntity({id,name,active=true}) { run('INSERT INTO legal_entities(id,name,active) VALUES(?,?,?)',required(id),required(name),active?1:0); return id; },
   updateLegalEntity({id,name}) { run('UPDATE legal_entities SET name=? WHERE id=?',required(name),required(id)); },
@@ -79,24 +85,26 @@ export function createDocumentsRepository(db) {
    });
   },
   getDocument:document,
-  findArchivedImport({clientId=null,entityId,number,counterparty,actorId,idempotencyKey,sha256}) {
+  findArchivedImport({clientId=null,entityId,number,counterparty,actorId,idempotencyKey,sha256,folder='clients'}) {
+    archiveFolder(folder);
     if(get('SELECT id FROM document_tombstones WHERE actor_id=? AND idempotency_key=?',actorId,idempotencyKey))throw documentError('DOCUMENT_PURGED','Этот запрос относится к окончательно удалённому договору.',410);
     if(get('SELECT id FROM document_attachments WHERE created_by=? AND idempotency_key=?',actorId,idempotencyKey))throw documentError('IDEMPOTENCY_CONFLICT','Этот ключ запроса уже использован.',409);
     const previous=get('SELECT * FROM document_archive_entries WHERE actor_id=? AND idempotency_key=?',actorId,idempotencyKey);
-    if(previous){if(previous.metadata_json!==canonical({counterparty,historicalNumber:number,signed:true,sha256})||previous.client_id!==clientId||previous.entity_id!==entityId)throw documentError('IDEMPOTENCY_CONFLICT','Повторный запрос содержит другие данные.',409);return document(previous.id);}
+    if(previous){if(!sameArchiveMetadata(previous.metadata_json,{counterparty,historicalNumber:number,signed:true,sha256,folder})||previous.client_id!==clientId||previous.entity_id!==entityId)throw documentError('IDEMPOTENCY_CONFLICT','Повторный запрос содержит другие данные.',409);return document(previous.id);}
     if(get('SELECT id FROM documents WHERE actor_id=? AND idempotency_key=?',actorId,idempotencyKey))throw documentError('IDEMPOTENCY_CONFLICT','Этот ключ запроса уже использован.',409);
     return null;
   },
-  importArchivedDocument({clientId=null,entityId,number,counterparty,actorId,idempotencyKey,file}) {return tx(()=>{
+  importArchivedDocument({clientId=null,entityId,number,counterparty,actorId,idempotencyKey,file,folder='clients'}) {return tx(()=>{
+    archiveFolder(folder);
     if(get('SELECT role FROM users WHERE id=?',actorId)?.role!=='admin')throw documentError('ADMIN_REQUIRED','Требуется администратор.',403);
     required(idempotencyKey);required(number);
     if(!get('SELECT id FROM legal_entities WHERE id=?',entityId))throw documentError('ENTITY_NOT_FOUND','Юрлицо не найдено.',404);
     if(clientId!==null&&get('SELECT role FROM users WHERE id=?',clientId)?.role!=='client')throw documentError('CLIENT_NOT_FOUND','Клиент не найден.',404);
-    const metadata={counterparty,historicalNumber:number,signed:true,sha256:file.sha256};const request=canonical(metadata);
+    const metadata={counterparty,historicalNumber:number,signed:true,sha256:file.sha256,folder};const request=canonical(metadata);
     if(get('SELECT id FROM document_tombstones WHERE actor_id=? AND idempotency_key=?',actorId,idempotencyKey))throw documentError('DOCUMENT_PURGED','Этот запрос относится к окончательно удалённому договору.',410);
     if(get('SELECT id FROM document_attachments WHERE created_by=? AND idempotency_key=?',actorId,idempotencyKey))throw documentError('IDEMPOTENCY_CONFLICT','Этот ключ запроса уже использован.',409);
     const previous=get('SELECT * FROM document_archive_entries WHERE actor_id=? AND idempotency_key=?',actorId,idempotencyKey);
-    if(previous){if(previous.metadata_json!==request||previous.client_id!==clientId||previous.entity_id!==entityId)throw documentError('IDEMPOTENCY_CONFLICT','Повторный запрос содержит другие данные.',409);return document(previous.id);}
+    if(previous){if(!sameArchiveMetadata(previous.metadata_json,metadata)||previous.client_id!==clientId||previous.entity_id!==entityId)throw documentError('IDEMPOTENCY_CONFLICT','Повторный запрос содержит другие данные.',409);return document(previous.id);}
     if(get('SELECT id FROM documents WHERE actor_id=? AND idempotency_key=?',actorId,idempotencyKey))throw documentError('IDEMPOTENCY_CONFLICT','Этот ключ запроса уже использован.',409);
     const id=randomUUID();run('INSERT INTO document_archive_entries(id,client_id,entity_id,actor_id,historical_number,metadata_json,idempotency_key,created_at) VALUES(?,?,?,?,?,?,?,?)',id,clientId,entityId,actorId,number,request,idempotencyKey,now());
     run('INSERT INTO document_archive_files VALUES(?,?,?,?,?,?,?,?,?,?)',randomUUID(),id,'signed',required(file.storageKey),required(file.originalName),required(file.mime),file.size,file.sha256,actorId,now());
