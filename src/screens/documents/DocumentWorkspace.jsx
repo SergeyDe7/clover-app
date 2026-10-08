@@ -858,4 +858,3 @@ function Workspace({ clientId, standalone = false, api, aiSession, capabilities 
     </>}
   </section>;
 }
-
