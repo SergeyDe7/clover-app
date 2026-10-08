@@ -1,6 +1,14 @@
 /** Server-owned Stage 3.1 target seeds. Not imported by frontend feature components. */
 
 export const SEEDS = {
+  "manager.orderStatus.waitingPayment": {
+    "en": "Awaiting payment",
+    "uz": "To‘lov kutilmoqda",
+    "ky": "Төлөм күтүлүүдө",
+    "tg": "Интизори пардохт",
+    "zh-CN": "等待付款",
+    "ar": "بانتظار الدفع"
+  },
   "shared.modal.confirmTitle": {
     "en": "Confirm action",
     "uz": "Amalni tasdiqlang",

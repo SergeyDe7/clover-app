@@ -11,6 +11,7 @@ export const STAGE31_FOUNDATIONAL_KEYS = Object.freeze([
 ]);
 
 const RAW_CATALOG = [
+  { key: "manager.orderStatus.waitingPayment", sourceRu: "Ожидание оплаты", namespace: "ui", surface: "manager", critical: false },
   {
     "key": "shared.modal.confirmTitle",
     "sourceRu": "Подтвердите действие",
