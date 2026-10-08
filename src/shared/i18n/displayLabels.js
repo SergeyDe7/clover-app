@@ -3,6 +3,7 @@
 const ORDER_STATUS_KEYS = {
   Новый: "manager.orderStatus.new",
   Принят: "manager.orderStatus.accepted",
+  "Ожидание оплаты": "manager.orderStatus.waitingPayment",
   "Обработан вручную": "manager.orderStatus.manual",
   Собирается: "manager.orderStatus.picking",
   "Готов к доставке": "manager.orderStatus.ready",

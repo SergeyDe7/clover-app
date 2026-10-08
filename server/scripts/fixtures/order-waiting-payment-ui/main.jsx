@@ -1,0 +1,14 @@
+import { createRoot } from 'react-dom/client';
+import { ClientScreen } from '../../../../src/screens/client/ClientScreen.jsx';
+import { ManagerOrders } from '../../../../src/screens/manager/ManagerOrders.jsx';
+import { APP_STYLES } from '../../../../src/shared/appHelpers.js';
+import '../../../../src/styles/clover-theme.css';
+import '../../../../src/index.css';
+import '../../../../src/App.css';
+const noop = () => {};
+const order = { id: 'fixture-order', number: 'CL-TEST-001', status: 'Ожидание оплаты', clientId: 'fixture-client', clientName: 'Тестовый клиент', createdAt: '2026-10-09T09:00:00Z', updatedAt: '2026-10-09T09:10:00Z', firstDeliveryDate: '2026-10-10', address: 'Тестовый адрес', items: [{productId: 'p1', name: 'Тестовый товар', quantity: 2, unit: 'шт', unitPrice: 100, lineTotal: 200}], customItems: [], history: [{id: 'h1', label: 'Статус: Ожидание оплаты', actor: 'Менеджер TEST', status: 'Ожидание оплаты', createdAt: '2026-10-09T09:10:00Z'}] };
+const settings = { showPrices: true, allowClientEdit: true, allowClientDelete: true, allowRepeatOrder: true };
+const role = new URLSearchParams(location.search).get('role');
+const props = { orders: [order], settings, profile: {id: 'fixture-client', name: 'Тестовый клиент'}, addresses: [], reconciliationRequests: [], products: [], favorites: [], setFavorites: noop, setProfile: noop, setAddresses: noop, onReload: noop, onNew: noop, onEdit: noop, onRepeat: noop, onDelete: noop, onLogout: noop, setShowFullCatalog: noop, onSaveOrder: noop, onCloseCatalog: noop, onAddToMatrix: noop, onRemoveFromMatrix: noop, canCreateOrder: true, profileComplete: true, catalogPolicy: {}, onUpdateOrder: (id, patch) => { window.__updates.push({id, patch}); }, staffRole: role, onCreateProductFromCustom: noop };
+window.__updates = [];
+createRoot(document.getElementById('root')).render(<><style>{APP_STYLES}</style>{role ? <main className="clover-app"><section className="page-content"><ManagerOrders {...props}/></section></main> : <ClientScreen {...props}/>}</>);
