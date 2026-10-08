@@ -12,5 +12,3 @@ const role = new URLSearchParams(location.search).get('role');
 const props = { orders: [order], settings, profile: {id: 'fixture-client', name: 'Тестовый клиент'}, addresses: [], reconciliationRequests: [], products: [], favorites: [], setFavorites: noop, setProfile: noop, setAddresses: noop, onReload: noop, onNew: noop, onEdit: noop, onRepeat: noop, onDelete: noop, onLogout: noop, setShowFullCatalog: noop, onSaveOrder: noop, onCloseCatalog: noop, onAddToMatrix: noop, onRemoveFromMatrix: noop, canCreateOrder: true, profileComplete: true, catalogPolicy: {}, onUpdateOrder: (id, patch) => { window.__updates.push({id, patch}); }, staffRole: role, onCreateProductFromCustom: noop };
 window.__updates = [];
 createRoot(document.getElementById('root')).render(<><style>{APP_STYLES}</style>{role ? <main className="clover-app"><section className="page-content"><ManagerOrders {...props}/></section></main> : <ClientScreen {...props}/>}</>);
-
-

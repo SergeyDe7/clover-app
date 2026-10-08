@@ -56,5 +56,3 @@ try {
 } finally {await browser?.close(); await server.close();writeFileSync(path.join(out,'results.json'),JSON.stringify(results,null,2));}
 console.log(JSON.stringify(results,null,2));
 assert(results.every(x=>x.status==='PASS'),'UI cases failed; inspect output/order-waiting-payment-ui/results.json');
-
-
