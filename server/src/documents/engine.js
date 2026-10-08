@@ -51,6 +51,37 @@ function replaceParagraph(xml, values) {
   });
 }
 
+const legalFormText = paragraph => [...paragraph.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>|<w:(?:br|tab)\b[^>]*\/?\s*>/g)]
+  .map(node => node[1] === undefined ? ' ' : decodeXml(node[1])).join('').normalize('NFC').replace(/\s+/gu,' ').trim();
+
+// Generated output only: a pure redundant buyer form immediately before its name,
+// within the same table cell. Existing versioned templates and other text stay intact.
+function removeRedundantBuyerForm(xml, values) {
+  const name = typeof values.BUYER_FULL_NAME === 'string' ? values.BUYER_FULL_NAME.replace(/\s+/gu,' ').trim() : '';
+  const type = /^(?:ООО|Общество с ограниченной ответственностью)(?=\s|[«"'„“])/iu.test(name) ? 'ooo'
+    : /^(?:ИП|Индивидуальный предприниматель)(?=\s|[«"'„“])/iu.test(name) ? 'ip' : null;
+  if (!type) return xml;
+  const forms = type === 'ooo' ? /^(?:ООО|Общество с ограниченной ответственностью)$/iu
+    : /^(?:ИП|Индивидуальный предприниматель)$/iu;
+  const cells = [];
+  const remove = [];
+  for (const token of xml.matchAll(/<w:tc\b[^>]*>|<\/w:tc\s*>|<w:p\b[^>]*>[\s\S]*?<\/w:p>/g)) {
+    if (/^<w:tc\b/.test(token[0])) { cells.push({ previous: null }); continue; }
+    if (/^<\/w:tc/.test(token[0])) { cells.pop(); continue; }
+    const cell = cells.at(-1);
+    if (!cell) continue;
+    const previous = cell.previous;
+    if (previous && legalFormText(token[0]) === '{{BUYER_FULL_NAME}}' &&
+        xml.slice(previous.end,token.index).trim() === '' && forms.test(legalFormText(previous.xml)) &&
+        !/<w:(?:drawing|object|pict|fldChar|instrText|footnoteReference|endnoteReference)\b/.test(previous.xml)) {
+      remove.push(previous);
+    }
+    cell.previous = { xml: token[0], start: token.index, end: token.index + token[0].length };
+  }
+  for (const item of remove.reverse()) xml = xml.slice(0,item.start) + xml.slice(item.end);
+  return xml;
+}
+
 export function renderDocx(templateBuffer, values, { previousClientTokens = [] } = {}) {
   if (!Buffer.isBuffer(templateBuffer) || templateBuffer.length > DOCUMENT_MAX_BYTES) throw documentError("TEMPLATE_INVALID", "Некорректный шаблон.");
   const zip = new AdmZip(templateBuffer);
@@ -69,7 +100,7 @@ export function renderDocx(templateBuffer, values, { previousClientTokens = [] }
   for (const entry of entries.filter((item) => /^word\/(document|header\d*|footer\d*)\.xml$/.test(item.entryName))) {
     const source = entry.getData().toString("utf8");
     if (/<!DOCTYPE|<!ENTITY/i.test(source)) throw documentError("TEMPLATE_UNSAFE", "Недопустимый XML.");
-    const rendered = source.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (paragraph) => replaceParagraph(paragraph, values));
+    const rendered = removeRedundantBuyerForm(source, values).replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (paragraph) => replaceParagraph(paragraph, values));
     const text = [...rendered.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>|<w:br\b[^>]*\/?\s*>/g)].map((node) => node[1] === undefined ? "\n" : decodeXml(node[1])).join("");
     if (/\{\{|\}\}/.test(text)) throw documentError("DOCUMENT_PLACEHOLDER", "В документе остались переменные шаблона.");
     if (previousClientTokens.some((token) => typeof token === "string" && token.length >= 3 && text.includes(token))) {
