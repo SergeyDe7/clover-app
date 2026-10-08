@@ -1,0 +1,7 @@
+.legal-entities-admin .legal-entity-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); list-style: none; padding: 0; gap: 10px; }
+.legal-entities-admin .legal-entity-list button { width: 100%; text-align: left; }
+.legal-entities-admin .legal-entity-list strong, .legal-entities-admin .legal-entity-list span { display: block; }
+.legal-entities-admin .legal-entity-list span { font-size: 12px; font-weight: 400; margin-top: 4px; }
+.legal-entities-admin .legal-entity-selected { border-color: #386f37; background: #eef7eb; }
+.legal-entities-admin .legal-template-list { padding-left: 20px; overflow-wrap: anywhere; }
+.legal-entities-admin .legal-template-list li { margin: 6px 0; }

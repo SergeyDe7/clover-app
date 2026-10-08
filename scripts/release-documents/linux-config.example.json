@@ -1,0 +1,8 @@
+{
+  "adapters": {
+    "pdf": {"command":"/opt/clover/documents-venv/bin/python","args":["/opt/clover/clover-app/server/scripts/extract-document-local.py","{input}","--pdftoppm","/usr/bin/pdftoppm","--tesseract","/usr/bin/tesseract","--soffice","/usr/bin/libreoffice"]},
+    "ocr": {"command":"/opt/clover/documents-venv/bin/python","args":["/opt/clover/clover-app/server/scripts/extract-document-local.py","{input}","--tesseract","/usr/bin/tesseract"]},
+    "doc": {"command":"/opt/clover/documents-venv/bin/python","args":["/opt/clover/clover-app/server/scripts/extract-document-local.py","{input}","--soffice","/usr/bin/libreoffice"]}
+  },
+  "clientCreate": false
+}

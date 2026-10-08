@@ -1,0 +1,21 @@
+.counterparty-verification { margin: 18px 0; padding: 16px; border: 1px solid #d9e7d4; border-radius: 16px; color: #293329; background: #fbfdfb; overflow-wrap: anywhere; }
+.counterparty-verification h3 { margin: 0 0 12px; font-size: 17px; }
+.counterparty-verification h4 { margin: 0 0 6px; font-size: 14px; }
+.counterparty-verification p { margin: 6px 0; }
+.counterparty-verification__sources, .counterparty-verification__comparisons { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 10px; margin-top: 12px; }
+.counterparty-verification__card { min-width: 0; padding: 12px; border: 1px solid #e2eae0; border-radius: 12px; background: #fff; font-size: 13px; }
+.counterparty-verification__card--checked { border-color: #cfe2c8; background: #f4f9f2; }
+.counterparty-verification__card--conflict { border-color: #eadba9; background: #fff8e4; }
+.counterparty-verification__source { display: flex; flex-wrap: wrap; gap: 6px 12px; color: #617061; font-size: 12px; }
+.counterparty-verification a { color: #386f37; text-decoration: underline; }
+.counterparty-verification dl { margin: 10px 0; }
+.counterparty-verification dt { font-weight: 700; margin-top: 8px; }
+.counterparty-verification dd { margin: 2px 0 0; white-space: pre-wrap; }
+.counterparty-verification__choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.counterparty-verification__choices button { min-height: 44px; padding: 8px 12px; border: 1px solid #b7d0b1; border-radius: 12px; background: #fff; color: #386f37; font: inherit; font-weight: 700; cursor: pointer; }
+.counterparty-verification__choices button:hover:not(:disabled) { background: #eef7eb; }
+.counterparty-verification__choices button:disabled { opacity: .6; cursor: not-allowed; }
+.counterparty-verification button:focus-visible, .counterparty-verification a:focus-visible { outline: 3px solid #386f37; outline-offset: 3px; }
+.counterparty-verification ul { padding-left: 18px; }
+.counterparty-verification__warnings { color: #805411; }
+@media (max-width: 480px) { .counterparty-verification { padding: 12px; } .counterparty-verification__choices button { flex: 1 1 130px; } }

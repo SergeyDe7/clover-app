@@ -1,0 +1,14 @@
+.document-select { position: relative; min-width: 0; width: 100%; font: inherit; }
+.document-select .document-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 48px; padding: 11px 14px; border: 1px solid #d5dfd2; border-radius: 14px; background: #fbfdfb; color: #293329; font: inherit; font-size: 16px; font-weight: 400; line-height: 1.5; text-align: left; cursor: pointer; }
+.document-select-trigger > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.document-select-chevron { flex: 0 0 20px; color: #386f37; transition: transform .15s ease; }
+.document-select-trigger[aria-expanded="true"] .document-select-chevron { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .document-select-chevron { transition: none; } }
+.document-select .document-select-trigger:focus-visible { outline: 3px solid #386f37; outline-offset: 3px; }
+.document-select .document-select-trigger:disabled { opacity: .65; cursor: default; }
+.document-select .document-select-trigger[aria-invalid="true"] { border-color: #b87521; background: #fffdf7; }
+.document-select-menu { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 30; max-height: min(280px, 50vh); overflow-y: auto; overscroll-behavior: contain; padding: 6px; border: 1px solid #b7d0b1; border-radius: 16px; background: #fff; box-shadow: 0 10px 28px #244d2426; font: inherit; }
+.document-select-menu [role="option"] { min-height: 44px; padding: 10px 12px; border-radius: 10px; color: #293329; font: inherit; font-size: 16px; font-weight: 400; line-height: 1.5; cursor: pointer; overflow-wrap: anywhere; }
+.document-select-menu [role="option"]:hover, .document-select-menu [role="option"]:focus-visible { background: #eef7eb; outline: 2px solid #8fb58a; outline-offset: -2px; }
+.document-select-menu [role="option"][aria-selected="true"] { background: #386f37; color: #fff; }
+.document-select-menu [role="option"][aria-disabled="true"] { opacity: .5; cursor: default; }

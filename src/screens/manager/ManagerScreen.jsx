@@ -29,8 +29,12 @@ import { ManagerAudit } from "./ManagerAudit";
 import { managerNotificationTab, ManagerNotificationBell, parseManagerNotification, ManagerOrderSummaryLines } from "./ManagerNotifications";
 import { ManagerAccessVault } from "./ManagerAccessVault";
 import { useLocalization } from "../../shared/i18n/LocalizationProvider";
+import { AdminDocumentCenter } from "../documents/AdminDocumentCenter";
+import { api } from "../../serverApi";
 
 function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setProducts, profile, addresses, serverClients, reconciliationRequests, managerNotifications, settings, setSettings, clientLinks, setClientLinks, dirtyClientLinkIdsRef, oneCPriceTypes = [], catalogPricesVersion = "", managerNotice, onDismissNotice, onReadNotification, onReadAllNotifications, onUpdateOrder, onBulkUpdateOrders, onDeleteOrder, onRestoreOrder, onPurgeOrder, onCreateProductFromCustom, onImport, onClearOrders, onResetAll, onReload, onApplyManagerNotifications, onApplyReconciliationRequests, onLogout }) {
+  const isAdmin = authUser?.role === "admin";
+  const documentsEnabled = import.meta.env.VITE_CLOVER_DOCUMENTS_UI_ENABLED !== "false";
   const [tab, setTab] = useState(readManagerActiveTab);
   const [moreTab, setMoreTab] = useState(() => {
     const saved = readManagerMoreTab();
@@ -44,8 +48,8 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
   const { t } = useLocalization();
 
   const allowedMainTabs = useMemo(
-    () => MANAGER_TABS.filter(([id]) => staffHasFeature(authUser, id)),
-    [authUser]
+    () => MANAGER_TABS.filter(([id]) => staffHasFeature(authUser, id) && (id !== "contracts" || (isAdmin && documentsEnabled))),
+    [authUser, isAdmin, documentsEnabled]
   );
   const allowedMoreTabs = useMemo(
     () => MANAGER_MORE_TABS.filter(([id]) => staffHasFeature(authUser, id)),
@@ -188,7 +192,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
           </nav>
         }
       >
-        {tab !== "price-list" ? (
+        {tab !== "price-list" && tab !== "contracts" ? (
           <div className="manager-header-tools">
             <input
               className="manager-search-input"
@@ -217,7 +221,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
       </Header>
     </StickyCabinetChrome>
     <section className={`page-content${tab === "price-list" ? " page-content--price-list" : ""}`}>
-      {tab !== "price-list" && managerNotice && (() => {
+      {tab !== "price-list" && tab !== "contracts" && managerNotice && (() => {
         const parsed = parseManagerNotification(managerNotice, t);
         const hasOrderSummary = Boolean(
           parsed.clientName || parsed.amount || parsed.positions || parsed.deliveryDate || parsed.orderDate || parsed.orderNumber
@@ -259,7 +263,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
         </div>
         );
       })()}
-      {tab !== "price-list" ? (
+      {tab !== "price-list" && tab !== "contracts" ? (
         <div className="stats-grid manager-stats-strip" aria-label={t("manager.summary")}>
           <article
             className="stat-card stat-card-action"
@@ -295,6 +299,7 @@ function ManagerDashboard({ authUser, orders, trashedOrders = [], products, setP
           <article className="stat-card"><span>{t("manager.unread")}</span><strong>{unreadCount}</strong></article>
         </div>
       ) : null}
+      {tab === "contracts" && isAdmin && documentsEnabled && <AdminDocumentCenter api={api} />}
       {tab === "orders" && staffHasFeature(authUser, "orders") && (
         <ManagerOrders
           orders={orders}

@@ -1,0 +1,32 @@
+/* Scoped navigation matching the Clover document controls. */
+.document-section-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.document-section-navigation > button {
+  box-sizing: border-box;
+  min-height: 46px;
+  padding: 11px 20px;
+  border: 1px solid #b7d0b1;
+  border-radius: 14px;
+  background: #fff;
+  color: #386f37;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.document-section-navigation > button:hover { background: #eef7eb; border-color: #5b9d57; }
+.document-section-navigation > button[aria-pressed="true"] { background: #386f37; border-color: #386f37; color: #fff; }
+.document-section-navigation > button[aria-pressed="true"]:hover { background: #2d5e2c; border-color: #2d5e2c; }
+.document-section-navigation > button:focus-visible { outline: 3px solid #386f37; outline-offset: 3px; }
+@media (max-width: 480px) {
+  .document-section-navigation > button { flex: 1 1 auto; padding-inline: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .document-section-navigation > button { transition: none; }
+}

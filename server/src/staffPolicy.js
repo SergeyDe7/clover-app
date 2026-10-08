@@ -277,7 +277,7 @@ export function evaluateStaffFeature(user, featureId) {
   const id = String(featureId || "").trim();
   const role = normalizeRole(user?.role);
   if (!id) return deny(FEATURE_FORBIDDEN, "Недостаточно прав для этого действия.");
-  if (id === "storefront" || id === "languages") {
+  if (id === "storefront" || id === "languages" || id === "contracts") {
     return role === ROLES.ADMIN
       ? allow()
       : deny(ADMIN_REQUIRED, "Недостаточно прав для этого действия.");
