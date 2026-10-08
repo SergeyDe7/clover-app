@@ -8,7 +8,7 @@ const registry={type:'ooo',inn:'7707083893',fullName:'ПАО Сбербанк',o
 const fns=()=>({status:'checked',source:{id:'fns',url:'https://egrul.nalog.ru/',checkedAt:'2026-10-07T09:59:00Z'},identity:{type:'ooo',inn:'7707083893'},facts:{...registry},evidence:Object.fromEntries(Object.entries(registry).map(([field,value])=>[field,`Из реестра: ${value}`]))});
 
 test('offline report states every source is unconfigured and never claims absence of records',async()=>{
- const report=await verifyCounterparty({fields,now});assert.equal(report.status,'unavailable');assert.equal(report.sources.length,3);assert.ok(report.sources.every(source=>source.status==='not_configured'));assert.deepEqual(report.comparisons,[]);
+ const report=await verifyCounterparty({fields,now});assert.equal(report.status,'unavailable');assert.equal(report.sources.length,4);assert.equal(report.sources.find(source=>source.id==='bankruptcy').status,'not_configured');assert.ok(report.sources.every(source=>source.status==='not_configured'));assert.deepEqual(report.comparisons,[]);
 });
 test('valid FNS proposes missing facts, exposes conflicts and does not modify supplied card',async()=>{
  const before=structuredClone(fields);let input;

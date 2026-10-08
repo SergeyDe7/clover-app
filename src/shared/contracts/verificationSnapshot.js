@@ -1,7 +1,7 @@
 import { validInn } from './requisiteChecks.js';
 import { REGISTRY_REQUISITE_FIELDS, resolveVerificationChoice } from './externalVerification.js';
 
-const OFFICIAL_ORIGINS = new Set(['https://egrul.nalog.ru', 'https://service.nalog.ru', 'https://kad.arbitr.ru', 'https://fssp.gov.ru', 'https://is.fssp.gov.ru']);
+const OFFICIAL_ORIGINS = new Set(['https://egrul.nalog.ru', 'https://service.nalog.ru', 'https://kad.arbitr.ru', 'https://fssp.gov.ru', 'https://is.fssp.gov.ru', 'https://bankrot.fedresurs.ru']);
 
 export function officialVerificationUrl(value) {
   try {

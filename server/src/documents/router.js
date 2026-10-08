@@ -56,7 +56,7 @@ export function createDocumentsRouter({ enabled = false, runtimeError, repositor
     if (!enabled || runtimeError) throw documentError(runtimeError || "DOCUMENTS_DISABLED", "Модуль документов не настроен. Требуется подготовка TEST-контура.", 503);
   }
   const wrap = (fn) => async (req, res, next) => { try { await fn(req, res); } catch (error) { next(error); } };
-  const verificationSources = ['fns', 'arbitration', 'fssp'].map(id => ({ id, configured: typeof verificationAdapters[id] === 'function' }));
+  const verificationSources = ['fns', 'arbitration', 'fssp', 'bankruptcy'].map(id => ({ id, configured: typeof verificationAdapters[id] === 'function' }));
   router.post('/admin/generator/verify-counterparty', wrap(async (req, res) => {
     ready(); requireAction(req, null, 'create');
     const input = z.object({ counterparty: fields }).strict().parse(req.body);

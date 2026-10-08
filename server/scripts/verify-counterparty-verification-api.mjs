@@ -45,7 +45,8 @@ test('unconfigured lookup reports not checked without billing, database or green
   assert.equal(options.body.verification.configured, false); assert.equal(options.body.verification.required, false);
   const report = await call({ counterparty });
   assert.equal(report.status, 200); assert.equal(report.body.status, 'unavailable');
-  assert.equal(report.body.sources.length, 3); assert.ok(report.body.sources.every(source => source.status === 'not_configured'));
+  assert.equal(report.body.sources.length, 4); assert.ok(report.body.sources.every(source => source.status === 'not_configured'));
+  assert.equal(report.body.sources.find(source => source.id === 'bankruptcy').status, 'not_configured');
   assert.deepEqual(report.body.comparisons, []);
 });
 
@@ -54,5 +55,6 @@ test('trusted adapter receives only INN and type; ambiguous report cannot fill f
   const options = await call(undefined, 'admin', '/admin/generator/options'); assert.equal(options.body.verification.configured, true);
   const report = await call({ counterparty: { ...counterparty, phone: '+7 (977) 777-77-77', email: 'client@example.invalid' } });
   assert.deepEqual(input, { inn: counterparty.inn, type: counterparty.type });
-  assert.equal(report.body.sources[0].status, 'ambiguous'); assert.deepEqual(report.body.comparisons, []);
+  assert.equal(report.body.sources[0].status, 'ambiguous'); assert.equal(report.body.sources.find(source => source.id === 'bankruptcy').status, 'not_configured');
+  assert.deepEqual(report.body.comparisons, []);
 });

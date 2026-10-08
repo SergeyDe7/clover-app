@@ -2,7 +2,7 @@ import { useId } from 'react';
 import { officialVerificationUrl, hasVerifiedRegistryField } from '../../shared/contracts/verificationSnapshot.js';
 import './CounterpartyVerification.css';
 
-const SOURCE_NAMES = { fns: 'ФНС — реквизиты', arbitration: 'Арбитражные дела', fssp: 'Исполнительные производства' };
+const SOURCE_NAMES = { fns: 'ФНС — реквизиты', arbitration: 'Арбитражные дела', fssp: 'Исполнительные производства', bankruptcy: 'Банкротство — Федресурс' };
 const FIELD_NAMES = { type: 'Тип контрагента', fullName: 'Полное наименование', inn: 'ИНН', kpp: 'КПП', ogrn: 'ОГРН', ogrnip: 'ОГРНИП', legalAddress: 'Юридический адрес', signerFullName: 'ФИО подписанта', signerPosition: 'Должность подписанта' };
 
 function Provenance({ sourceUrl, checkedAt, sourceId }) {
@@ -28,7 +28,7 @@ export default function CounterpartyVerification({ report, onChoose, busy = fals
       return <article key={id} className={`counterparty-verification__card ${checked ? 'counterparty-verification__card--checked' : ''}`}>
         <h4>{name}</h4><p><strong>{checked ? 'Проверено' : partial ? 'Проверено частично' : 'Не проверено'}</strong>{!checked && !partial && ` — ${reason}`}</p>
         {partial && <><p>Полная проверка не завершена. Не подтверждено: {(source.missingFields || []).map(field => FIELD_NAMES[field] || field).join(', ') || 'часть реквизитов'}.</p><Provenance {...source} sourceId={id} /></>}
-        {checked && <><Provenance {...source} sourceId={id} />{id !== 'fns' && <><p>Записей в ответе источника: {Array.isArray(source.records) ? source.records.length : 0}.</p>{Array.isArray(source.records) && source.records.length > 0 && <ul>{source.records.map((record, index) => <li key={record.id || index}>{record.summary}<Provenance sourceUrl={record.url} sourceId={id} /></li>)}</ul>}<p>Сведения о делах и производствах оцениваются отдельно от реквизитов.</p></>}</>}
+        {checked && <><Provenance {...source} sourceId={id} />{id !== 'fns' && <><p>{id === 'bankruptcy' ? 'Найдено в публичном поиске Федресурса по ИНН' : 'Записей в ответе источника'}: {Number.isSafeInteger(source.total) ? source.total : Array.isArray(source.records) ? source.records.length : 0}.</p>{Array.isArray(source.records) && source.records.length > 0 && <ul>{source.records.map((record, index) => <li key={record.id || index}>{record.summary}<Provenance sourceUrl={record.url} sourceId={id} /></li>)}</ul>}<p>Сведения о делах, производствах и банкротстве оцениваются отдельно от реквизитов. Отсутствие найденных записей не подтверждает надёжность контрагента.</p></>}</>}
       </article>;
     })}</div>}
     {comparisons.length > 0 && <div className="counterparty-verification__comparisons">{comparisons.map(item => {

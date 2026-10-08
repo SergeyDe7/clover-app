@@ -8,6 +8,7 @@ import { createDocumentsRouter } from "./router.js";
 import { createAIProvider } from "./providers.js";
 import { assertDocumentsSchemaReady } from "./schema.js";
 import { createFNSRegistryAdapter } from './fnsRegistry.js';
+import { createPublicBankruptcyAdapter } from './publicBankruptcy.js';
 
 // Disabled by default. Missing schema/config never causes an automatic migration.
 export function createDocumentRuntime({ db, env = process.env, authRequired, findUser, clientLink, audit, publicRoots = [] }) {
@@ -28,7 +29,7 @@ export function createDocumentRuntime({ db, env = process.env, authRequired, fin
       const storage = createDocumentStorage(env.CLOVER_DOCUMENTS_STORAGE_DIR, publicRoots);
       const converter = createDocumentConverter({ executable: env.CLOVER_DOCUMENTS_CONVERTER, tempRoot: path.join(env.CLOVER_DOCUMENTS_STORAGE_DIR, "temp") });
       config.fnsVerificationRequired = env.CLOVER_DOCUMENTS_FNS_REQUIRED !== 'false';
-      const verificationAdapters = env.CLOVER_DOCUMENTS_FNS_ENABLED === 'true' ? { fns: createFNSRegistryAdapter() } : {};
+      const verificationAdapters = { ...(env.CLOVER_DOCUMENTS_FNS_ENABLED === 'true' ? { fns: createFNSRegistryAdapter() } : {}), ...(env.CLOVER_DOCUMENTS_BANKRUPTCY_ENABLED !== 'false' ? { bankruptcy: createPublicBankruptcyAdapter() } : {}) };
       const service = createDocumentService({ repository, storage, converter, verificationAdapters, fnsVerificationRequired:config.fnsVerificationRequired });
       const aiProvider = createAIProvider({
         enabled: env.CLOVER_DOCUMENTS_AI_ENABLED === "true" && env.CLOVER_DOCUMENTS_AI_EXTERNAL_CONSENT === "true",

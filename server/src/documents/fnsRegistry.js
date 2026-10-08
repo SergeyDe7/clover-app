@@ -40,10 +40,24 @@ export function createFnsRegistryAdapter({fetchImpl=globalThis.fetch,now=()=>Dat
       }
       if(result.status==='wait')return unavailable('FNS_TIMEOUT');
       if(!Array.isArray(result.rows)||result.rows.length>100)return unavailable('FNS_RESPONSE_INVALID');
-      if(result.rows.length===0)return unavailable('FNS_NOT_FOUND');
+      const registryRows=[];
+      for(const item of result.rows) {
+        if(!item||typeof item!=='object'||Array.isArray(item))return unavailable('FNS_RESPONSE_INVALID');
+        if(['sprav-fl','sprav-ul'].includes(item.k)) {
+          const noIdentity=['i','n','o'].every(key=>!Object.hasOwn(item,key));
+          const knownMetadata=Object.keys(item).every(key=>['k','cnt','tot','pg','t'].includes(key));
+          const zeroTotals=String(item.cnt)==='0'&&String(item.tot)==='0';
+          const validPage=item.pg===undefined||/^[1-9]\d*$/u.test(String(item.pg));
+          const validToken=item.t===undefined||typeof item.t==='string'&&/^[A-Za-z0-9_-]{1,256}$/u.test(item.t);
+          if(!noIdentity||!knownMetadata||!zeroTotals||!validPage||!validToken)return unavailable('FNS_RESPONSE_INVALID');
+          continue;
+        }
+        registryRows.push(item);
+      }
+      if(registryRows.length===0)return unavailable('FNS_NOT_FOUND');
       // Pagination totals must confirm a unique registry record, not just a unique visible row.
-      if(result.rows.length!==1||String(result.rows[0].cnt)!=='1'||String(result.rows[0].tot)!=='1'||String(result.rows[0].pg)!=='1')return {status:'ambiguous',code:'FNS_AMBIGUOUS'};
-      const row=result.rows[0];if(row.i!==inn)return unavailable('FNS_IDENTITY_MISMATCH');
+      if(registryRows.length!==1||String(registryRows[0].cnt)!=='1'||String(registryRows[0].tot)!=='1'||String(registryRows[0].pg)!=='1')return {status:'ambiguous',code:'FNS_AMBIGUOUS'};
+      const row=registryRows[0];if(row.i!==inn)return unavailable('FNS_IDENTITY_MISMATCH');
       if(!safeText(row.n)||!safeText(row.o))return unavailable('FNS_FACTS_INCOMPLETE');
       const registryType=row.k==='fl'?'ip':row.k==='ul'&&/^ОБЩЕСТВО\s+С\s+ОГРАНИЧЕННОЙ\s+ОТВЕТСТВЕННОСТЬЮ(?:\s|$)/iu.test(row.n)?'ooo':null;
       if(registryType!==type)return unavailable('FNS_TYPE_MISMATCH');
@@ -51,7 +65,13 @@ export function createFnsRegistryAdapter({fetchImpl=globalThis.fetch,now=()=>Dat
       const facts={type,inn,fullName:row.n.trim(),[type==='ip'?'ogrnip':'ogrn']:row.o};
       const evidence={type:JSON.stringify(type==='ip'?{k:row.k}:{k:row.k,n:row.n}),inn:row.i,fullName:row.n,[type==='ip'?'ogrnip':'ogrn']:row.o};
       if(type==='ooo'){if(typeof row.p!=='string'||!/^\d{9}$/u.test(row.p))return unavailable('FNS_FACTS_INCOMPLETE');facts.kpp=row.p;evidence.kpp=row.p;}
-      return {status:type==='ip'?'checked':'partial',identity:{inn,type},facts,evidence,checkedFields:Object.keys(facts),missingFields:type==='ooo'?['legalAddress']:[],source:{id:'fns',url:ORIGIN+'/index.html',checkedAt:new Date(now()).toISOString()}};
+      let registryDetails;
+      if(typeof row.e==='string'&&/^\d{2}\.\d{2}\.\d{4}$/u.test(row.e)) {
+        const [day,month,year]=row.e.split('.');const iso=`${year}-${month}-${day}`;
+        const parsed=new Date(`${iso}T00:00:00Z`);
+        if(Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===iso&&parsed.getTime()<=now())registryDetails={registrationStatus:'terminated',terminationDate:iso,terminationDateEvidence:row.e};
+      }
+      return {status:type==='ip'?'checked':'partial',identity:{inn,type},facts,evidence,checkedFields:Object.keys(facts),missingFields:type==='ooo'?['legalAddress']:[],...(registryDetails?{registryDetails}:{}),source:{id:'fns',url:ORIGIN+'/index.html',checkedAt:new Date(now()).toISOString()}};
     }catch{return unavailable(controller.signal.aborted?'FNS_TIMEOUT':'FNS_SOURCE_UNAVAILABLE');}finally{clearTimeout(timer);}
   }
   return async function fnsRegistry(input,{signal}={}){
