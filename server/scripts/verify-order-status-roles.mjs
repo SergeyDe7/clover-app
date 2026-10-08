@@ -22,6 +22,7 @@ import {
 assert.deepEqual(ORDER_STATUSES, [
   "Новый",
   "Принят",
+  "Ожидание оплаты",
   "Обработан вручную",
   "Собирается",
   "Готов к доставке",
@@ -43,6 +44,7 @@ assert.equal(canTransitionOrderStatus("Доставляется", "Выполн�
 assert.deepEqual(allowedNextOrderStatuses("Новый"), [
   "Новый",
   "Принят",
+  "Ожидание оплаты",
   "Обработан вручную",
   "Собирается",
   "Готов к доставке",
@@ -52,6 +54,7 @@ assert.deepEqual(allowedNextOrderStatuses("Новый"), [
 ]);
 assert.deepEqual(allowedNextOrderStatuses("Принят"), [
   "Принят",
+  "Ожидание оплаты",
   "Обработан вручную",
   "Собирается",
   "Готов к доставке",
