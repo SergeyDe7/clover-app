@@ -1,5 +1,5 @@
 /**
- * Дозаказ в ЛК: позиции из корзины → в последний открытый заказ («Новый»),
+ * Дозаказ в ЛК: позиции из корзины → в выбранный открытый заказ («Новый»),
  * пока менеджер не принял и заказ не ушёл в обмен с 1С.
  */
 import { isCloverDeliveryLine } from "../config/orderConfig.js";
@@ -40,12 +40,16 @@ function orderCreatedMs(order) {
   return Number.isFinite(ms) ? ms : 0;
 }
 
-/** Последний по дате создания заказ, в который ещё можно сделать дозаказ. */
-export function findLatestAddendumOrder(orders, settings = {}) {
-  const list = (Array.isArray(orders) ? orders : [])
+/** Все доступные заказы, начиная с последнего созданного. */
+export function findAddendumOrders(orders, settings = {}) {
+  return (Array.isArray(orders) ? orders : [])
     .filter((order) => canOrderAcceptAddendum(order, settings))
     .sort((a, b) => orderCreatedMs(b) - orderCreatedMs(a));
-  return list[0] || null;
+}
+
+/** Последний по дате создания заказ, в который ещё можно сделать дозаказ. */
+export function findLatestAddendumOrder(orders, settings = {}) {
+  return findAddendumOrders(orders, settings)[0] || null;
 }
 
 /** Слияние товарных позиций (без служебной доставки); qty суммируется по productId+unit. */

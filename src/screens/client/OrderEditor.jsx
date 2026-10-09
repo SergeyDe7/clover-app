@@ -39,7 +39,7 @@ import {
   resolveEffectiveDeliveryTariffForAddress,
   isCloverDeliveryLine,
 } from "../../config/orderConfig";
-import { findLatestAddendumOrder } from "../../shared/orderAddendum";
+import { canOrderAcceptAddendum, findAddendumOrders } from "../../shared/orderAddendum";
 import { productImageSrc } from "../../shared/productPhoto";
 import { ManagerContact } from "./ManagerContact";
 import { DeliveryDateCalendar } from "./DeliveryDateCalendar";
@@ -741,20 +741,22 @@ export function OrderEditor({
   const deliveryDateParts = getDeliveryDateParts(deliveryDate, locale);
 
   // Дозаказ только из нового/повтора: в edit уже «Сохранить изменения».
-  const addendumTarget = useMemo(
+  const addendumTargets = useMemo(
     () =>
-      session.mode === "edit" ? null : findLatestAddendumOrder(orders, settings),
+      session.mode === "edit" ? [] : findAddendumOrders(orders, settings),
     [session.mode, orders, settings]
   );
   const cartHasLines = selectedItems.length > 0 || customItems.length > 0;
-  const canSubmitAddendum = Boolean(addendumTarget) && cartHasLines;
-  const addendumDisabledReason = !addendumTarget
+  const canSubmitAddendum = addendumTargets.length > 0 && cartHasLines;
+  const addendumDisabledReason = !addendumTargets.length
     ? t("client.thereIsNoOrderWithStatus")
     : !cartHasLines
       ? t("client.addProductsToTheCart")
       : "";
 
   const draftSaveLockedRef = useRef(false);
+  const addendumPendingRef = useRef(false);
+  const [addendumPending, setAddendumPending] = useState(false);
 
   useEffect(() => {
     if (draftSaveLockedRef.current) return;
@@ -1397,8 +1399,9 @@ export function OrderEditor({
       });
   };
 
-  const submitAddendum = async () => {
-    if (!canSubmitAddendum || !addendumTarget) {
+  const submitAddendum = async (addendumTarget) => {
+    if (addendumPendingRef.current) return;
+    if (!canSubmitAddendum || !addendumTarget || !canOrderAcceptAddendum(addendumTarget, settings)) {
       await appAlert({
         title: t("auth.addendumUnavailable"),
         message: addendumDisabledReason || t("client.itemsCannotBeAddedToThe"),
@@ -1407,61 +1410,70 @@ export function OrderEditor({
       return;
     }
 
-    const orderLabel = addendumTarget.number
-      ? `№${addendumTarget.number}`
-      : t("client.current");
-    const confirmed = await appConfirm({
-      title: t("client.addendum"),
-      message: cartHasLines
-        ? t("client.order.addendum.confirmWithCount", {
-            count: selectedItems.length + customItems.length,
-            orderLabel,
-          })
-        : t("client.order.addendum.confirm", { orderLabel }),
-      confirmLabel: t("checkout.addToOrder"),
-      cancelLabel: t("shared.modal.cancel"),
-      tone: "info",
-    });
-    if (!confirmed) return;
-
-    draftSaveLockedRef.current = true;
+    addendumPendingRef.current = true;
+    setAddendumPending(true);
     try {
-      if (draftStorageKey) localStorage.removeItem(draftStorageKey);
-    } catch {
-      // ignore
-    }
-    Promise.resolve(
-      onSave({
-        items: selectedItems,
-        customItems,
-        addendumToOrderId: addendumTarget.id,
-      })
-    )
-      .then(() => {
-        setCartSheetOpen(false);
-        setCart({});
-        setCustomItems([]);
-        setQtyDrafts({});
-        setCustomQtyDrafts({});
-      })
-      .catch(() => {
-        draftSaveLockedRef.current = false;
+      const orderLabel = addendumTarget.address || t("client.current");
+      const confirmed = await appConfirm({
+        title: t("client.addendum"),
+        message: cartHasLines
+          ? t("client.order.addendum.confirmWithCount", {
+              count: selectedItems.length + customItems.length,
+              orderLabel,
+            })
+          : t("client.order.addendum.confirm", { orderLabel }),
+        confirmLabel: t("checkout.addToOrder"),
+        cancelLabel: t("shared.modal.cancel"),
+        tone: "info",
       });
+      if (!confirmed) return;
+
+      draftSaveLockedRef.current = true;
+      try {
+        if (draftStorageKey) localStorage.removeItem(draftStorageKey);
+      } catch {
+        // ignore
+      }
+      await Promise.resolve(
+        onSave({
+          items: selectedItems,
+          customItems,
+          addendumToOrderId: addendumTarget.id,
+        })
+      )
+        .then(() => {
+          setCartSheetOpen(false);
+          setCart({});
+          setCustomItems([]);
+          setQtyDrafts({});
+          setCustomQtyDrafts({});
+        })
+        .catch(() => {
+          draftSaveLockedRef.current = false;
+        });
+    } finally {
+      addendumPendingRef.current = false;
+      setAddendumPending(false);
+    }
   };
 
   const addendumButton = (
-    <button
-      className="addendum-order-button"
-      type="button"
-      disabled={!canSubmitAddendum}
-      title={addendumDisabledReason || t("client.order.addendum.titleNumber", { number: addendumTarget?.number || "" })}
-      onClick={() => void submitAddendum()}
-    >
-      {t("client.addendum")}
-      {addendumTarget?.number ? (
-        <small>{t("client.order.addendumInNumber", { number: addendumTarget.number })}</small>
-      ) : null}
-    </button>
+    <div className="addendum-order-buttons" style={{ display: "grid", gap: 8, width: "100%", minWidth: 0 }}>
+      {(addendumTargets.length ? addendumTargets : [null]).map((order) => (
+        <button
+          key={order?.id || "unavailable"}
+          className="addendum-order-button"
+          type="button"
+          disabled={!canSubmitAddendum || addendumPending}
+          title={addendumDisabledReason || order?.address || t("client.addendum")}
+          onClick={() => void submitAddendum(order)}
+          style={{ minWidth: 0, padding: "8px 12px", whiteSpace: "normal", overflowWrap: "anywhere" }}
+        >
+          {t("client.addendum")}
+          {order ? <small>{order.address || t("client.current")}</small> : null}
+        </button>
+      ))}
+    </div>
   );
 
   const catalogBody = (
